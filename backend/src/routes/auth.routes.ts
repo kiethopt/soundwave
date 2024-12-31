@@ -8,6 +8,7 @@ import {
   updateUser,
   deactivateUser,
   activateUser,
+  deleteUser,
 } from '../controllers/auth.controller';
 
 const router = Router();
@@ -23,5 +24,6 @@ router.get('/users/username/:username', getUserByUsername);
 router.put('/users/:username', updateUser);
 router.patch('/users/:username/deactivate', deactivateUser);
 router.patch('/users/:username/activate', activateUser);
+router.delete('/users/:username', deleteUser);
 
 export default router;

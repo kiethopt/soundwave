@@ -254,3 +254,33 @@ export const activateUser = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// Xóa user hoàn toàn (Hard delete)
+export const deleteUser = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { username } = req.params;
+
+    const existingUser = await prisma.user.findUnique({
+      where: { username },
+    });
+
+    if (!existingUser) {
+      res.status(404).json({ message: 'User không tồn tại.' });
+      return;
+    }
+
+    await prisma.user.delete({
+      where: { username },
+    });
+
+    res.json({
+      message: 'Đã xóa tài khoản thành công',
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

@@ -14,8 +14,10 @@
   }
 }
 
-/* body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-} */
+.bg-black-gradient {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.8) 0%,
+    rgba(0, 0, 0, 1) 100%
+  );
+}
