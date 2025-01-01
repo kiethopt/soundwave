@@ -1,9 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { BellIcon, SettingsIcon } from '@/components/ui/Icons';
+import {
+  BellIcon,
+  HomeIcon,
+  SearchIcon,
+  SettingsIcon,
+} from '@/components/ui/Icons';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface UserData {
@@ -16,10 +21,13 @@ interface UserData {
 
 export default function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isActive = (path: string) => pathname === path;
 
   // Đóng dropdown khi click ra ngoài
   useEffect(() => {
@@ -54,6 +62,13 @@ export default function Header() {
     checkAuth();
   }, []);
 
+  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('userData');
@@ -61,27 +76,55 @@ export default function Header() {
     router.push('/login');
   };
 
-  const handleLogin = () => {
-    router.push('/login');
-  };
-
-  const handleSignup = () => {
-    router.push('/register');
-  };
-
   return (
     <header className="h-16 bg-[#111111] flex items-center justify-between px-6">
-      {/* Left side */}
-      <div className="flex items-center gap-4">
-        {/* Add navigation arrows here if needed */}
+      {/* Left side - Navigation */}
+      <div className="flex items-center gap-6">
+        <Link
+          href="/"
+          className={`flex items-center gap-2 text-sm font-medium ${
+            isActive('/') ? 'text-white' : 'text-white/70 hover:text-white'
+          }`}
+        >
+          <HomeIcon className="w-5 h-5" />
+          <span>Home</span>
+        </Link>
+
+        <Link
+          href="/discover"
+          className={`flex items-center gap-2 text-sm font-medium ${
+            isActive('/discover')
+              ? 'text-white'
+              : 'text-white/70 hover:text-white'
+          }`}
+        >
+          <span>Discover</span>
+        </Link>
       </div>
 
-      {/* Right side */}
+      {/* Center - Search */}
+      <div className="flex-1 max-w-[400px] px-4">
+        <form onSubmit={handleSearch} className="relative">
+          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/40" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search"
+            className="w-full bg-white/10 text-white rounded-full py-2 pl-10 pr-4 text-sm placeholder:text-white/40 focus:outline-none focus:bg-white/20"
+          />
+        </form>
+      </div>
+
+      {/* Right side - User controls */}
       <div className="flex items-center gap-4">
         {isAuthenticated ? (
           <>
             <button className="p-2 hover:bg-white/10 rounded-full">
               <BellIcon className="w-5 h-5 text-white" />
+            </button>
+            <button className="p-2 hover:bg-white/10 rounded-full">
+              <SettingsIcon className="w-5 h-5 text-white" />
             </button>
             <div className="relative" ref={dropdownRef}>
               <button
@@ -139,13 +182,13 @@ export default function Header() {
         ) : (
           <div className="flex items-center gap-4">
             <button
-              onClick={handleSignup}
+              onClick={() => router.push('/register')}
               className="text-white/70 hover:text-white text-sm font-medium"
             >
               Sign up
             </button>
             <button
-              onClick={handleLogin}
+              onClick={() => router.push('/login')}
               className="bg-white text-black px-6 py-2 rounded-full text-sm font-medium hover:bg-white/90"
             >
               Log in
