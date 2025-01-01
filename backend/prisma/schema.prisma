@@ -24,9 +24,57 @@ model User {
   isActive Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  albums Album[]
+  tracks Track[]
 
   @@index([email])
   @@index([username])
+}
+
+model Album {
+  id String @id @default(cuid())
+  title String
+  artist String
+  coverUrl String?
+  releaseDate DateTime
+  trackCount Int
+  tracks Track[]
+  uploadedBy User @relation(fields: [userId], references: [id])
+  userId String
+  discordMessageId String @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive Boolean @default(true)
+
+  @@index([title])
+  @@index([artist])
+  @@index([userId])
+}
+
+model Track {
+  id String @id @default(cuid())
+  title String
+  artist String
+  featuredArtists String?
+  duration Int
+  releaseDate DateTime
+  trackNumber Int?
+  coverUrl String?
+  audioUrl String
+  audioMessageId String @unique
+  album Album? @relation(fields: [albumId], references: [id])
+  albumId String?
+  uploadedBy User @relation(fields: [userId], references: [id])
+  userId String
+  discordMessageId String @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive Boolean @default(true)
+
+  @@index([title])
+  @@index([artist])
+  @@index([albumId])
+  @@index([userId])
 }
 
 enum Role {

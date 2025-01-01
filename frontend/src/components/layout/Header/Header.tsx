@@ -132,7 +132,7 @@ export default function Header() {
                 onClick={() => setShowDropdown(!showDropdown)}
               >
                 <Image
-                  src={userData?.avatar || '/default-avatar.png'}
+                  src={userData?.avatar || '/images/default-avatar.jpg'}
                   alt="User avatar"
                   width={32}
                   height={32}

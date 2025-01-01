@@ -1,5 +1,11 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
+import jwt from 'jsonwebtoken';
+import { isAdmin } from '../middleware/auth';
+import {
+  deleteAllDiscordMessages,
+  sendUserNotification,
+} from '../services/discord.service';
 
 const userSelect = {
   id: true,
@@ -13,9 +19,13 @@ const userSelect = {
   updatedAt: true,
 } as const;
 
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is not defined in environment variables');
+}
+
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, username, password, name } = req.body;
+    const { email, username, password, name, isAdmin } = req.body;
 
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -34,8 +44,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         username,
         password,
         name,
+        role: isAdmin ? 'ADMIN' : 'USER',
       },
+      select: userSelect,
     });
+
+    // Gửi thông báo đến Discord
+    await sendUserNotification(username);
 
     res.status(201).json({
       message: 'User mới đã được tạo thành công',
@@ -58,6 +73,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     const user = await prisma.user.findUnique({
       where: { email },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        password: true,
+        name: true,
+        avatar: true,
+        role: true,
+        isActive: true,
+      },
     });
 
     if (!user) {
@@ -73,11 +98,18 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Generate JWT token
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, {
+      expiresIn: '24h',
+    });
+
+    // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
 
     res.json({
-      message: 'Login successful',
+      message: 'Đăng nhập thành công',
       user: userWithoutPassword,
+      token,
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -281,6 +313,37 @@ export const deleteUser = async (
     });
   } catch (error) {
     console.error('Delete user error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Xóa sạch dữ liệu
+export const purgeAllData = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    // Xóa tất cả tracks
+    await prisma.track.deleteMany();
+
+    // Xóa tất cả albums
+    await prisma.album.deleteMany();
+
+    // Xóa tất cả users ngoại trừ admin hiện tại
+    await prisma.user.deleteMany({
+      where: {
+        NOT: {
+          id: req.user?.id,
+        },
+      },
+    });
+
+    // Xóa messages trên Discord
+    await deleteAllDiscordMessages();
+
+    res.json({ message: 'All data purged successfully' });
+  } catch (error) {
+    console.error('Purge data error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

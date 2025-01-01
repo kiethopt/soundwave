@@ -114,5 +114,6 @@
   "exclude": [
     "node_modules", // Không compile node_modules
     "dist" // Không compile thư mục dist
-  ]
+  ],
+  "typeRoots": ["./src/types", "./node_modules/@types"]
 }

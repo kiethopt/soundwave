@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { API_URL } from '@/utils/config';
+import { AuthResponse } from '@/types';
 
 interface LoginFormData {
   email: string;
@@ -18,6 +19,7 @@ interface LoginResponse {
     email: string;
     username: string;
     name: string;
+    role: 'USER' | 'ADMIN';
   };
 }
 
@@ -40,8 +42,7 @@ export default function LoginPage() {
         body: JSON.stringify(formData),
       });
 
-      const data = (await response.json()) as LoginResponse;
-
+      const data = (await response.json()) as AuthResponse;
       if (!response.ok) {
         throw new Error(data.message);
       }
@@ -50,14 +51,14 @@ export default function LoginPage() {
       localStorage.setItem('userToken', data.token);
       localStorage.setItem('userData', JSON.stringify(data.user));
 
-      // Handle successful login
-      router.push('/');
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
+      // Redirect based on role
+      if (data.user.role === 'ADMIN') {
+        router.push('/admin');
       } else {
-        setError('An unexpected error occurred');
+        router.push('/');
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 

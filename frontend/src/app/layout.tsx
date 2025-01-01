@@ -15,18 +15,16 @@ export default function RootLayout({
     pathname?.includes('/login') || pathname?.includes('/register');
 
   return (
-    <html lang="en" suppressHydrationWarning={true}>
+    <html lang="vi" suppressHydrationWarning={true}>
       <body className={isAuthPage ? '' : 'bg-[#222222]'}>
         {isAuthPage ? (
-          // Auth layout
           <main>{children}</main>
         ) : (
-          // Main app layout
-          <div className="flex h-screen text-white">
+          <div className="flex flex-col md:flex-row h-screen text-white">
             <Sidebar />
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0">
               <Header />
-              <main className="flex-1 overflow-y-auto p-6">{children}</main>
+              <main className="flex-1 overflow-y-auto p-2">{children}</main>
             </div>
           </div>
         )}
