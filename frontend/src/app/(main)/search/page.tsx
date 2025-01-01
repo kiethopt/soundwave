@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SearchIcon } from '@/components/ui/Icons';
+// import { SearchIcon } from '@/components/ui/Icons';
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
 interface SearchResult {
   id: string;
@@ -12,7 +13,7 @@ interface SearchResult {
   imageUrl: string;
 }
 
-export default function SearchPage() {
+function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -87,5 +88,13 @@ export default function SearchPage() {
         </p>
       )}
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SearchContent />
+    </Suspense>
   );
 }
