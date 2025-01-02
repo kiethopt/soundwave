@@ -41,7 +41,8 @@ export const createTrack = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { title, artist, featuredArtists, duration, releaseDate } = req.body;
+    const { title, artist, featuredArtists, duration, releaseDate, albumId } =
+      req.body;
     const files = req.files as
       | { [fieldname: string]: Express.Multer.File[] }
       | undefined;
@@ -59,25 +60,36 @@ export const createTrack = async (
       return;
     }
 
+    // Lấy coverUrl từ album nếu có
+    let albumData = null;
+    if (albumId) {
+      albumData = await prisma.album.findUnique({
+        where: { id: albumId },
+        select: { coverUrl: true },
+      });
+    }
+
     // Upload audio file
-    const { messageId: audioMessageId, url: audioUrl } = await uploadTrack(
+    const audioUpload = await uploadTrack(
       audioFile.buffer,
       audioFile.originalname,
       true,
-      false // isAlbumTrack = false cho single tracks
+      !!albumId
     );
 
-    // Upload cover if provided
-    let coverUrl;
+    // Upload cover if provided or use album cover
+    let coverUrl: string | undefined;
     if (coverFile) {
-      const { url } = await uploadTrack(
+      const coverUpload = await uploadTrack(
         coverFile.buffer,
         coverFile.originalname,
-        false, // isAudio = false
-        false, // isAlbumTrack = false
-        true // isMetadata = true (để lưu vào kênh audio-metadata)
+        false,
+        false,
+        true
       );
-      coverUrl = url;
+      coverUrl = coverUpload.url;
+    } else if (albumData?.coverUrl) {
+      coverUrl = albumData.coverUrl;
     }
 
     const metadata: TrackMetadata = {
@@ -86,10 +98,11 @@ export const createTrack = async (
       featuredArtists: featuredArtists || null,
       duration: parseInt(duration),
       releaseDate: new Date(releaseDate).toISOString().split('T')[0],
+      albumId: albumId || null,
       type: 'track',
     };
 
-    const { messageId: metadataMessageId } = await saveMetadata(metadata);
+    const metadataUpload = await saveMetadata(metadata);
 
     const track = await prisma.track.create({
       data: {
@@ -99,12 +112,13 @@ export const createTrack = async (
         duration: parseInt(duration),
         releaseDate: new Date(releaseDate),
         coverUrl,
-        audioUrl,
-        audioMessageId,
+        audioUrl: audioUpload.url,
+        audioMessageId: audioUpload.messageId,
+        albumId: albumId || undefined,
         uploadedBy: {
           connect: { id: user.id },
         },
-        discordMessageId: metadataMessageId,
+        discordMessageId: metadataUpload.messageId,
       },
       select: trackSelect,
     });
@@ -128,6 +142,30 @@ export const createTrack = async (
 };
 
 // Lấy tất cả tracks
+// export const getAllTracks = async (
+//   req: Request,
+//   res: Response
+// ): Promise<void> => {
+//   try {
+//     const tracks = await prisma.track.findMany({
+//       where: {
+//         isActive: true,
+//         albumId: null, // Chỉ lấy tracks không thuộc album nào
+//       },
+//       select: trackSelect,
+//       orderBy: { createdAt: 'desc' },
+//     });
+
+//     res.json(tracks);
+//   } catch (error) {
+//     console.error('Get tracks error:', error);
+//     res.status(500).json({
+//       message: 'Internal server error',
+//       error: process.env.NODE_ENV === 'development' ? String(error) : undefined,
+//     });
+//   }
+// };
+
 export const getAllTracks = async (
   req: Request,
   res: Response
@@ -136,13 +174,19 @@ export const getAllTracks = async (
     const tracks = await prisma.track.findMany({
       where: {
         isActive: true,
-        albumId: null, // Chỉ lấy tracks không thuộc album nào
+        albumId: null, // Lấy tracks không thuộc album nào
       },
       select: trackSelect,
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json(tracks);
+    // Map lại kết quả để sử dụng coverUrl của album nếu track không có
+    const mappedTracks = tracks.map((track) => ({
+      ...track,
+      coverUrl: track.coverUrl || track.album?.coverUrl || null,
+    }));
+
+    res.json(mappedTracks);
   } catch (error) {
     console.error('Get tracks error:', error);
     res.status(500).json({
@@ -260,12 +304,6 @@ export const searchTrack = async (
 ): Promise<void> => {
   try {
     const { q } = req.query;
-
-    if (!q) {
-      res.status(400).json({ message: 'Query is required' });
-      return;
-    }
-
     const tracks = await prisma.track.findMany({
       where: {
         isActive: true,
@@ -284,12 +322,27 @@ export const searchTrack = async (
           },
         ],
       },
-      select: trackSelect,
+      select: {
+        ...trackSelect,
+        album: {
+          select: {
+            id: true,
+            title: true,
+            coverUrl: true,
+          },
+        },
+      },
     });
 
-    res.json(tracks);
+    // Map lại kết quả để sử dụng coverUrl của album nếu track không có
+    const mappedTracks = tracks.map((track) => ({
+      ...track,
+      coverUrl: track.coverUrl || track.album?.coverUrl || null,
+    }));
+
+    res.json(mappedTracks);
   } catch (error) {
     console.error('Search track error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};
