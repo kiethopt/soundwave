@@ -1,11 +1,12 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Track } from '@/types';
 import { api } from '@/utils/api';
+import { useState, useEffect } from 'react';
 
-// Loading UI
+// Loading UI component
 function LoadingUI() {
   return (
     <div className="p-6">
@@ -25,8 +26,10 @@ function LoadingUI() {
   );
 }
 
-// Component hiển thị kết quả tìm kiếm
-function SearchResults({ query }: { query: string | null }) {
+// Search Results Component
+function SearchContent() {
+  const searchParams = useSearchParams();
+  const query = searchParams.get('q');
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -61,7 +64,7 @@ function SearchResults({ query }: { query: string | null }) {
           {searchResults.map((track) => (
             <div key={track.id} className="bg-white/5 p-4 rounded-lg">
               <img
-                src={track.coverUrl || '/placeholder.jpg'}
+                src={track.coverUrl || '/images/default-avatar.png'}
                 alt={track.title}
                 className="w-full aspect-square object-cover rounded-md mb-4"
               />
@@ -79,14 +82,11 @@ function SearchResults({ query }: { query: string | null }) {
   );
 }
 
-// Component chính
+// Main Page Component
 export default function SearchPage() {
-  const searchParams = useSearchParams();
-  const query = searchParams.get('q');
-
   return (
     <Suspense fallback={<LoadingUI />}>
-      <SearchResults query={query} />
+      <SearchContent />
     </Suspense>
   );
 }
