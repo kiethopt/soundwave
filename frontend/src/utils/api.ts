@@ -34,4 +34,7 @@ export const api = {
     resetPassword: (username: string) =>
       `${API_BASE}/api/auth/users/${username}/reset-password`,
   },
+  sse: {
+    url: `${API_BASE}/api/auth/sse`,
+  },
 };

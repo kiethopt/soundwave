@@ -5,6 +5,7 @@ import jwt, {
   TokenExpiredError,
 } from 'jsonwebtoken';
 import prisma from '../config/db';
+import { clients } from '..';
 
 interface JwtPayload {
   userId: string;
@@ -29,14 +30,31 @@ export const isAuthenticated = async (
       const user = await prisma.user.findUnique({
         where: {
           id: decoded.userId,
-          isActive: true, // Chỉ cho phép user đang active
         },
       });
 
       if (!user) {
-        res
-          .status(401)
-          .json({ message: 'User không tồn tại hoặc đã bị vô hiệu hóa' });
+        res.status(401).json({ message: 'User không tồn tại' });
+        return;
+      }
+
+      if (!user.isActive) {
+        // Gửi event force logout
+        const logoutEvent = {
+          type: 'FORCE_LOGOUT',
+          userId: decoded.userId,
+          message: 'Tài khoản đã bị vô hiệu hóa',
+          timestamp: new Date().toISOString(),
+        };
+
+        clients.forEach((client) => {
+          client(logoutEvent);
+        });
+
+        res.status(401).json({
+          message: 'Tài khoản đã bị vô hiệu hóa',
+          forceLogout: true,
+        });
         return;
       }
 
@@ -47,15 +65,7 @@ export const isAuthenticated = async (
         res.status(401).json({ message: 'Token đã hết hạn' });
         return;
       }
-      if (jwtError instanceof JsonWebTokenError) {
-        res.status(401).json({ message: 'Token không hợp lệ' });
-        return;
-      }
-      if (jwtError instanceof NotBeforeError) {
-        res.status(401).json({ message: 'Token chưa có hiệu lực' });
-        return;
-      }
-      throw jwtError; // Ném các lỗi khác để error handler xử lý
+      throw jwtError;
     }
   } catch (error) {
     next(error);
@@ -74,5 +84,30 @@ export const isAdmin = async (
     next();
   } catch (error) {
     return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const checkUserActive = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user?.id },
+      select: { isActive: true },
+    });
+
+    if (!user?.isActive) {
+      res.status(401).json({
+        message: 'Tài khoản đã bị vô hiệu hóa',
+        forceLogout: true,
+      });
+      return;
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
 };

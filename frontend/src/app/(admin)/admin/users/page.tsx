@@ -41,13 +41,11 @@ export default function AdminUsers() {
       const data = await response.json();
       const usersData = Array.isArray(data) ? data : [];
       setUsers(usersData);
-      return usersData;
     } catch (error) {
       console.error('Error fetching users:', error);
       setError(
         error instanceof Error ? error.message : 'Failed to fetch users'
       );
-      return [];
     } finally {
       setLoading(false);
     }
@@ -86,24 +84,28 @@ export default function AdminUsers() {
       });
 
       if (!response.ok) {
-        // Revert the optimistic update if the request fails
-        setUsers(
-          users.map((user) => {
-            if (user.username === username) {
-              return {
-                ...user,
-                isActive: action !== 'activate',
-              };
-            }
-            return user;
-          })
-        );
         throw new Error(`Failed to ${action} user`);
       }
+
+      // Refetch users after successful action
+      await fetchUsers();
     } catch (error) {
       console.error(`Error ${action}ing user:`, error);
       setError(
         error instanceof Error ? error.message : `Failed to ${action} user`
+      );
+
+      // Revert the optimistic update if the request fails
+      setUsers(
+        users.map((user) => {
+          if (user.username === username) {
+            return {
+              ...user,
+              isActive: user.isActive,
+            };
+          }
+          return user;
+        })
       );
     } finally {
       setActionLoading(null);
@@ -125,7 +127,8 @@ export default function AdminUsers() {
         throw new Error('Failed to reset password');
       }
 
-      // Show success message without reloading the table
+      // Refetch users after successful action
+      await fetchUsers();
       setError(null);
     } catch (error) {
       console.error('Error resetting password:', error);
@@ -154,18 +157,20 @@ export default function AdminUsers() {
       });
 
       if (!response.ok) {
-        // Revert the optimistic update if the request fails
-        const originalUsers = await fetchUsers();
-        setUsers(originalUsers);
         throw new Error('Failed to delete user');
       }
 
+      // Refetch users after successful action
+      await fetchUsers();
       setError(null);
     } catch (error) {
       console.error('Error deleting user:', error);
       setError(
         error instanceof Error ? error.message : 'Failed to delete user'
       );
+
+      // Revert the optimistic update if the request fails
+      fetchUsers();
     } finally {
       setActionLoading(null);
     }
@@ -302,21 +307,30 @@ export default function AdminUsers() {
                         }
                         disabled={actionLoading === user.username}
                       >
-                        <Power className="mr-2 h-4 w-4" />
-                        <span>
-                          {actionLoading === user.username
-                            ? 'Processing...'
-                            : user.isActive
-                            ? 'Deactivate'
-                            : 'Activate'}
-                        </span>
+                        {actionLoading === user.username &&
+                        user.username === user.username ? (
+                          <span className="animate-pulse">Processing...</span>
+                        ) : (
+                          <>
+                            <Power className="mr-2 h-4 w-4" />
+                            <span>
+                              {user.isActive ? 'Deactivate' : 'Activate'}
+                            </span>
+                          </>
+                        )}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => handleResetPassword(user.username)}
                         disabled={actionLoading === user.username}
                       >
-                        <Key className="mr-2 h-4 w-4" />
-                        <span>Reset Password</span>
+                        {actionLoading === user.username ? (
+                          <span className="animate-pulse">Processing...</span>
+                        ) : (
+                          <>
+                            <Key className="mr-2 h-4 w-4" />
+                            <span>Reset Password</span>
+                          </>
+                        )}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -324,8 +338,14 @@ export default function AdminUsers() {
                         disabled={actionLoading === user.username}
                         className="text-red-600"
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        <span>Delete</span>
+                        {actionLoading === user.username ? (
+                          <span className="animate-pulse">Processing...</span>
+                        ) : (
+                          <>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Delete</span>
+                          </>
+                        )}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

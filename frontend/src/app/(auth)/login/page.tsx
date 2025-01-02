@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { API_URL } from '@/utils/config';
 import { AuthResponse } from '@/types';
@@ -11,25 +11,21 @@ interface LoginFormData {
   password: string;
 }
 
-interface LoginResponse {
-  message: string;
-  token: string;
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    name: string;
-    role: 'USER' | 'ADMIN';
-  };
-}
-
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: '',
   });
   const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    const message = searchParams.get('message');
+    if (message === 'account_deactivated') {
+      setError('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin.');
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -128,5 +124,13 @@ export default function LoginPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

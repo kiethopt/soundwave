@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import jwt from 'jsonwebtoken';
-import { isAdmin } from '../middleware/auth';
 import {
   deleteAllDiscordMessages,
   sendUserNotification,
 } from '../services/discord.service';
+import { clients } from '../index';
 
 const userSelect = {
   id: true,
@@ -229,6 +229,11 @@ export const deactivateUser = async (
 
     const existingUser = await prisma.user.findUnique({
       where: { username },
+      select: {
+        id: true,
+        username: true,
+        isActive: true,
+      },
     });
 
     if (!existingUser) {
@@ -242,6 +247,18 @@ export const deactivateUser = async (
         isActive: false,
         updatedAt: new Date(),
       },
+    });
+
+    // Gửi event force logout ngay lập tức
+    const logoutEvent = {
+      type: 'FORCE_LOGOUT',
+      userId: existingUser.id,
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log('Broadcasting logout event:', logoutEvent);
+    clients.forEach((client) => {
+      client(logoutEvent);
     });
 
     res.json({
