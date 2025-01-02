@@ -7,6 +7,7 @@ export const api = {
     create: () => `${API_BASE}/api/tracks`,
     update: (id: string) => `${API_BASE}/api/tracks/${id}`,
     delete: (id: string) => `${API_BASE}/api/tracks/${id}`,
+    search: (query: string) => `${API_BASE}/api/tracks/search?q=${query}`,
   },
   albums: {
     getAll: () => `${API_BASE}/api/albums`,

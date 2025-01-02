@@ -1,31 +1,55 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-// import { SearchIcon } from '@/components/ui/Icons';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
-import { Track, Album } from '@/types/index';
+import { Track } from '@/types';
+import { api } from '@/utils/api';
 
+// Loading UI
+function LoadingUI() {
+  return (
+    <div className="p-6">
+      <div className="animate-pulse">
+        <div className="h-8 bg-white/5 rounded w-1/4 mb-6"></div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-white/5 p-4 rounded-lg">
+              <div className="bg-white/10 aspect-square rounded-md mb-4"></div>
+              <div className="h-4 bg-white/10 rounded w-3/4 mb-2"></div>
+              <div className="h-3 bg-white/10 rounded w-1/2"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-function SearchContent() {
-  const searchParams = useSearchParams();
-  const query = searchParams.get('q');
+// Component hiển thị kết quả tìm kiếm
+function SearchResults({ query }: { query: string | null }) {
   const [searchResults, setSearchResults] = useState<Track[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (query) {
-      // Thực hiện tìm kiếm khi query thay đổi
-      performSearchTrack(query);
+    async function performSearch() {
+      if (!query) return;
+
+      setIsLoading(true);
+      try {
+        const response = await fetch(api.tracks.search(query));
+        const data = await response.json();
+        setSearchResults(data);
+      } catch (error) {
+        console.error('Search error:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
+
+    performSearch();
   }, [query]);
 
-  const performSearchTrack = async (searchQuery: string) => {
-    // Giả lập API call
-    const response = await fetch(`http://localhost:10000/api/tracks/search?q=${searchQuery}`);
-    const data = await response.json();
-
-    setSearchResults(data);
-  };
+  if (isLoading) return <LoadingUI />;
 
   return (
     <div className="p-6">
@@ -34,17 +58,15 @@ function SearchContent() {
       </h1>
       {searchResults.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {searchResults.map((result) => (
-            <div key={result.id} className="bg-white/5 p-4 rounded-lg">
+          {searchResults.map((track) => (
+            <div key={track.id} className="bg-white/5 p-4 rounded-lg">
               <img
-                src={result.coverUrl}
-                alt={result.title}
+                src={track.coverUrl || '/placeholder.jpg'}
+                alt={track.title}
                 className="w-full aspect-square object-cover rounded-md mb-4"
               />
-              <h3 className="text-white font-medium">{result.title}</h3>
-              <p className="text-white/60 text-sm">
-                {result.artist}
-              </p>
+              <h3 className="text-white font-medium">{track.title}</h3>
+              <p className="text-white/60 text-sm">{track.artist}</p>
             </div>
           ))}
         </div>
@@ -57,10 +79,14 @@ function SearchContent() {
   );
 }
 
+// Component chính
 export default function SearchPage() {
+  const searchParams = useSearchParams();
+  const query = searchParams.get('q');
+
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <SearchContent />
+    <Suspense fallback={<LoadingUI />}>
+      <SearchResults query={query} />
     </Suspense>
   );
 }
