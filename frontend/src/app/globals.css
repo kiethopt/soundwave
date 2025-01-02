@@ -2,22 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 .bg-black-gradient {
   background: linear-gradient(
     180deg,
     rgba(0, 0, 0, 0.8) 0%,
     rgba(0, 0, 0, 1) 100%
   );
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+  }
 }
