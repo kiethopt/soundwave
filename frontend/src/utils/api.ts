@@ -18,5 +18,6 @@ export const api = {
     uploadTracks: (id: string) => `${API_BASE}/api/albums/${id}/tracks`,
     reorderTracks: (id: string) =>
       `${API_BASE}/api/albums/${id}/tracks/reorder`,
+    search: (query: string) => `${API_BASE}/api/albums/search?q=${query}`,
   },
 };

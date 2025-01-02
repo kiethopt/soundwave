@@ -2,7 +2,7 @@
 
 import { Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Track } from '@/types';
+import { Track, Album } from '@/types';
 import { api } from '@/utils/api';
 import { useState, useEffect } from 'react';
 import { Pause, Play } from '@/components/ui/Icons';
@@ -31,7 +31,8 @@ function LoadingUI() {
 function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q');
-  const [searchResults, setSearchResults] = useState<Track[]>([]);
+  const [trackResults, setTrackResults] = useState<Track[]>([]);
+  const [albumResults, setAlbumResults] = useState<Album[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Nghe nhạc
@@ -89,9 +90,14 @@ function SearchContent() {
 
       setIsLoading(true);
       try {
-        const response = await fetch(api.tracks.search(query));
-        const data = await response.json();
-        setSearchResults(data);
+        const trackResponse = await fetch(api.tracks.search(query));
+        const albumResponse = await fetch(api.albums.search(query));
+        
+        const trackData = await trackResponse.json();
+        const albumData = await albumResponse.json();
+
+        setTrackResults(trackData);
+        setAlbumResults(albumData);
       } catch (error) {
         console.error('Search error:', error);
       } finally {
@@ -106,43 +112,79 @@ function SearchContent() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-white mb-6">
+      <h1 className="text-2xl font-bold text-white mb-4">
         Search Results for "{query}"
       </h1>
-      {searchResults.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {searchResults.map((track) => (
-            <div
-              key={track.id}
-              className="bg-white/5 p-4 rounded-lg group relative"
-            >
-              <div className="relative">
-                <img
-                  src={track.coverUrl || '/images/default-avatar.png'}
-                  alt={track.title}
-                  className="w-full aspect-square object-cover rounded-md mb-4"
-                />
-                <button
-                  onClick={() => handlePlayPause(track)}
-                  className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  {currentlyPlaying === track.id ? (
-                    <Pause className="w-6 h-6 text-white" />
-                  ) : (
-                    <Play className="w-6 h-6 text-white" />
-                  )}
-                </button>
+
+      <div className='flex flex-col gap-4'>
+        <h1 className="text-xl font-bold text-white mt-12">
+          Albums
+        </h1>
+        {albumResults.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {albumResults.map((album) => (
+              <div
+                key={album.id}
+                className="bg-white/5 p-4 rounded-lg group relative"
+              >
+                <div className="relative">
+                  <img
+                    src={album.coverUrl || '/images/default-avatar.png'}
+                    alt={album.title}
+                    className="w-full aspect-square object-cover rounded-md mb-4"
+                  />
+                </div>
+                <h3 className="text-white font-medium">{album.title}</h3>
+                <p className="text-white/60 text-sm">{album.artist}</p>
               </div>
-              <h3 className="text-white font-medium">{track.title}</h3>
-              <p className="text-white/60 text-sm">{track.artist}</p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-white/60">
-          No results found for "{query}". Try searching for something else.
-        </p>
-      )}
+            ))}
+          </div>
+        ) : (
+          <p className="text-white/60">
+            No album found for "{query}". Try searching for something else.
+          </p>
+        )}
+      </div>
+
+      <div className='flex flex-col gap-4'>
+        <h1 className="text-xl font-bold text-white mt-8">
+          Tracks
+        </h1>
+        {trackResults.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {trackResults.map((track) => (
+              <div
+                key={track.id}
+                className="bg-white/5 p-4 rounded-lg group relative"
+              >
+                <div className="relative">
+                  <img
+                    src={track.coverUrl || '/images/default-avatar.png'}
+                    alt={track.title}
+                    className="w-full aspect-square object-cover rounded-md mb-4"
+                  />
+                  <button
+                    onClick={() => handlePlayPause(track)}
+                    className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    {currentlyPlaying === track.id ? (
+                      <Pause className="w-6 h-6 text-white" />
+                    ) : (
+                      <Play className="w-6 h-6 text-white" />
+                    )}
+                  </button>
+                </div>
+                <h3 className="text-white font-medium">{track.title}</h3>
+                <p className="text-white/60 text-sm">{track.artist}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-white/60">
+            No tracks found for "{query}". Try searching for something else.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

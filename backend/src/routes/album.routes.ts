@@ -9,6 +9,7 @@ import {
   reorderAlbumTracks,
   updateAlbum,
   uploadAlbumTracks,
+  searchAlbum,
 } from '../controllers/album.controller';
 import { isAdmin, isAuthenticated } from '../middleware/auth';
 import multer from 'multer';
@@ -49,6 +50,7 @@ const uploadCover = multer({
 
 // Public routes
 router.get('/albums', getAllAlbums);
+router.get('/albums/search', searchAlbum);
 router.get('/albums/:id', getAlbumById);
 router.get('/albums/artist/:artist', getAlbumsByArtist);
 router.get('/albums/:id/tracks', getAlbumTracks);

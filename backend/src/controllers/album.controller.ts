@@ -473,3 +473,43 @@ export const deleteAlbum = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+export const searchAlbum = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { q } = req.query;
+
+    if (!q) {
+      res.status(400).json({ message: 'Query is required' });
+      return;
+    }
+
+    const albums = await prisma.album.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          {
+            title: {
+              contains: String(q),
+              mode: 'insensitive',
+            },
+          },
+          {
+            artist: {
+              contains: String(q),
+              mode: 'insensitive',
+            },
+          },
+        ],
+      },
+      select: albumSelect,
+    });
+
+    res.json(albums);
+  } catch (error) {
+    console.error('Search album error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
