@@ -20,4 +20,18 @@ export const api = {
       `${API_BASE}/api/albums/${id}/tracks/reorder`,
     search: (query: string) => `${API_BASE}/api/albums/search?q=${query}`,
   },
+  users: {
+    getAll: () => `${API_BASE}/api/auth/users`,
+    getById: (id: string) => `${API_BASE}/api/auth/users/id/${id}`,
+    getByUsername: (username: string) =>
+      `${API_BASE}/api/auth/users/username/${username}`,
+    update: (username: string) => `${API_BASE}/api/auth/users/${username}`,
+    deactivate: (username: string) =>
+      `${API_BASE}/api/auth/users/${username}/deactivate`,
+    activate: (username: string) =>
+      `${API_BASE}/api/auth/users/${username}/activate`,
+    delete: (username: string) => `${API_BASE}/api/auth/users/${username}`,
+    resetPassword: (username: string) =>
+      `${API_BASE}/api/auth/users/${username}/reset-password`,
+  },
 };
