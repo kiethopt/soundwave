@@ -54,14 +54,20 @@ router.delete('/purge-data', isAuthenticated, isAdmin, purgeAllData);
 
 // SSE endpoint
 router.get('/sse', (req, res) => {
-  // Thêm CORS headers
+  // Cập nhật CORS headers cho SSE
+  const allowedOrigins = [
+    process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000',
+    'https://music-website-dl1.vercel.app',
+  ];
+
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader(
-    'Access-Control-Allow-Origin',
-    process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000'
-  );
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Flush headers ngay lập tức

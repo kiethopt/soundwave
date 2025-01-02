@@ -1,6 +1,12 @@
 -- CreateEnum
 CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
 
+-- CreateEnum
+CREATE TYPE "HistoryType" AS ENUM ('SEARCH', 'PLAY');
+
+-- CreateEnum
+CREATE TYPE "PlaylistPrivacy" AS ENUM ('PUBLIC', 'PRIVATE');
+
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
@@ -52,8 +58,46 @@ CREATE TABLE "Track" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "playCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "Track_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "History" (
+    "id" TEXT NOT NULL,
+    "type" "HistoryType" NOT NULL,
+    "query" TEXT,
+    "trackId" TEXT,
+    "userId" TEXT NOT NULL,
+    "duration" INTEGER,
+    "completed" BOOLEAN,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "History_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Playlist" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "coverUrl" TEXT,
+    "privacy" "PlaylistPrivacy" NOT NULL DEFAULT 'PRIVATE',
+    "userId" TEXT NOT NULL,
+    "isAIGenerated" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Playlist_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "_PlaylistToTrack" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_PlaylistToTrack_AB_pkey" PRIMARY KEY ("A","B")
 );
 
 -- CreateIndex
@@ -98,6 +142,30 @@ CREATE INDEX "Track_albumId_idx" ON "Track"("albumId");
 -- CreateIndex
 CREATE INDEX "Track_userId_idx" ON "Track"("userId");
 
+-- CreateIndex
+CREATE INDEX "Track_playCount_idx" ON "Track"("playCount");
+
+-- CreateIndex
+CREATE INDEX "History_userId_idx" ON "History"("userId");
+
+-- CreateIndex
+CREATE INDEX "History_type_idx" ON "History"("type");
+
+-- CreateIndex
+CREATE INDEX "History_trackId_idx" ON "History"("trackId");
+
+-- CreateIndex
+CREATE INDEX "History_createdAt_idx" ON "History"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "Playlist_userId_idx" ON "Playlist"("userId");
+
+-- CreateIndex
+CREATE INDEX "Playlist_privacy_idx" ON "Playlist"("privacy");
+
+-- CreateIndex
+CREATE INDEX "_PlaylistToTrack_B_index" ON "_PlaylistToTrack"("B");
+
 -- AddForeignKey
 ALTER TABLE "Album" ADD CONSTRAINT "Album_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -106,3 +174,18 @@ ALTER TABLE "Track" ADD CONSTRAINT "Track_albumId_fkey" FOREIGN KEY ("albumId") 
 
 -- AddForeignKey
 ALTER TABLE "Track" ADD CONSTRAINT "Track_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "History" ADD CONSTRAINT "History_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "Track"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "History" ADD CONSTRAINT "History_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Playlist" ADD CONSTRAINT "Playlist_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_PlaylistToTrack" ADD CONSTRAINT "_PlaylistToTrack_A_fkey" FOREIGN KEY ("A") REFERENCES "Playlist"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_PlaylistToTrack" ADD CONSTRAINT "_PlaylistToTrack_B_fkey" FOREIGN KEY ("B") REFERENCES "Track"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -30,7 +30,10 @@ prisma
 // Middleware
 app.use(
   cors({
-    origin: process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000',
+    origin: [
+      process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000',
+      'https://music-website-dl1.vercel.app',
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

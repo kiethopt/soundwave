@@ -11,13 +11,24 @@ export default function NewTrack() {
   const [newTrack, setNewTrack] = useState({
     title: '',
     artist: '',
-    duration: '',
+    duration: 0,
     releaseDate: '',
     audioFile: null as File | null,
     coverFile: null as File | null,
   });
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const formatDuration = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const parseDuration = (timeString: string): number => {
+    const [minutes, seconds] = timeString.split(':').map(Number);
+    return (minutes || 0) * 60 + (seconds || 0);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +41,7 @@ export default function NewTrack() {
 
       formData.append('title', newTrack.title);
       formData.append('artist', newTrack.artist);
-      formData.append('duration', newTrack.duration);
+      formData.append('duration', newTrack.duration.toString()); // Gửi duration dưới dạng seconds
       formData.append('releaseDate', newTrack.releaseDate);
 
       if (newTrack.audioFile) {
@@ -120,18 +131,26 @@ export default function NewTrack() {
                 htmlFor="duration"
                 className="block text-sm font-medium mb-1"
               >
-                Duration (in seconds)
+                Duration (mm:ss)
               </label>
               <input
                 id="duration"
-                type="number"
-                value={newTrack.duration}
-                onChange={(e) =>
-                  setNewTrack({ ...newTrack, duration: e.target.value })
+                type="text"
+                placeholder="0:00"
+                pattern="[0-9]+:[0-5][0-9]"
+                value={
+                  newTrack.duration ? formatDuration(newTrack.duration) : '0:00'
                 }
+                onChange={(e) => {
+                  const durationInSeconds = parseDuration(e.target.value);
+                  setNewTrack({ ...newTrack, duration: durationInSeconds });
+                }}
                 className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
                 required
               />
+              <p className="mt-1 text-sm text-white/60">
+                Enter duration in minutes:seconds format (e.g., 3:45)
+              </p>
             </div>
 
             <div>

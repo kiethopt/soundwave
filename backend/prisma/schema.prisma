@@ -26,6 +26,8 @@ model User {
   updatedAt DateTime @updatedAt
   albums Album[]
   tracks Track[]
+  history History[]
+  playlists Playlist[]
 
   @@index([email])
   @@index([username])
@@ -70,14 +72,63 @@ model Track {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   isActive Boolean @default(true)
+  playCount Int @default(0)
+  playlists Playlist[]
+  history History[]
 
   @@index([title])
   @@index([artist])
   @@index([albumId])
   @@index([userId])
+  @@index([playCount])
+}
+
+model History {
+  id String @id @default(cuid())
+  type HistoryType // SEARCH hoặc PLAY
+  query String? // cho SEARCH
+  track Track? @relation(fields: [trackId], references: [id])
+  trackId String?
+  user User @relation(fields: [userId], references: [id])
+  userId String
+  duration Int? // Thời gian nghe (giây) - cho PLAY
+  completed Boolean? // Đã nghe hết bài chưa - cho PLAY
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([trackId])
+  @@index([createdAt])
+}
+
+model Playlist {
+  id String @id @default(cuid())
+  name String
+  description String?
+  coverUrl String?
+  privacy PlaylistPrivacy @default(PRIVATE)
+  user User @relation(fields: [userId], references: [id])
+  userId String
+  tracks Track[]
+  isAIGenerated Boolean @default(false) // Đánh dấu playlist được tạo bởi AI hay người dùng
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([privacy])
 }
 
 enum Role {
   USER
   ADMIN
+}
+
+enum HistoryType {
+  SEARCH
+  PLAY
+}
+
+enum PlaylistPrivacy {
+  PUBLIC    // Ai cũng có thể xem
+  PRIVATE   // Chỉ người tạo xem được
 }
