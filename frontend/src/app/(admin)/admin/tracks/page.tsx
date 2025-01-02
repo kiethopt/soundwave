@@ -1,28 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { API_URL } from '@/utils/config';
+import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { Track } from '@/types';
 import { api } from '@/utils/api';
+import { debounce } from 'lodash';
+import { Search, Music, Plus, Play, Pause } from 'lucide-react';
+import Link from 'next/link';
+import AudioPlayer from '@/components/ui/AudioPlayer';
 
 export default function AdminTracks() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [newTrack, setNewTrack] = useState({
-    title: '',
-    artist: '',
-    duration: '0:00',
-    releaseDate: '',
-    audioFile: null as File | null,
-    coverFile: null as File | null,
-  });
+  const [searchInput, setSearchInput] = useState('');
+  const [playingTrack, setPlayingTrack] = useState<string | null>(null);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTracks();
-  }, []);
-
-  const fetchTracks = async () => {
+  // Fetch tracks data
+  const fetchTracks = useCallback(async (query: string = '') => {
     try {
       setLoading(true);
       setError(null);
@@ -32,11 +27,14 @@ export default function AdminTracks() {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`${API_URL}/api/tracks`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        query ? api.tracks.search(query) : api.tracks.getAll(),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch tracks');
@@ -50,199 +48,172 @@ export default function AdminTracks() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchTracks();
   }, []);
 
+  // Effect to fetch tracks on mount
+  useEffect(() => {
+    fetchTracks();
+  }, [fetchTracks]);
+
+  // Utility functions
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const parseDuration = (timeString: string): number => {
-    const [minutes, seconds] = timeString.split(':').map(Number);
-    return (minutes || 0) * 60 + (seconds || 0);
+  // Handlers
+  const handleSearch = (e: FormEvent) => {
+    e.preventDefault();
+    fetchTracks(searchInput);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const token = localStorage.getItem('userToken');
-      const formData = new FormData();
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(e.target.value);
+  };
 
-      formData.append('title', newTrack.title);
-      formData.append('artist', newTrack.artist);
-      formData.append('duration', String(parseDuration(newTrack.duration)));
-      formData.append('releaseDate', newTrack.releaseDate);
-
-      if (newTrack.audioFile) {
-        formData.append('audio', newTrack.audioFile);
+  const handlePlayPause = (trackId: string) => {
+    if (playingTrack === trackId) {
+      setPlayingTrack(null);
+      setCurrentAudioUrl(null);
+    } else {
+      const track = tracks.find((t) => t.id === trackId);
+      if (track && track.audioUrl) {
+        setPlayingTrack(trackId);
+        setCurrentAudioUrl(track.audioUrl);
       }
-
-      if (newTrack.coverFile) {
-        formData.append('cover', newTrack.coverFile);
-      }
-
-      const response = await fetch(api.tracks.create(), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create track');
-      }
-
-      await fetchTracks();
-      setNewTrack({
-        title: '',
-        artist: '',
-        duration: '0:00',
-        releaseDate: '',
-        audioFile: null,
-        coverFile: null,
-      });
-    } catch (error) {
-      console.error('Error creating track:', error);
-      alert(error instanceof Error ? error.message : 'Failed to create track');
     }
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500">Error: {error}</div>;
-  }
+  const handleTrackEnded = () => {
+    setPlayingTrack(null);
+    setCurrentAudioUrl(null);
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Manage Single Tracks</h2>
-        <p className="text-white/60">
-          Upload and manage individual tracks that are not part of any album
-        </p>
+    <div className="container mx-auto p-6 space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Track Management
+          </h1>
+          <p className="text-white/60 mt-2">
+            Upload and manage individual tracks
+          </p>
+        </div>
+        <Link
+          href="/admin/tracks/new"
+          className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90"
+        >
+          <Plus className="w-4 h-4" />
+          New Track
+        </Link>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
-        <input
-          type="text"
-          placeholder="Title"
-          value={newTrack.title}
-          onChange={(e) => setNewTrack({ ...newTrack, title: e.target.value })}
-          className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-          required
-          lang="vi"
-        />
-        <input
-          type="text"
-          placeholder="Artist"
-          value={newTrack.artist}
-          onChange={(e) => setNewTrack({ ...newTrack, artist: e.target.value })}
-          className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-          required
-          lang="vi"
-        />
-        <input
-          type="text"
-          placeholder="Duration (mm:ss)"
-          pattern="[0-9]+:[0-5][0-9]"
-          value={newTrack.duration}
-          onChange={(e) => {
-            const durationInSeconds = parseDuration(e.target.value);
-            setNewTrack({
-              ...newTrack,
-              duration: formatDuration(durationInSeconds),
-            });
-          }}
-          className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-          required
-        />
-        <input
-          type="date"
-          value={newTrack.releaseDate}
-          onChange={(e) =>
-            setNewTrack({ ...newTrack, releaseDate: e.target.value })
-          }
-          className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-          required
-        />
-
-        {/* Cover upload */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-white/70">
-            Cover Image (optional)
-          </label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) =>
-              setNewTrack({
-                ...newTrack,
-                coverFile: e.target.files?.[0] || null,
-              })
-            }
-            className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-          />
+      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08]">
+        <div className="p-6 border-b border-white/[0.08]">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Track List</h2>
+            <form onSubmit={handleSearch} className="relative">
+              <input
+                type="text"
+                placeholder="Search tracks..."
+                value={searchInput}
+                onChange={handleSearchInputChange}
+                className="pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent w-64"
+              />
+              <button
+                type="submit"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2"
+              >
+                <Search className="text-white/40 w-4 h-4" />
+              </button>
+            </form>
+          </div>
         </div>
 
-        {/* Audio upload */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-white/70">
-            Audio File
-          </label>
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={(e) =>
-              setNewTrack({
-                ...newTrack,
-                audioFile: e.target.files?.[0] || null,
-              })
-            }
-            className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="w-full p-2 bg-white text-black rounded hover:bg-white/90"
-        >
-          Add Track
-        </button>
-      </form>
-
-      {/* Track list */}
-      {tracks.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tracks.map((track) => (
-            <div key={track.id} className="p-4 bg-white/5 rounded">
-              {track.coverUrl && (
-                <img
-                  src={track.coverUrl}
-                  alt={track.title}
-                  className="w-full h-48 object-cover rounded mb-4"
-                />
-              )}
-              <h3 className="font-medium">{track.title}</h3>
-              <p className="text-sm text-white/70">{track.artist}</p>
-              <p className="text-sm text-white/50">
-                {formatDuration(track.duration)}
-              </p>
-              <audio src={track.audioUrl} controls className="mt-2 w-full" />
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
             </div>
-          ))}
+          ) : tracks.length > 0 ? (
+            <table className="w-full">
+              <thead className="bg-white/[0.03]">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Title
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Artist
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Duration
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Album
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.08]">
+                {tracks.map((track) => (
+                  <tr
+                    key={track.id}
+                    className="hover:bg-white/[0.03] transition-colors"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <button
+                          onClick={() => handlePlayPause(track.id)}
+                          className="mr-3 text-white/60 hover:text-white transition-colors"
+                        >
+                          {playingTrack === track.id ? (
+                            <Pause className="w-5 h-5" />
+                          ) : (
+                            <Play className="w-5 h-5" />
+                          )}
+                        </button>
+                        {track.coverUrl ? (
+                          <img
+                            src={track.coverUrl}
+                            alt={track.title}
+                            className="w-10 h-10 rounded-md mr-3 object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-md mr-3 bg-white/[0.03] flex items-center justify-center">
+                            <Music className="w-6 h-6 text-white/60" />
+                          </div>
+                        )}
+                        <span className="font-medium">{track.title}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {track.artist}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {formatDuration(track.duration)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {track.album?.title || 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
+              <Music className="w-12 h-12 mb-4" />
+              <p>No tracks found</p>
+            </div>
+          )}
         </div>
-      ) : (
-        <p className="text-white/60">No single tracks found</p>
+      </div>
+      {playingTrack && currentAudioUrl && (
+        <AudioPlayer
+          src={currentAudioUrl}
+          isPlaying={!!playingTrack}
+          onEnded={handleTrackEnded}
+        />
       )}
     </div>
   );

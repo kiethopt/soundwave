@@ -1,12 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  BellIcon,
-  HomeIcon,
-  SearchIcon,
-  SettingsIcon,
-} from '@/components/ui/Icons';
+import { Bell, Home, Search, Settings } from '@/components/ui/Icons';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -86,7 +81,7 @@ export default function Header() {
             isActive('/') ? 'text-white' : 'text-white/70 hover:text-white'
           }`}
         >
-          <HomeIcon className="w-5 h-5" />
+          <Home className="w-5 h-5" />
           <span>Home</span>
         </Link>
 
@@ -105,7 +100,7 @@ export default function Header() {
       {/* Center - Search */}
       <div className="flex-1 max-w-[400px] px-4">
         <form onSubmit={handleSearch} className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/40" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/40" />
           <input
             type="text"
             value={searchQuery}
@@ -121,10 +116,10 @@ export default function Header() {
         {isAuthenticated ? (
           <>
             <button className="p-2 hover:bg-white/10 rounded-full">
-              <BellIcon className="w-5 h-5 text-white" />
+              <Bell className="w-5 h-5 text-white" />
             </button>
             <button className="p-2 hover:bg-white/10 rounded-full">
-              <SettingsIcon className="w-5 h-5 text-white" />
+              <Settings className="w-5 h-5 text-white" />
             </button>
             <div className="relative" ref={dropdownRef}>
               <button

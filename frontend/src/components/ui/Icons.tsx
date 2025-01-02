@@ -1,16 +1,16 @@
-export const HomeIcon = (props: React.SVGProps<SVGSVGElement>) => (
+export const Home = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path d="M12.97 2.59a1.5 1.5 0 00-1.94 0l-7.5 6.363A1.5 1.5 0 003 10.097V19.5A1.5 1.5 0 004.5 21h4.75a.75.75 0 00.75-.75V14h4v6.25c0 .414.336.75.75.75h4.75a1.5 1.5 0 001.5-1.5v-9.403a1.5 1.5 0 00-.53-1.144l-7.5-6.363z" />
   </svg>
 );
 
-export const SearchIcon = (props: React.SVGProps<SVGSVGElement>) => (
+export const Search = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z" />
   </svg>
 );
 
-export const LibraryIcon = (props: React.SVGProps<SVGSVGElement>) => (
+export const Library = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -41,7 +41,7 @@ export const LibraryIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
+export const Plus = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path
       fillRule="evenodd"
@@ -51,7 +51,7 @@ export const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export const BellIcon = (props: React.SVGProps<SVGSVGElement>) => (
+export const Bell = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path
       fillRule="evenodd"
@@ -61,7 +61,7 @@ export const BellIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export const SettingsIcon = (props: React.SVGProps<SVGSVGElement>) => (
+export const Settings = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path
       fillRule="evenodd"
@@ -71,13 +71,13 @@ export const SettingsIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export const MusicIcon = (props: React.SVGProps<SVGSVGElement>) => (
+export const Music = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path d="M19.952 1.651a.75.75 0 01.298.599V16.303a3 3 0 01-2.176 2.884l-1.32.377a2.553 2.553 0 11-1.403-4.909l2.311-.66a1.5 1.5 0 001.088-1.442V6.994l-9 2.572v9.737a3 3 0 01-2.176 2.884l-1.32.377a2.553 2.553 0 11-1.402-4.909l2.31-.66a1.5 1.5 0 001.088-1.442V5.25a.75.75 0 01.544-.721l10.5-3a.75.75 0 01.658.122z" />
   </svg>
 );
 
-export const AlbumIcon = (props: React.SVGProps<SVGSVGElement>) => (
+export const Album = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -101,7 +101,7 @@ export const AlbumIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export const UsersIcon = (props: React.SVGProps<SVGSVGElement>) => (
+export const Users = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path d="M4.5 6.375a4.125 4.125 0 118.25 0 4.125 4.125 0 01-8.25 0zM14.25 8.625a3.375 3.375 0 116.75 0 3.375 3.375 0 01-6.75 0zM1.5 19.125a7.125 7.125 0 0114.25 0v.003l-.001.119a.75.75 0 01-.363.63 13.067 13.067 0 01-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 01-.364-.63l-.001-.122zM17.25 19.128l-.001.144a2.25 2.25 0 01-.233.96 10.088 10.088 0 005.06-1.01.75.75 0 00.42-.643 4.875 4.875 0 00-6.957-4.611 8.586 8.586 0 011.71 5.157v.003z" />
   </svg>

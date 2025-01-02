@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import {
-  HomeIcon,
-  SearchIcon,
-  LibraryIcon,
-  PlusIcon,
-  MusicIcon,
-  AlbumIcon,
-  UsersIcon,
+  Home,
+  Search,
+  Library,
+  Plus,
+  Music,
+  Album,
+  Users,
 } from '@/components/ui/Icons';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -39,7 +39,7 @@ export default function Sidebar() {
                 isActive('/') ? 'bg-white/10' : 'hover:bg-white/10'
               }`}
             >
-              <HomeIcon className="w-6 h-6" />
+              <Home className="w-6 h-6" />
               <span>Home</span>
             </Link>
 
@@ -49,7 +49,7 @@ export default function Sidebar() {
                 isActive('/search') ? 'bg-white/10' : 'hover:bg-white/10'
               }`}
             >
-              <SearchIcon className="w-6 h-6" />
+              <Search className="w-6 h-6" />
               <span>Search</span>
             </Link>
           </div>
@@ -58,10 +58,10 @@ export default function Sidebar() {
           <div className="space-y-2 pt-4 mt-4 border-t border-white/10">
             <div className="flex items-center justify-between px-3">
               <div className="flex items-center gap-3">
-                <LibraryIcon className="w-6 h-6" />
+                <Library className="w-6 h-6" />
                 <span>Your Library</span>
               </div>
-              <PlusIcon className="w-5 h-5" />
+              <Plus className="w-5 h-5" />
             </div>
             {/* Playlists content */}
           </div>
@@ -80,7 +80,7 @@ export default function Sidebar() {
                     : 'hover:bg-white/10'
                 }`}
               >
-                <MusicIcon className="w-6 h-6" />
+                <Music className="w-6 h-6" />
                 <span>Tracks</span>
               </Link>
 
@@ -92,7 +92,7 @@ export default function Sidebar() {
                     : 'hover:bg-white/10'
                 }`}
               >
-                <AlbumIcon className="w-6 h-6" />
+                <Album className="w-6 h-6" />
                 <span>Albums</span>
               </Link>
 
@@ -102,7 +102,7 @@ export default function Sidebar() {
                   isActive('/admin/users') ? 'bg-white/10' : 'hover:bg-white/10'
                 }`}
               >
-                <UsersIcon className="w-6 h-6" />
+                <Users className="w-6 h-6" />
                 <span>Users</span>
               </Link>
             </div>

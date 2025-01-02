@@ -2,7 +2,7 @@
 
 import { Album } from '@/types';
 import { API_URL } from '@/utils/config';
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState } from 'react';
 import TrackUploadForm, {
   TrackDetails,
 } from '@/components/admin/TrackUploadForm';
@@ -10,13 +10,10 @@ import TrackList from '@/components/admin/TrackList';
 import { ArrowLeftIcon, Calendar, Music } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/utils/api';
+import { useParams } from 'next/navigation';
 
-export default function AlbumDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
+export default function AlbumDetailPage() {
+  const { id } = useParams();
   const [album, setAlbum] = useState<Album | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [newTracks, setNewTracks] = useState<File[]>([]);
@@ -95,7 +92,7 @@ export default function AlbumDetailPage({
         }
       });
 
-      const response = await fetch(api.albums.uploadTracks(id), {
+      const response = await fetch(api.albums.uploadTracks(id as string), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

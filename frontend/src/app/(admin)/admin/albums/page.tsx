@@ -1,171 +1,179 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { API_URL } from '@/utils/config';
+import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { Album } from '@/types';
+import { api } from '@/utils/api';
+import { debounce } from 'lodash';
+import { Search, Music, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminAlbums() {
   const [albums, setAlbums] = useState<Album[]>([]);
-  const [newAlbum, setNewAlbum] = useState({
-    title: '',
-    artist: '',
-    releaseDate: '',
-    coverFile: null as File | null,
-  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
 
-  useEffect(() => {
-    fetchAlbums();
-  }, []);
-
-  const fetchAlbums = async () => {
+  // Fetch albums data
+  const fetchAlbums = useCallback(async (query: string = '') => {
     try {
+      setLoading(true);
+      setError(null);
       const token = localStorage.getItem('userToken');
-      const response = await fetch(`${API_URL}/api/albums`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      setAlbums(data);
-    } catch (error) {
-      console.error('Error fetching albums:', error);
-    }
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const token = localStorage.getItem('userToken');
-      const formData = new FormData();
-
-      // Đảm bảo dữ liệu được append đúng
-      formData.append('title', newAlbum.title);
-      formData.append('artist', newAlbum.artist);
-      formData.append('releaseDate', newAlbum.releaseDate);
-
-      // Kiểm tra và append cover file
-      if (newAlbum.coverFile) {
-        formData.append('cover', newAlbum.coverFile);
+      if (!token) {
+        throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`${API_URL}/api/albums`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
+      const response = await fetch(
+        query ? api.albums.search(query) : api.albums.getAll(),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create album');
+        throw new Error('Failed to fetch albums');
       }
 
       const data = await response.json();
-      console.log('Album created:', data);
-
-      // Reset form
-      setNewAlbum({
-        title: '',
-        artist: '',
-        releaseDate: '',
-        coverFile: null,
-      });
-
-      // Refresh album list
-      fetchAlbums();
-    } catch (error: any) {
-      console.error('Error creating album:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to create album';
-      alert(errorMessage);
+      setAlbums(data);
+    } catch (err) {
+      console.error('Error fetching albums:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch albums');
+    } finally {
+      setLoading(false);
     }
+  }, []);
+
+  // Effect to fetch albums on mount
+  useEffect(() => {
+    fetchAlbums();
+  }, [fetchAlbums]);
+
+  // Handlers
+  const handleSearch = (e: FormEvent) => {
+    e.preventDefault();
+    fetchAlbums(searchInput);
+  };
+
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(e.target.value);
   };
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-bold">Create New Album</h2>
-      <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
+    <div className="container mx-auto p-6 space-y-8">
+      <div className="flex items-center justify-between">
         <div>
-          <label className="block text-sm font-medium mb-1">Title</label>
-          <input
-            type="text"
-            value={newAlbum.title}
-            onChange={(e) =>
-              setNewAlbum({ ...newAlbum, title: e.target.value })
-            }
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
-            required
-          />
+          <h1 className="text-3xl font-bold tracking-tight">
+            Album Management
+          </h1>
+          <p className="text-white/60 mt-2">
+            Create and manage your music albums
+          </p>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Artist</label>
-          <input
-            type="text"
-            value={newAlbum.artist}
-            onChange={(e) =>
-              setNewAlbum({ ...newAlbum, artist: e.target.value })
-            }
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Release Date</label>
-          <input
-            type="date"
-            value={newAlbum.releaseDate}
-            onChange={(e) =>
-              setNewAlbum({ ...newAlbum, releaseDate: e.target.value })
-            }
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Cover Image</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) =>
-              setNewAlbum({
-                ...newAlbum,
-                coverFile: e.target.files?.[0] || null,
-              })
-            }
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
-          />
-        </div>
-        <button
-          type="submit"
-          className="w-full px-4 py-2 bg-white text-black rounded-md hover:bg-white/90"
+        <Link
+          href="/admin/albums/new"
+          className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90"
         >
-          Create Album
-        </button>
-      </form>
+          <Plus className="w-4 h-4" />
+          New Album
+        </Link>
+      </div>
 
-      <h2 className="text-xl font-semibold mb-4">Albums List</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {albums.map((album) => (
-          <div key={album.id} className="p-4 bg-white/5 rounded-lg">
-            <Link href={`/admin/albums/${album.id}`}>
-              {album.coverUrl && (
-                <img
-                  src={album.coverUrl}
-                  alt={album.title}
-                  className="w-full aspect-square object-cover rounded-md mb-2"
-                />
-              )}
-              <h3 className="font-medium">{album.title}</h3>
-              <p className="text-sm text-white/70">{album.artist}</p>
-              <p className="text-sm text-white/50">
-                {new Date(album.releaseDate).toLocaleDateString()}
-              </p>
-              <p className="text-sm text-white/50">{album.trackCount} tracks</p>
-            </Link>
+      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08]">
+        <div className="p-6 border-b border-white/[0.08]">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Album List</h2>
+            <form onSubmit={handleSearch} className="relative">
+              <input
+                type="text"
+                placeholder="Search albums..."
+                value={searchInput}
+                onChange={handleSearchInputChange}
+                className="pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent w-64"
+              />
+              <button
+                type="submit"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2"
+              >
+                <Search className="text-white/40 w-4 h-4" />
+              </button>
+            </form>
           </div>
-        ))}
+        </div>
+
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            </div>
+          ) : albums.length > 0 ? (
+            <table className="w-full">
+              <thead className="bg-white/[0.03]">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Title
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Artist
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Release Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Tracks
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.08]">
+                {albums.map((album) => (
+                  <tr
+                    key={album.id}
+                    className="hover:bg-white/[0.03] transition-colors"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        {album.coverUrl ? (
+                          <img
+                            src={album.coverUrl}
+                            alt={album.title}
+                            className="w-10 h-10 rounded-md mr-3 object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-md mr-3 bg-white/[0.03] flex items-center justify-center">
+                            <Music className="w-6 h-6 text-white/60" />
+                          </div>
+                        )}
+                        <Link
+                          href={`/admin/albums/${album.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {album.title}
+                        </Link>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {album.artist}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {new Date(album.releaseDate).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {album.trackCount || 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
+              <Music className="w-12 h-12 mb-4" />
+              <p>No albums found</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
