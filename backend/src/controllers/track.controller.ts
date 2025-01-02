@@ -253,3 +253,43 @@ export const deleteTrack = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+export const searchTrack = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { q } = req.query;
+
+    if (!q) {
+      res.status(400).json({ message: 'Query is required' });
+      return;
+    }
+
+    const tracks = await prisma.track.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          {
+            title: {
+              contains: String(q),
+              mode: 'insensitive',
+            },
+          },
+          {
+            artist: {
+              contains: String(q),
+              mode: 'insensitive',
+            },
+          },
+        ],
+      },
+      select: trackSelect,
+    });
+
+    res.json(tracks);
+  } catch (error) {
+    console.error('Search track error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}

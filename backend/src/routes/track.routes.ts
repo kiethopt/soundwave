@@ -6,6 +6,7 @@ import {
   getTrackById,
   getTracksByArtist,
   updateTrack,
+  searchTrack,
 } from '../controllers/track.controller';
 import { isAdmin, isAuthenticated } from '../middleware/auth';
 import multer from 'multer';
@@ -23,6 +24,7 @@ const upload = multer({
 
 // Public routes
 router.get('/tracks', getAllTracks);
+router.get('/tracks/search', searchTrack);
 router.get('/tracks/:id', getTrackById);
 router.get('/tracks/artist/:artist', getTracksByArtist);
 

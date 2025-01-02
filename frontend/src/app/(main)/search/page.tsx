@@ -4,61 +4,27 @@ import { useEffect, useState } from 'react';
 // import { SearchIcon } from '@/components/ui/Icons';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { Track, Album } from '@/types/index';
 
-interface SearchResult {
-  id: string;
-  title: string;
-  artist: string;
-  album: string;
-  imageUrl: string;
-}
 
 function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<Track[]>([]);
 
   useEffect(() => {
     if (query) {
       // Thực hiện tìm kiếm khi query thay đổi
-      performSearch(query);
+      performSearchTrack(query);
     }
   }, [query]);
 
-  const performSearch = async (searchQuery: string) => {
+  const performSearchTrack = async (searchQuery: string) => {
     // Giả lập API call
-    const mockResults: SearchResult[] = [
-      {
-        id: '1',
-        title: 'Song 1',
-        artist: 'Artist 1',
-        album: 'Album 1',
-        imageUrl: '/placeholder.svg?height=200&width=200',
-      },
-      {
-        id: '2',
-        title: 'Song 2',
-        artist: 'Artist 2',
-        album: 'Album 2',
-        imageUrl: '/placeholder.svg?height=200&width=200',
-      },
-      {
-        id: '3',
-        title: 'Song 3',
-        artist: 'Artist 3',
-        album: 'Album 3',
-        imageUrl: '/placeholder.svg?height=200&width=200',
-      },
-      {
-        id: '4',
-        title: 'Song 4',
-        artist: 'Artist 4',
-        album: 'Album 4',
-        imageUrl: '/placeholder.svg?height=200&width=200',
-      },
-    ];
+    const response = await fetch(`http://localhost:10000/api/tracks/search?q=${searchQuery}`);
+    const data = await response.json();
 
-    setSearchResults(mockResults);
+    setSearchResults(data);
   };
 
   return (
@@ -71,13 +37,13 @@ function SearchContent() {
           {searchResults.map((result) => (
             <div key={result.id} className="bg-white/5 p-4 rounded-lg">
               <img
-                src={result.imageUrl}
+                src={result.coverUrl}
                 alt={result.title}
                 className="w-full aspect-square object-cover rounded-md mb-4"
               />
               <h3 className="text-white font-medium">{result.title}</h3>
               <p className="text-white/60 text-sm">
-                {result.artist} • {result.album}
+                {result.artist}
               </p>
             </div>
           ))}
