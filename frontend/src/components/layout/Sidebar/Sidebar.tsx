@@ -53,13 +53,14 @@ export default function Sidebar({
         `}
       >
         <div className="px-6 py-4">
-          {/* Mobile Close Button */}
-          <button
-            onClick={onClose}
-            className="md:hidden absolute top-4 right-4 text-white/60 hover:text-white"
-          >
-            <XIcon className="w-6 h-6" />
-          </button>
+          <div className="flex justify-end md:hidden mb-4">
+            <button
+              onClick={onClose}
+              className="text-white/60 hover:text-white p-1"
+            >
+              <XIcon className="w-6 h-6" />
+            </button>
+          </div>
 
           {/* Existing Sidebar Content */}
           <nav className="space-y-6">
