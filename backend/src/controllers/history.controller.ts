@@ -6,43 +6,80 @@ export const saveHistory = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { trackId, duration, completed } = req.body;
+    const { type, trackId, duration, completed, query } = req.body;
     const userId = req.user!.id;
 
-    // Upsert để tạo mới hoặc update nếu đã tồn tại
-    const history = await prisma.history.upsert({
-      where: {
-        userId_trackId: {
+    // Validate history type
+    if (!['PLAY', 'SEARCH'].includes(type)) {
+      res.status(400).json({ message: 'Invalid history type' });
+      return;
+    }
+
+    if (type === 'PLAY') {
+      // Validate required fields for PLAY
+      if (!trackId) {
+        res
+          .status(400)
+          .json({ message: 'trackId is required for PLAY history' });
+        return;
+      }
+
+      // Upsert PLAY history
+      const history = await prisma.history.upsert({
+        where: {
+          userId_trackId: {
+            userId,
+            trackId,
+          },
+        },
+        update: {
+          duration,
+          completed,
+          playCount: { increment: 1 },
+          updatedAt: new Date(),
+        },
+        create: {
+          type: 'PLAY',
           userId,
           trackId,
+          duration,
+          completed,
+          playCount: 1,
         },
-      },
-      update: {
-        duration,
-        completed,
-        playCount: { increment: 1 },
-        updatedAt: new Date(),
-      },
-      create: {
-        type: 'PLAY',
-        userId,
-        trackId,
-        duration,
-        completed,
-        playCount: 1,
-      },
-    });
+      });
 
-    // Tăng playCount của track
-    await prisma.track.update({
-      where: { id: trackId },
-      data: {
-        playCount: { increment: 1 },
-      },
-    });
+      // Tăng playCount của track
+      await prisma.track.update({
+        where: { id: trackId },
+        data: {
+          playCount: { increment: 1 },
+        },
+      });
 
-    res.status(200).json(history);
+      res.status(200).json(history);
+    } else if (type === 'SEARCH') {
+      // Validate required fields for SEARCH
+      if (!query) {
+        res
+          .status(400)
+          .json({ message: 'query is required for SEARCH history' });
+        return;
+      }
+
+      // Create SEARCH history
+      const history = await prisma.history.create({
+        data: {
+          type: 'SEARCH',
+          userId,
+          query,
+          playCount: 0, // Set playCount = 0 cho SEARCH history
+        },
+      });
+
+      res.status(200).json(history);
+    }
   } catch (error) {
+    console.error('Save history error:', error);
     res.status(500).json({ message: 'Failed to save history' });
   }
 };
