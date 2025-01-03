@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Home, Search, Settings } from '@/components/ui/Icons';
+import { Bell, Home, Menu, Search, Settings } from '@/components/ui/Icons';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -14,7 +14,13 @@ interface UserData {
   avatar?: string;
 }
 
-export default function Header() {
+export default function Header({
+  isSidebarOpen,
+  onMenuClick,
+}: {
+  isSidebarOpen?: boolean;
+  onMenuClick?: () => void;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -72,33 +78,44 @@ export default function Header() {
   };
 
   return (
-    <header className="h-16 bg-[#111111] flex items-center justify-between px-6">
+    <header className="h-16 bg-[#111111] flex items-center justify-between px-2 md:px-4 lg:px-6">
       {/* Left side - Navigation */}
-      <div className="flex items-center gap-6">
-        <Link
-          href="/"
-          className={`flex items-center gap-2 text-sm font-medium ${
-            isActive('/') ? 'text-white' : 'text-white/70 hover:text-white'
-          }`}
+      <div className="flex items-center gap-2 md:gap-4 lg:gap-6">
+        {/* Mobile Menu Button */}
+        <button
+          onClick={onMenuClick}
+          className="md:hidden p-2 text-white/70 hover:text-white"
         >
-          <Home className="w-5 h-5" />
-          <span>Home</span>
-        </Link>
+          <Menu className="w-6 h-6" />
+        </button>
 
-        <Link
-          href="/discover"
-          className={`flex items-center gap-2 text-sm font-medium ${
-            isActive('/discover')
-              ? 'text-white'
-              : 'text-white/70 hover:text-white'
-          }`}
-        >
-          <span>Discover</span>
-        </Link>
+        {/* Navigation Links - Hidden on Mobile, Visible on Tablet and Desktop */}
+        <div className="hidden md:flex items-center gap-4 lg:gap-6">
+          <Link
+            href="/"
+            className={`flex items-center gap-2 text-sm font-medium ${
+              isActive('/') ? 'text-white' : 'text-white/70 hover:text-white'
+            }`}
+          >
+            <Home className="w-5 h-5" />
+            <span className="hidden lg:inline">Home</span>
+          </Link>
+
+          <Link
+            href="/discover"
+            className={`flex items-center gap-2 text-sm font-medium ${
+              isActive('/discover')
+                ? 'text-white'
+                : 'text-white/70 hover:text-white'
+            }`}
+          >
+            <span>Discover</span>
+          </Link>
+        </div>
       </div>
 
       {/* Center - Search */}
-      <div className="flex-1 max-w-[400px] px-4">
+      <div className="flex-1 max-w-[400px] px-2 md:px-4">
         <form onSubmit={handleSearch} className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/40" />
           <input
@@ -106,19 +123,20 @@ export default function Header() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search"
-            className="w-full bg-white/10 text-white rounded-full py-2 pl-10 pr-4 text-sm placeholder:text-white/40 focus:outline-none focus:bg-white/20"
+            className="w-full bg-white/10 text-white rounded-full py-1.5 md:py-2 pl-10 pr-4 text-sm placeholder:text-white/40 focus:outline-none focus:bg-white/20"
           />
         </form>
       </div>
 
       {/* Right side - User controls */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
         {isAuthenticated ? (
           <>
-            <button className="p-2 hover:bg-white/10 rounded-full">
+            {/* Hide Bell and Settings on mobile and small tablets */}
+            <button className="hidden lg:block p-2 hover:bg-white/10 rounded-full">
               <Bell className="w-5 h-5 text-white" />
             </button>
-            <button className="p-2 hover:bg-white/10 rounded-full">
+            <button className="hidden lg:block p-2 hover:bg-white/10 rounded-full">
               <Settings className="w-5 h-5 text-white" />
             </button>
             <div className="relative" ref={dropdownRef}>
@@ -136,9 +154,27 @@ export default function Header() {
                 />
               </button>
 
-              {/* Dropdown Menu */}
+              {/* Dropdown Menu - Adjusted for mobile */}
               {showDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-[#282828] rounded-md shadow-lg py-1 z-50">
+                  {/* Show Bell and Settings in dropdown on mobile and small tablets */}
+                  <div className="lg:hidden">
+                    <button
+                      className="flex items-center w-full px-4 py-2 text-sm text-white hover:bg-white/10"
+                      onClick={() => setShowDropdown(false)}
+                    >
+                      <Bell className="w-4 h-4 mr-3" />
+                      Notifications
+                    </button>
+                    <button
+                      className="flex items-center w-full px-4 py-2 text-sm text-white hover:bg-white/10"
+                      onClick={() => setShowDropdown(false)}
+                    >
+                      <Settings className="w-4 h-4 mr-3" />
+                      Settings
+                    </button>
+                    <div className="border-t border-white/10 my-1"></div>
+                  </div>
                   <Link
                     href="/account"
                     className="block px-4 py-2 text-sm text-white hover:bg-white/10"
@@ -152,13 +188,6 @@ export default function Header() {
                     onClick={() => setShowDropdown(false)}
                   >
                     Profile
-                  </Link>
-                  <Link
-                    href="/settings"
-                    className="block px-4 py-2 text-sm text-white hover:bg-white/10"
-                    onClick={() => setShowDropdown(false)}
-                  >
-                    Settings
                   </Link>
                   <div className="border-t border-white/10 my-1"></div>
                   <button
@@ -175,16 +204,16 @@ export default function Header() {
             </div>
           </>
         ) : (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <button
               onClick={() => router.push('/register')}
-              className="text-white/70 hover:text-white text-sm font-medium"
+              className="text-white/70 hover:text-white text-sm font-medium hidden md:block"
             >
               Sign up
             </button>
             <button
               onClick={() => router.push('/login')}
-              className="bg-white text-black px-6 py-2 rounded-full text-sm font-medium hover:bg-white/90"
+              className="bg-white text-black px-3 md:px-6 py-1.5 md:py-2 rounded-full text-sm font-medium hover:bg-white/90"
             >
               Log in
             </button>
