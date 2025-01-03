@@ -114,18 +114,143 @@ function SearchContent() {
     fetchResults();
   }, [query, token]);
 
-  const handlePlayPause = (track: Track) => {
-    if (!audioRef.current) return;
+  useEffect(() => {
+    async function performSearch() {
+      if (!query || !token) return;
+      setIsLoading(true);
+      try {
+        const [trackResponse, albumResponse] = await Promise.all([
+          fetch(api.tracks.search(query), {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(api.albums.search(query), {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
 
+        const [tracks, albums] = await Promise.all([
+          trackResponse.json(),
+          albumResponse.json(),
+        ]);
+
+        setTrackResults(tracks);
+        setAlbumResults(albums);
+
+        // Lưu search history
+        await saveSearchHistory(query);
+      } catch (error) {
+        console.error('Search error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    performSearch();
+  }, [query, token]);
+
+  const saveSearchHistory = async (query: string) => {
+    try {
+      if (!token) {
+        console.error('No token found');
+        return;
+      }
+
+      const response = await fetch(api.history.save(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          type: 'SEARCH',
+          query: query,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to save search history');
+      }
+    } catch (error) {
+      console.error('Save search history error:', error);
+    }
+  };
+
+  const savePlayHistory = async (
+    trackId: string,
+    duration: number,
+    completed: boolean
+  ) => {
+    try {
+      if (!token) {
+        console.error('No token found');
+        return;
+      }
+
+      await fetch(api.history.save(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          type: 'PLAY',
+          trackId,
+          duration,
+          completed,
+        }),
+      });
+    } catch (error) {
+      console.error('Save play history error:', error);
+    }
+  };
+
+  const cleanupAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.removeEventListener('timeupdate', () => {});
+      audioRef.current.removeEventListener('ended', () => {});
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  };
+
+  const handlePlayPause = (track: Track) => {
     if (currentlyPlaying === track.id) {
-      if (audioRef.current.paused) {
-        audioRef.current.play();
-      } else {
+      if (audioRef.current && !audioRef.current.paused) {
+        // Đang phát -> Pause
+        savePlayHistory(
+          track.id,
+          Math.floor(audioRef.current.currentTime),
+          false
+        );
         audioRef.current.pause();
+        setCurrentlyPlaying(null);
+      } else if (audioRef.current) {
+        // Đang pause -> Play lại
+        audioRef.current.play();
+        setCurrentlyPlaying(track.id);
       }
     } else {
-      audioRef.current.src = track.audioUrl;
-      audioRef.current.play();
+      // Chuyển sang bài mới
+      if (currentlyPlaying && audioRef.current) {
+        savePlayHistory(
+          currentlyPlaying,
+          Math.floor(audioRef.current.currentTime),
+          false
+        );
+      }
+      cleanupAudio();
+
+      const audio = new Audio(track.audioUrl);
+      audio.addEventListener('timeupdate', handleTimeUpdate);
+      audio.addEventListener('ended', () => {
+        savePlayHistory(track.id, track.duration, true);
+        setCurrentlyPlaying(null);
+        cleanupAudio();
+      });
+
+      audioRef.current = audio;
+      audio.play();
       setCurrentlyPlaying(track.id);
     }
   };
@@ -180,10 +305,10 @@ function SearchContent() {
     }
   };
 
-  const handleGoToAlbum = async (albumId: string) => {
-    // Implementation based on your schema
-    console.log('Go to album:', albumId);
-  };
+  // const handleGoToAlbum = async (albumId: string) => {
+  //   // Implementation based on your schema
+  //   console.log('Go to album:', albumId);
+  // };
 
   return (
     <div>
