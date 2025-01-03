@@ -72,7 +72,9 @@ CREATE TABLE "History" (
     "userId" TEXT NOT NULL,
     "duration" INTEGER,
     "completed" BOOLEAN,
+    "playCount" INTEGER NOT NULL DEFAULT 1,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "History_pkey" PRIMARY KEY ("id")
 );
@@ -156,6 +158,12 @@ CREATE INDEX "History_trackId_idx" ON "History"("trackId");
 
 -- CreateIndex
 CREATE INDEX "History_createdAt_idx" ON "History"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "History_playCount_idx" ON "History"("playCount");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "History_userId_trackId_key" ON "History"("userId", "trackId");
 
 -- CreateIndex
 CREATE INDEX "Playlist_userId_idx" ON "Playlist"("userId");

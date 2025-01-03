@@ -312,25 +312,35 @@ export const deleteUser = async (
   try {
     const { username } = req.params;
 
-    const existingUser = await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { username },
     });
 
-    if (!existingUser) {
-      res.status(404).json({ message: 'User không tồn tại.' });
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
       return;
     }
 
+    // Gửi event force logout trước khi xóa
+    const logoutEvent = {
+      type: 'FORCE_LOGOUT',
+      userId: user.id,
+      message: 'Tài khoản không tồn tại',
+      timestamp: new Date().toISOString(),
+    };
+
+    clients.forEach((client) => {
+      client(logoutEvent);
+    });
+
+    // Xóa user
     await prisma.user.delete({
       where: { username },
     });
 
-    res.json({
-      message: 'Đã xóa tài khoản thành công',
-    });
+    res.status(200).json({ message: 'User deleted successfully' });
   } catch (error) {
-    console.error('Delete user error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Failed to delete user' });
   }
 };
 

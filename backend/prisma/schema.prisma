@@ -93,12 +93,16 @@ model History {
   userId String
   duration Int? // Thời gian nghe (giây) - cho PLAY
   completed Boolean? // Đã nghe hết bài chưa - cho PLAY
+  playCount Int @default(1) // Số lần phát của user này với track này
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // Thời điểm nghe gần nhất
 
   @@index([userId])
   @@index([type])
   @@index([trackId])
   @@index([createdAt])
+  @@index([playCount])
+  @@unique([userId, trackId]) // Mỗi user chỉ có 1 history record cho mỗi track
 }
 
 model Playlist {

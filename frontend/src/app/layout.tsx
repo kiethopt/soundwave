@@ -18,47 +18,66 @@ export default function RootLayout({
     pathname?.includes('/login') || pathname?.includes('/register');
 
   useEffect(() => {
-    // Chỉ kết nối SSE khi không phải trang auth và đang ở client-side
     if (isAuthPage || typeof window === 'undefined') return;
 
     let eventSource: EventSource;
+    let reconnectTimer: NodeJS.Timeout;
 
-    try {
-      eventSource = new EventSource(api.sse.url, {
-        withCredentials: true,
-      });
+    const connectSSE = () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        const userData = localStorage.getItem('userData');
+        if (!token || !userData) return;
 
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('Root layout received SSE event:', data);
-
-          if (data.type === 'FORCE_LOGOUT') {
-            const currentUser = JSON.parse(
-              localStorage.getItem('userData') || '{}'
-            );
-            if (data.userId === currentUser.id) {
-              localStorage.removeItem('userToken');
-              localStorage.removeItem('userData');
-              router.push('/login?message=account_deactivated');
-            }
-          }
-        } catch (error) {
-          console.error('Error processing SSE message:', error);
+        // Đóng kết nối cũ nếu có
+        if (eventSource) {
+          eventSource.close();
         }
-      };
 
-      eventSource.onerror = (error) => {
-        console.error('SSE connection error:', error);
-        eventSource.close();
-      };
-    } catch (error) {
-      console.error('Error setting up SSE:', error);
-    }
+        eventSource = new EventSource(`${api.sse.url}?token=${token}`);
+
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'FORCE_LOGOUT') {
+              const currentUser = JSON.parse(userData);
+              if (data.userId === currentUser.id) {
+                localStorage.removeItem('userToken');
+                localStorage.removeItem('userData');
+                router.push('/login');
+                if (eventSource) {
+                  eventSource.close();
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error processing SSE message:', error);
+          }
+        };
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+          }
+          // Chỉ reconnect nếu vẫn còn token
+          const currentToken = localStorage.getItem('userToken');
+          if (currentToken) {
+            reconnectTimer = setTimeout(connectSSE, 5000);
+          }
+        };
+      } catch (error) {
+        console.error('Error setting up SSE:', error);
+      }
+    };
+
+    connectSSE();
 
     return () => {
       if (eventSource) {
         eventSource.close();
+      }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
       }
     };
   }, [isAuthPage, router]);

@@ -34,12 +34,27 @@ export const isAuthenticated = async (
       });
 
       if (!user) {
-        res.status(401).json({ message: 'User không tồn tại' });
+        // Gửi event force logout khi tài khoản không tồn tại
+        const logoutEvent = {
+          type: 'FORCE_LOGOUT',
+          userId: decoded.userId,
+          message: 'Tài khoản không tồn tại',
+          timestamp: new Date().toISOString(),
+        };
+
+        clients.forEach((client) => {
+          client(logoutEvent);
+        });
+
+        res.status(401).json({
+          message: 'Tài khoản không tồn tại',
+          forceLogout: true,
+        });
         return;
       }
 
       if (!user.isActive) {
-        // Gửi event force logout
+        // Gửi event force logout khi tài khoản bị vô hiệu hóa
         const logoutEvent = {
           type: 'FORCE_LOGOUT',
           userId: decoded.userId,
