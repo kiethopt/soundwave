@@ -6,6 +6,7 @@ import { Track, Album } from '@/types';
 import { api } from '@/utils/api';
 import { useState, useEffect } from 'react';
 import { Pause, Play } from '@/components/ui/Icons';
+import { useAuth } from '@/hooks/useAuth';
 
 // Loading UI component
 function LoadingUI() {
@@ -31,6 +32,7 @@ function LoadingUI() {
 function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q');
+  const { token } = useAuth();
   const [trackResults, setTrackResults] = useState<Track[]>([]);
   const [albumResults, setAlbumResults] = useState<Album[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,62 +44,164 @@ function SearchContent() {
     [key: string]: number;
   }>({});
 
-  const handlePlayPause = (track: Track) => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio(track.audioUrl);
-      audioRef.current.addEventListener('timeupdate', () => {
-        setTrackCurrentTimes((prev) => ({
-          ...prev,
-          [track.id]: audioRef.current?.currentTime || 0,
-        }));
-      });
-    }
+  const saveSearchHistory = async (query: string) => {
+    try {
+      if (!token) {
+        console.error('No token found');
+        return;
+      }
 
-    if (currentlyPlaying === track.id) {
-      if (!audioRef.current.paused) {
-        audioRef.current.pause();
-        setCurrentlyPlaying(null);
+      const response = await fetch(api.history.save(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          type: 'SEARCH',
+          query: query,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to save search history');
+      }
+
+      const data = await response.json();
+      console.log('Search history saved:', data);
+    } catch (error) {
+      console.error('Save search history error:', error);
+    }
+  };
+
+  const savePlayHistory = async (
+    trackId: string,
+    duration: number,
+    completed: boolean
+  ) => {
+    try {
+      if (!token) {
+        console.error('No token found');
+        return;
+      }
+
+      await fetch(api.history.save(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          type: 'PLAY',
+          trackId,
+          duration,
+          completed,
+        }),
+      });
+    } catch (error) {
+      console.error('Save play history error:', error);
+    }
+  };
+
+  const cleanupAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.removeEventListener('timeupdate', () => {});
+      audioRef.current.removeEventListener('ended', () => {});
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+  };
+
+  const handlePlayPause = (track: Track) => {
+    try {
+      if (currentlyPlaying === track.id) {
+        // Nếu đang phát bài hiện tại
+        if (audioRef.current && !audioRef.current.paused) {
+          // Đang phát -> Pause
+          savePlayHistory(
+            track.id,
+            Math.floor(audioRef.current.currentTime),
+            false
+          );
+          audioRef.current.pause();
+          setCurrentlyPlaying(null);
+        } else if (audioRef.current) {
+          // Đang pause -> Play lại
+          audioRef.current.play();
+          setCurrentlyPlaying(track.id);
+        }
       } else {
-        audioRef.current.currentTime = trackCurrentTimes[track.id] || 0;
-        audioRef.current.play();
+        // Chuyển sang bài mới
+        // Cleanup bài cũ
+        if (currentlyPlaying && audioRef.current) {
+          savePlayHistory(
+            currentlyPlaying,
+            Math.floor(audioRef.current.currentTime),
+            false
+          );
+        }
+        cleanupAudio();
+
+        // Tạo audio mới
+        const audio = new Audio(track.audioUrl);
+
+        // Add event listeners
+        audio.addEventListener('timeupdate', () => {
+          setTrackCurrentTimes((prev) => ({
+            ...prev,
+            [track.id]: audio.currentTime || 0,
+          }));
+        });
+
+        audio.addEventListener('ended', () => {
+          savePlayHistory(track.id, track.duration, true);
+          setCurrentlyPlaying(null);
+          cleanupAudio();
+        });
+
+        audioRef.current = audio;
+        audio.play();
         setCurrentlyPlaying(track.id);
       }
-    } else {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = track.audioUrl;
-      }
-      audioRef.current.currentTime = trackCurrentTimes[track.id] || 0;
-      audioRef.current.play();
-      setCurrentlyPlaying(track.id);
+    } catch (error) {
+      console.error('Error handling play/pause:', error);
     }
   };
 
   // Clean up audio khi unmount
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.removeEventListener('timeupdate', () => {});
-        audioRef.current = null;
-      }
+      cleanupAudio();
     };
   }, []);
 
+  // useEffect search để lưu search history
   useEffect(() => {
     async function performSearch() {
-      if (!query) return;
-
+      if (!query || !token) return;
       setIsLoading(true);
       try {
-        const trackResponse = await fetch(api.tracks.search(query));
-        const albumResponse = await fetch(api.albums.search(query));
-        
-        const trackData = await trackResponse.json();
-        const albumData = await albumResponse.json();
+        // Gọi API search tracks và albums trước
+        const [trackResponse, albumResponse] = await Promise.all([
+          fetch(api.tracks.search(query)),
+          fetch(api.albums.search(query)),
+        ]);
+
+        if (!trackResponse.ok || !albumResponse.ok) {
+          throw new Error('Search API failed');
+        }
+
+        const [trackData, albumData] = await Promise.all([
+          trackResponse.json(),
+          albumResponse.json(),
+        ]);
 
         setTrackResults(trackData);
         setAlbumResults(albumData);
+
+        // Lưu search history sau khi search thành công
+        await saveSearchHistory(query);
       } catch (error) {
         console.error('Search error:', error);
       } finally {
@@ -106,7 +210,7 @@ function SearchContent() {
     }
 
     performSearch();
-  }, [query]);
+  }, [query, token]);
 
   if (isLoading) return <LoadingUI />;
 
@@ -116,10 +220,8 @@ function SearchContent() {
         Search Results for "{query}"
       </h1>
 
-      <div className='flex flex-col gap-4'>
-        <h1 className="text-xl font-bold text-white mt-12">
-          Albums
-        </h1>
+      <div className="flex flex-col gap-4">
+        <h1 className="text-xl font-bold text-white mt-12">Albums</h1>
         {albumResults.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {albumResults.map((album) => (
@@ -146,10 +248,8 @@ function SearchContent() {
         )}
       </div>
 
-      <div className='flex flex-col gap-4'>
-        <h1 className="text-xl font-bold text-white mt-8">
-          Tracks
-        </h1>
+      <div className="flex flex-col gap-4">
+        <h1 className="text-xl font-bold text-white mt-8">Tracks</h1>
         {trackResults.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {trackResults.map((track) => (

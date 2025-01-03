@@ -34,6 +34,13 @@ export const api = {
     resetPassword: (username: string) =>
       `${API_BASE}/api/auth/users/${username}/reset-password`,
   },
+  history: {
+    save: () => `${API_BASE}/api/history`,
+    get: (type: string, page: number = 1, limit: number = 10) =>
+      `${API_BASE}/api/history?type=${type}&page=${page}&limit=${limit}`,
+    delete: (id: string) => `${API_BASE}/api/history/${id}`,
+    clear: (type: string) => `${API_BASE}/api/history?type=${type}`,
+  },
   sse: {
     url: `${API_BASE}/api/auth/sse`,
   },
