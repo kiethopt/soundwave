@@ -111,15 +111,17 @@ model Playlist {
   description String?
   coverUrl String?
   privacy PlaylistPrivacy @default(PRIVATE)
+  type PlaylistType @default(NORMAL)
   user User @relation(fields: [userId], references: [id])
   userId String
   tracks Track[]
-  isAIGenerated Boolean @default(false) // Đánh dấu playlist được tạo bởi AI hay người dùng
+  isAIGenerated Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([privacy])
+  @@unique([userId, type]) // Đảm bảo mỗi user chỉ có 1 playlist FAVORITE
 }
 
 enum Role {
@@ -135,4 +137,9 @@ enum HistoryType {
 enum PlaylistPrivacy {
   PUBLIC    // Ai cũng có thể xem
   PRIVATE   // Chỉ người tạo xem được
+}
+
+enum PlaylistType {
+  FAVORITE
+  NORMAL
 }

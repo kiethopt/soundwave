@@ -5,9 +5,19 @@ import { useSearchParams } from 'next/navigation';
 import { Track, Album } from '@/types';
 import { api } from '@/utils/api';
 import { useState, useEffect } from 'react';
-import { Pause, Play } from '@/components/ui/Icons';
+import { Music, Pause, Play, Plus } from '@/components/ui/Icons';
 import { useAuth } from '@/hooks/useAuth';
-import { MoreHorizontal } from 'lucide-react';
+import { Ban, Heart, MoreHorizontal, Share2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 type FilterType = 'all' | 'albums' | 'tracks';
 
@@ -52,6 +62,7 @@ function SearchContent() {
   const [albumResults, setAlbumResults] = useState<Album[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
   // Audio states
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
@@ -133,6 +144,47 @@ function SearchContent() {
     setTrackCurrentTimes({});
   };
 
+  const handleAddToPlaylist = async (trackId: string) => {
+    try {
+      // This would typically:
+      // 1. Mở hộp thoại để chọn danh sách phát
+      // 2. Thêm bài hát vào danh sách phát đã chọn
+      // 3. Hiển thị thông báo thành công/lỗi
+      console.log('Adding track to playlist:', trackId);
+    } catch (error) {
+      console.error('Failed to add to playlist:', error);
+    }
+  };
+
+  const handleAddToFavorites = async (trackId: string) => {
+    try {
+      // This would typically:
+      // 1. GET playlist YÊU THÍCH của người dùng hoặc tạo nếu playlist không tồn tại
+      // 2. Thêm bài hát vào playlist YÊU THÍCH
+      // 3. Hiển thị thông báo thành công/lỗi
+      console.log('Adding track to favorites:', trackId);
+    } catch (error) {
+      console.error('Failed to add to favorites:', error);
+    }
+  };
+
+  const handleShare = async (trackId: string) => {
+    try {
+      // This would typically:
+      // 1. Tạo liên kết có thể chia sẻ
+      // 2. Sao chép vào bảng tạm
+      // 3. Hiển thị thông báo thành công
+      console.log('Sharing track:', trackId);
+    } catch (error) {
+      console.error('Failed to share:', error);
+    }
+  };
+
+  const handleGoToAlbum = async (albumId: string) => {
+    // Implementation based on your schema
+    console.log('Go to album:', albumId);
+  };
+
   return (
     <div>
       {/* Filter Bar - Now at the top with full width and border bottom */}
@@ -190,7 +242,7 @@ function SearchContent() {
             trackResults.length > 0 && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">Tracks</h2>
-                <div className="md:grid md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div className="md:grid md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {/* Mobile List View */}
                   <div className="block md:hidden space-y-2">
                     {trackResults.map((track) => (
@@ -234,9 +286,34 @@ function SearchContent() {
                             {track.artist}
                           </p>
                         </div>
-                        <button className="p-2 opacity-60 hover:opacity-100">
-                          <MoreHorizontal className="w-5 h-5" />
-                        </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="p-2 opacity-60 hover:opacity-100">
+                              <MoreHorizontal className="w-5 h-5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuItem
+                              onClick={() => handleAddToPlaylist(track.id)}
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add to playlist
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleAddToFavorites(track.id)}
+                            >
+                              <Heart className="w-4 h-4 mr-2" />
+                              Add to favorites
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleShare(track.id)}
+                            >
+                              <Share2 className="w-4 h-4 mr-2" />
+                              Share
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     ))}
                   </div>
@@ -245,11 +322,11 @@ function SearchContent() {
                   {trackResults.map((track) => (
                     <div
                       key={track.id}
-                      className={`hidden md:block p-4 rounded-lg group relative
+                      className={`hidden md:block bg-white/5 p-4 rounded-lg group relative
                         ${
                           currentlyPlaying === track.id
                             ? 'bg-white/5'
-                            : 'bg-white/5 hover:bg-white/5'
+                            : 'hover:bg-white/5'
                         }`}
                     >
                       <div className="relative">
@@ -269,18 +346,50 @@ function SearchContent() {
                           )}
                         </button>
                       </div>
-                      <h3
-                        className={`font-medium truncate ${
-                          currentlyPlaying === track.id
-                            ? 'text-[#A57865]'
-                            : 'text-white'
-                        }`}
-                      >
-                        {track.title}
-                      </h3>
-                      <p className="text-white/60 text-sm truncate">
-                        {track.artist}
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-grow min-w-0">
+                          <h3
+                            className={`font-medium truncate ${
+                              currentlyPlaying === track.id
+                                ? 'text-[#A57865]'
+                                : 'text-white'
+                            }`}
+                          >
+                            {track.title}
+                          </h3>
+                          <p className="text-white/60 text-sm truncate">
+                            {track.artist}
+                          </p>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <MoreHorizontal className="w-5 h-5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuItem
+                              onClick={() => handleAddToPlaylist(track.id)}
+                            >
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add to playlist
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleAddToFavorites(track.id)}
+                            >
+                              <Heart className="w-4 h-4 mr-2" />
+                              Add to favorites
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleShare(track.id)}
+                            >
+                              <Share2 className="w-4 h-4 mr-2" />
+                              Share
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   ))}
                 </div>

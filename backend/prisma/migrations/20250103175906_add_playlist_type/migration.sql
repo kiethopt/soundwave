@@ -7,6 +7,9 @@ CREATE TYPE "HistoryType" AS ENUM ('SEARCH', 'PLAY');
 -- CreateEnum
 CREATE TYPE "PlaylistPrivacy" AS ENUM ('PUBLIC', 'PRIVATE');
 
+-- CreateEnum
+CREATE TYPE "PlaylistType" AS ENUM ('FAVORITE', 'NORMAL');
+
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
@@ -72,7 +75,7 @@ CREATE TABLE "History" (
     "userId" TEXT NOT NULL,
     "duration" INTEGER,
     "completed" BOOLEAN,
-    "playCount" INTEGER NOT NULL DEFAULT 1,
+    "playCount" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -86,6 +89,7 @@ CREATE TABLE "Playlist" (
     "description" TEXT,
     "coverUrl" TEXT,
     "privacy" "PlaylistPrivacy" NOT NULL DEFAULT 'PRIVATE',
+    "type" "PlaylistType" NOT NULL DEFAULT 'NORMAL',
     "userId" TEXT NOT NULL,
     "isAIGenerated" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -170,6 +174,9 @@ CREATE INDEX "Playlist_userId_idx" ON "Playlist"("userId");
 
 -- CreateIndex
 CREATE INDEX "Playlist_privacy_idx" ON "Playlist"("privacy");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Playlist_userId_type_key" ON "Playlist"("userId", "type");
 
 -- CreateIndex
 CREATE INDEX "_PlaylistToTrack_B_index" ON "_PlaylistToTrack"("B");
