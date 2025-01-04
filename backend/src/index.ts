@@ -7,6 +7,7 @@ import artistRoutes from './routes/artist.routes';
 import albumRoutes from './routes/album.routes';
 import trackRoutes from './routes/track.routes';
 import historyRoutes from './routes/history.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 import { errorHandler } from './middleware/error';
 import prisma from './config/db';
 
@@ -88,6 +89,7 @@ app.use('/api', artistRoutes);
 app.use('/api', albumRoutes);
 app.use('/api', trackRoutes);
 app.use('/api', historyRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Error Handler
 app.use(errorHandler);

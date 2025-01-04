@@ -344,34 +344,19 @@ export const updateMonthlyListeners = async (
   res: Response
 ): Promise<void> => {
   try {
-    // Lấy tất cả artists
     const artists = await prisma.artist.findMany({
       where: { isActive: true },
       select: { id: true, discordMessageId: true },
     });
 
-    // Cập nhật monthly listeners cho từng artist
     await Promise.all(
       artists.map(async (artist) => {
-        // Đếm số lượt nghe trong 30 ngày gần nhất
         const monthlyListeners = await prisma.history.groupBy({
           by: ['userId'],
           where: {
             OR: [
-              {
-                track: {
-                  artistId: artist.id,
-                },
-              },
-              {
-                track: {
-                  featuredArtists: {
-                    some: {
-                      id: artist.id,
-                    },
-                  },
-                },
-              },
+              { track: { artistId: artist.id } },
+              { track: { featuredArtists: { some: { id: artist.id } } } },
             ],
             type: 'PLAY',
             createdAt: {
@@ -381,7 +366,6 @@ export const updateMonthlyListeners = async (
           _count: true,
         });
 
-        // Cập nhật monthly listeners
         const updatedArtist = await prisma.artist.update({
           where: { id: artist.id },
           data: {
@@ -391,7 +375,6 @@ export const updateMonthlyListeners = async (
           select: artistSelect,
         });
 
-        // Cập nhật metadata trên Discord
         if (artist.discordMessageId) {
           await saveArtistMetadata(
             {
@@ -401,15 +384,15 @@ export const updateMonthlyListeners = async (
               monthlyListeners: updatedArtist.monthlyListeners,
               type: 'artist',
             },
-            artist.discordMessageId // Cập nhật message hiện có
+            artist.discordMessageId
           );
         }
       })
     );
 
-    res.json({ message: 'Monthly listeners đã được cập nhật thành công' });
+    // Do not send a response here
   } catch (error) {
     console.error('Update monthly listeners error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    // Do not send a response here
   }
 };

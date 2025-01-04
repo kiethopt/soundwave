@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
+import { updateMonthlyListeners } from './artist.controller';
 
 export const saveHistory = async (
   req: Request,
@@ -9,14 +10,12 @@ export const saveHistory = async (
     const { type, trackId, duration, completed, query } = req.body;
     const userId = req.user!.id;
 
-    // Validate history type
     if (!['PLAY', 'SEARCH'].includes(type)) {
       res.status(400).json({ message: 'Invalid history type' });
       return;
     }
 
     if (type === 'PLAY') {
-      // Validate required fields for PLAY
       if (!trackId) {
         res
           .status(400)
@@ -24,7 +23,6 @@ export const saveHistory = async (
         return;
       }
 
-      // Upsert PLAY history
       const history = await prisma.history.upsert({
         where: {
           userId_trackId: {
@@ -48,7 +46,6 @@ export const saveHistory = async (
         },
       });
 
-      // Tăng playCount của track
       await prisma.track.update({
         where: { id: trackId },
         data: {
@@ -56,9 +53,12 @@ export const saveHistory = async (
         },
       });
 
+      // Update monthly listeners without sending a response
+      await updateMonthlyListeners(req, res);
+
+      // Send response only once
       res.status(200).json(history);
     } else if (type === 'SEARCH') {
-      // Validate required fields for SEARCH
       if (!query) {
         res
           .status(400)
@@ -66,13 +66,12 @@ export const saveHistory = async (
         return;
       }
 
-      // Create SEARCH history
       const history = await prisma.history.create({
         data: {
           type: 'SEARCH',
           userId,
           query,
-          playCount: 0, // Set playCount = 0 cho SEARCH history
+          playCount: 0,
         },
       });
 

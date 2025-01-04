@@ -46,6 +46,11 @@ export default function ArtistDetail({
     fetchArtist();
   }, [id]);
 
+  // Log re-renders when the artist state changes
+  useEffect(() => {
+    console.log('Component re-rendered with artist:', artist);
+  }, [artist]);
+
   const handleVerify = async () => {
     try {
       setIsUpdating(true);
@@ -96,7 +101,7 @@ export default function ArtistDetail({
         throw new Error(data.message || 'Failed to update monthly listeners');
       }
 
-      // Refresh artist data
+      // Explicitly fetch the updated artist data
       const artistResponse = await fetch(api.artists.getById(id), {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -107,7 +112,9 @@ export default function ArtistDetail({
       }
 
       const artistData = await artistResponse.json();
+      console.log('Updated Artist Data:', artistData); // Log the updated artist data
       setArtist(artistData);
+      console.log('Artist state after update:', artist); // Log the state after update
     } catch (err) {
       console.error('Error updating monthly listeners:', err);
       setError(

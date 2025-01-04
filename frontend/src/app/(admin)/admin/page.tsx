@@ -31,35 +31,19 @@ export default function AdminDashboard() {
           throw new Error('No authentication token found');
         }
 
-        // Fetch tracks count
-        const tracksResponse = await fetch(api.tracks.getAll(), {
+        const response = await fetch(api.dashboard.getStats(), {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const tracksData = await tracksResponse.json();
-
-        // Fetch albums count
-        const albumsResponse = await fetch(api.albums.getAll(), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const albumsData = await albumsResponse.json();
-
-        // Fetch users count
-        const usersResponse = await fetch(api.users.getAll(), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const usersData = await usersResponse.json();
-
-        // Fetch artists count
-        const artistsResponse = await fetch(api.artists.getAll(), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const artistsData = await artistsResponse.json();
+        if (!response.ok) {
+          throw new Error('Failed to fetch stats');
+        }
+        const data = await response.json();
 
         setStats({
-          totalTracks: tracksData.length,
-          totalAlbums: albumsData.length,
-          totalUsers: usersData.length,
-          totalArtists: artistsData.length,
+          totalTracks: data.tracks,
+          totalAlbums: data.albums,
+          totalUsers: data.users,
+          totalArtists: data.artists,
         });
       } catch (err) {
         console.error('Error fetching stats:', err);

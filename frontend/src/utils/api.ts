@@ -53,6 +53,9 @@ export const api = {
     delete: (id: string) => `${API_BASE}/api/history/${id}`,
     clear: (type: string) => `${API_BASE}/api/history?type=${type}`,
   },
+  dashboard: {
+    getStats: () => `${API_BASE}/api/dashboard/stats`,
+  },
   sse: {
     url: `${API_BASE}/api/auth/sse`,
   },

@@ -2,7 +2,7 @@
 
 import { Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Track, Album } from '@/types';
+import { Track, Album, Artist } from '@/types';
 import { api } from '@/utils/api';
 import { useState, useEffect } from 'react';
 import { Music, Pause, Play, Plus } from '@/components/ui/Icons';
@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-type FilterType = 'all' | 'albums' | 'tracks';
+type FilterType = 'all' | 'albums' | 'tracks' | 'artists';
 
 // Loading UI component
 function LoadingUI() {
@@ -54,12 +54,12 @@ function LoadingUI() {
 function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q');
-  const { token } = useAuth();
+  const { token, loading } = useAuth();
   const [trackResults, setTrackResults] = useState<Track[]>([]);
   const [albumResults, setAlbumResults] = useState<Album[]>([]);
+  const [artistResults, setArtistResults] = useState<Artist[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
   // Audio states
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
@@ -73,34 +73,55 @@ function SearchContent() {
     { label: 'All', value: 'all' },
     { label: 'Albums', value: 'albums' },
     { label: 'Tracks', value: 'tracks' },
+    { label: 'Artists', value: 'artists' },
   ];
 
   useEffect(() => {
+    if (loading) {
+      console.log('Waiting for token to load...');
+      return; // Exit early if token is still loading
+    }
+
+    console.log('Token:', token); // Debug log
     const fetchResults = async () => {
       if (!query) {
         setTrackResults([]);
         setAlbumResults([]);
+        setArtistResults([]);
         return;
       }
 
       setIsLoading(true);
       try {
-        const [albumsResponse, tracksResponse] = await Promise.all([
-          fetch(api.albums.search(query), {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }),
-          fetch(api.tracks.search(query), {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }),
-        ]);
+        if (token) {
+          console.log('Saving search history with token:', token); // Debug log
+          await saveSearchHistory(query, token); // Pass token explicitly
+        } else {
+          console.error('No token found, skipping search history save');
+        }
 
-        const [albums, tracks] = await Promise.all([
+        const [albumsResponse, tracksResponse, artistsResponse] =
+          await Promise.all([
+            fetch(api.albums.search(query), {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            }),
+            fetch(api.tracks.search(query), {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            }),
+            fetch(api.artists.search(query), {
+              headers: token ? { Authorization: `Bearer ${token}` } : {},
+            }),
+          ]);
+
+        const [albums, tracks, artists] = await Promise.all([
           albumsResponse.json(),
           tracksResponse.json(),
+          artistsResponse.json(),
         ]);
 
         setAlbumResults(albums);
         setTrackResults(tracks);
+        setArtistResults(artists);
       } catch (error) {
         console.error('Search error:', error);
       } finally {
@@ -109,48 +130,9 @@ function SearchContent() {
     };
 
     fetchResults();
-  }, [query, token]);
+  }, [query, token, loading]);
 
-  useEffect(() => {
-    const fetchResults = async () => {
-      if (!query) {
-        setTrackResults([]);
-        setAlbumResults([]);
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        const [albumsResponse, tracksResponse] = await Promise.all([
-          fetch(api.albums.search(query), {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }),
-          fetch(api.tracks.search(query), {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }),
-        ]);
-
-        const [albums, tracks] = await Promise.all([
-          albumsResponse.json(),
-          tracksResponse.json(),
-        ]);
-
-        console.log('Albums:', albums); // Debug log
-        console.log('Tracks:', tracks); // Debug log
-
-        setAlbumResults(albums);
-        setTrackResults(tracks);
-      } catch (error) {
-        console.error('Search error:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchResults();
-  }, [query, token]);
-
-  const saveSearchHistory = async (query: string) => {
+  const saveSearchHistory = async (query: string, token: string | null) => {
     try {
       if (!token) {
         console.error('No token found');
@@ -219,7 +201,6 @@ function SearchContent() {
   const handlePlayPause = (track: Track) => {
     if (currentlyPlaying === track.id) {
       if (audioRef.current && !audioRef.current.paused) {
-        // Đang phát -> Pause
         savePlayHistory(
           track.id,
           Math.floor(audioRef.current.currentTime),
@@ -228,12 +209,10 @@ function SearchContent() {
         audioRef.current.pause();
         setCurrentlyPlaying(null);
       } else if (audioRef.current) {
-        // Đang pause -> Play lại
         audioRef.current.play();
         setCurrentlyPlaying(track.id);
       }
     } else {
-      // Chuyển sang bài mới
       if (currentlyPlaying && audioRef.current) {
         savePlayHistory(
           currentlyPlaying,
@@ -244,6 +223,7 @@ function SearchContent() {
       cleanupAudio();
 
       const audio = new Audio(track.audioUrl);
+      audio.preload = 'auto'; // Tải trước file âm thanh
       audio.addEventListener('timeupdate', handleTimeUpdate);
       audio.addEventListener('ended', () => {
         savePlayHistory(track.id, track.duration, true);
@@ -334,6 +314,32 @@ function SearchContent() {
       {/* Content Area */}
       <div className="p-6">
         <div className="space-y-8">
+          {/* Artists Section */}
+          {(activeFilter === 'all' || activeFilter === 'artists') &&
+            artistResults.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Artists</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {artistResults.map((artist) => (
+                    <div key={artist.id} className="bg-white/5 p-4 rounded-lg">
+                      <img
+                        src={artist.avatar || '/images/default-avatar.png'}
+                        alt={artist.name}
+                        className="w-full aspect-square object-cover rounded-md mb-4"
+                      />
+                      <h3 className="text-white font-medium truncate">
+                        {artist.name}
+                      </h3>
+                      <p className="text-white/60 text-sm truncate">
+                        {artist.monthlyListeners.toLocaleString()} monthly
+                        listeners
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
           {/* Albums Section */}
           {(activeFilter === 'all' || activeFilter === 'albums') &&
             albumResults.length > 0 && (
