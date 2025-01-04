@@ -13,6 +13,7 @@ interface SearchableSelectProps {
   placeholder?: string;
   multiple?: boolean;
   label?: string;
+  required?: boolean;
 }
 
 export function SearchableSelect({
@@ -22,6 +23,7 @@ export function SearchableSelect({
   placeholder = 'Select an option',
   multiple = false,
   label,
+  required = false,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -94,7 +96,9 @@ export function SearchableSelect({
       )}
       <div className="relative" ref={wrapperRef}>
         <div
-          className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent cursor-pointer"
+          className={`w-full px-3 py-2 bg-white/[0.07] rounded-md border ${
+            required && !value ? 'border-red-500' : 'border-white/[0.1]'
+          } focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent cursor-pointer`}
           onClick={() => setIsOpen(!isOpen)}
         >
           {displayValue()}
@@ -138,6 +142,9 @@ export function SearchableSelect({
           </div>
         )}
       </div>
+      {required && !value && (
+        <p className="text-red-500 text-sm mt-1">This field is required</p>
+      )}
     </div>
   );
 }
