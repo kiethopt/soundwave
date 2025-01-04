@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/Icons';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { User } from 'lucide-react';
 
 export default function Sidebar({
   isOpen,
@@ -105,6 +106,26 @@ export default function Sidebar({
                 <div className="px-3 text-sm font-medium text-white/70">
                   Admin Dashboard
                 </div>
+                <Link
+                  href="/admin"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    isActive('/admin') ? 'bg-white/10' : 'hover:bg-white/10'
+                  }`}
+                >
+                  <Home className="w-6 h-6" />
+                  <span>Dashboard</span>
+                </Link>
+                <Link
+                  href="/admin/artists"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    pathname.startsWith('/admin/artists')
+                      ? 'bg-white/10'
+                      : 'hover:bg-white/10'
+                  }`}
+                >
+                  <User className="w-6 h-6" />
+                  <span>Artists</span>
+                </Link>
                 <Link
                   href="/admin/tracks"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${

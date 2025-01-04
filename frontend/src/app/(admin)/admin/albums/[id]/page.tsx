@@ -1,11 +1,9 @@
 'use client';
 
-import { Album } from '@/types';
+import { Album, Artist } from '@/types';
 import { API_URL } from '@/utils/config';
 import { useEffect, useState } from 'react';
-import TrackUploadForm, {
-  TrackDetails,
-} from '@/components/admin/TrackUploadForm';
+import TrackUploadForm from '@/components/admin/TrackUploadForm';
 import TrackList from '@/components/admin/TrackList';
 import { ArrowLeftIcon, Calendar, Music } from 'lucide-react';
 import Link from 'next/link';
@@ -18,7 +16,14 @@ export default function AlbumDetailPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [newTracks, setNewTracks] = useState<File[]>([]);
   const [trackDetails, setTrackDetails] = useState<{
-    [key: string]: TrackDetails;
+    [key: string]: {
+      title: string;
+      artist: string;
+      featuredArtists: string[];
+      duration: number;
+      trackNumber: number;
+      releaseDate: string;
+    };
   }>({});
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isLoading, setIsLoading] = useState(true);
@@ -51,7 +56,6 @@ export default function AlbumDetailPage() {
       }
 
       const data = await response.json();
-      console.log('Album data loaded:', data);
       setAlbum(data);
     } catch (err) {
       console.error('Error fetching album:', err);
@@ -78,7 +82,7 @@ export default function AlbumDetailPage() {
           formData.append(`artist_${index}`, details.artist);
           formData.append(
             `featuredArtists_${index}`,
-            details.featuredArtists || ''
+            JSON.stringify(details.featuredArtists || [])
           );
           formData.append(`duration_${index}`, String(details.duration || 0));
           formData.append(
@@ -126,14 +130,13 @@ export default function AlbumDetailPage() {
       const files = Array.from(e.target.files);
       setNewTracks(files);
 
-      // Initialize trackDetails for new files
       const newTrackDetails = { ...trackDetails };
       files.forEach((file, index) => {
         if (!newTrackDetails[file.name]) {
           newTrackDetails[file.name] = {
             title: file.name.replace(/\.[^/.]+$/, ''),
-            artist: album?.artist || '',
-            featuredArtists: '',
+            artist: album?.artistId || '',
+            featuredArtists: [],
             duration: 0,
             trackNumber: (album?.tracks?.length || 0) + index + 1,
             releaseDate:
@@ -143,6 +146,13 @@ export default function AlbumDetailPage() {
       });
       setTrackDetails(newTrackDetails);
     }
+  };
+
+  const getArtistName = (artist: string | Artist): string => {
+    if (typeof artist === 'object' && artist !== null) {
+      return artist.name;
+    }
+    return artist;
   };
 
   if (error) {
@@ -189,7 +199,9 @@ export default function AlbumDetailPage() {
           <div className="flex-1">
             <h1 className="text-4xl font-bold mb-4">{album.title}</h1>
             <div className="flex flex-col gap-2 text-white/60">
-              <p className="text-xl text-white">{album.artist}</p>
+              <p className="text-xl text-white">
+                {getArtistName(album.artist)}
+              </p>
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
@@ -211,7 +223,11 @@ export default function AlbumDetailPage() {
         {album.tracks && album.tracks.length > 0 && (
           <div className="mb-12">
             <h2 className="text-xl font-semibold mb-4">Tracks</h2>
-            <TrackList tracks={album.tracks} albumId={album.id} />
+            <TrackList
+              tracks={album.tracks}
+              albumId={album.id}
+              albumCoverUrl={album.coverUrl}
+            />
           </div>
         )}
 

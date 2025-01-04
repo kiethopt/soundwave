@@ -1,11 +1,14 @@
 'use client';
 
-import { Album } from '@/types';
+import { Album, Artist } from '@/types';
+import { api } from '@/utils/api';
+import { useEffect, useState } from 'react';
+import { SearchableSelect } from '../ui/SearchableSelect';
 
 export interface TrackDetails {
   title: string;
   artist: string;
-  featuredArtists: string;
+  featuredArtists: string[];
   duration: number;
   trackNumber: number;
   releaseDate: string;
@@ -13,7 +16,7 @@ export interface TrackDetails {
 }
 
 interface TrackUploadFormProps {
-  album: Album | null;
+  album: Album;
   newTracks: File[];
   trackDetails: { [key: string]: TrackDetails };
   isUploading: boolean;
@@ -22,7 +25,7 @@ interface TrackUploadFormProps {
   onTrackDetailChange: (
     fileName: string,
     field: keyof TrackDetails,
-    value: string | number
+    value: any
   ) => void;
 }
 
@@ -35,115 +38,143 @@ export default function TrackUploadForm({
   onSubmit,
   onTrackDetailChange,
 }: TrackUploadFormProps) {
-  const formatDuration = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
+  const [artists, setArtists] = useState<Artist[]>([]);
 
-  const parseDuration = (timeString: string): number => {
-    const [minutes, seconds] = timeString.split(':').map(Number);
-    return (minutes || 0) * 60 + (seconds || 0);
-  };
+  useEffect(() => {
+    const fetchArtists = async () => {
+      try {
+        const response = await fetch(api.artists.getAllActive(), {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('userToken')}`,
+          },
+        });
+        if (!response.ok) throw new Error('Failed to fetch artists');
+        const data = await response.json();
+        setArtists(data);
+      } catch (error) {
+        console.error('Error fetching artists:', error);
+      }
+    };
+    fetchArtists();
+  }, []);
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-6">
       <div className="flex items-center gap-4">
         <input
           type="file"
-          multiple
           accept="audio/*"
+          multiple
           onChange={onFileChange}
-          className="flex-1 p-2 bg-white/5 rounded"
+          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-white file:text-black hover:file:bg-white/90"
         />
-        {newTracks.length > 0 && (
-          <button
-            type="submit"
-            disabled={isUploading}
-            className="px-4 py-2 bg-white text-black rounded hover:bg-white/90 disabled:opacity-50"
-          >
-            {isUploading ? 'Uploading...' : 'Upload Tracks'}
-          </button>
-        )}
       </div>
 
       {newTracks.length > 0 && (
-        <div className="space-y-4 mt-4">
-          <h2 className="text-xl font-semibold">Track Details</h2>
+        <div className="space-y-6">
           {newTracks.map((file) => (
-            <div key={file.name} className="p-4 bg-white/5 rounded space-y-2">
-              <p className="font-medium">{file.name}</p>
-              <div className="grid gap-2">
-                <input
-                  type="text"
-                  placeholder="Title"
-                  value={trackDetails[file.name]?.title || ''}
-                  onChange={(e) =>
-                    onTrackDetailChange(file.name, 'title', e.target.value)
-                  }
-                  className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-                  lang="vi"
-                />
-                <input
-                  type="text"
-                  placeholder="Artist"
-                  value={trackDetails[file.name]?.artist || album?.artist || ''}
-                  onChange={(e) =>
-                    onTrackDetailChange(file.name, 'artist', e.target.value)
-                  }
-                  className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-                  lang="vi"
-                />
-                <input
-                  type="text"
-                  placeholder="Featured Artists (optional)"
-                  value={trackDetails[file.name]?.featuredArtists || ''}
-                  onChange={(e) =>
-                    onTrackDetailChange(
-                      file.name,
-                      'featuredArtists',
-                      e.target.value
-                    )
-                  }
-                  className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-                  lang="vi"
-                />
-                <input
-                  type="text"
-                  placeholder="Duration (mm:ss)"
-                  pattern="[0-9]+:[0-5][0-9]"
-                  value={
-                    trackDetails[file.name]?.duration
-                      ? formatDuration(trackDetails[file.name].duration)
-                      : '0:00'
-                  }
-                  onChange={(e) => {
-                    const durationInSeconds = parseDuration(e.target.value);
-                    onTrackDetailChange(
-                      file.name,
-                      'duration',
-                      durationInSeconds
-                    );
-                  }}
-                  className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-                />
-                <input
-                  type="number"
-                  placeholder="Track Number"
-                  value={trackDetails[file.name]?.trackNumber || ''}
-                  onChange={(e) =>
-                    onTrackDetailChange(
-                      file.name,
-                      'trackNumber',
-                      parseInt(e.target.value, 10)
-                    )
-                  }
-                  min={1}
-                  className="w-full px-3 py-2 bg-white/5 rounded border border-white/10"
-                />
+            <div key={file.name} className="bg-white/5 p-6 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={trackDetails[file.name]?.title || ''}
+                    onChange={(e) =>
+                      onTrackDetailChange(file.name, 'title', e.target.value)
+                    }
+                    className="w-full px-3 py-2 bg-white/10 rounded-md"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Artist
+                  </label>
+                  <SearchableSelect
+                    options={artists}
+                    value={trackDetails[file.name]?.artist || ''}
+                    onChange={(value) =>
+                      onTrackDetailChange(file.name, 'artist', value)
+                    }
+                    placeholder="Select artist"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Featured Artists
+                  </label>
+                  <SearchableSelect
+                    options={artists}
+                    value={trackDetails[file.name]?.featuredArtists || []}
+                    onChange={(value) =>
+                      onTrackDetailChange(file.name, 'featuredArtists', value)
+                    }
+                    placeholder="Select featured artists"
+                    multiple
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Duration (MM:SS)
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      trackDetails[file.name]?.duration
+                        ? `${Math.floor(
+                            trackDetails[file.name].duration / 60
+                          )}:${(trackDetails[file.name].duration % 60)
+                            .toString()
+                            .padStart(2, '0')}`
+                        : '0:00'
+                    }
+                    onChange={(e) => {
+                      const [minutes, seconds] = e.target.value
+                        .split(':')
+                        .map(Number);
+                      onTrackDetailChange(
+                        file.name,
+                        'duration',
+                        minutes * 60 + (seconds || 0)
+                      );
+                    }}
+                    className="w-full px-3 py-2 bg-white/10 rounded-md"
+                    pattern="[0-9]+:[0-5][0-9]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Track Number
+                  </label>
+                  <input
+                    type="number"
+                    value={trackDetails[file.name]?.trackNumber || ''}
+                    onChange={(e) =>
+                      onTrackDetailChange(
+                        file.name,
+                        'trackNumber',
+                        parseInt(e.target.value)
+                      )
+                    }
+                    className="w-full px-3 py-2 bg-white/10 rounded-md"
+                    min="1"
+                    required
+                  />
+                </div>
               </div>
             </div>
           ))}
+          <button
+            type="submit"
+            disabled={isUploading}
+            className="w-full px-4 py-2 bg-white text-black rounded-full hover:bg-white/90 disabled:bg-white/50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isUploading ? 'Uploading...' : 'Upload Tracks'}
+          </button>
         </div>
       )}
     </form>

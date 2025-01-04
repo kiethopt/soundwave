@@ -3,6 +3,7 @@ import cors from 'cors';
 import http from 'http';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
+import artistRoutes from './routes/artist.routes';
 import albumRoutes from './routes/album.routes';
 import trackRoutes from './routes/track.routes';
 import historyRoutes from './routes/history.routes';
@@ -83,6 +84,7 @@ app.get('/api/auth/sse', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api', artistRoutes);
 app.use('/api', albumRoutes);
 app.use('/api', trackRoutes);
 app.use('/api', historyRoutes);

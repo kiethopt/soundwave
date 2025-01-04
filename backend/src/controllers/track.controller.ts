@@ -36,13 +36,118 @@ const trackSelect = {
   updatedAt: true,
 } as const;
 
+// export const createTrack = async (
+//   req: Request,
+//   res: Response
+// ): Promise<void> => {
+//   try {
+//     const { title, artist, featuredArtists, duration, releaseDate, albumId } =
+//       req.body;
+//     const files = req.files as
+//       | { [fieldname: string]: Express.Multer.File[] }
+//       | undefined;
+//     const audioFile = files?.['audio']?.[0];
+//     const coverFile = files?.['cover']?.[0];
+//     const user = req.user;
+
+//     if (!user?.id) {
+//       res.status(401).json({ message: 'Unauthorized' });
+//       return;
+//     }
+
+//     if (!audioFile) {
+//       res.status(400).json({ message: 'Audio file is required' });
+//       return;
+//     }
+
+//     // Lấy coverUrl từ album nếu có
+//     let albumData = null;
+//     if (albumId) {
+//       albumData = await prisma.album.findUnique({
+//         where: { id: albumId },
+//         select: { coverUrl: true },
+//       });
+//     }
+
+//     // Upload audio file
+//     const audioUpload = await uploadTrack(
+//       audioFile.buffer,
+//       audioFile.originalname,
+//       true,
+//       !!albumId
+//     );
+
+//     // Upload cover if provided or use album cover
+//     let coverUrl: string | undefined;
+//     if (coverFile) {
+//       const coverUpload = await uploadTrack(
+//         coverFile.buffer,
+//         coverFile.originalname,
+//         false,
+//         false,
+//         true
+//       );
+//       coverUrl = coverUpload.url;
+//     } else if (albumData?.coverUrl) {
+//       coverUrl = albumData.coverUrl;
+//     }
+
+//     const metadata: TrackMetadata = {
+//       title,
+//       artist,
+//       featuredArtists: featuredArtists || null,
+//       duration: parseInt(duration),
+//       releaseDate: new Date(releaseDate).toISOString().split('T')[0],
+//       albumId: albumId || null,
+//       type: 'track',
+//     };
+
+//     const metadataUpload = await saveMetadata(metadata);
+
+//     const track = await prisma.track.create({
+//       data: {
+//         title,
+//         artist,
+//         featuredArtists: featuredArtists || null,
+//         duration: parseInt(duration),
+//         releaseDate: new Date(releaseDate),
+//         coverUrl,
+//         audioUrl: audioUpload.url,
+//         audioMessageId: audioUpload.messageId,
+//         albumId: albumId || undefined,
+//         uploadedBy: {
+//           connect: { id: user.id },
+//         },
+//         discordMessageId: metadataUpload.messageId,
+//       },
+//       select: trackSelect,
+//     });
+
+//     res.status(201).json({
+//       message: 'Track created successfully',
+//       track,
+//     });
+//   } catch (error) {
+//     console.error('Create track error:', error);
+//     res.status(500).json({
+//       message: 'Internal server error',
+//       error:
+//         process.env.NODE_ENV === 'development'
+//           ? error instanceof Error
+//             ? error.message
+//             : String(error)
+//           : undefined,
+//     });
+//   }
+// };
+
 export const createTrack = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    const { title, artist, featuredArtists, duration, releaseDate, albumId } =
-      req.body;
+    const { title, artistId, duration, releaseDate, albumId } = req.body;
+    const featuredArtists = req.body.featuredArtists || []; // Lấy featuredArtists từ request body
     const files = req.files as
       | { [fieldname: string]: Express.Multer.File[] }
       | undefined;
@@ -59,6 +164,26 @@ export const createTrack = async (
       res.status(400).json({ message: 'Audio file is required' });
       return;
     }
+
+    // Lấy thông tin nghệ sĩ chính từ artistId
+    const artist = await prisma.artist.findUnique({
+      where: { id: artistId },
+      select: { name: true },
+    });
+
+    if (!artist) {
+      res.status(400).json({ message: 'Artist not found' });
+      return;
+    }
+
+    // Lấy thông tin các nghệ sĩ featured từ featuredArtists
+    const featuredArtistsInfo =
+      featuredArtists.length > 0
+        ? await prisma.artist.findMany({
+            where: { id: { in: featuredArtists } },
+            select: { name: true },
+          })
+        : [];
 
     // Lấy coverUrl từ album nếu có
     let albumData = null;
@@ -94,8 +219,10 @@ export const createTrack = async (
 
     const metadata: TrackMetadata = {
       title,
-      artist,
-      featuredArtists: featuredArtists || null,
+      artist: artist.name, // Sử dụng tên nghệ sĩ thay vì artistId
+      featuredArtists: featuredArtistsInfo
+        .map((artist) => artist.name)
+        .join(', '), // Thêm thông tin featured artists
       duration: parseInt(duration),
       releaseDate: new Date(releaseDate).toISOString().split('T')[0],
       albumId: albumId || null,
@@ -107,16 +234,27 @@ export const createTrack = async (
     const track = await prisma.track.create({
       data: {
         title,
-        artist,
-        featuredArtists: featuredArtists || null,
+        artist: {
+          connect: { id: artistId }, // Sử dụng connect để liên kết artistId
+        },
+        featuredArtists:
+          featuredArtists.length > 0
+            ? {
+                connect: featuredArtists.map((id: string) => ({ id })), // Liên kết featuredArtists
+              }
+            : undefined,
         duration: parseInt(duration),
         releaseDate: new Date(releaseDate),
         coverUrl,
         audioUrl: audioUpload.url,
         audioMessageId: audioUpload.messageId,
-        albumId: albumId || undefined,
+        album: albumId
+          ? {
+              connect: { id: albumId }, // Liên kết albumId nếu có
+            }
+          : undefined,
         uploadedBy: {
-          connect: { id: user.id },
+          connect: { id: user.id }, // Liên kết userId
         },
         discordMessageId: metadataUpload.messageId,
       },
@@ -140,31 +278,6 @@ export const createTrack = async (
     });
   }
 };
-
-// Lấy tất cả tracks
-// export const getAllTracks = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   try {
-//     const tracks = await prisma.track.findMany({
-//       where: {
-//         isActive: true,
-//         albumId: null, // Chỉ lấy tracks không thuộc album nào
-//       },
-//       select: trackSelect,
-//       orderBy: { createdAt: 'desc' },
-//     });
-
-//     res.json(tracks);
-//   } catch (error) {
-//     console.error('Get tracks error:', error);
-//     res.status(500).json({
-//       message: 'Internal server error',
-//       error: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-//     });
-//   }
-// };
 
 export const getAllTracks = async (
   req: Request,
@@ -232,12 +345,16 @@ export const getTracksByArtist = async (
     const tracks = await prisma.track.findMany({
       where: {
         artist: {
-          contains: artist,
-          mode: 'insensitive',
+          name: {
+            equals: artist,
+            mode: 'insensitive',
+          },
         },
         isActive: true,
       },
-      select: trackSelect,
+      include: {
+        album: true,
+      },
     });
 
     res.json(tracks);
@@ -310,20 +427,46 @@ export const searchTrack = async (
         OR: [
           {
             title: {
-              contains: String(q),
               mode: 'insensitive',
+              contains: String(q),
             },
           },
           {
             artist: {
-              contains: String(q),
-              mode: 'insensitive',
+              name: {
+                mode: 'insensitive',
+                contains: String(q),
+              },
             },
           },
         ],
       },
+      // Thêm select để lấy đầy đủ thông tin artist
       select: {
-        ...trackSelect,
+        id: true,
+        title: true,
+        duration: true,
+        releaseDate: true,
+        trackNumber: true,
+        coverUrl: true,
+        audioUrl: true,
+        audioMessageId: true,
+        artist: {
+          select: {
+            id: true,
+            name: true,
+            avatar: true,
+            isVerified: true,
+          },
+        },
+        featuredArtists: {
+          select: {
+            id: true,
+            name: true,
+            avatar: true,
+            isVerified: true,
+          },
+        },
         album: {
           select: {
             id: true,
@@ -331,6 +474,16 @@ export const searchTrack = async (
             coverUrl: true,
           },
         },
+        uploadedBy: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+          },
+        },
+        discordMessageId: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 

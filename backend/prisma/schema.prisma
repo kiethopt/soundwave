@@ -13,6 +13,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+/*
+BẢNG USER
+- Khóa chính (PK): id
+- Khóa duy nhất (Unique): email, username
+- Khóa ngoại (FK): không có
+- Indexes: email, username (để tối ưu tìm kiếm)
+- Quan hệ:
+  + 1 User -> n Albums (one-to-many)
+  + 1 User -> n Tracks (one-to-many)
+  + 1 User -> n History (one-to-many)
+  + 1 User -> n Playlists (one-to-many)
+*/
 model User {
   id String @id @default(cuid())
   email String @unique
@@ -21,9 +34,11 @@ model User {
   name String?
   avatar String?
   role Role @default(USER)
-  isActive Boolean  @default(true)
+  isActive Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  // Relations
   albums Album[]
   tracks Track[]
   history History[]
@@ -31,80 +46,171 @@ model User {
 
   @@index([email])
   @@index([username])
+  @@map("users")
 }
 
+/*
+BẢNG ARTIST
+- Khóa chính (PK): id
+- Khóa duy nhất (Unique): name
+- Khóa ngoại (FK): không có
+- Indexes: name, monthlyListeners, verified (để tối ưu tìm kiếm và sắp xếp)
+- Quan hệ:
+  + 1 Artist -> n Albums (one-to-many)
+  + 1 Artist -> n Tracks as MainArtist (one-to-many)
+  + n Artists -> n Tracks as FeaturedArtists (many-to-many)
+*/
+model Artist {
+  id String @id @default(cuid())
+  name String @unique
+  bio String? @db.Text
+  avatar String?
+  isVerified Boolean @default(false)
+  monthlyListeners Int @default(0)
+  isActive Boolean @default(true)
+  discordMessageId String? @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  albums Album[] @relation("AlbumArtist")
+  tracks Track[] @relation("TrackArtist")
+  featuredTracks Track[] @relation("TrackFeaturedArtists")
+
+  @@index([name])
+  @@index([monthlyListeners])
+  @@index([isVerified])
+  @@map("artists")
+}
+
+/*
+BẢNG ALBUM
+- Khóa chính (PK): id
+- Khóa duy nhất (Unique): discordMessageId
+- Khóa ngoại (FK): artistId, userId
+- Indexes: title, artistId, userId (để tối ưu tìm kiếm)
+- Quan hệ:
+  + n Albums -> 1 Artist (many-to-one)
+  + n Albums -> 1 User (many-to-one)
+  + 1 Album -> n Tracks (one-to-many)
+*/
 model Album {
   id String @id @default(cuid())
   title String
-  artist String
   coverUrl String?
   releaseDate DateTime
   trackCount Int
-  tracks Track[]
-  uploadedBy User @relation(fields: [userId], references: [id])
-  userId String
+  isActive Boolean @default(true)
   discordMessageId String @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  isActive Boolean @default(true)
+
+  // Relations
+  artist Artist @relation("AlbumArtist", fields: [artistId], references: [id])
+  artistId String
+  uploadedBy User @relation(fields: [userId], references: [id])
+  userId String
+  tracks Track[]
 
   @@index([title])
-  @@index([artist])
+  @@index([artistId])
   @@index([userId])
+  @@map("albums")
 }
 
+/*
+BẢNG TRACK
+- Khóa chính (PK): id
+- Khóa duy nhất (Unique): discordMessageId, audioMessageId
+- Khóa ngoại (FK): artistId, albumId, userId
+- Indexes: title, artistId, albumId, userId, playCount
+- Quan hệ:
+  + n Tracks -> 1 Artist (many-to-one)
+  + n Tracks -> n Artists as FeaturedArtists (many-to-many)
+  + n Tracks -> 1 Album (many-to-one)
+  + n Tracks -> 1 User (many-to-one)
+  + n Tracks -> n Playlists (many-to-many)
+  + 1 Track -> n History (one-to-many)
+*/
 model Track {
   id String @id @default(cuid())
   title String
-  artist String
-  featuredArtists String?
   duration Int
   releaseDate DateTime
   trackNumber Int?
   coverUrl String?
   audioUrl String
   audioMessageId String @unique
+  discordMessageId String @unique
+  playCount Int @default(0)
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  artist Artist @relation("TrackArtist", fields: [artistId], references: [id])
+  artistId String
+  featuredArtists Artist[] @relation("TrackFeaturedArtists")
   album Album? @relation(fields: [albumId], references: [id])
   albumId String?
   uploadedBy User @relation(fields: [userId], references: [id])
   userId String
-  discordMessageId String @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isActive Boolean @default(true)
-  playCount Int @default(0)
   playlists Playlist[]
   history History[]
 
   @@index([title])
-  @@index([artist])
+  @@index([artistId])
   @@index([albumId])
   @@index([userId])
   @@index([playCount])
+  @@map("tracks")
 }
 
+/*
+BẢNG HISTORY
+- Khóa chính (PK): id
+- Khóa ngoại (FK): trackId, userId
+- Unique Constraint: [userId, trackId]
+- Indexes: userId, type, trackId, createdAt, playCount
+- Quan hệ:
+  + n History -> 1 User (many-to-one)
+  + n History -> 1 Track (many-to-one)
+*/
 model History {
   id String @id @default(cuid())
-  type HistoryType // SEARCH hoặc PLAY
-  query String? // cho SEARCH
+  type HistoryType
+  query String?
+  duration Int?
+  completed Boolean?
+  playCount Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
   track Track? @relation(fields: [trackId], references: [id])
   trackId String?
   user User @relation(fields: [userId], references: [id])
   userId String
-  duration Int? // Thời gian nghe (giây) - cho PLAY
-  completed Boolean? // Đã nghe hết bài chưa - cho PLAY
-  playCount Int @default(0) // Số lần phát, chỉ dùng cho PLAY history
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
+  @@unique([userId, trackId])
   @@index([userId])
   @@index([type])
   @@index([trackId])
   @@index([createdAt])
   @@index([playCount])
-  @@unique([userId, trackId])
+  @@map("histories")
 }
 
+/*
+BẢNG PLAYLIST
+- Khóa chính (PK): id
+- Khóa ngoại (FK): userId
+- Unique Constraint: [userId, type] // Đảm bảo mỗi user chỉ có 1 playlist FAVORITE
+- Indexes: userId, privacy
+- Quan hệ:
+  + n Playlists -> 1 User (many-to-one)
+  + n Playlists -> n Tracks (many-to-many)
+*/
 model Playlist {
   id String @id @default(cuid())
   name String
@@ -112,16 +218,19 @@ model Playlist {
   coverUrl String?
   privacy PlaylistPrivacy @default(PRIVATE)
   type PlaylistType @default(NORMAL)
-  user User @relation(fields: [userId], references: [id])
-  userId String
-  tracks Track[]
   isAIGenerated Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+  userId String
+  tracks Track[]
+
+  @@unique([userId, type])
   @@index([userId])
   @@index([privacy])
-  @@unique([userId, type]) // Đảm bảo mỗi user chỉ có 1 playlist FAVORITE
+  @@map("playlists")
 }
 
 enum Role {
@@ -135,8 +244,8 @@ enum HistoryType {
 }
 
 enum PlaylistPrivacy {
-  PUBLIC    // Ai cũng có thể xem
-  PRIVATE   // Chỉ người tạo xem được
+  PUBLIC
+  PRIVATE
 }
 
 enum PlaylistType {

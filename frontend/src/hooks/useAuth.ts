@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 
 export const useAuth = () => {
   const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -12,7 +13,8 @@ export const useAuth = () => {
       return;
     }
     setToken(storedToken);
+    setLoading(false);
   }, [router]);
 
-  return { token };
+  return { token, loading };
 };

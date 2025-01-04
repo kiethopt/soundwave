@@ -1,80 +1,67 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import NewTrackUploadForm from '@/components/admin/NewTrackUploadForm';
+import { Artist } from '@/types';
 
 export default function NewTrack() {
   const router = useRouter();
-  const [newTrack, setNewTrack] = useState({
-    title: '',
-    artist: '',
-    duration: 0,
-    releaseDate: '',
-    audioFile: null as File | null,
-    coverFile: null as File | null,
-  });
-  const [isUploading, setIsUploading] = useState(false);
+  const [artists, setArtists] = useState<Artist[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const formatDuration = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
+  // Fetch artists
+  useEffect(() => {
+    const fetchArtists = async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) {
+          router.push('/login');
+          return;
+        }
 
-  const parseDuration = (timeString: string): number => {
-    const [minutes, seconds] = timeString.split(':').map(Number);
-    return (minutes || 0) * 60 + (seconds || 0);
-  };
+        const response = await fetch(api.artists.getAll(), {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsUploading(true);
-    setError(null);
+        if (!response.ok) {
+          throw new Error('Failed to fetch artists');
+        }
 
-    try {
-      const token = localStorage.getItem('userToken');
-      const formData = new FormData();
-
-      formData.append('title', newTrack.title);
-      formData.append('artist', newTrack.artist);
-      formData.append('duration', newTrack.duration.toString()); // Gửi duration dưới dạng seconds
-      formData.append('releaseDate', newTrack.releaseDate);
-
-      if (newTrack.audioFile) {
-        formData.append('audio', newTrack.audioFile);
+        const data = await response.json();
+        setArtists(data || []);
+      } catch (error) {
+        console.error('Failed to fetch artists:', error);
+        setError('Failed to fetch artists');
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      if (newTrack.coverFile) {
-        formData.append('cover', newTrack.coverFile);
-      }
+    fetchArtists();
+  }, [router]);
 
-      const response = await fetch(api.tracks.create(), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+      </div>
+    );
+  }
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create track');
-      }
-
-      router.push('/admin/tracks');
-    } catch (error: any) {
-      console.error('Error creating track:', error);
-      setError(
-        error instanceof Error ? error.message : 'Failed to create track'
-      );
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  if (error) {
+    return (
+      <div className="p-4 bg-red-500/10 text-red-500 rounded">
+        Error: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-8">
@@ -89,147 +76,7 @@ export default function NewTrack() {
         <h1 className="text-3xl font-bold tracking-tight">Add New Track</h1>
       </div>
       <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium mb-1">
-                Title
-              </label>
-              <input
-                id="title"
-                type="text"
-                value={newTrack.title}
-                onChange={(e) =>
-                  setNewTrack({ ...newTrack, title: e.target.value })
-                }
-                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="artist"
-                className="block text-sm font-medium mb-1"
-              >
-                Artist
-              </label>
-              <input
-                id="artist"
-                type="text"
-                value={newTrack.artist}
-                onChange={(e) =>
-                  setNewTrack({ ...newTrack, artist: e.target.value })
-                }
-                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="duration"
-                className="block text-sm font-medium mb-1"
-              >
-                Duration (mm:ss)
-              </label>
-              <input
-                id="duration"
-                type="text"
-                placeholder="0:00"
-                pattern="[0-9]+:[0-5][0-9]"
-                value={
-                  newTrack.duration ? formatDuration(newTrack.duration) : '0:00'
-                }
-                onChange={(e) => {
-                  const durationInSeconds = parseDuration(e.target.value);
-                  setNewTrack({ ...newTrack, duration: durationInSeconds });
-                }}
-                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
-                required
-              />
-              <p className="mt-1 text-sm text-white/60">
-                Enter duration in minutes:seconds format (e.g., 3:45)
-              </p>
-            </div>
-
-            <div>
-              <label
-                htmlFor="releaseDate"
-                className="block text-sm font-medium mb-1"
-              >
-                Release Date
-              </label>
-              <input
-                id="releaseDate"
-                type="date"
-                value={newTrack.releaseDate}
-                onChange={(e) =>
-                  setNewTrack({ ...newTrack, releaseDate: e.target.value })
-                }
-                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="audioFile"
-                className="block text-sm font-medium mb-1"
-              >
-                Audio File
-              </label>
-              <input
-                id="audioFile"
-                type="file"
-                accept="audio/*"
-                onChange={(e) =>
-                  setNewTrack({
-                    ...newTrack,
-                    audioFile: e.target.files?.[0] || null,
-                  })
-                }
-                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent file:bg-white/20 file:border-0 file:mr-4 file:px-4 file:py-2 file:rounded-md file:text-sm file:font-medium hover:file:bg-white/30"
-                required
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="coverFile"
-                className="block text-sm font-medium mb-1"
-              >
-                Cover Image (optional)
-              </label>
-              <input
-                id="coverFile"
-                type="file"
-                accept="image/*"
-                onChange={(e) =>
-                  setNewTrack({
-                    ...newTrack,
-                    coverFile: e.target.files?.[0] || null,
-                  })
-                }
-                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent file:bg-white/20 file:border-0 file:mr-4 file:px-4 file:py-2 file:rounded-md file:text-sm file:font-medium hover:file:bg-white/30"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-2 rounded">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isUploading}
-            className="w-full px-4 py-2 bg-white text-[#121212] rounded-md hover:bg-white/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isUploading ? 'Creating Track...' : 'Create Track'}
-          </button>
-        </form>
+        <NewTrackUploadForm artists={artists} />
       </div>
     </div>
   );

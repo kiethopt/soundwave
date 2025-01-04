@@ -1,6 +1,18 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 export const api = {
+  artists: {
+    getAllActive: () => `${API_BASE}/api/artists?active=true`,
+    getAll: () => `${API_BASE}/api/artists`,
+    getById: (id: string) => `${API_BASE}/api/artists/${id}`,
+    create: () => `${API_BASE}/api/artists`,
+    update: (id: string) => `${API_BASE}/api/artists/${id}`,
+    delete: (id: string) => `${API_BASE}/api/artists/${id}`,
+    search: (query: string) => `${API_BASE}/api/artists/search?q=${query}`,
+    verify: (id: string) => `${API_BASE}/api/artists/${id}/verify`,
+    updateMonthlyListeners: () =>
+      `${API_BASE}/api/artists/update-monthly-listeners`,
+  },
   tracks: {
     getAll: () => `${API_BASE}/api/tracks`,
     getById: (id: string) => `${API_BASE}/api/tracks/${id}`,

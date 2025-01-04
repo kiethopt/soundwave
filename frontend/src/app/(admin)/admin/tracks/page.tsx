@@ -148,10 +148,13 @@ export default function AdminTracks() {
                     Artist
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                    Duration
+                    Featured Artists
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
                     Album
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Duration
                   </th>
                 </tr>
               </thead>
@@ -188,13 +191,24 @@ export default function AdminTracks() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {track.artist}
+                      {typeof track.artist === 'string'
+                        ? track.artist
+                        : track.artist.name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {formatDuration(track.duration)}
+                      {track.featuredArtists
+                        ? track.featuredArtists
+                            .map((artist) =>
+                              typeof artist === 'string' ? artist : artist.name
+                            )
+                            .join(', ')
+                        : 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {track.album?.title || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {formatDuration(track.duration)}
                     </td>
                   </tr>
                 ))}

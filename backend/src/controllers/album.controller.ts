@@ -7,12 +7,18 @@ import {
   updateAlbumMetadata,
   TrackMetadata,
 } from '../services/discord.service';
-import { getErrorMessage } from '../middleware/error';
 
 const albumSelect = {
   id: true,
   title: true,
-  artist: true,
+  artist: {
+    select: {
+      id: true,
+      name: true,
+      avatar: true,
+      isVerified: true,
+    },
+  },
   releaseDate: true,
   trackCount: true,
   coverUrl: true,
@@ -29,8 +35,18 @@ const albumSelect = {
     select: {
       id: true,
       title: true,
-      artist: true,
-      featuredArtists: true,
+      artist: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      featuredArtists: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
       duration: true,
       trackNumber: true,
       audioUrl: true,
@@ -123,8 +139,10 @@ export const getAlbumsByArtist = async (
     const albums = await prisma.album.findMany({
       where: {
         artist: {
-          contains: artist,
-          mode: 'insensitive',
+          name: {
+            contains: artist,
+            mode: 'insensitive',
+          },
         },
         isActive: true,
       },
@@ -190,7 +208,7 @@ export const createAlbum = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { title, artist, releaseDate } = req.body;
+    const { title, artist: artistId, releaseDate } = req.body;
     const coverFile = req.file;
     const user = req.user;
 
@@ -199,9 +217,24 @@ export const createAlbum = async (
       return;
     }
 
-    const validationError = validateAlbumData(title, artist, releaseDate);
-    if (validationError) {
-      res.status(400).json({ message: validationError });
+    // Validate title and releaseDate
+    if (!title || title.trim().length === 0) {
+      res.status(400).json({ message: 'Title không được để trống' });
+      return;
+    }
+    if (!releaseDate || isNaN(Date.parse(releaseDate))) {
+      res.status(400).json({ message: 'Release date không hợp lệ' });
+      return;
+    }
+
+    // Fetch artist name for metadata
+    const artist = await prisma.artist.findUnique({
+      where: { id: artistId },
+      select: { name: true },
+    });
+
+    if (!artist) {
+      res.status(400).json({ message: 'Artist không tồn tại' });
       return;
     }
 
@@ -213,14 +246,14 @@ export const createAlbum = async (
     const { messageId: coverMessageId, url: coverUrl } = await uploadTrack(
       coverFile.buffer,
       coverFile.originalname,
-      false, // isAudio = false vì là ảnh
-      true, // isAlbumTrack = true vì là cover của album
-      true // isMetadata = true để lưu vào kênh audio-metadata
+      false,
+      true,
+      true
     );
 
     const metadata: AlbumMetadata = {
       title,
-      artist,
+      artist: artist.name,
       releaseDate,
       trackCount: 0,
       type: 'album' as const,
@@ -231,7 +264,9 @@ export const createAlbum = async (
     const album = await prisma.album.create({
       data: {
         title,
-        artist,
+        artist: {
+          connect: { id: artistId },
+        },
         releaseDate: new Date(releaseDate),
         trackCount: 0,
         coverUrl,
@@ -270,6 +305,7 @@ export const uploadAlbumTracks = async (
     const album = await prisma.album.findUnique({
       where: { id },
       include: {
+        artist: true,
         tracks: {
           where: { isActive: true },
           orderBy: { trackNumber: 'asc' },
@@ -282,62 +318,87 @@ export const uploadAlbumTracks = async (
       return;
     }
 
+    // album.controller.ts
     const uploadedTracks = await Promise.all(
       files.map(async (file, index) => {
+        // Upload audio file first
         const { messageId: audioMessageId, url: audioUrl } = await uploadTrack(
           file.buffer,
           file.originalname,
-          true, // isAudio
-          true, // isAlbumTrack - thêm parameter này
-          false // isMetadata
+          true,
+          true,
+          false
         );
 
         const title =
           req.body[`title_${index}`] ||
           file.originalname.replace(/\.[^/.]+$/, '');
-        const artist = req.body[`artist_${index}`] || album.artist;
-        const featuredArtists = req.body[`featuredArtists_${index}`] || null;
-        const duration = parseInt(req.body[`duration_${index}`]) || 0;
-        const trackNumber =
-          parseInt(req.body[`trackNumber_${index}`]) ||
-          album.tracks.length + index + 1;
+        const artistId = req.body[`artist_${index}`] || album.artistId;
+        const featuredArtistIds = JSON.parse(
+          req.body[`featuredArtists_${index}`] || '[]'
+        );
 
+        // Lấy tên của các featured artists
+        const featuredArtists = await Promise.all(
+          featuredArtistIds.map(async (id: string) => {
+            const artist = await prisma.artist.findUnique({
+              where: { id },
+              select: { name: true },
+            });
+            return artist?.name || '';
+          })
+        );
+
+        // Save track metadata and get metadata message ID
         const metadata: TrackMetadata = {
           title,
-          artist,
-          featuredArtists,
-          duration,
-          releaseDate: album.releaseDate.toISOString().split('T')[0],
+          artist:
+            (await prisma.artist.findUnique({ where: { id: artistId } }))
+              ?.name || '',
+          featuredArtists: featuredArtists.join(', '), // Featured artists trong metadata
+          duration: parseInt(req.body[`duration_${index}`]) || 0,
           albumId: album.id,
+          releaseDate: new Date(
+            req.body[`releaseDate_${index}`] || album.releaseDate
+          )
+            .toISOString()
+            .split('T')[0],
           type: 'track',
         };
 
         const { messageId: metadataMessageId } = await saveMetadata(metadata);
 
-        return prisma.track.create({
+        // Create track with all necessary connections
+        return await prisma.track.create({
           data: {
             title,
-            artist,
-            featuredArtists,
-            duration,
-            releaseDate: album.releaseDate,
-            trackNumber,
+            artist: {
+              connect: { id: artistId },
+            },
+            featuredArtists: {
+              connect: featuredArtistIds.map((id: string) => ({ id })),
+            },
+            duration: parseInt(req.body[`duration_${index}`]) || 0,
+            releaseDate: new Date(
+              req.body[`releaseDate_${index}`] || album.releaseDate
+            ),
+            trackNumber:
+              parseInt(req.body[`trackNumber_${index}`]) ||
+              album.tracks.length + index + 1,
             audioUrl,
             audioMessageId,
-            album: { connect: { id: album.id } },
-            uploadedBy: { connect: { id: user.id } },
+            coverUrl: album.coverUrl, // Lấy coverUrl từ album
+            album: {
+              connect: { id: album.id },
+            },
+            uploadedBy: {
+              connect: { id: user.id },
+            },
             discordMessageId: metadataMessageId,
           },
-          select: {
-            id: true,
-            title: true,
+          include: {
             artist: true,
             featuredArtists: true,
-            duration: true,
-            trackNumber: true,
-            audioUrl: true,
-            audioMessageId: true,
-            discordMessageId: true,
           },
         });
       })
@@ -355,7 +416,7 @@ export const uploadAlbumTracks = async (
 
     await updateAlbumMetadata(updatedAlbum.discordMessageId, {
       title: updatedAlbum.title,
-      artist: updatedAlbum.artist,
+      artist: updatedAlbum.artist.name,
       releaseDate: updatedAlbum.releaseDate.toISOString().split('T')[0],
       trackCount: updatedAlbum.trackCount,
       type: 'album',
@@ -399,7 +460,7 @@ export const updateAlbum = async (
 
     await updateAlbumMetadata(album.discordMessageId, {
       title: album.title,
-      artist: album.artist,
+      artist: album.artist.name,
       releaseDate: album.releaseDate.toISOString().split('T')[0],
       trackCount: album.trackCount,
       type: 'album',
@@ -498,8 +559,10 @@ export const searchAlbum = async (
           },
           {
             artist: {
-              contains: String(q),
-              mode: 'insensitive',
+              name: {
+                contains: String(q),
+                mode: 'insensitive',
+              },
             },
           },
         ],
@@ -512,4 +575,4 @@ export const searchAlbum = async (
     console.error('Search album error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};

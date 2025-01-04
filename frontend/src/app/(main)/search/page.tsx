@@ -13,9 +13,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -115,37 +112,42 @@ function SearchContent() {
   }, [query, token]);
 
   useEffect(() => {
-    async function performSearch() {
-      if (!query || !token) return;
+    const fetchResults = async () => {
+      if (!query) {
+        setTrackResults([]);
+        setAlbumResults([]);
+        return;
+      }
+
       setIsLoading(true);
       try {
-        const [trackResponse, albumResponse] = await Promise.all([
-          fetch(api.tracks.search(query), {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+        const [albumsResponse, tracksResponse] = await Promise.all([
           fetch(api.albums.search(query), {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }),
+          fetch(api.tracks.search(query), {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
           }),
         ]);
 
-        const [tracks, albums] = await Promise.all([
-          trackResponse.json(),
-          albumResponse.json(),
+        const [albums, tracks] = await Promise.all([
+          albumsResponse.json(),
+          tracksResponse.json(),
         ]);
 
-        setTrackResults(tracks);
-        setAlbumResults(albums);
+        console.log('Albums:', albums); // Debug log
+        console.log('Tracks:', tracks); // Debug log
 
-        // Lưu search history
-        await saveSearchHistory(query);
+        setAlbumResults(albums);
+        setTrackResults(tracks);
       } catch (error) {
         console.error('Search error:', error);
       } finally {
         setIsLoading(false);
       }
-    }
+    };
 
-    performSearch();
+    fetchResults();
   }, [query, token]);
 
   const saveSearchHistory = async (query: string) => {
@@ -305,11 +307,6 @@ function SearchContent() {
     }
   };
 
-  // const handleGoToAlbum = async (albumId: string) => {
-  //   // Implementation based on your schema
-  //   console.log('Go to album:', albumId);
-  // };
-
   return (
     <div>
       {/* Filter Bar - Now at the top with full width and border bottom */}
@@ -354,7 +351,9 @@ function SearchContent() {
                         {album.title}
                       </h3>
                       <p className="text-white/60 text-sm truncate">
-                        {album.artist}
+                        {typeof album.artist === 'string'
+                          ? album.artist
+                          : album.artist?.name || 'Unknown Artist'}
                       </p>
                     </div>
                   ))}
@@ -408,7 +407,11 @@ function SearchContent() {
                             {track.title}
                           </h3>
                           <p className="text-white/60 text-sm truncate">
-                            {track.artist}
+                            {track.artist
+                              ? typeof track.artist === 'string'
+                                ? track.artist
+                                : track.artist.name
+                              : 'Unknown Artist'}
                           </p>
                         </div>
                         <DropdownMenu>
@@ -483,7 +486,11 @@ function SearchContent() {
                             {track.title}
                           </h3>
                           <p className="text-white/60 text-sm truncate">
-                            {track.artist}
+                            {track.artist
+                              ? typeof track.artist === 'string'
+                                ? track.artist
+                                : track.artist.name
+                              : 'Unknown Artist'}
                           </p>
                         </div>
                         <DropdownMenu>

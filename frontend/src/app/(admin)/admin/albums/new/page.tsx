@@ -1,20 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { Artist } from '@/types';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 export default function NewAlbum() {
   const router = useRouter();
   const [newAlbum, setNewAlbum] = useState({
     title: '',
-    artist: '',
+    artistId: '',
     releaseDate: '',
     coverFile: null as File | null,
   });
   const [error, setError] = useState<string | null>(null);
+  const [artists, setArtists] = useState<Artist[]>([]);
+  const [selectedArtist, setSelectedArtist] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +27,7 @@ export default function NewAlbum() {
       const formData = new FormData();
 
       formData.append('title', newAlbum.title);
-      formData.append('artist', newAlbum.artist);
+      formData.append('artist', selectedArtist);
       formData.append('releaseDate', newAlbum.releaseDate);
 
       if (newAlbum.coverFile) {
@@ -51,6 +55,37 @@ export default function NewAlbum() {
       );
     }
   };
+
+  // Hooks
+  useEffect(() => {
+    const fetchArtists = async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) {
+          router.push('/login');
+          return;
+        }
+
+        const response = await fetch(api.artists.getAll(), {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch artists');
+        }
+
+        const data = await response.json();
+        setArtists(data || []); // Đảm bảo luôn có mảng
+      } catch (error) {
+        console.error('Failed to fetch artists:', error);
+        setError('Failed to fetch artists');
+      }
+    };
+
+    fetchArtists();
+  }, [router]);
 
   return (
     <div className="container mx-auto p-6 space-y-8">
@@ -87,18 +122,17 @@ export default function NewAlbum() {
               <label htmlFor="artist" className="block text-sm font-medium">
                 Artist
               </label>
-              <input
-                id="artist"
-                type="text"
-                value={newAlbum.artist}
-                onChange={(e) =>
-                  setNewAlbum({ ...newAlbum, artist: e.target.value })
-                }
-                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
+              <SearchableSelect
+                options={artists.map((artist) => ({
+                  id: artist.id,
+                  name: artist.name,
+                }))}
+                value={selectedArtist}
+                onChange={(value) => setSelectedArtist(value as string)}
+                placeholder="Select an artist"
                 required
               />
             </div>
-
             <div className="space-y-2">
               <label
                 htmlFor="releaseDate"
@@ -110,9 +144,15 @@ export default function NewAlbum() {
                 id="releaseDate"
                 type="date"
                 value={newAlbum.releaseDate}
-                onChange={(e) =>
-                  setNewAlbum({ ...newAlbum, releaseDate: e.target.value })
-                }
+                onChange={(e) => {
+                  const date = new Date(e.target.value);
+                  const formattedDate = date.toLocaleDateString('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                  });
+                  setNewAlbum({ ...newAlbum, releaseDate: e.target.value });
+                }}
                 className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
                 required
               />
