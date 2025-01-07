@@ -6,8 +6,18 @@ import { saveTrackMetadata } from '../services/discord.service';
 const trackSelect = {
   id: true,
   title: true,
-  artist: true,
-  featuredArtists: true,
+  artist: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  featuredArtists: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
   duration: true,
   releaseDate: true,
   trackNumber: true,
@@ -57,7 +67,6 @@ export const createTrack = async (
       return;
     }
 
-    // Upload audio file to Cloudinary
     const audioUpload: any = await uploadFile(
       audioFile.buffer,
       'tracks',
@@ -65,7 +74,6 @@ export const createTrack = async (
     );
     const audioUrl = audioUpload.secure_url;
 
-    // Upload cover file to Cloudinary if provided
     let coverUrl: string | undefined;
     if (coverFile) {
       const coverUpload: any = await uploadFile(
@@ -76,7 +84,6 @@ export const createTrack = async (
       coverUrl = coverUpload.secure_url;
     }
 
-    // Lấy thông tin nghệ sĩ chính từ artistId
     const artist = await prisma.artist.findUnique({
       where: { id: artistId },
       select: { name: true },
@@ -87,7 +94,6 @@ export const createTrack = async (
       return;
     }
 
-    // Lấy thông tin các nghệ sĩ featured từ featuredArtists
     const featuredArtistsInfo =
       featuredArtists.length > 0
         ? await prisma.artist.findMany({
@@ -96,7 +102,6 @@ export const createTrack = async (
           })
         : [];
 
-    // Lấy coverUrl từ album nếu có
     let albumData = null;
     if (albumId) {
       albumData = await prisma.album.findUnique({
@@ -121,8 +126,8 @@ export const createTrack = async (
         releaseDate: new Date(releaseDate),
         coverUrl: coverUrl || albumData?.coverUrl,
         audioUrl,
-        audioMessageId: null, // Giá trị mặc định
-        discordMessageId: null, // Giá trị mặc định
+        audioMessageId: null,
+        discordMessageId: null,
         album: albumId
           ? {
               connect: { id: albumId },
@@ -135,18 +140,16 @@ export const createTrack = async (
       select: trackSelect,
     });
 
-    // Gửi thông báo metadata vào kênh Discord
     const metadataUpload = await saveTrackMetadata({
       title: track.title,
       artist: artist.name,
       featuredArtists: featuredArtistsInfo.map((a) => a.name).join(', '),
       duration: track.duration,
       releaseDate: track.releaseDate.toISOString().split('T')[0],
-      albumId: track.album?.id || null, // Sửa ở đây
+      albumId: track.album?.id || null,
       type: 'track',
     });
 
-    // Cập nhật discordMessageId vào database
     await prisma.track.update({
       where: { id: track.id },
       data: {
@@ -334,7 +337,7 @@ export const searchTrack = async (
           },
         ],
       },
-      // Thêm select để lấy đầy đủ thông tin artist
+      // Sử dụng select đúng với các trường trong model Track
       select: {
         id: true,
         title: true,
@@ -354,10 +357,14 @@ export const searchTrack = async (
         },
         featuredArtists: {
           select: {
-            id: true,
-            name: true,
-            avatar: true,
-            isVerified: true,
+            artist: {
+              select: {
+                id: true,
+                name: true,
+                avatar: true,
+                isVerified: true,
+              },
+            },
           },
         },
         album: {
@@ -384,6 +391,7 @@ export const searchTrack = async (
     const mappedTracks = tracks.map((track) => ({
       ...track,
       coverUrl: track.coverUrl || track.album?.coverUrl || null,
+      featuredArtists: track.featuredArtists.map((fa) => fa.artist), // Lấy thông tin artist từ featuredArtists
     }));
 
     res.json(mappedTracks);

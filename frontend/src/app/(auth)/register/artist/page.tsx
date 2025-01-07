@@ -5,65 +5,68 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { API_URL } from '@/utils/config';
 
-interface RegisterFormData {
+interface ArtistFormData {
   email: string;
-  username: string;
   password: string;
   name: string;
+  bio: string;
+  avatar?: File;
 }
 
-interface RegisterResponse {
-  message: string;
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    name: string;
-  };
-}
-
-export default function RegisterPage() {
+export default function RegisterArtistPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState<RegisterFormData>({
+  const [formData, setFormData] = useState<ArtistFormData>({
     email: '',
-    username: '',
     password: '',
     name: '',
+    bio: '',
   });
   const [error, setError] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
+      const formDataToSend = new FormData();
+      formDataToSend.append('email', formData.email);
+      formDataToSend.append('password', formData.password);
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('bio', formData.bio);
+      formDataToSend.append('role', 'ARTIST');
+
+      if (selectedFile) {
+        formDataToSend.append('avatar', selectedFile);
+      }
+
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+        body: formDataToSend,
       });
 
-      const data = (await response.json()) as RegisterResponse;
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.message);
       }
 
-      // Handle successful registration
       router.push('/login');
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unexpected error occurred');
-      }
+      setError(
+        err instanceof Error ? err.message : 'An unexpected error occurred'
+      );
     }
   };
 
   return (
     <div className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4">
       <h1 className="text-2xl font-bold text-white mb-8">
-        Create Your Account
+        Register as an Artist
       </h1>
 
       {error && (
@@ -94,29 +97,10 @@ export default function RegisterPage() {
 
         <div>
           <label
-            htmlFor="username"
-            className="block text-sm font-medium text-white/70 mb-1"
-          >
-            Username
-          </label>
-          <input
-            type="text"
-            id="username"
-            value={formData.username}
-            onChange={(e) =>
-              setFormData({ ...formData, username: e.target.value })
-            }
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
-            required
-          />
-        </div>
-
-        <div>
-          <label
             htmlFor="name"
             className="block text-sm font-medium text-white/70 mb-1"
           >
-            Full Name
+            Artist Name
           </label>
           <input
             type="text"
@@ -125,6 +109,38 @@ export default function RegisterPage() {
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
             required
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="bio"
+            className="block text-sm font-medium text-white/70 mb-1"
+          >
+            Bio
+          </label>
+          <textarea
+            id="bio"
+            value={formData.bio}
+            onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
+            rows={4}
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="avatar"
+            className="block text-sm font-medium text-white/70 mb-1"
+          >
+            Profile Picture
+          </label>
+          <input
+            type="file"
+            id="avatar"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
           />
         </div>
 
@@ -151,7 +167,7 @@ export default function RegisterPage() {
           type="submit"
           className="w-full bg-white text-black py-2 rounded-full font-medium hover:bg-white/90"
         >
-          Sign up
+          Register as Artist
         </button>
       </form>
 
@@ -159,13 +175,6 @@ export default function RegisterPage() {
         Already have an account?{' '}
         <Link href="/login" className="text-white hover:underline">
           Log in
-        </Link>
-      </p>
-
-      <p className="mt-4 text-center text-white/70">
-        Are you an artist?{' '}
-        <Link href="/register/artist" className="text-white hover:underline">
-          Register as an artist
         </Link>
       </p>
     </div>

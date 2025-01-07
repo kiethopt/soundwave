@@ -203,7 +203,7 @@ export const createAlbum = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { title, artist: artistId, releaseDate } = req.body;
+    const { title, artist: artistId, releaseDate, genres } = req.body;
     const coverFile = req.file;
     const user = req.user;
 
@@ -259,6 +259,13 @@ export const createAlbum = async (
         discordMessageId: null, // Giá trị mặc định
         uploadedBy: {
           connect: { id: user.id },
+        },
+        genres: {
+          create: genres.map((genreId: string) => ({
+            genre: {
+              connect: { id: genreId },
+            },
+          })),
         },
       },
       select: albumSelect,
@@ -422,13 +429,18 @@ export const updateAlbum = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, artist, releaseDate } = req.body;
+    const { title, artist, releaseDate, genres } = req.body;
 
     const validationError = validateAlbumData(title, artist, releaseDate);
     if (validationError) {
       res.status(400).json({ message: validationError });
       return;
     }
+
+    // Xóa các genres cũ và thêm genres mới
+    await prisma.albumGenre.deleteMany({
+      where: { albumId: id },
+    });
 
     const album = await prisma.album.update({
       where: { id },
@@ -437,6 +449,13 @@ export const updateAlbum = async (
         artist,
         releaseDate: new Date(releaseDate),
         updatedAt: new Date(),
+        genres: {
+          create: genres.map((genreId: string) => ({
+            genre: {
+              connect: { id: genreId },
+            },
+          })),
+        },
       },
       select: albumSelect,
     });

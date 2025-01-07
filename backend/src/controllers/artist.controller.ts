@@ -184,7 +184,7 @@ export const createArtist = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { name, bio } = req.body;
+    const { name, bio, email, password } = req.body;
     const avatarFile = req.file;
 
     let avatarUrl: string | undefined;
@@ -203,6 +203,8 @@ export const createArtist = async (
       data: {
         name,
         bio,
+        email, // Thêm email
+        password, // Thêm password
         avatar: avatarUrl,
       },
       select: artistSelect,

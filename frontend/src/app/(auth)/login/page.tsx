@@ -50,6 +50,8 @@ function LoginForm() {
       // Redirect based on role
       if (data.user.role === 'ADMIN') {
         router.push('/admin');
+      } else if (data.user.role === 'ARTIST') {
+        router.push('/artist/albums');
       } else {
         router.push('/');
       }

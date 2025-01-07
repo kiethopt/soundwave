@@ -21,13 +21,13 @@ export default function Sidebar({
   onClose: () => void;
 }) {
   const pathname = usePathname();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<'USER' | 'ARTIST' | 'ADMIN'>('USER');
 
   useEffect(() => {
     const userData = localStorage.getItem('userData');
     if (userData) {
       const user = JSON.parse(userData);
-      setIsAdmin(user.role === 'ADMIN');
+      setUserRole(user.role);
     }
   }, []);
 
@@ -100,8 +100,39 @@ export default function Sidebar({
               {/* Playlists content */}
             </div>
 
+            {/* Artist Section */}
+            {userRole === 'ARTIST' && (
+              <div className="space-y-2 pt-4 mt-4 border-t border-white/10">
+                <div className="px-3 text-sm font-medium text-white/70">
+                  Artist Dashboard
+                </div>
+                <Link
+                  href="/artist/albums"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    pathname.startsWith('/artist/albums')
+                      ? 'bg-white/10'
+                      : 'hover:bg-white/10'
+                  }`}
+                >
+                  <Album className="w-6 h-6" />
+                  <span>Albums</span>
+                </Link>
+                <Link
+                  href="/artist/tracks"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    pathname.startsWith('/artist/tracks')
+                      ? 'bg-white/10'
+                      : 'hover:bg-white/10'
+                  }`}
+                >
+                  <Music className="w-6 h-6" />
+                  <span>Tracks</span>
+                </Link>
+              </div>
+            )}
+
             {/* Admin Section */}
-            {isAdmin && (
+            {userRole === 'ADMIN' && (
               <div className="space-y-2 pt-4 mt-4 border-t border-white/10">
                 <div className="px-3 text-sm font-medium text-white/70">
                   Admin Dashboard
@@ -137,7 +168,6 @@ export default function Sidebar({
                   <Music className="w-6 h-6" />
                   <span>Tracks</span>
                 </Link>
-
                 <Link
                   href="/admin/albums"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
@@ -149,7 +179,6 @@ export default function Sidebar({
                   <Album className="w-6 h-6" />
                   <span>Albums</span>
                 </Link>
-
                 <Link
                   href="/admin/users"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${

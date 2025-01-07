@@ -6,6 +6,8 @@ import {
   sendUserNotification,
 } from '../services/discord.service';
 import { clients } from '../index';
+import multer from 'multer';
+import { uploadFile } from '../services/cloudinary.service';
 
 const userSelect = {
   id: true,
@@ -17,49 +19,112 @@ const userSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  followedArtists: true,
 } as const;
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET is not defined in environment variables');
 }
 
+// Cấu hình multer
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
+
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, username, password, name, isAdmin } = req.body;
+    const { email, password, name, role, isAdmin } = req.body; // Thêm trường isAdmin
+    const avatarFile = req.file;
 
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ email }, { username }],
-      },
-    });
+    let avatarUrl: string | undefined;
 
-    if (existingUser) {
-      res.status(400).json({ message: 'Email hoặc username đã tồn tại!' });
+    if (avatarFile) {
+      const avatarUpload: any = await uploadFile(
+        avatarFile.buffer,
+        'avatars',
+        'image'
+      );
+      avatarUrl = avatarUpload.secure_url;
+    }
+
+    // Xử lý đăng ký artist
+    if (role === 'ARTIST') {
+      const bio = req.body.bio || '';
+      const newArtist = await prisma.artist.create({
+        data: {
+          email,
+          name,
+          password,
+          bio,
+          avatar: avatarUrl,
+          role: 'ARTIST',
+          isVerified: false,
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isVerified: true,
+        },
+      });
+
+      await sendUserNotification(`🎉 New artist registered: ${name}`);
+
+      res.status(201).json({
+        message: 'Đăng ký artist thành công',
+        user: newArtist,
+      });
       return;
     }
 
-    const user = await prisma.user.create({
+    // Xử lý đăng ký user thường hoặc admin
+    const { username } = req.body;
+    if (!username) {
+      res
+        .status(400)
+        .json({ message: 'Username is required for regular users' });
+      return;
+    }
+
+    // Xác định role dựa trên trường isAdmin hoặc role
+    const userRole = isAdmin ? 'ADMIN' : role === 'ADMIN' ? 'ADMIN' : 'USER';
+
+    const newUser = await prisma.user.create({
       data: {
         email,
         username,
         password,
         name,
-        role: isAdmin ? 'ADMIN' : 'USER',
+        avatar: avatarUrl,
+        role: userRole, // Sử dụng role đã xác định
       },
-      select: userSelect,
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        role: true,
+      },
     });
 
-    // Gửi thông báo đến Discord
-    await sendUserNotification(username);
+    // Gửi thông báo đến Discord khi user thường đăng ký
+    await sendUserNotification(`🎉 New user registered: ${username}`);
 
     res.status(201).json({
-      message: 'User mới đã được tạo thành công',
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        name: user.name,
-      },
+      message: 'Đăng ký user thành công',
+      user: newUser,
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -71,6 +136,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
+    // Tìm user hoặc artist với email
     const user = await prisma.user.findUnique({
       where: { email },
       select: {
@@ -85,30 +151,55 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     });
 
-    if (!user) {
-      res.status(404).json({ message: 'User không tồn tại trong hệ thống.' });
+    const artist = await prisma.artist.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        password: true,
+        avatar: true,
+        role: true,
+        isActive: true,
+        isVerified: true,
+      },
+    });
+
+    const account = user || artist;
+
+    if (!account) {
+      res
+        .status(404)
+        .json({ message: 'Tài khoản không tồn tại trong hệ thống.' });
       return;
     }
 
     // Kiểm tra tài khoản có bị khóa không
-    if (!user.isActive) {
+    if (!account.isActive) {
       res
         .status(403)
         .json({ message: 'Tài khoản đã bị khóa. Vui lòng liên hệ Admin.' });
       return;
     }
 
+    // Kiểm tra password (bạn cần thêm logic so sánh password hash)
+    // Ví dụ: const isPasswordValid = await comparePassword(password, account.password);
+    // if (!isPasswordValid) {
+    //   res.status(401).json({ message: 'Sai mật khẩu' });
+    //   return;
+    // }
+
     // Generate JWT token
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, {
+    const token = jwt.sign({ userId: account.id }, process.env.JWT_SECRET!, {
       expiresIn: '24h',
     });
 
     // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: _, ...accountWithoutPassword } = account;
 
     res.json({
       message: 'Đăng nhập thành công',
-      user: userWithoutPassword,
+      user: accountWithoutPassword,
       token,
     });
   } catch (error) {
@@ -123,7 +214,9 @@ export const getAllUsers = async (
   res: Response
 ): Promise<void> => {
   try {
-    const users = await prisma.user.findMany();
+    const users = await prisma.user.findMany({
+      select: userSelect,
+    });
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });

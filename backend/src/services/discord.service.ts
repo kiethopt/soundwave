@@ -73,7 +73,7 @@ const sanitizeFilename = (filename: string, isAudio = true): string => {
   return `${normalized}.${ext}`;
 };
 
-export const sendUserNotification = async (username: string) => {
+export const sendUserNotification = async (message: string) => {
   if (!process.env.DISCORD_BOT_TOKEN) {
     console.warn('Discord notification skipped: Bot token not configured');
     return;
@@ -83,7 +83,7 @@ export const sendUserNotification = async (username: string) => {
     const channel = (await client.channels.fetch(
       DISCORD_CHANNELS.USERS
     )) as TextChannel;
-    await channel.send(`🎉 User mới đăng ký: ${username}`);
+    await channel.send(message);
   } catch (error) {
     console.error('Discord notification error:', error);
   }

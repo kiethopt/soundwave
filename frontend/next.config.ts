@@ -9,6 +9,16 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/attachments/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        port: '',
+      },
+      {
+        protocol: 'https',
+        hostname: 'example.com',
+        port: '',
+      },
     ],
   },
 };

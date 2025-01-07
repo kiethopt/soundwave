@@ -5,7 +5,7 @@ export interface User {
   password?: string;
   name?: string;
   avatar?: string;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'ADMIN' | 'ARTIST';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

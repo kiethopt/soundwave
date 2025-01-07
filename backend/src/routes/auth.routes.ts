@@ -13,11 +13,28 @@ import {
 } from '../controllers/auth.controller';
 import { checkUserActive, isAdmin, isAuthenticated } from '../middleware/auth';
 import { clients } from '..';
+import multer from 'multer';
 
 const router = Router();
 
+// Cấu hình multer
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
+
 // Auth routes
-router.post('/register', register);
+router.post('/register', upload.single('avatar'), register);
 router.post('/login', login);
 
 // Protected routes (cần authentication and admin role)
