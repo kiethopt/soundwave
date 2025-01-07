@@ -19,7 +19,12 @@ const userSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
-  followedArtists: true,
+  followedArtists: {
+    select: {
+      artistId: true,
+      createdAt: true,
+    },
+  },
 } as const;
 
 if (!process.env.JWT_SECRET) {

@@ -9,6 +9,7 @@ import {
   updateArtist,
   updateMonthlyListeners,
   verifyArtist,
+  followArtist,
 } from '../controllers/artist.controller';
 import { isAdmin, isAuthenticated } from '../middleware/auth';
 import multer from 'multer';
@@ -60,5 +61,5 @@ router.post(
   isAdmin,
   updateMonthlyListeners
 );
-
+router.post('/artists/:id/follow', isAuthenticated, followArtist);
 export default router;
