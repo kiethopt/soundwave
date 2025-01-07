@@ -138,67 +138,6 @@ export const uploadTrack = async (
   }
 };
 
-// export const saveMetadata = async (
-//   metadata: Metadata
-// ): Promise<{ messageId: string }> => {
-//   try {
-//     const channel = (await client.channels.fetch(
-//       DISCORD_CHANNELS.AUDIO_METADATA
-//     )) as TextChannel;
-
-//     const fields = [
-//       {
-//         name: 'Type',
-//         value: metadata.type.charAt(0).toUpperCase() + metadata.type.slice(1),
-//         inline: true,
-//       },
-//       {
-//         name: metadata.type === 'track' ? 'Duration' : 'Track Count',
-//         value:
-//           metadata.type === 'track'
-//             ? `${Math.floor(metadata.duration / 60)}:${(metadata.duration % 60)
-//                 .toString()
-//                 .padStart(2, '0')}`
-//             : `${metadata.trackCount} tracks`,
-//         inline: true,
-//       },
-//       {
-//         name: metadata.type === 'track' ? 'Album ID' : 'Release Date',
-//         value:
-//           metadata.type === 'track'
-//             ? metadata.albumId || 'Single Track'
-//             : metadata.releaseDate,
-//         inline: true,
-//       },
-//     ];
-
-//     // Thêm trường Featured Artists nếu metadata là TrackMetadata
-//     if (metadata.type === 'track') {
-//       fields.push({
-//         name: 'Featured Artists',
-//         value: metadata.featuredArtists || 'None', // Thêm thông tin featured artists
-//         inline: true,
-//       });
-//     }
-
-//     const message = await channel.send({
-//       embeds: [
-//         {
-//           title: metadata.title,
-//           description: `Artist: ${metadata.artist}`,
-//           fields,
-//         },
-//       ],
-//     });
-
-//     return { messageId: message.id };
-//   } catch (error) {
-//     console.error('Discord metadata error:', error);
-//     throw error;
-//   }
-// };
-
-// discord.service.ts
 export const saveMetadata = async (
   metadata: Metadata
 ): Promise<{ messageId: string }> => {

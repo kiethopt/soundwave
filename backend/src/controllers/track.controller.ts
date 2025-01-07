@@ -1,10 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
-import {
-  uploadTrack,
-  saveMetadata,
-  TrackMetadata,
-} from '../services/discord.service';
+import { uploadFile } from '../services/cloudinary.service';
 
 const trackSelect = {
   id: true,
@@ -41,8 +37,8 @@ const trackSelect = {
 //   res: Response
 // ): Promise<void> => {
 //   try {
-//     const { title, artist, featuredArtists, duration, releaseDate, albumId } =
-//       req.body;
+//     const { title, artistId, duration, releaseDate, albumId } = req.body;
+//     const featuredArtists = req.body.featuredArtists || []; // Lấy featuredArtists từ request body
 //     const files = req.files as
 //       | { [fieldname: string]: Express.Multer.File[] }
 //       | undefined;
@@ -59,6 +55,26 @@ const trackSelect = {
 //       res.status(400).json({ message: 'Audio file is required' });
 //       return;
 //     }
+
+//     // Lấy thông tin nghệ sĩ chính từ artistId
+//     const artist = await prisma.artist.findUnique({
+//       where: { id: artistId },
+//       select: { name: true },
+//     });
+
+//     if (!artist) {
+//       res.status(400).json({ message: 'Artist not found' });
+//       return;
+//     }
+
+//     // Lấy thông tin các nghệ sĩ featured từ featuredArtists
+//     const featuredArtistsInfo =
+//       featuredArtists.length > 0
+//         ? await prisma.artist.findMany({
+//             where: { id: { in: featuredArtists } },
+//             select: { name: true },
+//           })
+//         : [];
 
 //     // Lấy coverUrl từ album nếu có
 //     let albumData = null;
@@ -94,8 +110,10 @@ const trackSelect = {
 
 //     const metadata: TrackMetadata = {
 //       title,
-//       artist,
-//       featuredArtists: featuredArtists || null,
+//       artist: artist.name, // Sử dụng tên nghệ sĩ thay vì artistId
+//       featuredArtists: featuredArtistsInfo
+//         .map((artist) => artist.name)
+//         .join(', '), // Thêm thông tin featured artists
 //       duration: parseInt(duration),
 //       releaseDate: new Date(releaseDate).toISOString().split('T')[0],
 //       albumId: albumId || null,
@@ -107,16 +125,27 @@ const trackSelect = {
 //     const track = await prisma.track.create({
 //       data: {
 //         title,
-//         artist,
-//         featuredArtists: featuredArtists || null,
+//         artist: {
+//           connect: { id: artistId }, // Sử dụng connect để liên kết artistId
+//         },
+//         featuredArtists:
+//           featuredArtists.length > 0
+//             ? {
+//                 connect: featuredArtists.map((id: string) => ({ id })), // Liên kết featuredArtists
+//               }
+//             : undefined,
 //         duration: parseInt(duration),
 //         releaseDate: new Date(releaseDate),
 //         coverUrl,
 //         audioUrl: audioUpload.url,
 //         audioMessageId: audioUpload.messageId,
-//         albumId: albumId || undefined,
+//         album: albumId
+//           ? {
+//               connect: { id: albumId }, // Liên kết albumId nếu có
+//             }
+//           : undefined,
 //         uploadedBy: {
-//           connect: { id: user.id },
+//           connect: { id: user.id }, // Liên kết userId
 //         },
 //         discordMessageId: metadataUpload.messageId,
 //       },
@@ -147,7 +176,7 @@ export const createTrack = async (
 ): Promise<void> => {
   try {
     const { title, artistId, duration, releaseDate, albumId } = req.body;
-    const featuredArtists = req.body.featuredArtists || []; // Lấy featuredArtists từ request body
+    const featuredArtists = req.body.featuredArtists || [];
     const files = req.files as
       | { [fieldname: string]: Express.Multer.File[] }
       | undefined;
@@ -163,6 +192,25 @@ export const createTrack = async (
     if (!audioFile) {
       res.status(400).json({ message: 'Audio file is required' });
       return;
+    }
+
+    // Upload audio file to Cloudinary
+    const audioUpload: any = await uploadFile(
+      audioFile.buffer,
+      'tracks',
+      'video'
+    );
+    const audioUrl = audioUpload.secure_url;
+
+    // Upload cover file to Cloudinary if provided
+    let coverUrl: string | undefined;
+    if (coverFile) {
+      const coverUpload: any = await uploadFile(
+        coverFile.buffer,
+        'covers',
+        'image'
+      );
+      coverUrl = coverUpload.secure_url;
     }
 
     // Lấy thông tin nghệ sĩ chính từ artistId
@@ -194,69 +242,32 @@ export const createTrack = async (
       });
     }
 
-    // Upload audio file
-    const audioUpload = await uploadTrack(
-      audioFile.buffer,
-      audioFile.originalname,
-      true,
-      !!albumId
-    );
-
-    // Upload cover if provided or use album cover
-    let coverUrl: string | undefined;
-    if (coverFile) {
-      const coverUpload = await uploadTrack(
-        coverFile.buffer,
-        coverFile.originalname,
-        false,
-        false,
-        true
-      );
-      coverUrl = coverUpload.url;
-    } else if (albumData?.coverUrl) {
-      coverUrl = albumData.coverUrl;
-    }
-
-    const metadata: TrackMetadata = {
-      title,
-      artist: artist.name, // Sử dụng tên nghệ sĩ thay vì artistId
-      featuredArtists: featuredArtistsInfo
-        .map((artist) => artist.name)
-        .join(', '), // Thêm thông tin featured artists
-      duration: parseInt(duration),
-      releaseDate: new Date(releaseDate).toISOString().split('T')[0],
-      albumId: albumId || null,
-      type: 'track',
-    };
-
-    const metadataUpload = await saveMetadata(metadata);
-
     const track = await prisma.track.create({
       data: {
         title,
         artist: {
-          connect: { id: artistId }, // Sử dụng connect để liên kết artistId
+          connect: { id: artistId },
         },
         featuredArtists:
           featuredArtists.length > 0
             ? {
-                connect: featuredArtists.map((id: string) => ({ id })), // Liên kết featuredArtists
+                connect: featuredArtists.map((id: string) => ({ id })),
               }
             : undefined,
         duration: parseInt(duration),
         releaseDate: new Date(releaseDate),
-        coverUrl,
-        audioUrl: audioUpload.url,
-        audioMessageId: audioUpload.messageId,
+        coverUrl: coverUrl || albumData?.coverUrl,
+        audioUrl,
+        audioMessageId: null, // Giá trị mặc định
+        discordMessageId: null, // Giá trị mặc định
         album: albumId
           ? {
-              connect: { id: albumId }, // Liên kết albumId nếu có
+              connect: { id: albumId },
             }
           : undefined,
         uploadedBy: {
-          connect: { id: user.id }, // Liên kết userId
+          connect: { id: user.id },
         },
-        discordMessageId: metadataUpload.messageId,
       },
       select: trackSelect,
     });

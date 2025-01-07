@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,7 +9,6 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 
 /*
 BẢNG USER
@@ -25,6 +21,7 @@ BẢNG USER
   + 1 User -> n Tracks (one-to-many)
   + 1 User -> n History (one-to-many)
   + 1 User -> n Playlists (one-to-many)
+  + 1 User -> n Artists (many-to-many qua bảng UserFollowArtist)
 */
 model User {
   id String @id @default(cuid())
@@ -43,6 +40,7 @@ model User {
   tracks Track[]
   history History[]
   playlists Playlist[]
+  followedArtists UserFollowArtist[] // Quan hệ với bảng trung gian UserFollowArtist
 
   @@index([email])
   @@index([username])
@@ -59,6 +57,7 @@ BẢNG ARTIST
   + 1 Artist -> n Albums (one-to-many)
   + 1 Artist -> n Tracks as MainArtist (one-to-many)
   + n Artists -> n Tracks as FeaturedArtists (many-to-many)
+  + 1 Artist -> n Users (many-to-many qua bảng UserFollowArtist)
 */
 model Artist {
   id String @id @default(cuid())
@@ -76,11 +75,35 @@ model Artist {
   albums Album[] @relation("AlbumArtist")
   tracks Track[] @relation("TrackArtist")
   featuredTracks Track[] @relation("TrackFeaturedArtists")
+  followers UserFollowArtist[] // Quan hệ với bảng trung gian UserFollowArtist
 
   @@index([name])
   @@index([monthlyListeners])
   @@index([isVerified])
   @@map("artists")
+}
+
+/*
+BẢNG TRUNG GIAN UserFollowArtist
+- Khóa chính (PK): id
+- Khóa ngoại (FK): userId, artistId
+- Unique Constraint: [userId, artistId] (đảm bảo mỗi user chỉ follow một artist một lần)
+- Quan hệ:
+  + 1 UserFollowArtist -> 1 User (many-to-one)
+  + 1 UserFollowArtist -> 1 Artist (many-to-one)
+*/
+model UserFollowArtist {
+  id String @id @default(cuid())
+  userId String
+  artistId String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+  artist Artist @relation(fields: [artistId], references: [id])
+
+  @@unique([userId, artistId]) // Đảm bảo mỗi user chỉ follow một artist một lần
+  @@map("user_follow_artist")
 }
 
 /*
@@ -101,7 +124,7 @@ model Album {
   releaseDate DateTime
   trackCount Int
   isActive Boolean @default(true)
-  discordMessageId String @unique
+  discordMessageId String? @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -140,8 +163,8 @@ model Track {
   trackNumber Int?
   coverUrl String?
   audioUrl String
-  audioMessageId String @unique
-  discordMessageId String @unique
+  audioMessageId String? @unique
+  discordMessageId String? @unique
   playCount Int @default(0)
   isActive Boolean @default(true)
   createdAt DateTime @default(now())
