@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { saveArtistMetadata } from '../services/discord.service';
 import { uploadFile } from '../services/cloudinary.service';
+import { create } from 'domain';
 
 const artistSelect = {
   id: true,
@@ -14,6 +15,12 @@ const artistSelect = {
   updatedAt: true,
   isActive: true,
   discordMessageId: true,
+  followers: {
+    select: {
+      userId: true,
+      createdAt: true,
+    },
+  },
   _count: {
     select: {
       tracks: true,
@@ -433,5 +440,59 @@ export const updateMonthlyListeners = async (
   } catch (error) {
     console.error('Update monthly listeners error:', error);
     // Do not send a response here
+  }
+};
+
+// Follow artist
+export const followArtist = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, artistId } = req.body;
+    console.log(userId, artistId);
+
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized: User not authenticated' });
+      return;
+    }
+
+    // Check artist có tồn tại không
+    const artist = await prisma.artist.findUnique({
+      where: { id: artistId},
+      select: artistSelect
+    });
+
+    if (!artist) {
+      res.status(404).json({ message: 'Artist not found' });
+      return;
+    }
+
+    // Check user đã follow artist chưa
+    const existingFollow = await prisma.userFollowArtist.findFirst({
+      where: {
+        userId,
+        artistId,
+      },
+    });
+
+    if (existingFollow) {
+      res.status(400).json({ message: 'You are already following this artist' });
+      return;
+    }
+
+    // Add a follow relationship
+    const follow = await prisma.userFollowArtist.create({
+      data: {
+        userId,
+        artistId,
+        createdAt: new Date(),
+      },
+    });
+
+    res.status(201).json({
+      message: 'Successfully followed the artist',
+      follow,
+    });
+  } catch (error) {
+    console.error('Follow artist error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };

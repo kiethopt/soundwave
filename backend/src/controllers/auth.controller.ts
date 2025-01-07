@@ -17,6 +17,12 @@ const userSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  followedArtists: {
+    select: {
+      artistId: true,
+      createdAt: true,
+    },
+  },
 } as const;
 
 if (!process.env.JWT_SECRET) {
@@ -123,7 +129,9 @@ export const getAllUsers = async (
   res: Response
 ): Promise<void> => {
   try {
-    const users = await prisma.user.findMany();
+    const users = await prisma.user.findMany({
+      select: userSelect,
+    });
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
