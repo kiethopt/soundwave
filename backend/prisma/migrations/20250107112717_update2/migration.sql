@@ -43,6 +43,16 @@ CREATE TABLE "artists" (
 );
 
 -- CreateTable
+CREATE TABLE "user_follow_artist" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "artistId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "user_follow_artist_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "albums" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
@@ -157,6 +167,9 @@ CREATE INDEX "artists_monthlyListeners_idx" ON "artists"("monthlyListeners");
 CREATE INDEX "artists_isVerified_idx" ON "artists"("isVerified");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "user_follow_artist_userId_artistId_key" ON "user_follow_artist"("userId", "artistId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "albums_discordMessageId_key" ON "albums"("discordMessageId");
 
 -- CreateIndex
@@ -221,6 +234,12 @@ CREATE INDEX "_TrackFeaturedArtists_B_index" ON "_TrackFeaturedArtists"("B");
 
 -- CreateIndex
 CREATE INDEX "_PlaylistToTrack_B_index" ON "_PlaylistToTrack"("B");
+
+-- AddForeignKey
+ALTER TABLE "user_follow_artist" ADD CONSTRAINT "user_follow_artist_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_follow_artist" ADD CONSTRAINT "user_follow_artist_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "albums" ADD CONSTRAINT "albums_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

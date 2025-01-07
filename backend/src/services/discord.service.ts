@@ -1,4 +1,4 @@
-import { Client, TextChannel } from 'discord.js';
+import { Client, PermissionsBitField, TextChannel } from 'discord.js';
 
 export interface TrackMetadata {
   title: string;
@@ -23,6 +23,7 @@ export interface ArtistMetadata {
   bio?: string;
   isVerified: boolean;
   monthlyListeners: number;
+  followers: number;
   type: 'artist';
 }
 
@@ -198,6 +199,67 @@ export const saveMetadata = async (
   }
 };
 
+export const saveTrackMetadata = async (
+  metadata: TrackMetadata,
+  messageId?: string // Tham số messageId để cập nhật message hiện có
+): Promise<{ messageId: string }> => {
+  try {
+    const channel = (await client.channels.fetch(
+      DISCORD_CHANNELS.AUDIO_METADATA
+    )) as TextChannel;
+
+    const fields = [
+      {
+        name: 'Type',
+        value: metadata.type.charAt(0).toUpperCase() + metadata.type.slice(1),
+        inline: true,
+      },
+      {
+        name: 'Duration',
+        value: `${Math.floor(metadata.duration / 60)}:${(metadata.duration % 60)
+          .toString()
+          .padStart(2, '0')}`,
+        inline: true,
+      },
+      {
+        name: 'Release Date',
+        value: metadata.releaseDate || 'N/A',
+        inline: true,
+      },
+      {
+        name: 'Album ID',
+        value: metadata.albumId || 'Single Track',
+        inline: true,
+      },
+      {
+        name: 'Featured Artists',
+        value: metadata.featuredArtists || 'None',
+        inline: true,
+      },
+    ];
+
+    const embed = {
+      title: metadata.title,
+      description: `Artist: ${metadata.artist}`,
+      fields,
+    };
+
+    if (messageId) {
+      // Cập nhật message hiện có
+      const message = await channel.messages.fetch(messageId);
+      await message.edit({ embeds: [embed] });
+      return { messageId: message.id };
+    } else {
+      // Tạo message mới nếu không có messageId
+      const message = await channel.send({ embeds: [embed] });
+      return { messageId: message.id };
+    }
+  } catch (error) {
+    console.error('Discord track metadata error:', error);
+    throw error;
+  }
+};
+
 export const saveArtistMetadata = async (
   metadata: ArtistMetadata,
   messageId?: string // Tham số messageId để cập nhật message hiện có
@@ -224,6 +286,11 @@ export const saveArtistMetadata = async (
         {
           name: 'Monthly Listeners',
           value: metadata.monthlyListeners.toString(),
+          inline: true,
+        },
+        {
+          name: 'Followers',
+          value: metadata.followers.toString(),
           inline: true,
         },
       ],
@@ -293,22 +360,54 @@ export const updateAlbumMetadata = async (
 
 export const deleteAllDiscordMessages = async () => {
   try {
-    const channels = [
-      DISCORD_CHANNELS.AUDIO_TRACKS,
-      DISCORD_CHANNELS.AUDIO_ALBUMS,
-      DISCORD_CHANNELS.AUDIO_METADATA,
-    ];
+    // Lấy tất cả các kênh cần xóa tin nhắn
+    const channels = Object.values(DISCORD_CHANNELS);
 
     for (const channelId of channels) {
-      const channel = (await client.channels.fetch(channelId)) as TextChannel;
-      const messages = await channel.messages.fetch();
+      try {
+        // Fetch kênh từ Discord
+        const channel = (await client.channels.fetch(channelId)) as TextChannel;
 
-      for (const message of messages.values()) {
-        await message.delete();
+        // Kiểm tra xem bot có quyền xóa tin nhắn không
+        if (
+          !channel
+            .permissionsFor(client.user!)
+            ?.has(PermissionsBitField.Flags.ManageMessages)
+        ) {
+          console.warn(
+            `Bot không có quyền xóa tin nhắn trong kênh ${channelId}`
+          );
+          continue;
+        }
+
+        // Fetch tất cả tin nhắn trong kênh
+        let messages = await channel.messages.fetch({ limit: 100 });
+
+        // Lặp qua từng batch tin nhắn và xóa
+        while (messages.size > 0) {
+          // Xóa tất cả tin nhắn trong batch hiện tại
+          await channel.bulkDelete(messages);
+
+          console.log(
+            `Đã xóa ${messages.size} tin nhắn trong kênh ${channelId}`
+          );
+
+          // Fetch lại tin nhắn tiếp theo
+          messages = await channel.messages.fetch({ limit: 100 });
+
+          // Thêm độ trễ 1 giây để tránh rate limits
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
+        console.log(`Đã xóa tất cả tin nhắn trong kênh ${channelId}`);
+      } catch (error) {
+        console.error(`Lỗi khi xử lý kênh ${channelId}:`, error);
       }
     }
+
+    console.log('Đã xóa tất cả tin nhắn trong tất cả kênh.');
   } catch (error) {
-    console.error('Delete Discord messages error:', error);
+    console.error('Lỗi khi xóa tin nhắn Discord:', error);
     throw error;
   }
 };

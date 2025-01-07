@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
-import { saveArtistMetadata, uploadTrack } from '../services/discord.service';
+import { saveArtistMetadata } from '../services/discord.service';
+import { uploadFile } from '../services/cloudinary.service';
 
 const artistSelect = {
   id: true,
@@ -54,6 +55,7 @@ const artistTrackSelect = {
       isVerified: true,
     },
   },
+  followers: true,
   createdAt: true,
   updatedAt: true,
   isActive: true,
@@ -188,15 +190,13 @@ export const createArtist = async (
     let avatarUrl: string | undefined;
 
     if (avatarFile) {
-      const { url } = await uploadTrack(
+      // Upload avatar lên Cloudinary
+      const avatarUpload: any = await uploadFile(
         avatarFile.buffer,
-        avatarFile.originalname,
-        false,
-        false,
-        false,
-        true // Tham số để xác định đây là hình ảnh của nghệ sĩ
+        'artists',
+        'image'
       );
-      avatarUrl = url;
+      avatarUrl = avatarUpload.secure_url;
     }
 
     const artist = await prisma.artist.create({
@@ -208,14 +208,22 @@ export const createArtist = async (
       select: artistSelect,
     });
 
+    // Lấy số lượng followers
+    const followers = await prisma.userFollowArtist.count({
+      where: { artistId: artist.id },
+    });
+
+    // Gửi thông báo metadata vào kênh Discord
     const metadataUpload = await saveArtistMetadata({
       name: artist.name,
       bio: artist.bio || undefined,
       isVerified: artist.isVerified,
       monthlyListeners: artist.monthlyListeners,
+      followers, // Thêm số lượng followers
       type: 'artist',
     });
 
+    // Cập nhật discordMessageId vào database
     await prisma.artist.update({
       where: { id: artist.id },
       data: {
@@ -246,14 +254,13 @@ export const updateArtist = async (
     let avatarUrl: string | undefined;
 
     if (avatarFile) {
-      const { url } = await uploadTrack(
+      // Upload avatar lên Cloudinary
+      const avatarUpload: any = await uploadFile(
         avatarFile.buffer,
-        avatarFile.originalname,
-        false,
-        false,
-        true
+        'artists',
+        'image'
       );
-      avatarUrl = url;
+      avatarUrl = avatarUpload.secure_url;
     }
 
     const artist = await prisma.artist.update({
@@ -266,6 +273,26 @@ export const updateArtist = async (
       },
       select: artistSelect,
     });
+
+    // Lấy số lượng followers
+    const followers = await prisma.userFollowArtist.count({
+      where: { artistId: artist.id },
+    });
+
+    // Gửi thông báo metadata vào kênh Discord
+    if (artist.discordMessageId) {
+      await saveArtistMetadata(
+        {
+          name: artist.name,
+          bio: artist.bio || undefined,
+          isVerified: artist.isVerified,
+          monthlyListeners: artist.monthlyListeners,
+          followers,
+          type: 'artist',
+        },
+        artist.discordMessageId // Cập nhật message hiện có
+      );
+    }
 
     res.json({
       message: 'Artist đã được cập nhật thành công',
@@ -314,6 +341,11 @@ export const verifyArtist = async (
       select: artistSelect,
     });
 
+    // Lấy số lượng followers
+    const followers = await prisma.userFollowArtist.count({
+      where: { artistId: artist.id },
+    });
+
     // Cập nhật metadata trên Discord
     if (artist.discordMessageId) {
       await saveArtistMetadata(
@@ -322,6 +354,7 @@ export const verifyArtist = async (
           bio: artist.bio || undefined,
           isVerified: artist.isVerified,
           monthlyListeners: artist.monthlyListeners,
+          followers,
           type: 'artist',
         },
         artist.discordMessageId // Cập nhật message hiện có
@@ -366,6 +399,11 @@ export const updateMonthlyListeners = async (
           _count: true,
         });
 
+        // Lấy số lượng followers
+        const followers = await prisma.userFollowArtist.count({
+          where: { artistId: artist.id },
+        });
+
         const updatedArtist = await prisma.artist.update({
           where: { id: artist.id },
           data: {
@@ -382,6 +420,7 @@ export const updateMonthlyListeners = async (
               bio: updatedArtist.bio || undefined,
               isVerified: updatedArtist.isVerified,
               monthlyListeners: updatedArtist.monthlyListeners,
+              followers, // Thêm số lượng followers
               type: 'artist',
             },
             artist.discordMessageId

@@ -1,12 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
-import {
-  uploadTrack,
-  saveMetadata,
-  AlbumMetadata,
-  updateAlbumMetadata,
-  TrackMetadata,
-} from '../services/discord.service';
+import { saveMetadata, updateAlbumMetadata } from '../services/discord.service';
 import { uploadFile } from '../services/cloudinary.service';
 
 const albumSelect = {
@@ -204,91 +198,6 @@ export const getAlbumTracks = async (
 };
 
 // Tạo album mới
-// export const createAlbum = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   try {
-//     const { title, artist: artistId, releaseDate } = req.body;
-//     const coverFile = req.file;
-//     const user = req.user;
-
-//     if (!user?.id) {
-//       res.status(401).json({ message: 'Unauthorized' });
-//       return;
-//     }
-
-//     // Validate title and releaseDate
-//     if (!title || title.trim().length === 0) {
-//       res.status(400).json({ message: 'Title không được để trống' });
-//       return;
-//     }
-//     if (!releaseDate || isNaN(Date.parse(releaseDate))) {
-//       res.status(400).json({ message: 'Release date không hợp lệ' });
-//       return;
-//     }
-
-//     // Fetch artist name for metadata
-//     const artist = await prisma.artist.findUnique({
-//       where: { id: artistId },
-//       select: { name: true },
-//     });
-
-//     if (!artist) {
-//       res.status(400).json({ message: 'Artist không tồn tại' });
-//       return;
-//     }
-
-//     if (!coverFile) {
-//       res.status(400).json({ message: 'Cover image là bắt buộc' });
-//       return;
-//     }
-
-//     const { messageId: coverMessageId, url: coverUrl } = await uploadTrack(
-//       coverFile.buffer,
-//       coverFile.originalname,
-//       false,
-//       true,
-//       true
-//     );
-
-//     const metadata: AlbumMetadata = {
-//       title,
-//       artist: artist.name,
-//       releaseDate,
-//       trackCount: 0,
-//       type: 'album' as const,
-//     };
-
-//     const { messageId: metadataMessageId } = await saveMetadata(metadata);
-
-//     const album = await prisma.album.create({
-//       data: {
-//         title,
-//         artist: {
-//           connect: { id: artistId },
-//         },
-//         releaseDate: new Date(releaseDate),
-//         trackCount: 0,
-//         coverUrl,
-//         discordMessageId: metadataMessageId,
-//         uploadedBy: {
-//           connect: { id: user.id },
-//         },
-//       },
-//       select: albumSelect,
-//     });
-
-//     res.status(201).json({
-//       message: 'Album đã được tạo thành công',
-//       album,
-//     });
-//   } catch (error) {
-//     console.error('Create album error:', error);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// };
-
 export const createAlbum = async (
   req: Request,
   res: Response
@@ -337,6 +246,7 @@ export const createAlbum = async (
     );
     const coverUrl = coverUpload.secure_url;
 
+    // Tạo album trong database
     const album = await prisma.album.create({
       data: {
         title,
@@ -354,6 +264,23 @@ export const createAlbum = async (
       select: albumSelect,
     });
 
+    // Gửi thông báo metadata vào kênh Discord
+    const metadataUpload = await saveMetadata({
+      title: album.title,
+      artist: artist.name,
+      releaseDate: album.releaseDate.toISOString().split('T')[0],
+      trackCount: album.trackCount,
+      type: 'album',
+    });
+
+    // Cập nhật discordMessageId vào database
+    await prisma.album.update({
+      where: { id: album.id },
+      data: {
+        discordMessageId: metadataUpload.messageId,
+      },
+    });
+
     res.status(201).json({
       message: 'Album đã được tạo thành công',
       album,
@@ -363,152 +290,6 @@ export const createAlbum = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
-// export const uploadAlbumTracks = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   try {
-//     const { id } = req.params;
-//     const files = req.files as Express.Multer.File[];
-//     const user = req.user;
-
-//     if (!user?.id) {
-//       res.status(401).json({ message: 'Unauthorized' });
-//       return;
-//     }
-
-//     const album = await prisma.album.findUnique({
-//       where: { id },
-//       include: {
-//         artist: true,
-//         tracks: {
-//           where: { isActive: true },
-//           orderBy: { trackNumber: 'asc' },
-//         },
-//       },
-//     });
-
-//     if (!album) {
-//       res.status(404).json({ message: 'Album không tồn tại' });
-//       return;
-//     }
-
-//     // album.controller.ts
-//     const uploadedTracks = await Promise.all(
-//       files.map(async (file, index) => {
-//         // Upload audio file first
-//         const { messageId: audioMessageId, url: audioUrl } = await uploadTrack(
-//           file.buffer,
-//           file.originalname,
-//           true,
-//           true,
-//           false
-//         );
-
-//         const title =
-//           req.body[`title_${index}`] ||
-//           file.originalname.replace(/\.[^/.]+$/, '');
-//         const artistId = req.body[`artist_${index}`] || album.artistId;
-//         const featuredArtistIds = JSON.parse(
-//           req.body[`featuredArtists_${index}`] || '[]'
-//         );
-
-//         // Lấy tên của các featured artists
-//         const featuredArtists = await Promise.all(
-//           featuredArtistIds.map(async (id: string) => {
-//             const artist = await prisma.artist.findUnique({
-//               where: { id },
-//               select: { name: true },
-//             });
-//             return artist?.name || '';
-//           })
-//         );
-
-//         // Save track metadata and get metadata message ID
-//         const metadata: TrackMetadata = {
-//           title,
-//           artist:
-//             (await prisma.artist.findUnique({ where: { id: artistId } }))
-//               ?.name || '',
-//           featuredArtists: featuredArtists.join(', '), // Featured artists trong metadata
-//           duration: parseInt(req.body[`duration_${index}`]) || 0,
-//           albumId: album.id,
-//           releaseDate: new Date(
-//             req.body[`releaseDate_${index}`] || album.releaseDate
-//           )
-//             .toISOString()
-//             .split('T')[0],
-//           type: 'track',
-//         };
-
-//         const { messageId: metadataMessageId } = await saveMetadata(metadata);
-
-//         // Create track with all necessary connections
-//         return await prisma.track.create({
-//           data: {
-//             title,
-//             artist: {
-//               connect: { id: artistId },
-//             },
-//             featuredArtists: {
-//               connect: featuredArtistIds.map((id: string) => ({ id })),
-//             },
-//             duration: parseInt(req.body[`duration_${index}`]) || 0,
-//             releaseDate: new Date(
-//               req.body[`releaseDate_${index}`] || album.releaseDate
-//             ),
-//             trackNumber:
-//               parseInt(req.body[`trackNumber_${index}`]) ||
-//               album.tracks.length + index + 1,
-//             audioUrl,
-//             audioMessageId,
-//             coverUrl: album.coverUrl, // Lấy coverUrl từ album
-//             album: {
-//               connect: { id: album.id },
-//             },
-//             uploadedBy: {
-//               connect: { id: user.id },
-//             },
-//             discordMessageId: metadataMessageId,
-//           },
-//           include: {
-//             artist: true,
-//             featuredArtists: true,
-//           },
-//         });
-//       })
-//     );
-
-//     const updatedAlbum = await prisma.album.update({
-//       where: { id },
-//       data: {
-//         trackCount: {
-//           increment: files.length,
-//         },
-//       },
-//       select: albumSelect,
-//     });
-
-//     await updateAlbumMetadata(updatedAlbum.discordMessageId, {
-//       title: updatedAlbum.title,
-//       artist: updatedAlbum.artist.name,
-//       releaseDate: updatedAlbum.releaseDate.toISOString().split('T')[0],
-//       trackCount: updatedAlbum.trackCount,
-//       type: 'album',
-//     });
-
-//     res.status(201).json({
-//       message: 'Tracks uploaded successfully',
-//       tracks: uploadedTracks,
-//     });
-//   } catch (error) {
-//     console.error('Upload album tracks error:', error);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// };
-
-// Cập nhật album
 
 export const uploadAlbumTracks = async (
   req: Request,
@@ -614,6 +395,17 @@ export const uploadAlbumTracks = async (
       select: albumSelect,
     });
 
+    // Cập nhật metadata của album trên Discord
+    if (updatedAlbum.discordMessageId) {
+      await updateAlbumMetadata(updatedAlbum.discordMessageId, {
+        title: updatedAlbum.title,
+        artist: updatedAlbum.artist.name,
+        releaseDate: updatedAlbum.releaseDate.toISOString().split('T')[0],
+        trackCount: updatedAlbum.trackCount,
+        type: 'album',
+      });
+    }
+
     res.status(201).json({
       message: 'Tracks uploaded successfully',
       tracks: uploadedTracks,
@@ -623,49 +415,6 @@ export const uploadAlbumTracks = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
-// export const updateAlbum = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   try {
-//     const { id } = req.params;
-//     const { title, artist, releaseDate } = req.body;
-
-//     const validationError = validateAlbumData(title, artist, releaseDate);
-//     if (validationError) {
-//       res.status(400).json({ message: validationError });
-//       return;
-//     }
-
-//     const album = await prisma.album.update({
-//       where: { id },
-//       data: {
-//         title,
-//         artist,
-//         releaseDate: new Date(releaseDate),
-//         updatedAt: new Date(),
-//       },
-//       select: albumSelect,
-//     });
-
-//     await updateAlbumMetadata(album.discordMessageId, {
-//       title: album.title,
-//       artist: album.artist.name,
-//       releaseDate: album.releaseDate.toISOString().split('T')[0],
-//       trackCount: album.trackCount,
-//       type: 'album',
-//     });
-
-//     res.json({
-//       message: 'Album đã được cập nhật thành công',
-//       album,
-//     });
-//   } catch (error) {
-//     console.error('Update album error:', error);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// };
 
 export const updateAlbum = async (
   req: Request,
