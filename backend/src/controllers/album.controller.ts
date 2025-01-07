@@ -38,8 +38,12 @@ const albumSelect = {
       },
       featuredArtists: {
         select: {
-          id: true,
-          name: true,
+          artist: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
       duration: true,
@@ -150,6 +154,32 @@ export const getAlbumsByArtist = async (
     res.json(albums);
   } catch (error) {
     console.error('Get albums by artist error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Lấy albums theo artistId
+export const getAlbumsByArtistId = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { artistId } = req.params;
+
+    const albums = await prisma.album.findMany({
+      where: {
+        artistId,
+        isActive: true,
+      },
+      select: albumSelect,
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.json(albums);
+  } catch (error) {
+    console.error('Get albums by artist id error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

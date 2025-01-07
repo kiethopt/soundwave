@@ -3,6 +3,7 @@ import prisma from '../config/db';
 import jwt from 'jsonwebtoken';
 import {
   deleteAllDiscordMessages,
+  saveArtistMetadata,
   sendUserNotification,
 } from '../services/discord.service';
 import { clients } from '../index';
@@ -82,6 +83,24 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           name: true,
           role: true,
           isVerified: true,
+        },
+      });
+
+      // Gửi thông báo metadata vào kênh Discord
+      const metadataUpload = await saveArtistMetadata({
+        name: newArtist.name,
+        bio: bio || undefined,
+        isVerified: newArtist.isVerified,
+        monthlyListeners: 0, // Mặc định là 0 khi mới đăng ký
+        followers: 0, // Mặc định là 0 khi mới đăng ký
+        type: 'artist',
+      });
+
+      // Cập nhật discordMessageId vào database
+      await prisma.artist.update({
+        where: { id: newArtist.id },
+        data: {
+          discordMessageId: metadataUpload.messageId,
         },
       });
 

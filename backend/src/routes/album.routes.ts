@@ -10,6 +10,7 @@ import {
   updateAlbum,
   uploadAlbumTracks,
   searchAlbum,
+  getAlbumsByArtistId,
 } from '../controllers/album.controller';
 import { isAdmin, isAuthenticated } from '../middleware/auth';
 import multer from 'multer';
@@ -53,6 +54,7 @@ router.get('/albums', getAllAlbums);
 router.get('/albums/search', searchAlbum);
 router.get('/albums/:id', getAlbumById);
 router.get('/albums/artist/:artist', getAlbumsByArtist);
+router.get('/albums/artist/:artistId', getAlbumsByArtistId);
 router.get('/albums/:id/tracks', getAlbumTracks);
 
 // Admin only routes

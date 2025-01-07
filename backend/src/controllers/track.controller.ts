@@ -14,8 +14,12 @@ const trackSelect = {
   },
   featuredArtists: {
     select: {
-      id: true,
-      name: true,
+      artist: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   },
   duration: true,
@@ -256,6 +260,32 @@ export const getTracksByArtist = async (
     res.json(tracks);
   } catch (error) {
     console.error('Get tracks by artist error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Lấy tracks theo artistId
+export const getTracksByArtistId = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { artistId } = req.params;
+
+    const tracks = await prisma.track.findMany({
+      where: {
+        artistId,
+        isActive: true,
+      },
+      select: trackSelect,
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.json(tracks);
+  } catch (error) {
+    console.error('Get tracks by artist id error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

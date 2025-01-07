@@ -20,6 +20,8 @@ export const api = {
     update: (id: string) => `${API_BASE}/api/tracks/${id}`,
     delete: (id: string) => `${API_BASE}/api/tracks/${id}`,
     search: (query: string) => `${API_BASE}/api/tracks/search?q=${query}`,
+    getByArtistId: (artistId: string) =>
+      `${API_BASE}/api/tracks/artist/${artistId}`,
   },
   albums: {
     getAll: () => `${API_BASE}/api/albums`,
@@ -31,6 +33,8 @@ export const api = {
     reorderTracks: (id: string) =>
       `${API_BASE}/api/albums/${id}/tracks/reorder`,
     search: (query: string) => `${API_BASE}/api/albums/search?q=${query}`,
+    getByArtistId: (artistId: string) =>
+      `${API_BASE}/api/albums/artist/${artistId}`,
   },
   users: {
     getAll: () => `${API_BASE}/api/auth/users`,

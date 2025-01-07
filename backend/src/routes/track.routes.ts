@@ -7,6 +7,7 @@ import {
   getTracksByArtist,
   updateTrack,
   searchTrack,
+  getTracksByArtistId,
 } from '../controllers/track.controller';
 import { isAdmin, isAuthenticated } from '../middleware/auth';
 import multer from 'multer';
@@ -27,6 +28,7 @@ router.get('/tracks', getAllTracks);
 router.get('/tracks/search', searchTrack);
 router.get('/tracks/:id', getTrackById);
 router.get('/tracks/artist/:artist', getTracksByArtist);
+router.get('/tracks/artist/:artistId', getTracksByArtistId);
 
 // Admin only routes
 router.post(
