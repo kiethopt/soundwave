@@ -14,8 +14,6 @@ datasource db {
 BẢNG USER
 - Khóa chính (PK): id
 - Khóa duy nhất (Unique): email, username
-- Khóa ngoại (FK): không có
-- Indexes: email, username (để tối ưu tìm kiếm)
 - Quan hệ:
   + 1 User -> n Albums (one-to-many)
   + 1 User -> n Tracks (one-to-many)
@@ -36,7 +34,7 @@ model User {
   isActive Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relations
   albums Album[]
   tracks Track[]
@@ -48,6 +46,7 @@ model User {
 
   @@index([email])
   @@index([username])
+  @@unique([email, username]) // Đảm bảo email và username là duy nhất
   @@map("users")
 }
 
@@ -55,8 +54,6 @@ model User {
 BẢNG ARTIST
 - Khóa chính (PK): id (String)
 - Khóa duy nhất (Unique): email (String), name (String)
-- Khóa ngoại (FK): không có
-- Indexes: name, email, monthlyListeners, isVerified (để tối ưu tìm kiếm và sắp xếp)
 - Quan hệ:
   + 1 Artist -> n Albums (one-to-many)
   + 1 Artist -> n Tracks as MainArtist (one-to-many)
@@ -94,74 +91,8 @@ model Artist {
   @@index([email])
   @@index([monthlyListeners])
   @@index([isVerified])
+  @@unique([email, name]) // Đảm bảo email và name là duy nhất
   @@map("artists") // Tên bảng trong database
-}
-
-/*
-BẢNG TRUNG GIAN UserFollowArtist
-- Khóa chính (PK): id (String)
-- Khóa ngoại (FK): userId (String), artistId (String)
-- Unique Constraint: [userId, artistId] (đảm bảo mỗi user chỉ follow một artist một lần)
-- Quan hệ:
-  + 1 UserFollowArtist -> 1 User (many-to-one)
-  + 1 UserFollowArtist -> 1 Artist (many-to-one)
-*/
-model UserFollowArtist {
-  id String @id @default(cuid())
-  userId String // Khóa ngoại tham chiếu đến User
-  artistId String // Khóa ngoại tham chiếu đến Artist
-  createdAt DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id]) // Quan hệ many-to-one với User
-  artist Artist @relation(fields: [artistId], references: [id]) // Quan hệ many-to-one với Artist
-
-  @@unique([userId, artistId]) // Đảm bảo mỗi user chỉ follow một artist một lần
-  @@map("user_follow_artist") // Tên bảng trong database
-}
-
-/*
-BẢNG GENRE
-- Khóa chính (PK): id (String)
-- Khóa duy nhất (Unique): name (String)
-- Indexes: name (để tối ưu tìm kiếm)
-- Quan hệ:
-  + 1 Genre -> n Albums (many-to-many qua bảng AlbumGenre)
-*/
-model Genre {
-  id String @id @default(cuid())
-  name String @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  albums AlbumGenre[] // Quan hệ many-to-many với Album qua bảng trung gian AlbumGenre
-
-  @@index([name])
-  @@map("genres") // Tên bảng trong database
-}
-
-/*
-BẢNG TRUNG GIAN AlbumGenre
-- Khóa chính (PK): id (String)
-- Khóa ngoại (FK): albumId (String), genreId (String)
-- Unique Constraint: [albumId, genreId] (đảm bảo mỗi album chỉ có một genre một lần)
-- Quan hệ:
-  + 1 AlbumGenre -> 1 Album (many-to-one)
-  + 1 AlbumGenre -> 1 Genre (many-to-one)
-*/
-model AlbumGenre {
-  id String @id @default(cuid())
-  albumId String // Khóa ngoại tham chiếu đến Album
-  genreId String // Khóa ngoại tham chiếu đến Genre
-  createdAt DateTime @default(now())
-
-  // Relations
-  album Album @relation(fields: [albumId], references: [id]) // Quan hệ many-to-one với Album
-  genre Genre @relation(fields: [genreId], references: [id]) // Quan hệ many-to-one với Genre
-
-  @@unique([albumId, genreId]) // Đảm bảo mỗi album chỉ có một genre một lần
-  @@map("album_genre") // Tên bảng trong database
 }
 
 /*
@@ -169,7 +100,6 @@ BẢNG ALBUM
 - Khóa chính (PK): id
 - Khóa duy nhất (Unique): discordMessageId
 - Khóa ngoại (FK): artistId, userId
-- Indexes: title, artistId, userId (để tối ưu tìm kiếm)
 - Quan hệ:
   + n Albums -> 1 Artist (many-to-one)
   + n Albums -> 1 User (many-to-one)
@@ -182,6 +112,7 @@ model Album {
   coverUrl String?
   releaseDate DateTime
   trackCount Int
+  type AlbumType @default(ALBUM) // Phân loại Album, EP, hoặc Single
   isActive Boolean @default(true)
   discordMessageId String? @unique
   createdAt DateTime @default(now())
@@ -192,12 +123,13 @@ model Album {
   artistId String
   uploadedBy User @relation(fields: [userId], references: [id])
   userId String
-  tracks Track[]
+  tracks Track[] // Quan hệ one-to-many với Track
   genres AlbumGenre[] // Quan hệ many-to-many với Genre qua bảng trung gian AlbumGenre
 
   @@index([title])
   @@index([artistId])
   @@index([userId])
+  @@unique([title, artistId]) // Đảm bảo mỗi album của một nghệ sĩ có tiêu đề duy nhất
   @@map("albums")
 }
 
@@ -206,7 +138,6 @@ BẢNG TRACK
 - Khóa chính (PK): id
 - Khóa duy nhất (Unique): discordMessageId, audioMessageId
 - Khóa ngoại (FK): artistId, albumId, userId
-- Indexes: title, artistId, albumId, userId, playCount
 - Quan hệ:
   + n Tracks -> 1 Artist (many-to-one)
   + n Tracks -> n Artists as FeaturedArtists (many-to-many qua bảng TrackArtist)
@@ -248,38 +179,14 @@ model Track {
   @@index([albumId])
   @@index([userId])
   @@index([playCount])
+  @@unique([title, artistId]) // Đảm bảo mỗi track của một nghệ sĩ có tiêu đề duy nhất
   @@map("tracks")
-}
-
-/*
-BẢNG TRUNG GIAN TrackArtist
-- Khóa chính (PK): id (String)
-- Khóa ngoại (FK): trackId (String), artistId (String)
-- Unique Constraint: [trackId, artistId] (đảm bảo mỗi track chỉ có một artist featured một lần)
-- Quan hệ:
-  + 1 TrackArtist -> 1 Track (many-to-one)
-  + 1 TrackArtist -> 1 Artist (many-to-one)
-*/
-model TrackArtist {
-  id String @id @default(cuid())
-  trackId String // Khóa ngoại tham chiếu đến Track
-  artistId String // Khóa ngoại tham chiếu đến Artist
-  createdAt DateTime @default(now())
-
-  // Relations
-  track Track @relation(fields: [trackId], references: [id]) // Quan hệ many-to-one với Track
-  artist Artist @relation(fields: [artistId], references: [id]) // Quan hệ many-to-one với Artist
-
-  @@unique([trackId, artistId]) // Đảm bảo mỗi track chỉ có một artist featured một lần
-  @@map("track_artist") // Tên bảng trong database
 }
 
 /*
 BẢNG HISTORY
 - Khóa chính (PK): id
 - Khóa ngoại (FK): trackId, userId
-- Unique Constraint: [userId, trackId]
-- Indexes: userId, type, trackId, createdAt, playCount
 - Quan hệ:
   + n History -> 1 User (many-to-one)
   + n History -> 1 Track (many-to-one)
@@ -300,7 +207,7 @@ model History {
   user User @relation(fields: [userId], references: [id])
   userId String
 
-  @@unique([userId, trackId])
+  @@unique([userId, trackId, type]) // Đảm bảo mỗi user chỉ có một lịch sử cho mỗi track và loại (type)
   @@index([userId])
   @@index([type])
   @@index([trackId])
@@ -313,8 +220,6 @@ model History {
 BẢNG PLAYLIST
 - Khóa chính (PK): id
 - Khóa ngoại (FK): userId
-- Unique Constraint: [userId, type] // Đảm bảo mỗi user chỉ có 1 playlist FAVORITE
-- Indexes: userId, privacy
 - Quan hệ:
   + n Playlists -> 1 User (many-to-one)
   + n Playlists -> n Tracks (many-to-many qua bảng PlaylistTrack)
@@ -336,16 +241,166 @@ model Playlist {
   tracks PlaylistTrack[] // Quan hệ many-to-many với Track qua bảng trung gian PlaylistTrack
 
   @@unique([userId, type])
+  @@unique([name, userId]) // Đảm bảo mỗi user chỉ có một playlist với tên duy nhất
   @@index([userId])
   @@index([privacy])
   @@map("playlists")
 }
 
 /*
+BẢNG GENRE
+- Khóa chính (PK): id
+- Khóa duy nhất (Unique): name
+- Quan hệ:
+  + 1 Genre -> n Albums (many-to-many qua bảng AlbumGenre)
+*/
+model Genre {
+  id String @id @default(cuid())
+  name String @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  albums AlbumGenre[] // Quan hệ many-to-many với Album qua bảng trung gian AlbumGenre
+
+  @@map("genres") // Tên bảng trong database
+}
+
+/*
+BẢNG NOTIFICATION
+- Khóa chính (PK): id
+- Khóa ngoại (FK): userId, artistId
+- Quan hệ:
+  + n Notifications -> 1 User (many-to-one)
+  + n Notifications -> 1 Artist (many-to-one)
+*/
+model Notification {
+  id String @id @default(cuid())
+  type NotificationType
+  message String
+  isRead Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+  userId String?
+  artist Artist? @relation(fields: [artistId], references: [id])
+  artistId String?
+
+  @@index([userId])
+  @@index([artistId])
+  @@index([createdAt])
+  @@unique([userId, artistId, type]) // Đảm bảo mỗi user hoặc artist chỉ nhận một thông báo duy nhất cho mỗi loại (type)
+  @@map("notifications")
+}
+
+/*
+BẢNG EVENT
+- Khóa chính (PK): id
+- Khóa ngoại (FK): artistId
+- Quan hệ:
+  + n Events -> 1 Artist (many-to-one)
+*/
+model Event {
+  id String @id @default(cuid())
+  title String
+  description String?
+  location String
+  startDate DateTime
+  endDate DateTime
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  artist Artist @relation(fields: [artistId], references: [id])
+  artistId String
+
+  @@index([artistId])
+  @@index([startDate])
+  @@index([endDate])
+  @@unique([title, artistId]) // Đảm bảo mỗi event của một nghệ sĩ có tiêu đề duy nhất
+  @@map("events")
+}
+
+/*
+BẢNG TRUNG GIAN
+- Các bảng trung gian được nhóm lại để dễ quản lý.
+*/
+
+/*
+BẢNG TRUNG GIAN UserFollowArtist
+- Khóa chính (PK): id (String)
+- Khóa ngoại (FK): userId (String), artistId (String)
+- Quan hệ:
+  + 1 UserFollowArtist -> 1 User (many-to-one)
+  + 1 UserFollowArtist -> 1 Artist (many-to-one)
+*/
+model UserFollowArtist {
+  id String @id @default(cuid())
+  userId String // Khóa ngoại tham chiếu đến User
+  artistId String // Khóa ngoại tham chiếu đến Artist
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id]) // Quan hệ many-to-one với User
+  artist Artist @relation(fields: [artistId], references: [id]) // Quan hệ many-to-one với Artist
+
+  @@unique([userId, artistId]) // Đảm bảo mỗi user chỉ follow một artist một lần
+  @@map("user_follow_artist") // Tên bảng trong database
+}
+
+/*
+BẢNG TRUNG GIAN AlbumGenre
+- Khóa chính (PK): id (String)
+- Khóa ngoại (FK): albumId (String), genreId (String)
+- Quan hệ:
+  + 1 AlbumGenre -> 1 Album (many-to-one)
+  + 1 AlbumGenre -> 1 Genre (many-to-one)
+- Ràng buộc:
+  + @@unique([albumId, genreId]): Đảm bảo mỗi album không được gán cùng một genre nhiều lần.
+*/
+model AlbumGenre {
+  id String @id @default(cuid())
+  albumId String // Khóa ngoại tham chiếu đến Album
+  genreId String // Khóa ngoại tham chiếu đến Genre
+  createdAt DateTime @default(now())
+
+  // Relations
+  album Album @relation(fields: [albumId], references: [id]) // Quan hệ many-to-one với Album
+  genre Genre @relation(fields: [genreId], references: [id]) // Quan hệ many-to-one với Genre
+
+  @@unique([albumId, genreId]) // Đảm bảo mỗi album không được gán cùng một genre nhiều lần
+  @@map("album_genre") // Tên bảng trong database
+}
+
+/*
+BẢNG TRUNG GIAN TrackArtist
+- Khóa chính (PK): id (String)
+- Khóa ngoại (FK): trackId (String), artistId (String)
+- Quan hệ:
+  + 1 TrackArtist -> 1 Track (many-to-one)
+  + 1 TrackArtist -> 1 Artist (many-to-one)
+*/
+model TrackArtist {
+  id String @id @default(cuid())
+  trackId String // Khóa ngoại tham chiếu đến Track
+  artistId String // Khóa ngoại tham chiếu đến Artist
+  createdAt DateTime @default(now())
+
+  // Relations
+  track Track @relation(fields: [trackId], references: [id]) // Quan hệ many-to-one với Track
+  artist Artist @relation(fields: [artistId], references: [id]) // Quan hệ many-to-one với Artist
+
+  @@unique([trackId, artistId]) // Đảm bảo mỗi track chỉ có một artist featured một lần
+  @@map("track_artist") // Tên bảng trong database
+}
+
+/*
 BẢNG TRUNG GIAN PlaylistTrack
 - Khóa chính (PK): id (String)
 - Khóa ngoại (FK): playlistId (String), trackId (String)
-- Unique Constraint: [playlistId, trackId] (đảm bảo mỗi track chỉ có trong một playlist một lần)
 - Quan hệ:
   + 1 PlaylistTrack -> 1 Playlist (many-to-one)
   + 1 PlaylistTrack -> 1 Track (many-to-one)
@@ -368,7 +423,6 @@ model PlaylistTrack {
 BẢNG TRUNG GIAN UserLikeTrack
 - Khóa chính (PK): id (String)
 - Khóa ngoại (FK): userId (String), trackId (String)
-- Unique Constraint: [userId, trackId] (đảm bảo mỗi user chỉ like một track một lần)
 - Quan hệ:
   + 1 UserLikeTrack -> 1 User (many-to-one)
   + 1 UserLikeTrack -> 1 Track (many-to-one)
@@ -388,64 +442,6 @@ model UserLikeTrack {
 }
 
 /*
-BẢNG NOTIFICATION
-- Khóa chính (PK): id
-- Khóa ngoại (FK): userId, artistId
-- Indexes: userId, artistId, createdAt
-- Quan hệ:
-  + n Notifications -> 1 User (many-to-one)
-  + n Notifications -> 1 Artist (many-to-one)
-*/
-model Notification {
-  id String @id @default(cuid())
-  type NotificationType
-  message String
-  isRead Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  user User? @relation(fields: [userId], references: [id])
-  userId String?
-  artist Artist? @relation(fields: [artistId], references: [id])
-  artistId String?
-
-  @@index([userId])
-  @@index([artistId])
-  @@index([createdAt])
-  @@map("notifications")
-}
-
-/*
-BẢNG EVENT
-- Khóa chính (PK): id
-- Khóa ngoại (FK): artistId
-- Indexes: artistId, startDate, endDate
-- Quan hệ:
-  + n Events -> 1 Artist (many-to-one)
-*/
-model Event {
-  id String @id @default(cuid())
-  title String
-  description String?
-  location String
-  startDate DateTime
-  endDate DateTime
-  isActive Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  artist Artist @relation(fields: [artistId], references: [id])
-  artistId String
-
-  @@index([artistId])
-  @@index([startDate])
-  @@index([endDate])
-  @@map("events")
-}
-
-/*
 ENUM ROLE
 - USER: Người dùng bình thường
 - ARTIST: Nghệ sĩ, có thể upload nhạc sau khi được admin xác minh
@@ -455,6 +451,18 @@ enum Role {
   USER
   ARTIST
   ADMIN
+}
+
+/*
+ENUM ALBUM TYPE
+- ALBUM: Album chính thức
+- EP: Extended Play (EP)
+- SINGLE: Bài hát đơn
+*/
+enum AlbumType {
+  ALBUM
+  EP
+  SINGLE
 }
 
 enum HistoryType {
