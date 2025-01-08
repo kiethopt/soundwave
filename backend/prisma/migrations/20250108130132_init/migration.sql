@@ -28,29 +28,37 @@ CREATE TABLE "users" (
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "bio" TEXT,
+    "isVerified" BOOLEAN NOT NULL DEFAULT false,
+    "verificationRequestedAt" TIMESTAMP(3),
+    "verifiedAt" TIMESTAMP(3),
+    "monthlyListeners" INTEGER NOT NULL DEFAULT 0,
+    "discordMessageId" TEXT,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "artists" (
+CREATE TABLE "artist_profiles" (
     "id" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "password" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
+    "artistName" TEXT NOT NULL,
     "bio" TEXT,
-    "avatar" TEXT,
-    "role" "Role" NOT NULL DEFAULT 'ARTIST',
-    "isVerified" BOOLEAN NOT NULL DEFAULT false,
-    "verificationRequestedAt" TIMESTAMP(3),
-    "verifiedAt" TIMESTAMP(3),
-    "monthlyListeners" INTEGER NOT NULL DEFAULT 0,
-    "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "discordMessageId" TEXT,
+    "socialMediaLinks" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "userId" TEXT NOT NULL,
 
-    CONSTRAINT "artists_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "artist_profiles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "artist_genre" (
+    "id" TEXT NOT NULL,
+    "artistProfileId" TEXT NOT NULL,
+    "genreId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "artist_genre_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -60,13 +68,13 @@ CREATE TABLE "albums" (
     "coverUrl" TEXT,
     "releaseDate" TIMESTAMP(3) NOT NULL,
     "trackCount" INTEGER NOT NULL,
+    "duration" INTEGER NOT NULL DEFAULT 0,
     "type" "AlbumType" NOT NULL DEFAULT 'ALBUM',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "discordMessageId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "artistId" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
 
     CONSTRAINT "albums_pkey" PRIMARY KEY ("id")
 );
@@ -75,7 +83,7 @@ CREATE TABLE "albums" (
 CREATE TABLE "tracks" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
-    "duration" INTEGER NOT NULL,
+    "duration" INTEGER NOT NULL DEFAULT 0,
     "releaseDate" TIMESTAMP(3) NOT NULL,
     "trackNumber" INTEGER,
     "coverUrl" TEXT,
@@ -88,7 +96,6 @@ CREATE TABLE "tracks" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "artistId" TEXT NOT NULL,
     "albumId" TEXT,
-    "userId" TEXT NOT NULL,
 
     CONSTRAINT "tracks_pkey" PRIMARY KEY ("id")
 );
@@ -118,6 +125,8 @@ CREATE TABLE "playlists" (
     "privacy" "PlaylistPrivacy" NOT NULL DEFAULT 'PRIVATE',
     "type" "PlaylistType" NOT NULL DEFAULT 'NORMAL',
     "isAIGenerated" BOOLEAN NOT NULL DEFAULT false,
+    "totalTracks" INTEGER NOT NULL DEFAULT 0,
+    "totalDuration" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "userId" TEXT NOT NULL,
@@ -143,8 +152,7 @@ CREATE TABLE "notifications" (
     "isRead" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "userId" TEXT,
-    "artistId" TEXT,
+    "userId" TEXT NOT NULL,
 
     CONSTRAINT "notifications_pkey" PRIMARY KEY ("id")
 );
@@ -168,8 +176,8 @@ CREATE TABLE "events" (
 -- CreateTable
 CREATE TABLE "user_follow_artist" (
     "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "artistId" TEXT NOT NULL,
+    "followerId" TEXT NOT NULL,
+    "followingId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "user_follow_artist_pkey" PRIMARY KEY ("id")
@@ -200,7 +208,8 @@ CREATE TABLE "playlist_track" (
     "id" TEXT NOT NULL,
     "playlistId" TEXT NOT NULL,
     "trackId" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "addedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "trackOrder" INTEGER NOT NULL,
 
     CONSTRAINT "playlist_track_pkey" PRIMARY KEY ("id")
 );
@@ -222,37 +231,34 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "users_discordMessageId_key" ON "users"("discordMessageId");
+
+-- CreateIndex
 CREATE INDEX "users_email_idx" ON "users"("email");
 
 -- CreateIndex
 CREATE INDEX "users_username_idx" ON "users"("username");
 
 -- CreateIndex
+CREATE INDEX "users_verifiedAt_idx" ON "users"("verifiedAt");
+
+-- CreateIndex
+CREATE INDEX "users_createdAt_idx" ON "users"("createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "users_email_username_key" ON "users"("email", "username");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "artists_email_key" ON "artists"("email");
+CREATE UNIQUE INDEX "artist_profiles_artistName_key" ON "artist_profiles"("artistName");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "artists_name_key" ON "artists"("name");
+CREATE UNIQUE INDEX "artist_profiles_userId_key" ON "artist_profiles"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "artists_discordMessageId_key" ON "artists"("discordMessageId");
+CREATE INDEX "artist_profiles_artistName_idx" ON "artist_profiles"("artistName");
 
 -- CreateIndex
-CREATE INDEX "artists_name_idx" ON "artists"("name");
-
--- CreateIndex
-CREATE INDEX "artists_email_idx" ON "artists"("email");
-
--- CreateIndex
-CREATE INDEX "artists_monthlyListeners_idx" ON "artists"("monthlyListeners");
-
--- CreateIndex
-CREATE INDEX "artists_isVerified_idx" ON "artists"("isVerified");
-
--- CreateIndex
-CREATE UNIQUE INDEX "artists_email_name_key" ON "artists"("email", "name");
+CREATE UNIQUE INDEX "artist_genre_artistProfileId_genreId_key" ON "artist_genre"("artistProfileId", "genreId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "albums_discordMessageId_key" ON "albums"("discordMessageId");
@@ -264,7 +270,13 @@ CREATE INDEX "albums_title_idx" ON "albums"("title");
 CREATE INDEX "albums_artistId_idx" ON "albums"("artistId");
 
 -- CreateIndex
-CREATE INDEX "albums_userId_idx" ON "albums"("userId");
+CREATE INDEX "albums_releaseDate_idx" ON "albums"("releaseDate");
+
+-- CreateIndex
+CREATE INDEX "albums_isActive_idx" ON "albums"("isActive");
+
+-- CreateIndex
+CREATE INDEX "albums_createdAt_idx" ON "albums"("createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "albums_title_artistId_key" ON "albums"("title", "artistId");
@@ -285,10 +297,16 @@ CREATE INDEX "tracks_artistId_idx" ON "tracks"("artistId");
 CREATE INDEX "tracks_albumId_idx" ON "tracks"("albumId");
 
 -- CreateIndex
-CREATE INDEX "tracks_userId_idx" ON "tracks"("userId");
+CREATE INDEX "tracks_playCount_idx" ON "tracks"("playCount");
 
 -- CreateIndex
-CREATE INDEX "tracks_playCount_idx" ON "tracks"("playCount");
+CREATE INDEX "tracks_releaseDate_idx" ON "tracks"("releaseDate");
+
+-- CreateIndex
+CREATE INDEX "tracks_isActive_idx" ON "tracks"("isActive");
+
+-- CreateIndex
+CREATE INDEX "tracks_createdAt_idx" ON "tracks"("createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "tracks_title_artistId_key" ON "tracks"("title", "artistId");
@@ -327,16 +345,13 @@ CREATE UNIQUE INDEX "playlists_name_userId_key" ON "playlists"("name", "userId")
 CREATE UNIQUE INDEX "genres_name_key" ON "genres"("name");
 
 -- CreateIndex
+CREATE INDEX "genres_name_idx" ON "genres"("name");
+
+-- CreateIndex
 CREATE INDEX "notifications_userId_idx" ON "notifications"("userId");
 
 -- CreateIndex
-CREATE INDEX "notifications_artistId_idx" ON "notifications"("artistId");
-
--- CreateIndex
 CREATE INDEX "notifications_createdAt_idx" ON "notifications"("createdAt");
-
--- CreateIndex
-CREATE UNIQUE INDEX "notifications_userId_artistId_type_key" ON "notifications"("userId", "artistId", "type");
 
 -- CreateIndex
 CREATE INDEX "events_artistId_idx" ON "events"("artistId");
@@ -348,82 +363,118 @@ CREATE INDEX "events_startDate_idx" ON "events"("startDate");
 CREATE INDEX "events_endDate_idx" ON "events"("endDate");
 
 -- CreateIndex
+CREATE INDEX "events_isActive_idx" ON "events"("isActive");
+
+-- CreateIndex
+CREATE INDEX "events_createdAt_idx" ON "events"("createdAt");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "events_title_artistId_key" ON "events"("title", "artistId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_follow_artist_userId_artistId_key" ON "user_follow_artist"("userId", "artistId");
+CREATE INDEX "user_follow_artist_followerId_idx" ON "user_follow_artist"("followerId");
+
+-- CreateIndex
+CREATE INDEX "user_follow_artist_followingId_idx" ON "user_follow_artist"("followingId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_follow_artist_followerId_followingId_key" ON "user_follow_artist"("followerId", "followingId");
+
+-- CreateIndex
+CREATE INDEX "album_genre_albumId_idx" ON "album_genre"("albumId");
+
+-- CreateIndex
+CREATE INDEX "album_genre_genreId_idx" ON "album_genre"("genreId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "album_genre_albumId_genreId_key" ON "album_genre"("albumId", "genreId");
 
 -- CreateIndex
+CREATE INDEX "track_artist_trackId_idx" ON "track_artist"("trackId");
+
+-- CreateIndex
+CREATE INDEX "track_artist_artistId_idx" ON "track_artist"("artistId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "track_artist_trackId_artistId_key" ON "track_artist"("trackId", "artistId");
+
+-- CreateIndex
+CREATE INDEX "playlist_track_playlistId_idx" ON "playlist_track"("playlistId");
+
+-- CreateIndex
+CREATE INDEX "playlist_track_trackId_idx" ON "playlist_track"("trackId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "playlist_track_playlistId_trackId_key" ON "playlist_track"("playlistId", "trackId");
 
 -- CreateIndex
+CREATE INDEX "user_like_track_userId_idx" ON "user_like_track"("userId");
+
+-- CreateIndex
+CREATE INDEX "user_like_track_trackId_idx" ON "user_like_track"("trackId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "user_like_track_userId_trackId_key" ON "user_like_track"("userId", "trackId");
 
 -- AddForeignKey
-ALTER TABLE "albums" ADD CONSTRAINT "albums_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "artist_profiles" ADD CONSTRAINT "artist_profiles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "albums" ADD CONSTRAINT "albums_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "artist_genre" ADD CONSTRAINT "artist_genre_artistProfileId_fkey" FOREIGN KEY ("artistProfileId") REFERENCES "artist_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tracks" ADD CONSTRAINT "tracks_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "artist_genre" ADD CONSTRAINT "artist_genre_genreId_fkey" FOREIGN KEY ("genreId") REFERENCES "genres"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tracks" ADD CONSTRAINT "tracks_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "albums"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "albums" ADD CONSTRAINT "albums_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tracks" ADD CONSTRAINT "tracks_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "tracks" ADD CONSTRAINT "tracks_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "histories" ADD CONSTRAINT "histories_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "tracks" ADD CONSTRAINT "tracks_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "albums"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "histories" ADD CONSTRAINT "histories_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "histories" ADD CONSTRAINT "histories_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "playlists" ADD CONSTRAINT "playlists_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "histories" ADD CONSTRAINT "histories_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "notifications" ADD CONSTRAINT "notifications_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "playlists" ADD CONSTRAINT "playlists_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "notifications" ADD CONSTRAINT "notifications_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artists"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "events" ADD CONSTRAINT "events_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "events" ADD CONSTRAINT "events_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_follow_artist" ADD CONSTRAINT "user_follow_artist_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "user_follow_artist" ADD CONSTRAINT "user_follow_artist_followerId_fkey" FOREIGN KEY ("followerId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_follow_artist" ADD CONSTRAINT "user_follow_artist_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "user_follow_artist" ADD CONSTRAINT "user_follow_artist_followingId_fkey" FOREIGN KEY ("followingId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "album_genre" ADD CONSTRAINT "album_genre_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "albums"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "album_genre" ADD CONSTRAINT "album_genre_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "albums"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "album_genre" ADD CONSTRAINT "album_genre_genreId_fkey" FOREIGN KEY ("genreId") REFERENCES "genres"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "album_genre" ADD CONSTRAINT "album_genre_genreId_fkey" FOREIGN KEY ("genreId") REFERENCES "genres"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "playlist_track" ADD CONSTRAINT "playlist_track_playlistId_fkey" FOREIGN KEY ("playlistId") REFERENCES "playlists"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "playlist_track" ADD CONSTRAINT "playlist_track_playlistId_fkey" FOREIGN KEY ("playlistId") REFERENCES "playlists"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "playlist_track" ADD CONSTRAINT "playlist_track_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "playlist_track" ADD CONSTRAINT "playlist_track_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_like_track" ADD CONSTRAINT "user_like_track_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "user_like_track" ADD CONSTRAINT "user_like_track_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_like_track" ADD CONSTRAINT "user_like_track_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "user_like_track" ADD CONSTRAINT "user_like_track_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,204 +7,162 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/*
-BẢNG USER
-- Khóa chính (PK): id
-- Khóa duy nhất (Unique): email, username
-- Quan hệ:
-  + 1 User -> n Albums (one-to-many)
-  + 1 User -> n Tracks (one-to-many)
-  + 1 User -> n History (one-to-many)
-  + 1 User -> n Playlists (one-to-many)
-  + 1 User -> n Artists (many-to-many qua bảng UserFollowArtist)
-  + 1 User -> n Notifications (one-to-many)
-  + 1 User -> n Tracks (many-to-many qua bảng UserLikeTrack)
-*/
 model User {
-  id String @id @default(cuid())
-  email String @unique
-  username String? @unique
-  password String
-  name String?
-  avatar String?
-  role Role @default(USER)
-  isActive Boolean @default(true)
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String?  @unique
+  password  String
+  name      String?
+  avatar    String?
+  role      Role     @default(USER)
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  albums Album[]
-  tracks Track[]
-  history History[]
-  playlists Playlist[]
-  followedArtists UserFollowArtist[] // Quan hệ many-to-many với Artist qua bảng trung gian UserFollowArtist
-  notifications Notification[]
-  likedTracks UserLikeTrack[] // Quan hệ many-to-many với Track qua bảng trung gian UserLikeTrack
+  // Artist specific fields
+  artistProfile           ArtistProfile?
+  bio                     String?        @db.Text
+  isVerified              Boolean        @default(false)
+  verificationRequestedAt DateTime?
+  verifiedAt              DateTime?
+  monthlyListeners        Int            @default(0) @db.Integer
+  discordMessageId        String?        @unique
 
+  // Relations
+  albums          Album[]
+  tracks          Track[]
+  history         History[]
+  playlists       Playlist[]
+  followedArtists UserFollowArtist[] @relation("Follower")
+  followers       UserFollowArtist[] @relation("Following")
+  notifications   Notification[]
+  likedTracks     UserLikeTrack[]
+  events          Event[]
+  trackArtist     TrackArtist[]
+
+  @@unique([email, username])
   @@index([email])
   @@index([username])
-  @@unique([email, username]) // Đảm bảo email và username là duy nhất
+  @@index([verifiedAt])
+  @@index([createdAt])
   @@map("users")
 }
 
-/*
-BẢNG ARTIST
-- Khóa chính (PK): id (String)
-- Khóa duy nhất (Unique): email (String), name (String)
-- Quan hệ:
-  + 1 Artist -> n Albums (one-to-many)
-  + 1 Artist -> n Tracks as MainArtist (one-to-many)
-  + n Artists -> n Tracks as FeaturedArtists (many-to-many qua bảng TrackArtist)
-  + 1 Artist -> n Users (many-to-many qua bảng UserFollowArtist)
-  + 1 Artist -> n Events (one-to-many)
-  + 1 Artist -> n Notifications (one-to-many)
-*/
-model Artist {
-  id String @id @default(cuid())
-  email String @unique
-  password String
-  name String @unique
-  bio String? @db.Text
-  avatar String?
-  role Role @default(ARTIST) // Role của artist: ARTIST
-  isVerified Boolean @default(false) // Đã được xác minh hay chưa
-  verificationRequestedAt DateTime? // Thời điểm yêu cầu xác minh
-  verifiedAt DateTime? // Thời điểm được xác minh
-  monthlyListeners Int @default(0)
-  isActive Boolean @default(true)
-  discordMessageId String? @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model ArtistProfile {
+  id               String   @id @default(cuid())
+  artistName       String   @unique
+  bio              String?  @db.Text
+  socialMediaLinks Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  // Relations
-  albums Album[] @relation("AlbumArtist")
-  tracks Track[] @relation("TrackArtist")
-  featuredTracks TrackArtist[] // Quan hệ many-to-many với Track qua bảng trung gian TrackArtist
-  followers UserFollowArtist[] // Quan hệ many-to-many với User qua bảng trung gian UserFollowArtist
-  events Event[]
-  notifications Notification[]
+  // Quan hệ one-to-one với User
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
 
-  @@index([name])
-  @@index([email])
-  @@index([monthlyListeners])
-  @@index([isVerified])
-  @@unique([email, name]) // Đảm bảo email và name là duy nhất
-  @@map("artists") // Tên bảng trong database
+  // Quan hệ many-to-many với Genre qua bảng trung gian ArtistGenre
+  genres ArtistGenre[]
+
+  @@index([artistName])
+  @@map("artist_profiles")
 }
 
-/*
-BẢNG ALBUM
-- Khóa chính (PK): id
-- Khóa duy nhất (Unique): discordMessageId
-- Khóa ngoại (FK): artistId, userId
-- Quan hệ:
-  + n Albums -> 1 Artist (many-to-one)
-  + n Albums -> 1 User (many-to-one)
-  + 1 Album -> n Tracks (one-to-many)
-  + 1 Album -> n Genres (many-to-many qua bảng AlbumGenre)
-*/
+model ArtistGenre {
+  id              String   @id @default(cuid())
+  artistProfileId String
+  genreId         String
+  createdAt       DateTime @default(now())
+
+  // Quan hệ many-to-one với ArtistProfile
+  artistProfile ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+
+  // Quan hệ many-to-one với Genre
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+
+  @@unique([artistProfileId, genreId])
+  @@map("artist_genre")
+}
+
 model Album {
-  id String @id @default(cuid())
-  title String
-  coverUrl String?
-  releaseDate DateTime
-  trackCount Int
-  type AlbumType @default(ALBUM) // Phân loại Album, EP, hoặc Single
-  isActive Boolean @default(true)
-  discordMessageId String? @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String    @id @default(cuid())
+  title            String
+  coverUrl         String?
+  releaseDate      DateTime
+  trackCount       Int       @db.Integer
+  duration         Int       @default(0) @db.Integer
+  type             AlbumType @default(ALBUM)
+  isActive         Boolean   @default(true)
+  discordMessageId String?   @unique
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relations
-  artist Artist @relation("AlbumArtist", fields: [artistId], references: [id])
+  artist   User         @relation(fields: [artistId], references: [id], onDelete: Cascade)
   artistId String
-  uploadedBy User @relation(fields: [userId], references: [id])
-  userId String
-  tracks Track[] // Quan hệ one-to-many với Track
-  genres AlbumGenre[] // Quan hệ many-to-many với Genre qua bảng trung gian AlbumGenre
+  tracks   Track[]
+  genres   AlbumGenre[]
 
+  @@unique([title, artistId])
   @@index([title])
   @@index([artistId])
-  @@index([userId])
-  @@unique([title, artistId]) // Đảm bảo mỗi album của một nghệ sĩ có tiêu đề duy nhất
+  @@index([releaseDate])
+  @@index([isActive])
+  @@index([createdAt])
   @@map("albums")
 }
 
-/*
-BẢNG TRACK
-- Khóa chính (PK): id
-- Khóa duy nhất (Unique): discordMessageId, audioMessageId
-- Khóa ngoại (FK): artistId, albumId, userId
-- Quan hệ:
-  + n Tracks -> 1 Artist (many-to-one)
-  + n Tracks -> n Artists as FeaturedArtists (many-to-many qua bảng TrackArtist)
-  + n Tracks -> 1 Album (many-to-one)
-  + n Tracks -> 1 User (many-to-one)
-  + n Tracks -> n Playlists (many-to-many qua bảng PlaylistTrack)
-  + 1 Track -> n History (one-to-many)
-  + n Tracks -> n Users (many-to-many qua bảng UserLikeTrack)
-*/
 model Track {
-  id String @id @default(cuid())
-  title String
-  duration Int
-  releaseDate DateTime
-  trackNumber Int?
-  coverUrl String?
-  audioUrl String
-  audioMessageId String? @unique
-  discordMessageId String? @unique
-  playCount Int @default(0)
-  isActive Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(cuid())
+  title            String
+  duration         Int      @default(0) @db.Integer
+  releaseDate      DateTime
+  trackNumber      Int?     @db.Integer
+  coverUrl         String?
+  audioUrl         String
+  audioMessageId   String?  @unique
+  discordMessageId String?  @unique
+  playCount        Int      @default(0) @db.Integer
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   // Relations
-  artist Artist @relation("TrackArtist", fields: [artistId], references: [id])
-  artistId String
-  featuredArtists TrackArtist[] // Quan hệ many-to-many với Artist qua bảng trung gian TrackArtist
-  album Album? @relation(fields: [albumId], references: [id])
-  albumId String?
-  uploadedBy User @relation(fields: [userId], references: [id])
-  userId String
-  playlists PlaylistTrack[] // Quan hệ many-to-many với Playlist qua bảng trung gian PlaylistTrack
-  history History[]
-  likedBy UserLikeTrack[] // Quan hệ many-to-many với User qua bảng trung gian UserLikeTrack
+  artist          User            @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artistId        String
+  featuredArtists TrackArtist[]
+  album           Album?          @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  albumId         String?
+  playlists       PlaylistTrack[]
+  history         History[]
+  likedBy         UserLikeTrack[]
 
+  @@unique([title, artistId])
   @@index([title])
   @@index([artistId])
   @@index([albumId])
-  @@index([userId])
   @@index([playCount])
-  @@unique([title, artistId]) // Đảm bảo mỗi track của một nghệ sĩ có tiêu đề duy nhất
+  @@index([releaseDate])
+  @@index([isActive])
+  @@index([createdAt])
   @@map("tracks")
 }
 
-/*
-BẢNG HISTORY
-- Khóa chính (PK): id
-- Khóa ngoại (FK): trackId, userId
-- Quan hệ:
-  + n History -> 1 User (many-to-one)
-  + n History -> 1 Track (many-to-one)
-*/
 model History {
-  id String @id @default(cuid())
-  type HistoryType
-  query String?
-  duration Int?
+  id        String      @id @default(cuid())
+  type      HistoryType
+  query     String?
+  duration  Int?        @db.Integer
   completed Boolean?
-  playCount Int @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  playCount Int         @default(0) @db.Integer
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
-  // Relations
-  track Track? @relation(fields: [trackId], references: [id])
+  track   Track?  @relation(fields: [trackId], references: [id], onDelete: Cascade)
   trackId String?
-  user User @relation(fields: [userId], references: [id])
-  userId String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
 
-  @@unique([userId, trackId, type]) // Đảm bảo mỗi user chỉ có một lịch sử cho mỗi track và loại (type)
+  @@unique([userId, trackId, type])
   @@index([userId])
   @@index([type])
   @@index([trackId])
@@ -216,249 +171,167 @@ model History {
   @@map("histories")
 }
 
-/*
-BẢNG PLAYLIST
-- Khóa chính (PK): id
-- Khóa ngoại (FK): userId
-- Quan hệ:
-  + n Playlists -> 1 User (many-to-one)
-  + n Playlists -> n Tracks (many-to-many qua bảng PlaylistTrack)
-*/
 model Playlist {
-  id String @id @default(cuid())
-  name String
-  description String?
-  coverUrl String?
-  privacy PlaylistPrivacy @default(PRIVATE)
-  type PlaylistType @default(NORMAL)
-  isAIGenerated Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String          @id @default(cuid())
+  name          String
+  description   String?
+  coverUrl      String?
+  privacy       PlaylistPrivacy @default(PRIVATE)
+  type          PlaylistType    @default(NORMAL)
+  isAIGenerated Boolean         @default(false)
+  totalTracks   Int             @default(0) @db.Integer
+  totalDuration Int             @default(0) @db.Integer
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
-  // Relations
-  user User @relation(fields: [userId], references: [id])
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
-  tracks PlaylistTrack[] // Quan hệ many-to-many với Track qua bảng trung gian PlaylistTrack
+  tracks PlaylistTrack[]
 
   @@unique([userId, type])
-  @@unique([name, userId]) // Đảm bảo mỗi user chỉ có một playlist với tên duy nhất
+  @@unique([name, userId])
   @@index([userId])
   @@index([privacy])
   @@map("playlists")
 }
 
-/*
-BẢNG GENRE
-- Khóa chính (PK): id
-- Khóa duy nhất (Unique): name
-- Quan hệ:
-  + 1 Genre -> n Albums (many-to-many qua bảng AlbumGenre)
-*/
 model Genre {
-  id String @id @default(cuid())
-  name String @unique
+  id        String   @id @default(cuid())
+  name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  albums AlbumGenre[] // Quan hệ many-to-many với Album qua bảng trung gian AlbumGenre
+  albums         AlbumGenre[]
+  artistProfiles ArtistGenre[]
 
-  @@map("genres") // Tên bảng trong database
+  @@index([name])
+  @@map("genres")
 }
 
-/*
-BẢNG NOTIFICATION
-- Khóa chính (PK): id
-- Khóa ngoại (FK): userId, artistId
-- Quan hệ:
-  + n Notifications -> 1 User (many-to-one)
-  + n Notifications -> 1 Artist (many-to-one)
-*/
 model Notification {
-  id String @id @default(cuid())
-  type NotificationType
-  message String
-  isRead Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String           @id @default(cuid())
+  type      NotificationType
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
-  // Relations
-  user User? @relation(fields: [userId], references: [id])
-  userId String?
-  artist Artist? @relation(fields: [artistId], references: [id])
-  artistId String?
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 
   @@index([userId])
-  @@index([artistId])
   @@index([createdAt])
-  @@unique([userId, artistId, type]) // Đảm bảo mỗi user hoặc artist chỉ nhận một thông báo duy nhất cho mỗi loại (type)
   @@map("notifications")
 }
 
-/*
-BẢNG EVENT
-- Khóa chính (PK): id
-- Khóa ngoại (FK): artistId
-- Quan hệ:
-  + n Events -> 1 Artist (many-to-one)
-*/
 model Event {
-  id String @id @default(cuid())
-  title String
+  id          String   @id @default(cuid())
+  title       String
   description String?
-  location String
-  startDate DateTime
-  endDate DateTime
-  isActive Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  location    String
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  // Relations
-  artist Artist @relation(fields: [artistId], references: [id])
+  artist   User   @relation(fields: [artistId], references: [id], onDelete: Cascade)
   artistId String
 
+  @@unique([title, artistId])
   @@index([artistId])
   @@index([startDate])
   @@index([endDate])
-  @@unique([title, artistId]) // Đảm bảo mỗi event của một nghệ sĩ có tiêu đề duy nhất
+  @@index([isActive])
+  @@index([createdAt])
   @@map("events")
 }
 
-/*
-BẢNG TRUNG GIAN
-- Các bảng trung gian được nhóm lại để dễ quản lý.
-*/
+// Bảng trung gian
 
-/*
-BẢNG TRUNG GIAN UserFollowArtist
-- Khóa chính (PK): id (String)
-- Khóa ngoại (FK): userId (String), artistId (String)
-- Quan hệ:
-  + 1 UserFollowArtist -> 1 User (many-to-one)
-  + 1 UserFollowArtist -> 1 Artist (many-to-one)
-*/
 model UserFollowArtist {
-  id String @id @default(cuid())
-  userId String // Khóa ngoại tham chiếu đến User
-  artistId String // Khóa ngoại tham chiếu đến Artist
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
 
-  // Relations
-  user User @relation(fields: [userId], references: [id]) // Quan hệ many-to-one với User
-  artist Artist @relation(fields: [artistId], references: [id]) // Quan hệ many-to-one với Artist
+  follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
 
-  @@unique([userId, artistId]) // Đảm bảo mỗi user chỉ follow một artist một lần
-  @@map("user_follow_artist") // Tên bảng trong database
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("user_follow_artist")
 }
 
-/*
-BẢNG TRUNG GIAN AlbumGenre
-- Khóa chính (PK): id (String)
-- Khóa ngoại (FK): albumId (String), genreId (String)
-- Quan hệ:
-  + 1 AlbumGenre -> 1 Album (many-to-one)
-  + 1 AlbumGenre -> 1 Genre (many-to-one)
-- Ràng buộc:
-  + @@unique([albumId, genreId]): Đảm bảo mỗi album không được gán cùng một genre nhiều lần.
-*/
 model AlbumGenre {
-  id String @id @default(cuid())
-  albumId String // Khóa ngoại tham chiếu đến Album
-  genreId String // Khóa ngoại tham chiếu đến Genre
+  id        String   @id @default(cuid())
+  albumId   String
+  genreId   String
   createdAt DateTime @default(now())
 
-  // Relations
-  album Album @relation(fields: [albumId], references: [id]) // Quan hệ many-to-one với Album
-  genre Genre @relation(fields: [genreId], references: [id]) // Quan hệ many-to-one với Genre
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
 
-  @@unique([albumId, genreId]) // Đảm bảo mỗi album không được gán cùng một genre nhiều lần
-  @@map("album_genre") // Tên bảng trong database
+  @@unique([albumId, genreId])
+  @@index([albumId])
+  @@index([genreId])
+  @@map("album_genre")
 }
 
-/*
-BẢNG TRUNG GIAN TrackArtist
-- Khóa chính (PK): id (String)
-- Khóa ngoại (FK): trackId (String), artistId (String)
-- Quan hệ:
-  + 1 TrackArtist -> 1 Track (many-to-one)
-  + 1 TrackArtist -> 1 Artist (many-to-one)
-*/
 model TrackArtist {
-  id String @id @default(cuid())
-  trackId String // Khóa ngoại tham chiếu đến Track
-  artistId String // Khóa ngoại tham chiếu đến Artist
+  id        String   @id @default(cuid())
+  trackId   String
+  artistId  String
   createdAt DateTime @default(now())
 
-  // Relations
-  track Track @relation(fields: [trackId], references: [id]) // Quan hệ many-to-one với Track
-  artist Artist @relation(fields: [artistId], references: [id]) // Quan hệ many-to-one với Artist
+  track  Track @relation(fields: [trackId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  artist User  @relation(fields: [artistId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
 
-  @@unique([trackId, artistId]) // Đảm bảo mỗi track chỉ có một artist featured một lần
-  @@map("track_artist") // Tên bảng trong database
+  @@unique([trackId, artistId])
+  @@index([trackId])
+  @@index([artistId])
+  @@map("track_artist")
 }
 
-/*
-BẢNG TRUNG GIAN PlaylistTrack
-- Khóa chính (PK): id (String)
-- Khóa ngoại (FK): playlistId (String), trackId (String)
-- Quan hệ:
-  + 1 PlaylistTrack -> 1 Playlist (many-to-one)
-  + 1 PlaylistTrack -> 1 Track (many-to-one)
-*/
 model PlaylistTrack {
-  id String @id @default(cuid())
-  playlistId String // Khóa ngoại tham chiếu đến Playlist
-  trackId String // Khóa ngoại tham chiếu đến Track
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  playlistId String
+  trackId    String
+  addedAt    DateTime @default(now())
+  trackOrder Int      @db.Integer
 
   // Relations
-  playlist Playlist @relation(fields: [playlistId], references: [id]) // Quan hệ many-to-one với Playlist
-  track Track @relation(fields: [trackId], references: [id]) // Quan hệ many-to-one với Track
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
 
-  @@unique([playlistId, trackId]) // Đảm bảo mỗi track chỉ có trong một playlist một lần
-  @@map("playlist_track") // Tên bảng trong database
+  @@unique([playlistId, trackId])
+  @@index([playlistId])
+  @@index([trackId])
+  @@map("playlist_track")
 }
 
-/*
-BẢNG TRUNG GIAN UserLikeTrack
-- Khóa chính (PK): id (String)
-- Khóa ngoại (FK): userId (String), trackId (String)
-- Quan hệ:
-  + 1 UserLikeTrack -> 1 User (many-to-one)
-  + 1 UserLikeTrack -> 1 Track (many-to-one)
-*/
 model UserLikeTrack {
-  id String @id @default(cuid())
-  userId String // Khóa ngoại tham chiếu đến User
-  trackId String // Khóa ngoại tham chiếu đến Track
+  id        String   @id @default(cuid())
+  userId    String
+  trackId   String
   createdAt DateTime @default(now())
 
-  // Relations
-  user User @relation(fields: [userId], references: [id]) // Quan hệ many-to-one với User
-  track Track @relation(fields: [trackId], references: [id]) // Quan hệ many-to-one với Track
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
 
-  @@unique([userId, trackId]) // Đảm bảo mỗi user chỉ like một track một lần
-  @@map("user_like_track") // Tên bảng trong database
+  @@unique([userId, trackId])
+  @@index([userId])
+  @@index([trackId])
+  @@map("user_like_track")
 }
 
-/*
-ENUM ROLE
-- USER: Người dùng bình thường
-- ARTIST: Nghệ sĩ, có thể upload nhạc sau khi được admin xác minh
-- ADMIN: Quản trị viên, có quyền cao nhất
-*/
 enum Role {
   USER
   ARTIST
   ADMIN
 }
 
-/*
-ENUM ALBUM TYPE
-- ALBUM: Album chính thức
-- EP: Extended Play (EP)
-- SINGLE: Bài hát đơn
-*/
 enum AlbumType {
   ALBUM
   EP
