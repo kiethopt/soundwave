@@ -28,12 +28,14 @@ CREATE TABLE "users" (
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "lastLoginAt" TIMESTAMP(3),
+    "passwordResetToken" TEXT,
+    "passwordResetExpires" TIMESTAMP(3),
     "bio" TEXT,
     "isVerified" BOOLEAN NOT NULL DEFAULT false,
     "verificationRequestedAt" TIMESTAMP(3),
     "verifiedAt" TIMESTAMP(3),
     "monthlyListeners" INTEGER NOT NULL DEFAULT 0,
-    "discordMessageId" TEXT,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -71,7 +73,6 @@ CREATE TABLE "albums" (
     "duration" INTEGER NOT NULL DEFAULT 0,
     "type" "AlbumType" NOT NULL DEFAULT 'ALBUM',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "discordMessageId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "artistId" TEXT NOT NULL,
@@ -88,9 +89,8 @@ CREATE TABLE "tracks" (
     "trackNumber" INTEGER,
     "coverUrl" TEXT,
     "audioUrl" TEXT NOT NULL,
-    "audioMessageId" TEXT,
-    "discordMessageId" TEXT,
     "playCount" INTEGER NOT NULL DEFAULT 0,
+    "type" "AlbumType" NOT NULL DEFAULT 'SINGLE',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -194,11 +194,22 @@ CREATE TABLE "album_genre" (
 );
 
 -- CreateTable
+CREATE TABLE "track_genre" (
+    "id" TEXT NOT NULL,
+    "trackId" TEXT NOT NULL,
+    "genreId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "track_genre_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "track_artist" (
     "id" TEXT NOT NULL,
     "trackId" TEXT NOT NULL,
-    "artistId" TEXT NOT NULL,
+    "artistProfileId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" TEXT,
 
     CONSTRAINT "track_artist_pkey" PRIMARY KEY ("id")
 );
@@ -231,13 +242,16 @@ CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_discordMessageId_key" ON "users"("discordMessageId");
-
--- CreateIndex
 CREATE INDEX "users_email_idx" ON "users"("email");
 
 -- CreateIndex
 CREATE INDEX "users_username_idx" ON "users"("username");
+
+-- CreateIndex
+CREATE INDEX "users_role_idx" ON "users"("role");
+
+-- CreateIndex
+CREATE INDEX "users_isActive_idx" ON "users"("isActive");
 
 -- CreateIndex
 CREATE INDEX "users_verifiedAt_idx" ON "users"("verifiedAt");
@@ -261,9 +275,6 @@ CREATE INDEX "artist_profiles_artistName_idx" ON "artist_profiles"("artistName")
 CREATE UNIQUE INDEX "artist_genre_artistProfileId_genreId_key" ON "artist_genre"("artistProfileId", "genreId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "albums_discordMessageId_key" ON "albums"("discordMessageId");
-
--- CreateIndex
 CREATE INDEX "albums_title_idx" ON "albums"("title");
 
 -- CreateIndex
@@ -280,12 +291,6 @@ CREATE INDEX "albums_createdAt_idx" ON "albums"("createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "albums_title_artistId_key" ON "albums"("title", "artistId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "tracks_audioMessageId_key" ON "tracks"("audioMessageId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "tracks_discordMessageId_key" ON "tracks"("discordMessageId");
 
 -- CreateIndex
 CREATE INDEX "tracks_title_idx" ON "tracks"("title");
@@ -390,13 +395,22 @@ CREATE INDEX "album_genre_genreId_idx" ON "album_genre"("genreId");
 CREATE UNIQUE INDEX "album_genre_albumId_genreId_key" ON "album_genre"("albumId", "genreId");
 
 -- CreateIndex
+CREATE INDEX "track_genre_trackId_idx" ON "track_genre"("trackId");
+
+-- CreateIndex
+CREATE INDEX "track_genre_genreId_idx" ON "track_genre"("genreId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "track_genre_trackId_genreId_key" ON "track_genre"("trackId", "genreId");
+
+-- CreateIndex
 CREATE INDEX "track_artist_trackId_idx" ON "track_artist"("trackId");
 
 -- CreateIndex
-CREATE INDEX "track_artist_artistId_idx" ON "track_artist"("artistId");
+CREATE INDEX "track_artist_artistProfileId_idx" ON "track_artist"("artistProfileId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "track_artist_trackId_artistId_key" ON "track_artist"("trackId", "artistId");
+CREATE UNIQUE INDEX "track_artist_trackId_artistProfileId_key" ON "track_artist"("trackId", "artistProfileId");
 
 -- CreateIndex
 CREATE INDEX "playlist_track_playlistId_idx" ON "playlist_track"("playlistId");
@@ -462,10 +476,19 @@ ALTER TABLE "album_genre" ADD CONSTRAINT "album_genre_albumId_fkey" FOREIGN KEY 
 ALTER TABLE "album_genre" ADD CONSTRAINT "album_genre_genreId_fkey" FOREIGN KEY ("genreId") REFERENCES "genres"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "track_genre" ADD CONSTRAINT "track_genre_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "track_genre" ADD CONSTRAINT "track_genre_genreId_fkey" FOREIGN KEY ("genreId") REFERENCES "genres"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_artistProfileId_fkey" FOREIGN KEY ("artistProfileId") REFERENCES "artist_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "playlist_track" ADD CONSTRAINT "playlist_track_playlistId_fkey" FOREIGN KEY ("playlistId") REFERENCES "playlists"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -3,8 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { API_URL } from '@/utils/config';
-import { AuthResponse } from '@/types';
+import { api } from '@/utils/api';
 
 interface LoginFormData {
   email: string;
@@ -23,40 +22,31 @@ function LoginForm() {
   useEffect(() => {
     const message = searchParams.get('message');
     if (message === 'account_deactivated') {
-      setError('Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ Admin.');
+      setError('Your account has been deactivated. Please contact Admin.');
     }
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      const response = await api.auth.login(formData);
 
-      const data = (await response.json()) as AuthResponse;
-      if (!response.ok) {
-        throw new Error(data.message);
-      }
+      if (response.token && response.user) {
+        localStorage.setItem('userToken', response.token);
+        localStorage.setItem('userData', JSON.stringify(response.user));
 
-      // Save authentication data
-      localStorage.setItem('userToken', data.token);
-      localStorage.setItem('userData', JSON.stringify(data.user));
-
-      // Redirect based on role
-      if (data.user.role === 'ADMIN') {
-        router.push('/admin');
-      } else if (data.user.role === 'ARTIST') {
-        router.push('/artist/albums');
+        if (response.user.role === 'ADMIN') {
+          router.push('/admin');
+        } else if (response.user.role === 'ARTIST') {
+          router.push('/artist/albums');
+        } else {
+          router.push('/');
+        }
       } else {
-        router.push('/');
+        setError(response.message || 'An error occurred');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError('An unexpected error occurred');
     }
   };
 
@@ -123,6 +113,13 @@ function LoginForm() {
         {`Don't have an account?`}{' '}
         <Link href="/register" className="text-white hover:underline">
           Sign up
+        </Link>
+      </p>
+
+      <p className="mt-4 text-center text-[#A7A7A7]">
+        Forgot your password?{' '}
+        <Link href="/forgot-password" className="text-white hover:underline">
+          Reset it here
         </Link>
       </p>
     </div>

@@ -22,39 +22,39 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('userToken');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
+  // useEffect(() => {
+  //   const fetchStats = async () => {
+  //     try {
+  //       setLoading(true);
+  //       const token = localStorage.getItem('userToken');
+  //       if (!token) {
+  //         throw new Error('No authentication token found');
+  //       }
 
-        const response = await fetch(api.dashboard.getStats(), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) {
-          throw new Error('Failed to fetch stats');
-        }
-        const data = await response.json();
+  //       const response = await fetch(api.dashboard.getStats(), {
+  //         headers: { Authorization: `Bearer ${token}` },
+  //       });
+  //       if (!response.ok) {
+  //         throw new Error('Failed to fetch stats');
+  //       }
+  //       const data = await response.json();
 
-        setStats({
-          totalTracks: data.tracks,
-          totalAlbums: data.albums,
-          totalUsers: data.users,
-          totalArtists: data.artists,
-        });
-      } catch (err) {
-        console.error('Error fetching stats:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch stats');
-      } finally {
-        setLoading(false);
-      }
-    };
+  //       setStats({
+  //         totalTracks: data.tracks,
+  //         totalAlbums: data.albums,
+  //         totalUsers: data.users,
+  //         totalArtists: data.artists,
+  //       });
+  //     } catch (err) {
+  //       console.error('Error fetching stats:', err);
+  //       setError(err instanceof Error ? err.message : 'Failed to fetch stats');
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
 
-    fetchStats();
-  }, []);
+  //   fetchStats();
+  // }, []);
 
   return (
     <div className="space-y-6">

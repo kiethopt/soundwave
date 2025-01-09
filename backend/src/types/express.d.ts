@@ -1,14 +1,19 @@
-import { User } from '@prisma/client';
+import { Role } from '@prisma/client';
+import { File } from 'multer';
 
 declare global {
   namespace Express {
     interface Request {
-      user?: User;
+      user?: {
+        id: string;
+        role: Role;
+        isVerified: boolean;
+        verificationRequestedAt?: string;
+      };
       files?: {
-        [fieldname: string]: Express.Multer.File[];
+        audioFile?: File[];
+        coverFile?: File[];
       };
     }
   }
 }
-
-export {};

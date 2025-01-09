@@ -1,84 +1,73 @@
-import { Router } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import {
   createAlbum,
+  updateAlbum,
   deleteAlbum,
   getAlbumById,
-  getAlbumsByArtist,
-  getAlbumTracks,
-  getAllAlbums,
-  reorderAlbumTracks,
-  updateAlbum,
-  uploadAlbumTracks,
   searchAlbum,
-  getAlbumsByArtistId,
+  addTracksToAlbum,
+  getAllAlbums,
 } from '../controllers/album.controller';
-import { isAdmin, isAuthenticated } from '../middleware/auth';
-import multer from 'multer';
+import { authenticate, authorize } from '../middleware/auth.middleware';
+import { Role } from '@prisma/client';
+import upload, { handleUploadError } from '../middleware/upload.middleware';
 
-const router = Router();
+const router = express.Router();
 
-// Cấu hình multer cho upload tracks
-const trackStorage = multer.memoryStorage();
-const uploadTracks = multer({
-  storage: trackStorage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB cho mỗi file audio
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('audio/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Chỉ chấp nhận file audio'));
-    }
-  },
-});
-
-// Cấu hình multer cho upload cover
-const coverStorage = multer.memoryStorage();
-const uploadCover = multer({
-  storage: coverStorage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB cho ảnh cover
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Chỉ chấp nhận file ảnh'));
-    }
-  },
-});
-
-// Public routes
-router.get('/albums', getAllAlbums);
-router.get('/albums/search', searchAlbum);
-router.get('/albums/:id', getAlbumById);
-router.get('/albums/artist/:artist', getAlbumsByArtist);
-router.get('/albums/artist/:artistId', getAlbumsByArtistId);
-router.get('/albums/:id/tracks', getAlbumTracks);
-
-// Admin only routes
+// Chỉ ADMIN và ARTIST có thể tạo, cập nhật, xóa album
 router.post(
-  '/albums',
-  isAuthenticated,
-  isAdmin,
-  uploadCover.single('cover'),
+  '/',
+  authenticate,
+  (req: Request, res: Response, next: NextFunction) => {
+    console.log('User:', req.user);
+    const user = req.user;
+    if (
+      user &&
+      (user.role === Role.ADMIN ||
+        user.role === Role.ARTIST ||
+        (user.role === Role.USER && user.verificationRequestedAt))
+    ) {
+      next();
+    } else {
+      res.status(403).json({ message: 'Forbidden' });
+    }
+  },
+  upload.single('coverFile'),
+  handleUploadError,
   createAlbum
 );
-router.post(
-  '/albums/:id/tracks',
-  isAuthenticated,
-  isAdmin,
-  uploadTracks.array('tracks', 1000),
-  uploadAlbumTracks
-);
-router.put('/albums/:id', isAuthenticated, isAdmin, updateAlbum);
+
 router.put(
-  '/albums/:id/tracks/reorder',
-  isAuthenticated,
-  isAdmin,
-  reorderAlbumTracks
+  '/:id',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  upload.single('coverFile'),
+  handleUploadError,
+  updateAlbum
 );
-router.delete('/albums/:id', isAuthenticated, isAdmin, deleteAlbum);
+
+router.delete(
+  '/:id',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  deleteAlbum
+);
+
+router.post(
+  '/:albumId/tracks',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  addTracksToAlbum
+);
+
+// PUBLIC routes
+router.get(
+  '/',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  getAllAlbums
+);
+router.get('/:id', getAlbumById);
+router.get('/search', authenticate, searchAlbum);
 
 export default router;

@@ -1,10 +1,15 @@
 import cloudinary from '../config/cloudinary.config';
 
+export interface CloudinaryUploadResult {
+  secure_url: string;
+  public_id: string;
+}
+
 export const uploadFile = async (
   fileBuffer: Buffer,
   folder: string,
   resourceType: 'image' | 'video' | 'auto' = 'auto'
-) => {
+): Promise<CloudinaryUploadResult> => {
   return new Promise((resolve, reject) => {
     cloudinary.uploader
       .upload_stream(
@@ -13,7 +18,7 @@ export const uploadFile = async (
           if (error) {
             reject(error);
           } else {
-            resolve(result);
+            resolve(result as CloudinaryUploadResult);
           }
         }
       )

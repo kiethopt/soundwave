@@ -8,16 +8,19 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  username  String?  @unique
-  password  String
-  name      String?
-  avatar    String?
-  role      Role     @default(USER)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  username             String?   @unique
+  password             String
+  name                 String?
+  avatar               String?
+  role                 Role      @default(USER)
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  lastLoginAt          DateTime?
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
 
   // Artist specific fields
   artistProfile           ArtistProfile?
@@ -26,7 +29,6 @@ model User {
   verificationRequestedAt DateTime?
   verifiedAt              DateTime?
   monthlyListeners        Int            @default(0) @db.Integer
-  discordMessageId        String?        @unique
 
   // Relations
   albums          Album[]
@@ -43,6 +45,8 @@ model User {
   @@unique([email, username])
   @@index([email])
   @@index([username])
+  @@index([role])
+  @@index([isActive])
   @@index([verifiedAt])
   @@index([createdAt])
   @@map("users")
@@ -61,7 +65,8 @@ model ArtistProfile {
   userId String @unique
 
   // Quan hệ many-to-many với Genre qua bảng trung gian ArtistGenre
-  genres ArtistGenre[]
+  genres      ArtistGenre[]
+  TrackArtist TrackArtist[]
 
   @@index([artistName])
   @@map("artist_profiles")
@@ -84,17 +89,16 @@ model ArtistGenre {
 }
 
 model Album {
-  id               String    @id @default(cuid())
-  title            String
-  coverUrl         String?
-  releaseDate      DateTime
-  trackCount       Int       @db.Integer
-  duration         Int       @default(0) @db.Integer
-  type             AlbumType @default(ALBUM)
-  isActive         Boolean   @default(true)
-  discordMessageId String?   @unique
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  title       String
+  coverUrl    String?
+  releaseDate DateTime
+  trackCount  Int       @db.Integer
+  duration    Int       @default(0) @db.Integer
+  type        AlbumType @default(ALBUM)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
   artist   User         @relation(fields: [artistId], references: [id], onDelete: Cascade)
@@ -112,19 +116,18 @@ model Album {
 }
 
 model Track {
-  id               String   @id @default(cuid())
-  title            String
-  duration         Int      @default(0) @db.Integer
-  releaseDate      DateTime
-  trackNumber      Int?     @db.Integer
-  coverUrl         String?
-  audioUrl         String
-  audioMessageId   String?  @unique
-  discordMessageId String?  @unique
-  playCount        Int      @default(0) @db.Integer
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id          String    @id @default(cuid())
+  title       String
+  duration    Int       @default(0) @db.Integer
+  releaseDate DateTime
+  trackNumber Int?      @db.Integer
+  coverUrl    String?
+  audioUrl    String
+  playCount   Int       @default(0) @db.Integer
+  type        AlbumType @default(SINGLE)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
   artist          User            @relation(fields: [artistId], references: [id], onDelete: Cascade)
@@ -132,6 +135,7 @@ model Track {
   featuredArtists TrackArtist[]
   album           Album?          @relation(fields: [albumId], references: [id], onDelete: Cascade)
   albumId         String?
+  genres          TrackGenre[]
   playlists       PlaylistTrack[]
   history         History[]
   likedBy         UserLikeTrack[]
@@ -202,6 +206,7 @@ model Genre {
   updatedAt DateTime @updatedAt
 
   albums         AlbumGenre[]
+  tracks         TrackGenre[]
   artistProfiles ArtistGenre[]
 
   @@index([name])
@@ -279,18 +284,35 @@ model AlbumGenre {
   @@map("album_genre")
 }
 
-model TrackArtist {
+model TrackGenre {
   id        String   @id @default(cuid())
   trackId   String
-  artistId  String
+  genreId   String
   createdAt DateTime @default(now())
 
-  track  Track @relation(fields: [trackId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
-  artist User  @relation(fields: [artistId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
 
-  @@unique([trackId, artistId])
+  @@unique([trackId, genreId])
   @@index([trackId])
-  @@index([artistId])
+  @@index([genreId])
+  @@map("track_genre")
+}
+
+model TrackArtist {
+  id              String   @id @default(cuid())
+  trackId         String
+  artistProfileId String
+  createdAt       DateTime @default(now())
+
+  track         Track         @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  artistProfile ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
+  User          User?         @relation(fields: [userId], references: [id])
+  userId        String?
+
+  @@unique([trackId, artistProfileId])
+  @@index([trackId])
+  @@index([artistProfileId])
   @@map("track_artist")
 }
 

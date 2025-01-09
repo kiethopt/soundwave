@@ -3,9 +3,8 @@
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar/Sidebar';
 import Header from '@/components/layout/Header/Header';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { api } from '@/utils/api';
+import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 
 export default function RootLayout({
   children,
@@ -13,75 +12,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const isAuthPage =
-    pathname?.includes('/login') || pathname?.includes('/register');
-
-  useEffect(() => {
-    if (isAuthPage || typeof window === 'undefined') return;
-
-    let eventSource: EventSource;
-    let reconnectTimer: NodeJS.Timeout;
-
-    const connectSSE = () => {
-      try {
-        const token = localStorage.getItem('userToken');
-        const userData = localStorage.getItem('userData');
-        if (!token || !userData) return;
-
-        // Đóng kết nối cũ nếu có
-        if (eventSource) {
-          eventSource.close();
-        }
-
-        eventSource = new EventSource(`${api.sse.url}?token=${token}`);
-
-        eventSource.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === 'FORCE_LOGOUT') {
-              const currentUser = JSON.parse(userData);
-              if (data.userId === currentUser.id) {
-                localStorage.removeItem('userToken');
-                localStorage.removeItem('userData');
-                router.push('/login');
-                if (eventSource) {
-                  eventSource.close();
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Error processing SSE message:', error);
-          }
-        };
-
-        eventSource.onerror = () => {
-          if (eventSource) {
-            eventSource.close();
-          }
-          // Chỉ reconnect nếu vẫn còn token
-          const currentToken = localStorage.getItem('userToken');
-          if (currentToken) {
-            reconnectTimer = setTimeout(connectSSE, 5000);
-          }
-        };
-      } catch (error) {
-        console.error('Error setting up SSE:', error);
-      }
-    };
-
-    connectSSE();
-
-    return () => {
-      if (eventSource) {
-        eventSource.close();
-      }
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
-    };
-  }, [isAuthPage, router]);
+    pathname?.includes('/login') ||
+    pathname?.includes('/register') ||
+    pathname?.includes('/reset-password') ||
+    pathname?.includes('/forgot-password');
 
   return (
     <html lang="vi" suppressHydrationWarning={true}>

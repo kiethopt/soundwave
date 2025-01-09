@@ -5,4 +5,7 @@ import { Router } from 'express';
 //   deleteHistory,
 //   clearHistory,
 // } from '../controllers/playlist.controller';
-import { isAuthenticated, checkUserActive } from '../middleware/auth';
+import {
+  isAuthenticated,
+  checkUserActive,
+} from '../middleware/auth.middleware';

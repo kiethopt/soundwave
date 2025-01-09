@@ -1,47 +1,61 @@
-import { Router } from 'express';
+import express from 'express';
 import {
   createTrack,
+  getTracksByType,
+  updateTrack,
   deleteTrack,
   getAllTracks,
-  getTrackById,
-  getTracksByArtist,
-  updateTrack,
-  searchTrack,
-  getTracksByArtistId,
+  getTracksByGenre,
+  getTracksByTypeAndGenre,
 } from '../controllers/track.controller';
-import { isAdmin, isAuthenticated } from '../middleware/auth';
-import multer from 'multer';
+import { authenticate, authorize } from '../middleware/auth.middleware';
+import { Role } from '@prisma/client';
+import upload, { handleUploadError } from '../middleware/upload.middleware';
 
-const router = Router();
+const router = express.Router();
 
-// Cấu hình multer để xử lý file upload
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-});
+// Lấy danh sách tất cả tracks (ADMIN & ARTIST only)
+router.get(
+  '/',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  getAllTracks
+);
 
-// Public routes
-router.get('/tracks', getAllTracks);
-router.get('/tracks/search', searchTrack);
-router.get('/tracks/:id', getTrackById);
-router.get('/tracks/artist/:artist', getTracksByArtist);
-router.get('/tracks/artist/:artistId', getTracksByArtistId);
-
-// Admin only routes
+// Route tạo track (ADMIN & ARTIST only)
 router.post(
-  '/tracks',
-  isAuthenticated,
-  isAdmin,
+  '/',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
   upload.fields([
-    { name: 'audio', maxCount: 1 },
-    { name: 'cover', maxCount: 1 },
+    { name: 'audioFile', maxCount: 1 },
+    { name: 'coverFile', maxCount: 1 },
   ]),
+  handleUploadError,
   createTrack
 );
-router.put('/tracks/:id', isAuthenticated, isAdmin, updateTrack);
-router.delete('/tracks/:id', isAuthenticated, isAdmin, deleteTrack);
+
+// Route lấy danh sách tracks theo type (PUBLIC)
+router.get('/type/:type', getTracksByType);
+// Route lấy danh sách tracks theo genre (PUBLIC)
+router.get('/genre/:genreId', getTracksByGenre);
+// Route lấy danh sách tracks theo type và genre (PUBLIC)
+router.get('/type/:type/genre/:genreId', getTracksByTypeAndGenre);
+
+// Route cập nhật track (ADMIN & ARTIST only)
+router.put(
+  '/:id',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  updateTrack
+);
+
+// Route xóa track (ADMIN & ARTIST only)
+router.delete(
+  '/:id',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  deleteTrack
+);
 
 export default router;

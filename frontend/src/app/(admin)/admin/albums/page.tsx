@@ -24,21 +24,14 @@ export default function AdminAlbums() {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(
-        query ? api.albums.search(query) : api.albums.getAll(),
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch albums');
+      let response;
+      if (query) {
+        response = await api.albums.search(query, token); // Gọi API search nếu có query
+      } else {
+        response = await api.albums.getAll(token); // Gọi API getAll nếu không có query
       }
 
-      const data = await response.json();
-      setAlbums(data);
+      setAlbums(response);
     } catch (err) {
       console.error('Error fetching albums:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch albums');

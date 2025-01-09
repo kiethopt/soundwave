@@ -1,7 +1,7 @@
 export interface User {
   id: string;
   email: string;
-  username: string;
+  username?: string;
   password?: string;
   name?: string;
   avatar?: string;
@@ -9,22 +9,37 @@ export interface User {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  lastLoginAt?: string;
+  passwordResetToken?: string;
+  passwordResetExpires?: string;
+  bio?: string;
+  isVerified: boolean;
+  verificationRequestedAt?: string;
+  verifiedAt?: string;
+  monthlyListeners: number;
+  artistProfile?: ArtistProfile;
+  albums?: Album[];
+  tracks?: Track[];
+  history?: History[];
+  playlists?: Playlist[];
+  followedArtists?: User[];
+  followers?: User[];
+  notifications?: Notification[];
+  events?: Event[];
+  likedTracks?: Track[];
 }
 
-export interface Artist {
+export interface ArtistProfile {
   id: string;
-  name: string;
+  artistName: string;
   bio?: string;
-  avatar?: string;
-  isVerified: boolean;
-  monthlyListeners: number;
-  isActive: boolean;
+  socialMediaLinks?: any; // JSON type
   createdAt: string;
   updatedAt: string;
-  _count?: {
-    tracks: number;
-    albums: number;
-  };
+  user: User;
+  userId: string;
+  genres?: Genre[];
+  tracks?: Track[];
 }
 
 export interface Album {
@@ -33,17 +48,15 @@ export interface Album {
   coverUrl?: string;
   releaseDate: string;
   trackCount: number;
+  duration: number;
+  type: 'ALBUM' | 'EP' | 'SINGLE';
   isActive: boolean;
-  discordMessageId: string;
   createdAt: string;
   updatedAt: string;
-
-  // Relations
-  artist: string | Artist;
+  artist: User;
   artistId: string;
-  uploadedBy: User;
-  userId: string;
   tracks?: Track[];
+  genres?: Genre[];
 }
 
 export interface Track {
@@ -54,21 +67,27 @@ export interface Track {
   trackNumber?: number;
   coverUrl?: string;
   audioUrl: string;
-  audioMessageId: string;
-  discordMessageId: string;
   playCount: number;
+  type: 'ALBUM' | 'EP' | 'SINGLE';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-
-  // Relations
-  artist: string | Artist;
+  artist: User;
   artistId: string;
-  featuredArtists: Artist[];
+  featuredArtists?: ArtistProfile[];
   album?: Album;
   albumId?: string;
-  uploadedBy: User;
-  userId: string;
+  genres?: Genre[];
+}
+
+export interface Genre {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  albums?: Album[];
+  tracks?: Track[];
+  artistProfiles?: ArtistProfile[];
 }
 
 export interface History {
@@ -80,8 +99,6 @@ export interface History {
   playCount: number;
   createdAt: string;
   updatedAt: string;
-
-  // Relations
   track?: Track;
   trackId?: string;
   user: User;
@@ -96,13 +113,38 @@ export interface Playlist {
   privacy: 'PUBLIC' | 'PRIVATE';
   type: 'FAVORITE' | 'NORMAL';
   isAIGenerated: boolean;
+  totalTracks: number;
+  totalDuration: number;
   createdAt: string;
   updatedAt: string;
-
-  // Relations
   user: User;
   userId: string;
-  tracks: Track[];
+  tracks?: Track[];
+}
+
+export interface Notification {
+  id: string;
+  type: 'NEW_TRACK' | 'NEW_ALBUM' | 'EVENT' | 'FOLLOW';
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+  user: User;
+  userId: string;
+}
+
+export interface Event {
+  id: string;
+  title: string;
+  description?: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  artist: User;
+  artistId: string;
 }
 
 export interface AuthResponse {

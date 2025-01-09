@@ -3,23 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { API_URL } from '@/utils/config';
+import { api } from '@/utils/api';
 
 interface RegisterFormData {
   email: string;
   username: string;
   password: string;
   name: string;
-}
-
-interface RegisterResponse {
-  message: string;
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    name: string;
-  };
 }
 
 export default function RegisterPage() {
@@ -35,28 +25,15 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      const response = await api.auth.register(formData);
 
-      const data = (await response.json()) as RegisterResponse;
-
-      if (!response.ok) {
-        throw new Error(data.message);
-      }
-
-      // Handle successful registration
-      router.push('/login');
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
+      if (response.message) {
+        router.push('/login');
       } else {
-        setError('An unexpected error occurred');
+        setError(response.message || 'An error occurred');
       }
+    } catch (err) {
+      setError('An unexpected error occurred');
     }
   };
 
@@ -159,13 +136,6 @@ export default function RegisterPage() {
         Already have an account?{' '}
         <Link href="/login" className="text-white hover:underline">
           Log in
-        </Link>
-      </p>
-
-      <p className="mt-4 text-center text-white/70">
-        Are you an artist?{' '}
-        <Link href="/register/artist" className="text-white hover:underline">
-          Register as an artist
         </Link>
       </p>
     </div>
