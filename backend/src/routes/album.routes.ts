@@ -60,14 +60,15 @@ router.post(
   addTracksToAlbum
 );
 
+router.get('/search', authenticate, searchAlbum);
+
 // PUBLIC routes
+router.get('/:id', getAlbumById);
 router.get(
   '/',
   authenticate,
   authorize([Role.ADMIN, Role.ARTIST]),
   getAllAlbums
 );
-router.get('/:id', getAlbumById);
-router.get('/search', authenticate, searchAlbum);
 
 export default router;
