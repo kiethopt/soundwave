@@ -157,7 +157,7 @@ model History {
   query     String?
   duration  Int?        @db.Integer
   completed Boolean?
-  playCount Int         @default(0) @db.Integer
+  playCount Int?        @db.Integer
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 

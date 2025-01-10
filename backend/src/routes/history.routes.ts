@@ -1,21 +1,28 @@
-// import { Router } from 'express';
-// import {
-//   saveHistory,
-//   getHistory,
-//   deleteHistory,
-//   clearHistory,
-// } from '../controllers/history.controller';
-// import { isAuthenticated, checkUserActive } from '../middleware/auth';
+import express from 'express';
+import {
+  savePlayHistory,
+  saveSearchHistory,
+  getPlayHistory,
+  getSearchHistory,
+  getAllHistory, // Import hàm mới
+} from '../controllers/history.controller';
+import { authenticate } from '../middleware/auth.middleware';
 
-// const router = Router();
+const router = express.Router();
 
-// // Protected routes
-// router.use(isAuthenticated);
-// router.use(checkUserActive);
+// Lưu lịch sử nghe nhạc
+router.post('/play', authenticate, savePlayHistory);
 
-// router.post('/history', saveHistory);
-// router.get('/history', getHistory);
-// router.delete('/history/:id', deleteHistory);
-// router.delete('/history', clearHistory);
+// Lưu lịch sử tìm kiếm
+router.post('/search', authenticate, saveSearchHistory);
 
-// export default router;
+// Lấy lịch sử nghe nhạc của người dùng
+router.get('/play', authenticate, getPlayHistory);
+
+// Lấy lịch sử tìm kiếm của người dùng
+router.get('/search', authenticate, getSearchHistory);
+
+// Lấy tất cả lịch sử (nghe nhạc và tìm kiếm) của người dùng
+router.get('/', authenticate, getAllHistory);
+
+export default router;

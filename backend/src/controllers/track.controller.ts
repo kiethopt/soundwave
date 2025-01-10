@@ -4,7 +4,8 @@ import {
   uploadFile,
   CloudinaryUploadResult,
 } from '../services/cloudinary.service';
-import { AlbumType, Role } from '@prisma/client';
+import { AlbumType, Role, HistoryType } from '@prisma/client';
+import { historySelect } from './history.controller';
 
 const trackSelect = {
   id: true,
@@ -559,21 +560,89 @@ export const searchTrack = async (
 ): Promise<void> => {
   try {
     const { q } = req.query;
+    const user = req.user;
 
     if (!q) {
       res.status(400).json({ message: 'Query is required' });
       return;
     }
 
+    const searchQuery = String(q).trim();
+
+    // Lưu lịch sử tìm kiếm nếu người dùng đã đăng nhập
+    if (user) {
+      const existingHistory = await prisma.history.findFirst({
+        where: {
+          userId: user.id,
+          type: HistoryType.SEARCH,
+          query: {
+            equals: searchQuery,
+            mode: 'insensitive',
+          },
+        },
+      });
+
+      if (existingHistory) {
+        await prisma.history.update({
+          where: { id: existingHistory.id },
+          data: { updatedAt: new Date() },
+        });
+      } else {
+        await prisma.history.create({
+          data: {
+            type: HistoryType.SEARCH,
+            query: searchQuery,
+            userId: user.id,
+          },
+        });
+      }
+    }
+
+    // Tìm kiếm track
     const tracks = await prisma.track.findMany({
       where: {
         isActive: true,
         OR: [
-          { title: { contains: String(q), mode: 'insensitive' } },
-          { artist: { name: { contains: String(q), mode: 'insensitive' } } },
+          {
+            title: {
+              contains: searchQuery,
+              mode: 'insensitive',
+            },
+          },
+          {
+            artist: {
+              name: {
+                contains: searchQuery,
+                mode: 'insensitive',
+              },
+            },
+          },
+          {
+            artist: {
+              artistProfile: {
+                artistName: {
+                  contains: searchQuery,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+          {
+            featuredArtists: {
+              some: {
+                artistProfile: {
+                  artistName: {
+                    contains: searchQuery,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
+          },
         ],
       },
       select: trackSelect,
+      orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
     });
 
     res.json(tracks);
@@ -844,6 +913,108 @@ export const getTracksByTypeAndGenre = async (
     });
   } catch (error) {
     console.error('Get tracks by type and genre error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Nghe nhạc
+export const playTrack = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { trackId } = req.params;
+    const { duration = 0, completed = false } = req.body;
+    const user = req.user;
+
+    // Kiểm tra xem người dùng có đăng nhập không
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Kiểm tra xem track có tồn tại không
+    const track = await prisma.track.findUnique({
+      where: { id: trackId },
+      select: { ...trackSelect, duration: true }, // Đảm bảo lấy thời lượng bài hát
+    });
+
+    if (!track) {
+      res.status(404).json({ message: 'Track not found' });
+      return;
+    }
+
+    // Kiểm tra giá trị của duration
+    if (duration < 0 || duration > track.duration) {
+      res.status(400).json({ message: 'Invalid duration' });
+      return;
+    }
+
+    // Kiểm tra điều kiện để đánh dấu completed
+    if (completed && duration < track.duration / 2) {
+      res.status(400).json({
+        message:
+          'Cannot mark as completed if duration is less than half of the track',
+      });
+      return;
+    }
+
+    // Tính toán điều kiện để tăng playCount
+    const shouldIncrementPlayCount =
+      completed || (duration && duration >= track.duration / 2);
+
+    // Lưu hoặc cập nhật lịch sử nghe nhạc
+    const existingHistory = await prisma.history.findFirst({
+      where: {
+        userId: user.id,
+        trackId: track.id,
+        type: HistoryType.PLAY,
+      },
+    });
+
+    let history;
+    if (existingHistory) {
+      // Cập nhật history hiện có
+      history = await prisma.history.update({
+        where: { id: existingHistory.id },
+        data: {
+          duration: duration || existingHistory.duration,
+          completed: completed || existingHistory.completed, // completed không bị ghi đè nếu đã là true
+          playCount: shouldIncrementPlayCount ? { increment: 1 } : undefined,
+        },
+        select: historySelect,
+      });
+    } else {
+      // Tạo history mới
+      history = await prisma.history.create({
+        data: {
+          type: HistoryType.PLAY,
+          duration: duration || 0,
+          completed: completed || false,
+          playCount: shouldIncrementPlayCount ? 1 : 0,
+          trackId: track.id,
+          userId: user.id,
+        },
+        select: historySelect,
+      });
+    }
+
+    // Chỉ tăng playCount của track nếu đủ điều kiện
+    let updatedTrack = track;
+    if (shouldIncrementPlayCount) {
+      updatedTrack = await prisma.track.update({
+        where: { id: trackId },
+        data: {
+          playCount: { increment: 1 },
+        },
+        select: trackSelect,
+      });
+    }
+
+    res.status(200).json({
+      message: 'Track played successfully',
+      history,
+      track: updatedTrack,
+    });
+  } catch (error) {
+    console.error('Play track error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

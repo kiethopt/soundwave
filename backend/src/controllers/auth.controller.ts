@@ -2,10 +2,11 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/db';
-import { Role } from '@prisma/client';
+import { Role, HistoryType } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { addHours } from 'date-fns';
 import sgMail from '@sendgrid/mail';
+import { client, setCache } from '../middleware/cache.middleware';
 
 const userSelect = {
   id: true,
@@ -456,5 +457,275 @@ const sendEmail = async (
   } catch (error) {
     console.error('Error sending email:', error);
     throw new Error('Failed to send email');
+  }
+};
+
+// Tìm kiếm tổng hợp (Search All)
+export const searchAll = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { q } = req.query;
+    const user = req.user;
+
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    if (!q) {
+      res.status(400).json({ message: 'Query is required' });
+      return;
+    }
+
+    const searchQuery = String(q).trim();
+    const cacheKey = `/search-all?q=${searchQuery}`;
+
+    // Kiểm tra xem có sử dụng Redis cache không
+    const useRedisCache = process.env.USE_REDIS_CACHE === 'true';
+
+    if (useRedisCache) {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log('Serving from Redis cache:', cacheKey);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+    }
+
+    // Lưu lịch sử tìm kiếm
+    const existingHistory = await prisma.history.findFirst({
+      where: {
+        userId: user.id,
+        type: HistoryType.SEARCH,
+        query: {
+          equals: searchQuery,
+          mode: 'insensitive',
+        },
+      },
+    });
+
+    if (existingHistory) {
+      await prisma.history.update({
+        where: { id: existingHistory.id },
+        data: { updatedAt: new Date() },
+      });
+    } else {
+      await prisma.history.create({
+        data: {
+          type: HistoryType.SEARCH,
+          query: searchQuery,
+          userId: user.id,
+        },
+      });
+    }
+
+    // Thực hiện tìm kiếm album và track song song
+    const [albums, tracks] = await Promise.all([
+      prisma.album.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { title: { contains: searchQuery, mode: 'insensitive' } },
+            {
+              artist: { name: { contains: searchQuery, mode: 'insensitive' } },
+            },
+          ],
+        },
+        select: {
+          id: true,
+          title: true,
+          coverUrl: true,
+          releaseDate: true,
+          trackCount: true,
+          duration: true,
+          type: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          artist: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
+              isVerified: true,
+              artistProfile: {
+                select: {
+                  artistName: true,
+                },
+              },
+            },
+          },
+          tracks: {
+            where: { isActive: true },
+            orderBy: { trackNumber: 'asc' },
+            select: {
+              id: true,
+              title: true,
+              duration: true,
+              releaseDate: true,
+              trackNumber: true,
+              coverUrl: true,
+              audioUrl: true,
+              playCount: true,
+              type: true,
+              artist: {
+                select: {
+                  id: true,
+                  name: true,
+                  artistProfile: {
+                    select: {
+                      artistName: true,
+                    },
+                  },
+                },
+              },
+              featuredArtists: {
+                select: {
+                  artistProfile: {
+                    select: {
+                      id: true,
+                      artistName: true,
+                      user: {
+                        select: {
+                          id: true,
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          genres: {
+            select: {
+              genre: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.track.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            {
+              title: {
+                contains: searchQuery,
+                mode: 'insensitive',
+              },
+            },
+            {
+              artist: {
+                name: {
+                  contains: searchQuery,
+                  mode: 'insensitive',
+                },
+              },
+            },
+            {
+              artist: {
+                artistProfile: {
+                  artistName: {
+                    contains: searchQuery,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
+            {
+              featuredArtists: {
+                some: {
+                  artistProfile: {
+                    artistName: {
+                      contains: searchQuery,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+        select: {
+          id: true,
+          title: true,
+          duration: true,
+          releaseDate: true,
+          trackNumber: true,
+          coverUrl: true,
+          audioUrl: true,
+          playCount: true,
+          type: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          artist: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
+              isVerified: true,
+              artistProfile: {
+                select: {
+                  artistName: true,
+                },
+              },
+            },
+          },
+          featuredArtists: {
+            select: {
+              artistProfile: {
+                select: {
+                  id: true,
+                  artistName: true,
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          album: {
+            select: {
+              id: true,
+              title: true,
+              coverUrl: true,
+            },
+          },
+          genres: {
+            select: {
+              genre: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
+      }),
+    ]);
+
+    const searchResult = {
+      albums,
+      tracks,
+    };
+
+    if (useRedisCache) {
+      await setCache(cacheKey, searchResult, 600); // Cache trong 10 phút
+    }
+
+    res.json(searchResult);
+  } catch (error) {
+    console.error('Search all error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };

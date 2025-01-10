@@ -1,173 +1,275 @@
-// import { Request, Response } from 'express';
-// import prisma from '../config/db';
-// import { updateMonthlyListeners } from './artist.controller';
+import { Request, Response } from 'express';
+import prisma from '../config/db';
+import { HistoryType } from '@prisma/client';
 
-// export const saveHistory = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   try {
-//     const { type, trackId, duration, completed, query } = req.body;
-//     const userId = req.user!.id;
+export const historySelect = {
+  id: true,
+  type: true,
+  query: true,
+  duration: true,
+  completed: true,
+  playCount: true,
+  createdAt: true,
+  updatedAt: true,
+  track: {
+    select: {
+      id: true,
+      title: true,
+      duration: true,
+      coverUrl: true,
+      audioUrl: true,
+      artist: {
+        select: {
+          id: true,
+          name: true,
+          avatar: true,
+        },
+      },
+    },
+  },
+  user: {
+    select: {
+      id: true,
+      name: true,
+      avatar: true,
+    },
+  },
+} as const;
 
-//     if (!['PLAY', 'SEARCH'].includes(type)) {
-//       res.status(400).json({ message: 'Invalid history type' });
-//       return;
-//     }
+// Lưu lịch sử nghe nhạc
+export const savePlayHistory = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { trackId, duration, completed } = req.body;
+    const user = req.user;
 
-//     if (type === 'PLAY') {
-//       if (!trackId) {
-//         res
-//           .status(400)
-//           .json({ message: 'trackId is required for PLAY history' });
-//         return;
-//       }
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
-//       const history = await prisma.history.upsert({
-//         where: {
-//           userId_trackId: {
-//             userId,
-//             trackId,
-//           },
-//         },
-//         update: {
-//           duration,
-//           completed,
-//           playCount: { increment: 1 },
-//           updatedAt: new Date(),
-//         },
-//         create: {
-//           type: 'PLAY',
-//           userId,
-//           trackId,
-//           duration,
-//           completed,
-//           playCount: 1,
-//         },
-//       });
+    // Kiểm tra xem track có tồn tại không
+    const track = await prisma.track.findUnique({
+      where: { id: trackId },
+    });
 
-//       await prisma.track.update({
-//         where: { id: trackId },
-//         data: {
-//           playCount: { increment: 1 },
-//         },
-//       });
+    if (!track) {
+      res.status(404).json({ message: 'Track not found' });
+      return;
+    }
 
-//       // Update monthly listeners without sending a response
-//       await updateMonthlyListeners(req, res);
+    // Lưu lịch sử nghe nhạc
+    const history = await prisma.history.create({
+      data: {
+        type: HistoryType.PLAY,
+        duration,
+        completed,
+        trackId,
+        userId: user.id,
+        playCount: 1,
+      },
+      select: historySelect,
+    });
 
-//       // Send response only once
-//       res.status(200).json(history);
-//     } else if (type === 'SEARCH') {
-//       if (!query) {
-//         res
-//           .status(400)
-//           .json({ message: 'query is required for SEARCH history' });
-//         return;
-//       }
+    // Tăng playCount của track
+    await prisma.track.update({
+      where: { id: trackId },
+      data: {
+        playCount: { increment: 1 },
+      },
+    });
 
-//       const history = await prisma.history.create({
-//         data: {
-//           type: 'SEARCH',
-//           userId,
-//           query,
-//           playCount: 0,
-//         },
-//       });
+    res.status(201).json({
+      message: 'Play history saved successfully',
+      history,
+    });
+  } catch (error) {
+    console.error('Save play history error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
 
-//       res.status(200).json(history);
-//     }
-//   } catch (error) {
-//     console.error('Save history error:', error);
-//     res.status(500).json({ message: 'Failed to save history' });
-//   }
-// };
+// Lưu lịch sử tìm kiếm
+export const saveSearchHistory = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { query } = req.body;
+    const user = req.user;
 
-// export const getHistory = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   try {
-//     const { page = 1, limit = 10, type } = req.query;
-//     const userId = req.user!.id;
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
-//     const skip = (Number(page) - 1) * Number(limit);
+    // Lưu lịch sử tìm kiếm
+    const history = await prisma.history.create({
+      data: {
+        type: HistoryType.SEARCH,
+        query,
+        userId: user.id,
+        duration: null,
+        completed: null,
+        playCount: null,
+      },
+      select: historySelect,
+    });
 
-//     const [history, total] = await Promise.all([
-//       prisma.history.findMany({
-//         where: {
-//           userId,
-//           type: type as 'PLAY' | 'SEARCH',
-//         },
-//         include: {
-//           track: true,
-//         },
-//         orderBy: {
-//           updatedAt: 'desc',
-//         },
-//         skip,
-//         take: Number(limit),
-//       }),
-//       prisma.history.count({
-//         where: {
-//           userId,
-//           type: type as 'PLAY' | 'SEARCH',
-//         },
-//       }),
-//     ]);
+    res.status(201).json({
+      message: 'Search history saved successfully',
+      history,
+    });
+  } catch (error) {
+    console.error('Save search history error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
 
-//     res.status(200).json({
-//       history,
-//       pagination: {
-//         total,
-//         page: Number(page),
-//         limit: Number(limit),
-//         totalPages: Math.ceil(total / Number(limit)),
-//       },
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Failed to get history' });
-//   }
-// };
+// Lấy lịch sử nghe nhạc của người dùng
+export const getPlayHistory = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = req.user;
 
-// export const deleteHistory = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   try {
-//     const { id } = req.params;
-//     const userId = req.user!.id;
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
-//     await prisma.history.delete({
-//       where: {
-//         id,
-//         userId, // Đảm bảo user chỉ xóa được history của mình
-//       },
-//     });
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
 
-//     res.status(200).json({ message: 'History deleted successfully' });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Failed to delete history' });
-//   }
-// };
+    const histories = await prisma.history.findMany({
+      where: {
+        userId: user.id,
+        type: HistoryType.PLAY,
+      },
+      select: historySelect,
+      orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: Number(limit),
+    });
 
-// export const clearHistory = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   try {
-//     const userId = req.user!.id;
-//     const { type } = req.query;
+    const totalHistories = await prisma.history.count({
+      where: {
+        userId: user.id,
+        type: HistoryType.PLAY,
+      },
+    });
 
-//     await prisma.history.deleteMany({
-//       where: {
-//         userId,
-//         type: type as 'PLAY' | 'SEARCH',
-//       },
-//     });
+    res.json({
+      histories,
+      pagination: {
+        total: totalHistories,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(totalHistories / Number(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Get play history error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
 
-//     res.status(200).json({ message: 'History cleared successfully' });
-//   } catch (error) {
-//     res.status(500).json({ message: 'Failed to clear history' });
-//   }
-// };
+// Lấy lịch sử tìm kiếm của người dùng
+export const getSearchHistory = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    const histories = await prisma.history.findMany({
+      where: {
+        userId: user.id,
+        type: HistoryType.SEARCH,
+      },
+      select: historySelect,
+      orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: Number(limit),
+    });
+
+    const totalHistories = await prisma.history.count({
+      where: {
+        userId: user.id,
+        type: HistoryType.SEARCH,
+      },
+    });
+
+    res.json({
+      histories,
+      pagination: {
+        total: totalHistories,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(totalHistories / Number(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Get search history error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Lấy tất cả lịch sử (nghe nhạc và tìm kiếm) của người dùng
+export const getAllHistory = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    // Lấy tất cả lịch sử của người dùng
+    const histories = await prisma.history.findMany({
+      where: {
+        userId: user.id,
+      },
+      select: historySelect,
+      orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: Number(limit),
+    });
+
+    const totalHistories = await prisma.history.count({
+      where: {
+        userId: user.id,
+      },
+    });
+
+    res.json({
+      histories,
+      pagination: {
+        total: totalHistories,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(totalHistories / Number(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Get all history error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

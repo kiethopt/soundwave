@@ -7,7 +7,8 @@ import {
   getAllTracks,
   getTracksByGenre,
   getTracksByTypeAndGenre,
-  searchTrack, // Thêm hàm searchTrack
+  searchTrack,
+  playTrack,
 } from '../controllers/track.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -47,6 +48,9 @@ router.get('/type/:type/genre/:genreId', getTracksByTypeAndGenre);
 
 // Route tìm kiếm track (PUBLIC)
 router.get('/search', authenticate, searchTrack);
+
+// Route nghe nhạc
+router.post('/:trackId/play', authenticate, playTrack);
 
 // Route cập nhật track (ADMIN & ARTIST only)
 router.put(

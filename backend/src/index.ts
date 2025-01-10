@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.routes';
 import albumRoutes from './routes/album.routes';
 import trackRoutes from './routes/track.routes';
 import adminRoutes from './routes/admin.routes';
+import historyRoutes from './routes/history.routes';
 import { errorHandler } from './middleware/error';
 
 dotenv.config();
@@ -22,6 +23,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/albums', albumRoutes);
 app.use('/api/tracks', trackRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/history', historyRoutes);
 
 // Error Handler
 app.use(errorHandler);

@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
+import { clearSearchCache, client } from '../middleware/cache.middleware';
 import prisma from '../config/db';
 import {
   uploadFile,
   CloudinaryUploadResult,
 } from '../services/cloudinary.service';
 import { Role, AlbumType } from '@prisma/client';
+import { playTrack } from './track.controller';
 
 const albumSelect = {
   id: true,
@@ -329,6 +331,10 @@ export const createAlbum = async (
       select: albumSelect,
     });
 
+    // Xóa cache của route GET all albums và cache tìm kiếm
+    await client.del('/api/albums');
+    await clearSearchCache();
+
     res.status(201).json({
       message: 'Album created successfully',
       album,
@@ -486,7 +492,7 @@ export const updateAlbum = async (
     // Kiểm tra quyền
     const album = await prisma.album.findUnique({
       where: { id },
-      select: { artistId: true },
+      select: { artistId: true, coverUrl: true },
     });
 
     if (!album) {
@@ -504,6 +510,25 @@ export const updateAlbum = async (
     if (validationError) {
       res.status(400).json({ message: validationError });
       return;
+    }
+
+    // Chuyển đổi genres từ chuỗi sang mảng nếu cần
+    const genreIds = genres
+      ? Array.isArray(genres)
+        ? genres
+        : genres.split(',').map((g: string) => g.trim())
+      : [];
+
+    // Kiểm tra xem tất cả các genreId có tồn tại không
+    if (genreIds.length > 0) {
+      const existingGenres = await prisma.genre.findMany({
+        where: { id: { in: genreIds } },
+      });
+
+      if (existingGenres.length !== genreIds.length) {
+        res.status(400).json({ message: 'One or more genres do not exist' });
+        return;
+      }
     }
 
     // Upload cover if provided
@@ -530,7 +555,7 @@ export const updateAlbum = async (
         type,
         ...(coverUrl && { coverUrl }),
         genres: {
-          create: genres.map((genreId: string) => ({
+          create: genreIds.map((genreId: string) => ({
             genre: { connect: { id: genreId } },
           })),
         },
@@ -544,6 +569,11 @@ export const updateAlbum = async (
       },
       select: albumSelect,
     });
+
+    // Xóa cache của route GET all albums, cache tìm kiếm và cache của album cụ thể
+    await client.del('/api/albums');
+    await clearSearchCache();
+    await client.del(`/api/albums/${id}`);
 
     res.json({
       message: 'Album updated successfully',
@@ -591,6 +621,11 @@ export const deleteAlbum = async (
       data: { isActive: false },
     });
 
+    // Xóa cache của route GET all albums, cache tìm kiếm và cache của album cụ thể
+    await client.del('/api/albums');
+    await clearSearchCache();
+    await client.del(`/api/albums/${id}`);
+
     res.json({ message: 'Album deleted successfully' });
   } catch (error) {
     console.error('Delete album error:', error);
@@ -599,103 +634,147 @@ export const deleteAlbum = async (
 };
 
 // Tìm kiếm album
-export const searchAlbum = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { q } = req.query;
+export const searchAlbum = async (req: Request) => {
+  const { q } = req.query;
 
-    if (!q) {
-      res.status(400).json({ message: 'Query is required' });
-      return;
-    }
-
-    const albums = await prisma.album.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          { title: { contains: String(q), mode: 'insensitive' } },
-          { artist: { name: { contains: String(q), mode: 'insensitive' } } },
-        ],
-      },
-      select: albumSelect,
-    });
-
-    res.json(albums);
-  } catch (error) {
-    console.error('Search album error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+  if (!q) {
+    throw new Error('Query is required');
   }
+
+  const albums = await prisma.album.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        { title: { contains: String(q), mode: 'insensitive' } },
+        { artist: { name: { contains: String(q), mode: 'insensitive' } } },
+      ],
+    },
+    select: albumSelect,
+  });
+
+  return albums;
 };
 
 // Lấy danh sách tất cả album (ADMIN & ARTIST only)
-export const getAllAlbums = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const user = req.user;
+export const getAllAlbums = async (req: Request) => {
+  const user = req.user;
 
-    // Kiểm tra quyền truy cập
-    if (!user || (user.role !== Role.ADMIN && user.role !== Role.ARTIST)) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
-    }
+  // Kiểm tra user tồn tại
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
 
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+  // Kiểm tra role
+  if (user.role !== Role.ADMIN && user.role !== Role.ARTIST) {
+    throw new Error('Forbidden');
+  }
 
-    // Nếu là ARTIST, chỉ lấy album của chính họ
-    const whereClause = user.role === Role.ARTIST ? { artistId: user.id } : {};
+  const { page = 1, limit = 10 } = req.query;
+  const offset = (Number(page) - 1) * Number(limit);
 
-    const albums = await prisma.album.findMany({
+  // Nếu là ARTIST, chỉ lấy album của chính họ
+  const whereClause = user.role === Role.ARTIST ? { artistId: user.id } : {};
+
+  const [albums, totalAlbums] = await Promise.all([
+    prisma.album.findMany({
       skip: offset,
       take: Number(limit),
       where: whereClause,
       select: albumSelect,
-    });
-
-    const totalAlbums = await prisma.album.count({
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.album.count({
       where: whereClause,
-    });
+    }),
+  ]);
 
-    res.json({
-      albums,
-      pagination: {
-        total: totalAlbums,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(totalAlbums / Number(limit)),
-      },
-    });
-  } catch (error) {
-    console.error('Get all albums error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
+  return {
+    albums,
+    pagination: {
+      total: totalAlbums,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(totalAlbums / Number(limit)),
+    },
+  };
 };
 
 // Get album theo ID
-export const getAlbumById = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { id } = req.params;
+export const getAlbumById = async (req: Request) => {
+  const { id } = req.params;
 
+  const album = await prisma.album.findUnique({
+    where: { id },
+    select: albumSelect,
+  });
+
+  if (!album || !album.isActive) {
+    throw new Error('Album not found');
+  }
+
+  return album;
+};
+
+// Nghe album
+export const playAlbum = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { albumId } = req.params;
+    const user = req.user;
+
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Lấy thông tin album
     const album = await prisma.album.findUnique({
-      where: { id },
-      select: albumSelect,
+      where: { id: albumId },
+      select: {
+        id: true,
+        tracks: {
+          where: { isActive: true },
+          orderBy: { trackNumber: 'asc' },
+          select: {
+            id: true,
+            title: true,
+            duration: true,
+            audioUrl: true,
+            artist: {
+              select: {
+                id: true,
+                name: true,
+                artistProfile: {
+                  select: {
+                    artistName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
-    if (!album || !album.isActive) {
+    if (!album) {
       res.status(404).json({ message: 'Album not found' });
       return;
     }
 
-    res.json(album);
+    // Lấy bài hát đầu tiên trong album
+    const firstTrack = album.tracks[0];
+
+    if (!firstTrack) {
+      res.status(404).json({ message: 'No tracks found in this album' });
+      return;
+    }
+
+    // Gọi API playTrack để phát bài hát đầu tiên
+    req.params.trackId = firstTrack.id;
+    req.body.duration = firstTrack.duration; // Đặt duration là thời lượng của bài hát đầu tiên
+    req.body.completed = false; // Đặt completed là false
+    await playTrack(req, res);
   } catch (error) {
-    console.error('Get album by id error:', error);
+    console.error('Play album error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

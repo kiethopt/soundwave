@@ -7,6 +7,7 @@ import {
   validateToken,
   requestPasswordReset,
   resetPassword,
+  searchAll,
 } from '../controllers/auth.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -32,5 +33,8 @@ router.post('/register-admin', registerAdmin);
 
 // Route kiểm tra token
 router.get('/validate-token', authenticate, validateToken);
+
+// Route tìm kiếm tổng hợp
+router.get('/search-all', authenticate, searchAll);
 
 export default router;
