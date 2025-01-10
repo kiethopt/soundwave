@@ -15,7 +15,6 @@ const userSelect = {
   isVerified: true,
   verificationRequestedAt: true,
   verifiedAt: true,
-  monthlyListeners: true,
   createdAt: true,
   updatedAt: true,
   artistProfile: {
@@ -24,6 +23,7 @@ const userSelect = {
       artistName: true,
       bio: true,
       socialMediaLinks: true,
+      monthlyListeners: true,
       createdAt: true,
       updatedAt: true,
       genres: {
@@ -162,6 +162,7 @@ const artistSelect = {
       artistName: true,
       bio: true,
       socialMediaLinks: true,
+      monthlyListeners: true,
       createdAt: true,
       updatedAt: true,
       genres: {
@@ -743,6 +744,7 @@ export const approveArtistRequest = async (
             artistName: true,
             bio: true,
             socialMediaLinks: true,
+            monthlyListeners: true,
           },
         },
       },

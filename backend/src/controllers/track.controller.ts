@@ -20,6 +20,7 @@ const trackSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  artistId: true,
   artist: {
     select: {
       id: true,
@@ -917,14 +918,13 @@ export const getTracksByTypeAndGenre = async (
   }
 };
 
-// Nghe nhạc
+// Phát một track
 export const playTrack = async (req: Request, res: Response): Promise<void> => {
   try {
     const { trackId } = req.params;
-    const { duration = 0, completed = false } = req.body;
+    const { duration, completed } = req.body;
     const user = req.user;
 
-    // Kiểm tra xem người dùng có đăng nhập không
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
@@ -933,7 +933,7 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
     // Kiểm tra xem track có tồn tại không
     const track = await prisma.track.findUnique({
       where: { id: trackId },
-      select: { ...trackSelect, duration: true }, // Đảm bảo lấy thời lượng bài hát
+      select: trackSelect,
     });
 
     if (!track) {
@@ -941,64 +941,55 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Kiểm tra giá trị của duration
-    if (duration < 0 || duration > track.duration) {
-      res.status(400).json({ message: 'Invalid duration' });
-      return;
-    }
-
-    // Kiểm tra điều kiện để đánh dấu completed
-    if (completed && duration < track.duration / 2) {
-      res.status(400).json({
-        message:
-          'Cannot mark as completed if duration is less than half of the track',
-      });
-      return;
-    }
-
-    // Tính toán điều kiện để tăng playCount
-    const shouldIncrementPlayCount =
-      completed || (duration && duration >= track.duration / 2);
-
-    // Lưu hoặc cập nhật lịch sử nghe nhạc
+    // Kiểm tra xem user đã có lịch sử nghe track này chưa
     const existingHistory = await prisma.history.findFirst({
       where: {
         userId: user.id,
-        trackId: track.id,
+        trackId,
         type: HistoryType.PLAY,
       },
     });
 
-    let history;
-    if (existingHistory) {
-      // Cập nhật history hiện có
-      history = await prisma.history.update({
-        where: { id: existingHistory.id },
-        data: {
-          duration: duration || existingHistory.duration,
-          completed: completed || existingHistory.completed, // completed không bị ghi đè nếu đã là true
-          playCount: shouldIncrementPlayCount ? { increment: 1 } : undefined,
-        },
-        select: historySelect,
-      });
-    } else {
-      // Tạo history mới
-      history = await prisma.history.create({
-        data: {
-          type: HistoryType.PLAY,
-          duration: duration || 0,
-          completed: completed || false,
-          playCount: shouldIncrementPlayCount ? 1 : 0,
-          trackId: track.id,
-          userId: user.id,
-        },
-        select: historySelect,
-      });
-    }
+    // Tính toán điều kiện để tăng playCount và monthlyListeners
+    const shouldIncrementPlayCount =
+      completed || (duration && duration >= track.duration / 2);
 
-    // Chỉ tăng playCount của track nếu đủ điều kiện
+    // Tạo hoặc cập nhật lịch sử nghe nhạc
+    const history = await prisma.history.upsert({
+      where: {
+        userId_trackId_type: {
+          userId: user.id,
+          trackId,
+          type: HistoryType.PLAY,
+        },
+      },
+      create: {
+        type: HistoryType.PLAY,
+        duration,
+        completed,
+        trackId,
+        userId: user.id,
+        playCount: 1,
+      },
+      update: {
+        duration,
+        completed,
+        playCount: { increment: 1 },
+        updatedAt: new Date(),
+      },
+      select: historySelect,
+    });
+
     let updatedTrack = track;
     if (shouldIncrementPlayCount) {
+      // Kiểm tra xem user đã nghe track này trong tháng này chưa
+      const currentMonth = new Date().getMonth();
+      const lastPlayedMonth = existingHistory?.createdAt?.getMonth();
+
+      // Chỉ tăng monthlyListeners nếu user chưa nghe track này trong tháng này
+      const shouldIncrementMonthlyListeners = lastPlayedMonth !== currentMonth;
+
+      // Tăng playCount của track
       updatedTrack = await prisma.track.update({
         where: { id: trackId },
         data: {
@@ -1006,9 +997,19 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
         },
         select: trackSelect,
       });
+
+      // Tăng monthlyListeners của artist nếu cần
+      if (shouldIncrementMonthlyListeners) {
+        await prisma.artistProfile.update({
+          where: { userId: track.artistId },
+          data: {
+            monthlyListeners: { increment: 1 },
+          },
+        });
+      }
     }
 
-    res.status(200).json({
+    res.json({
       message: 'Track played successfully',
       history,
       track: updatedTrack,

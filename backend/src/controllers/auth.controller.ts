@@ -20,7 +20,6 @@ const userSelect = {
   isVerified: true,
   verificationRequestedAt: true,
   verifiedAt: true,
-  monthlyListeners: true,
   lastLoginAt: true,
   passwordResetToken: true,
   passwordResetExpires: true,
@@ -30,6 +29,7 @@ const userSelect = {
       artistName: true,
       bio: true,
       socialMediaLinks: true,
+      monthlyListeners: true,
       genres: {
         select: {
           genre: {

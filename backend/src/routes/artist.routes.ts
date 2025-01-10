@@ -1,53 +1,58 @@
 import express from 'express';
-
 import {
-    getAllArtistsProfile,
-    getArtistProfile,
-    getArtistStats,
-    getArtistTracks,
-    getArtistAlbums,
-    updateArtistProfile,
+  getAllArtistsProfile,
+  getArtistProfile,
+  getArtistStats,
+  getArtistTracks,
+  getArtistAlbums,
+  updateArtistProfile,
 } from '../controllers/artist.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 
 const router = express.Router();
 
-
 // Admin & Artist routes
 router.get(
-    '/profile/:id',
-    authenticate,
-    authorize([Role.ADMIN, Role.ARTIST]),
-    getArtistProfile
+  '/profiles',
+  authenticate,
+  authorize([Role.ADMIN]),
+  getAllArtistsProfile
+);
+
+router.get(
+  '/profile/:id',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  getArtistProfile
 );
 
 router.put(
-    '/profile/:id',
-    authenticate,
-    authorize([Role.ADMIN, Role.ARTIST]),
-    updateArtistProfile
+  '/profile/:id',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  updateArtistProfile
 );
 
 router.get(
-    '/stats/:id',
-    authenticate,
-    authorize([Role.ADMIN, Role.ARTIST]),
-    getArtistStats
+  '/stats/:id',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  getArtistStats
 );
 
 router.get(
-    '/tracks/:id',
-    authenticate,
-    authorize([Role.ADMIN, Role.ARTIST]),
-    getArtistTracks
+  '/tracks/:id',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  getArtistTracks
 );
 
 router.get(
-    '/albums/:id',
-    authenticate,
-    authorize([Role.ADMIN, Role.ARTIST]),
-    getArtistAlbums
+  '/albums/:id',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  getArtistAlbums
 );
 
 export default router;

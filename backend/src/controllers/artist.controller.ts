@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
-import { Prisma, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 
 const artistSelect = {
   id: true,
@@ -13,6 +13,7 @@ const artistSelect = {
       artistName: true,
       bio: true,
       socialMediaLinks: true,
+      monthlyListeners: true,
       createdAt: true,
       updatedAt: true,
       genres: {
@@ -58,31 +59,75 @@ const artistSelect = {
   },
 } as const;
 
-/*
-    Artist chỉ có thể xem và thao tác trên dữ liệu của chính họ, không xem hoặc thay đổi dữ liệu của artist khác.
-    Admin có quyền xem và thao tác trên dữ liệu của tất cả artists.
-*/
+// Cho phép tất cả các Artist xem thông tin của nhau
+const canViewArtistData = async (
+  user: any,
+  artistProfileId: string
+): Promise<boolean> => {
+  if (user.role === Role.ADMIN || user.role === Role.ARTIST) return true;
+  return false;
+};
 
-// Valid quyền truy cập data (Artist & Admin ONLY)
-const canAccessArtistData = (user: any, artistId: string): boolean => {
-  return (
-    user.role === Role.ADMIN || // Admin có quyền truy cập mọi artist
-    (user.role === Role.ARTIST && user.id === artistId) // Artist chỉ truy cập được dữ liệu của chính họ
-  );
-};          
+// Chỉ cho phép Admin hoặc chính Artist đó chỉnh sửa thông tin
+const canEditArtistData = async (
+  user: any,
+  artistProfileId: string
+): Promise<{ canEdit: boolean; message?: string }> => {
+  if (user.role === Role.ADMIN) {
+    return { canEdit: true };
+  }
 
-// Valid update profile artist
+  const artistProfile = await prisma.artistProfile.findUnique({
+    where: { id: artistProfileId },
+    select: { userId: true },
+  });
+
+  if (!artistProfile) {
+    return { canEdit: false, message: 'Artist profile not found' };
+  }
+
+  if (artistProfile.userId === user.id) {
+    return { canEdit: true };
+  }
+
+  return {
+    canEdit: false,
+    message: 'You do not have permission to edit this profile',
+  };
+};
+
 const validateUpdateArtistProfile = (data: any): string | null => {
-  const { bio, socialMediaLinks } = data;
+  const { bio, socialMediaLinks, genreIds } = data;
 
-  // Kiểm tra độ dài của bio (tối đa 500 ký tự)
+  // Validate bio và socialMediaLinks như cũ
   if (bio && bio.length > 500) {
     return 'Bio must be less than 500 characters';
   }
 
-  // Kiểm tra socialMediaLinks có phải là object không
-  if (socialMediaLinks && typeof socialMediaLinks !== 'object') {
-    return 'Social media links must be an object';
+  if (socialMediaLinks) {
+    if (typeof socialMediaLinks !== 'object') {
+      return 'Social media links must be an object';
+    }
+
+    const validKeys = ['facebook', 'instagram', 'twitter', 'youtube'];
+    for (const key of Object.keys(socialMediaLinks)) {
+      if (!validKeys.includes(key)) {
+        return `Invalid social media key: ${key}`;
+      }
+      if (typeof socialMediaLinks[key] !== 'string') {
+        return `Social media link for ${key} must be a string`;
+      }
+    }
+  }
+
+  // Validate genreIds
+  if (genreIds) {
+    if (!Array.isArray(genreIds)) {
+      return 'Genre IDs must be an array';
+    }
+    if (genreIds.some((id) => typeof id !== 'string')) {
+      return 'All genre IDs must be strings';
+    }
   }
 
   return null;
@@ -102,19 +147,22 @@ export const getAllArtistsProfile = async (
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};
 
-// Lấy thông tin chi tiết của artist
 export const getArtistProfile = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
-  
+
   try {
-    const artist = await prisma.user.findUnique({
+    const artist = await prisma.artistProfile.findUnique({
       where: { id },
-      select: artistSelect,
+      include: {
+        user: {
+          select: artistSelect,
+        },
+      },
     });
 
     if (!artist) {
@@ -122,52 +170,12 @@ export const getArtistProfile = async (
       return;
     }
 
-    res.json(artist);
+    res.json(artist.user);
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// Cập nhật thông tin artist
-export const updateArtistProfile = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  const { id } = req.params;
-  const data = req.body;
-  const user = req.user;
-
-
-  if (!canAccessArtistData(user, id)) {
-    res.status(403).json({ message: 'Forbidden' });
-    return;
-  }
-
-  const error = validateUpdateArtistProfile(data);
-
-  if (error) {
-    res.status(400).json({ message: error });
-    return;
-  }
-
-  try {
-    const updatedArtist = await prisma.user.update({
-      where: { id },
-      data: {
-        artistProfile: {
-          update: data,
-        },
-      },
-      select: artistSelect,
-    });
-
-    res.json(updatedArtist);
-  } catch (error) {
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
-// Lấy danh sách album của artist
 export const getArtistAlbums = async (
   req: Request,
   res: Response
@@ -175,14 +183,27 @@ export const getArtistAlbums = async (
   const { id } = req.params;
   const user = req.user;
 
-  if (!canAccessArtistData(user, id)) {
-    res.status(403).json({ message: 'Forbidden' });
+  const canAccess = await canViewArtistData(user, id);
+  if (!canAccess) {
+    res.status(403).json({
+      message: "You do not have permission to view this artist's albums",
+    });
     return;
   }
 
   try {
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    if (!artistProfile) {
+      res.status(404).json({ message: 'Artist not found' });
+      return;
+    }
+
     const albums = await prisma.album.findMany({
-      where: { artistId: id },
+      where: { artistId: artistProfile.userId },
       select: {
         id: true,
         title: true,
@@ -199,11 +220,11 @@ export const getArtistAlbums = async (
 
     res.json(albums);
   } catch (error) {
+    console.error('Error fetching artist albums:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// Lấy danh sách track của artist
 export const getArtistTracks = async (
   req: Request,
   res: Response
@@ -211,14 +232,25 @@ export const getArtistTracks = async (
   const { id } = req.params;
   const user = req.user;
 
-  if (!canAccessArtistData(user, id)) {
+  const canAccess = await canViewArtistData(user, id);
+  if (!canAccess) {
     res.status(403).json({ message: 'Forbidden' });
     return;
   }
 
   try {
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    if (!artistProfile) {
+      res.status(404).json({ message: 'Artist not found' });
+      return;
+    }
+
     const tracks = await prisma.track.findMany({
-      where: { artistId: id },
+      where: { artistId: artistProfile.userId },
       select: {
         id: true,
         title: true,
@@ -240,7 +272,6 @@ export const getArtistTracks = async (
   }
 };
 
-// Lấy thống kê của artist (totalAlbums, totalTracks, totalPlays, monthlyListeners)
 export const getArtistStats = async (
   req: Request,
   res: Response
@@ -248,22 +279,33 @@ export const getArtistStats = async (
   const { id } = req.params;
   const user = req.user;
 
-  if (!canAccessArtistData(user, id)) {
+  const canAccess = await canViewArtistData(user, id);
+  if (!canAccess) {
     res.status(403).json({ message: 'Forbidden' });
     return;
   }
 
   try {
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { id },
+      select: { userId: true, monthlyListeners: true },
+    });
+
+    if (!artistProfile) {
+      res.status(404).json({ message: 'Artist not found' });
+      return;
+    }
+
     const totalAlbums = await prisma.album.count({
-      where: { artistId: id },
+      where: { artistId: artistProfile.userId },
     });
 
     const totalTracks = await prisma.track.count({
-      where: { artistId: id },
+      where: { artistId: artistProfile.userId },
     });
 
     const totalPlays = await prisma.track.aggregate({
-      where: { artistId: id },
+      where: { artistId: artistProfile.userId },
       _sum: { playCount: true },
     });
 
@@ -271,9 +313,70 @@ export const getArtistStats = async (
       totalAlbums,
       totalTracks,
       totalPlays: totalPlays._sum.playCount || 0,
+      monthlyListeners: artistProfile.monthlyListeners,
     });
   } catch (error) {
     console.error('Error fetching artist stats:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const updateArtistProfile = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { id } = req.params;
+  const { bio, socialMediaLinks, genreIds } = req.body;
+  const user = req.user;
+
+  const { canEdit, message } = await canEditArtistData(user, id);
+  if (!canEdit) {
+    res.status(403).json({ message: message || 'Forbidden' });
+    return;
+  }
+
+  const error = validateUpdateArtistProfile(req.body);
+  if (error) {
+    res.status(400).json({ message: error });
+    return;
+  }
+
+  try {
+    // Kiểm tra sự tồn tại của genres nếu có
+    if (genreIds && genreIds.length > 0) {
+      const existingGenres = await prisma.genre.findMany({
+        where: { id: { in: genreIds } },
+      });
+
+      if (existingGenres.length !== genreIds.length) {
+        res.status(400).json({ message: 'One or more genres do not exist' });
+        return;
+      }
+    }
+
+    // Cập nhật profile với genres
+    const updatedArtist = await prisma.artistProfile.update({
+      where: { id },
+      data: {
+        bio,
+        socialMediaLinks,
+        genres: {
+          deleteMany: {}, // Xóa tất cả genres hiện tại
+          create: genreIds?.map((genreId: string) => ({
+            genreId,
+          })),
+        },
+      },
+      include: {
+        user: {
+          select: artistSelect,
+        },
+      },
+    });
+
+    res.json(updatedArtist.user);
+  } catch (error) {
+    console.error('Update artist profile error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
