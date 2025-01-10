@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { Role } from '@prisma/client';
+import { uploadFile } from '../services/cloudinary.service';
 
 // Định nghĩa các select cho user
 const userSelect = {
@@ -255,6 +256,75 @@ const genreSelect = {
   },
 } as const;
 
+// Tạo 1 artist mới
+export const createArtist = async (req: Request, res: Response) => {
+  try {
+    const { name, bio, email } = req.body; // Lấy dữ liệu từ form-data
+    const avatarFile = req.file; // Lấy file từ multer
+
+    // Kiểm tra xem người dùng có quyền ADMIN không
+    const user = req.user;
+    if (!user || user.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    // Xử lý file avatar nếu có
+    let avatarUrl = null;
+    if (avatarFile) {
+      // Tải lên file avatar lên Cloudinary
+      const uploadResult = await uploadFile(
+        avatarFile.buffer,
+        'avatars',
+        'image'
+      );
+      avatarUrl = uploadResult.secure_url;
+    }
+
+    // Tạo artist mới
+    const artist = await prisma.user.create({
+      data: {
+        email,
+        password: 'artist123', // Mật khẩu mặc định, có thể thay đổi
+        name,
+        bio,
+        avatar: avatarUrl,
+        role: Role.ARTIST,
+        artistProfile: {
+          create: {
+            artistName: name, // Sử dụng tên của artist làm artistName
+            monthlyListeners: 0, // Khởi tạo monthlyListeners với giá trị mặc định là 0
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        avatar: true,
+        bio: true,
+        role: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+        artistProfile: {
+          select: {
+            id: true,
+            artistName: true,
+            monthlyListeners: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json({ message: 'Artist created successfully', artist });
+  } catch (error) {
+    console.error('Create artist error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Lấy danh sách tất cả người dùng
 export const getAllUsers = async (
   req: Request,
@@ -308,6 +378,52 @@ export const getUserById = async (
     res.json(user);
   } catch (error) {
     console.error('Get user by id error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Lấy tất cả request yêu cầu trở thành Artist từ User
+export const getArtistRequests = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    const requests = await prisma.user.findMany({
+      where: {
+        verificationRequestedAt: { not: null },
+        isVerified: false,
+      },
+      skip: offset,
+      take: Number(limit),
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        verificationRequestedAt: true,
+      },
+    });
+
+    const totalRequests = await prisma.user.count({
+      where: {
+        verificationRequestedAt: { not: null },
+        isVerified: false,
+      },
+    });
+
+    res.json({
+      requests,
+      pagination: {
+        total: totalRequests,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(totalRequests / Number(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Get artist requests error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -553,6 +669,42 @@ export const getAllArtists = async (
   }
 };
 
+// Lấy thông tin chi tiết của một nghệ sĩ
+export const getArtistById = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const artist = await prisma.user.findUnique({
+      where: { id, role: Role.ARTIST },
+      select: {
+        id: true,
+        name: true,
+        avatar: true,
+        bio: true,
+        isVerified: true,
+        artistProfile: {
+          select: {
+            monthlyListeners: true,
+          },
+        },
+      },
+    });
+
+    if (!artist) {
+      res.status(404).json({ message: 'Artist not found' });
+      return;
+    }
+
+    res.json(artist);
+  } catch (error) {
+    console.error('Get artist by id error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Lấy danh sách tất cả thể loại nhạc
 export const getAllGenres = async (
   req: Request,
@@ -761,21 +913,24 @@ export const approveArtistRequest = async (
     // Tạo một artistName duy nhất bằng cách thêm ID của user
     const artistName = `${user.name || 'Artist'}-${user.id.substring(0, 8)}`;
 
-    // Cập nhật role thành ARTIST và tạo ArtistProfile
+    // Cập nhật role thành ARTIST và tạo ArtistProfile nếu chưa tồn tại
     await prisma.$transaction([
       prisma.user.update({
         where: { id: userId },
         data: {
           role: Role.ARTIST,
           isVerified: true, // Xác thực ARTIST
-          verifiedAt: new Date(), // Thời gian xác thực
-          verificationRequestedAt: null, // Reset trạng thái yêu cầu
+          verifiedAt: new Date(),
+          verificationRequestedAt: null,
         },
       }),
-      prisma.artistProfile.create({
-        data: {
-          artistName, // Sử dụng artistName duy nhất
+      prisma.artistProfile.upsert({
+        where: { userId },
+        update: {},
+        create: {
+          artistName,
           user: { connect: { id: userId } },
+          monthlyListeners: 0, // Khởi tạo monthlyListeners là 0
         },
       }),
     ]);
@@ -797,6 +952,7 @@ export const approveArtistRequest = async (
             artistName: true,
             bio: true,
             socialMediaLinks: true,
+            monthlyListeners: true,
           },
         },
       },
@@ -825,6 +981,258 @@ export const approveArtistRequest = async (
       }
     }
 
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Từ chối yêu cầu trở thành Artist (Reject Artist Request) - ADMIN only
+export const rejectArtistRequest = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { userId } = req.body;
+    const admin = req.user;
+
+    // Chỉ ADMIN mới có thể từ chối yêu cầu
+    if (!admin || admin.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    // Tìm người dùng cần từ chối
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        role: true,
+        isVerified: true,
+        verificationRequestedAt: true,
+        verifiedAt: true,
+      },
+    });
+
+    // Kiểm tra xem user có tồn tại và đã gửi yêu cầu trở thành artist chưa
+    if (!user || user.role !== Role.USER || !user.verificationRequestedAt) {
+      res
+        .status(404)
+        .json({ message: 'User not found or not requested artist role' });
+      return;
+    }
+
+    // Reset trạng thái yêu cầu
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        verificationRequestedAt: null, // Reset trạng thái yêu cầu
+      },
+    });
+
+    res.json({
+      message: 'Artist role request rejected successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Reject artist request error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Xác thực artist (Verify Artist) - ADMIN only
+export const verifyArtist = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { userId } = req.body;
+    const admin = req.user;
+
+    if (!admin || admin.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        avatar: true,
+        bio: true,
+        role: true,
+        isVerified: true,
+        artistProfile: {
+          select: {
+            artistName: true,
+            bio: true,
+            socialMediaLinks: true,
+            monthlyListeners: true,
+          },
+        },
+      },
+    });
+
+    if (!user || user.role !== Role.ARTIST || user.isVerified) {
+      res.status(404).json({ message: 'Artist not found or already verified' });
+      return;
+    }
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          isVerified: true,
+          verifiedAt: new Date(),
+        },
+      }),
+      prisma.artistProfile.upsert({
+        where: { userId },
+        update: {},
+        create: {
+          artistName: user.name || 'Artist',
+          user: { connect: { id: userId } },
+          monthlyListeners: 0,
+        },
+      }),
+    ]);
+
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        avatar: true,
+        bio: true,
+        role: true,
+        isVerified: true,
+        artistProfile: {
+          select: {
+            artistName: true,
+            bio: true,
+            socialMediaLinks: true,
+            monthlyListeners: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      message: 'Artist verified successfully',
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('Verify artist error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Update số lượng người nghe hàng tháng của các Artists - ADMIN only
+export const updateMonthlyListeners = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const admin = req.user;
+
+    if (!admin || admin.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    // Lấy thông tin artist
+    const artist = await prisma.user.findUnique({
+      where: { id, role: Role.ARTIST },
+      include: {
+        artistProfile: true,
+        tracks: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!artist || !artist.artistProfile) {
+      res.status(404).json({ message: 'Artist not found' });
+      return;
+    }
+
+    // Lấy danh sách track ID của artist
+    const trackIds = artist.tracks.map((track) => track.id);
+
+    // Tính số unique listeners trong 30 ngày gần nhất
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const uniqueListeners = await prisma.history.groupBy({
+      by: ['userId'],
+      where: {
+        trackId: {
+          in: trackIds,
+        },
+        type: 'PLAY',
+        createdAt: {
+          gte: thirtyDaysAgo,
+        },
+      },
+    });
+
+    const monthlyListeners = uniqueListeners.length;
+
+    // Cập nhật monthlyListeners trong artistProfile
+    const updatedArtist = await prisma.user.update({
+      where: { id },
+      data: {
+        artistProfile: {
+          update: {
+            monthlyListeners,
+          },
+        },
+      },
+      select: artistSelect,
+    });
+
+    res.json(updatedArtist);
+  } catch (error) {
+    console.error('Update monthly listeners error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Lấy thông số tổng quan để thống kê
+export const getStats = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const totalUsers = await prisma.user.count();
+    const totalArtists = await prisma.user.count({
+      where: { role: Role.ARTIST },
+    });
+    const totalAlbums = await prisma.album.count();
+    const totalTracks = await prisma.track.count();
+    const totalArtistRequests = await prisma.user.count({
+      where: {
+        verificationRequestedAt: { not: null },
+        isVerified: false,
+      },
+    });
+
+    res.json({
+      totalUsers,
+      totalArtists,
+      totalAlbums,
+      totalTracks,
+      totalArtistRequests,
+    });
+  } catch (error) {
+    console.error('Get stats error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

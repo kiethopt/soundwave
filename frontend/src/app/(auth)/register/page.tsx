@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/utils/api';
@@ -22,33 +22,35 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState<string>('');
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      const response = await api.auth.register(formData);
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      try {
+        const response = await api.auth.register(formData);
 
-      if (response.message) {
-        router.push('/login');
-      } else {
-        setError(response.message || 'An error occurred');
+        if (response.message) {
+          router.push('/login');
+        } else {
+          setError(response.message || 'An error occurred');
+        }
+      } catch (err: any) {
+        // Hiển thị thông báo lỗi từ backend
+        setError(err.message || 'An unexpected error occurred');
       }
-    } catch (err) {
-      setError('An unexpected error occurred');
-    }
-  };
+    },
+    [formData, router]
+  );
 
   return (
     <div className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4">
       <h1 className="text-2xl font-bold text-white mb-8">
         Create Your Account
       </h1>
-
       {error && (
         <div className="bg-red-500/10 text-red-500 p-3 rounded-md mb-4">
           {error}
         </div>
       )}
-
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label
@@ -68,7 +70,6 @@ export default function RegisterPage() {
             required
           />
         </div>
-
         <div>
           <label
             htmlFor="username"
@@ -86,8 +87,10 @@ export default function RegisterPage() {
             className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
             required
           />
+          <p className="text-sm text-gray-400 mt-1">
+            Username không được chứa khoảng trắng hoặc ký tự đặc biệt.
+          </p>
         </div>
-
         <div>
           <label
             htmlFor="name"
@@ -104,7 +107,6 @@ export default function RegisterPage() {
             required
           />
         </div>
-
         <div>
           <label
             htmlFor="password"
@@ -123,7 +125,6 @@ export default function RegisterPage() {
             required
           />
         </div>
-
         <button
           type="submit"
           className="w-full bg-white text-black py-2 rounded-full font-medium hover:bg-white/90"
@@ -131,7 +132,6 @@ export default function RegisterPage() {
           Sign up
         </button>
       </form>
-
       <p className="mt-4 text-center text-white/70">
         Already have an account?{' '}
         <Link href="/login" className="text-white hover:underline">

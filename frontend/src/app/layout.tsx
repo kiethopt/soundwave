@@ -4,7 +4,7 @@ import './globals.css';
 import Sidebar from '@/components/layout/Sidebar/Sidebar';
 import Header from '@/components/layout/Header/Header';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 export default function RootLayout({
   children,
@@ -13,11 +13,15 @@ export default function RootLayout({
 }) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const isAuthPage =
-    pathname?.includes('/login') ||
-    pathname?.includes('/register') ||
-    pathname?.includes('/reset-password') ||
-    pathname?.includes('/forgot-password');
+
+  const isAuthPage = useMemo(
+    () =>
+      pathname?.includes('/login') ||
+      pathname?.includes('/register') ||
+      pathname?.includes('/reset-password') ||
+      pathname?.includes('/forgot-password'),
+    [pathname]
+  );
 
   return (
     <html lang="vi" suppressHydrationWarning={true}>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/utils/api';
@@ -11,28 +11,30 @@ export default function ForgotPasswordPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    try {
-      const response = await api.auth.requestPasswordReset(email);
+      try {
+        const response = await api.auth.requestPasswordReset(email);
 
-      if (response.message) {
-        setMessage(response.message);
-        setError('');
-      } else {
-        setError(response.message || 'An error occurred');
-        setMessage('');
+        if (response.message) {
+          setMessage(response.message);
+          setError('');
+        } else {
+          setError(response.message || 'An error occurred');
+          setMessage('');
+        }
+      } catch (err) {
+        setError('An error occurred while requesting password reset');
       }
-    } catch (err) {
-      setError('An error occurred while requesting password reset');
-    }
-  };
+    },
+    [email]
+  );
 
   return (
     <div className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4">
       <h1 className="text-2xl font-bold text-white mb-8">Forgot Password</h1>
-
       {message && (
         <div className="bg-green-500/10 text-green-500 p-3 rounded-md mb-4">
           {message}
@@ -43,7 +45,6 @@ export default function ForgotPasswordPage() {
           {error}
         </div>
       )}
-
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label
@@ -61,7 +62,6 @@ export default function ForgotPasswordPage() {
             required
           />
         </div>
-
         <button
           type="submit"
           className="w-full bg-white text-black py-2 rounded-full font-medium hover:bg-white/90"
@@ -69,7 +69,6 @@ export default function ForgotPasswordPage() {
           Request Password Reset
         </button>
       </form>
-
       <p className="mt-6 text-center text-[#A7A7A7]">
         Remember your password?{' '}
         <Link href="/login" className="text-white hover:underline">

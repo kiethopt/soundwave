@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 
@@ -14,41 +14,43 @@ function ResetPasswordContent() {
   const router = useRouter();
   const token = searchParams.get('token');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    if (!token) {
-      setError('Invalid token');
-      return;
-    }
-
-    try {
-      const data = await api.auth.resetPassword({ token, newPassword });
-
-      if (data.message) {
-        setMessage(data.message);
-        setError('');
-        setTimeout(() => {
-          router.push('/login');
-        }, 2000); // Redirect to login after 2 seconds
-      } else {
-        setError(data.message || 'An error occurred');
-        setMessage('');
+      if (newPassword !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
       }
-    } catch (err) {
-      setError('An error occurred while resetting password');
-    }
-  };
+
+      if (!token) {
+        setError('Invalid token');
+        return;
+      }
+
+      try {
+        const data = await api.auth.resetPassword({ token, newPassword });
+
+        if (data.message) {
+          setMessage(data.message);
+          setError('');
+          setTimeout(() => {
+            router.push('/login');
+          }, 2000);
+        } else {
+          setError(data.message || 'An error occurred');
+          setMessage('');
+        }
+      } catch (err) {
+        setError('An error occurred while resetting password');
+      }
+    },
+    [newPassword, confirmPassword, token, router]
+  );
 
   return (
     <div className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4">
       <h1 className="text-2xl font-bold text-white mb-8">Reset Password</h1>
-
       {message && (
         <div className="bg-green-500/10 text-green-500 p-3 rounded-md mb-4">
           {message}
@@ -59,7 +61,6 @@ function ResetPasswordContent() {
           {error}
         </div>
       )}
-
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label
@@ -77,7 +78,6 @@ function ResetPasswordContent() {
             required
           />
         </div>
-
         <div>
           <label
             htmlFor="confirmPassword"
@@ -94,7 +94,6 @@ function ResetPasswordContent() {
             required
           />
         </div>
-
         <button
           type="submit"
           className="w-full bg-white text-black py-2 rounded-full font-medium hover:bg-white/90"
@@ -102,7 +101,6 @@ function ResetPasswordContent() {
           Reset Password
         </button>
       </form>
-
       <p className="mt-6 text-center text-[#A7A7A7]">
         Remember your password?{' '}
         <a href="/login" className="text-white hover:underline">

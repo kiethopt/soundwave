@@ -33,13 +33,26 @@ export interface ArtistProfile {
   id: string;
   artistName: string;
   bio?: string;
-  socialMediaLinks?: any; // JSON type
+  socialMediaLinks?: any;
+  monthlyListeners: number;
   createdAt: string;
   updatedAt: string;
   user: User;
   userId: string;
   genres?: Genre[];
   tracks?: Track[];
+}
+
+export interface Artist {
+  id: string;
+  name: string;
+  avatar: string | null;
+  bio: string | null;
+  isVerified: boolean;
+  artistProfile: {
+    monthlyListeners: number;
+    createdAt: string;
+  };
 }
 
 export interface Album {

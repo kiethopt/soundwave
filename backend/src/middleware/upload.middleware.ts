@@ -8,17 +8,14 @@ const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // Giới hạn 5MB
+    fileSize: 10 * 1024 * 1024, // Giới hạn 10MB
   },
   fileFilter: (req, file, cb) => {
     // Chấp nhận file ảnh và audio
-    if (
-      file.mimetype.startsWith('image/') ||
-      file.mimetype.startsWith('audio/')
-    ) {
+    if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
-      cb(new Error('Only image and audio files are allowed'));
+      cb(new Error('Only image files are allowed'));
     }
   },
 });
@@ -34,7 +31,7 @@ export const handleUploadError = (
     if (err.code === 'LIMIT_FILE_SIZE') {
       res
         .status(400)
-        .json({ message: 'File too large. Maximum allowed size is 5MB.' });
+        .json({ message: 'File too large. Maximum allowed size is 10MB.' });
     } else {
       res.status(400).json({ message: err.message });
     }

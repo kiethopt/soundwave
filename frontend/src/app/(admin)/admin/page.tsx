@@ -10,6 +10,7 @@ interface Stats {
   totalAlbums: number;
   totalUsers: number;
   totalArtists: number;
+  totalArtistRequests: number;
 }
 
 export default function AdminDashboard() {
@@ -18,43 +19,38 @@ export default function AdminDashboard() {
     totalAlbums: 0,
     totalUsers: 0,
     totalArtists: 0,
+    totalArtistRequests: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // useEffect(() => {
-  //   const fetchStats = async () => {
-  //     try {
-  //       setLoading(true);
-  //       const token = localStorage.getItem('userToken');
-  //       if (!token) {
-  //         throw new Error('No authentication token found');
-  //       }
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('userToken');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
 
-  //       const response = await fetch(api.dashboard.getStats(), {
-  //         headers: { Authorization: `Bearer ${token}` },
-  //       });
-  //       if (!response.ok) {
-  //         throw new Error('Failed to fetch stats');
-  //       }
-  //       const data = await response.json();
+        const data = await api.dashboard.getStats(token);
+        setStats({
+          totalTracks: data.totalTracks,
+          totalAlbums: data.totalAlbums,
+          totalUsers: data.totalUsers,
+          totalArtists: data.totalArtists,
+          totalArtistRequests: data.totalArtistRequests,
+        });
+      } catch (err) {
+        console.error('Error fetching stats:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch stats');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  //       setStats({
-  //         totalTracks: data.tracks,
-  //         totalAlbums: data.albums,
-  //         totalUsers: data.users,
-  //         totalArtists: data.artists,
-  //       });
-  //     } catch (err) {
-  //       console.error('Error fetching stats:', err);
-  //       setError(err instanceof Error ? err.message : 'Failed to fetch stats');
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   fetchStats();
-  // }, []);
+    fetchStats();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -63,7 +59,7 @@ export default function AdminDashboard() {
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
+          {[...Array(5)].map((_, i) => (
             <div
               key={i}
               className="h-32 bg-white/5 rounded-lg animate-pulse"
@@ -96,7 +92,6 @@ export default function AdminDashboard() {
             <h3 className="text-xl font-bold">Tracks</h3>
             <p className="text-white/60">Manage music tracks</p>
           </Link>
-
           <Link
             href="/admin/albums"
             className="p-6 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
@@ -108,7 +103,6 @@ export default function AdminDashboard() {
             <h3 className="text-xl font-bold">Albums</h3>
             <p className="text-white/60">Manage albums</p>
           </Link>
-
           <Link
             href="/admin/users"
             className="p-6 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
@@ -119,6 +113,19 @@ export default function AdminDashboard() {
             </div>
             <h3 className="text-xl font-bold">Users</h3>
             <p className="text-white/60">Manage users</p>
+          </Link>
+          <Link
+            href="/admin/artist-requests"
+            className="p-6 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <User className="w-8 h-8 text-white/60" />
+              <span className="text-2xl font-bold">
+                {stats.totalArtistRequests}
+              </span>
+            </div>
+            <h3 className="text-xl font-bold">Artist Requests</h3>
+            <p className="text-white/60">Manage artist requests</p>
           </Link>
         </div>
       )}

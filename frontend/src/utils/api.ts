@@ -1,5 +1,37 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
+// Helper function giúp giảm bớt lặp code
+const fetchWithAuth = async (
+  url: string,
+  options: RequestInit = {},
+  token?: string
+) => {
+  // Định nghĩa kiểu dữ liệu cho headers
+  const headers: Record<string, string> = {
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(options.headers as Record<string, string>),
+  };
+
+  // Nếu body là FormData, không đặt Content-Type
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const response = await fetch(`${API_BASE}${url}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    // Parse error response từ backend
+    const errorResponse = await response.json();
+    throw new Error(errorResponse.message || 'An unexpected error occurred');
+  }
+
+  return response.json();
+};
+
+// Interfaces
 interface RegisterData {
   email: string;
   password: string;
@@ -19,253 +51,199 @@ interface ResetPasswordData {
 
 export const api = {
   auth: {
-    // Public routes
-    register: async (data: RegisterData) => {
-      const response = await fetch(`${API_BASE}/api/auth/register`, {
+    register: async (data: RegisterData) =>
+      fetchWithAuth('/api/auth/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(data),
-      });
-      return response.json();
-    },
+      }),
 
-    login: async (data: LoginData) => {
-      const response = await fetch(`${API_BASE}/api/auth/login`, {
+    login: async (data: LoginData) =>
+      fetchWithAuth('/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(data),
-      });
-      return response.json();
-    },
+      }),
 
-    requestPasswordReset: async (email: string) => {
-      const response = await fetch(
-        `${API_BASE}/api/auth/request-password-reset`,
+    requestPasswordReset: async (email: string) =>
+      fetchWithAuth('/api/auth/request-password-reset', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+
+    resetPassword: async (data: ResetPasswordData) =>
+      fetchWithAuth('/api/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    validateToken: async (token: string) =>
+      fetchWithAuth('/api/auth/validate-token', { method: 'GET' }, token),
+
+    requestArtistRole: async (token: string) =>
+      fetchWithAuth('/api/auth/request-artist', { method: 'POST' }, token),
+  },
+
+  admin: {
+    approveArtistRequest: async (userId: string, token: string) =>
+      fetchWithAuth(
+        '/api/admin/artist-requests/approve',
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email }),
-        }
-      );
-      return response.json();
-    },
-
-    resetPassword: async (data: ResetPasswordData) => {
-      const response = await fetch(`${API_BASE}/api/auth/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+          body: JSON.stringify({ userId }),
         },
-        body: JSON.stringify(data),
-      });
-      return response.json();
-    },
+        token
+      ),
 
-    // Protected routes
-    validateToken: async (token: string) => {
-      const response = await fetch(`${API_BASE}/api/auth/validate-token`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+    rejectArtistRequest: async (userId: string, token: string) =>
+      fetchWithAuth(
+        '/api/admin/artist-requests/reject',
+        {
+          method: 'POST',
+          body: JSON.stringify({ userId }),
         },
-      });
-      return response.json();
-    },
+        token
+      ),
 
-    requestArtistRole: async (token: string) => {
-      const response = await fetch(`${API_BASE}/api/auth/request-artist`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
+    verifyArtist: async (data: { userId: string }, token: string) =>
+      fetchWithAuth(
+        '/api/admin/artists/verify',
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
         },
-      });
-      return response.json();
-    },
-
-    // Admin routes
-    registerAdmin: async (data: RegisterData) => {
-      const response = await fetch(`${API_BASE}/api/auth/register-admin`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      return response.json();
-    },
+        token
+      ),
   },
 
   albums: {
-    // Lấy danh sách tất cả albums
-    getAll: async (token: string) => {
-      const response = await fetch(`${API_BASE}/api/albums`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.json();
-    },
+    getAll: async (token: string) =>
+      fetchWithAuth('/api/albums', { method: 'GET' }, token),
 
-    // Lấy thông tin chi tiết của một album
-    getById: async (id: string, token: string) => {
-      const response = await fetch(`${API_BASE}/api/albums/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.json();
-    },
+    getById: async (id: string, token: string) =>
+      fetchWithAuth(`/api/albums/${id}`, { method: 'GET' }, token),
 
-    // Tạo album mới
-    create: async (data: FormData, token: string) => {
-      const response = await fetch(`${API_BASE}/api/albums`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: data,
-      });
-      return response.json();
-    },
+    create: async (data: FormData, token: string) =>
+      fetchWithAuth('/api/albums', { method: 'POST', body: data }, token),
 
-    // Cập nhật album
-    update: async (id: string, data: FormData, token: string) => {
-      const response = await fetch(`${API_BASE}/api/albums/${id}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: data,
-      });
-      return response.json();
-    },
+    update: async (id: string, data: FormData, token: string) =>
+      fetchWithAuth(`/api/albums/${id}`, { method: 'PUT', body: data }, token),
 
-    // Xóa album
-    delete: async (id: string, token: string) => {
-      const response = await fetch(`${API_BASE}/api/albums/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.json();
-    },
+    delete: async (id: string, token: string) =>
+      fetchWithAuth(`/api/albums/${id}`, { method: 'DELETE' }, token),
 
-    // Thêm tracks vào album
-    uploadTracks: async (id: string, data: FormData, token: string) => {
-      const response = await fetch(`${API_BASE}/api/albums/${id}/tracks`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: data,
-      });
-      return response.json();
-    },
+    uploadTracks: async (id: string, data: FormData, token: string) =>
+      fetchWithAuth(
+        `/api/albums/${id}/tracks`,
+        { method: 'POST', body: data },
+        token
+      ),
 
-    search: async (query: string, token: string) => {
-      const response = await fetch(`${API_BASE}/api/albums/search?q=${query}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.json();
-    },
+    search: async (query: string, token: string) =>
+      fetchWithAuth(`/api/albums/search?q=${query}`, { method: 'GET' }, token),
   },
 
-  // artists: {
-  //   getAll: async (token: string) => {
-  //     const response = await fetch(`${API_BASE}/api/artists`, {
-  //       headers: {
-  //         Authorization: `Bearer ${token}`,
-  //       },
-  //     });
-  //     return response.json();
-  //   },
-  // },
+  artists: {
+    getAll: async (token: string, page: number, limit: number) =>
+      fetchWithAuth(
+        `/api/admin/artists?page=${page}&limit=${limit}`,
+        { method: 'GET' },
+        token
+      ),
+
+    getRequests: async (token: string, page: number, limit: number) =>
+      fetchWithAuth(
+        `/api/admin/artist-requests?page=${page}&limit=${limit}`,
+        { method: 'GET' },
+        token
+      ),
+
+    getById: async (id: string, token: string) =>
+      fetchWithAuth(`/api/admin/artists/${id}`, { method: 'GET' }, token),
+
+    create: async (data: FormData, token: string) =>
+      fetchWithAuth(
+        '/api/admin/artists',
+        { method: 'POST', body: data },
+        token
+      ),
+
+    getProfile: async (id: string, token: string) =>
+      fetchWithAuth(`/api/artist/profile/${id}`, { method: 'GET' }, token),
+
+    updateProfile: async (id: string, data: any, token: string) =>
+      fetchWithAuth(
+        `/api/artist/profile/${id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        },
+        token
+      ),
+
+    getStats: async (id: string, token: string) =>
+      fetchWithAuth(`/api/artist/stats/${id}`, { method: 'GET' }, token),
+
+    getTracks: async (id: string, token: string) =>
+      fetchWithAuth(`/api/artist/tracks/${id}`, { method: 'GET' }, token),
+
+    getAlbums: async (id: string, token: string) =>
+      fetchWithAuth(`/api/artist/albums/${id}`, { method: 'GET' }, token),
+
+    updateMonthlyListeners: async (id: string, token: string) =>
+      fetchWithAuth(
+        `/api/admin/artists/${id}/update-monthly-listeners`,
+        {
+          method: 'POST',
+        },
+        token
+      ),
+  },
 
   tracks: {
-    // Lấy danh sách tất cả tracks
-    getAll: async (token: string) => {
-      const response = await fetch(`${API_BASE}/api/tracks`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.json();
-    },
+    getAll: async (token: string) =>
+      fetchWithAuth('/api/tracks', { method: 'GET' }, token),
 
-    // Lấy danh sách tracks theo type
-    getByType: async (type: string, token: string) => {
-      const response = await fetch(`${API_BASE}/api/tracks/type/${type}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.json();
-    },
+    getByType: async (type: string, token: string) =>
+      fetchWithAuth(`/api/tracks/type/${type}`, { method: 'GET' }, token),
 
-    // Lấy danh sách tracks theo genre
-    getByGenre: async (genreId: string, token: string) => {
-      const response = await fetch(`${API_BASE}/api/tracks/genre/${genreId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.json();
-    },
+    getByGenre: async (genreId: string, token: string) =>
+      fetchWithAuth(`/api/tracks/genre/${genreId}`, { method: 'GET' }, token),
 
-    // Lấy danh sách tracks theo type và genre
-    getByTypeAndGenre: async (type: string, genreId: string, token: string) => {
-      const response = await fetch(
-        `${API_BASE}/api/tracks/type/${type}/genre/${genreId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      return response.json();
-    },
+    getByTypeAndGenre: async (type: string, genreId: string, token: string) =>
+      fetchWithAuth(
+        `/api/tracks/type/${type}/genre/${genreId}`,
+        { method: 'GET' },
+        token
+      ),
 
-    // Tạo track mới
-    create: async (data: FormData, token: string) => {
-      const response = await fetch(`${API_BASE}/api/tracks`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: data,
-      });
-      return response.json();
-    },
+    create: async (data: FormData, token: string) =>
+      fetchWithAuth('/api/tracks', { method: 'POST', body: data }, token),
 
-    // Cập nhật track
-    update: async (id: string, data: FormData, token: string) => {
-      const response = await fetch(`${API_BASE}/api/tracks/${id}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: data,
-      });
-      return response.json();
-    },
+    update: async (id: string, data: FormData, token: string) =>
+      fetchWithAuth(`/api/tracks/${id}`, { method: 'PUT', body: data }, token),
 
-    // Xóa track
-    delete: async (id: string, token: string) => {
-      const response = await fetch(`${API_BASE}/api/tracks/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return response.json();
-    },
+    delete: async (id: string, token: string) =>
+      fetchWithAuth(`/api/tracks/${id}`, { method: 'DELETE' }, token),
+
+    search: async (query: string, token: string) =>
+      fetchWithAuth(`/api/tracks/search?q=${query}`, { method: 'GET' }, token),
+
+    play: async (trackId: string, token: string) =>
+      fetchWithAuth(`/api/tracks/${trackId}/play`, { method: 'POST' }, token),
+  },
+
+  history: {
+    getPlayHistory: async (token: string) =>
+      fetchWithAuth('/api/history/play', { method: 'GET' }, token),
+
+    getSearchHistory: async (token: string) =>
+      fetchWithAuth('/api/history/search', { method: 'GET' }, token),
+
+    getAllHistory: async (token: string) =>
+      fetchWithAuth('/api/history', { method: 'GET' }, token),
+  },
+
+  dashboard: {
+    getStats: async (token: string) =>
+      fetchWithAuth('/api/admin/stats', { method: 'GET' }, token),
   },
 };

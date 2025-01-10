@@ -4,7 +4,7 @@ import {
   saveSearchHistory,
   getPlayHistory,
   getSearchHistory,
-  getAllHistory, // Import hàm mới
+  getAllHistory,
 } from '../controllers/history.controller';
 import { authenticate } from '../middleware/auth.middleware';
 

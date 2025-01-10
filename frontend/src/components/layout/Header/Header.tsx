@@ -189,6 +189,14 @@ export default function Header({
                   >
                     Profile
                   </Link>
+                  {/* Thêm option "Become an Artist" */}
+                  <Link
+                    href="/request-artist"
+                    className="block px-4 py-2 text-sm text-white hover:bg-white/10"
+                    onClick={() => setShowDropdown(false)}
+                  >
+                    Become an Artist
+                  </Link>
                   <div className="border-t border-white/10 my-1"></div>
                   <button
                     onClick={() => {

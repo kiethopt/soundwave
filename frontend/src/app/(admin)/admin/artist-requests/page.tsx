@@ -2,29 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
-import { Search, User, Plus } from 'lucide-react';
-import Link from 'next/link';
+import { Search, User, Check, RefreshCw, X } from 'lucide-react';
+import Link from 'next/link'; // Import Link từ next/link
 
-interface Artist {
+interface ArtistRequest {
   id: string;
   name: string;
-  avatar: string | null;
-  isVerified: boolean;
-  artistProfile: {
-    monthlyListeners: number;
-    createdAt: string;
-  };
+  email: string;
+  verificationRequestedAt: string;
 }
 
-export default function AdminArtists() {
-  const [artists, setArtists] = useState<Artist[]>([]);
+export default function ArtistRequests() {
+  const [requests, setRequests] = useState<ArtistRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const fetchArtists = async (page: number, query: string = '') => {
+  const fetchRequests = async (page: number, query: string = '') => {
     try {
       setLoading(true);
       setError(null);
@@ -34,30 +30,30 @@ export default function AdminArtists() {
         throw new Error('No authentication token found');
       }
 
-      const limit = 10; // Số lượng nghệ sĩ trên mỗi trang
-      const response = await api.artists.getAll(token, page, limit);
+      const limit = 10;
+      const response = await api.artists.getRequests(token, page, limit);
 
-      const totalArtists = response.pagination.total; // Tổng số nghệ sĩ
-      const totalPages = Math.ceil(totalArtists / limit); // Tính tổng số trang
+      const totalRequests = response.pagination.total;
+      const totalPages = Math.ceil(totalRequests / limit);
 
-      setArtists(response.artists); // Lấy dữ liệu từ response.artists
+      setRequests(response.requests);
       setTotalPages(totalPages);
     } catch (err) {
-      console.error('Error fetching artists:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch artists');
+      console.error('Error fetching artist requests:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch requests');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchArtists(page, searchInput);
+    fetchRequests(page, searchInput);
   }, [page, searchInput]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(1); // Reset to first page when searching
-    fetchArtists(1, searchInput);
+    setPage(1);
+    fetchRequests(1, searchInput);
   };
 
   const formatDate = (dateString: string): string => {
@@ -66,35 +62,62 @@ export default function AdminArtists() {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
+  };
+
+  const handleApprove = async (userId: string) => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      await api.admin.approveArtistRequest(userId, token);
+      alert('Request approved successfully!');
+      fetchRequests(page, searchInput); // Refresh danh sách
+    } catch (err) {
+      console.error('Error approving request:', err);
+      alert('Failed to approve request');
+    }
+  };
+
+  const handleReject = async (userId: string) => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      await api.admin.rejectArtistRequest(userId, token);
+      alert('Request rejected successfully!');
+      fetchRequests(page, searchInput); // Refresh danh sách
+    } catch (err) {
+      console.error('Error rejecting request:', err);
+      alert('Failed to reject request');
+    }
   };
 
   return (
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Artist Management
-          </h1>
-          <p className="text-white/60 mt-2">Create and manage your artists</p>
+          <h1 className="text-3xl font-bold tracking-tight">Artist Requests</h1>
+          <p className="text-white/60 mt-2">
+            Manage artist requests from users
+          </p>
         </div>
-        <Link
-          href="/admin/artists/new"
-          className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90"
-        >
-          <Plus className="w-4 h-4" />
-          New Artist
-        </Link>
       </div>
 
       <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08]">
         <div className="p-6 border-b border-white/[0.08]">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Artist List</h2>
+            <h2 className="text-xl font-semibold">Request List</h2>
             <form onSubmit={handleSearch} className="relative">
               <input
                 type="text"
-                placeholder="Search artists..."
+                placeholder="Search requests..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent w-64"
@@ -114,7 +137,7 @@ export default function AdminArtists() {
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
             </div>
-          ) : artists.length > 0 ? (
+          ) : requests.length > 0 ? (
             <table className="w-full">
               <thead className="bg-white/[0.03]">
                 <tr>
@@ -122,64 +145,51 @@ export default function AdminArtists() {
                     Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                    Monthly Listeners
+                    Email
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                    Status
+                    Requested At
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                    Created At
+                    Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.08]">
-                {artists.map((artist) => (
+                {requests.map((request) => (
                   <tr
-                    key={artist.id}
+                    key={request.id}
                     className="hover:bg-white/[0.03] transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        {artist.avatar ? (
-                          <img
-                            src={artist.avatar}
-                            alt={artist.name}
-                            className="w-10 h-10 rounded-full mr-3 object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.src = '/images/default-avatar.jpg';
-                            }}
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full mr-3 bg-white/[0.03] flex items-center justify-center">
-                            <User className="w-6 h-6 text-white/60" />
-                          </div>
-                        )}
-                        <Link
-                          href={`/admin/artists/${artist.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {artist.name}
-                        </Link>
+                        <div className="w-10 h-10 rounded-full bg-white/[0.03] flex items-center justify-center">
+                          <User className="w-6 h-6 text-white/60" />
+                        </div>
+                        <span className="ml-3 font-medium">{request.name}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {artist.artistProfile.monthlyListeners.toLocaleString()}
+                      {request.email}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          artist.isVerified
-                            ? 'bg-green-500/10 text-green-500'
-                            : 'bg-yellow-500/10 text-yellow-500'
-                        }`}
-                      >
-                        {artist.isVerified ? 'Verified' : 'Unverified'}
-                      </span>
+                      {formatDate(request.verificationRequestedAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {formatDate(artist.artistProfile.createdAt)}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApprove(request.id)}
+                          className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleReject(request.id)}
+                          className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -188,7 +198,7 @@ export default function AdminArtists() {
           ) : (
             <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
               <User className="w-12 h-12 mb-4" />
-              <p>No artists found</p>
+              <p>No requests found</p>
             </div>
           )}
         </div>

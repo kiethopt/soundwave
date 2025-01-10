@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/utils/api';
@@ -26,42 +26,43 @@ function LoginForm() {
     }
   }, [searchParams]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      const response = await api.auth.login(formData);
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      try {
+        const response = await api.auth.login(formData);
 
-      if (response.token && response.user) {
-        localStorage.setItem('userToken', response.token);
-        localStorage.setItem('userData', JSON.stringify(response.user));
+        if (response.token && response.user) {
+          localStorage.setItem('userToken', response.token);
+          localStorage.setItem('userData', JSON.stringify(response.user));
 
-        if (response.user.role === 'ADMIN') {
-          router.push('/admin');
-        } else if (response.user.role === 'ARTIST') {
-          router.push('/artist/albums');
+          if (response.user.role === 'ADMIN') {
+            router.push('/admin');
+          } else if (response.user.role === 'ARTIST') {
+            router.push('/artist/albums');
+          } else {
+            router.push('/');
+          }
         } else {
-          router.push('/');
+          setError(response.message || 'An error occurred');
         }
-      } else {
-        setError(response.message || 'An error occurred');
+      } catch (err) {
+        setError('An unexpected error occurred');
       }
-    } catch (err) {
-      setError('An unexpected error occurred');
-    }
-  };
+    },
+    [formData, router]
+  );
 
   return (
     <div className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4">
       <h1 className="text-2xl font-bold text-white mb-8">
         Login to Your Account
       </h1>
-
       {error && (
         <div className="bg-red-500/10 text-red-500 p-3 rounded-md mb-4">
           {error}
         </div>
       )}
-
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label
@@ -81,7 +82,6 @@ function LoginForm() {
             required
           />
         </div>
-
         <div>
           <label
             htmlFor="password"
@@ -100,7 +100,6 @@ function LoginForm() {
             required
           />
         </div>
-
         <button
           type="submit"
           className="w-full bg-white text-black py-2 rounded-full font-medium hover:bg-white/90"
@@ -108,14 +107,12 @@ function LoginForm() {
           Log in
         </button>
       </form>
-
       <p className="mt-6 text-center text-[#A7A7A7]">
         {`Don't have an account?`}{' '}
         <Link href="/register" className="text-white hover:underline">
           Sign up
         </Link>
       </p>
-
       <p className="mt-4 text-center text-[#A7A7A7]">
         Forgot your password?{' '}
         <Link href="/forgot-password" className="text-white hover:underline">
