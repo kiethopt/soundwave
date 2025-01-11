@@ -640,15 +640,58 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Thực hiện tìm kiếm album và track song song
-    const [albums, tracks] = await Promise.all([
+    const [artists, albums, tracks, users] = await Promise.all([
+      prisma.user.findMany({
+        where: {
+          isActive: true,
+          role: Role.ARTIST,
+          id: { not: user.id },
+          OR: [
+            { name: { contains: searchQuery, mode: 'insensitive' } },
+            { username: { contains: searchQuery, mode: 'insensitive' } },
+            { artistProfile: {genres: {some: {genreId: {equals: searchQuery}}}}},
+            { artistProfile: {artistName: {contains: searchQuery, mode: 'insensitive'}}},
+          ],
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          name: true,
+          avatar: true,
+          role: true,
+          isActive: true,
+          artistProfile: {
+            select: {
+              id: true,
+              artistName: true,
+              bio: true,
+              isVerified: true,
+              avatar: true,
+              socialMediaLinks: true,
+              monthlyListeners: true,
+              genres: {
+                select: {
+                  genre: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+
       prisma.album.findMany({
         where: {
           isActive: true,
           OR: [
             { title: { contains: searchQuery, mode: 'insensitive' } },
-            {
-              artist: { name: { contains: searchQuery, mode: 'insensitive' } },
-            },
+            { artist: {name: {contains: searchQuery, mode: 'insensitive'}} },
+            { genres: {some: {genreId: {equals: searchQuery}}} },
           ],
         },
         select: {
@@ -769,6 +812,15 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
                 },
               },
             },
+            {
+              genres: {
+                some: {
+                  genreId: {
+                    equals: searchQuery,
+                  },
+                },
+              },
+            },
           ],
         },
         select: {
@@ -833,11 +885,32 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
         },
         orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
       }),
+      prisma.user.findMany({
+        where: {
+          id: { not: user.id },
+          role: Role.USER,
+          isActive: true,
+          OR: [
+            { name: { contains: searchQuery, mode: 'insensitive' } },
+            { username: { contains: searchQuery, mode: 'insensitive' } },
+          ],
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          name: true,
+          avatar: true,
+          isActive: true,
+        },
+      }),
     ]);
 
     const searchResult = {
+      artists,
       albums,
       tracks,
+      users,
     };
 
     if (useRedisCache) {
