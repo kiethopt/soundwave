@@ -10,7 +10,7 @@ const userSelect = {
   createdAt: true,
   updatedAt: true,
   lastLoginAt: true,
-  ArtistProfile: {
+  artistProfile: {
     select: {
       id: true,
       artistName: true,
@@ -118,11 +118,14 @@ export const getFollowers = async (
         followingId: user?.id,
       },
       select: {
-        followerId: true,
+        follower: {
+          select: userSelect,
+        },
       },
     });
 
-    res.json(followers);
+    const followerData = followers.map((follow) => follow.follower);
+    res.json(followerData);
   } catch (error) {
     console.error('Get followers error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -141,11 +144,14 @@ export const getFollowing = async (
         followerId: user?.id,
       },
       select: {
-        followingId: true,
+        following: {
+          select: userSelect,
+        },
       },
     });
 
-    res.json(following);
+    const followingData = following.map((follow) => follow.following);
+    res.json(followingData);
   } catch (error) {
     console.error('Get following error:', error);
     res.status(500).json({ message: 'Internal server error' });
