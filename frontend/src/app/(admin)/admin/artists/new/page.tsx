@@ -29,7 +29,7 @@ export default function NewArtist() {
   useEffect(() => {
     const fetchGenres = async () => {
       try {
-        const response = await api.auth.getAllGenres();
+        const response = await api.user.getAllGenres();
         setGenreOptions(response);
       } catch (err) {
         console.error('Error fetching genres:', err);

@@ -74,26 +74,6 @@ export const api = {
 
     validateToken: async (token: string) =>
       fetchWithAuth('/api/auth/validate-token', { method: 'GET' }, token),
-
-    requestArtistRole: async (token: string, data: FormData) =>
-      fetchWithAuth(
-        '/api/auth/request-artist',
-        {
-          method: 'POST',
-          body: data,
-        },
-        token
-      ),
-
-    searchAll: async (query: string, token: string) =>
-      fetchWithAuth(
-        `/api/auth/search-all?q=${query}`,
-        { method: 'GET' },
-        token
-      ),
-
-    getAllGenres: async () =>
-      fetchWithAuth('/api/auth/genres', { method: 'GET' }),
   },
 
   admin: {
@@ -212,6 +192,44 @@ export const api = {
 
     deleteGenre: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/genres/${id}`, { method: 'DELETE' }, token),
+  },
+
+  user: {
+    searchAll: async (query: string, token: string) =>
+      fetchWithAuth(
+        `/api/user/search-all?q=${query}`,
+        { method: 'GET' },
+        token
+      ),
+
+    getAllGenres: async () =>
+      fetchWithAuth('/api/user/genres', { method: 'GET' }),
+
+    followUser: async (userId: string, token: string) =>
+      fetchWithAuth(`/api/user/follow/${userId}`, { method: 'POST' }, token),
+
+    unfollowUser: async (userId: string, token: string) =>
+      fetchWithAuth(
+        `/api/user/unfollow/${userId}`,
+        { method: 'DELETE' },
+        token
+      ),
+
+    getFollowers: async (token: string) =>
+      fetchWithAuth('/api/user/followers', { method: 'GET' }, token),
+
+    getFollowing: async (token: string) =>
+      fetchWithAuth('/api/user/following', { method: 'GET' }, token),
+
+    requestArtistRole: async (token: string, data: FormData) =>
+      fetchWithAuth(
+        '/api/user/request-artist',
+        {
+          method: 'POST',
+          body: data,
+        },
+        token
+      ),
   },
 
   artists: {

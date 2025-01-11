@@ -37,7 +37,7 @@ export default function RequestArtistPage() {
 
     const fetchGenres = async () => {
       try {
-        const response = await api.auth.getAllGenres();
+        const response = await api.user.getAllGenres();
         setGenreOptions(response);
       } catch (err) {
         console.error('Error fetching genres:', err);
@@ -76,7 +76,7 @@ export default function RequestArtistPage() {
       }
 
       // Gửi yêu cầu trở thành artist
-      await api.auth.requestArtistRole(token, formData);
+      await api.user.requestArtistRole(token, formData);
 
       setHasRequested(true);
       alert(

@@ -4,17 +4,31 @@ import {
   unfollowUser,
   getFollowers,
   getFollowing,
+  searchAll,
+  getAllGenres,
+  requestArtistRole,
 } from '../controllers/user.controller';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate, authorize } from '../middleware/auth.middleware';
+import { Role } from '@prisma/client';
+import upload, { handleUploadError } from '../middleware/upload.middleware';
 
 const router = express.Router();
 
 router.post('/follow/:id', authenticate, followUser);
-
 router.delete('/unfollow/:id', authenticate, unfollowUser);
-
 router.get('/followers', authenticate, getFollowers);
-
 router.get('/following', authenticate, getFollowing);
+router.get('/search-all', authenticate, searchAll);
+router.get('/genres', getAllGenres);
+
+// Route yêu cầu trở thành Artist
+router.post(
+  '/request-artist',
+  authenticate,
+  authorize([Role.USER]),
+  upload.single('avatar'),
+  handleUploadError,
+  requestArtistRole
+);
 
 export default router;
