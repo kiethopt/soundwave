@@ -649,8 +649,16 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
           OR: [
             { name: { contains: searchQuery, mode: 'insensitive' } },
             { username: { contains: searchQuery, mode: 'insensitive' } },
-            { artistProfile: {genres: {some: {genreId: {equals: searchQuery}}}}},
-            { artistProfile: {artistName: {contains: searchQuery, mode: 'insensitive'}}},
+            {
+              artistProfile: {
+                genres: { some: { genreId: { equals: searchQuery } } },
+              },
+            },
+            {
+              artistProfile: {
+                artistName: { contains: searchQuery, mode: 'insensitive' },
+              },
+            },
           ],
         },
         select: {
@@ -690,8 +698,10 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
           isActive: true,
           OR: [
             { title: { contains: searchQuery, mode: 'insensitive' } },
-            { artist: {name: {contains: searchQuery, mode: 'insensitive'}} },
-            { genres: {some: {genreId: {equals: searchQuery}}} },
+            {
+              artist: { name: { contains: searchQuery, mode: 'insensitive' } },
+            },
+            { genres: { some: { genreId: { equals: searchQuery } } } },
           ],
         },
         select: {
@@ -920,6 +930,26 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
     res.json(searchResult);
   } catch (error) {
     console.error('Search all error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Lấy danh sách tất cả thể loại hiện có
+export const getAllGenres = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const genres = await prisma.genre.findMany({
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    res.json(genres);
+  } catch (error) {
+    console.error('Get all genres error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

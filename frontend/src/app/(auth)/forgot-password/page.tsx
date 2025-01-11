@@ -1,12 +1,10 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/utils/api';
 
 export default function ForgotPasswordPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -25,8 +23,11 @@ export default function ForgotPasswordPage() {
           setError(response.message || 'An error occurred');
           setMessage('');
         }
-      } catch (err) {
-        setError('An error occurred while requesting password reset');
+      } catch (err: any) {
+        // Hiển thị thông báo lỗi từ backend
+        setError(
+          err.message || 'An error occurred while requesting password reset'
+        );
       }
     },
     [email]

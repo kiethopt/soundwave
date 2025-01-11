@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
-import { Role } from '@prisma/client';
 
 const userSelect = {
   id: true,
@@ -36,7 +35,10 @@ const userSelect = {
   },
 };
 
-export const followUser = async (req: Request, res: Response): Promise<void> => {
+export const followUser = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const user = req.user;
     const { id } = req.params;
@@ -67,9 +69,12 @@ export const followUser = async (req: Request, res: Response): Promise<void> => 
     console.error('Follow user error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-} 
+};
 
-export const unfollowUser = async (req: Request, res: Response): Promise<void> => {
+export const unfollowUser = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const user = req.user;
     const { id } = req.params;
@@ -99,9 +104,12 @@ export const unfollowUser = async (req: Request, res: Response): Promise<void> =
     console.error('Unfollow user error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};
 
-export const getFollowers = async (req: Request, res: Response): Promise<void> => {
+export const getFollowers = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const user = req.user;
 
@@ -119,9 +127,12 @@ export const getFollowers = async (req: Request, res: Response): Promise<void> =
     console.error('Get followers error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};
 
-export const getFollowing = async (req: Request, res: Response): Promise<void> => {
+export const getFollowing = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const user = req.user;
 
@@ -139,4 +150,4 @@ export const getFollowing = async (req: Request, res: Response): Promise<void> =
     console.error('Get following error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};

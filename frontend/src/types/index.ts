@@ -45,13 +45,74 @@ export interface ArtistProfile {
 
 export interface Artist {
   id: string;
-  name: string;
+  email: string;
+  name: string | null;
   avatar: string | null;
-  bio: string | null;
-  isVerified: boolean;
+  createdAt: string;
   artistProfile: {
+    id: string;
+    artistName: string;
+    bio: string | null;
+    avatar: string | null;
+    socialMediaLinks?: {
+      facebook?: string;
+      instagram?: string;
+      twitter?: string;
+    };
     monthlyListeners: number;
+    isVerified: boolean;
+    verificationRequestedAt: string | null;
+    verifiedAt: string | null;
     createdAt: string;
+    genres?: {
+      genre: {
+        id: string;
+        name: string;
+      };
+    }[];
+  };
+  albums?: {
+    id: string;
+    title: string;
+    coverUrl?: string;
+    releaseDate: string;
+    trackCount: number;
+    duration: number;
+    type: 'ALBUM' | 'EP' | 'SINGLE';
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }[];
+  tracks?: {
+    id: string;
+    title: string;
+    duration: number;
+    releaseDate: string;
+    trackNumber?: number;
+    coverUrl?: string;
+    audioUrl: string;
+    playCount: number;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }[];
+}
+
+export interface ArtistRequest {
+  id: string;
+  artistName: string;
+  bio?: string;
+  socialMediaLinks?: {
+    facebook?: string;
+    twitter?: string;
+    instagram?: string;
+  };
+  verificationRequestedAt: string;
+  avatar?: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
   };
 }
 

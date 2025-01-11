@@ -2,15 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
-import { Search, User, Check, RefreshCw, X } from 'lucide-react';
-import Link from 'next/link'; // Import Link từ next/link
-
-interface ArtistRequest {
-  id: string;
-  name: string;
-  email: string;
-  verificationRequestedAt: string;
-}
+import { Search, User, Check, RefreshCw, X, Eye } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArtistRequest } from '@/types';
 
 export default function ArtistRequests() {
   const [requests, setRequests] = useState<ArtistRequest[]>([]);
@@ -19,6 +13,7 @@ export default function ArtistRequests() {
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const router = useRouter();
 
   const fetchRequests = async (page: number, query: string = '') => {
     try {
@@ -31,7 +26,7 @@ export default function ArtistRequests() {
       }
 
       const limit = 10;
-      const response = await api.artists.getRequests(token, page, limit);
+      const response = await api.admin.getArtistRequests(token, page, limit);
 
       const totalRequests = response.pagination.total;
       const totalPages = Math.ceil(totalRequests / limit);
@@ -99,6 +94,10 @@ export default function ArtistRequests() {
     }
   };
 
+  const handleViewDetails = (requestId: string) => {
+    router.push(`/admin/artist-requests/${requestId}`);
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex items-center justify-between">
@@ -142,7 +141,10 @@ export default function ArtistRequests() {
               <thead className="bg-white/[0.03]">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                    Name
+                    Artist Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    User Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
                     Email
@@ -164,13 +166,26 @@ export default function ArtistRequests() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-10 h-10 rounded-full bg-white/[0.03] flex items-center justify-center">
-                          <User className="w-6 h-6 text-white/60" />
+                          {request.avatar ? (
+                            <img
+                              src={request.avatar}
+                              alt={request.artistName}
+                              className="w-10 h-10 rounded-full"
+                            />
+                          ) : (
+                            <User className="w-6 h-6 text-white/60" />
+                          )}
                         </div>
-                        <span className="ml-3 font-medium">{request.name}</span>
+                        <span className="ml-3 font-medium">
+                          {request.artistName}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {request.email}
+                      {request.user.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {request.user.email}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {formatDate(request.verificationRequestedAt)}
@@ -178,13 +193,19 @@ export default function ArtistRequests() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleApprove(request.id)}
+                          onClick={() => handleViewDetails(request.id)}
+                          className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleApprove(request.user.id)}
                           className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
                         >
                           <Check className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleReject(request.id)}
+                          onClick={() => handleReject(request.user.id)}
                           className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
                         >
                           <X className="w-4 h-4" />

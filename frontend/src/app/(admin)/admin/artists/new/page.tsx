@@ -1,21 +1,44 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 export default function NewArtist() {
   const router = useRouter();
-  const [newArtist, setNewArtist] = useState({
-    name: '',
+  const [formData, setFormData] = useState({
+    name: '', // Giữ lại trường name (User Name)
     email: '',
+    artistName: '',
     bio: '',
+    facebookLink: '',
+    twitterLink: '',
+    instagramLink: '',
+    genres: [] as string[],
     avatarFile: null as File | null,
   });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [genreOptions, setGenreOptions] = useState<
+    { id: string; name: string }[]
+  >([]);
+
+  useEffect(() => {
+    const fetchGenres = async () => {
+      try {
+        const response = await api.auth.getAllGenres();
+        setGenreOptions(response);
+      } catch (err) {
+        console.error('Error fetching genres:', err);
+        setError('Failed to load genres');
+      }
+    };
+
+    fetchGenres();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,22 +51,34 @@ export default function NewArtist() {
         throw new Error('No authentication token found');
       }
 
-      // Kiểm tra kích thước file
-      if (newArtist.avatarFile && newArtist.avatarFile.size > 5 * 1024 * 1024) {
+      // Validate file size
+      if (formData.avatarFile && formData.avatarFile.size > 5 * 1024 * 1024) {
         throw new Error('File size exceeds the limit of 5MB');
       }
 
-      const formData = new FormData();
-      formData.append('name', newArtist.name);
-      formData.append('email', newArtist.email);
-      if (newArtist.bio) {
-        formData.append('bio', newArtist.bio);
-      }
-      if (newArtist.avatarFile) {
-        formData.append('avatar', newArtist.avatarFile);
+      const submitFormData = new FormData();
+      submitFormData.append('name', formData.name);
+      submitFormData.append('email', formData.email);
+      submitFormData.append('artistName', formData.artistName);
+      submitFormData.append('bio', formData.bio);
+      submitFormData.append('genres', formData.genres.join(','));
+
+      // Add social media links
+      const socialMediaLinks = {
+        facebook: formData.facebookLink,
+        twitter: formData.twitterLink,
+        instagram: formData.instagramLink,
+      };
+      submitFormData.append(
+        'socialMediaLinks',
+        JSON.stringify(socialMediaLinks)
+      );
+
+      if (formData.avatarFile) {
+        submitFormData.append('avatar', formData.avatarFile);
       }
 
-      const response = await api.artists.create(formData, token);
+      await api.artists.create(submitFormData, token);
       router.push('/admin/artists');
     } catch (error: any) {
       console.error('Error creating artist:', error);
@@ -71,16 +106,17 @@ export default function NewArtist() {
       <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
+            {/* Basic Info */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium mb-1">
-                Name
+                User Name
               </label>
               <input
                 id="name"
                 type="text"
-                value={newArtist.name}
+                value={formData.name}
                 onChange={(e) =>
-                  setNewArtist({ ...newArtist, name: e.target.value })
+                  setFormData({ ...formData, name: e.target.value })
                 }
                 className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
                 required
@@ -94,9 +130,29 @@ export default function NewArtist() {
               <input
                 id="email"
                 type="email"
-                value={newArtist.email}
+                value={formData.email}
                 onChange={(e) =>
-                  setNewArtist({ ...newArtist, email: e.target.value })
+                  setFormData({ ...formData, email: e.target.value })
+                }
+                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
+                required
+              />
+            </div>
+
+            {/* Artist Info */}
+            <div>
+              <label
+                htmlFor="artistName"
+                className="block text-sm font-medium mb-1"
+              >
+                Artist Name
+              </label>
+              <input
+                id="artistName"
+                type="text"
+                value={formData.artistName}
+                onChange={(e) =>
+                  setFormData({ ...formData, artistName: e.target.value })
                 }
                 className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
                 required
@@ -109,15 +165,93 @@ export default function NewArtist() {
               </label>
               <textarea
                 id="bio"
-                value={newArtist.bio}
+                value={formData.bio}
                 onChange={(e) =>
-                  setNewArtist({ ...newArtist, bio: e.target.value })
+                  setFormData({ ...formData, bio: e.target.value })
                 }
                 className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
                 rows={4}
+                required
               />
             </div>
 
+            {/* Social Media Links */}
+            <div>
+              <label
+                htmlFor="facebookLink"
+                className="block text-sm font-medium mb-1"
+              >
+                Facebook Link
+              </label>
+              <input
+                id="facebookLink"
+                type="url"
+                value={formData.facebookLink}
+                onChange={(e) =>
+                  setFormData({ ...formData, facebookLink: e.target.value })
+                }
+                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
+                placeholder="https://facebook.com/artist"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="twitterLink"
+                className="block text-sm font-medium mb-1"
+              >
+                Twitter Link
+              </label>
+              <input
+                id="twitterLink"
+                type="url"
+                value={formData.twitterLink}
+                onChange={(e) =>
+                  setFormData({ ...formData, twitterLink: e.target.value })
+                }
+                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
+                placeholder="https://twitter.com/artist"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="instagramLink"
+                className="block text-sm font-medium mb-1"
+              >
+                Instagram Link
+              </label>
+              <input
+                id="instagramLink"
+                type="url"
+                value={formData.instagramLink}
+                onChange={(e) =>
+                  setFormData({ ...formData, instagramLink: e.target.value })
+                }
+                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
+                placeholder="https://instagram.com/artist"
+              />
+            </div>
+
+            {/* Genres */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Genres</label>
+              <SearchableSelect
+                options={genreOptions}
+                value={formData.genres}
+                onChange={(selected) =>
+                  setFormData({
+                    ...formData,
+                    genres: Array.isArray(selected) ? selected : [selected],
+                  })
+                }
+                placeholder="Select genres"
+                multiple={true}
+                required={true}
+              />
+            </div>
+
+            {/* Avatar */}
             <div>
               <label
                 htmlFor="avatar"
@@ -130,12 +264,13 @@ export default function NewArtist() {
                 type="file"
                 accept="image/*"
                 onChange={(e) =>
-                  setNewArtist({
-                    ...newArtist,
+                  setFormData({
+                    ...formData,
                     avatarFile: e.target.files?.[0] || null,
                   })
                 }
                 className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent file:bg-white/20 file:border-0 file:mr-4 file:px-4 file:py-2 file:rounded-md file:text-sm file:font-medium hover:file:bg-white/30"
+                required
               />
             </div>
           </div>

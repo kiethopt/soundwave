@@ -17,6 +17,7 @@ import {
   rejectArtistRequest,
   verifyArtist,
   updateMonthlyListeners,
+  getArtistRequestDetails,
 } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -46,6 +47,12 @@ router.get(
   queryRateLimiter,
   authorize([Role.ADMIN]),
   getArtistRequests
+);
+router.get(
+  '/artist-requests/:id',
+  queryRateLimiter,
+  authorize([Role.ADMIN]),
+  getArtistRequestDetails
 );
 router.post('/artists/verify', verifyArtist);
 router.post('/artists/:id/update-monthly-listeners', updateMonthlyListeners);

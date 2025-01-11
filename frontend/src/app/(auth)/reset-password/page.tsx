@@ -41,8 +41,9 @@ function ResetPasswordContent() {
           setError(data.message || 'An error occurred');
           setMessage('');
         }
-      } catch (err) {
-        setError('An error occurred while resetting password');
+      } catch (err: any) {
+        // Hiển thị thông báo lỗi từ backend
+        setError(err.message || 'An error occurred while resetting password');
       }
     },
     [newPassword, confirmPassword, token, router]

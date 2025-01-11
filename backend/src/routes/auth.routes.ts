@@ -8,6 +8,7 @@ import {
   requestPasswordReset,
   resetPassword,
   searchAll,
+  getAllGenres,
 } from '../controllers/auth.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -20,6 +21,7 @@ router.post('/register', register);
 router.post('/login', login);
 router.post('/request-password-reset', requestPasswordReset);
 router.post('/reset-password', resetPassword);
+router.get('/genres', getAllGenres);
 
 // USER routes
 router.post(

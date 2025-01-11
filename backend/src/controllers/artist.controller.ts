@@ -4,8 +4,10 @@ import { Role } from '@prisma/client';
 
 const artistSelect = {
   id: true,
+  email: true,
   name: true,
   avatar: true,
+  createdAt: true,
   artistProfile: {
     select: {
       id: true,
@@ -17,6 +19,7 @@ const artistSelect = {
       isVerified: true,
       verificationRequestedAt: true,
       verifiedAt: true,
+      createdAt: true,
       genres: {
         select: {
           genre: {
@@ -134,17 +137,38 @@ const validateUpdateArtistProfile = (data: any): string | null => {
   return null;
 };
 
+// Lấy danh sách tất cả profile của các Artist (ADMIN only)
 export const getAllArtistsProfile = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    const artists = await prisma.user.findMany({
-      where: { role: Role.ARTIST },
-      select: artistSelect,
-    });
+    const { page = 1, limit = 10 } = req.query;
+    const pageNumber = parseInt(page as string, 10);
+    const limitNumber = parseInt(limit as string, 10);
+    const offset = (pageNumber - 1) * limitNumber;
 
-    res.json(artists);
+    const [artists, total] = await Promise.all([
+      prisma.user.findMany({
+        where: { role: Role.ARTIST },
+        select: artistSelect,
+        skip: offset,
+        take: limitNumber,
+      }),
+      prisma.user.count({
+        where: { role: Role.ARTIST },
+      }),
+    ]);
+
+    res.json({
+      artists,
+      pagination: {
+        total,
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(total / limitNumber),
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
   }

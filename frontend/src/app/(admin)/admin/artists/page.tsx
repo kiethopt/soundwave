@@ -4,17 +4,7 @@ import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
 import { Search, User, Plus } from 'lucide-react';
 import Link from 'next/link';
-
-interface Artist {
-  id: string;
-  name: string;
-  avatar: string | null;
-  isVerified: boolean;
-  artistProfile: {
-    monthlyListeners: number;
-    createdAt: string;
-  };
-}
+import { Artist } from '@/types';
 
 export default function AdminArtists() {
   const [artists, setArtists] = useState<Artist[]>([]);
@@ -34,14 +24,14 @@ export default function AdminArtists() {
         throw new Error('No authentication token found');
       }
 
-      const limit = 10; // Số lượng nghệ sĩ trên mỗi trang
-      const response = await api.artists.getAll(token, page, limit);
-
-      const totalArtists = response.pagination.total; // Tổng số nghệ sĩ
-      const totalPages = Math.ceil(totalArtists / limit); // Tính tổng số trang
-
-      setArtists(response.artists); // Lấy dữ liệu từ response.artists
-      setTotalPages(totalPages);
+      const limit = 10;
+      const response = await api.artists.getAllArtistsProfile(
+        token,
+        page,
+        limit
+      );
+      setArtists(response.artists);
+      setTotalPages(response.pagination.totalPages);
     } catch (err) {
       console.error('Error fetching artists:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch artists');
@@ -56,17 +46,24 @@ export default function AdminArtists() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(1); // Reset to first page when searching
+    setPage(1);
     fetchArtists(1, searchInput);
   };
 
   const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      return date.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
   };
 
   return (
@@ -122,6 +119,9 @@ export default function AdminArtists() {
                     Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
                     Monthly Listeners
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
@@ -140,10 +140,10 @@ export default function AdminArtists() {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        {artist.avatar ? (
+                        {artist.artistProfile?.avatar ? (
                           <img
-                            src={artist.avatar}
-                            alt={artist.name}
+                            src={artist.artistProfile.avatar}
+                            alt={artist.artistProfile.artistName}
                             className="w-10 h-10 rounded-full mr-3 object-cover"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
@@ -160,26 +160,32 @@ export default function AdminArtists() {
                           href={`/admin/artists/${artist.id}`}
                           className="font-medium hover:underline"
                         >
-                          {artist.name}
+                          {artist.artistProfile?.artistName}
                         </Link>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {artist.artistProfile.monthlyListeners.toLocaleString()}
+                      {artist.email}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {artist.artistProfile?.monthlyListeners.toLocaleString() ??
+                        0}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`px-2 py-1 text-xs rounded-full ${
-                          artist.isVerified
+                          artist.artistProfile?.isVerified
                             ? 'bg-green-500/10 text-green-500'
                             : 'bg-yellow-500/10 text-yellow-500'
                         }`}
                       >
-                        {artist.isVerified ? 'Verified' : 'Unverified'}
+                        {artist.artistProfile?.isVerified
+                          ? 'Verified'
+                          : 'Unverified'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {formatDate(artist.artistProfile.createdAt)}
+                      {formatDate(artist.createdAt)}
                     </td>
                   </tr>
                 ))}
@@ -193,7 +199,6 @@ export default function AdminArtists() {
           )}
         </div>
 
-        {/* Pagination */}
         <div className="flex justify-between items-center p-4 border-t border-white/[0.08]">
           <button
             onClick={() => setPage((prev) => Math.max(prev - 1, 1))}

@@ -25,7 +25,7 @@ export default function ArtistDetail({
         const token = localStorage.getItem('userToken');
         if (!token) throw new Error('No authentication token found');
 
-        const response = await api.artists.getById(id, token);
+        const response = await api.admin.getArtistById(id, token);
         setArtist(response);
       } catch (err) {
         console.error('Error fetching artist:', err);
@@ -46,7 +46,9 @@ export default function ArtistDetail({
       if (!token) throw new Error('No authentication token found');
 
       const response = await api.admin.verifyArtist({ userId: id }, token);
-      setArtist(response.user); // Ensure this includes the avatar
+      if (response && response.user) {
+        setArtist(response.user);
+      }
     } catch (err) {
       console.error('Error verifying artist:', err);
       setError(err instanceof Error ? err.message : 'Failed to verify artist');
@@ -63,13 +65,21 @@ export default function ArtistDetail({
       if (!token) throw new Error('No authentication token found');
 
       const response = await api.artists.updateMonthlyListeners(id, token);
-      console.log('API Response:', response); // Log the API response
 
-      // Ensure the response includes all necessary fields
-      if (response && response.avatar && response.artistProfile) {
-        setArtist(response);
+      if (response && response.artistProfile) {
+        setArtist((prev) =>
+          prev
+            ? {
+                ...prev,
+                artistProfile: {
+                  ...prev.artistProfile,
+                  monthlyListeners: response.artistProfile.monthlyListeners,
+                },
+              }
+            : null
+        );
       } else {
-        throw new Error('Incomplete data received from API');
+        throw new Error('Invalid response format');
       }
     } catch (err) {
       console.error('Error updating monthly listeners:', err);
@@ -116,11 +126,11 @@ export default function ArtistDetail({
       <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] p-6">
         <div className="grid gap-6 md:grid-cols-[240px_1fr]">
           <div className="space-y-4">
-            {artist.avatar ? (
+            {artist.artistProfile?.avatar ? (
               <div className="relative w-60 h-60">
                 <img
-                  src={artist.avatar}
-                  alt={artist.name}
+                  src={artist.artistProfile.avatar}
+                  alt={artist.artistProfile.artistName}
                   className="w-full h-full rounded-lg object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -146,9 +156,9 @@ export default function ArtistDetail({
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <h1 className="text-4xl font-bold tracking-tight text-white">
-                  {artist.name}
+                  {artist.artistProfile?.artistName || artist.name}
                 </h1>
-                {artist.isVerified && (
+                {artist.artistProfile?.isVerified && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-500/10 text-green-500">
                     <Check className="w-4 h-4 mr-1" />
                     Verified
@@ -156,9 +166,9 @@ export default function ArtistDetail({
                 )}
               </div>
 
-              {artist.bio && (
+              {artist.artistProfile?.bio && (
                 <p className="text-white/60 text-lg leading-relaxed">
-                  {artist.bio}
+                  {artist.artistProfile.bio}
                 </p>
               )}
             </div>
@@ -166,9 +176,9 @@ export default function ArtistDetail({
             <div className="flex flex-wrap gap-4">
               <button
                 onClick={handleVerify}
-                disabled={artist.isVerified || isUpdating}
+                disabled={artist.artistProfile?.isVerified || isUpdating}
                 className={`min-w-[200px] px-4 py-2 rounded-md ${
-                  artist.isVerified
+                  artist.artistProfile?.isVerified
                     ? 'bg-green-600 hover:bg-green-700'
                     : 'bg-[#A57865] hover:bg-[#7d5d50]'
                 } text-white`}
@@ -178,7 +188,7 @@ export default function ArtistDetail({
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                     Verifying...
                   </>
-                ) : artist.isVerified ? (
+                ) : artist.artistProfile?.isVerified ? (
                   <>
                     <Check className="w-4 h-4 mr-2" />
                     Verified Artist

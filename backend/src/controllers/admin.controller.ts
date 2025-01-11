@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { Role } from '@prisma/client';
 import { uploadFile } from '../services/cloudinary.service';
+import bcrypt from 'bcrypt';
 
 // Định nghĩa các select cho user
 const userSelect = {
@@ -268,6 +269,10 @@ export const createArtist = async (req: Request, res: Response) => {
       return;
     }
 
+    // Generate username từ name hoặc email
+    const username =
+      name?.toLowerCase().replace(/\s+/g, '') || email.split('@')[0];
+
     let avatarUrl = null;
     if (avatarFile) {
       const uploadResult = await uploadFile(
@@ -278,17 +283,22 @@ export const createArtist = async (req: Request, res: Response) => {
       avatarUrl = uploadResult.secure_url;
     }
 
-    // Tạo artist mới với ArtistProfile
+    // Hash the password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash('artist123', saltRounds);
+
+    // Tạo artist mới với username và ArtistProfile
     const artist = await prisma.user.create({
       data: {
         email,
-        password: 'artist123',
+        username,
+        password: hashedPassword,
         name,
         avatar: avatarUrl,
         role: Role.ARTIST,
         artistProfile: {
           create: {
-            artistName: artistName || name, // Sử dụng artistName hoặc name làm tên nghệ sĩ
+            artistName: artistName || name,
             avatar: avatarUrl,
             monthlyListeners: 0,
           },
@@ -413,6 +423,51 @@ export const getArtistRequests = async (
     });
   } catch (error) {
     console.error('Get artist requests error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Xem chi tiết request yêu cầu trở thành Artist từ User
+export const getArtistRequestDetails = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const request = await prisma.artistProfile.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        artistName: true,
+        bio: true,
+        avatar: true,
+        socialMediaLinks: true,
+        verificationRequestedAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!request) {
+      res.status(404).json({ message: 'Request not found' });
+      return;
+    }
+
+    res.json(request);
+  } catch (error) {
+    console.error('Get artist request details error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

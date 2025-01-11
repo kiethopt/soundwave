@@ -46,8 +46,9 @@ function LoginForm() {
         } else {
           setError(response.message || 'An error occurred');
         }
-      } catch (err) {
-        setError('An unexpected error occurred');
+      } catch (err: any) {
+        // Hiển thị thông báo lỗi từ backend
+        setError(err.message || 'An unexpected error occurred');
       }
     },
     [formData, router]
