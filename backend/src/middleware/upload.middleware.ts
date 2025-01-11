@@ -12,10 +12,13 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     // Chấp nhận file ảnh và audio
-    if (file.mimetype.startsWith('image/')) {
+    if (
+      file.mimetype.startsWith('image/') ||
+      file.mimetype.startsWith('audio/')
+    ) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only image and audio files are allowed'));
     }
   },
 });

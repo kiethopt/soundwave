@@ -26,10 +26,10 @@ const trackSelect = {
       id: true,
       name: true,
       avatar: true,
-      isVerified: true,
       artistProfile: {
         select: {
           artistName: true,
+          isVerified: true,
         },
       },
     },
@@ -188,8 +188,12 @@ export const createTrack = async (
       select: {
         id: true,
         role: true,
-        isVerified: true,
-        verificationRequestedAt: true,
+        artistProfile: {
+          select: {
+            isVerified: true,
+            verificationRequestedAt: true,
+          },
+        },
       },
     });
 
@@ -201,7 +205,7 @@ export const createTrack = async (
     // Kiểm tra trạng thái verification
     if (
       fullUserInfo.role === Role.USER &&
-      fullUserInfo.verificationRequestedAt
+      fullUserInfo.artistProfile?.verificationRequestedAt
     ) {
       res.status(403).json({
         message:
@@ -211,7 +215,10 @@ export const createTrack = async (
     }
 
     // Nếu user là ARTIST, kiểm tra xem họ đã được xác thực chưa
-    if (fullUserInfo.role === Role.ARTIST && !fullUserInfo.isVerified) {
+    if (
+      fullUserInfo.role === Role.ARTIST &&
+      !fullUserInfo.artistProfile?.isVerified
+    ) {
       res.status(403).json({
         message: 'Artist is not verified. Please wait for admin approval.',
       });

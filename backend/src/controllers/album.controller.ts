@@ -24,10 +24,10 @@ const albumSelect = {
       id: true,
       name: true,
       avatar: true,
-      isVerified: true,
       artistProfile: {
         select: {
           artistName: true,
+          isVerified: true,
         },
       },
     },
@@ -52,6 +52,7 @@ const albumSelect = {
           artistProfile: {
             select: {
               artistName: true,
+              isVerified: true,
             },
           },
         },
@@ -203,8 +204,12 @@ export const createAlbum = async (
       select: {
         id: true,
         role: true,
-        isVerified: true,
-        verificationRequestedAt: true,
+        artistProfile: {
+          select: {
+            isVerified: true,
+            verificationRequestedAt: true,
+          },
+        },
       },
     });
 
@@ -216,7 +221,7 @@ export const createAlbum = async (
     // Kiểm tra trạng thái verification
     if (
       fullUserInfo.role === Role.USER &&
-      fullUserInfo.verificationRequestedAt
+      fullUserInfo.artistProfile?.verificationRequestedAt
     ) {
       res.status(403).json({
         message:
@@ -226,7 +231,10 @@ export const createAlbum = async (
     }
 
     // Nếu user là ARTIST, kiểm tra xem họ đã được xác thực chưa
-    if (fullUserInfo.role === Role.ARTIST && !fullUserInfo.isVerified) {
+    if (
+      fullUserInfo.role === Role.ARTIST &&
+      !fullUserInfo.artistProfile?.isVerified
+    ) {
       res.status(403).json({
         message: 'Artist is not verified. Please wait for admin approval.',
       });
@@ -275,10 +283,22 @@ export const createAlbum = async (
       // Kiểm tra xem artistId có tồn tại và có vai trò là ARTIST không
       const artist = await prisma.user.findUnique({
         where: { id: artistId },
-        select: { id: true, role: true, isVerified: true },
+        select: {
+          id: true,
+          role: true,
+          artistProfile: {
+            select: {
+              isVerified: true, // Di chuyển isVerified vào đây
+            },
+          },
+        },
       });
 
-      if (!artist || artist.role !== Role.ARTIST || !artist.isVerified) {
+      if (
+        !artist ||
+        artist.role !== Role.ARTIST ||
+        !artist.artistProfile?.isVerified
+      ) {
         res.status(400).json({ message: 'Invalid artist ID' });
         return;
       }

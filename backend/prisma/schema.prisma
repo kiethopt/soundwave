@@ -22,14 +22,8 @@ model User {
   passwordResetToken   String?
   passwordResetExpires DateTime?
 
-  // Artist specific fields
-  artistProfile           ArtistProfile?
-  bio                     String?        @db.Text
-  isVerified              Boolean        @default(false)
-  verificationRequestedAt DateTime?
-  verifiedAt              DateTime?
-
   // Relations
+  artistProfile   ArtistProfile?
   albums          Album[]
   tracks          Track[]
   history         History[]
@@ -46,19 +40,22 @@ model User {
   @@index([username])
   @@index([role])
   @@index([isActive])
-  @@index([verifiedAt])
   @@index([createdAt])
   @@map("users")
 }
 
 model ArtistProfile {
-  id               String   @id @default(cuid())
-  artistName       String   @unique
-  bio              String?  @db.Text
-  socialMediaLinks Json?
-  monthlyListeners Int      @default(0) @db.Integer
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                      String    @id @default(cuid())
+  artistName              String    @unique
+  bio                     String?   @db.Text
+  avatar                  String?
+  socialMediaLinks        Json?
+  monthlyListeners        Int       @default(0) @db.Integer
+  isVerified              Boolean   @default(false)
+  verificationRequestedAt DateTime?
+  verifiedAt              DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   // Quan hệ one-to-one với User
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -69,6 +66,8 @@ model ArtistProfile {
   TrackArtist TrackArtist[]
 
   @@index([artistName])
+  @@index([isVerified])
+  @@index([verifiedAt])
   @@map("artist_profiles")
 }
 

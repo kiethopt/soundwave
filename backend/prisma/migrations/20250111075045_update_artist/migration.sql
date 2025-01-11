@@ -31,10 +31,6 @@ CREATE TABLE "users" (
     "lastLoginAt" TIMESTAMP(3),
     "passwordResetToken" TEXT,
     "passwordResetExpires" TIMESTAMP(3),
-    "bio" TEXT,
-    "isVerified" BOOLEAN NOT NULL DEFAULT false,
-    "verificationRequestedAt" TIMESTAMP(3),
-    "verifiedAt" TIMESTAMP(3),
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -44,8 +40,12 @@ CREATE TABLE "artist_profiles" (
     "id" TEXT NOT NULL,
     "artistName" TEXT NOT NULL,
     "bio" TEXT,
+    "avatar" TEXT,
     "socialMediaLinks" JSONB,
     "monthlyListeners" INTEGER NOT NULL DEFAULT 0,
+    "isVerified" BOOLEAN NOT NULL DEFAULT false,
+    "verificationRequestedAt" TIMESTAMP(3),
+    "verifiedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "userId" TEXT NOT NULL,
@@ -254,9 +254,6 @@ CREATE INDEX "users_role_idx" ON "users"("role");
 CREATE INDEX "users_isActive_idx" ON "users"("isActive");
 
 -- CreateIndex
-CREATE INDEX "users_verifiedAt_idx" ON "users"("verifiedAt");
-
--- CreateIndex
 CREATE INDEX "users_createdAt_idx" ON "users"("createdAt");
 
 -- CreateIndex
@@ -270,6 +267,12 @@ CREATE UNIQUE INDEX "artist_profiles_userId_key" ON "artist_profiles"("userId");
 
 -- CreateIndex
 CREATE INDEX "artist_profiles_artistName_idx" ON "artist_profiles"("artistName");
+
+-- CreateIndex
+CREATE INDEX "artist_profiles_isVerified_idx" ON "artist_profiles"("isVerified");
+
+-- CreateIndex
+CREATE INDEX "artist_profiles_verifiedAt_idx" ON "artist_profiles"("verifiedAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "artist_genre_artistProfileId_genreId_key" ON "artist_genre"("artistProfileId", "genreId");

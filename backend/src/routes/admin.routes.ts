@@ -32,8 +32,8 @@ router.use(authenticate, authorize([Role.ADMIN, Role.ARTIST]));
 router.get('/stats', queryRateLimiter, getStats);
 
 // Quản lý người dùng
-router.get('/users', queryRateLimiter, getAllUsers);
-router.get('/users/:id', getUserById);
+router.get('/users', queryRateLimiter, authorize([Role.ADMIN]), getAllUsers);
+router.get('/users/:id', authorize([Role.ADMIN]), getUserById);
 router.put('/users/:id', updateUser);
 router.delete('/users/:id', deleteUser);
 
@@ -41,7 +41,12 @@ router.delete('/users/:id', deleteUser);
 router.get('/artists', queryRateLimiter, getAllArtists);
 router.get('/artists/:id', getArtistById);
 router.post('/artists', upload.single('avatar'), createArtist);
-router.get('/artist-requests', queryRateLimiter, getArtistRequests);
+router.get(
+  '/artist-requests',
+  queryRateLimiter,
+  authorize([Role.ADMIN]),
+  getArtistRequests
+);
 router.post('/artists/verify', verifyArtist);
 router.post('/artists/:id/update-monthly-listeners', updateMonthlyListeners);
 

@@ -6,16 +6,17 @@ const artistSelect = {
   id: true,
   name: true,
   avatar: true,
-  isVerified: true,
   artistProfile: {
     select: {
       id: true,
       artistName: true,
       bio: true,
+      avatar: true,
       socialMediaLinks: true,
       monthlyListeners: true,
-      createdAt: true,
-      updatedAt: true,
+      isVerified: true,
+      verificationRequestedAt: true,
+      verifiedAt: true,
       genres: {
         select: {
           genre: {
@@ -326,7 +327,7 @@ export const updateArtistProfile = async (
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
-  const { bio, socialMediaLinks, genreIds, isVerified } = req.body;
+  const { bio, socialMediaLinks, genreIds, isVerified, avatar } = req.body;
   const user = req.user;
 
   const { canEdit, message } = await canEditArtistData(user, id);
@@ -354,101 +355,25 @@ export const updateArtistProfile = async (
       }
     }
 
-    // Kiểm tra xem ArtistProfile có tồn tại không
-    const artistProfile = await prisma.artistProfile.findUnique({
+    // Cập nhật ArtistProfile
+    const updatedArtistProfile = await prisma.artistProfile.update({
       where: { id },
-    });
-
-    if (!artistProfile) {
-      // Nếu không tồn tại, tạo mới ArtistProfile
-      const user = await prisma.user.findUnique({
-        where: { id },
-        select: { name: true },
-      });
-
-      if (!user) {
-        res.status(404).json({ message: 'User not found' });
-        return;
-      }
-
-      const artistName = `${user.name || 'Artist'}-${id.substring(0, 8)}`;
-
-      await prisma.artistProfile.create({
-        data: {
-          id,
-          artistName,
-          userId: id,
-          bio,
-          socialMediaLinks,
-          monthlyListeners: 0,
-          genres: {
-            create: genreIds?.map((genreId: string) => ({
-              genreId,
-            })),
-          },
-        },
-      });
-    } else {
-      // Nếu tồn tại, cập nhật ArtistProfile
-      await prisma.artistProfile.update({
-        where: { id },
-        data: {
-          bio,
-          socialMediaLinks,
-          genres: {
-            deleteMany: {}, // Xóa tất cả genres hiện tại
-            create: genreIds?.map((genreId: string) => ({
-              genreId,
-            })),
-          },
-        },
-      });
-    }
-
-    // Nếu isVerified được cập nhật, cập nhật trạng thái trong User
-    if (isVerified !== undefined) {
-      await prisma.user.update({
-        where: { id },
-        data: {
-          isVerified,
-          verifiedAt: isVerified ? new Date() : null,
-        },
-      });
-    }
-
-    // Lấy lại thông tin artist đã cập nhật
-    const updatedArtist = await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        avatar: true,
-        isVerified: true,
-        artistProfile: {
-          select: {
-            id: true,
-            artistName: true,
-            bio: true,
-            socialMediaLinks: true,
-            monthlyListeners: true,
-            createdAt: true,
-            updatedAt: true,
-            genres: {
-              select: {
-                genre: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-          },
+      data: {
+        bio,
+        avatar, // Thêm trường avatar vào đây
+        socialMediaLinks,
+        isVerified,
+        verifiedAt: isVerified ? new Date() : null,
+        genres: {
+          deleteMany: {}, // Xóa tất cả genres hiện tại
+          create: genreIds?.map((genreId: string) => ({
+            genreId,
+          })),
         },
       },
     });
 
-    res.json(updatedArtist);
+    res.json(updatedArtistProfile);
   } catch (error) {
     console.error('Update artist profile error:', error);
     res.status(500).json({ message: 'Internal server error' });

@@ -1,15 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt, { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
 import { Role } from '@prisma/client';
+import prisma from '../config/db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Middleware xác thực
-export const authenticate = (
+export const authenticate = async (
   req: Request,
   res: Response,
   next: NextFunction
-): void => {
+): Promise<void> => {
   console.log('Checking authentication...'); // Log để debug
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) {
@@ -25,8 +26,37 @@ export const authenticate = (
       isVerified: boolean;
       verificationRequestedAt?: string;
     };
-    req.user = decoded;
-    console.log('User authenticated:', decoded); // Log để debug
+
+    // Lấy thông tin artistProfile từ database
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        role: true,
+        artistProfile: {
+          select: {
+            isVerified: true,
+            verificationRequestedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    // Gán thông tin user vào request
+    req.user = {
+      id: user.id,
+      role: user.role,
+      isVerified: user.artistProfile?.isVerified || false,
+      verificationRequestedAt:
+        user.artistProfile?.verificationRequestedAt?.toISOString(),
+    };
+
+    console.log('User authenticated:', req.user); // Log để debug
     next();
   } catch (error) {
     // Xử lý lỗi token hết hạn

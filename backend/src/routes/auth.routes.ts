@@ -11,6 +11,7 @@ import {
 } from '../controllers/auth.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
+import upload, { handleUploadError } from '../middleware/upload.middleware';
 
 const router = express.Router();
 
@@ -25,6 +26,8 @@ router.post(
   '/request-artist',
   authenticate,
   authorize([Role.USER]),
+  upload.single('avatar'),
+  handleUploadError,
   requestArtistRole
 );
 

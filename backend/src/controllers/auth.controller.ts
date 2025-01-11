@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { addHours } from 'date-fns';
 import sgMail from '@sendgrid/mail';
 import { client, setCache } from '../middleware/cache.middleware';
+import { uploadFile } from '../services/cloudinary.service';
 
 const userSelect = {
   id: true,
@@ -16,10 +17,6 @@ const userSelect = {
   avatar: true,
   role: true,
   isActive: true,
-  bio: true,
-  isVerified: true,
-  verificationRequestedAt: true,
-  verifiedAt: true,
   lastLoginAt: true,
   passwordResetToken: true,
   passwordResetExpires: true,
@@ -28,8 +25,12 @@ const userSelect = {
       id: true,
       artistName: true,
       bio: true,
+      avatar: true,
       socialMediaLinks: true,
       monthlyListeners: true,
+      isVerified: true,
+      verificationRequestedAt: true,
+      verifiedAt: true,
       genres: {
         select: {
           genre: {
@@ -83,23 +84,81 @@ const validateLoginData = (data: any): string | null => {
   return null;
 };
 
+// Hàm validation cho dữ liệu nghệ sĩ
+const validateArtistData = (data: any): string | null => {
+  const { artistName, bio, socialMediaLinks, genres } = data;
+
+  if (!artistName?.trim()) return 'Artist name is required';
+  if (artistName.length < 3) return 'Artist name must be at least 3 characters';
+
+  if (bio && bio.length > 500) return 'Bio must be less than 500 characters';
+
+  // Kiểm tra socialMediaLinks
+  if (socialMediaLinks) {
+    if (
+      typeof socialMediaLinks !== 'object' ||
+      Array.isArray(socialMediaLinks)
+    ) {
+      return 'socialMediaLinks must be an object';
+    }
+    for (const key in socialMediaLinks) {
+      if (typeof socialMediaLinks[key] !== 'string') {
+        return `socialMediaLinks.${key} must be a string`;
+      }
+    }
+  }
+
+  // Kiểm tra genres
+  if (!genres || !Array.isArray(genres) || genres.length === 0) {
+    return 'At least one genre is required';
+  }
+
+  return null;
+};
+
 // Helper function để tạo JWT token
+// const generateToken = (
+//   userId: string,
+//   role: Role,
+//   artistProfile?: {
+//     isVerified: boolean;
+//     verificationRequestedAt?: Date | null;
+//   } | null
+// ): string => {
+//   return jwt.sign(
+//     {
+//       id: userId,
+//       role,
+//       isVerified: artistProfile?.isVerified || false,
+//       verificationRequestedAt:
+//         artistProfile?.verificationRequestedAt?.toISOString(),
+//     },
+//     JWT_SECRET,
+//     {
+//       expiresIn: '1h',
+//     }
+//   );
+// };
+
 const generateToken = (
   userId: string,
   role: Role,
-  isVerified: boolean,
-  verificationRequestedAt?: Date | null
+  artistProfile?: {
+    isVerified: boolean;
+    verificationRequestedAt?: Date | null;
+  } | null
 ): string => {
   return jwt.sign(
     {
       id: userId,
       role,
-      isVerified,
-      verificationRequestedAt: verificationRequestedAt?.toISOString(),
+      isVerified: artistProfile?.isVerified || false,
+      verificationRequestedAt:
+        artistProfile?.verificationRequestedAt?.toISOString(),
     },
     JWT_SECRET,
     {
-      expiresIn: '1h',
+      expiresIn: '24h',
     }
   );
 };
@@ -117,7 +176,12 @@ export const validateToken = async (
     }
 
     // Xác thực token
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: Role };
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      id: string;
+      role: Role;
+      isVerified: boolean;
+      verificationRequestedAt?: string;
+    };
 
     // Tìm người dùng trong database
     const user = await prisma.user.findUnique({
@@ -287,12 +351,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const { password: _, ...userWithoutPassword } = user;
 
     // Tạo JWT token
-    const token = generateToken(
-      user.id,
-      user.role,
-      user.isVerified,
-      user.verificationRequestedAt
-    );
+    const token = generateToken(user.id, user.role, user.artistProfile);
 
     res.json({
       message: 'Login successful',
@@ -312,6 +371,49 @@ export const requestArtistRole = async (
 ): Promise<void> => {
   try {
     const user = req.user;
+    const {
+      artistName,
+      bio,
+      socialMediaLinks: socialMediaLinksString,
+      genres: genresString,
+    } = req.body;
+    const avatarFile = req.file; // Lấy file từ request
+
+    // Chuyển đổi socialMediaLinks từ chuỗi JSON sang đối tượng JavaScript
+    let socialMediaLinks = {};
+    if (socialMediaLinksString) {
+      try {
+        socialMediaLinks = JSON.parse(socialMediaLinksString);
+      } catch (error) {
+        res
+          .status(400)
+          .json({ message: 'Invalid JSON format for socialMediaLinks' });
+        return;
+      }
+    }
+
+    // Chuyển đổi genres từ chuỗi sang mảng
+    let genres = [];
+    if (genresString) {
+      try {
+        genres = genresString.split(','); // Chuyển chuỗi thành mảng dựa trên dấu phẩy
+      } catch (error) {
+        res.status(400).json({ message: 'Invalid format for genres' });
+        return;
+      }
+    }
+
+    // Validate dữ liệu nghệ sĩ
+    const validationError = validateArtistData({
+      artistName,
+      bio,
+      socialMediaLinks,
+      genres,
+    });
+    if (validationError) {
+      res.status(400).json({ message: validationError });
+      return;
+    }
 
     // Chỉ USER mới có thể yêu cầu trở thành ARTIST
     if (!user || user.role !== Role.USER) {
@@ -320,8 +422,8 @@ export const requestArtistRole = async (
     }
 
     // Kiểm tra xem USER đã gửi yêu cầu trước đó chưa
-    const existingRequest = await prisma.user.findUnique({
-      where: { id: user.id },
+    const existingRequest = await prisma.artistProfile.findUnique({
+      where: { userId: user.id },
       select: { verificationRequestedAt: true },
     });
 
@@ -332,11 +434,30 @@ export const requestArtistRole = async (
       return;
     }
 
-    // Cập nhật trạng thái yêu cầu trở thành ARTIST
-    await prisma.user.update({
-      where: { id: user.id },
+    // Upload avatar lên Cloudinary
+    let avatarUrl = null;
+    if (avatarFile) {
+      const uploadResult = await uploadFile(
+        avatarFile.buffer,
+        'artist-avatars'
+      );
+      avatarUrl = uploadResult.secure_url;
+    }
+
+    // Tạo ArtistProfile với thông tin cung cấp
+    await prisma.artistProfile.create({
       data: {
-        verificationRequestedAt: new Date(),
+        artistName,
+        bio,
+        socialMediaLinks,
+        avatar: avatarUrl, // Lưu URL avatar vào database
+        verificationRequestedAt: new Date(), // Cập nhật trường mới
+        user: { connect: { id: user.id } },
+        genres: {
+          create: genres.map((genreId: string) => ({
+            genre: { connect: { id: genreId } },
+          })),
+        },
       },
     });
 
@@ -546,9 +667,9 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
               id: true,
               name: true,
               avatar: true,
-              isVerified: true,
               artistProfile: {
                 select: {
+                  isVerified: true,
                   artistName: true,
                 },
               },
@@ -668,9 +789,9 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
               id: true,
               name: true,
               avatar: true,
-              isVerified: true,
               artistProfile: {
                 select: {
+                  isVerified: true,
                   artistName: true,
                 },
               },
