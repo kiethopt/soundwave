@@ -23,17 +23,13 @@ model User {
   passwordResetExpires DateTime?
 
   // Relations
-  artistProfile   ArtistProfile?
-  albums          Album[]
-  tracks          Track[]
-  history         History[]
-  playlists       Playlist[]
-  followedArtists UserFollowArtist[] @relation("Follower")
-  followers       UserFollowArtist[] @relation("Following")
-  notifications   Notification[]
-  likedTracks     UserLikeTrack[]
-  events          Event[]
-  trackArtist     TrackArtist[]
+  artistProfile ArtistProfile?
+  history       History[]
+  playlists     Playlist[]
+  followed      UserFollow[]    @relation("Follower") // Người dùng này theo dõi người khác
+  followers     UserFollow[]    @relation("FollowingUser") // Người dùng này được người khác theo dõi
+  notifications Notification[]  @relation("UserNotifications") // Thông báo mà người dùng nhận được
+  likedTracks   UserLikeTrack[]
 
   @@unique([email, username])
   @@index([email])
@@ -61,9 +57,14 @@ model ArtistProfile {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String @unique
 
-  // Quan hệ many-to-many với Genre qua bảng trung gian ArtistGenre
-  genres      ArtistGenre[]
-  TrackArtist TrackArtist[]
+  // Relations liên quan đến nghệ sĩ
+  genres        ArtistGenre[]
+  albums        Album[]
+  tracks        Track[]
+  events        Event[]
+  TrackArtist   TrackArtist[]
+  followers     UserFollow[]   @relation("FollowingArtist") // Người dùng theo dõi nghệ sĩ
+  notifications Notification[] @relation("ArtistNotifications") // Thông báo mà artist nhận được
 
   @@index([artistName])
   @@index([isVerified])
@@ -78,10 +79,10 @@ model ArtistGenre {
   createdAt       DateTime @default(now())
 
   // Quan hệ many-to-one với ArtistProfile
-  artistProfile ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  artistProfile ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
 
   // Quan hệ many-to-one với Genre
-  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
 
   @@unique([artistProfileId, genreId])
   @@map("artist_genre")
@@ -100,7 +101,7 @@ model Album {
   updatedAt   DateTime  @updatedAt
 
   // Relations
-  artist   User         @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artist   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
   artistId String
   tracks   Track[]
   genres   AlbumGenre[]
@@ -129,7 +130,7 @@ model Track {
   updatedAt   DateTime  @updatedAt
 
   // Relations
-  artist          User            @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artist          ArtistProfile   @relation(fields: [artistId], references: [id], onDelete: Cascade)
   artistId        String
   featuredArtists TrackArtist[]
   album           Album?          @relation(fields: [albumId], references: [id], onDelete: Cascade)
@@ -212,18 +213,31 @@ model Genre {
   @@map("genres")
 }
 
+/**
+ * Trong quan hệ user, tên ràng buộc được đặt là "notifications_user_recipientId_fkey".
+ * Trong quan hệ artist, tên ràng buộc được đặt là "notifications_artist_recipientId_fkey".
+ */
+
 model Notification {
-  id        String           @id @default(cuid())
-  type      NotificationType
-  message   String
-  isRead    Boolean          @default(false)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id            String           @id @default(cuid())
+  type          NotificationType // Loại thông báo (NEW_TRACK, NEW_ALBUM, EVENT_REMINDER, NEW_FOLLOW)
+  message       String // Nội dung thông báo
+  isRead        Boolean          @default(false) // Đánh dấu đã đọc hay chưa
+  recipientType RecipientType // Loại người nhận (USER hoặc ARTIST)
+  recipientId   String // ID của người nhận (User hoặc ArtistProfile)
+  senderId      String? // ID của người gửi thông báo (nếu có)
+  count         Int?             @default(1) // Số lượng hành động trong thông báo nhóm (ví dụ: số người theo dõi)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
+  // Quan hệ với User (nếu recipientType là USER)
+  user User? @relation("UserNotifications", fields: [recipientId], references: [id], onDelete: Cascade, map: "notifications_user_recipientId_fkey")
 
-  @@index([userId])
+  // Quan hệ với ArtistProfile (nếu recipientType là ARTIST)
+  artist ArtistProfile? @relation("ArtistNotifications", fields: [recipientId], references: [id], onDelete: Cascade, map: "notifications_artist_recipientId_fkey")
+
+  @@index([recipientId])
+  @@index([senderId])
   @@index([createdAt])
   @@map("notifications")
 }
@@ -239,7 +253,7 @@ model Event {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  artist   User   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artist   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
   artistId String
 
   @@unique([title, artistId])
@@ -253,19 +267,26 @@ model Event {
 
 // Bảng trung gian
 
-model UserFollowArtist {
-  id          String   @id @default(cuid())
-  followerId  String
-  followingId String
-  createdAt   DateTime @default(now())
+model UserFollow {
+  id            String        @id @default(cuid())
+  followerId    String // Người theo dõi (luôn là User)
+  followingId   String // Người được theo dõi (có thể là User hoặc ArtistProfile)
+  followingType FollowingType // Loại người được theo dõi: USER hoặc ARTIST
+  createdAt     DateTime      @default(now())
 
-  follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
-  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  // Quan hệ với User (người theo dõi)
+  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
 
-  @@unique([followerId, followingId])
+  // Quan hệ với User (nếu followingType là USER)
+  followingUser User? @relation("FollowingUser", fields: [followingId], references: [id], onDelete: Cascade, map: "user_follow_following_user_fkey")
+
+  // Quan hệ với ArtistProfile (nếu followingType là ARTIST)
+  followingArtist ArtistProfile? @relation("FollowingArtist", fields: [followingId], references: [id], onDelete: Cascade, map: "user_follow_following_artist_fkey")
+
+  @@unique([followerId, followingId, followingType]) // Đảm bảo mỗi người dùng chỉ theo dõi một đối tượng một lần
   @@index([followerId])
   @@index([followingId])
-  @@map("user_follow_artist")
+  @@map("user_follow")
 }
 
 model AlbumGenre {
@@ -274,8 +295,8 @@ model AlbumGenre {
   genreId   String
   createdAt DateTime @default(now())
 
-  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
-  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
 
   @@unique([albumId, genreId])
   @@index([albumId])
@@ -306,8 +327,6 @@ model TrackArtist {
 
   track         Track         @relation(fields: [trackId], references: [id], onDelete: Cascade)
   artistProfile ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
-  User          User?         @relation(fields: [userId], references: [id])
-  userId        String?
 
   @@unique([trackId, artistProfileId])
   @@index([trackId])
@@ -323,8 +342,8 @@ model PlaylistTrack {
   trackOrder Int      @db.Integer
 
   // Relations
-  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
-  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([playlistId, trackId])
   @@index([playlistId])
@@ -338,8 +357,8 @@ model UserLikeTrack {
   trackId   String
   createdAt DateTime @default(now())
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
-  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade) // Giữ onDelete ở bảng trung gian
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId])
   @@index([userId])
@@ -375,8 +394,18 @@ enum PlaylistType {
 }
 
 enum NotificationType {
-  NEW_TRACK
-  NEW_ALBUM
-  EVENT
-  FOLLOW
+  NEW_TRACK // Artist phát hành track mới
+  NEW_ALBUM // Artist phát hành album mới
+  EVENT_REMINDER // Nhắc nhở về sự kiện
+  NEW_FOLLOW // Thông báo có người follow (dùng cho cả user và artist)
+}
+
+enum FollowingType {
+  USER
+  ARTIST
+}
+
+enum RecipientType {
+  USER
+  ARTIST
 }

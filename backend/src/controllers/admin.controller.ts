@@ -15,6 +15,9 @@ const userSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  lastLoginAt: true,
+  passwordResetToken: true,
+  passwordResetExpires: true,
   artistProfile: {
     select: {
       id: true,
@@ -36,59 +39,72 @@ const userSelect = {
           },
         },
       },
+      albums: {
+        select: {
+          id: true,
+          title: true,
+          coverUrl: true,
+          releaseDate: true,
+          trackCount: true,
+          duration: true,
+          type: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          tracks: {
+            select: {
+              id: true,
+              title: true,
+              duration: true,
+              releaseDate: true,
+              trackNumber: true,
+              coverUrl: true,
+              audioUrl: true,
+              playCount: true,
+              type: true,
+              isActive: true,
+            },
+          },
+        },
+      },
+      tracks: {
+        select: {
+          id: true,
+          title: true,
+          duration: true,
+          releaseDate: true,
+          trackNumber: true,
+          coverUrl: true,
+          audioUrl: true,
+          playCount: true,
+          type: true,
+          isActive: true,
+          album: {
+            select: {
+              id: true,
+              title: true,
+              coverUrl: true,
+            },
+          },
+        },
+      },
     },
   },
-  albums: {
+  followed: {
     select: {
-      id: true,
-      title: true,
-      coverUrl: true,
-      releaseDate: true,
-      trackCount: true,
-      duration: true,
-      type: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
-  tracks: {
-    select: {
-      id: true,
-      title: true,
-      duration: true,
-      releaseDate: true,
-      trackNumber: true,
-      coverUrl: true,
-      audioUrl: true,
-      playCount: true,
-      type: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
-  playlists: {
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      coverUrl: true,
-      privacy: true,
-      type: true,
-      isAIGenerated: true,
-      totalTracks: true,
-      totalDuration: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
-  followedArtists: {
-    select: {
-      following: {
+      followingId: true,
+      followingType: true,
+      followingUser: {
         select: {
           id: true,
           name: true,
+          avatar: true,
+        },
+      },
+      followingArtist: {
+        select: {
+          id: true,
+          artistName: true,
           avatar: true,
         },
       },
@@ -96,6 +112,7 @@ const userSelect = {
   },
   followers: {
     select: {
+      followerId: true,
       follower: {
         select: {
           id: true,
@@ -115,19 +132,6 @@ const userSelect = {
       updatedAt: true,
     },
   },
-  events: {
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      location: true,
-      startDate: true,
-      endDate: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
   likedTracks: {
     select: {
       track: {
@@ -142,8 +146,6 @@ const userSelect = {
           playCount: true,
           type: true,
           isActive: true,
-          createdAt: true,
-          updatedAt: true,
         },
       },
     },
@@ -176,35 +178,55 @@ const artistSelect = {
           },
         },
       },
-    },
-  },
-  albums: {
-    select: {
-      id: true,
-      title: true,
-      coverUrl: true,
-      releaseDate: true,
-      trackCount: true,
-      duration: true,
-      type: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
-  tracks: {
-    select: {
-      id: true,
-      title: true,
-      duration: true,
-      releaseDate: true,
-      trackNumber: true,
-      coverUrl: true,
-      audioUrl: true,
-      playCount: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
+      albums: {
+        select: {
+          id: true,
+          title: true,
+          coverUrl: true,
+          releaseDate: true,
+          trackCount: true,
+          duration: true,
+          type: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          tracks: {
+            select: {
+              id: true,
+              title: true,
+              duration: true,
+              releaseDate: true,
+              trackNumber: true,
+              coverUrl: true,
+              audioUrl: true,
+              playCount: true,
+              type: true,
+              isActive: true,
+            },
+          },
+        },
+      },
+      tracks: {
+        select: {
+          id: true,
+          title: true,
+          duration: true,
+          releaseDate: true,
+          trackNumber: true,
+          coverUrl: true,
+          audioUrl: true,
+          playCount: true,
+          type: true,
+          isActive: true,
+          album: {
+            select: {
+              id: true,
+              title: true,
+              coverUrl: true,
+            },
+          },
+        },
+      },
     },
   },
 } as const;
@@ -393,7 +415,7 @@ export const getArtistRequests = async (
         id: true,
         artistName: true,
         avatar: true,
-        socialMediaLinks: true, // Thêm trường này vào đây
+        socialMediaLinks: true,
         user: {
           select: {
             id: true,
@@ -402,6 +424,55 @@ export const getArtistRequests = async (
           },
         },
         verificationRequestedAt: true,
+        albums: {
+          select: {
+            id: true,
+            title: true,
+            coverUrl: true,
+            releaseDate: true,
+            trackCount: true,
+            duration: true,
+            type: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+            tracks: {
+              select: {
+                id: true,
+                title: true,
+                duration: true,
+                releaseDate: true,
+                trackNumber: true,
+                coverUrl: true,
+                audioUrl: true,
+                playCount: true,
+                type: true,
+                isActive: true,
+              },
+            },
+          },
+        },
+        tracks: {
+          select: {
+            id: true,
+            title: true,
+            duration: true,
+            releaseDate: true,
+            trackNumber: true,
+            coverUrl: true,
+            audioUrl: true,
+            playCount: true,
+            type: true,
+            isActive: true,
+            album: {
+              select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -455,6 +526,55 @@ export const getArtistRequestDetails = async (
             id: true,
             name: true,
             email: true,
+          },
+        },
+        albums: {
+          select: {
+            id: true,
+            title: true,
+            coverUrl: true,
+            releaseDate: true,
+            trackCount: true,
+            duration: true,
+            type: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+            tracks: {
+              select: {
+                id: true,
+                title: true,
+                duration: true,
+                releaseDate: true,
+                trackNumber: true,
+                coverUrl: true,
+                audioUrl: true,
+                playCount: true,
+                type: true,
+                isActive: true,
+              },
+            },
+          },
+        },
+        tracks: {
+          select: {
+            id: true,
+            title: true,
+            duration: true,
+            releaseDate: true,
+            trackNumber: true,
+            coverUrl: true,
+            audioUrl: true,
+            playCount: true,
+            type: true,
+            isActive: true,
+            album: {
+              select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+              },
+            },
           },
         },
       },
@@ -713,7 +833,89 @@ export const getArtistById = async (
 
     const artist = await prisma.user.findUnique({
       where: { id, role: Role.ARTIST },
-      select: artistSelect,
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        avatar: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        artistProfile: {
+          select: {
+            id: true,
+            artistName: true,
+            bio: true,
+            avatar: true,
+            socialMediaLinks: true,
+            monthlyListeners: true,
+            isVerified: true,
+            verificationRequestedAt: true,
+            verifiedAt: true,
+            genres: {
+              select: {
+                genre: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            albums: {
+              select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+                releaseDate: true,
+                trackCount: true,
+                duration: true,
+                type: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true,
+                tracks: {
+                  select: {
+                    id: true,
+                    title: true,
+                    duration: true,
+                    releaseDate: true,
+                    trackNumber: true,
+                    coverUrl: true,
+                    audioUrl: true,
+                    playCount: true,
+                    type: true,
+                    isActive: true,
+                  },
+                },
+              },
+            },
+            tracks: {
+              select: {
+                id: true,
+                title: true,
+                duration: true,
+                releaseDate: true,
+                trackNumber: true,
+                coverUrl: true,
+                audioUrl: true,
+                playCount: true,
+                type: true,
+                isActive: true,
+                album: {
+                  select: {
+                    id: true,
+                    title: true,
+                    coverUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!artist) {
@@ -893,7 +1095,7 @@ export const approveArtistRequest = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { userId } = req.body;
+    const { requestId } = req.body;
     const admin = req.user;
 
     // Chỉ ADMIN mới có thể duyệt yêu cầu
@@ -902,9 +1104,55 @@ export const approveArtistRequest = async (
       return;
     }
 
-    // Tìm người dùng cần duyệt
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
+    // Tìm ArtistProfile bằng requestId
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { id: requestId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            name: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    // Kiểm tra xem yêu cầu có tồn tại và chưa được xác thực không
+    if (
+      !artistProfile ||
+      !artistProfile.verificationRequestedAt ||
+      artistProfile.isVerified
+    ) {
+      res
+        .status(404)
+        .json({ message: 'Artist request not found or already verified' });
+      return;
+    }
+
+    // Cập nhật role của User thành ARTIST và xác thực ArtistProfile
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: artistProfile.userId },
+        data: {
+          role: Role.ARTIST,
+        },
+      }),
+      prisma.artistProfile.update({
+        where: { id: requestId },
+        data: {
+          isVerified: true,
+          verifiedAt: new Date(),
+          verificationRequestedAt: null,
+        },
+      }),
+    ]);
+
+    // Lấy lại thông tin người dùng sau khi cập nhật
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: artistProfile.userId },
       select: {
         id: true,
         email: true,
@@ -920,47 +1168,10 @@ export const approveArtistRequest = async (
             socialMediaLinks: true,
             monthlyListeners: true,
             isVerified: true,
-            verificationRequestedAt: true,
             verifiedAt: true,
           },
         },
       },
-    });
-
-    // Kiểm tra xem user có tồn tại và đã gửi yêu cầu trở thành artist chưa
-    if (
-      !user ||
-      user.role !== Role.USER ||
-      !user.artistProfile?.verificationRequestedAt
-    ) {
-      res
-        .status(404)
-        .json({ message: 'User not found or not requested artist role' });
-      return;
-    }
-
-    // Cập nhật role thành ARTIST và xác thực ArtistProfile
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: userId },
-        data: {
-          role: Role.ARTIST,
-        },
-      }),
-      prisma.artistProfile.update({
-        where: { userId },
-        data: {
-          isVerified: true,
-          verifiedAt: new Date(),
-          verificationRequestedAt: null,
-        },
-      }),
-    ]);
-
-    // Lấy lại thông tin người dùng sau khi cập nhật
-    const updatedUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: userSelect,
     });
 
     res.json({
@@ -979,7 +1190,7 @@ export const rejectArtistRequest = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { userId } = req.body;
+    const { requestId } = req.body; // Sửa từ userId thành requestId
     const admin = req.user;
 
     // Chỉ ADMIN mới có thể từ chối yêu cầu
@@ -988,56 +1199,41 @@ export const rejectArtistRequest = async (
       return;
     }
 
-    // Tìm người dùng cần từ chối
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        role: true,
-        artistProfile: {
+    // Tìm ArtistProfile bằng requestId
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { id: requestId },
+      include: {
+        user: {
           select: {
             id: true,
-            artistName: true,
-            bio: true,
-            avatar: true,
-            socialMediaLinks: true,
-            monthlyListeners: true,
-            isVerified: true,
-            verificationRequestedAt: true,
-            verifiedAt: true,
+            email: true,
+            name: true,
+            role: true,
           },
         },
       },
     });
 
-    // Kiểm tra xem user có tồn tại và đã gửi yêu cầu trở thành artist chưa
+    // Kiểm tra xem yêu cầu có tồn tại và chưa được xác thực không
     if (
-      !user ||
-      user.role !== Role.USER ||
-      !user.artistProfile?.verificationRequestedAt
+      !artistProfile ||
+      !artistProfile.verificationRequestedAt ||
+      artistProfile.isVerified
     ) {
       res
         .status(404)
-        .json({ message: 'User not found or not requested artist role' });
+        .json({ message: 'Artist request not found or already verified' });
       return;
     }
 
     // Xóa ArtistProfile nếu yêu cầu bị từ chối
     await prisma.artistProfile.delete({
-      where: { userId },
+      where: { id: requestId },
     });
 
     res.json({
       message: 'Artist role request rejected successfully',
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-      },
+      user: artistProfile.user,
     });
   } catch (error) {
     console.error('Reject artist request error:', error);
@@ -1113,10 +1309,13 @@ export const updateMonthlyListeners = async (
     const artist = await prisma.user.findUnique({
       where: { id, role: Role.ARTIST },
       include: {
-        artistProfile: true,
-        tracks: {
-          select: {
-            id: true,
+        artistProfile: {
+          include: {
+            tracks: {
+              select: {
+                id: true,
+              },
+            },
           },
         },
       },
@@ -1127,7 +1326,9 @@ export const updateMonthlyListeners = async (
       return;
     }
 
-    const trackIds = artist.tracks.map((track) => track.id);
+    const trackIds = artist.artistProfile.tracks.map(
+      (track: { id: string }) => track.id
+    );
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 

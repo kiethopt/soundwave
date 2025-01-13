@@ -21,7 +21,7 @@ export const historySelect = {
       artist: {
         select: {
           id: true,
-          name: true,
+          artistName: true,
           avatar: true,
         },
       },

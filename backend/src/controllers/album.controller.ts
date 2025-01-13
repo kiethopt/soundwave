@@ -22,14 +22,9 @@ const albumSelect = {
   artist: {
     select: {
       id: true,
-      name: true,
+      artistName: true,
       avatar: true,
-      artistProfile: {
-        select: {
-          artistName: true,
-          isVerified: true,
-        },
-      },
+      isVerified: true,
     },
   },
   tracks: {
@@ -48,13 +43,8 @@ const albumSelect = {
       artist: {
         select: {
           id: true,
-          name: true,
-          artistProfile: {
-            select: {
-              artistName: true,
-              isVerified: true,
-            },
-          },
+          artistName: true,
+          isVerified: true,
         },
       },
       featuredArtists: {
@@ -91,7 +81,7 @@ const albumSelect = {
 const canManageAlbum = (user: any, albumArtistId: string) => {
   return (
     user.role === Role.ADMIN ||
-    (user.role === Role.ARTIST && user.id === albumArtistId)
+    (user.role === Role.ARTIST && user.artistProfileId === albumArtistId)
   );
 };
 
@@ -206,6 +196,7 @@ export const createAlbum = async (
         role: true,
         artistProfile: {
           select: {
+            id: true,
             isVerified: true,
             verificationRequestedAt: true,
           },
@@ -273,7 +264,7 @@ export const createAlbum = async (
     }
 
     // Nếu là ADMIN, kiểm tra artistId có hợp lệ không
-    let finalArtistId = user.id; // Mặc định là ID của người dùng hiện tại
+    let finalArtistId = fullUserInfo.artistProfile?.id;
     if (user.role === Role.ADMIN) {
       if (!artistId) {
         res.status(400).json({ message: 'Artist ID is required for admin' });
@@ -288,7 +279,8 @@ export const createAlbum = async (
           role: true,
           artistProfile: {
             select: {
-              isVerified: true, // Di chuyển isVerified vào đây
+              id: true, // Thêm id của artistProfile
+              isVerified: true,
             },
           },
         },
@@ -303,7 +295,12 @@ export const createAlbum = async (
         return;
       }
 
-      finalArtistId = artistId; // Sử dụng artistId được cung cấp bởi ADMIN
+      finalArtistId = artist.artistProfile.id; // Sử dụng id của artistProfile
+    }
+
+    if (!finalArtistId) {
+      res.status(400).json({ message: 'Artist profile not found' });
+      return;
     }
 
     // Chuyển đổi genres từ chuỗi sang mảng nếu cần
@@ -666,7 +663,14 @@ export const searchAlbum = async (req: Request) => {
       isActive: true,
       OR: [
         { title: { contains: String(q), mode: 'insensitive' } },
-        { artist: { name: { contains: String(q), mode: 'insensitive' } } },
+        {
+          artist: {
+            artistName: {
+              contains: String(q),
+              mode: 'insensitive',
+            },
+          },
+        },
       ],
     },
     select: albumSelect,
@@ -762,12 +766,7 @@ export const playAlbum = async (req: Request, res: Response): Promise<void> => {
             artist: {
               select: {
                 id: true,
-                name: true,
-                artistProfile: {
-                  select: {
-                    artistName: true,
-                  },
-                },
+                artistName: true,
               },
             },
           },

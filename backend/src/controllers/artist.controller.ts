@@ -149,15 +149,27 @@ export const getAllArtistsProfile = async (
     const offset = (pageNumber - 1) * limitNumber;
 
     const [artists, total] = await Promise.all([
-      prisma.user.findMany({
-        where: { role: Role.ARTIST },
-        select: artistSelect,
+      prisma.artistProfile.findMany({
         skip: offset,
         take: limitNumber,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatar: true,
+              role: true,
+            },
+          },
+          genres: {
+            include: {
+              genre: true,
+            },
+          },
+        },
       }),
-      prisma.user.count({
-        where: { role: Role.ARTIST },
-      }),
+      prisma.artistProfile.count(),
     ]);
 
     res.json({
@@ -170,6 +182,7 @@ export const getAllArtistsProfile = async (
       },
     });
   } catch (error) {
+    console.error('Get all artists profile error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

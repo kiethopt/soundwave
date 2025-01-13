@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
-import { HistoryType, Role } from '@prisma/client';
+import { FollowingType, HistoryType, Role } from '@prisma/client';
 import { client, setCache } from '../middleware/cache.middleware';
 import { uploadFile } from '../services/cloudinary.service';
 
@@ -292,9 +292,19 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
           OR: [
             { title: { contains: searchQuery, mode: 'insensitive' } },
             {
-              artist: { name: { contains: searchQuery, mode: 'insensitive' } },
+              artist: {
+                artistName: { contains: searchQuery, mode: 'insensitive' },
+              },
             },
-            { genres: { some: { genreId: { equals: searchQuery } } } },
+            {
+              genres: {
+                some: {
+                  genre: {
+                    name: { contains: searchQuery, mode: 'insensitive' },
+                  },
+                },
+              },
+            },
           ],
         },
         select: {
@@ -311,14 +321,9 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
           artist: {
             select: {
               id: true,
-              name: true,
+              artistName: true,
               avatar: true,
-              artistProfile: {
-                select: {
-                  isVerified: true,
-                  artistName: true,
-                },
-              },
+              isVerified: true,
             },
           },
           tracks: {
@@ -337,12 +342,7 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
               artist: {
                 select: {
                   id: true,
-                  name: true,
-                  artistProfile: {
-                    select: {
-                      artistName: true,
-                    },
-                  },
+                  artistName: true,
                 },
               },
               featuredArtists: {
@@ -351,12 +351,6 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
                     select: {
                       id: true,
                       artistName: true,
-                      user: {
-                        select: {
-                          id: true,
-                          name: true,
-                        },
-                      },
                     },
                   },
                 },
@@ -375,6 +369,7 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
           },
         },
       }),
+
       prisma.track.findMany({
         where: {
           isActive: true,
@@ -387,19 +382,9 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
             },
             {
               artist: {
-                name: {
+                artistName: {
                   contains: searchQuery,
                   mode: 'insensitive',
-                },
-              },
-            },
-            {
-              artist: {
-                artistProfile: {
-                  artistName: {
-                    contains: searchQuery,
-                    mode: 'insensitive',
-                  },
                 },
               },
             },
@@ -418,8 +403,11 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
             {
               genres: {
                 some: {
-                  genreId: {
-                    equals: searchQuery,
+                  genre: {
+                    name: {
+                      contains: searchQuery,
+                      mode: 'insensitive',
+                    },
                   },
                 },
               },
@@ -442,14 +430,9 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
           artist: {
             select: {
               id: true,
-              name: true,
+              artistName: true,
               avatar: true,
-              artistProfile: {
-                select: {
-                  isVerified: true,
-                  artistName: true,
-                },
-              },
+              isVerified: true,
             },
           },
           featuredArtists: {
@@ -458,12 +441,6 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
                 select: {
                   id: true,
                   artistName: true,
-                  user: {
-                    select: {
-                      id: true,
-                      name: true,
-                    },
-                  },
                 },
               },
             },
@@ -488,6 +465,7 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
         },
         orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
       }),
+
       prisma.user.findMany({
         where: {
           id: { not: user.id },
@@ -554,32 +532,40 @@ export const followUser = async (
 ): Promise<void> => {
   try {
     const user = req.user;
-    const { id } = req.params;
+    const { id: followingId } = req.params;
+    const { type } = req.body; // USER hoặc ARTIST
+
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
     // Kiểm tra xem người dùng đã follow chưa
-    const existingFollow = await prisma.userFollowArtist.findFirst({
+    const existingFollow = await prisma.userFollow.findFirst({
       where: {
-        followerId: user?.id,
-        followingId: id,
+        followerId: user.id,
+        followingId,
+        followingType: type,
       },
     });
 
     if (existingFollow) {
-      res.status(400).json({ message: 'Already following this user' });
+      res.status(400).json({ message: 'Already following this user/artist' });
       return;
     }
 
     // Tạo follow mới
-    await prisma.userFollowArtist.create({
+    await prisma.userFollow.create({
       data: {
-        follower: { connect: { id: user?.id } },
-        following: { connect: { id } },
+        followerId: user.id,
+        followingId,
+        followingType: type,
       },
     });
 
-    res.json({ message: 'User followed successfully' });
+    res.json({ message: 'Followed successfully' });
   } catch (error) {
-    console.error('Follow user error:', error);
+    console.error('Follow error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -591,31 +577,21 @@ export const unfollowUser = async (
 ): Promise<void> => {
   try {
     const user = req.user;
-    const { id } = req.params;
-
-    // Kiểm tra xem người dùng đã follow chưa
-    const existingFollow = await prisma.userFollowArtist.findFirst({
-      where: {
-        followerId: user?.id,
-        followingId: id,
-      },
-    });
-
-    if (!existingFollow) {
-      res.status(400).json({ message: 'Not following this user' });
-      return;
-    }
+    const { id: followingId } = req.params;
+    const { type } = req.body; // USER hoặc ARTIST
 
     // Xóa follow
-    await prisma.userFollowArtist.delete({
+    await prisma.userFollow.deleteMany({
       where: {
-        id: existingFollow.id,
+        followerId: user?.id,
+        followingId,
+        followingType: type,
       },
     });
 
-    res.json({ message: 'User unfollowed successfully' });
+    res.json({ message: 'Unfollowed successfully' });
   } catch (error) {
-    console.error('Unfollow user error:', error);
+    console.error('Unfollow error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -627,10 +603,12 @@ export const getFollowers = async (
 ): Promise<void> => {
   try {
     const user = req.user;
+    const { type } = req.query; // Tùy chọn lọc theo type
 
-    const followers = await prisma.userFollowArtist.findMany({
+    const followers = await prisma.userFollow.findMany({
       where: {
         followingId: user?.id,
+        ...(type && { followingType: type as FollowingType }),
       },
       select: {
         follower: {
@@ -639,8 +617,7 @@ export const getFollowers = async (
       },
     });
 
-    const followerData = followers.map((follow) => follow.follower);
-    res.json(followerData);
+    res.json(followers.map((f) => f.follower));
   } catch (error) {
     console.error('Get followers error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -655,18 +632,48 @@ export const getFollowing = async (
   try {
     const user = req.user;
 
-    const following = await prisma.userFollowArtist.findMany({
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const following = await prisma.userFollow.findMany({
       where: {
-        followerId: user?.id,
+        followerId: user.id,
       },
       select: {
-        following: {
+        followingUser: {
           select: userSelect,
+        },
+        followingArtist: {
+          select: {
+            id: true,
+            artistName: true,
+            avatar: true,
+            user: {
+              select: userSelect,
+            },
+          },
         },
       },
     });
 
-    const followingData = following.map((follow) => follow.following);
+    const followingData = following
+      .map((follow) => {
+        if (follow.followingUser) {
+          return follow.followingUser;
+        } else if (follow.followingArtist) {
+          return {
+            ...follow.followingArtist.user,
+            artistProfile: {
+              ...follow.followingArtist,
+            },
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+
     res.json(followingData);
   } catch (error) {
     console.error('Get following error:', error);

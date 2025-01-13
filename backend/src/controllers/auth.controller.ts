@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/db';
@@ -39,6 +39,66 @@ const userSelect = {
           },
         },
       },
+      followers: {
+        select: {
+          id: true,
+          followerId: true,
+          follower: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
+            },
+          },
+        },
+      },
+    },
+  },
+  followed: {
+    select: {
+      id: true,
+      followingId: true,
+      followingType: true,
+      followingUser: {
+        select: {
+          id: true,
+          name: true,
+          avatar: true,
+        },
+      },
+      followingArtist: {
+        select: {
+          id: true,
+          artistName: true,
+          avatar: true,
+        },
+      },
+    },
+  },
+  followers: {
+    select: {
+      id: true,
+      followerId: true,
+      follower: {
+        select: {
+          id: true,
+          name: true,
+          avatar: true,
+        },
+      },
+    },
+  },
+  notifications: {
+    select: {
+      id: true,
+      type: true,
+      message: true,
+      isRead: true,
+      recipientType: true,
+      senderId: true,
+      count: true,
+      createdAt: true,
+      updatedAt: true,
     },
   },
 } as const;
@@ -109,7 +169,8 @@ const generateToken = (
 // Route kiểm tra token
 export const validateToken = async (
   req: Request,
-  res: Response
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -118,7 +179,6 @@ export const validateToken = async (
       return;
     }
 
-    // Xác thực token
     const decoded = jwt.verify(token, JWT_SECRET) as {
       id: string;
       role: Role;
@@ -126,7 +186,6 @@ export const validateToken = async (
       verificationRequestedAt?: string;
     };
 
-    // Tìm người dùng trong database
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: userSelect,
@@ -143,7 +202,7 @@ export const validateToken = async (
     });
   } catch (error) {
     console.error('Validate token error:', error);
-    res.status(400).json({ message: 'Invalid token' });
+    next(error); // Chuyển lỗi đến middleware xử lý lỗi
   }
 };
 
@@ -155,21 +214,18 @@ export const registerAdmin = async (
   try {
     const { email, password, name, username } = req.body;
 
-    // Validate dữ liệu đăng ký
     const validationError = validateRegisterData({ email, password, username });
     if (validationError) {
       res.status(400).json({ message: validationError });
       return;
     }
 
-    // Kiểm tra email đã tồn tại chưa
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       res.status(400).json({ message: 'Email already exists' });
       return;
     }
 
-    // Kiểm tra username đã tồn tại chưa
     if (username) {
       const existingUsername = await prisma.user.findUnique({
         where: { username },
@@ -180,10 +236,8 @@ export const registerAdmin = async (
       }
     }
 
-    // Mã hóa mật khẩu
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Tạo người dùng mới với role là ADMIN
     const user = await prisma.user.create({
       data: {
         email,

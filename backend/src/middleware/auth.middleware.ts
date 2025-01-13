@@ -35,6 +35,7 @@ export const authenticate = async (
         role: true,
         artistProfile: {
           select: {
+            id: true,
             isVerified: true,
             verificationRequestedAt: true,
           },
@@ -51,6 +52,7 @@ export const authenticate = async (
     req.user = {
       id: user.id,
       role: user.role,
+      artistProfileId: user.artistProfile?.id || null,
       isVerified: user.artistProfile?.isVerified || false,
       verificationRequestedAt:
         user.artistProfile?.verificationRequestedAt?.toISOString(),

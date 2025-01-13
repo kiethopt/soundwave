@@ -24,12 +24,13 @@ const trackSelect = {
   artist: {
     select: {
       id: true,
-      name: true,
+      artistName: true,
       avatar: true,
-      artistProfile: {
+      isVerified: true,
+      user: {
         select: {
-          artistName: true,
-          isVerified: true,
+          id: true,
+          name: true,
         },
       },
     },
@@ -40,6 +41,8 @@ const trackSelect = {
         select: {
           id: true,
           artistName: true,
+          avatar: true,
+          isVerified: true,
           user: {
             select: {
               id: true,
@@ -55,6 +58,7 @@ const trackSelect = {
       id: true,
       title: true,
       coverUrl: true,
+      type: true,
     },
   },
   genres: {
@@ -347,7 +351,7 @@ export const createTrack = async (
         trackNumber: trackNumber ? Number(trackNumber) : null,
         coverUrl,
         audioUrl: audioUpload.secure_url,
-        artistId: user.id,
+        artistId: user.artistProfileId!,
         albumId: albumId || null,
         type: albumId ? undefined : 'SINGLE',
         featuredArtists:
@@ -619,19 +623,9 @@ export const searchTrack = async (
           },
           {
             artist: {
-              name: {
+              artistName: {
                 contains: searchQuery,
                 mode: 'insensitive',
-              },
-            },
-          },
-          {
-            artist: {
-              artistProfile: {
-                artistName: {
-                  contains: searchQuery,
-                  mode: 'insensitive',
-                },
               },
             },
           },
@@ -1008,7 +1002,7 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
       // Tăng monthlyListeners của artist nếu cần
       if (shouldIncrementMonthlyListeners) {
         await prisma.artistProfile.update({
-          where: { userId: track.artistId },
+          where: { id: track.artistId },
           data: {
             monthlyListeners: { increment: 1 },
           },
