@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { Album } from '@/types';
 import { api } from '@/utils/api';
-import { debounce } from 'lodash';
 import { Search, Music, Plus } from 'lucide-react';
 import Link from 'next/link';
 

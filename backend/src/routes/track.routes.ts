@@ -13,6 +13,7 @@ import {
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload, { handleUploadError } from '../middleware/upload.middleware';
+import { cacheMiddleware } from '../middleware/cache.middleware';
 
 const router = express.Router();
 
@@ -50,7 +51,7 @@ router.get('/type/:type/genre/:genreId', getTracksByTypeAndGenre);
 router.get('/search', authenticate, searchTrack);
 
 // Route nghe nhạc
-router.post('/:trackId/play', authenticate, playTrack);
+router.post('/:trackId/play', authenticate, cacheMiddleware, playTrack);
 
 // Route cập nhật track (ADMIN & ARTIST only)
 router.put(

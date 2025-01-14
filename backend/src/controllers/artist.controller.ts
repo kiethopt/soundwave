@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { Role } from '@prisma/client';
 import { uploadFile } from '../services/cloudinary.service';
+import { client } from '../middleware/cache.middleware';
 
 const artistSelect = {
   id: true,
@@ -475,6 +476,12 @@ export const updateArtistProfile = async (
         },
       },
     });
+
+    // Xóa cache liên quan đến artist
+    await client.del(`/api/artists/profile/${id}`);
+    await client.del(`/api/artists/tracks/${id}`);
+    await client.del(`/api/artists/albums/${id}`);
+    await client.del(`/api/artists/stats/${id}`);
 
     res.status(200).json({
       success: true,

@@ -75,7 +75,7 @@ router.get('/search', cacheMiddleware, async (req: Request, res: Response) => {
 });
 
 // Route phát album
-router.post('/:albumId/play', authenticate, playAlbum);
+router.post('/:albumId/play', authenticate, cacheMiddleware, playAlbum);
 
 // PUBLIC routes
 // Route lấy thông tin album theo ID (có cache)

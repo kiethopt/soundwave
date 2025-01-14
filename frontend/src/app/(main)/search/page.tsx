@@ -64,6 +64,9 @@ function SearchContent() {
 
   // Audio states
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
+  const [currentlyPlayingAlbum, setCurrentlyPlayingAlbum] = useState<
+    string | null
+  >(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [trackCurrentTimes, setTrackCurrentTimes] = useState<{
     [key: string]: number;
@@ -114,23 +117,85 @@ function SearchContent() {
     fetchResults();
   }, [query, router]);
 
-  const handlePlayPause = (track: Track) => {
-    if (currentlyPlaying === track.id) {
-      if (audioRef.current && !audioRef.current.paused) {
+  // Preload metadata của các track khi component mount
+  useEffect(() => {
+    const preloadMetadata = async (url: string) => {
+      const audio = new Audio(url);
+      audio.preload = 'metadata';
+      await audio.load();
+    };
+
+    results.tracks.forEach((track) => {
+      preloadMetadata(track.audioUrl);
+    });
+  }, [results.tracks]);
+
+  const handlePlayPause = async (item: Track | Album) => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const isAlbum = 'trackCount' in item;
+      const itemId = item.id;
+
+      // Pause current audio if playing
+      if (audioRef.current) {
         audioRef.current.pause();
+      }
+
+      // If clicking on currently playing item, just pause it
+      if ((isAlbum ? currentlyPlayingAlbum : currentlyPlaying) === itemId) {
+        setTrackCurrentTimes({
+          ...trackCurrentTimes,
+          [itemId]: audioRef.current?.currentTime || 0,
+        });
+        if (isAlbum) {
+          setCurrentlyPlayingAlbum(null);
+        }
         setCurrentlyPlaying(null);
-      } else if (audioRef.current) {
-        audioRef.current.play();
-        setCurrentlyPlaying(track.id);
+        return;
       }
-    } else {
-      if (currentlyPlaying && audioRef.current) {
-        audioRef.current.pause();
+
+      try {
+        let response;
+        if (isAlbum) {
+          response = await api.albums.playAlbum(itemId, token);
+          // Kiểm tra response có đúng định dạng không
+          if (!response?.track?.id || !response?.track?.audioUrl) {
+            console.error('Invalid response format:', response);
+            return;
+          }
+          setCurrentlyPlayingAlbum(itemId);
+          setCurrentlyPlaying(response.track.id);
+        } else {
+          response = await api.tracks.play(itemId, token);
+          if (!response?.track?.id || !response?.track?.audioUrl) {
+            console.error('Invalid response format:', response);
+            return;
+          }
+          setCurrentlyPlaying(itemId);
+          setCurrentlyPlayingAlbum(null);
+        }
+
+        const audio = new Audio(response.track.audioUrl);
+        audioRef.current = audio;
+        audio.currentTime = trackCurrentTimes[itemId] || 0;
+        await audio.play();
+
+        audio.onended = () => {
+          if (isAlbum) {
+            setCurrentlyPlayingAlbum(null);
+          }
+          setCurrentlyPlaying(null);
+        };
+      } catch (error) {
+        console.error('Error playing audio:', error);
       }
-      const audio = new Audio(track.audioUrl);
-      audioRef.current = audio;
-      audio.play();
-      setCurrentlyPlaying(track.id);
+    } catch (error) {
+      console.error('Error:', error);
     }
   };
 
@@ -170,8 +235,11 @@ function SearchContent() {
                   {results.artists.map((artist) => (
                     <div key={artist.id} className="bg-white/5 p-4 rounded-lg">
                       <img
-                        src={artist.avatar || '/images/default-avatar.png'}
-                        alt={artist.name || 'Artist'}
+                        src={
+                          artist.artistProfile?.avatar ||
+                          '/images/default-avatar.png'
+                        }
+                        alt={artist.artistProfile?.artistName || 'Artist'}
                         className="w-full aspect-square object-cover rounded-md mb-4"
                       />
                       <h3 className="text-white font-medium truncate">
@@ -194,12 +262,27 @@ function SearchContent() {
                 <h2 className="text-2xl font-bold mb-4">Albums</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {results.albums.map((album) => (
-                    <div key={album.id} className="bg-white/5 p-4 rounded-lg">
-                      <img
-                        src={album.coverUrl || '/images/default-album.png'}
-                        alt={album.title}
-                        className="w-full aspect-square object-cover rounded-md mb-4"
-                      />
+                    <div
+                      key={album.id}
+                      className="bg-white/5 p-4 rounded-lg group relative"
+                    >
+                      <div className="relative">
+                        <img
+                          src={album.coverUrl || '/images/default-album.png'}
+                          alt={album.title}
+                          className="w-full aspect-square object-cover rounded-md mb-4"
+                        />
+                        <button
+                          onClick={() => handlePlayPause(album)}
+                          className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          {currentlyPlayingAlbum === album.id ? (
+                            <Pause className="w-6 h-6 text-white" />
+                          ) : (
+                            <Play className="w-6 h-6 text-white" />
+                          )}
+                        </button>
+                      </div>
                       <h3 className="text-white font-medium truncate">
                         {album.title}
                       </h3>

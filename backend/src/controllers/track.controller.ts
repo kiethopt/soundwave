@@ -6,6 +6,8 @@ import {
 } from '../services/cloudinary.service';
 import { AlbumType, Role, HistoryType, Prisma } from '@prisma/client';
 import { historySelect } from './history.controller';
+import { client, setCache } from '../middleware/cache.middleware';
+import { clearSearchCache } from '../middleware/cache.middleware';
 
 const trackSelect = {
   id: true,
@@ -374,22 +376,16 @@ export const createTrack = async (
       select: trackSelect,
     });
 
+    // Xóa cache của route GET all tracks và cache tìm kiếm
+    await client.del('/api/tracks');
+    await clearSearchCache();
+
     res.status(201).json({
       message: 'Track created successfully',
       track,
     });
   } catch (error) {
     console.error('Create track error:', error);
-
-    // Kiểm tra kiểu của error trước khi truy cập thuộc tính code
-    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
-      res.status(400).json({
-        message: 'A track with the same title already exists for this artist.',
-      });
-      return;
-    }
-
-    // Xử lý các lỗi khác
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -503,20 +499,17 @@ export const updateTrack = async (
       select: trackSelect,
     });
 
+    // Xóa cache của route GET all tracks, cache tìm kiếm và cache của track cụ thể
+    await client.del('/api/tracks');
+    await clearSearchCache();
+    await client.del(`/api/tracks/${id}`);
+
     res.json({
       message: 'Track updated successfully',
       track: updatedTrack,
     });
   } catch (error) {
     console.error('Update track error:', error);
-
-    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
-      res.status(400).json({
-        message: 'A track with the same title already exists for this artist.',
-      });
-      return;
-    }
-
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -557,6 +550,11 @@ export const deleteTrack = async (
     await prisma.track.delete({
       where: { id },
     });
+
+    // Xóa cache của route GET all tracks, cache tìm kiếm và cache của track cụ thể
+    await client.del('/api/tracks');
+    await clearSearchCache();
+    await client.del(`/api/tracks/${id}`);
 
     res.json({ message: 'Track deleted successfully' });
   } catch (error) {
@@ -938,7 +936,17 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Kiểm tra xem track có tồn tại không
+    // Kiểm tra cache trước
+    const cacheKey = `/api/tracks/${trackId}/play`;
+    const cachedData = await client.get(cacheKey);
+
+    if (cachedData) {
+      console.log('Serving from Redis cache:', cacheKey);
+      res.json(JSON.parse(cachedData));
+      return;
+    }
+
+    // Nếu không có cache, truy vấn database
     const track = await prisma.track.findUnique({
       where: { id: trackId },
       select: trackSelect,
@@ -1017,11 +1025,15 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    res.json({
+    // Lưu kết quả vào cache
+    const responseData = {
       message: 'Track played successfully',
       history,
       track: updatedTrack,
-    });
+    };
+    await setCache(cacheKey, responseData);
+
+    res.json(responseData);
   } catch (error) {
     console.error('Play track error:', error);
     res.status(500).json({ message: 'Internal server error' });

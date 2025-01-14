@@ -1,5 +1,9 @@
 import { Request, Response } from 'express';
-import { clearSearchCache, client } from '../middleware/cache.middleware';
+import {
+  clearSearchCache,
+  client,
+  setCache,
+} from '../middleware/cache.middleware';
 import prisma from '../config/db';
 import {
   uploadFile,
@@ -479,6 +483,11 @@ export const addTracksToAlbum = async (
       select: albumSelect,
     });
 
+    // Xóa cache của route GET all albums, cache tìm kiếm và cache của album cụ thể
+    await client.del('/api/albums');
+    await clearSearchCache();
+    await client.del(`/api/albums/${albumId}`);
+
     res.status(201).json({
       message: 'Tracks added to album successfully',
       album: updatedAlbum,
@@ -486,14 +495,6 @@ export const addTracksToAlbum = async (
     });
   } catch (error) {
     console.error('Add tracks to album error:', error);
-
-    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
-      res.status(400).json({
-        message: 'A track with the same title already exists in this album.',
-      });
-      return;
-    }
-
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -776,9 +777,12 @@ export const playAlbum = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Lấy thông tin album
+    // Kiểm tra album và tracks
     const album = await prisma.album.findUnique({
-      where: { id: albumId },
+      where: {
+        id: albumId,
+        isActive: true,
+      },
       select: {
         id: true,
         tracks: {
@@ -800,24 +804,25 @@ export const playAlbum = async (req: Request, res: Response): Promise<void> => {
       },
     });
 
-    if (!album) {
-      res.status(404).json({ message: 'Album not found' });
+    if (!album || !album.tracks.length) {
+      res.status(404).json({ message: 'Album or tracks not found' });
       return;
     }
 
     // Lấy bài hát đầu tiên trong album
     const firstTrack = album.tracks[0];
 
-    if (!firstTrack) {
-      res.status(404).json({ message: 'No tracks found in this album' });
-      return;
-    }
+    // Cache response
+    const cacheKey = `/api/albums/${albumId}/play`;
+    const responseData = {
+      message: 'Album played successfully',
+      track: firstTrack,
+      album,
+    };
+    await setCache(cacheKey, responseData);
 
-    // Gọi API playTrack để phát bài hát đầu tiên
-    req.params.trackId = firstTrack.id;
-    req.body.duration = firstTrack.duration; // Đặt duration là thời lượng của bài hát đầu tiên
-    req.body.completed = false; // Đặt completed là false
-    await playTrack(req, res);
+    // Trả về JSON response
+    res.json(responseData);
   } catch (error) {
     console.error('Play album error:', error);
     res.status(500).json({ message: 'Internal server error' });
