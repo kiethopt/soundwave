@@ -9,6 +9,7 @@ import {
 } from '../controllers/artist.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
+import upload from '../middleware/upload.middleware';
 
 const router = express.Router();
 
@@ -20,11 +21,12 @@ router.get(
   getAllArtistsProfile
 );
 
-router.get(
+router.put(
   '/profile/:id',
   authenticate,
   authorize([Role.ADMIN, Role.ARTIST]),
-  getArtistProfile
+  upload.single('avatar'),
+  updateArtistProfile
 );
 
 router.put(

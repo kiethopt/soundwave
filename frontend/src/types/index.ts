@@ -12,20 +12,12 @@ export interface User {
   lastLoginAt?: string;
   passwordResetToken?: string;
   passwordResetExpires?: string;
-  bio?: string;
-  isVerified: boolean;
-  verificationRequestedAt?: string;
-  verifiedAt?: string;
-  monthlyListeners: number;
   artistProfile?: ArtistProfile;
-  albums?: Album[];
-  tracks?: Track[];
   history?: History[];
   playlists?: Playlist[];
-  followedArtists?: User[];
-  followers?: User[];
+  followed?: UserFollow[]; // Người dùng này theo dõi người khác
+  followers?: UserFollow[]; // Người dùng này được người khác theo dõi
   notifications?: Notification[];
-  events?: Event[];
   likedTracks?: Track[];
 }
 
@@ -33,14 +25,37 @@ export interface ArtistProfile {
   id: string;
   artistName: string;
   bio?: string;
-  socialMediaLinks?: any;
+  avatar?: string;
+  socialMediaLinks?: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+  };
   monthlyListeners: number;
+  isVerified: boolean;
+  verificationRequestedAt?: string;
+  verifiedAt?: string;
   createdAt: string;
   updatedAt: string;
   user: User;
   userId: string;
   genres?: Genre[];
+  albums?: Album[];
   tracks?: Track[];
+  events?: Event[];
+  followers?: UserFollow[];
+  notifications?: Notification[];
+}
+
+export interface UserFollow {
+  id: string;
+  followerId: string; // Người theo dõi (luôn là User)
+  followingId: string; // Người được theo dõi (có thể là User hoặc ArtistProfile)
+  followingType: 'USER' | 'ARTIST'; // Loại người được theo dõi: USER hoặc ARTIST
+  createdAt: string;
+  follower: User; // Người theo dõi
+  followingUser?: User; // Người được theo dõi (nếu followingType là USER)
+  followingArtist?: ArtistProfile; // Người được theo dõi (nếu followingType là ARTIST)
 }
 
 export interface Artist {
@@ -49,53 +64,7 @@ export interface Artist {
   name: string | null;
   avatar: string | null;
   createdAt: string;
-  artistProfile: {
-    id: string;
-    artistName: string;
-    bio: string | null;
-    avatar: string | null;
-    socialMediaLinks?: {
-      facebook?: string;
-      instagram?: string;
-      twitter?: string;
-    };
-    monthlyListeners: number;
-    isVerified: boolean;
-    verificationRequestedAt: string | null;
-    verifiedAt: string | null;
-    createdAt: string;
-    genres?: {
-      genre: {
-        id: string;
-        name: string;
-      };
-    }[];
-  };
-  albums?: {
-    id: string;
-    title: string;
-    coverUrl?: string;
-    releaseDate: string;
-    trackCount: number;
-    duration: number;
-    type: 'ALBUM' | 'EP' | 'SINGLE';
-    isActive: boolean;
-    createdAt: string;
-    updatedAt: string;
-  }[];
-  tracks?: {
-    id: string;
-    title: string;
-    duration: number;
-    releaseDate: string;
-    trackNumber?: number;
-    coverUrl?: string;
-    audioUrl: string;
-    playCount: number;
-    isActive: boolean;
-    createdAt: string;
-    updatedAt: string;
-  }[];
+  artistProfile: ArtistProfile; // Sử dụng ArtistProfile thay vì định nghĩa lại
 }
 
 export interface ArtistRequest {
@@ -127,7 +96,7 @@ export interface Album {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  artist: User;
+  artist: ArtistProfile; // Thay đổi từ User sang ArtistProfile
   artistId: string;
   tracks?: Track[];
   genres?: Genre[];
@@ -146,7 +115,7 @@ export interface Track {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  artist: User;
+  artist: ArtistProfile;
   artistId: string;
   featuredArtists?: ArtistProfile[];
   album?: Album;
@@ -198,13 +167,17 @@ export interface Playlist {
 
 export interface Notification {
   id: string;
-  type: 'NEW_TRACK' | 'NEW_ALBUM' | 'EVENT' | 'FOLLOW';
+  type: 'NEW_TRACK' | 'NEW_ALBUM' | 'EVENT_REMINDER' | 'NEW_FOLLOW';
   message: string;
   isRead: boolean;
+  recipientType: 'USER' | 'ARTIST'; // Loại người nhận (USER hoặc ARTIST)
+  recipientId: string; // ID của người nhận (User hoặc ArtistProfile)
+  senderId?: string; // ID của người gửi thông báo (nếu có)
+  count?: number; // Số lượng hành động trong thông báo nhóm
   createdAt: string;
   updatedAt: string;
-  user: User;
-  userId: string;
+  user?: User; // Quan hệ với User (nếu recipientType là USER)
+  artist?: ArtistProfile; // Quan hệ với ArtistProfile (nếu recipientType là ARTIST)
 }
 
 export interface Event {

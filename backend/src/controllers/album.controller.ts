@@ -99,7 +99,11 @@ const validateAlbumData = (data: any): string | null => {
 };
 
 // Validation functions cho tracks
-const validateTrackData = (track: any, artistId?: string): string | null => {
+const validateTrackData = (
+  track: any,
+  artistId?: string,
+  isAlbumTrack: boolean = false // Thêm tham số isAlbumTrack, nếu add tracks vào album thì không cần coverUrl
+): string | null => {
   const {
     title,
     duration,
@@ -118,7 +122,7 @@ const validateTrackData = (track: any, artistId?: string): string | null => {
     return 'Valid release date is required';
   if (trackNumber === undefined || trackNumber <= 0)
     return 'Track number must be a positive integer';
-  if (!coverUrl?.trim()) return 'Cover URL is required';
+  if (!isAlbumTrack && !coverUrl?.trim()) return 'Cover URL is required'; // Chỉ yêu cầu coverUrl nếu không phải track trong album
   if (!audioUrl?.trim()) return 'Audio URL is required';
 
   // Validate featuredArtists (nếu có)
@@ -389,7 +393,7 @@ export const addTracksToAlbum = async (
 
     const album = await prisma.album.findUnique({
       where: { id: albumId },
-      select: { artistId: true, type: true },
+      select: { artistId: true, type: true, coverUrl: true },
     });
 
     if (!album) {
@@ -411,7 +415,7 @@ export const addTracksToAlbum = async (
 
     // Kiểm tra sự tồn tại của các featuredArtists và validate từng track
     for (const track of tracks) {
-      const validationError = validateTrackData(track, album.artistId);
+      const validationError = validateTrackData(track, album.artistId, true); // Truyền true cho isAlbumTrack
       if (validationError) {
         res.status(400).json({ message: validationError });
         return;
@@ -442,16 +446,20 @@ export const addTracksToAlbum = async (
             duration: track.duration || 0,
             releaseDate: new Date(track.releaseDate || Date.now()),
             trackNumber: track.trackNumber,
-            coverUrl: track.coverUrl,
+            coverUrl: album.coverUrl || track.coverUrl, // Sử dụng coverUrl của album nếu có
             audioUrl: track.audioUrl,
             artistId: album.artistId,
             albumId: albumId,
             type: album.type,
-            featuredArtists: {
-              create: track.featuredArtists?.map((artistProfileId: string) => ({
-                artistProfileId,
-              })),
-            },
+            featuredArtists: track.featuredArtists
+              ? {
+                  create: track.featuredArtists.map(
+                    (artistProfileId: string) => ({
+                      artistProfileId,
+                    })
+                  ),
+                }
+              : undefined,
           },
         })
       )

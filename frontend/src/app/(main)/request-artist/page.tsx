@@ -76,12 +76,14 @@ export default function RequestArtistPage() {
       }
 
       // Gửi yêu cầu trở thành artist
-      await api.user.requestArtistRole(token, formData);
+      const response = await api.user.requestArtistRole(token, formData);
 
-      setHasRequested(true);
-      alert(
-        'Your request to become an artist has been submitted successfully!'
-      );
+      if (response.message) {
+        setHasRequested(true);
+        alert(response.message);
+      } else {
+        throw new Error('No response message from server');
+      }
     } catch (err) {
       console.error('Error requesting artist role:', err);
       setError(err instanceof Error ? err.message : 'Failed to submit request');

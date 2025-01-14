@@ -91,22 +91,22 @@ export const api = {
         token
       ),
 
-    approveArtistRequest: async (userId: string, token: string) =>
+    approveArtistRequest: async (requestId: string, token: string) =>
       fetchWithAuth(
         '/api/admin/artist-requests/approve',
         {
           method: 'POST',
-          body: JSON.stringify({ userId }),
+          body: JSON.stringify({ requestId }),
         },
         token
       ),
 
-    rejectArtistRequest: async (userId: string, token: string) =>
+    rejectArtistRequest: async (requestId: string, token: string) =>
       fetchWithAuth(
         '/api/admin/artist-requests/reject',
         {
           method: 'POST',
-          body: JSON.stringify({ userId }),
+          body: JSON.stringify({ requestId }),
         },
         token
       ),
@@ -205,13 +205,31 @@ export const api = {
     getAllGenres: async () =>
       fetchWithAuth('/api/user/genres', { method: 'GET' }),
 
-    followUser: async (userId: string, token: string) =>
-      fetchWithAuth(`/api/user/follow/${userId}`, { method: 'POST' }, token),
-
-    unfollowUser: async (userId: string, token: string) =>
+    followUserOrArtist: async (
+      followingId: string,
+      followingType: 'USER' | 'ARTIST',
+      token: string
+    ) =>
       fetchWithAuth(
-        `/api/user/unfollow/${userId}`,
-        { method: 'DELETE' },
+        '/api/user/follow',
+        {
+          method: 'POST',
+          body: JSON.stringify({ followingId, followingType }),
+        },
+        token
+      ),
+
+    unfollowUserOrArtist: async (
+      followingId: string,
+      followingType: 'USER' | 'ARTIST',
+      token: string
+    ) =>
+      fetchWithAuth(
+        '/api/user/unfollow',
+        {
+          method: 'DELETE',
+          body: JSON.stringify({ followingId, followingType }),
+        },
         token
       ),
 

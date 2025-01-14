@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
 import { Search, User, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { Artist } from '@/types';
+import { ArtistProfile } from '@/types';
 
 export default function AdminArtists() {
-  const [artists, setArtists] = useState<Artist[]>([]);
+  const [artists, setArtists] = useState<ArtistProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
@@ -140,10 +140,10 @@ export default function AdminArtists() {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        {artist.artistProfile?.avatar ? (
+                        {artist.avatar ? (
                           <img
-                            src={artist.artistProfile.avatar}
-                            alt={artist.artistProfile.artistName}
+                            src={artist.avatar}
+                            alt={artist.artistName}
                             className="w-10 h-10 rounded-full mr-3 object-cover"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
@@ -160,28 +160,25 @@ export default function AdminArtists() {
                           href={`/admin/artists/${artist.id}`}
                           className="font-medium hover:underline"
                         >
-                          {artist.artistProfile?.artistName}
+                          {artist.artistName}
                         </Link>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {artist.email}
+                      {artist.user.email}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {artist.artistProfile?.monthlyListeners.toLocaleString() ??
-                        0}
+                      {artist.monthlyListeners.toLocaleString() ?? 0}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`px-2 py-1 text-xs rounded-full ${
-                          artist.artistProfile?.isVerified
+                          artist.isVerified
                             ? 'bg-green-500/10 text-green-500'
                             : 'bg-yellow-500/10 text-yellow-500'
                         }`}
                       >
-                        {artist.artistProfile?.isVerified
-                          ? 'Verified'
-                          : 'Unverified'}
+                        {artist.isVerified ? 'Verified' : 'Unverified'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

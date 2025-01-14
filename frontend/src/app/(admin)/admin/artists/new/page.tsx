@@ -63,11 +63,11 @@ export default function NewArtist() {
       submitFormData.append('bio', formData.bio);
       submitFormData.append('genres', formData.genres.join(','));
 
-      // Add social media links
+      // Add social media links as a JSON string
       const socialMediaLinks = {
-        facebook: formData.facebookLink,
-        twitter: formData.twitterLink,
-        instagram: formData.instagramLink,
+        facebook: formData.facebookLink || '',
+        twitter: formData.twitterLink || '',
+        instagram: formData.instagramLink || '',
       };
       submitFormData.append(
         'socialMediaLinks',

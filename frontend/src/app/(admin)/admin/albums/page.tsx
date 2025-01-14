@@ -26,9 +26,10 @@ export default function AdminAlbums() {
 
       let response;
       if (query) {
-        response = await api.albums.search(query, token); // Gọi API search nếu có query
+        response = await api.albums.search(query, token);
       } else {
-        response = await api.albums.getAll(token); // Gọi API getAll nếu không có query
+        const data = await api.albums.getAll(token);
+        response = data.albums;
       }
 
       setAlbums(response);
@@ -148,9 +149,10 @@ export default function AdminAlbums() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {typeof album.artist === 'string'
-                        ? album.artist
-                        : album.artist.name}
+                      {album.artist.artistName}
+                      {album.artist.isVerified && (
+                        <span className="ml-1 text-blue-500">✓</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {new Date(album.releaseDate).toLocaleDateString()}

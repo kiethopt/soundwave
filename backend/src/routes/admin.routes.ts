@@ -55,7 +55,12 @@ router.get(
   getArtistRequestDetails
 );
 router.post('/artists/verify', verifyArtist);
-router.post('/artists/:id/update-monthly-listeners', updateMonthlyListeners);
+router.post(
+  '/artists/:id/update-monthly-listeners',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  updateMonthlyListeners
+);
 
 // Quản lý thể loại nhạc
 router.get('/genres', queryRateLimiter, getAllGenres);

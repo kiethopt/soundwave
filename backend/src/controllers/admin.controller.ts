@@ -282,7 +282,7 @@ const genreSelect = {
 // Tạo 1 artist mới
 export const createArtist = async (req: Request, res: Response) => {
   try {
-    const { name, email, artistName } = req.body;
+    const { name, email, artistName, bio, genres, socialMediaLinks } = req.body;
     const avatarFile = req.file;
 
     const user = req.user;
@@ -292,8 +292,30 @@ export const createArtist = async (req: Request, res: Response) => {
     }
 
     // Generate username từ name hoặc email
-    const username =
+    let username =
       name?.toLowerCase().replace(/\s+/g, '') || email.split('@')[0];
+
+    // Kiểm tra xem username đã tồn tại chưa
+    let existingUser = await prisma.user.findUnique({
+      where: { username },
+    });
+
+    // Nếu username đã tồn tại, thêm một số ngẫu nhiên vào cuối
+    if (existingUser) {
+      let isUnique = false;
+      let counter = 1;
+      while (!isUnique) {
+        const newUsername = `${username}${counter}`;
+        existingUser = await prisma.user.findUnique({
+          where: { username: newUsername },
+        });
+        if (!existingUser) {
+          username = newUsername;
+          isUnique = true;
+        }
+        counter++;
+      }
+    }
 
     let avatarUrl = null;
     if (avatarFile) {
@@ -303,6 +325,14 @@ export const createArtist = async (req: Request, res: Response) => {
         'image'
       );
       avatarUrl = uploadResult.secure_url;
+    }
+
+    // Parse socialMediaLinks from string to object
+    let parsedSocialMediaLinks = {};
+    try {
+      parsedSocialMediaLinks = JSON.parse(socialMediaLinks);
+    } catch (e) {
+      console.error('Error parsing socialMediaLinks:', e);
     }
 
     // Hash the password
@@ -321,7 +351,9 @@ export const createArtist = async (req: Request, res: Response) => {
         artistProfile: {
           create: {
             artistName: artistName || name,
+            bio: bio || null,
             avatar: avatarUrl,
+            socialMediaLinks: parsedSocialMediaLinks,
             monthlyListeners: 0,
           },
         },
@@ -831,67 +863,48 @@ export const getArtistById = async (
   try {
     const { id } = req.params;
 
-    const artist = await prisma.user.findUnique({
-      where: { id, role: Role.ARTIST },
+    // Tìm ArtistProfile và join với User
+    const artist = await prisma.artistProfile.findUnique({
+      where: { id },
       select: {
         id: true,
-        email: true,
-        username: true,
-        name: true,
+        artistName: true,
+        bio: true,
         avatar: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-        artistProfile: {
+        socialMediaLinks: true,
+        monthlyListeners: true,
+        isVerified: true,
+        verificationRequestedAt: true,
+        verifiedAt: true,
+        user: {
           select: {
             id: true,
-            artistName: true,
-            bio: true,
+            name: true,
+            email: true,
             avatar: true,
-            socialMediaLinks: true,
-            monthlyListeners: true,
-            isVerified: true,
-            verificationRequestedAt: true,
-            verifiedAt: true,
-            genres: {
-              select: {
-                genre: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            albums: {
+            role: true,
+          },
+        },
+        genres: {
+          select: {
+            genre: {
               select: {
                 id: true,
-                title: true,
-                coverUrl: true,
-                releaseDate: true,
-                trackCount: true,
-                duration: true,
-                type: true,
-                isActive: true,
-                createdAt: true,
-                updatedAt: true,
-                tracks: {
-                  select: {
-                    id: true,
-                    title: true,
-                    duration: true,
-                    releaseDate: true,
-                    trackNumber: true,
-                    coverUrl: true,
-                    audioUrl: true,
-                    playCount: true,
-                    type: true,
-                    isActive: true,
-                  },
-                },
+                name: true,
               },
             },
+          },
+        },
+        albums: {
+          select: {
+            id: true,
+            title: true,
+            coverUrl: true,
+            releaseDate: true,
+            trackCount: true,
+            duration: true,
+            type: true,
+            isActive: true,
             tracks: {
               select: {
                 id: true,
@@ -904,13 +917,27 @@ export const getArtistById = async (
                 playCount: true,
                 type: true,
                 isActive: true,
-                album: {
-                  select: {
-                    id: true,
-                    title: true,
-                    coverUrl: true,
-                  },
-                },
+              },
+            },
+          },
+        },
+        tracks: {
+          select: {
+            id: true,
+            title: true,
+            duration: true,
+            releaseDate: true,
+            trackNumber: true,
+            coverUrl: true,
+            audioUrl: true,
+            playCount: true,
+            type: true,
+            isActive: true,
+            album: {
+              select: {
+                id: true,
+                title: true,
+                coverUrl: true,
               },
             },
           },
@@ -1255,20 +1282,22 @@ export const verifyArtist = async (
       return;
     }
 
-    const user = await prisma.user.findUnique({
+    // Tìm ArtistProfile trực tiếp bằng id
+    const artistProfile = await prisma.artistProfile.findUnique({
       where: { id: userId },
       include: {
-        artistProfile: true,
+        user: true,
       },
     });
 
-    if (!user || user.role !== Role.ARTIST || user.artistProfile?.isVerified) {
+    if (!artistProfile || artistProfile.isVerified) {
       res.status(404).json({ message: 'Artist not found or already verified' });
       return;
     }
 
+    // Cập nhật ArtistProfile
     await prisma.artistProfile.update({
-      where: { userId },
+      where: { id: userId },
       data: {
         isVerified: true,
         verifiedAt: new Date(),
@@ -1276,7 +1305,7 @@ export const verifyArtist = async (
     });
 
     const updatedUser = await prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: artistProfile.userId },
       include: {
         artistProfile: true,
       },
@@ -1298,42 +1327,38 @@ export const updateMonthlyListeners = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params;
-    const admin = req.user;
+    const { id } = req.params; // id này là artistProfileId
+    const user = req.user;
 
-    if (!admin || admin.role !== Role.ADMIN) {
+    // Kiểm tra quyền truy cập
+    if (!user || (user.role !== Role.ADMIN && user.artistProfileId !== id)) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
 
-    const artist = await prisma.user.findUnique({
-      where: { id, role: Role.ARTIST },
+    // Tìm ArtistProfile
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { id },
       include: {
-        artistProfile: {
-          include: {
-            tracks: {
-              select: {
-                id: true,
-              },
-            },
+        tracks: {
+          select: {
+            id: true,
           },
         },
       },
     });
 
-    if (!artist || !artist.artistProfile) {
+    if (!artistProfile) {
       res.status(404).json({ message: 'Artist not found' });
       return;
     }
 
-    const trackIds = artist.artistProfile.tracks.map(
-      (track: { id: string }) => track.id
-    );
+    const trackIds = artistProfile.tracks.map((track) => track.id);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const uniqueListeners = await prisma.history.groupBy({
-      by: ['userId'],
+    // Đếm số lượng người nghe duy nhất trong 30 ngày gần nhất
+    const uniqueListeners = await prisma.history.findMany({
       where: {
         trackId: {
           in: trackIds,
@@ -1343,14 +1368,14 @@ export const updateMonthlyListeners = async (
           gte: thirtyDaysAgo,
         },
       },
+      distinct: ['userId'], // Đảm bảo mỗi user chỉ được tính một lần
     });
 
-    const monthlyListeners = uniqueListeners.length;
-
+    // Cập nhật monthlyListeners với số lượng người nghe duy nhất
     const updatedArtistProfile = await prisma.artistProfile.update({
-      where: { userId: id },
+      where: { id },
       data: {
-        monthlyListeners,
+        monthlyListeners: uniqueListeners.length,
       },
     });
 

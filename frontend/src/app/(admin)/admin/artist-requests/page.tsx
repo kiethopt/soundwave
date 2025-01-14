@@ -62,32 +62,32 @@ export default function ArtistRequests() {
     });
   };
 
-  const handleApprove = async (userId: string) => {
+  const handleApprove = async (requestId: string) => {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) {
         throw new Error('No authentication token found');
       }
 
-      await api.admin.approveArtistRequest(userId, token);
+      await api.admin.approveArtistRequest(requestId, token);
       alert('Request approved successfully!');
-      fetchRequests(page, searchInput); // Refresh danh sách
+      fetchRequests(page, searchInput);
     } catch (err) {
       console.error('Error approving request:', err);
       alert('Failed to approve request');
     }
   };
 
-  const handleReject = async (userId: string) => {
+  const handleReject = async (requestId: string) => {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) {
         throw new Error('No authentication token found');
       }
 
-      await api.admin.rejectArtistRequest(userId, token);
+      await api.admin.rejectArtistRequest(requestId, token);
       alert('Request rejected successfully!');
-      fetchRequests(page, searchInput); // Refresh danh sách
+      fetchRequests(page, searchInput);
     } catch (err) {
       console.error('Error rejecting request:', err);
       alert('Failed to reject request');
@@ -144,9 +144,6 @@ export default function ArtistRequests() {
                     Artist Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                    User Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
                     Email
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
@@ -182,9 +179,6 @@ export default function ArtistRequests() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {request.user.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
                       {request.user.email}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -199,13 +193,13 @@ export default function ArtistRequests() {
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleApprove(request.user.id)}
+                          onClick={() => handleApprove(request.id)}
                           className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
                         >
                           <Check className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleReject(request.user.id)}
+                          onClick={() => handleReject(request.id)}
                           className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
                         >
                           <X className="w-4 h-4" />

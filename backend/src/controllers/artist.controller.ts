@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { Role } from '@prisma/client';
+import { uploadFile } from '../services/cloudinary.service';
 
 const artistSelect = {
   id: true,
@@ -364,30 +365,82 @@ export const updateArtistProfile = async (
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
-  const { bio, socialMediaLinks, genreIds, isVerified, avatar } = req.body;
+  const { bio, socialMediaLinks, genreIds, isVerified } = req.body;
   const user = req.user;
 
-  const { canEdit, message } = await canEditArtistData(user, id);
-  if (!canEdit) {
-    res.status(403).json({ message: message || 'Forbidden' });
-    return;
-  }
-
-  const error = validateUpdateArtistProfile(req.body);
-  if (error) {
-    res.status(400).json({ message: error });
-    return;
-  }
-
   try {
-    // Kiểm tra sự tồn tại của genres nếu có
-    if (genreIds && genreIds.length > 0) {
+    const { canEdit, message } = await canEditArtistData(user, id);
+    if (!canEdit) {
+      res.status(403).json({
+        success: false,
+        message: message || 'Forbidden',
+      });
+      return;
+    }
+
+    // Parse socialMediaLinks nếu là string
+    let parsedSocialMediaLinks = socialMediaLinks;
+    if (typeof socialMediaLinks === 'string') {
+      try {
+        parsedSocialMediaLinks = JSON.parse(socialMediaLinks);
+      } catch (error) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid socialMediaLinks format',
+        });
+        return;
+      }
+    }
+
+    // Parse genreIds nếu là string
+    let parsedGenreIds = genreIds;
+    if (typeof genreIds === 'string') {
+      try {
+        parsedGenreIds = genreIds.split(',');
+      } catch (error) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid genreIds format',
+        });
+        return;
+      }
+    }
+
+    const error = validateUpdateArtistProfile({
+      bio,
+      socialMediaLinks: parsedSocialMediaLinks,
+      genreIds: parsedGenreIds,
+    });
+    if (error) {
+      res.status(400).json({
+        success: false,
+        message: error,
+      });
+      return;
+    }
+
+    // Upload avatar nếu có
+    let avatarUrl = undefined;
+    if (req.file) {
+      const result = await uploadFile(
+        req.file.buffer,
+        'artist-avatars',
+        'image'
+      );
+      avatarUrl = result.secure_url;
+    }
+
+    // Kiểm tra genres nếu có
+    if (parsedGenreIds?.length > 0) {
       const existingGenres = await prisma.genre.findMany({
-        where: { id: { in: genreIds } },
+        where: { id: { in: parsedGenreIds } },
       });
 
-      if (existingGenres.length !== genreIds.length) {
-        res.status(400).json({ message: 'One or more genres do not exist' });
+      if (existingGenres.length !== parsedGenreIds.length) {
+        res.status(400).json({
+          success: false,
+          message: 'One or more genres do not exist',
+        });
         return;
       }
     }
@@ -397,22 +450,42 @@ export const updateArtistProfile = async (
       where: { id },
       data: {
         bio,
-        avatar, // Thêm trường avatar vào đây
-        socialMediaLinks,
-        isVerified,
-        verifiedAt: isVerified ? new Date() : null,
+        ...(avatarUrl && { avatar: avatarUrl }),
+        ...(parsedSocialMediaLinks && {
+          socialMediaLinks: parsedSocialMediaLinks,
+        }),
+        ...(isVerified !== undefined && {
+          isVerified,
+          verifiedAt: isVerified ? new Date() : null,
+        }),
+        ...(parsedGenreIds && {
+          genres: {
+            deleteMany: {},
+            create: parsedGenreIds.map((genreId: string) => ({
+              genreId,
+            })),
+          },
+        }),
+      },
+      include: {
         genres: {
-          deleteMany: {}, // Xóa tất cả genres hiện tại
-          create: genreIds?.map((genreId: string) => ({
-            genreId,
-          })),
+          include: {
+            genre: true,
+          },
         },
       },
     });
 
-    res.json(updatedArtistProfile);
+    res.status(200).json({
+      success: true,
+      message: 'Artist profile updated successfully',
+      data: updatedArtistProfile,
+    });
   } catch (error) {
     console.error('Update artist profile error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
   }
 };
