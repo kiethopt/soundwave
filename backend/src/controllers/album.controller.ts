@@ -5,7 +5,7 @@ import {
   uploadFile,
   CloudinaryUploadResult,
 } from '../services/cloudinary.service';
-import { Role, AlbumType } from '@prisma/client';
+import { Role, AlbumType, Prisma } from '@prisma/client';
 import { playTrack } from './track.controller';
 
 const albumSelect = {
@@ -683,12 +683,10 @@ export const searchAlbum = async (req: Request) => {
 export const getAllAlbums = async (req: Request) => {
   const user = req.user;
 
-  // Kiểm tra user tồn tại
   if (!user) {
     throw new Error('Unauthorized');
   }
 
-  // Kiểm tra role
   if (user.role !== Role.ADMIN && user.role !== Role.ARTIST) {
     throw new Error('Forbidden');
   }
@@ -696,8 +694,28 @@ export const getAllAlbums = async (req: Request) => {
   const { page = 1, limit = 10 } = req.query;
   const offset = (Number(page) - 1) * Number(limit);
 
-  // Nếu là ARTIST, chỉ lấy album của chính họ
-  const whereClause = user.role === Role.ARTIST ? { artistId: user.id } : {};
+  // Tạo điều kiện whereClause với isActive: true
+  const whereClause: Prisma.AlbumWhereInput = {
+    isActive: true,
+  };
+
+  // Nếu là ARTIST, chỉ lấy album của chính họ hoặc album có tracks mà họ được featured
+  if (user.role === Role.ARTIST && user.artistProfileId) {
+    whereClause.OR = [
+      { artistId: user.artistProfileId }, // Album của chính artist
+      {
+        tracks: {
+          some: {
+            featuredArtists: {
+              some: {
+                artistProfileId: user.artistProfileId, // Album có tracks mà artist được featured
+              },
+            },
+          },
+        },
+      },
+    ];
+  }
 
   const [albums, totalAlbums] = await Promise.all([
     prisma.album.findMany({

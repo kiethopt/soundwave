@@ -4,7 +4,7 @@ import {
   uploadFile,
   CloudinaryUploadResult,
 } from '../services/cloudinary.service';
-import { AlbumType, Role, HistoryType } from '@prisma/client';
+import { AlbumType, Role, HistoryType, Prisma } from '@prisma/client';
 import { historySelect } from './history.controller';
 
 const trackSelect = {
@@ -77,7 +77,7 @@ const trackSelect = {
 const canManageTrack = (user: any, trackArtistId: string) => {
   return (
     user.role === Role.ADMIN ||
-    (user.role === Role.ARTIST && user.id === trackArtistId)
+    (user.role === Role.ARTIST && user.artistProfileId === trackArtistId)
   );
 };
 
@@ -409,7 +409,7 @@ export const updateTrack = async (
       trackNumber,
       albumId,
       featuredArtists,
-      genreIds, // Thêm trường genreIds để nhận danh sách thể loại
+      genreIds,
     } = req.body;
 
     // Kiểm tra xem user có tồn tại và có quyền cập nhật track không
@@ -723,19 +723,26 @@ export const getAllTracks = async (
     const { page = 1, limit = 10 } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
+    // Tạo điều kiện whereClause
+    const whereClause: Prisma.TrackWhereInput = {
+      isActive: true,
+    };
+
     // Nếu là ARTIST, chỉ lấy track của chính họ
-    const whereClause = user.role === Role.ARTIST ? { artistId: user.id } : {};
+    if (user.role === Role.ARTIST && user.artistProfileId) {
+      whereClause.artistId = user.artistProfileId;
+    }
 
     const tracks = await prisma.track.findMany({
       skip: offset,
       take: Number(limit),
-      where: { ...whereClause, isActive: true },
+      where: whereClause,
       select: trackSelect,
       orderBy: { createdAt: 'desc' },
     });
 
     const totalTracks = await prisma.track.count({
-      where: { ...whereClause, isActive: true },
+      where: whereClause,
     });
 
     res.json({
