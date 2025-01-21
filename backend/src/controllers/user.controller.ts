@@ -12,6 +12,7 @@ const userSelect = {
   role: true,
   createdAt: true,
   updatedAt: true,
+  name: true,
   lastLoginAt: true,
   artistProfile: {
     select: {
@@ -837,6 +838,80 @@ export const getFollowing = async (
     res.json(formattedResults);
   } catch (error) {
     console.error('Get following error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Cập nhật thông tin người dùng thông tin là FormData
+export const editProfile = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = req.user;
+    const { email, username, name, avatar } = req.body;
+    const avatarFile = req.file; // Lấy file từ request
+
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Kiểm tra email đã tồn tại chưa
+    if (email) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (existingUser && existingUser.id !== user.id) {
+        res.status(400).json({ message: 'Email already in use' });
+        return;
+      }
+    }
+
+    // Kiểm tra username đã tồn tại chưa
+    if (username) {
+      const existingUsername = await prisma.user.findUnique({
+        where: { username },
+      });
+
+      if (existingUsername && existingUsername.id !== user.id) {
+        res.status(400).json({ message: 'Username already in use' });
+        return;
+      }
+    }
+
+    // Upload avatar lên Cloudinary nếu có file
+    let avatarUrl = null;
+    if (avatarFile) {
+      const uploadResult = await uploadFile(avatarFile.buffer, 'user-avatars');
+      avatarUrl = uploadResult.secure_url;
+    }
+
+    // Xây dựng dữ liệu cập nhật chỉ với các trường hợp lệ
+    const updateData: Record<string, any> = {};
+    if (email) updateData.email = email;
+    if (username) updateData.username = username;
+    if (name) updateData.name = name;
+    if (avatarFile) updateData.avatar = avatarUrl;
+    else if (avatar) updateData.avatar = avatar;
+
+    // Nếu không có gì để cập nhật
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({ message: 'No data provided for update' });
+      return;
+    }
+
+    // Cập nhật thông tin người dùng
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: updateData,
+      select: userSelect,
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    console.error('Edit profile error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

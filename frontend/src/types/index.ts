@@ -49,13 +49,14 @@ export interface ArtistProfile {
 
 export interface UserFollow {
   id: string;
-  followerId: string; // Người theo dõi (luôn là User)
-  followingId: string; // Người được theo dõi (có thể là User hoặc ArtistProfile)
-  followingType: 'USER' | 'ARTIST'; // Loại người được theo dõi: USER hoặc ARTIST
+  followerId: string;
+  followingUserId?: string; // ID của User được follow (nếu followingType là USER)
+  followingArtistId?: string; // ID của ArtistProfile được follow (nếu followingType là ARTIST)
+  followingType: 'USER' | 'ARTIST';
   createdAt: string;
-  follower: User; // Người theo dõi
-  followingUser?: User; // Người được theo dõi (nếu followingType là USER)
-  followingArtist?: ArtistProfile; // Người được theo dõi (nếu followingType là ARTIST)
+  follower: User;
+  followingUser?: User; // User được follow (nếu followingType là USER)
+  followingArtist?: ArtistProfile; // ArtistProfile được follow (nếu followingType là ARTIST)
 }
 
 export interface Artist {

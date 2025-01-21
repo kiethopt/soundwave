@@ -7,6 +7,7 @@ import {
   searchAll,
   getAllGenres,
   requestArtistRole,
+  editProfile,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -30,5 +31,16 @@ router.post(
   handleUploadError,
   requestArtistRole
 );
+
+// Route chỉnh sửa thông tin người dùng
+router.put(
+  '/edit-profile',
+  authenticate,
+  upload.single('avatar'),
+  handleUploadError,
+  editProfile
+);
+
+
 
 export default router;
