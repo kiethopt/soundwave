@@ -149,7 +149,7 @@ export default function Header({
                   alt="User avatar"
                   width={32}
                   height={32}
-                  className="object-cover"
+                  className="object-cover w-full h-full"
                   priority
                 />
               </button>

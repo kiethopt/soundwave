@@ -1,3 +1,5 @@
+import { get } from "lodash";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 // Helper function giúp giảm bớt lặp code
@@ -244,6 +246,16 @@ export const api = {
         '/api/user/request-artist',
         {
           method: 'POST',
+          body: data,
+        },
+        token
+      ),
+    
+    editProfile: async (token: string, data: FormData) =>
+      fetchWithAuth(
+        '/api/user/edit-profile',
+        {
+          method: 'PUT',
           body: data,
         },
         token
