@@ -103,7 +103,10 @@ const userSelect = {
   },
 } as const;
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('Missing JWT_SECRET in environment variables');
+}
 
 // Hàm kiểm tra định dạng email
 const validateEmail = (email: string): string | null => {
@@ -143,26 +146,14 @@ const validateLoginData = (data: any): string | null => {
 };
 
 // Helper function để tạo JWT token
-const generateToken = (
-  userId: string,
-  role: Role,
-  artistProfile?: {
-    isVerified: boolean;
-    verificationRequestedAt?: Date | null;
-  } | null
-): string => {
+const generateToken = (userId: string, role: Role, artistProfile?: any) => {
   return jwt.sign(
     {
       id: userId,
       role,
-      isVerified: artistProfile?.isVerified || false,
-      verificationRequestedAt:
-        artistProfile?.verificationRequestedAt?.toISOString(),
     },
     JWT_SECRET,
-    {
-      expiresIn: '24h',
-    }
+    { expiresIn: '24h' }
   );
 };
 

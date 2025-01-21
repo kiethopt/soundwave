@@ -23,6 +23,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import { queryRateLimiter } from '../middleware/rateLimit.middleware';
 import upload from '../middleware/upload.middleware';
+import { cacheMiddleware } from '../middleware/cache.middleware';
 
 const router = express.Router();
 
@@ -30,7 +31,13 @@ const router = express.Router();
 router.use(authenticate, authorize([Role.ADMIN, Role.ARTIST]));
 
 // Thống kê
-router.get('/stats', queryRateLimiter, getStats);
+router.get(
+  '/stats',
+  authorize([Role.ADMIN]),
+  cacheMiddleware,
+  queryRateLimiter,
+  getStats
+);
 
 // Quản lý người dùng
 router.get('/users', queryRateLimiter, authorize([Role.ADMIN]), getAllUsers);

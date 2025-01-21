@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import {
   createTrack,
   getTracksByType,
@@ -9,6 +9,7 @@ import {
   getTracksByTypeAndGenre,
   searchTrack,
   playTrack,
+  toggleTrackVisibility,
 } from '../controllers/track.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -51,7 +52,17 @@ router.get('/type/:type/genre/:genreId', getTracksByTypeAndGenre);
 router.get('/search', authenticate, searchTrack);
 
 // Route nghe nhạc
-router.post('/:trackId/play', authenticate, cacheMiddleware, playTrack);
+router.post(
+  '/:trackId/play',
+  authenticate,
+  cacheMiddleware,
+  (req: Request, res: Response) => {
+    playTrack(req, res).catch((error) => {
+      console.error('Play track error:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    });
+  }
+);
 
 // Route cập nhật track (ADMIN & ARTIST only)
 router.put(
@@ -67,6 +78,14 @@ router.delete(
   authenticate,
   authorize([Role.ADMIN, Role.ARTIST]),
   deleteTrack
+);
+
+// Route ẩn track (ADMIN & ARTIST only)
+router.put(
+  '/:id/toggle-visibility',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  toggleTrackVisibility
 );
 
 export default router;

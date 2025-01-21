@@ -52,10 +52,14 @@ export const authenticate = async (
     req.user = {
       id: user.id,
       role: user.role,
-      artistProfileId: user.artistProfile?.id || null,
-      isVerified: user.artistProfile?.isVerified || false,
-      verificationRequestedAt:
-        user.artistProfile?.verificationRequestedAt?.toISOString(),
+      artistProfile: user.artistProfile
+        ? {
+            id: user.artistProfile.id,
+            isVerified: user.artistProfile.isVerified,
+            verificationRequestedAt:
+              user.artistProfile.verificationRequestedAt?.toISOString() || null,
+          }
+        : undefined,
     };
 
     console.log('User authenticated:', req.user); // Log để debug

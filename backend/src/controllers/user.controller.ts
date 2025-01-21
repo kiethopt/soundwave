@@ -533,34 +533,98 @@ export const followUser = async (
   try {
     const user = req.user;
     const { id: followingId } = req.params;
-    const { type } = req.body; // USER hoặc ARTIST
 
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    // Kiểm tra xem người dùng đã follow chưa
+    // Kiểm tra tồn tại
+    const [userExists, artistExists] = await Promise.all([
+      prisma.user.findUnique({ where: { id: followingId } }),
+      prisma.artistProfile.findUnique({
+        where: { id: followingId },
+        select: { id: true },
+      }),
+    ]);
+
+    let followingType: FollowingType;
+    let followData: any = {
+      followerId: user.id,
+      followingType: 'USER' as FollowingType,
+    };
+
+    if (userExists) {
+      followingType = FollowingType.USER;
+      followData.followingUserId = followingId;
+    } else if (artistExists) {
+      followingType = FollowingType.ARTIST;
+      followData.followingArtistId = followingId;
+      followData.followingType = 'ARTIST';
+    } else {
+      res.status(404).json({ message: 'Target not found' });
+      return;
+    }
+
+    // Validate self-follow
+    if (followingType === 'USER' && followingId === user.id) {
+      res.status(400).json({ message: 'Cannot follow yourself' });
+      return;
+    }
+
+    // Check existing follow
     const existingFollow = await prisma.userFollow.findFirst({
       where: {
         followerId: user.id,
-        followingId,
-        followingType: type,
+        OR: [
+          {
+            followingUserId: followingId,
+            followingType: 'USER',
+          },
+          {
+            followingArtistId: followingId,
+            followingType: 'ARTIST',
+          },
+        ],
       },
     });
 
     if (existingFollow) {
-      res.status(400).json({ message: 'Already following this user/artist' });
+      res.status(400).json({ message: 'Already following' });
       return;
     }
 
-    // Tạo follow mới
-    await prisma.userFollow.create({
-      data: {
-        followerId: user.id,
-        followingId,
-        followingType: type,
-      },
+    await prisma.$transaction(async (tx) => {
+      // Create follow
+      await tx.userFollow.create({
+        data: followData,
+      });
+
+      // Tạo thông báo
+      if (followingType === 'ARTIST') {
+        const currentUser = await tx.user.findUnique({
+          where: { id: user.id },
+          select: { username: true, email: true },
+        });
+
+        await tx.notification.create({
+          data: {
+            type: 'NEW_FOLLOW',
+            message: `New follower: ${
+              currentUser?.username || currentUser?.email
+            }`,
+            recipientType: 'ARTIST',
+            artistId: followingId,
+            senderId: user.id,
+          },
+        });
+
+        // Update artist stats
+        await tx.artistProfile.update({
+          where: { id: followingId },
+          data: { monthlyListeners: { increment: 1 } },
+        });
+      }
     });
 
     res.json({ message: 'Followed successfully' });
@@ -578,16 +642,54 @@ export const unfollowUser = async (
   try {
     const user = req.user;
     const { id: followingId } = req.params;
-    const { type } = req.body; // USER hoặc ARTIST
 
-    // Xóa follow
-    await prisma.userFollow.deleteMany({
-      where: {
-        followerId: user?.id,
-        followingId,
-        followingType: type,
-      },
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Tự động xác định followingType bằng cách kiểm tra followingId
+    const [userExists, artistExists] = await Promise.all([
+      prisma.user.findUnique({ where: { id: followingId } }),
+      prisma.artistProfile.findUnique({ where: { id: followingId } }),
+    ]);
+
+    let followingType: FollowingType | null = null;
+
+    if (userExists) {
+      followingType = FollowingType.USER;
+    } else if (artistExists) {
+      followingType = FollowingType.ARTIST;
+    } else {
+      res.status(404).json({ message: 'Target not found' });
+      return;
+    }
+
+    // Xóa dựa trên followingType
+    const deleteConditions = {
+      followerId: user.id,
+      followingType: followingType,
+      ...(followingType === FollowingType.USER
+        ? { followingUserId: followingId }
+        : { followingArtistId: followingId }),
+    };
+
+    const result = await prisma.userFollow.deleteMany({
+      where: deleteConditions,
     });
+
+    if (result.count === 0) {
+      res.status(404).json({ message: 'Follow not found' });
+      return;
+    }
+
+    // Cập nhật monthlyListeners nếu unfollow artist
+    if (followingType === FollowingType.ARTIST) {
+      await prisma.artistProfile.update({
+        where: { id: followingId },
+        data: { monthlyListeners: { decrement: 1 } },
+      });
+    }
 
     res.json({ message: 'Unfollowed successfully' });
   } catch (error) {
@@ -603,21 +705,63 @@ export const getFollowers = async (
 ): Promise<void> => {
   try {
     const user = req.user;
-    const { type } = req.query; // Tùy chọn lọc theo type
+    const { type } = req.query;
+
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Xây dựng điều kiện where
+    const whereConditions: any = {
+      OR: [
+        {
+          followingUserId: user.id, // User
+          followingType: FollowingType.USER,
+        },
+        {
+          followingArtistId: user.id, // Artist
+          followingType: FollowingType.ARTIST,
+        },
+      ],
+    };
+
+    // Lọc theo type nếu có
+    if (type) {
+      if (type === 'USER') {
+        whereConditions.OR = [
+          {
+            followingUserId: user.id,
+            followingType: FollowingType.USER,
+          },
+        ];
+      } else if (type === 'ARTIST') {
+        whereConditions.OR = [
+          {
+            followingArtistId: user.id,
+            followingType: FollowingType.ARTIST,
+          },
+        ];
+      }
+    }
 
     const followers = await prisma.userFollow.findMany({
-      where: {
-        followingId: user?.id,
-        ...(type && { followingType: type as FollowingType }),
-      },
+      where: whereConditions,
       select: {
         follower: {
           select: userSelect,
         },
+        followingType: true,
       },
     });
 
-    res.json(followers.map((f) => f.follower));
+    // Format kết quả
+    const result = followers.map((f) => ({
+      ...f.follower,
+      followingType: f.followingType,
+    }));
+
+    res.json(result);
   } catch (error) {
     console.error('Get followers error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -642,8 +786,22 @@ export const getFollowing = async (
         followerId: user.id,
       },
       select: {
+        followingUserId: true,
+        followingArtistId: true,
+        followingType: true,
         followingUser: {
-          select: userSelect,
+          select: {
+            id: true,
+            name: true,
+            avatar: true,
+            role: true,
+            artistProfile: {
+              select: {
+                id: true,
+                artistName: true,
+              },
+            },
+          },
         },
         followingArtist: {
           select: {
@@ -651,30 +809,32 @@ export const getFollowing = async (
             artistName: true,
             avatar: true,
             user: {
-              select: userSelect,
+              select: {
+                id: true,
+                name: true,
+                avatar: true,
+              },
             },
           },
         },
       },
     });
 
-    const followingData = following
-      .map((follow) => {
-        if (follow.followingUser) {
-          return follow.followingUser;
-        } else if (follow.followingArtist) {
-          return {
-            ...follow.followingArtist.user,
-            artistProfile: {
-              ...follow.followingArtist,
-            },
-          };
-        }
-        return null;
-      })
-      .filter(Boolean);
+    const formattedResults = following.map((follow) => {
+      if (follow.followingType === 'USER') {
+        return {
+          type: 'USER',
+          ...follow.followingUser,
+        };
+      }
+      return {
+        type: 'ARTIST',
+        ...follow.followingArtist,
+        user: follow.followingArtist?.user,
+      };
+    });
 
-    res.json(followingData);
+    res.json(formattedResults);
   } catch (error) {
     console.error('Get following error:', error);
     res.status(500).json({ message: 'Internal server error' });

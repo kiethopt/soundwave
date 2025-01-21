@@ -29,13 +29,6 @@ router.put(
   updateArtistProfile
 );
 
-router.put(
-  '/profile/:id',
-  authenticate,
-  authorize([Role.ADMIN, Role.ARTIST]),
-  updateArtistProfile
-);
-
 router.get(
   '/stats/:id',
   authenticate,

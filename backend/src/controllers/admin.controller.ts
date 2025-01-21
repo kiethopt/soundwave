@@ -3,6 +3,11 @@ import prisma from '../config/db';
 import { Role } from '@prisma/client';
 import { uploadFile } from '../services/cloudinary.service';
 import bcrypt from 'bcrypt';
+import {
+  clearCacheForEntity,
+  client,
+  setCache,
+} from '../middleware/cache.middleware';
 
 // Định nghĩa các select cho user
 const userSelect = {
@@ -88,12 +93,27 @@ const userSelect = {
           },
         },
       },
+      followers: {
+        select: {
+          id: true,
+          follower: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
+            },
+          },
+          createdAt: true,
+        },
+      },
     },
   },
   followed: {
     select: {
-      followingId: true,
+      id: true,
       followingType: true,
+      followingUserId: true,
+      followingArtistId: true,
       followingUser: {
         select: {
           id: true,
@@ -112,7 +132,7 @@ const userSelect = {
   },
   followers: {
     select: {
-      followerId: true,
+      id: true,
       follower: {
         select: {
           id: true,
@@ -223,6 +243,17 @@ const artistSelect = {
               id: true,
               title: true,
               coverUrl: true,
+            },
+          },
+        },
+      },
+      followers: {
+        select: {
+          follower: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
             },
           },
         },
@@ -785,6 +816,12 @@ export const updateUser = async (
       });
     });
 
+    // Clear cache
+    await clearCacheForEntity('user', { entityId: id, clearSearch: true });
+    if (isVerifyingArtistRequest) {
+      await clearCacheForEntity('artist', { clearSearch: true });
+    }
+
     res.json({
       message: 'User updated successfully',
       user: updatedUser,
@@ -1001,6 +1038,13 @@ export const createGenre = async (
       data: { name },
     });
 
+    // Clear cache
+    await Promise.all([
+      clearCacheForEntity('genre', { clearSearch: true }),
+      clearCacheForEntity('track', { clearSearch: true }),
+      clearCacheForEntity('stats', {}),
+    ]);
+
     res.status(201).json({ message: 'Genre created successfully', genre });
   } catch (error) {
     console.error('Create genre error:', error);
@@ -1070,6 +1114,10 @@ export const updateGenre = async (
       data: { name },
     });
 
+    // Clear cache
+    await clearCacheForEntity('genre', { entityId: id, clearSearch: true });
+    await clearCacheForEntity('track', { clearSearch: true });
+
     res.json({
       message: 'Genre updated successfully',
       genre: updatedGenre,
@@ -1108,6 +1156,10 @@ export const deleteGenre = async (
     await prisma.genre.delete({
       where: { id },
     });
+
+    // Clear cache
+    await clearCacheForEntity('genre', { entityId: id, clearSearch: true });
+    await clearCacheForEntity('track', { clearSearch: true });
 
     res.json({ message: 'Genre deleted successfully' });
   } catch (error) {
@@ -1200,6 +1252,15 @@ export const approveArtistRequest = async (
         },
       },
     });
+
+    // Clear cache
+    await Promise.all([
+      clearCacheForEntity('artist', { clearSearch: true }),
+      clearCacheForEntity('user', { clearSearch: true }),
+      clearCacheForEntity('stats', {}),
+      clearCacheForEntity('album', { clearSearch: true }),
+      clearCacheForEntity('track', { clearSearch: true }),
+    ]);
 
     res.json({
       message: 'Artist role approved successfully',
@@ -1331,7 +1392,7 @@ export const updateMonthlyListeners = async (
     const user = req.user;
 
     // Kiểm tra quyền truy cập
-    if (!user || (user.role !== Role.ADMIN && user.artistProfileId !== id)) {
+    if (!user || (user.role !== Role.ADMIN && user.artistProfile?.id !== id)) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
@@ -1392,28 +1453,96 @@ export const updateMonthlyListeners = async (
 // Lấy thông số tổng quan để thống kê
 export const getStats = async (req: Request, res: Response): Promise<void> => {
   try {
-    const totalUsers = await prisma.user.count();
-    const totalArtists = await prisma.user.count({
-      where: { role: Role.ARTIST },
-    });
-    const totalAlbums = await prisma.album.count();
-    const totalTracks = await prisma.track.count();
-    const totalArtistRequests = await prisma.artistProfile.count({
-      where: {
-        verificationRequestedAt: { not: null },
-        isVerified: false,
-      },
-    });
+    const cacheKey = '/api/admin/stats';
+    const user = req.user;
 
-    res.json({
+    if (!user || user.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    // Kiểm tra cache trước
+    const cachedStats = await client.get(cacheKey);
+    if (cachedStats) {
+      console.log('Serving stats from cache');
+      res.json(JSON.parse(cachedStats));
+      return;
+    }
+
+    // Thực hiện các truy vấn song song
+    const [
       totalUsers,
       totalArtists,
       totalAlbums,
       totalTracks,
       totalArtistRequests,
-    });
+      totalGenres,
+      topGenre,
+      mostActiveArtist,
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { role: Role.ARTIST } }),
+      prisma.album.count(),
+      prisma.track.count(),
+      prisma.artistProfile.count({
+        where: {
+          verificationRequestedAt: { not: null },
+          isVerified: false,
+        },
+      }),
+      prisma.genre.count(),
+      prisma.genre.findFirst({
+        orderBy: {
+          tracks: { _count: 'desc' },
+        },
+        select: {
+          id: true,
+          name: true,
+          _count: { select: { tracks: true } },
+        },
+      }),
+      prisma.artistProfile.findFirst({
+        orderBy: [{ monthlyListeners: 'desc' }, { tracks: { _count: 'desc' } }],
+        select: {
+          id: true,
+          artistName: true,
+          monthlyListeners: true,
+          _count: { select: { tracks: true } },
+        },
+      }),
+    ]);
+
+    // Chuẩn bị dữ liệu thống kê
+    const statsData = {
+      totalUsers,
+      totalArtists,
+      totalAlbums,
+      totalTracks,
+      totalArtistRequests,
+      totalGenres,
+      popularGenre: {
+        id: topGenre?.id,
+        name: topGenre?.name,
+        trackCount: topGenre?._count.tracks,
+      },
+      trendingArtist: {
+        id: mostActiveArtist?.id,
+        name: mostActiveArtist?.artistName,
+        monthlyListeners: mostActiveArtist?.monthlyListeners,
+        trackCount: mostActiveArtist?._count.tracks,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Lưu vào cache với thời hạn 5 phút
+    await setCache(cacheKey, statsData, 300);
+
+    res.json(statsData);
   } catch (error) {
     console.error('Get stats error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({
+      message: 'Internal server error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 };

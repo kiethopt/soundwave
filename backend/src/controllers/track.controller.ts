@@ -6,8 +6,11 @@ import {
 } from '../services/cloudinary.service';
 import { AlbumType, Role, HistoryType, Prisma } from '@prisma/client';
 import { historySelect } from './history.controller';
-import { client, setCache } from '../middleware/cache.middleware';
-import { clearSearchCache } from '../middleware/cache.middleware';
+import {
+  clearCacheForEntity,
+  client,
+  setCache,
+} from '../middleware/cache.middleware';
 
 const trackSelect = {
   id: true,
@@ -79,7 +82,7 @@ const trackSelect = {
 const canManageTrack = (user: any, trackArtistId: string) => {
   return (
     user.role === Role.ADMIN ||
-    (user.role === Role.ARTIST && user.artistProfileId === trackArtistId)
+    (user.role === Role.ARTIST && user.artistProfile?.id === trackArtistId)
   );
 };
 
@@ -353,7 +356,7 @@ export const createTrack = async (
         trackNumber: trackNumber ? Number(trackNumber) : null,
         coverUrl,
         audioUrl: audioUpload.secure_url,
-        artistId: user.artistProfileId!,
+        artistId: user.artistProfile?.id!,
         albumId: albumId || null,
         type: albumId ? undefined : 'SINGLE',
         featuredArtists:
@@ -377,8 +380,11 @@ export const createTrack = async (
     });
 
     // Xóa cache của route GET all tracks và cache tìm kiếm
-    await client.del('/api/tracks');
-    await clearSearchCache();
+    await clearCacheForEntity('track', {
+      userId: user.artistProfile?.id || undefined,
+      adminId: user.role === Role.ADMIN ? user.id : undefined,
+      clearSearch: true,
+    });
 
     res.status(201).json({
       message: 'Track created successfully',
@@ -500,9 +506,12 @@ export const updateTrack = async (
     });
 
     // Xóa cache của route GET all tracks, cache tìm kiếm và cache của track cụ thể
-    await client.del('/api/tracks');
-    await clearSearchCache();
-    await client.del(`/api/tracks/${id}`);
+    await clearCacheForEntity('track', {
+      userId: track.artistId,
+      adminId: user.role === Role.ADMIN ? user.id : undefined,
+      entityId: id,
+      clearSearch: true,
+    });
 
     res.json({
       message: 'Track updated successfully',
@@ -552,13 +561,71 @@ export const deleteTrack = async (
     });
 
     // Xóa cache của route GET all tracks, cache tìm kiếm và cache của track cụ thể
-    await client.del('/api/tracks');
-    await clearSearchCache();
-    await client.del(`/api/tracks/${id}`);
+    await clearCacheForEntity('track', {
+      userId: track.artistId,
+      adminId: user.role === Role.ADMIN ? user.id : undefined,
+      entityId: id,
+      clearSearch: true,
+    });
 
     res.json({ message: 'Track deleted successfully' });
   } catch (error) {
     console.error('Delete track error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Ẩn track (ADMIN & ARTIST only)
+export const toggleTrackVisibility = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    if (!user || (user.role !== Role.ADMIN && user.role !== Role.ARTIST)) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    const track = await prisma.track.findUnique({
+      where: { id },
+      select: { artistId: true, isActive: true },
+    });
+
+    if (!track) {
+      res.status(404).json({ message: 'Track not found' });
+      return;
+    }
+
+    if (!canManageTrack(user, track.artistId)) {
+      res.status(403).json({ message: 'You can only toggle your own tracks' });
+      return;
+    }
+
+    const updatedTrack = await prisma.track.update({
+      where: { id },
+      data: { isActive: !track.isActive },
+      select: trackSelect,
+    });
+
+    // Clear cache
+    await clearCacheForEntity('track', {
+      userId: track.artistId,
+      adminId: user.role === Role.ADMIN ? user.id : undefined,
+      entityId: id,
+      clearSearch: true,
+    });
+
+    res.json({
+      message: `Track ${
+        updatedTrack.isActive ? 'activated' : 'hidden'
+      } successfully`,
+      track: updatedTrack,
+    });
+  } catch (error) {
+    console.error('Toggle track error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -659,8 +726,12 @@ export const getTracksByType = async (
 ): Promise<void> => {
   try {
     const { type } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    let { page = 1, limit = 10 } = req.query;
+
+    // Validate pagination
+    page = Math.max(1, parseInt(page as string));
+    limit = Math.min(100, Math.max(1, parseInt(limit as string)));
+    const offset = (page - 1) * limit;
 
     // Kiểm tra xem type có hợp lệ không
     if (!Object.values(AlbumType).includes(type as AlbumType)) {
@@ -722,13 +793,11 @@ export const getAllTracks = async (
     const offset = (Number(page) - 1) * Number(limit);
 
     // Tạo điều kiện whereClause
-    const whereClause: Prisma.TrackWhereInput = {
-      isActive: true,
-    };
+    const whereClause: Prisma.TrackWhereInput = {};
 
     // Nếu là ARTIST, chỉ lấy track của chính họ
-    if (user.role === Role.ARTIST && user.artistProfileId) {
-      whereClause.artistId = user.artistProfileId;
+    if (user.role === Role.ARTIST && user.artistProfile?.id) {
+      whereClause.artistId = user.artistProfile?.id;
     }
 
     const tracks = await prisma.track.findMany({

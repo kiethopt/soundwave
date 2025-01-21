@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import {
-  clearSearchCache,
+  clearCacheForEntity,
   client,
   setCache,
 } from '../middleware/cache.middleware';
@@ -10,7 +10,6 @@ import {
   CloudinaryUploadResult,
 } from '../services/cloudinary.service';
 import { Role, AlbumType, Prisma } from '@prisma/client';
-import { playTrack } from './track.controller';
 
 const albumSelect = {
   id: true,
@@ -85,7 +84,7 @@ const albumSelect = {
 const canManageAlbum = (user: any, albumArtistId: string) => {
   return (
     user.role === Role.ADMIN ||
-    (user.role === Role.ARTIST && user.artistProfileId === albumArtistId)
+    (user.role === Role.ARTIST && user.artistProfile?.id === albumArtistId)
   );
 };
 
@@ -273,12 +272,9 @@ export const createAlbum = async (
 
     // Nếu là ADMIN, kiểm tra artistId có hợp lệ không
     let finalArtistId = fullUserInfo.artistProfile?.id;
-    if (user.role === Role.ADMIN) {
-      if (!artistId) {
-        res.status(400).json({ message: 'Artist ID is required for admin' });
-        return;
-      }
+    let targetUserId = user.id; // ID của user cần xóa cache
 
+    if (user.role === Role.ADMIN && artistId) {
       // Kiểm tra xem artistId có tồn tại và có vai trò là ARTIST không
       const artist = await prisma.user.findUnique({
         where: { id: artistId },
@@ -287,7 +283,7 @@ export const createAlbum = async (
           role: true,
           artistProfile: {
             select: {
-              id: true, // Thêm id của artistProfile
+              id: true,
               isVerified: true,
             },
           },
@@ -303,7 +299,8 @@ export const createAlbum = async (
         return;
       }
 
-      finalArtistId = artist.artistProfile.id; // Sử dụng id của artistProfile
+      finalArtistId = artist.artistProfile.id;
+      targetUserId = artistId; // Cập nhật targetUserId để xóa cache của artist được chỉ định
     }
 
     if (!finalArtistId) {
@@ -356,9 +353,17 @@ export const createAlbum = async (
       select: albumSelect,
     });
 
-    // Xóa cache của route GET all albums và cache tìm kiếm
-    await client.del('/api/albums');
-    await clearSearchCache();
+    // Xóa tất cả cache liên quan
+    // 1. Xóa cache của route GET albums cho user cụ thể
+    // 2. Xóa cache của route GET albums cho admin (nếu người tạo là admin)
+    // 3. Xóa cache tìm kiếm
+    await clearCacheForEntity('album', {
+      userId: targetUserId,
+      adminId: user.role === Role.ADMIN ? user.id : undefined,
+      clearSearch: true,
+    });
+
+    // Tạo thông báo cho người dùng theo dõi artist (nếu có) -- Kim
 
     res.status(201).json({
       message: 'Album created successfully',
@@ -484,9 +489,10 @@ export const addTracksToAlbum = async (
     });
 
     // Xóa cache của route GET all albums, cache tìm kiếm và cache của album cụ thể
-    await client.del('/api/albums');
-    await clearSearchCache();
-    await client.del(`/api/albums/${albumId}`);
+    await clearCacheForEntity('album', {
+      entityId: albumId,
+      clearSearch: true,
+    });
 
     res.status(201).json({
       message: 'Tracks added to album successfully',
@@ -596,10 +602,16 @@ export const updateAlbum = async (
       select: albumSelect,
     });
 
-    // Xóa cache của route GET all albums, cache tìm kiếm và cache của album cụ thể
-    await client.del('/api/albums');
-    await clearSearchCache();
-    await client.del(`/api/albums/${id}`);
+    // Xóa cache liên quan
+    // 1. Xóa cache của route GET albums cho user cụ thể
+    // 2. Xóa cache của album cụ thể
+    // 3. Xóa cache tìm kiếm
+    await clearCacheForEntity('album', {
+      userId: album.artistId,
+      adminId: user.role === Role.ADMIN ? user.id : undefined,
+      entityId: id,
+      clearSearch: true,
+    });
 
     res.json({
       message: 'Album updated successfully',
@@ -641,20 +653,77 @@ export const deleteAlbum = async (
       return;
     }
 
-    // Soft delete album
-    await prisma.album.update({
+    // Hard delete album
+    await prisma.album.delete({
       where: { id },
-      data: { isActive: false },
     });
 
     // Xóa cache của route GET all albums, cache tìm kiếm và cache của album cụ thể
-    await client.del('/api/albums');
-    await clearSearchCache();
-    await client.del(`/api/albums/${id}`);
+    await clearCacheForEntity('album', {
+      userId: album.artistId,
+      adminId: user.role === Role.ADMIN ? user.id : undefined,
+      entityId: id,
+      clearSearch: true,
+    });
 
     res.json({ message: 'Album deleted successfully' });
   } catch (error) {
     console.error('Delete album error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Ẩn album (ADMIN & ARTIST only)
+export const toggleAlbumVisibility = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    if (!user || (user.role !== Role.ADMIN && user.role !== Role.ARTIST)) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    const album = await prisma.album.findUnique({
+      where: { id },
+      select: { artistId: true, isActive: true },
+    });
+
+    if (!album) {
+      res.status(404).json({ message: 'Album not found' });
+      return;
+    }
+
+    if (!canManageAlbum(user, album.artistId)) {
+      res.status(403).json({ message: 'You can only toggle your own albums' });
+      return;
+    }
+
+    const updatedAlbum = await prisma.album.update({
+      where: { id },
+      data: { isActive: !album.isActive },
+      select: albumSelect,
+    });
+
+    // Clear cache
+    await clearCacheForEntity('album', {
+      userId: album.artistId,
+      adminId: user.role === Role.ADMIN ? user.id : undefined,
+      entityId: id,
+      clearSearch: true,
+    });
+
+    res.json({
+      message: `Album ${
+        updatedAlbum.isActive ? 'activated' : 'hidden'
+      } successfully`,
+      album: updatedAlbum,
+    });
+  } catch (error) {
+    console.error('Toggle album error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -703,21 +772,22 @@ export const getAllAlbums = async (req: Request) => {
   const { page = 1, limit = 10 } = req.query;
   const offset = (Number(page) - 1) * Number(limit);
 
-  // Tạo điều kiện whereClause với isActive: true
-  const whereClause: Prisma.AlbumWhereInput = {
-    isActive: true,
-  };
+  // Tạo cache key dựa trên user.id và query params
+  const cacheKey = `/api/albums?userId=${user.id}&page=${page}&limit=${limit}`;
 
-  // Nếu là ARTIST, chỉ lấy album của chính họ hoặc album có tracks mà họ được featured
-  if (user.role === Role.ARTIST && user.artistProfileId) {
+  // Tạo điều kiện whereClause với isActive: true
+  const whereClause: Prisma.AlbumWhereInput = {};
+
+  // Nếu là ARTIST, chỉ lấy album của chính họ
+  if (user.role === Role.ARTIST && user.artistProfile?.id) {
     whereClause.OR = [
-      { artistId: user.artistProfileId }, // Album của chính artist
+      { artistId: user.artistProfile.id },
       {
         tracks: {
           some: {
             featuredArtists: {
               some: {
-                artistProfileId: user.artistProfileId, // Album có tracks mà artist được featured
+                artistProfileId: user.artistProfile.id,
               },
             },
           },
@@ -739,6 +809,18 @@ export const getAllAlbums = async (req: Request) => {
     }),
   ]);
 
+  // Xóa cache cũ và set cache mới
+  await client.del(cacheKey);
+  await setCache(cacheKey, {
+    albums,
+    pagination: {
+      total: totalAlbums,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(totalAlbums / Number(limit)),
+    },
+  });
+
   return {
     albums,
     pagination: {
@@ -753,13 +835,21 @@ export const getAllAlbums = async (req: Request) => {
 // Get album theo ID
 export const getAlbumById = async (req: Request) => {
   const { id } = req.params;
+  const user = req.user;
 
   const album = await prisma.album.findUnique({
     where: { id },
     select: albumSelect,
   });
 
-  if (!album || !album.isActive) {
+  if (!album) throw new Error('Album not found');
+
+  // Cho phép ADMIN/ARTIST xem album ẩn
+  if (
+    !album.isActive &&
+    (!user ||
+      (user.role !== Role.ADMIN && user.artistProfile?.id !== album.artist.id))
+  ) {
     throw new Error('Album not found');
   }
 

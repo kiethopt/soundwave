@@ -7,9 +7,11 @@ declare global {
       user?: {
         id: string;
         role: Role;
-        artistProfileId?: string | null;
-        isVerified: boolean;
-        verificationRequestedAt?: string | null;
+        artistProfile?: {
+          id: string | null;
+          isVerified: boolean;
+          verificationRequestedAt: string | null;
+        };
       };
       file?: File;
       files?: {

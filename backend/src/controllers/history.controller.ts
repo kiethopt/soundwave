@@ -50,6 +50,11 @@ export const savePlayHistory = async (
       return;
     }
 
+    if (!trackId) {
+      res.status(400).json({ message: 'Track ID is required' });
+      return;
+    }
+
     // Kiểm tra xem track có tồn tại không
     const track = await prisma.track.findUnique({
       where: { id: trackId },
@@ -102,6 +107,11 @@ export const saveSearchHistory = async (
 
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    if (!query?.trim()) {
+      res.status(400).json({ message: 'Search query is required' });
       return;
     }
 
