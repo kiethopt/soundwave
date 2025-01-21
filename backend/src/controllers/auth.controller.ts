@@ -57,8 +57,9 @@ const userSelect = {
   followed: {
     select: {
       id: true,
-      followingId: true,
       followingType: true,
+      followingUserId: true,
+      followingArtistId: true,
       followingUser: {
         select: {
           id: true,
@@ -101,7 +102,7 @@ const userSelect = {
       updatedAt: true,
     },
   },
-} as const;
+};
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
