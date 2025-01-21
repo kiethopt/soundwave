@@ -3,7 +3,17 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
-import { ArrowLeft, User, Check, RefreshCw, Disc, Music } from 'lucide-react';
+import {
+  ArrowLeft,
+  User,
+  Check,
+  RefreshCw,
+  Disc,
+  Music,
+  Plus,
+  Play,
+  Pause,
+} from 'lucide-react';
 import Link from 'next/link';
 import { ArtistProfile } from '@/types';
 
@@ -12,12 +22,14 @@ export default function ArtistDetail({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params); // Sử dụng `use` để unwrap `params`
+  const { id } = use(params);
   const router = useRouter();
   const [artist, setArtist] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [activeTab, setActiveTab] = useState<'albums' | 'tracks'>('albums');
+  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchArtist = async () => {
@@ -87,6 +99,12 @@ export default function ArtistDetail({
     }
   };
 
+  const formatDuration = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -119,6 +137,7 @@ export default function ArtistDetail({
 
       <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] p-6">
         <div className="grid gap-6 md:grid-cols-[240px_1fr]">
+          {/* Artist Info - Left Column */}
           <div className="space-y-4">
             {artist.avatar ? (
               <div className="relative w-60 h-60">
@@ -146,6 +165,7 @@ export default function ArtistDetail({
             </div>
           </div>
 
+          {/* Artist Info - Right Column */}
           <div className="space-y-6">
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -207,59 +227,151 @@ export default function ArtistDetail({
               </button>
             </div>
 
-            {/* Hiển thị danh sách album */}
-            {artist.albums && artist.albums.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-white">Albums</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {artist.albums.map((album: any) => (
-                    <div
-                      key={album.id}
-                      className="bg-white/[0.03] rounded-lg p-4 hover:bg-white/[0.05] transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <Disc className="w-8 h-8 text-white/60" />
-                        <div>
-                          <h3 className="text-lg font-semibold text-white">
-                            {album.title}
-                          </h3>
-                          <p className="text-sm text-white/60">
-                            {album.trackCount} tracks
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            {/* Tab Navigation */}
+            <div className="border-b border-white/[0.08] mt-8">
+              <div className="flex gap-8">
+                <button
+                  onClick={() => setActiveTab('albums')}
+                  className={`pb-4 px-1 ${
+                    activeTab === 'albums'
+                      ? 'border-b-2 border-white text-white'
+                      : 'text-white/60'
+                  }`}
+                >
+                  Albums ({artist.albums?.length || 0})
+                </button>
+                <button
+                  onClick={() => setActiveTab('tracks')}
+                  className={`pb-4 px-1 ${
+                    activeTab === 'tracks'
+                      ? 'border-b-2 border-white text-white'
+                      : 'text-white/60'
+                  }`}
+                >
+                  Tracks ({artist.tracks?.length || 0})
+                </button>
               </div>
-            )}
+            </div>
 
-            {/* Hiển thị danh sách bài hát */}
-            {artist.tracks && artist.tracks.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-white">Tracks</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {artist.tracks.map((track: any) => (
-                    <div
-                      key={track.id}
-                      className="bg-white/[0.03] rounded-lg p-4 hover:bg-white/[0.05] transition-colors"
+            {/* Content Area */}
+            <div className="mt-6">
+              {/* Albums Tab */}
+              {activeTab === 'albums' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-bold">Albums</h2>
+                    <Link
+                      href={`/admin/artists/${id}/albums/new`}
+                      className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full hover:bg-white/20"
                     >
-                      <div className="flex items-center gap-4">
-                        <Music className="w-8 h-8 text-white/60" />
-                        <div>
-                          <h3 className="text-lg font-semibold text-white">
-                            {track.title}
-                          </h3>
-                          <p className="text-sm text-white/60">
-                            {track.duration} seconds
-                          </p>
+                      <Plus className="w-4 h-4" />
+                      New Album
+                    </Link>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {artist.albums?.map((album: any) => (
+                      <div
+                        key={album.id}
+                        className="bg-white/[0.03] rounded-lg p-4 hover:bg-white/[0.05] transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          {album.coverUrl ? (
+                            <img
+                              src={album.coverUrl}
+                              alt={album.title}
+                              className="w-16 h-16 rounded-md object-cover"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-md bg-white/[0.03] flex items-center justify-center">
+                              <Disc className="w-8 h-8 text-white/60" />
+                            </div>
+                          )}
+                          <div>
+                            <Link
+                              href={`/admin/artists/${id}/albums/${album.id}`}
+                              className="text-lg font-semibold text-white hover:underline"
+                            >
+                              {album.title}
+                            </Link>
+                            <p className="text-sm text-white/60">
+                              {album.trackCount} tracks ·{' '}
+                              {formatDuration(album.duration)}
+                            </p>
+                            <p className="text-sm text-white/60">
+                              {new Date(album.releaseDate).getFullYear()}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* Tracks Tab */}
+              {activeTab === 'tracks' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-bold">Tracks</h2>
+                    <Link
+                      href={`/admin/artists/${id}/tracks/new`}
+                      className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full hover:bg-white/20"
+                    >
+                      <Plus className="w-4 h-4" />
+                      New Track
+                    </Link>
+                  </div>
+                  <div className="space-y-2">
+                    {artist.tracks?.map((track: any) => (
+                      <div
+                        key={track.id}
+                        className="bg-white/[0.03] rounded-lg p-4 hover:bg-white/[0.05] transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={() =>
+                              setPlayingTrackId(
+                                playingTrackId === track.id ? null : track.id
+                              )
+                            }
+                            className="text-white/60 hover:text-white"
+                          >
+                            {playingTrackId === track.id ? (
+                              <Pause className="w-6 h-6" />
+                            ) : (
+                              <Play className="w-6 h-6" />
+                            )}
+                          </button>
+                          {track.coverUrl ? (
+                            <img
+                              src={track.coverUrl}
+                              alt={track.title}
+                              className="w-12 h-12 rounded-md object-cover"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-md bg-white/[0.03] flex items-center justify-center">
+                              <Music className="w-6 h-6 text-white/60" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-white">
+                              {track.title}
+                            </h3>
+                            <p className="text-sm text-white/60">
+                              {track.album?.title || 'Single'} ·{' '}
+                              {formatDuration(track.duration)}
+                            </p>
+                          </div>
+                          <div className="text-sm text-white/60">
+                            {track.playCount.toLocaleString()} plays
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

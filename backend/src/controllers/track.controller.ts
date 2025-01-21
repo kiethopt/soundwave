@@ -610,10 +610,8 @@ export const toggleTrackVisibility = async (
       select: trackSelect,
     });
 
-    // Clear cache
+    // Clear toàn bộ cache liên quan đến track và search
     await clearCacheForEntity('track', {
-      userId: track.artistId,
-      adminId: user.role === Role.ADMIN ? user.id : undefined,
       entityId: id,
       clearSearch: true,
     });

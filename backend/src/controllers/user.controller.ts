@@ -239,21 +239,22 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
         where: {
           isActive: true,
           role: Role.ARTIST,
-          id: { not: user.id },
-          OR: [
-            { name: { contains: searchQuery, mode: 'insensitive' } },
-            { username: { contains: searchQuery, mode: 'insensitive' } },
-            {
-              artistProfile: {
-                genres: { some: { genreId: { equals: searchQuery } } },
-              },
-            },
-            {
-              artistProfile: {
+          artistProfile: {
+            OR: [
+              {
                 artistName: { contains: searchQuery, mode: 'insensitive' },
               },
-            },
-          ],
+              {
+                genres: {
+                  some: {
+                    genre: {
+                      name: { contains: searchQuery, mode: 'insensitive' },
+                    },
+                  },
+                },
+              },
+            ],
+          },
         },
         select: {
           id: true,

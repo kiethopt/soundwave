@@ -75,19 +75,31 @@ export const clearCacheForEntity = async (
 ) => {
   if (process.env.USE_REDIS_CACHE !== 'true') return;
 
-  const patterns = [
-    ...(entity === 'stats' ? ['/api/admin/stats'] : []),
-    ...(options.userId ? [`/api/${entity}s?*userId=${options.userId}*`] : []),
-    ...(options.adminId ? [`/api/${entity}s?*userId=${options.adminId}*`] : []),
-    ...(options.entityId ? [`/api/${entity}s/${options.entityId}`] : []),
-    `/api/${entity}s`,
-    ...(options.clearSearch ? [`/api/${entity}s/search*`] : []),
-  ];
-
   try {
+    // Tạo danh sách patterns cần xóa
+    const patterns = [
+      `/api/${entity}s*`, // Xóa cache của entity
+      ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
+    ];
+
+    // Nếu clearSearch = true, thêm các pattern liên quan đến tìm kiếm
+    if (options.clearSearch) {
+      patterns.push(
+        '/api/search*', // Cache của các route search
+        '/api/*/search*', // Cache của các route search con
+        '/search-all*', // Cache của searchAll
+        '/api/users/search-all*', // Cache của user search
+        '/api/user/search-all*' // Thêm pattern này để xóa cache của user search
+      );
+    }
+
+    // Xóa cache cho từng pattern
     for (const pattern of patterns) {
       const keys = await client.keys(pattern);
-      if (keys.length) await client.del(keys);
+      if (keys.length) {
+        console.log(`Clearing cache for pattern: ${pattern}, keys:`, keys);
+        await Promise.all(keys.map((key) => client.del(key)));
+      }
     }
   } catch (error) {
     console.error(`Error clearing ${entity} cache:`, error);

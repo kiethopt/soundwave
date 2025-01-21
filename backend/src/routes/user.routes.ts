@@ -41,6 +41,4 @@ router.put(
   editProfile
 );
 
-
-
 export default router;

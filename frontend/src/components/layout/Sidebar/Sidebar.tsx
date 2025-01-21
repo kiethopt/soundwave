@@ -157,7 +157,6 @@ export default function Sidebar({
                   <User className="w-6 h-6" />
                   <span>Artists</span>
                 </Link>
-                {/* Thêm liên kết đến trang artist-requests */}
                 <Link
                   href="/admin/artist-requests"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
@@ -169,28 +168,7 @@ export default function Sidebar({
                   <User className="w-6 h-6" />
                   <span>Artist Requests</span>
                 </Link>
-                <Link
-                  href="/admin/tracks"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                    isActive('/admin/tracks')
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/10'
-                  }`}
-                >
-                  <Music className="w-6 h-6" />
-                  <span>Tracks</span>
-                </Link>
-                <Link
-                  href="/admin/albums"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                    pathname.startsWith('/admin/albums')
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/10'
-                  }`}
-                >
-                  <Album className="w-6 h-6" />
-                  <span>Albums</span>
-                </Link>
+                {/* Xóa các link đến Tracks và Albums */}
                 <Link
                   href="/admin/users"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${

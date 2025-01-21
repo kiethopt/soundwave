@@ -67,6 +67,8 @@ router.post(
   '/:albumId/tracks',
   authenticate,
   authorize([Role.ADMIN, Role.ARTIST]),
+  upload.array('tracks'),
+  handleUploadError,
   addTracksToAlbum
 );
 

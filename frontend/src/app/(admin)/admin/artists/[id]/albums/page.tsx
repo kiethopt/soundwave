@@ -5,48 +5,47 @@ import { Album } from '@/types';
 import { api } from '@/utils/api';
 import { Search, Music, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 
 export default function AdminAlbums() {
+  const { id } = useParams();
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
 
   // Fetch albums data
-  const fetchAlbums = useCallback(async (query: string = '') => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = localStorage.getItem('userToken');
+  const fetchAlbums = useCallback(
+    async (query: string = '') => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = localStorage.getItem('userToken');
+        if (!token) throw new Error('No authentication token found');
 
-      if (!token) {
-        throw new Error('No authentication token found');
+        let response;
+        if (query) {
+          const data = await api.albums.search(query, token);
+          response = data.filter((a: Album) => a.artistId === id);
+        } else {
+          response = await api.artists.getAlbums(id as string, token);
+        }
+
+        setAlbums(response);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch albums');
+      } finally {
+        setLoading(false);
       }
+    },
+    [id]
+  );
 
-      let response;
-      if (query) {
-        response = await api.albums.search(query, token);
-      } else {
-        const data = await api.albums.getAll(token);
-        response = data.albums;
-      }
-
-      setAlbums(response);
-    } catch (err) {
-      console.error('Error fetching albums:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch albums');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Effect to fetch albums on mount
   useEffect(() => {
     fetchAlbums();
   }, [fetchAlbums]);
 
-  // Handlers
-  const handleSearch = (e: FormEvent) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     fetchAlbums(searchInput);
   };
@@ -60,14 +59,12 @@ export default function AdminAlbums() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Album Management
+            {albums[0]?.artist.artistName}'s Albums
           </h1>
-          <p className="text-white/60 mt-2">
-            Create and manage your music albums
-          </p>
+          <p className="text-white/60 mt-2">Manage artist's discography</p>
         </div>
         <Link
-          href="/admin/albums/new"
+          href={`/admin/artists/${id}/albums/new`}
           className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90"
         >
           <Plus className="w-4 h-4" />
@@ -140,7 +137,7 @@ export default function AdminAlbums() {
                           </div>
                         )}
                         <Link
-                          href={`/admin/albums/${album.id}`}
+                          href={`/admin/artists/${id}/albums/${album.id}`}
                           className="font-medium hover:underline"
                         >
                           {album.title}

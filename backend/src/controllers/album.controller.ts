@@ -393,7 +393,6 @@ export const addTracksToAlbum = async (
   try {
     const user = req.user;
     const { albumId } = req.params;
-    const { tracks } = req.body;
 
     if (!user || (user.role !== Role.ADMIN && user.role !== Role.ARTIST)) {
       res.status(403).json({ message: 'Forbidden' });
@@ -417,70 +416,81 @@ export const addTracksToAlbum = async (
       return;
     }
 
-    if (!Array.isArray(tracks) || tracks.length === 0) {
-      res.status(400).json({ message: 'Invalid tracks data' });
+    // Kiểm tra xem có file được gửi lên không
+    if (!req.files || !Array.isArray(req.files)) {
+      res.status(400).json({ message: 'No files uploaded' });
       return;
     }
 
-    // Kiểm tra sự tồn tại của các featuredArtists và validate từng track
-    for (const track of tracks) {
-      const validationError = validateTrackData(track, album.artistId, true); // Truyền true cho isAlbumTrack
-      if (validationError) {
-        res.status(400).json({ message: validationError });
-        return;
-      }
+    const files = req.files as Express.Multer.File[];
 
-      if (track.featuredArtists && track.featuredArtists.length > 0) {
-        // Sử dụng prisma.artistProfile.findMany để kiểm tra sự tồn tại của các artistProfileId
-        const existingArtists = await prisma.artistProfile.findMany({
-          where: {
-            id: { in: track.featuredArtists },
-          },
-        });
+    // Lấy các trường dữ liệu từ req.body
+    const { title, releaseDate, trackNumber, featuredArtists } = req.body;
 
-        if (existingArtists.length !== track.featuredArtists.length) {
-          res
-            .status(400)
-            .json({ message: 'One or more featured artists do not exist' });
-          return;
+    // Xây dựng tracksData từ các trường dữ liệu
+    const tracksData = [
+      {
+        title,
+        releaseDate,
+        trackNumber: parseInt(trackNumber, 10),
+        featuredArtists: featuredArtists ? featuredArtists.split(',') : [],
+      },
+    ];
+
+    const mm = await import('music-metadata');
+
+    // Upload từng file lên Cloudinary và tạo track
+    const createdTracks = await Promise.all(
+      files.map(async (file, index) => {
+        const trackDetails = tracksData[index];
+
+        try {
+          // Parse metadata directly from buffer
+          const metadata = await mm.parseBuffer(file.buffer);
+          const duration = Math.floor(metadata.format.duration || 0);
+
+          // Upload file to Cloudinary
+          const uploadResult = await uploadFile(file.buffer, 'tracks', 'auto');
+
+          // Create track in database
+          return prisma.track.create({
+            data: {
+              title: trackDetails.title,
+              duration,
+              releaseDate: new Date(trackDetails.releaseDate || Date.now()),
+              trackNumber: trackDetails.trackNumber,
+              coverUrl: album.coverUrl,
+              audioUrl: uploadResult.secure_url,
+              artistId: album.artistId,
+              albumId: albumId,
+              type: album.type,
+              featuredArtists:
+                trackDetails.featuredArtists?.length > 0
+                  ? {
+                      create: trackDetails.featuredArtists.map(
+                        (artistProfileId: string) => ({
+                          artistProfileId,
+                        })
+                      ),
+                    }
+                  : undefined,
+            },
+          });
+        } catch (err) {
+          console.error('Error processing track:', err);
+          throw err;
         }
-      }
-    }
-
-    const createdTracks = await prisma.$transaction(
-      tracks.map((track) =>
-        prisma.track.create({
-          data: {
-            title: track.title,
-            duration: track.duration || 0,
-            releaseDate: new Date(track.releaseDate || Date.now()),
-            trackNumber: track.trackNumber,
-            coverUrl: album.coverUrl || track.coverUrl, // Sử dụng coverUrl của album nếu có
-            audioUrl: track.audioUrl,
-            artistId: album.artistId,
-            albumId: albumId,
-            type: album.type,
-            featuredArtists: track.featuredArtists
-              ? {
-                  create: track.featuredArtists.map(
-                    (artistProfileId: string) => ({
-                      artistProfileId,
-                    })
-                  ),
-                }
-              : undefined,
-          },
-        })
-      )
+      })
     );
 
+    // Cập nhật số lượng track và duration của album
     const updatedAlbum = await prisma.album.update({
       where: { id: albumId },
       data: {
-        trackCount: { increment: tracks.length },
+        trackCount: { increment: files.length },
         duration: {
-          increment: tracks.reduce(
-            (sum, track) => sum + (track.duration || 0),
+          increment: createdTracks.reduce(
+            (sum: number, track: any) => sum + (track.duration || 0),
             0
           ),
         },
@@ -488,10 +498,12 @@ export const addTracksToAlbum = async (
       select: albumSelect,
     });
 
-    // Xóa cache của route GET all albums, cache tìm kiếm và cache của album cụ thể
+    // Xóa cache liên quan đến album, artist, và admin
     await clearCacheForEntity('album', {
-      entityId: albumId,
-      clearSearch: true,
+      userId: album.artistId, // Xóa cache của artist
+      adminId: user.role === Role.ADMIN ? user.id : undefined, // Xóa cache của admin nếu người thêm là admin
+      entityId: albumId, // Xóa cache của album cụ thể
+      clearSearch: true, // Xóa cache tìm kiếm
     });
 
     res.status(201).json({
@@ -708,10 +720,8 @@ export const toggleAlbumVisibility = async (
       select: albumSelect,
     });
 
-    // Clear cache
+    // Clear toàn bộ cache liên quan đến album và search
     await clearCacheForEntity('album', {
-      userId: album.artistId,
-      adminId: user.role === Role.ADMIN ? user.id : undefined,
       entityId: id,
       clearSearch: true,
     });

@@ -1,4 +1,4 @@
-import { get } from "lodash";
+import { get } from 'lodash';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -250,7 +250,7 @@ export const api = {
         },
         token
       ),
-    
+
     editProfile: async (token: string, data: FormData) =>
       fetchWithAuth(
         '/api/user/edit-profile',
@@ -413,12 +413,17 @@ export const api = {
     delete: async (id: string, token: string) =>
       fetchWithAuth(`/api/albums/${id}`, { method: 'DELETE' }, token),
 
-    uploadTracks: async (id: string, data: FormData, token: string) =>
-      fetchWithAuth(
+    uploadTracks: async (id: string, data: FormData, token: string) => {
+      return fetchWithAuth(
         `/api/albums/${id}/tracks`,
-        { method: 'POST', body: data },
+        {
+          method: 'POST',
+          body: data,
+          headers: {},
+        },
         token
-      ),
+      );
+    },
 
     search: async (query: string, token: string) =>
       fetchWithAuth(`/api/albums/search?q=${query}`, { method: 'GET' }, token),
