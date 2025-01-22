@@ -10,6 +10,7 @@ import {
   CloudinaryUploadResult,
 } from '../services/cloudinary.service';
 import { Role, AlbumType, Prisma } from '@prisma/client';
+import { sessionService } from 'src/services/session.service';
 
 const albumSelect = {
   id: true,
@@ -871,11 +872,24 @@ export const playAlbum = async (req: Request, res: Response): Promise<void> => {
   try {
     const { albumId } = req.params;
     const user = req.user;
+    const sessionId = req.header('Session-ID');
 
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
+
+    // Kiểm tra session
+    if (
+      !sessionId ||
+      !(await sessionService.validateSession(user.id, sessionId))
+    ) {
+      res.status(401).json({ message: 'Session expired or invalid' });
+      return;
+    }
+
+    // Gửi thông báo dừng phát nhạc đến các session khác
+    await sessionService.handleAudioPlay(user.id, sessionId);
 
     // Kiểm tra album và tracks
     const album = await prisma.album.findUnique({
@@ -911,6 +925,12 @@ export const playAlbum = async (req: Request, res: Response): Promise<void> => {
 
     // Lấy bài hát đầu tiên trong album
     const firstTrack = album.tracks[0];
+
+    // Kiểm tra xem URL âm thanh có hợp lệ không
+    if (!firstTrack.audioUrl || !firstTrack.audioUrl.startsWith('http')) {
+      res.status(400).json({ message: 'Invalid audio URL' });
+      return;
+    }
 
     // Cache response
     const cacheKey = `/api/albums/${albumId}/play`;

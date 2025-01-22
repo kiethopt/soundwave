@@ -80,6 +80,8 @@ export const clearCacheForEntity = async (
     const patterns = [
       `/api/${entity}s*`, // Xóa cache của entity
       ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
+      `/api/${entity}s/play*`, // Thêm pattern cho route play
+      `/api/${entity}/play*`, // Thêm pattern cho route play (số ít)
     ];
 
     // Nếu clearSearch = true, thêm các pattern liên quan đến tìm kiếm
@@ -89,7 +91,9 @@ export const clearCacheForEntity = async (
         '/api/*/search*', // Cache của các route search con
         '/search-all*', // Cache của searchAll
         '/api/users/search-all*', // Cache của user search
-        '/api/user/search-all*' // Thêm pattern này để xóa cache của user search
+        '/api/user/search-all*', // Cache của user search
+        `/api/${entity}s/search*`, // Cache của entity search
+        `/api/${entity}/search*` // Cache của entity search (số ít)
       );
     }
 
@@ -98,6 +102,23 @@ export const clearCacheForEntity = async (
       const keys = await client.keys(pattern);
       if (keys.length) {
         console.log(`Clearing cache for pattern: ${pattern}, keys:`, keys);
+        await Promise.all(keys.map((key) => client.del(key)));
+      }
+    }
+
+    // Xóa thêm các cache liên quan đến play và search
+    const additionalPatterns = [
+      '*play*', // Bất kỳ key nào có chứa 'play'
+      '*search*', // Bất kỳ key nào có chứa 'search'
+    ];
+
+    for (const pattern of additionalPatterns) {
+      const keys = await client.keys(pattern);
+      if (keys.length) {
+        console.log(
+          `Clearing additional cache for pattern: ${pattern}, keys:`,
+          keys
+        );
         await Promise.all(keys.map((key) => client.del(key)));
       }
     }

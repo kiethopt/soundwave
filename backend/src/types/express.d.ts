@@ -7,6 +7,7 @@ declare global {
       user?: {
         id: string;
         role: Role;
+        isActive: boolean;
         artistProfile?: {
           id: string | null;
           isVerified: boolean;

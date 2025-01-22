@@ -6,6 +6,8 @@ import { Role } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { addHours } from 'date-fns';
 import sgMail from '@sendgrid/mail';
+import { clearCacheForEntity } from '../middleware/cache.middleware';
+import { sessionService } from 'src/services/session.service';
 
 const userSelect = {
   id: true,
@@ -15,6 +17,8 @@ const userSelect = {
   avatar: true,
   role: true,
   isActive: true,
+  createdAt: true,
+  updatedAt: true,
   lastLoginAt: true,
   passwordResetToken: true,
   passwordResetExpires: true,
@@ -193,8 +197,7 @@ export const validateToken = async (
       user,
     });
   } catch (error) {
-    console.error('Validate token error:', error);
-    next(error); // Chuyển lỗi đến middleware xử lý lỗi
+    next(error);
   }
 };
 
@@ -293,6 +296,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       select: userSelect, // Sử dụng userSelect để trả về thông tin người dùng
     });
 
+    // Clear cache sau khi tạo user mới
+    await clearCacheForEntity('user', { clearSearch: true });
+
     res.status(201).json({ message: 'User registered successfully', user });
   } catch (error) {
     console.error('Register error:', error);
@@ -315,7 +321,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Tìm người dùng theo email
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { ...userSelect, password: true },
+      select: { ...userSelect, password: true, role: true, isActive: true },
     });
 
     if (!user) {
@@ -323,10 +329,19 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Kiểm tra trạng thái tài khoản trước khi cho phép đăng nhập
+    if (!user.isActive) {
+      res.status(403).json({
+        message:
+          'Your account has been deactivated. Please contact administrator.',
+      });
+      return;
+    }
+
     // Kiểm tra mật khẩu
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      res.status(400).json({ message: 'Invalid email or password' });
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      res.status(401).json({ message: 'Invalid email or password' });
       return;
     }
 
@@ -336,15 +351,19 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       data: { lastLoginAt: new Date() },
     });
 
-    // Loại bỏ password khỏi phản hồi
-    const { password: _, ...userWithoutPassword } = user;
-
     // Tạo JWT token
     const token = generateToken(user.id, user.role, user.artistProfile);
+
+    // Tạo session mới
+    const sessionId = await sessionService.createSession(user);
+
+    // Loại bỏ password khỏi phản hồi
+    const { password: _, ...userWithoutPassword } = user;
 
     res.json({
       message: 'Login successful',
       token,
+      sessionId,
       user: userWithoutPassword,
     });
   } catch (error) {

@@ -8,6 +8,7 @@ import {
   resetPassword,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
+import { sessionMiddleware } from 'src/middleware/session.middleware';
 
 const router = express.Router();
 
@@ -20,7 +21,6 @@ router.post('/reset-password', resetPassword);
 // Route đăng ký admin (chỉ dành cho development)
 router.post('/register-admin', registerAdmin);
 
-// Route kiểm tra token
-router.get('/validate-token', authenticate, validateToken);
+router.get('/validate-token', authenticate, sessionMiddleware, validateToken);
 
 export default router;

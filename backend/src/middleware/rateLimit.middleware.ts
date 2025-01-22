@@ -12,7 +12,7 @@ export const apiRateLimiter = rateLimit({
 // Rate limiting cho các route query nhiều (ví dụ: getAllUsers, getAllAlbums, v.v.)
 export const queryRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 phút
-  max: 10, // Giới hạn mỗi IP được gửi tối đa 10 request trong 1 phút
+  max: 30,
   message: 'Too many query requests, please wait a moment before trying again',
   standardHeaders: true,
   legacyHeaders: false,

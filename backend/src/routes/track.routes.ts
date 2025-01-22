@@ -15,6 +15,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload, { handleUploadError } from '../middleware/upload.middleware';
 import { cacheMiddleware } from '../middleware/cache.middleware';
+import { sessionMiddleware } from 'src/middleware/session.middleware';
 
 const router = express.Router();
 
@@ -55,13 +56,9 @@ router.get('/search', authenticate, searchTrack);
 router.post(
   '/:trackId/play',
   authenticate,
+  sessionMiddleware,
   cacheMiddleware,
-  (req: Request, res: Response) => {
-    playTrack(req, res).catch((error) => {
-      console.error('Play track error:', error);
-      res.status(500).json({ message: 'Internal server error' });
-    });
-  }
+  playTrack
 );
 
 // Route cập nhật track (ADMIN & ARTIST only)

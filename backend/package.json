@@ -22,6 +22,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.2",
     "@types/nodemailer": "^6.4.17",
+    "@types/pusher-js": "^4.2.2",
     "@types/uuid": "^10.0.0",
     "prisma": "^6.2.1",
     "tsx": "^4.19.2",
@@ -42,10 +43,16 @@
     "express-rate-limit": "^7.5.0",
     "fs-extra": "^11.3.0",
     "jsonwebtoken": "^9.0.2",
+    "module-alias": "^2.2.3",
     "multer": "^1.4.5-lts.1",
     "music-metadata": "^10.7.0",
     "nodemailer": "^6.9.16",
+    "punycode": "^2.3.1",
+    "pusher": "^5.2.0",
     "redis": "^4.7.0",
     "uuid": "^11.0.4"
+  },
+  "_moduleAliases": {
+    "punycode": "node_modules/punycode"
   }
 }

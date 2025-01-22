@@ -8,8 +8,10 @@ const fetchWithAuth = async (
   options: RequestInit = {},
   token?: string
 ) => {
+  const sessionId = localStorage.getItem('sessionId');
   const headers: Record<string, string> = {
     ...(token && { Authorization: `Bearer ${token}` }),
+    ...(sessionId && { 'Session-ID': sessionId }),
     ...(options.headers as Record<string, string>),
   };
 
@@ -23,8 +25,19 @@ const fetchWithAuth = async (
   });
 
   if (!response.ok) {
-    const errorResponse = await response.json();
-    throw new Error(errorResponse.message || 'An unexpected error occurred');
+    const errorText = await response.text();
+    let errorMessage = 'An unexpected error occurred';
+
+    try {
+      // Thử parse JSON nếu có thể
+      const errorResponse = JSON.parse(errorText);
+      errorMessage = errorResponse.message || errorMessage;
+    } catch (e) {
+      // Nếu không parse được, sử dụng nguyên văn bản lỗi
+      errorMessage = errorText;
+    }
+
+    throw new Error(errorMessage);
   }
 
   return response.json();
@@ -76,6 +89,18 @@ export const api = {
 
     validateToken: async (token: string) =>
       fetchWithAuth('/api/auth/validate-token', { method: 'GET' }, token),
+  },
+
+  session: {
+    handleAudioPlay: async (userId: string, sessionId: string, token: string) =>
+      fetchWithAuth(
+        `/api/session/handle-audio-play`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ userId, sessionId }),
+        },
+        token
+      ),
   },
 
   admin: {
@@ -147,7 +172,7 @@ export const api = {
         `/api/admin/users?page=${page}&limit=${limit}`,
         { method: 'GET' },
         token
-      ),
+      ).then((res) => res.data || res.users || []),
 
     getUserById: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/users/${id}`, { method: 'GET' }, token),
@@ -164,6 +189,20 @@ export const api = {
 
     deleteUser: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/users/${id}`, { method: 'DELETE' }, token),
+
+    deactivateUser: async (
+      id: string,
+      data: { isActive: boolean },
+      token: string
+    ) =>
+      fetchWithAuth(
+        `/api/admin/users/${id}/deactivate`,
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        },
+        token
+      ),
 
     getAllGenres: async (token: string, page: number, limit: number) =>
       fetchWithAuth(

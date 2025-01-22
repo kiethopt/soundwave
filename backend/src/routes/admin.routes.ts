@@ -18,6 +18,7 @@ import {
   verifyArtist,
   updateMonthlyListeners,
   getArtistRequestDetails,
+  deactivateUser,
 } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -44,6 +45,7 @@ router.get('/users', queryRateLimiter, authorize([Role.ADMIN]), getAllUsers);
 router.get('/users/:id', authorize([Role.ADMIN]), getUserById);
 router.put('/users/:id', updateUser);
 router.delete('/users/:id', deleteUser);
+router.post('/users/:id/deactivate', authorize([Role.ADMIN]), deactivateUser);
 
 // Quản lý nghệ sĩ
 router.get('/artists', queryRateLimiter, getAllArtists);

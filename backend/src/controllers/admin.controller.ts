@@ -8,6 +8,8 @@ import {
   client,
   setCache,
 } from '../middleware/cache.middleware';
+import pusher from '../config/pusher';
+import { sessionService } from 'src/services/session.service';
 
 // Định nghĩa các select cho user
 const userSelect = {
@@ -408,25 +410,42 @@ export const getAllUsers = async (
 ): Promise<void> => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
+    const offset = (pageNumber - 1) * limitNumber;
+
+    // Tạo cache key dựa trên tham số phân trang
+    const cacheKey = `users:list:${page}:${limit}`;
+
+    // Thử lấy dữ liệu từ cache
+    const cachedData = await client.get(cacheKey);
+    if (cachedData) {
+      res.json(JSON.parse(cachedData));
+      return;
+    }
 
     const users = await prisma.user.findMany({
       skip: offset,
-      take: Number(limit),
+      take: limitNumber,
       select: userSelect,
     });
 
     const totalUsers = await prisma.user.count();
 
-    res.json({
+    const response = {
       users,
       pagination: {
         total: totalUsers,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(totalUsers / Number(limit)),
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(totalUsers / limitNumber),
       },
-    });
+    };
+
+    // Lưu vào cache với thời gian sống là 5 phút
+    await client.setEx(cacheKey, 300, JSON.stringify(response));
+
+    res.json(response);
   } catch (error) {
     console.error('Get all users error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -853,6 +872,88 @@ export const deleteUser = async (
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Delete user error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Deactivate user (Khóa tài khoản người dùng)
+export const deactivateUser = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+    const admin = req.user;
+
+    // Kiểm tra quyền admin
+    if (!admin || admin.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    // Kiểm tra user tồn tại
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        role: true,
+        isActive: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    // Không cho phép deactivate ADMIN
+    if (user.role === Role.ADMIN) {
+      res.status(403).json({ message: 'Cannot deactivate admin users' });
+      return;
+    }
+
+    // Cập nhật trạng thái user
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        isActive: isActive,
+      },
+      select: userSelect,
+    });
+
+    // Clear tất cả cache liên quan đến users list
+    const keys = await client.keys('users:list:*');
+    if (keys.length) {
+      await Promise.all(keys.map((key) => client.del(key)));
+    }
+
+    // Clear cache của user cụ thể và các cache liên quan
+    await Promise.all([
+      clearCacheForEntity('user', {
+        entityId: id,
+        clearSearch: true,
+      }),
+      clearCacheForEntity('stats', {}),
+      user.role === Role.ARTIST
+        ? clearCacheForEntity('artist', { clearSearch: true })
+        : null,
+    ]);
+
+    // Chỉ gửi thông báo Pusher khi deactivate tài khoản
+    if (!isActive) {
+      await sessionService.handleUserDeactivation(user.id);
+    }
+
+    res.json({
+      message: isActive
+        ? 'User activated successfully'
+        : 'User deactivated successfully',
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('Deactivate user error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

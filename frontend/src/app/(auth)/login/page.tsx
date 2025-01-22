@@ -34,6 +34,7 @@ function LoginForm() {
 
         if (response.token && response.user) {
           localStorage.setItem('userToken', response.token);
+          localStorage.setItem('sessionId', response.sessionId);
           localStorage.setItem('userData', JSON.stringify(response.user));
 
           if (response.user.role === 'ADMIN') {

@@ -3,8 +3,9 @@
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar/Sidebar';
 import Header from '@/components/layout/Header/Header';
-import { usePathname } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import pusher from '@/utils/pusher';
 
 export default function RootLayout({
   children,
@@ -12,6 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const isAuthPage = useMemo(
@@ -22,6 +24,32 @@ export default function RootLayout({
       pathname?.includes('/forgot-password'),
     [pathname]
   );
+
+  useEffect(() => {
+    const userDataStr = localStorage.getItem('userData');
+    if (userDataStr) {
+      const user = JSON.parse(userDataStr);
+      const channel = pusher.subscribe(`user-${user.id}`);
+
+      // Handle account deactivation
+      channel.bind('account-status', (data: any) => {
+        if (data.type === 'ACCOUNT_DEACTIVATED') {
+          // Clear all auth data
+          localStorage.removeItem('userToken');
+          localStorage.removeItem('userData');
+          localStorage.removeItem('sessionId');
+
+          // Redirect to login with message
+          router.push('/login?message=account_deactivated');
+        }
+      });
+
+      return () => {
+        channel.unbind('account-status');
+        pusher.unsubscribe(`user-${user.id}`);
+      };
+    }
+  }, [router]);
 
   return (
     <html lang="vi" suppressHydrationWarning={true}>

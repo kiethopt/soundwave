@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
+import pusher from '@/utils/pusher';
 
 type FilterType = 'all' | 'albums' | 'tracks' | 'artists' | 'users';
 
@@ -81,6 +82,7 @@ function SearchContent() {
     { label: 'Users', value: 'users' },
   ];
 
+  // Fetch search results
   useEffect(() => {
     const fetchResults = async () => {
       if (!query) {
@@ -91,8 +93,6 @@ function SearchContent() {
       setIsLoading(true);
       try {
         const token = localStorage.getItem('userToken');
-
-        // Kiểm tra token
         if (!token) {
           router.push('/login');
           return;
@@ -102,7 +102,6 @@ function SearchContent() {
         setResults(searchResult);
       } catch (error: any) {
         console.error('Search error:', error);
-        // Nếu lỗi là unauthorized hoặc token invalid, chuyển về trang login
         if (
           error.message === 'Unauthorized' ||
           error.message === 'User not found'
@@ -117,36 +116,59 @@ function SearchContent() {
     fetchResults();
   }, [query, router]);
 
-  // Preload metadata của các track khi component mount
   useEffect(() => {
-    const preloadMetadata = async (url: string) => {
-      const audio = new Audio(url);
-      audio.preload = 'metadata';
-      await audio.load();
-    };
+    const userDataStr = localStorage.getItem('userData');
+    if (userDataStr) {
+      const user = JSON.parse(userDataStr);
 
-    results.tracks.forEach((track) => {
-      preloadMetadata(track.audioUrl);
-    });
-  }, [results.tracks]);
+      // Subscribe vào channel của user
+      const channel = pusher.subscribe(`user-${user.id}`);
 
+      // Lắng nghe sự kiện audio-control
+      channel.bind('audio-control', (data: any) => {
+        if (data.type === 'STOP_OTHER_SESSIONS') {
+          // Dừng phát nhạc nếu đang phát
+          if (audioRef.current) {
+            audioRef.current.pause();
+            setCurrentlyPlaying(null);
+            setCurrentlyPlayingAlbum(null);
+          }
+        }
+      });
+
+      // Cleanup function
+      return () => {
+        channel.unbind('audio-control');
+        pusher.unsubscribe(`user-${user.id}`);
+      };
+    }
+  }, []);
+
+  // Xử lý play/pause track hoặc album
   const handlePlayPause = async (item: Track | Album) => {
     try {
       const token = localStorage.getItem('userToken');
-      if (!token) {
+      const sessionId = localStorage.getItem('sessionId');
+      const userDataStr = localStorage.getItem('userData');
+
+      if (!token || !sessionId || !userDataStr) {
         router.push('/login');
         return;
       }
 
+      const user = JSON.parse(userDataStr);
       const isAlbum = 'trackCount' in item;
       const itemId = item.id;
 
-      // Pause current audio if playing
+      // Gọi API để thông báo bắt đầu phát nhạc
+      await api.session.handleAudioPlay(user.id, sessionId, token);
+
+      // Xử lý phát nhạc
       if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.currentTime = trackCurrentTimes[itemId] || 0;
       }
 
-      // If clicking on currently playing item, just pause it
       if ((isAlbum ? currentlyPlayingAlbum : currentlyPlaying) === itemId) {
         setTrackCurrentTimes({
           ...trackCurrentTimes,
@@ -159,43 +181,32 @@ function SearchContent() {
         return;
       }
 
-      try {
-        let response;
+      let response;
+      if (isAlbum) {
+        response = await api.albums.playAlbum(itemId, token);
+      } else {
+        response = await api.tracks.play(itemId, token);
+      }
+
+      const audio = new Audio(response.track.audioUrl);
+      audioRef.current = audio;
+      audio.currentTime = trackCurrentTimes[itemId] || 0;
+      await audio.play();
+
+      audio.onended = () => {
         if (isAlbum) {
-          response = await api.albums.playAlbum(itemId, token);
-          // Kiểm tra response có đúng định dạng không
-          if (!response?.track?.id || !response?.track?.audioUrl) {
-            console.error('Invalid response format:', response);
-            return;
-          }
-          setCurrentlyPlayingAlbum(itemId);
-          setCurrentlyPlaying(response.track.id);
-        } else {
-          response = await api.tracks.play(itemId, token);
-          if (!response?.track?.id || !response?.track?.audioUrl) {
-            console.error('Invalid response format:', response);
-            return;
-          }
-          setCurrentlyPlaying(itemId);
           setCurrentlyPlayingAlbum(null);
         }
+        setCurrentlyPlaying(null);
+      };
 
-        const audio = new Audio(response.track.audioUrl);
-        audioRef.current = audio;
-        audio.currentTime = trackCurrentTimes[itemId] || 0;
-        await audio.play();
-
-        audio.onended = () => {
-          if (isAlbum) {
-            setCurrentlyPlayingAlbum(null);
-          }
-          setCurrentlyPlaying(null);
-        };
-      } catch (error) {
-        console.error('Error playing audio:', error);
+      if (isAlbum) {
+        setCurrentlyPlayingAlbum(itemId);
+      } else {
+        setCurrentlyPlaying(itemId);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error playing audio:', error);
     }
   };
 

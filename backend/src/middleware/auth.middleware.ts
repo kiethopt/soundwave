@@ -11,10 +11,8 @@ export const authenticate = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  console.log('Checking authentication...'); // Log để debug
   const token = req.header('Authorization')?.replace('Bearer ', '');
   if (!token) {
-    console.log('No token provided'); // Log để debug
     res.status(401).json({ message: 'Access denied. No token provided.' });
     return;
   }
@@ -27,12 +25,13 @@ export const authenticate = async (
       verificationRequestedAt?: string;
     };
 
-    // Lấy thông tin artistProfile từ database
+    // Lấy thông tin user từ database
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: {
         id: true,
         role: true,
+        isActive: true,
         artistProfile: {
           select: {
             id: true,
@@ -48,10 +47,21 @@ export const authenticate = async (
       return;
     }
 
+    // Kiểm tra trạng thái active trừ khi là ADMIN
+    if (!user.isActive && user.role !== Role.ADMIN) {
+      res.status(403).json({
+        message:
+          'Your account has been deactivated. Please contact administrator.',
+        code: 'ACCOUNT_DEACTIVATED',
+      });
+      return;
+    }
+
     // Gán thông tin user vào request
     req.user = {
       id: user.id,
       role: user.role,
+      isActive: user.isActive,
       artistProfile: user.artistProfile
         ? {
             id: user.artistProfile.id,
@@ -62,25 +72,18 @@ export const authenticate = async (
         : undefined,
     };
 
-    console.log('User authenticated:', req.user); // Log để debug
     next();
   } catch (error) {
-    // Xử lý lỗi token hết hạn
     if (error instanceof TokenExpiredError) {
-      console.log('Token expired at:', error.expiredAt); // Log thời gian hết hạn
       res.status(401).json({ message: 'Token expired. Please log in again.' });
       return;
     }
 
-    // Xử lý lỗi token không hợp lệ
     if (error instanceof JsonWebTokenError) {
-      console.log('Invalid token:', error.message); // Log thông báo lỗi
       res.status(401).json({ message: 'Invalid token. Please log in again.' });
       return;
     }
 
-    // Xử lý các lỗi khác
-    console.error('Unexpected authentication error:', error); // Log lỗi không mong đợi
     res
       .status(500)
       .json({ message: 'Internal server error during authentication.' });
@@ -91,12 +94,23 @@ export const authenticate = async (
 export const authorize = (roles: Role[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = req.user;
+
     if (!user || !roles.includes(user.role)) {
-      res
-        .status(403)
-        .json({ message: 'You do not have permission to perform this action' });
+      res.status(403).json({
+        message: 'You do not have permission to perform this action',
+      });
       return;
     }
+
+    if (!user.isActive && user.role !== Role.ADMIN) {
+      res.status(403).json({
+        message:
+          'Your account has been deactivated. Please contact administrator.',
+        code: 'ACCOUNT_DEACTIVATED',
+      });
+      return;
+    }
+
     next();
   };
 };

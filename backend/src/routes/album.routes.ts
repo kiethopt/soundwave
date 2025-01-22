@@ -14,6 +14,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload, { handleUploadError } from '../middleware/upload.middleware';
 import { cacheMiddleware, setCache } from '../middleware/cache.middleware';
+import { sessionMiddleware } from 'src/middleware/session.middleware';
 
 const router = express.Router();
 
@@ -86,7 +87,13 @@ router.get('/search', cacheMiddleware, (req: Request, res: Response) => {
 });
 
 // Route phát album
-router.post('/:albumId/play', authenticate, cacheMiddleware, playAlbum);
+router.post(
+  '/:albumId/play',
+  authenticate,
+  sessionMiddleware,
+  cacheMiddleware,
+  playAlbum
+);
 
 // PUBLIC routes
 // Route lấy thông tin album theo ID (có cache)
