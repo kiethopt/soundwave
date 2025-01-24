@@ -127,6 +127,12 @@ export interface Track {
   updatedAt: string;
   artistId: string;
   albumId?: string;
+  album?: {
+    id: string;
+    title: string;
+    coverUrl?: string;
+    type: 'ALBUM' | 'EP' | 'SINGLE';
+  };
   artist: {
     id: string;
     artistName: string;
