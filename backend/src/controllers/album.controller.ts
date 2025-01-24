@@ -11,75 +11,7 @@ import {
 } from '../services/cloudinary.service';
 import { Role, AlbumType, Prisma } from '@prisma/client';
 import { sessionService } from 'src/services/session.service';
-
-const albumSelect = {
-  id: true,
-  title: true,
-  coverUrl: true,
-  releaseDate: true,
-  trackCount: true,
-  duration: true,
-  type: true,
-  isActive: true,
-  createdAt: true,
-  updatedAt: true,
-  artist: {
-    select: {
-      id: true,
-      artistName: true,
-      avatar: true,
-      isVerified: true,
-    },
-  },
-  tracks: {
-    where: { isActive: true },
-    orderBy: { trackNumber: 'asc' },
-    select: {
-      id: true,
-      title: true,
-      duration: true,
-      releaseDate: true,
-      trackNumber: true,
-      coverUrl: true,
-      audioUrl: true,
-      playCount: true,
-      type: true,
-      artist: {
-        select: {
-          id: true,
-          artistName: true,
-          isVerified: true,
-        },
-      },
-      featuredArtists: {
-        select: {
-          artistProfile: {
-            select: {
-              id: true,
-              artistName: true,
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  },
-  genres: {
-    select: {
-      genre: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-    },
-  },
-} as const;
+import { albumSelect } from 'src/utils/prisma-selects';
 
 // Function để kiểm tra quyền
 const canManageAlbum = (user: any, albumArtistId: string) => {

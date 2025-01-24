@@ -3,67 +3,7 @@ import prisma from '../config/db';
 import { Role } from '@prisma/client';
 import { uploadFile } from '../services/cloudinary.service';
 import { client } from '../middleware/cache.middleware';
-
-const artistSelect = {
-  id: true,
-  email: true,
-  name: true,
-  avatar: true,
-  createdAt: true,
-  artistProfile: {
-    select: {
-      id: true,
-      artistName: true,
-      bio: true,
-      avatar: true,
-      socialMediaLinks: true,
-      monthlyListeners: true,
-      isVerified: true,
-      verificationRequestedAt: true,
-      verifiedAt: true,
-      createdAt: true,
-      genres: {
-        select: {
-          genre: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-      },
-    },
-  },
-  albums: {
-    select: {
-      id: true,
-      title: true,
-      coverUrl: true,
-      releaseDate: true,
-      trackCount: true,
-      duration: true,
-      type: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
-  tracks: {
-    select: {
-      id: true,
-      title: true,
-      duration: true,
-      releaseDate: true,
-      trackNumber: true,
-      coverUrl: true,
-      audioUrl: true,
-      playCount: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
-} as const;
+import { artistProfileSelect } from 'src/utils/prisma-selects';
 
 // Cho phép tất cả các Artist xem thông tin của nhau
 const canViewArtistData = async (
@@ -200,7 +140,7 @@ export const getArtistProfile = async (
       where: { id },
       include: {
         user: {
-          select: artistSelect,
+          select: artistProfileSelect,
         },
       },
     });

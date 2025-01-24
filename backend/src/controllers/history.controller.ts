@@ -1,40 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { HistoryType } from '@prisma/client';
-
-export const historySelect = {
-  id: true,
-  type: true,
-  query: true,
-  duration: true,
-  completed: true,
-  playCount: true,
-  createdAt: true,
-  updatedAt: true,
-  track: {
-    select: {
-      id: true,
-      title: true,
-      duration: true,
-      coverUrl: true,
-      audioUrl: true,
-      artist: {
-        select: {
-          id: true,
-          artistName: true,
-          avatar: true,
-        },
-      },
-    },
-  },
-  user: {
-    select: {
-      id: true,
-      name: true,
-      avatar: true,
-    },
-  },
-} as const;
+import { historySelect } from 'src/utils/prisma-selects';
 
 // Lưu lịch sử nghe nhạc
 export const savePlayHistory = async (

@@ -3,41 +3,7 @@ import prisma from '../config/db';
 import { FollowingType, HistoryType, Role } from '@prisma/client';
 import { client, setCache } from '../middleware/cache.middleware';
 import { uploadFile } from '../services/cloudinary.service';
-
-const userSelect = {
-  id: true,
-  email: true,
-  username: true,
-  avatar: true,
-  role: true,
-  createdAt: true,
-  updatedAt: true,
-  name: true,
-  lastLoginAt: true,
-  artistProfile: {
-    select: {
-      id: true,
-      artistName: true,
-      bio: true,
-      avatar: true,
-      socialMediaLinks: true,
-      monthlyListeners: true,
-      isVerified: true,
-      verificationRequestedAt: true,
-      verifiedAt: true,
-      genres: {
-        select: {
-          genre: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-      },
-    },
-  },
-};
+import { userSelect } from 'src/utils/prisma-selects';
 
 // Hàm validation cho dữ liệu nghệ sĩ
 const validateArtistData = (data: any): string | null => {

@@ -5,79 +5,13 @@ import {
   CloudinaryUploadResult,
 } from '../services/cloudinary.service';
 import { AlbumType, Role, HistoryType, Prisma } from '@prisma/client';
-import { historySelect } from './history.controller';
 import {
   clearCacheForEntity,
   client,
   setCache,
 } from '../middleware/cache.middleware';
 import { sessionService } from 'src/services/session.service';
-
-const trackSelect = {
-  id: true,
-  title: true,
-  duration: true,
-  releaseDate: true,
-  trackNumber: true,
-  coverUrl: true,
-  audioUrl: true,
-  playCount: true,
-  type: true,
-  isActive: true,
-  createdAt: true,
-  updatedAt: true,
-  artistId: true,
-  artist: {
-    select: {
-      id: true,
-      artistName: true,
-      avatar: true,
-      isVerified: true,
-      user: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-    },
-  },
-  featuredArtists: {
-    select: {
-      artistProfile: {
-        select: {
-          id: true,
-          artistName: true,
-          avatar: true,
-          isVerified: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-      },
-    },
-  },
-  album: {
-    select: {
-      id: true,
-      title: true,
-      coverUrl: true,
-      type: true,
-    },
-  },
-  genres: {
-    select: {
-      genre: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-    },
-  },
-} as const;
+import { historySelect, trackSelect } from 'src/utils/prisma-selects';
 
 // Function để kiểm tra quyền
 const canManageTrack = (user: any, trackArtistId: string) => {
