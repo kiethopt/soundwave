@@ -38,6 +38,7 @@ export default function ArtistDetail({
         if (!token) throw new Error('No authentication token found');
 
         const response = await api.admin.getArtistById(id, token);
+        console.log('Artist data:', response);
         if (!response) throw new Error('Artist not found');
         setArtist(response);
       } catch (err) {
@@ -294,7 +295,7 @@ export default function ArtistDetail({
                               {album.title}
                             </Link>
                             <p className="text-sm text-white/60">
-                              {album.trackCount} tracks ·{' '}
+                              {album.totalTracks} tracks ·{' '}
                               {formatDuration(album.duration)}
                             </p>
                             <p className="text-sm text-white/60">

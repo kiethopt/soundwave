@@ -93,8 +93,8 @@ model Album {
   title       String
   coverUrl    String?
   releaseDate DateTime
-  trackCount  Int       @db.Integer
   duration    Int       @default(0) @db.Integer
+  totalTracks Int       @default(0) @db.Integer
   type        AlbumType @default(ALBUM)
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())

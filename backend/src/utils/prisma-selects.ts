@@ -5,8 +5,8 @@ export const albumSelect = {
   title: true,
   coverUrl: true,
   releaseDate: true,
-  trackCount: true,
   duration: true,
+  totalTracks: true,
   type: true,
   isActive: true,
   createdAt: true,
@@ -20,7 +20,6 @@ export const albumSelect = {
     },
   },
   tracks: {
-    where: { isActive: true },
     orderBy: { trackNumber: 'asc' },
     select: {
       id: true,
@@ -32,10 +31,16 @@ export const albumSelect = {
       audioUrl: true,
       playCount: true,
       type: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+      artistId: true,
+      albumId: true,
       artist: {
         select: {
           id: true,
           artistName: true,
+          avatar: true,
           isVerified: true,
         },
       },
@@ -45,12 +50,8 @@ export const albumSelect = {
             select: {
               id: true,
               artistName: true,
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
+              avatar: true,
+              isVerified: true,
             },
           },
         },
@@ -212,6 +213,81 @@ export const userSelect = {
       artistName: true,
       isVerified: true,
       verificationRequestedAt: true,
+      albums: {
+        select: {
+          id: true,
+          title: true,
+          coverUrl: true,
+          releaseDate: true,
+          duration: true,
+          type: true,
+          isActive: true,
+          tracks: {
+            select: {
+              id: true,
+              title: true,
+              duration: true,
+              releaseDate: true,
+              trackNumber: true,
+              coverUrl: true,
+              audioUrl: true,
+              playCount: true,
+              type: true,
+              isActive: true,
+              featuredArtists: {
+                select: {
+                  artistProfile: {
+                    select: {
+                      id: true,
+                      artistName: true,
+                      avatar: true,
+                      isVerified: true,
+                      user: {
+                        select: {
+                          id: true,
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      tracks: {
+        select: {
+          id: true,
+          title: true,
+          duration: true,
+          releaseDate: true,
+          trackNumber: true,
+          coverUrl: true,
+          audioUrl: true,
+          playCount: true,
+          type: true,
+          isActive: true,
+          featuredArtists: {
+            select: {
+              artistProfile: {
+                select: {
+                  id: true,
+                  artistName: true,
+                  avatar: true,
+                  isVerified: true,
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   },
 } satisfies Prisma.UserSelect;
@@ -263,7 +339,6 @@ export const genreSelect = {
           title: true,
           coverUrl: true,
           releaseDate: true,
-          trackCount: true,
           duration: true,
           type: true,
           isActive: true,
@@ -310,3 +385,115 @@ export const genreSelect = {
     },
   },
 } satisfies Prisma.GenreSelect;
+
+// Các hàm khác
+export const searchAlbumSelect = {
+  id: true,
+  title: true,
+  coverUrl: true,
+  releaseDate: true,
+  duration: true,
+  type: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  artist: {
+    select: {
+      id: true,
+      artistName: true,
+      avatar: true,
+      isVerified: true,
+    },
+  },
+  tracks: {
+    where: { isActive: true },
+    orderBy: { trackNumber: 'asc' },
+    select: {
+      id: true,
+      title: true,
+      duration: true,
+      releaseDate: true,
+      trackNumber: true,
+      coverUrl: true,
+      audioUrl: true,
+      playCount: true,
+      type: true,
+      artist: {
+        select: {
+          id: true,
+          artistName: true,
+        },
+      },
+      featuredArtists: {
+        select: {
+          artistProfile: {
+            select: {
+              id: true,
+              artistName: true,
+            },
+          },
+        },
+      },
+    },
+  },
+  genres: {
+    select: {
+      genre: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.AlbumSelect;
+
+export const searchTrackSelect = {
+  id: true,
+  title: true,
+  duration: true,
+  releaseDate: true,
+  trackNumber: true,
+  coverUrl: true,
+  audioUrl: true,
+  playCount: true,
+  type: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  artist: {
+    select: {
+      id: true,
+      artistName: true,
+      avatar: true,
+      isVerified: true,
+    },
+  },
+  featuredArtists: {
+    select: {
+      artistProfile: {
+        select: {
+          id: true,
+          artistName: true,
+        },
+      },
+    },
+  },
+  album: {
+    select: {
+      id: true,
+      title: true,
+      coverUrl: true,
+    },
+  },
+  genres: {
+    select: {
+      genre: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.TrackSelect;

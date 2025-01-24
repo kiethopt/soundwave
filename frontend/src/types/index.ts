@@ -65,7 +65,7 @@ export interface Artist {
   name: string | null;
   avatar: string | null;
   createdAt: string;
-  artistProfile: ArtistProfile; // Sử dụng ArtistProfile thay vì định nghĩa lại
+  artistProfile: ArtistProfile;
 }
 
 export interface ArtistRequest {
@@ -91,16 +91,25 @@ export interface Album {
   title: string;
   coverUrl?: string;
   releaseDate: string;
-  trackCount: number;
   duration: number;
+  totalTracks: number;
   type: 'ALBUM' | 'EP' | 'SINGLE';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  artist: ArtistProfile; // Thay đổi từ User sang ArtistProfile
-  artistId: string;
-  tracks?: Track[];
-  genres?: Genre[];
+  artist: {
+    id: string;
+    artistName: string;
+    avatar: string | null;
+    isVerified: boolean;
+  };
+  tracks: Track[];
+  genres: {
+    genre: {
+      id: string;
+      name: string;
+    };
+  }[];
 }
 
 export interface Track {
@@ -108,7 +117,7 @@ export interface Track {
   title: string;
   duration: number;
   releaseDate: string;
-  trackNumber?: number;
+  trackNumber: number;
   coverUrl?: string;
   audioUrl: string;
   playCount: number;
@@ -116,12 +125,22 @@ export interface Track {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  artist: ArtistProfile;
   artistId: string;
-  featuredArtists?: ArtistProfile[];
-  album?: Album;
   albumId?: string;
-  genres?: Genre[];
+  artist: {
+    id: string;
+    artistName: string;
+    avatar: string | null;
+    isVerified: boolean;
+  };
+  featuredArtists: {
+    artistProfile: {
+      id: string;
+      artistName: string;
+      avatar: string | null;
+      isVerified: boolean;
+    };
+  }[];
 }
 
 export interface Genre {

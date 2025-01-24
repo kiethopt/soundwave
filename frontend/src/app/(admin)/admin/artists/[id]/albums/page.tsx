@@ -25,17 +25,17 @@ export default function AdminAlbums() {
 
         let response;
         if (query) {
-          const data = await api.albums.search(query, token);
-          response = data.filter((a: Album) => a.artistId === id);
+          const { albums } = await api.albums.search(query, token); // Lấy data từ response
+          response = albums.filter((a: Album) => a.artist.id === id);
         } else {
+          // Sửa tên phương thức API
           response = await api.artists.getAlbums(id as string, token);
         }
 
+        console.log('Albums data:', response);
         setAlbums(response);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch albums');
-      } finally {
-        setLoading(false);
+        // ... giữ nguyên
       }
     },
     [id]
@@ -45,128 +45,69 @@ export default function AdminAlbums() {
     fetchAlbums();
   }, [fetchAlbums]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: FormEvent) => {
     e.preventDefault();
     fetchAlbums(searchInput);
   };
 
-  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchInput(e.target.value);
-  };
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {albums[0]?.artist.artistName}'s Albums
-          </h1>
-          <p className="text-white/60 mt-2">Manage artist's discography</p>
-        </div>
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Albums</h1>
         <Link
-          href={`/admin/artists/${id}/albums/new`}
-          className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90"
+          href={`/admin/artists/${id}/albums/create`}
+          className="flex items-center gap-2 bg-primary px-4 py-2 rounded-lg hover:bg-primary/90"
         >
-          <Plus className="w-4 h-4" />
-          New Album
+          <Plus size={20} />
+          <span>Create Album</span>
         </Link>
       </div>
 
-      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08]">
-        <div className="p-6 border-b border-white/[0.08]">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Album List</h2>
-            <form onSubmit={handleSearch} className="relative">
-              <input
-                type="text"
-                placeholder="Search albums..."
-                value={searchInput}
-                onChange={handleSearchInputChange}
-                className="pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent w-64"
-              />
-              <button
-                type="submit"
-                className="absolute left-3 top-1/2 transform -translate-y-1/2"
-              >
-                <Search className="text-white/40 w-4 h-4" />
-              </button>
-            </form>
-          </div>
+      <form onSubmit={handleSearch} className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search albums..."
+            className="w-full pl-10 pr-4 py-2 bg-black/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          />
         </div>
+      </form>
 
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {albums.map((album) => (
+          <Link
+            key={album.id}
+            href={`/admin/artists/${id}/albums/${album.id}`}
+            className="bg-black/20 rounded-lg overflow-hidden hover:bg-black/30 transition"
+          >
+            <div className="aspect-square relative">
+              {album.coverUrl ? (
+                <img
+                  src={album.coverUrl}
+                  alt={album.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-black/40">
+                  <Music size={48} className="text-gray-500" />
+                </div>
+              )}
             </div>
-          ) : albums.length > 0 ? (
-            <table className="w-full">
-              <thead className="bg-white/[0.03]">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                    Title
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                    Artist
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                    Release Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                    Tracks
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.08]">
-                {albums.map((album) => (
-                  <tr
-                    key={album.id}
-                    className="hover:bg-white/[0.03] transition-colors"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {album.coverUrl ? (
-                          <img
-                            src={album.coverUrl}
-                            alt={album.title}
-                            className="w-10 h-10 rounded-md mr-3 object-cover"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-md mr-3 bg-white/[0.03] flex items-center justify-center">
-                            <Music className="w-6 h-6 text-white/60" />
-                          </div>
-                        )}
-                        <Link
-                          href={`/admin/artists/${id}/albums/${album.id}`}
-                          className="font-medium hover:underline"
-                        >
-                          {album.title}
-                        </Link>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {album.artist.artistName}
-                      {album.artist.isVerified && (
-                        <span className="ml-1 text-blue-500">✓</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {new Date(album.releaseDate).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {album.trackCount || 0}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
-              <Music className="w-12 h-12 mb-4" />
-              <p>No albums found</p>
+            <div className="p-4">
+              <h3 className="font-semibold mb-1">{album.title}</h3>
+              <div className="text-sm text-gray-400">
+                <p>{new Date(album.releaseDate).getFullYear()}</p>
+                <p>{album.totalTracks} tracks</p>
+              </div>
             </div>
-          )}
-        </div>
+          </Link>
+        ))}
       </div>
     </div>
   );

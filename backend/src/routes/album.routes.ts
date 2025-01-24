@@ -97,17 +97,25 @@ router.post(
 
 // PUBLIC routes
 // Route lấy thông tin album theo ID (có cache)
-router.get('/:id', cacheMiddleware, (req: Request, res: Response) => {
-  getAlbumById(req)
-    .then((data) => {
-      setCache(req.originalUrl, data);
-      res.json(data);
-    })
-    .catch((error) => {
-      console.error('Get album error:', error);
-      res.status(500).json({ message: 'Internal server error' });
-    });
-});
+router.get(
+  '/:id',
+  authenticate,
+  cacheMiddleware,
+  (req: Request, res: Response) => {
+    getAlbumById(req)
+      .then((data) => {
+        res.json(data);
+      })
+      .catch((error) => {
+        console.error('Get album error:', error);
+        if (error.message === 'Album not found') {
+          res.status(404).json({ message: 'Album not found' });
+        } else {
+          res.status(500).json({ message: 'Internal server error' });
+        }
+      });
+  }
+);
 
 // Route lấy danh sách tất cả album (có cache)
 router.get(

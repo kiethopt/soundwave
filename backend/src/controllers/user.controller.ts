@@ -3,7 +3,11 @@ import prisma from '../config/db';
 import { FollowingType, HistoryType, Role } from '@prisma/client';
 import { client, setCache } from '../middleware/cache.middleware';
 import { uploadFile } from '../services/cloudinary.service';
-import { userSelect } from 'src/utils/prisma-selects';
+import {
+  searchAlbumSelect,
+  searchTrackSelect,
+  userSelect,
+} from 'src/utils/prisma-selects';
 
 // Hàm validation cho dữ liệu nghệ sĩ
 const validateArtistData = (data: any): string | null => {
@@ -201,6 +205,7 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
 
     // Thực hiện tìm kiếm album và track song song
     const [artists, albums, tracks, users] = await Promise.all([
+      // Artist
       prisma.user.findMany({
         where: {
           isActive: true,
@@ -254,6 +259,7 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
         },
       }),
 
+      // Album
       prisma.album.findMany({
         where: {
           isActive: true,
@@ -275,95 +281,25 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
             },
           ],
         },
-        select: {
-          id: true,
-          title: true,
-          coverUrl: true,
-          releaseDate: true,
-          trackCount: true,
-          duration: true,
-          type: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-          artist: {
-            select: {
-              id: true,
-              artistName: true,
-              avatar: true,
-              isVerified: true,
-            },
-          },
-          tracks: {
-            where: { isActive: true },
-            orderBy: { trackNumber: 'asc' },
-            select: {
-              id: true,
-              title: true,
-              duration: true,
-              releaseDate: true,
-              trackNumber: true,
-              coverUrl: true,
-              audioUrl: true,
-              playCount: true,
-              type: true,
-              artist: {
-                select: {
-                  id: true,
-                  artistName: true,
-                },
-              },
-              featuredArtists: {
-                select: {
-                  artistProfile: {
-                    select: {
-                      id: true,
-                      artistName: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-          genres: {
-            select: {
-              genre: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
+        select: searchAlbumSelect,
       }),
 
+      // Track
       prisma.track.findMany({
         where: {
           isActive: true,
           OR: [
-            {
-              title: {
-                contains: searchQuery,
-                mode: 'insensitive',
-              },
-            },
+            { title: { contains: searchQuery, mode: 'insensitive' } },
             {
               artist: {
-                artistName: {
-                  contains: searchQuery,
-                  mode: 'insensitive',
-                },
+                artistName: { contains: searchQuery, mode: 'insensitive' },
               },
             },
             {
               featuredArtists: {
                 some: {
                   artistProfile: {
-                    artistName: {
-                      contains: searchQuery,
-                      mode: 'insensitive',
-                    },
+                    artistName: { contains: searchQuery, mode: 'insensitive' },
                   },
                 },
               },
@@ -372,68 +308,18 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
               genres: {
                 some: {
                   genre: {
-                    name: {
-                      contains: searchQuery,
-                      mode: 'insensitive',
-                    },
+                    name: { contains: searchQuery, mode: 'insensitive' },
                   },
                 },
               },
             },
           ],
         },
-        select: {
-          id: true,
-          title: true,
-          duration: true,
-          releaseDate: true,
-          trackNumber: true,
-          coverUrl: true,
-          audioUrl: true,
-          playCount: true,
-          type: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-          artist: {
-            select: {
-              id: true,
-              artistName: true,
-              avatar: true,
-              isVerified: true,
-            },
-          },
-          featuredArtists: {
-            select: {
-              artistProfile: {
-                select: {
-                  id: true,
-                  artistName: true,
-                },
-              },
-            },
-          },
-          album: {
-            select: {
-              id: true,
-              title: true,
-              coverUrl: true,
-            },
-          },
-          genres: {
-            select: {
-              genre: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
+        select: searchTrackSelect,
         orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
       }),
 
+      // User
       prisma.user.findMany({
         where: {
           id: { not: user.id },

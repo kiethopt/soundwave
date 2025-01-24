@@ -11,7 +11,6 @@ import {
 import { sessionService } from 'src/services/session.service';
 import {
   artistProfileForUserSelect,
-  artistProfileSelect,
   genreSelect,
   userSelect,
 } from 'src/utils/prisma-selects';
@@ -216,7 +215,6 @@ export const getArtistRequests = async (
             title: true,
             coverUrl: true,
             releaseDate: true,
-            trackCount: true,
             duration: true,
             type: true,
             isActive: true,
@@ -234,6 +232,11 @@ export const getArtistRequests = async (
                 playCount: true,
                 type: true,
                 isActive: true,
+              },
+            },
+            _count: {
+              select: {
+                tracks: true,
               },
             },
           },
@@ -320,7 +323,6 @@ export const getArtistRequestDetails = async (
             title: true,
             coverUrl: true,
             releaseDate: true,
-            trackCount: true,
             duration: true,
             type: true,
             isActive: true,
@@ -749,10 +751,10 @@ export const getArtistById = async (
             title: true,
             coverUrl: true,
             releaseDate: true,
-            trackCount: true,
             duration: true,
             type: true,
             isActive: true,
+            totalTracks: true,
             tracks: {
               select: {
                 id: true,
