@@ -5,6 +5,7 @@ import { api } from '@/utils/api';
 import { Search, User, Check, RefreshCw, X, Eye } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ArtistRequest } from '@/types';
+import { toast } from 'react-toastify';
 
 export default function ArtistRequests() {
   const [requests, setRequests] = useState<ArtistRequest[]>([]);
@@ -70,27 +71,43 @@ export default function ArtistRequests() {
       }
 
       await api.admin.approveArtistRequest(requestId, token);
-      alert('Request approved successfully!');
+      toast.success('Artist request approved successfully!');
       fetchRequests(page, searchInput);
     } catch (err) {
       console.error('Error approving request:', err);
-      alert('Failed to approve request');
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to approve request'
+      );
     }
   };
 
   const handleReject = async (requestId: string) => {
+    // Xác nhận trước khi reject
+    if (!confirm('Are you sure you want to reject this artist request?')) {
+      return;
+    }
+
     try {
       const token = localStorage.getItem('userToken');
       if (!token) {
         throw new Error('No authentication token found');
       }
 
-      await api.admin.rejectArtistRequest(requestId, token);
-      alert('Request rejected successfully!');
+      const response = await api.admin.rejectArtistRequest(requestId, token);
+
+      // Kiểm tra hasPendingRequest từ response
+      if (response.hasPendingRequest === false) {
+        toast.success('Artist request rejected successfully!');
+      } else {
+        toast.error('Failed to update request status');
+      }
+
       fetchRequests(page, searchInput);
     } catch (err) {
       console.error('Error rejecting request:', err);
-      alert('Failed to reject request');
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to reject request'
+      );
     }
   };
 

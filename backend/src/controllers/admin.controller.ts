@@ -1075,6 +1075,8 @@ export const approveArtistRequest = async (
       clearCacheForEntity('track', { clearSearch: true }),
     ]);
 
+    await sessionService.handleArtistRequestApproval(artistProfile.user.id);
+
     res.json({
       message: 'Artist role approved successfully',
       user: updatedUser,
@@ -1091,16 +1093,15 @@ export const rejectArtistRequest = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { requestId } = req.body; // Sửa từ userId thành requestId
+    console.log('[Admin] Starting reject artist request process'); // Log debug
+    const { requestId } = req.body;
     const admin = req.user;
 
-    // Chỉ ADMIN mới có thể từ chối yêu cầu
     if (!admin || admin.role !== Role.ADMIN) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
 
-    // Tìm ArtistProfile bằng requestId
     const artistProfile = await prisma.artistProfile.findUnique({
       where: { id: requestId },
       include: {
@@ -1115,7 +1116,6 @@ export const rejectArtistRequest = async (
       },
     });
 
-    // Kiểm tra xem yêu cầu có tồn tại và chưa được xác thực không
     if (
       !artistProfile ||
       !artistProfile.verificationRequestedAt ||
@@ -1127,14 +1127,18 @@ export const rejectArtistRequest = async (
       return;
     }
 
-    // Xóa ArtistProfile nếu yêu cầu bị từ chối
+    // Xóa artist profile
     await prisma.artistProfile.delete({
       where: { id: requestId },
     });
 
+    // Gửi thông báo realtime qua Pusher
+    await sessionService.handleArtistRequestRejection(artistProfile.user.id);
+
     res.json({
       message: 'Artist role request rejected successfully',
       user: artistProfile.user,
+      hasPendingRequest: false,
     });
   } catch (error) {
     console.error('Reject artist request error:', error);
@@ -1283,61 +1287,35 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Thực hiện các truy vấn song song
-    const [
-      totalUsers,
-      totalArtists,
-      totalAlbums,
-      totalTracks,
-      totalArtistRequests,
-      totalGenres,
-      topGenre,
-      mostActiveArtist,
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { role: Role.ARTIST } }),
-      prisma.album.count(),
-      prisma.track.count(),
-      prisma.artistProfile.count({
-        where: {
-          verificationRequestedAt: { not: null },
-          isVerified: false,
-        },
-      }),
-      prisma.genre.count(),
-      prisma.genre.findFirst({
-        orderBy: {
-          tracks: { _count: 'desc' },
-        },
-        select: {
-          id: true,
-          name: true,
-          _count: { select: { tracks: true } },
-        },
-      }),
-      prisma.artistProfile.findFirst({
-        orderBy: [{ monthlyListeners: 'desc' }, { tracks: { _count: 'desc' } }],
-        select: {
-          id: true,
-          artistName: true,
-          monthlyListeners: true,
-          _count: { select: { tracks: true } },
-        },
-      }),
-    ]);
+    const [totalUsers, totalArtists, totalArtistRequests, mostActiveArtist] =
+      await Promise.all([
+        prisma.user.count(),
+        prisma.user.count({ where: { role: Role.ARTIST } }),
+        prisma.artistProfile.count({
+          where: {
+            verificationRequestedAt: { not: null },
+            isVerified: false,
+          },
+        }),
+        prisma.artistProfile.findFirst({
+          orderBy: [
+            { monthlyListeners: 'desc' },
+            { tracks: { _count: 'desc' } },
+          ],
+          select: {
+            id: true,
+            artistName: true,
+            monthlyListeners: true,
+            _count: { select: { tracks: true } },
+          },
+        }),
+      ]);
 
     // Chuẩn bị dữ liệu thống kê
     const statsData = {
       totalUsers,
       totalArtists,
-      totalAlbums,
-      totalTracks,
       totalArtistRequests,
-      totalGenres,
-      popularGenre: {
-        id: topGenre?.id,
-        name: topGenre?.name,
-        trackCount: topGenre?._count.tracks,
-      },
       trendingArtist: {
         id: mostActiveArtist?.id,
         name: mostActiveArtist?.artistName,

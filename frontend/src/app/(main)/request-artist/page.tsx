@@ -1,40 +1,113 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { api } from '@/utils/api';
 import { useRouter } from 'next/navigation';
+import { api } from '@/utils/api';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { toast } from 'react-toastify';
+import pusher from '@/utils/pusher';
 
 export default function RequestArtistPage() {
-  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    artistName: '',
+    bio: '',
+    facebookLink: 'https://www.facebook.com/',
+    instagramLink: 'https://www.instagram.com/',
+    genres: [] as string[],
+    avatarFile: null as File | null,
+  });
   const [error, setError] = useState<string | null>(null);
-  const [hasRequested, setHasRequested] = useState(false);
-  const [artistName, setArtistName] = useState('');
-  const [bio, setBio] = useState('');
-  const [facebookLink, setFacebookLink] = useState('');
-  const [twitterLink, setTwitterLink] = useState('');
-  const [instagramLink, setInstagramLink] = useState('');
-  const [genres, setGenres] = useState<string[]>([]);
-  const [avatar, setAvatar] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [genreOptions, setGenreOptions] = useState<
     { id: string; name: string }[]
   >([]);
-  const router = useRouter();
+  const [hasPendingRequest, setHasPendingRequest] = useState<boolean>(false);
+
+  // Sử dụng useEffect để đảm bảo localStorage chỉ được truy cập trên client-side
+  useEffect(() => {
+    const storedValue = localStorage.getItem('hasPendingRequest');
+    setHasPendingRequest(storedValue ? JSON.parse(storedValue) : false);
+  }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('userToken');
-    const userData = localStorage.getItem('userData');
+    const userDataStr = localStorage.getItem('userData');
+    if (!userDataStr) return;
 
-    if (!token || !userData) {
-      router.push('/login');
-      return;
-    }
+    const userData = JSON.parse(userDataStr);
+    const userId = userData.id;
 
-    const user = JSON.parse(userData);
-    if (user.verificationRequestedAt) {
-      setHasRequested(true);
-    }
+    // Subscribe to Pusher channel
+    const channel = pusher.subscribe(`user-${userId}`);
+    console.log('Subscribed to Pusher channel:', `user-${userId}`);
 
+    // Listen for artist request status updates
+    channel.bind(
+      'artist-request-status',
+      (data: { type: string; message: string; hasPendingRequest: boolean }) => {
+        console.log('Received Pusher event:', data);
+        if (
+          data.type === 'REQUEST_REJECTED' ||
+          data.type === 'REQUEST_APPROVED'
+        ) {
+          setHasPendingRequest(false);
+          localStorage.setItem('hasPendingRequest', JSON.stringify(false));
+
+          // Tăng số thông báo
+          const currentCount = Number(
+            localStorage.getItem('notificationCount') || '0'
+          );
+          localStorage.setItem('notificationCount', String(currentCount + 1));
+
+          toast.info(data.message);
+        }
+      }
+    );
+
+    return () => {
+      channel.unbind('artist-request-status');
+      pusher.unsubscribe(`user-${userId}`);
+    };
+  }, []);
+
+  // Kiểm tra xem người dùng đã có yêu cầu trở thành Artist chưa
+  useEffect(() => {
+    const checkPendingRequest = async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) {
+          throw new Error('No authentication token found');
+        }
+
+        const response = await api.user.checkArtistRequest(token);
+        console.log('Check pending request response:', response);
+
+        setHasPendingRequest(response.hasPendingRequest);
+        localStorage.setItem(
+          'hasPendingRequest',
+          JSON.stringify(response.hasPendingRequest)
+        );
+
+        const userDataStr = localStorage.getItem('userData');
+        if (userDataStr) {
+          const user = JSON.parse(userDataStr);
+          if (user.role === 'ARTIST') {
+            router.push('/profile');
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Error checking pending request:', err);
+      }
+    };
+
+    checkPendingRequest();
+  }, [router]);
+
+  // Lấy danh sách thể loại
+  useEffect(() => {
     const fetchGenres = async () => {
       try {
         const response = await api.user.getAllGenres();
@@ -46,157 +119,244 @@ export default function RequestArtistPage() {
     };
 
     fetchGenres();
-  }, [router]);
+  }, []);
 
-  const handleRequest = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      setError(null);
-
       const token = localStorage.getItem('userToken');
       if (!token) {
         throw new Error('No authentication token found');
       }
 
-      // Tạo đối tượng socialMediaLinks từ các link nhập vào
+      if (formData.avatarFile && formData.avatarFile.size > 5 * 1024 * 1024) {
+        throw new Error('File size exceeds the limit of 5MB');
+      }
+
+      const submitFormData = new FormData();
+      submitFormData.append('artistName', formData.artistName);
+      submitFormData.append('bio', formData.bio);
+      submitFormData.append('genres', formData.genres.join(','));
+
       const socialMediaLinks = {
-        facebook: facebookLink,
-        twitter: twitterLink,
-        instagram: instagramLink,
+        facebook: formData.facebookLink.replace(
+          'https://www.facebook.com/',
+          ''
+        ),
+        instagram: formData.instagramLink.replace(
+          'https://www.instagram.com/',
+          ''
+        ),
       };
+      submitFormData.append(
+        'socialMediaLinks',
+        JSON.stringify(socialMediaLinks)
+      );
 
-      // Tạo FormData để gửi file và các trường dữ liệu khác
-      const formData = new FormData();
-      formData.append('artistName', artistName);
-      formData.append('bio', bio);
-      formData.append('socialMediaLinks', JSON.stringify(socialMediaLinks));
-      formData.append('genres', genres.join(','));
-      if (avatar) {
-        formData.append('avatar', avatar);
+      if (formData.avatarFile) {
+        submitFormData.append('avatar', formData.avatarFile);
       }
 
-      // Gửi yêu cầu trở thành artist
-      const response = await api.user.requestArtistRole(token, formData);
+      await api.user.requestArtistRole(token, submitFormData);
 
-      if (response.message) {
-        setHasRequested(true);
-        alert(response.message);
-      } else {
-        throw new Error('No response message from server');
-      }
-    } catch (err) {
-      console.error('Error requesting artist role:', err);
-      setError(err instanceof Error ? err.message : 'Failed to submit request');
+      // Cập nhật trạng thái ngay lập tức
+      setHasPendingRequest(true);
+      localStorage.setItem('hasPendingRequest', JSON.stringify(true));
+
+      // Hiển thị thông báo thành công
+      toast.success('Your request has been submitted successfully!', {
+        autoClose: 2000, // Thời gian hiển thị thông báo (2 giây)
+      });
+
+      // Trì hoãn chuyển trang sau khi thông báo được hiển thị
+      setTimeout(() => {
+        router.push('/profile'); // Chuyển hướng đến trang profile sau khi submit thành công
+      }, 2000); // Đợi 2 giây trước khi chuyển trang
+    } catch (error: any) {
+      console.error('Error requesting artist role:', error);
+      setError(
+        error instanceof Error ? error.message : 'Failed to request artist role'
+      );
+      toast.error(error.message || 'Failed to request artist role');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Request to Become an Artist</h1>
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-      {hasRequested ? (
-        <p className="text-green-500 mb-4">
-          You have already submitted a request to become an artist.
-        </p>
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-white">
-              Artist Name
-            </label>
-            <input
-              type="text"
-              value={artistName}
-              onChange={(e) => setArtistName(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-black"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-white">Bio</label>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-black"
-              rows={4}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-white">
-              Facebook Link
-            </label>
-            <input
-              type="text"
-              value={facebookLink}
-              onChange={(e) => setFacebookLink(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-black"
-              placeholder="https://www.facebook.com/yourprofile"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-white">
-              Twitter Link
-            </label>
-            <input
-              type="text"
-              value={twitterLink}
-              onChange={(e) => setTwitterLink(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-black"
-              placeholder="https://twitter.com/yourprofile"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-white">
-              Instagram Link
-            </label>
-            <input
-              type="text"
-              value={instagramLink}
-              onChange={(e) => setInstagramLink(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-black"
-              placeholder="https://www.instagram.com/yourprofile"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-white">
-              Genres
-            </label>
-            <SearchableSelect
-              options={genreOptions}
-              value={genres}
-              onChange={(selected) =>
-                setGenres(Array.isArray(selected) ? selected : [selected])
-              }
-              placeholder="Select genres"
-              multiple={true}
-              required={true}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-white">
-              Avatar
-            </label>
-            <input
-              type="file"
-              onChange={(e) =>
-                setAvatar(e.target.files ? e.target.files[0] : null)
-              }
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-white"
-              required
-            />
-          </div>
-          <button
-            onClick={handleRequest}
-            disabled={loading}
-            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:opacity-50"
+  // Nếu đã có yêu cầu trở thành Artist, hiển thị thông báo
+  if (hasPendingRequest) {
+    return (
+      <div className="container mx-auto p-6 space-y-8">
+        <div className="flex items-center justify-between mb-6">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
           >
-            {loading ? 'Submitting...' : 'Submit Request'}
-          </button>
+            <ArrowLeft className="w-5 h-5" />
+            <span>Back to Home</span>
+          </Link>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Request to Become an Artist
+          </h1>
         </div>
-      )}
+
+        <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] p-6">
+          <p className="text-center text-white">
+            You have already submitted a request to become an artist. Please
+            wait for admin approval.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-6 space-y-8">
+      <div className="flex items-center justify-between mb-6">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span>Back to Home</span>
+        </Link>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Request to Become an Artist
+        </h1>
+      </div>
+
+      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] p-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label
+                htmlFor="artistName"
+                className="block text-sm font-medium mb-1"
+              >
+                Artist Name
+              </label>
+              <input
+                id="artistName"
+                type="text"
+                value={formData.artistName}
+                onChange={(e) =>
+                  setFormData({ ...formData, artistName: e.target.value })
+                }
+                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="bio" className="block text-sm font-medium mb-1">
+                Bio
+              </label>
+              <textarea
+                id="bio"
+                value={formData.bio}
+                onChange={(e) =>
+                  setFormData({ ...formData, bio: e.target.value })
+                }
+                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
+                rows={4}
+                required
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="facebookLink"
+                className="block text-sm font-medium mb-1"
+              >
+                Facebook Link
+              </label>
+              <input
+                id="facebookLink"
+                type="url"
+                value={formData.facebookLink}
+                onChange={(e) =>
+                  setFormData({ ...formData, facebookLink: e.target.value })
+                }
+                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="instagramLink"
+                className="block text-sm font-medium mb-1"
+              >
+                Instagram Link
+              </label>
+              <input
+                id="instagramLink"
+                type="url"
+                value={formData.instagramLink}
+                onChange={(e) =>
+                  setFormData({ ...formData, instagramLink: e.target.value })
+                }
+                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Genres</label>
+              <SearchableSelect
+                options={genreOptions}
+                value={formData.genres}
+                onChange={(selected) =>
+                  setFormData({
+                    ...formData,
+                    genres: Array.isArray(selected) ? selected : [selected],
+                  })
+                }
+                placeholder="Select genres"
+                multiple={true}
+                required={true}
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="avatar"
+                className="block text-sm font-medium mb-1"
+              >
+                Avatar Image
+              </label>
+              <input
+                id="avatar"
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    avatarFile: e.target.files?.[0] || null,
+                  })
+                }
+                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent file:bg-white/20 file:border-0 file:mr-4 file:px-4 file:py-2 file:rounded-md file:text-sm file:font-medium hover:file:bg-white/30"
+                required
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/50 text-red-500 px-4 py-2 rounded">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full px-4 py-2 bg-white text-[#121212] rounded-md hover:bg-white/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Submitting Request...' : 'Submit Request'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

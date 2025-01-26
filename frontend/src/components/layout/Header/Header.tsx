@@ -5,14 +5,8 @@ import { Bell, Home, Menu, Search, Settings } from '@/components/ui/Icons';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-
-interface UserData {
-  id: string;
-  email: string;
-  username: string;
-  name: string;
-  avatar?: string;
-}
+import { User } from '@/types';
+import pusher from '@/utils/pusher';
 
 export default function Header({
   isSidebarOpen,
@@ -24,11 +18,51 @@ export default function Header({
   const router = useRouter();
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState<UserData | null>(null);
+  const [userData, setUserData] = useState<User | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const isActive = (path: string) => pathname === path;
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  // Pusher channel for notifications
+  useEffect(() => {
+    const userDataStr = localStorage.getItem('userData');
+    if (!userDataStr) return;
+
+    const userData = JSON.parse(userDataStr);
+    const userId = userData.id;
+
+    // Subscribe to Pusher channel
+    const channel = pusher.subscribe(`user-${userId}`);
+    console.log('Subscribed to Pusher channel:', `user-${userId}`);
+
+    // Listen for artist request status updates
+    const handleNotification = (data: { type: string }) => {
+      console.log('Received notification event:', data);
+      if (
+        data.type === 'REQUEST_REJECTED' ||
+        data.type === 'REQUEST_APPROVED'
+      ) {
+        setNotificationCount((prev) => {
+          const newCount = prev + 1;
+          localStorage.setItem('notificationCount', String(newCount));
+          return newCount;
+        });
+      }
+    };
+
+    channel.bind('artist-request-status', handleNotification);
+
+    // Khôi phục số thông báo từ localStorage khi component mount
+    const savedCount = Number(localStorage.getItem('notificationCount') || '0');
+    setNotificationCount(savedCount);
+
+    return () => {
+      channel.unbind('artist-request-status', handleNotification);
+      pusher.unsubscribe(`user-${userId}`);
+    };
+  }, []);
 
   // Đóng dropdown khi click ra ngoài
   useEffect(() => {
@@ -75,6 +109,11 @@ export default function Header({
     localStorage.removeItem('userData');
     setIsAuthenticated(false);
     router.push('/login');
+  };
+
+  const handleBellClick = () => {
+    setNotificationCount(0);
+    localStorage.setItem('notificationCount', '0');
   };
 
   return (
@@ -133,8 +172,18 @@ export default function Header({
         {isAuthenticated ? (
           <>
             {/* Hide Bell and Settings on mobile and small tablets */}
-            <button className="hidden lg:block p-2 hover:bg-white/10 rounded-full">
-              <Bell className="w-5 h-5 text-white" />
+            <button
+              className="hidden lg:block p-2 hover:bg-white/10 rounded-full relative"
+              onClick={handleBellClick}
+            >
+              <div className="relative">
+                <Bell className="w-5 h-5 text-white" />
+                {notificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </span>
+                )}
+              </div>
             </button>
             <button className="hidden lg:block p-2 hover:bg-white/10 rounded-full">
               <Settings className="w-5 h-5 text-white" />
@@ -165,6 +214,11 @@ export default function Header({
                     >
                       <Bell className="w-4 h-4 mr-3" />
                       Notifications
+                      {notificationCount > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+                          {notificationCount}
+                        </span>
+                      )}
                     </button>
                     <button
                       className="flex items-center w-full px-4 py-2 text-sm text-white hover:bg-white/10"
@@ -189,14 +243,16 @@ export default function Header({
                   >
                     Profile
                   </Link>
-                  {/* Thêm option "Become an Artist" */}
-                  <Link
-                    href="/request-artist"
-                    className="block px-4 py-2 text-sm text-white hover:bg-white/10"
-                    onClick={() => setShowDropdown(false)}
-                  >
-                    Become an Artist
-                  </Link>
+                  {/* Thêm option "Become an Artist" chỉ khi role là USER */}
+                  {userData?.role === 'USER' && (
+                    <Link
+                      href="/request-artist"
+                      className="block px-4 py-2 text-sm text-white hover:bg-white/10"
+                      onClick={() => setShowDropdown(false)}
+                    >
+                      Become an Artist
+                    </Link>
+                  )}
                   <div className="border-t border-white/10 my-1"></div>
                   <button
                     onClick={() => {

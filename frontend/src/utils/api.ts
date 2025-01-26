@@ -1,5 +1,3 @@
-import { get } from 'lodash';
-
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 // Helper function giúp giảm bớt lặp code
@@ -299,6 +297,19 @@ export const api = {
         },
         token
       ),
+
+    checkArtistRequest: async (
+      token: string
+    ): Promise<{
+      hasPendingRequest: boolean;
+      isVerified: boolean;
+    }> => {
+      return fetchWithAuth(
+        '/api/user/check-artist-request',
+        { method: 'GET' },
+        token
+      );
+    },
   },
 
   artists: {

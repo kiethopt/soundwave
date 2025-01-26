@@ -8,6 +8,7 @@ import {
   getAllGenres,
   requestArtistRole,
   editProfile,
+  checkArtistRequest,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -39,6 +40,14 @@ router.put(
   upload.single('avatar'),
   handleUploadError,
   editProfile
+);
+
+// Route kiểm tra yêu cầu trở thành Artist
+router.get(
+  '/check-artist-request',
+  authenticate,
+  authorize([Role.USER]),
+  checkArtistRequest
 );
 
 export default router;

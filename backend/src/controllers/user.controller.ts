@@ -26,7 +26,13 @@ const validateArtistData = (data: any): string | null => {
     ) {
       return 'socialMediaLinks must be an object';
     }
+
+    // Chỉ cho phép facebook và instagram
+    const allowedPlatforms = ['facebook', 'instagram'];
     for (const key in socialMediaLinks) {
+      if (!allowedPlatforms.includes(key)) {
+        return `Invalid social media platform: ${key}`;
+      }
       if (typeof socialMediaLinks[key] !== 'string') {
         return `socialMediaLinks.${key} must be a string`;
       }
@@ -765,6 +771,43 @@ export const editProfile = async (
     res.json(updatedUser);
   } catch (error) {
     console.error('Edit profile error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Thêm hàm kiểm tra yêu cầu trở thành Artist
+export const checkArtistRequest = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Kiểm tra xem người dùng đã có yêu cầu trở thành Artist chưa
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { userId: user.id },
+      select: {
+        id: true,
+        isVerified: true,
+        verificationRequestedAt: true,
+      },
+    });
+
+    if (artistProfile) {
+      res.json({
+        hasPendingRequest: !!artistProfile.verificationRequestedAt,
+        isVerified: artistProfile.isVerified,
+      });
+    } else {
+      res.json({ hasPendingRequest: false, isVerified: false });
+    }
+  } catch (error) {
+    console.error('Check artist request error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

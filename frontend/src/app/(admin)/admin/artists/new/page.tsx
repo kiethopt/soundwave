@@ -10,13 +10,12 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 export default function NewArtist() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: '', // Giữ lại trường name (User Name)
+    name: '',
     email: '',
     artistName: '',
     bio: '',
-    facebookLink: '',
-    twitterLink: '',
-    instagramLink: '',
+    facebookLink: 'https://facebook.com/',
+    instagramLink: 'https://instagram.com/',
     genres: [] as string[],
     avatarFile: null as File | null,
   });
@@ -65,9 +64,8 @@ export default function NewArtist() {
 
       // Add social media links as a JSON string
       const socialMediaLinks = {
-        facebook: formData.facebookLink || '',
-        twitter: formData.twitterLink || '',
-        instagram: formData.instagramLink || '',
+        facebook: formData.facebookLink,
+        instagram: formData.instagramLink,
       };
       submitFormData.append(
         'socialMediaLinks',
@@ -188,29 +186,16 @@ export default function NewArtist() {
                 type="url"
                 value={formData.facebookLink}
                 onChange={(e) =>
-                  setFormData({ ...formData, facebookLink: e.target.value })
+                  setFormData({
+                    ...formData,
+                    facebookLink: `https://facebook.com/${e.target.value.replace(
+                      'https://facebook.com/',
+                      ''
+                    )}`,
+                  })
                 }
                 className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
-                placeholder="https://facebook.com/artist"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="twitterLink"
-                className="block text-sm font-medium mb-1"
-              >
-                Twitter Link
-              </label>
-              <input
-                id="twitterLink"
-                type="url"
-                value={formData.twitterLink}
-                onChange={(e) =>
-                  setFormData({ ...formData, twitterLink: e.target.value })
-                }
-                className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
-                placeholder="https://twitter.com/artist"
+                placeholder="username"
               />
             </div>
 
@@ -226,10 +211,16 @@ export default function NewArtist() {
                 type="url"
                 value={formData.instagramLink}
                 onChange={(e) =>
-                  setFormData({ ...formData, instagramLink: e.target.value })
+                  setFormData({
+                    ...formData,
+                    instagramLink: `https://instagram.com/${e.target.value.replace(
+                      'https://instagram.com/',
+                      ''
+                    )}`,
+                  })
                 }
                 className="w-full px-3 py-2 bg-white/[0.07] rounded-md border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-transparent"
-                placeholder="https://instagram.com/artist"
+                placeholder="username"
               />
             </div>
 

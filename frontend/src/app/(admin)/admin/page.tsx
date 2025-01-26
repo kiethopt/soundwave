@@ -2,24 +2,32 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Music, Library, Users, User } from 'lucide-react';
+import { Users, User } from 'lucide-react';
 import { api } from '@/utils/api';
 
 interface Stats {
-  totalTracks: number;
-  totalAlbums: number;
   totalUsers: number;
   totalArtists: number;
   totalArtistRequests: number;
+  trendingArtist: {
+    id: string;
+    name: string;
+    monthlyListeners: number;
+    trackCount: number;
+  };
 }
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats>({
-    totalTracks: 0,
-    totalAlbums: 0,
     totalUsers: 0,
     totalArtists: 0,
     totalArtistRequests: 0,
+    trendingArtist: {
+      id: '',
+      name: '',
+      monthlyListeners: 0,
+      trackCount: 0,
+    },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +43,10 @@ export default function AdminDashboard() {
 
         const data = await api.dashboard.getStats(token);
         setStats({
-          totalTracks: data.totalTracks,
-          totalAlbums: data.totalAlbums,
           totalUsers: data.totalUsers,
           totalArtists: data.totalArtists,
           totalArtistRequests: data.totalArtistRequests,
+          trendingArtist: data.trendingArtist,
         });
       } catch (err) {
         console.error('Error fetching stats:', err);
@@ -58,8 +65,8 @@ export default function AdminDashboard() {
       <h2 className="text-white/60">Welcome to your admin dashboard</h2>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {[...Array(5)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
             <div
               key={i}
               className="h-32 bg-white/5 rounded-lg animate-pulse"
@@ -69,7 +76,7 @@ export default function AdminDashboard() {
       ) : error ? (
         <div className="text-red-500 bg-red-500/10 p-4 rounded-lg">{error}</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Link
             href="/admin/artists"
             className="p-6 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
@@ -80,28 +87,6 @@ export default function AdminDashboard() {
             </div>
             <h3 className="text-xl font-bold">Artists</h3>
             <p className="text-white/60">Manage artists</p>
-          </Link>
-          <Link
-            href="/admin/tracks"
-            className="p-6 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <Music className="w-8 h-8 text-white/60" />
-              <span className="text-2xl font-bold">{stats.totalTracks}</span>
-            </div>
-            <h3 className="text-xl font-bold">Tracks</h3>
-            <p className="text-white/60">Manage music tracks</p>
-          </Link>
-          <Link
-            href="/admin/albums"
-            className="p-6 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <Library className="w-8 h-8 text-white/60" />
-              <span className="text-2xl font-bold">{stats.totalAlbums}</span>
-            </div>
-            <h3 className="text-xl font-bold">Albums</h3>
-            <p className="text-white/60">Manage albums</p>
           </Link>
           <Link
             href="/admin/users"
@@ -127,6 +112,22 @@ export default function AdminDashboard() {
             <h3 className="text-xl font-bold">Artist Requests</h3>
             <p className="text-white/60">Manage artist requests</p>
           </Link>
+        </div>
+      )}
+
+      {/* Trending Artist Section */}
+      {!loading && !error && (
+        <div className="mt-8">
+          <h2 className="text-xl font-bold mb-4">Trending Artist</h2>
+          <div className="p-6 bg-white/5 rounded-lg">
+            <h3 className="text-lg font-bold">{stats.trendingArtist.name}</h3>
+            <p className="text-white/60">
+              Monthly Listeners: {stats.trendingArtist.monthlyListeners}
+            </p>
+            <p className="text-white/60">
+              Tracks: {stats.trendingArtist.trackCount}
+            </p>
+          </div>
         </div>
       )}
     </div>
