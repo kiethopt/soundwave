@@ -3,25 +3,99 @@ import { Prisma } from '@prisma/client';
 export const albumExtension = Prisma.defineExtension((client) => {
   return client.$extends({
     query: {
+      album: {
+        async update({ args, query }) {
+          // Thực hiện update album
+          const result = await query(args);
+
+          // Kiểm tra data có phải là object và có coverUrl không
+          if (typeof args.data === 'object') {
+            // Nếu có thay đổi coverUrl
+            if ('coverUrl' in args.data) {
+              await client.track.updateMany({
+                where: { albumId: result.id },
+                data: { coverUrl: args.data.coverUrl as string },
+              });
+            }
+
+            // Nếu có thay đổi isActive
+            if ('isActive' in args.data) {
+              await client.track.updateMany({
+                where: { albumId: result.id },
+                data: { isActive: args.data.isActive as boolean },
+              });
+            }
+          }
+
+          return result;
+        },
+      },
       track: {
         async create({ args, query }) {
+          const data = args.data as Prisma.TrackCreateInput;
+
+          // Nếu track được thêm vào album, kiểm tra trạng thái của album
+          if (data.album) {
+            const albumId = (data.album as any).connect?.id;
+            if (albumId) {
+              const album = await client.album.findUnique({
+                where: { id: albumId },
+                select: { isActive: true },
+              });
+
+              // Nếu album đang ẩn, track mới cũng sẽ ẩn
+              if (album && !album.isActive) {
+                args.data = {
+                  ...data,
+                  isActive: false,
+                };
+              }
+            }
+          }
+
           // Thực hiện tạo track
           const result = await query(args);
 
           // Cập nhật totalTracks nếu track thuộc album
-          if (result.albumId) {
-            await updateAlbumTotalTracks(client, result.albumId);
+          if ((result as any).albumId) {
+            await updateAlbumTotalTracks(client, (result as any).albumId);
           }
 
           return result;
         },
 
         async update({ args, query }) {
+          const data = args.data as Prisma.TrackUpdateInput;
+
           // Lấy thông tin track cũ trước khi update
           const oldTrack = await client.track.findUnique({
-            where: { id: args.where.id },
+            where: args.where,
             select: { albumId: true },
           });
+
+          // Nếu track được chuyển sang album khác
+          if (
+            data.album &&
+            typeof data.album === 'object' &&
+            'connect' in data.album
+          ) {
+            const newAlbumId = (data.album.connect as any)?.id;
+
+            if (newAlbumId && newAlbumId !== oldTrack?.albumId) {
+              const newAlbum = await client.album.findUnique({
+                where: { id: newAlbumId },
+                select: { isActive: true },
+              });
+
+              // Nếu album mới đang ẩn, track cũng sẽ ẩn
+              if (newAlbum && !newAlbum.isActive) {
+                args.data = {
+                  ...data,
+                  isActive: false,
+                };
+              }
+            }
+          }
 
           // Thực hiện update track
           const result = await query(args);
@@ -30,8 +104,11 @@ export const albumExtension = Prisma.defineExtension((client) => {
           if (oldTrack?.albumId) {
             await updateAlbumTotalTracks(client, oldTrack.albumId);
           }
-          if (result.albumId && result.albumId !== oldTrack?.albumId) {
-            await updateAlbumTotalTracks(client, result.albumId);
+          if (
+            (result as any).albumId &&
+            (result as any).albumId !== oldTrack?.albumId
+          ) {
+            await updateAlbumTotalTracks(client, (result as any).albumId);
           }
 
           return result;
@@ -65,7 +142,6 @@ async function updateAlbumTotalTracks(client: any, albumId: string) {
     const trackCount = await client.track.count({
       where: {
         albumId,
-        isActive: true,
       },
     });
 

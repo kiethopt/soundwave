@@ -26,7 +26,7 @@ export const cacheMiddleware = (
   res: Response,
   next: NextFunction
 ): void => {
-  if (process.env.USE_REDIS_CACHE !== 'true') {
+  if (process.env.USE_REDIS_CACHE === 'false') {
     next();
     return;
   }
@@ -55,7 +55,7 @@ export const cacheMiddleware = (
 };
 
 export const setCache = async (key: string, data: any, ttl: number = 600) => {
-  if (process.env.USE_REDIS_CACHE !== 'true') return;
+  if (process.env.USE_REDIS_CACHE === 'false') return;
 
   try {
     await client.set(key, JSON.stringify(data), { EX: ttl });
@@ -73,7 +73,7 @@ export const clearCacheForEntity = async (
     clearSearch?: boolean;
   }
 ) => {
-  if (process.env.USE_REDIS_CACHE !== 'true') return;
+  if (process.env.USE_REDIS_CACHE === 'false') return;
 
   try {
     // Tạo danh sách patterns cần xóa

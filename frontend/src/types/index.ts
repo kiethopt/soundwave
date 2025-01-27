@@ -1,3 +1,44 @@
+import { ChangeEvent, FormEvent } from 'react';
+
+// Form Data Types
+export interface FormData {
+  title: string;
+  trackNumber: number;
+  releaseDate: string;
+  featuredArtists: string[];
+}
+
+export interface TrackUploadFormProps {
+  album: Album;
+  newTracks: File[];
+  trackDetails: {
+    [key: string]: FormData;
+  };
+  isUploading: boolean;
+  onFileChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  onSubmit: (e: FormEvent) => void;
+  onTrackDetailChange: (fileName: string, field: string, value: any) => void;
+  artists?: ArtistProfile[];
+}
+
+// API Types
+export interface RegisterData {
+  email: string;
+  password: string;
+  name?: string;
+}
+
+export interface LoginData {
+  email: string;
+  password: string;
+}
+
+export interface ResetPasswordData {
+  token: string;
+  password: string;
+}
+
+// Model Types
 export interface User {
   id: string;
   email: string;
@@ -5,7 +46,8 @@ export interface User {
   password?: string;
   name?: string;
   avatar?: string;
-  role: 'USER' | 'ADMIN' | 'ARTIST';
+  role: 'USER' | 'ADMIN'; // Chỉ có USER và ADMIN
+  currentProfile: 'USER' | 'ARTIST';
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -15,8 +57,8 @@ export interface User {
   artistProfile?: ArtistProfile;
   history?: History[];
   playlists?: Playlist[];
-  followed?: UserFollow[]; // Người dùng này theo dõi người khác
-  followers?: UserFollow[]; // Người dùng này được người khác theo dõi
+  followed?: UserFollow[];
+  followers?: UserFollow[];
   notifications?: Notification[];
   likedTracks?: Track[];
 }
@@ -26,6 +68,7 @@ export interface ArtistProfile {
   artistName: string;
   bio?: string;
   avatar?: string;
+  role: 'ARTIST'; // Role luôn là ARTIST
   socialMediaLinks?: {
     facebook?: string;
     instagram?: string;
@@ -224,4 +267,16 @@ export interface AuthResponse {
   message: string;
   token: string;
   user: User;
+}
+
+export interface Stats {
+  totalUsers: number;
+  totalArtists: number;
+  totalArtistRequests: number;
+  trendingArtist: {
+    id: string;
+    artistName: string;
+    monthlyListeners: number;
+    trackCount: number;
+  };
 }

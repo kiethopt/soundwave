@@ -21,13 +21,21 @@ export default function Sidebar({
   onClose: () => void;
 }) {
   const pathname = usePathname();
-  const [userRole, setUserRole] = useState<'USER' | 'ARTIST' | 'ADMIN'>('USER');
+  const [userRole, setUserRole] = useState<'USER' | 'ADMIN'>('USER');
+  const [hasArtistProfile, setHasArtistProfile] = useState(false);
+  const [isArtistVerified, setIsArtistVerified] = useState(false);
+  const [currentProfile, setCurrentProfile] = useState<'USER' | 'ARTIST'>(
+    'USER'
+  );
 
   useEffect(() => {
     const userData = localStorage.getItem('userData');
     if (userData) {
       const user = JSON.parse(userData);
       setUserRole(user.role);
+      setCurrentProfile(user.currentProfile);
+      setHasArtistProfile(!!user.artistProfile);
+      setIsArtistVerified(user.artistProfile?.isVerified || false);
     }
   }, []);
 
@@ -101,35 +109,37 @@ export default function Sidebar({
             </div>
 
             {/* Artist Section */}
-            {userRole === 'ARTIST' && (
-              <div className="space-y-2 pt-4 mt-4 border-t border-white/10">
-                <div className="px-3 text-sm font-medium text-white/70">
-                  Artist Dashboard
+            {hasArtistProfile &&
+              isArtistVerified &&
+              currentProfile === 'ARTIST' && (
+                <div className="space-y-2 pt-4 mt-4 border-t border-white/10">
+                  <div className="px-3 text-sm font-medium text-white/70">
+                    Artist Dashboard
+                  </div>
+                  <Link
+                    href="/artist/albums"
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                      pathname.startsWith('/artist/albums')
+                        ? 'bg-white/10'
+                        : 'hover:bg-white/10'
+                    }`}
+                  >
+                    <Album className="w-6 h-6" />
+                    <span>Albums</span>
+                  </Link>
+                  <Link
+                    href="/artist/tracks"
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                      pathname.startsWith('/artist/tracks')
+                        ? 'bg-white/10'
+                        : 'hover:bg-white/10'
+                    }`}
+                  >
+                    <Music className="w-6 h-6" />
+                    <span>Tracks</span>
+                  </Link>
                 </div>
-                <Link
-                  href="/artist/albums"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                    pathname.startsWith('/artist/albums')
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/10'
-                  }`}
-                >
-                  <Album className="w-6 h-6" />
-                  <span>Albums</span>
-                </Link>
-                <Link
-                  href="/artist/tracks"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                    pathname.startsWith('/artist/tracks')
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/10'
-                  }`}
-                >
-                  <Music className="w-6 h-6" />
-                  <span>Tracks</span>
-                </Link>
-              </div>
-            )}
+              )}
 
             {/* Admin Section */}
             {userRole === 'ADMIN' && (
@@ -168,7 +178,6 @@ export default function Sidebar({
                   <User className="w-6 h-6" />
                   <span>Artist Requests</span>
                 </Link>
-                {/* Xóa các link đến Tracks và Albums */}
                 <Link
                   href="/admin/users"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${

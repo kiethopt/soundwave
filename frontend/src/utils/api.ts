@@ -1,3 +1,5 @@
+import { toast } from 'react-toastify';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 // Helper function giúp giảm bớt lặp code
@@ -25,13 +27,20 @@ const fetchWithAuth = async (
   if (!response.ok) {
     const errorText = await response.text();
     let errorMessage = 'An unexpected error occurred';
+    let errorCode = '';
 
     try {
-      // Thử parse JSON nếu có thể
       const errorResponse = JSON.parse(errorText);
       errorMessage = errorResponse.message || errorMessage;
+      errorCode = errorResponse.code || '';
+
+      // Xử lý các error code đặc biệt
+      if (errorCode === 'SWITCH_TO_ARTIST_PROFILE') {
+        toast.warning(errorMessage);
+        window.location.href = '/';
+        return;
+      }
     } catch (e) {
-      // Nếu không parse được, sử dụng nguyên văn bản lỗi
       errorMessage = errorText;
     }
 
@@ -87,6 +96,18 @@ export const api = {
 
     validateToken: async (token: string) =>
       fetchWithAuth('/api/auth/validate-token', { method: 'GET' }, token),
+
+    switchProfile: async (token: string) => {
+      return fetchWithAuth(
+        '/api/auth/switch-profile',
+        { method: 'POST' },
+        token
+      );
+    },
+
+    logout: async (token: string) => {
+      return fetchWithAuth('/api/auth/logout', { method: 'POST' }, token);
+    },
   },
 
   session: {
@@ -406,6 +427,13 @@ export const api = {
     delete: async (id: string, token: string) =>
       fetchWithAuth(`/api/tracks/${id}`, { method: 'DELETE' }, token),
 
+    toggleVisibility: async (trackId: string, token: string) =>
+      fetchWithAuth(
+        `/api/tracks/${trackId}/toggle-visibility`,
+        { method: 'PUT' },
+        token
+      ),
+
     search: async (query: string, token: string) =>
       fetchWithAuth(`/api/tracks/search?q=${query}`, { method: 'GET' }, token),
 
@@ -462,6 +490,13 @@ export const api = {
 
     delete: async (id: string, token: string) =>
       fetchWithAuth(`/api/albums/${id}`, { method: 'DELETE' }, token),
+
+    toggleVisibility: async (albumId: string, token: string) =>
+      fetchWithAuth(
+        `/api/albums/${albumId}/toggle-visibility`,
+        { method: 'PUT' },
+        token
+      ),
 
     uploadTracks: async (id: string, data: FormData, token: string) => {
       return fetchWithAuth(

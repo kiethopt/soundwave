@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import {
   createAlbum,
   updateAlbum,
@@ -22,20 +22,7 @@ const router = express.Router();
 router.post(
   '/',
   authenticate,
-  (req: Request, res: Response, next: NextFunction) => {
-    const user = req.user;
-    if (
-      user &&
-      (user.role === Role.ADMIN ||
-        (user.role === Role.ARTIST && user.artistProfile?.isVerified) ||
-        (user.role === Role.USER &&
-          user.artistProfile?.verificationRequestedAt))
-    ) {
-      next();
-    } else {
-      res.status(403).json({ message: 'Forbidden' });
-    }
-  },
+  authorize([Role.ADMIN, Role.ARTIST]), // Cho phép ADMIN và ARTIST (qua artistProfile)
   upload.single('coverFile'),
   handleUploadError,
   createAlbum
@@ -74,17 +61,7 @@ router.post(
 );
 
 // Route tìm kiếm album (có cache)
-router.get('/search', cacheMiddleware, (req: Request, res: Response) => {
-  searchAlbum(req)
-    .then((data) => {
-      setCache(req.originalUrl, data);
-      res.json(data);
-    })
-    .catch((error) => {
-      console.error('Search album error:', error);
-      res.status(500).json({ message: 'Internal server error' });
-    });
-});
+router.get('/search', authenticate, cacheMiddleware, searchAlbum);
 
 // Route phát album
 router.post(

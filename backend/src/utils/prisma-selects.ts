@@ -17,6 +17,7 @@ export const albumSelect = {
       artistName: true,
       avatar: true,
       isVerified: true,
+      role: true,
     },
   },
   tracks: {
@@ -90,6 +91,7 @@ export const trackSelect = {
       artistName: true,
       avatar: true,
       isVerified: true,
+      role: true,
       user: {
         select: {
           id: true,
@@ -141,6 +143,7 @@ export const artistProfileSelect = {
   artistName: true,
   bio: true,
   avatar: true,
+  role: true,
   socialMediaLinks: true,
   monthlyListeners: true,
   isVerified: true,
@@ -154,6 +157,43 @@ export const artistProfileSelect = {
         select: {
           id: true,
           name: true,
+        },
+      },
+    },
+  },
+  albums: {
+    select: {
+      id: true,
+      title: true,
+      coverUrl: true,
+      releaseDate: true,
+      duration: true,
+      totalTracks: true,
+      type: true,
+      isActive: true,
+      tracks: {
+        select: {
+          id: true,
+          title: true,
+          duration: true,
+          playCount: true,
+        },
+      },
+    },
+  },
+  tracks: {
+    select: {
+      id: true,
+      title: true,
+      duration: true,
+      coverUrl: true,
+      audioUrl: true,
+      playCount: true,
+      type: true,
+      album: {
+        select: {
+          id: true,
+          title: true,
         },
       },
     },
@@ -175,6 +215,7 @@ export const artistProfileForUserSelect = {
       artistName: true,
       bio: true,
       avatar: true,
+      role: true,
       socialMediaLinks: true,
       monthlyListeners: true,
       isVerified: true,
@@ -200,8 +241,9 @@ export const userSelect = {
   username: true,
   name: true,
   avatar: true,
-  role: true,
+  role: true, // USER hoặc ADMIN
   isActive: true,
+  currentProfile: true,
   createdAt: true,
   updatedAt: true,
   lastLoginAt: true,
@@ -213,6 +255,7 @@ export const userSelect = {
       artistName: true,
       isVerified: true,
       verificationRequestedAt: true,
+      role: true, // Role ARTIST ở đây
       albums: {
         select: {
           id: true,

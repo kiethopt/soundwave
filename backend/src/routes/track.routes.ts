@@ -41,16 +41,16 @@ router.post(
 );
 
 // Route lấy danh sách tracks theo type (PUBLIC)
-router.get('/type/:type', getTracksByType);
+router.get('/type/:type', authenticate, getTracksByType);
 
 // Route lấy danh sách tracks theo genre (PUBLIC)
-router.get('/genre/:genreId', getTracksByGenre);
+router.get('/genre/:genreId', authenticate, getTracksByGenre);
 
 // Route lấy danh sách tracks theo type và genre (PUBLIC)
-router.get('/type/:type/genre/:genreId', getTracksByTypeAndGenre);
+router.get('/type/:type/genre/:genreId', authenticate, getTracksByTypeAndGenre);
 
 // Route tìm kiếm track (PUBLIC)
-router.get('/search', authenticate, searchTrack);
+router.get('/search', authenticate, cacheMiddleware, searchTrack);
 
 // Route nghe nhạc
 router.post(
@@ -66,6 +66,11 @@ router.put(
   '/:id',
   authenticate,
   authorize([Role.ADMIN, Role.ARTIST]),
+  upload.fields([
+    { name: 'audioFile', maxCount: 1 },
+    { name: 'coverFile', maxCount: 1 },
+  ]),
+  handleUploadError,
   updateTrack
 );
 

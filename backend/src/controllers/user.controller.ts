@@ -99,7 +99,11 @@ export const requestArtistRole = async (
     }
 
     // Chỉ USER mới có thể yêu cầu trở thành ARTIST
-    if (!user || user.role !== Role.USER) {
+    if (
+      !user ||
+      user.role !== Role.USER ||
+      user.artistProfile?.role === Role.ARTIST
+    ) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
@@ -133,8 +137,9 @@ export const requestArtistRole = async (
         artistName,
         bio,
         socialMediaLinks,
-        avatar: avatarUrl, // Lưu URL avatar vào database
-        verificationRequestedAt: new Date(), // Cập nhật trường mới
+        avatar: avatarUrl,
+        role: Role.ARTIST,
+        verificationRequestedAt: new Date(),
         user: { connect: { id: user.id } },
         genres: {
           create: genres.map((genreId: string) => ({

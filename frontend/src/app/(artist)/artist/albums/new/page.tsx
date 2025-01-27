@@ -1,22 +1,17 @@
 'use client';
 
-import { useState, use, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Genre } from '@/types';
+import { toast } from 'react-toastify';
 
-export default function NewAlbum({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function NewAlbum() {
   const router = useRouter();
-  const { id } = use(params);
   const [genres, setGenres] = useState<Genre[]>([]);
-
   const [newAlbum, setNewAlbum] = useState({
     title: '',
     releaseDate: '',
@@ -61,12 +56,6 @@ export default function NewAlbum({
       formData.append('releaseDate', newAlbum.releaseDate);
       formData.append('type', newAlbum.type);
 
-      // Only append artistId if user is admin OR if creating for specific artist
-      const user = await api.auth.validateToken(token);
-      if (user.role === 'ADMIN' || id) {
-        formData.append('artistId', id);
-      }
-
       newAlbum.genres.forEach((genre) => formData.append('genres', genre));
 
       if (newAlbum.coverFile) {
@@ -76,7 +65,8 @@ export default function NewAlbum({
       const response = await api.albums.create(formData, token);
 
       if (response.message) {
-        router.push(`/admin/artists/${id}`);
+        toast.success('Album created successfully');
+        router.push('/artist/albums');
       } else {
         throw new Error('Failed to create album');
       }
@@ -94,7 +84,7 @@ export default function NewAlbum({
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex items-center justify-between mb-6">
         <Link
-          href={`/admin/artists/${id}`}
+          href="/artist/albums"
           className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />

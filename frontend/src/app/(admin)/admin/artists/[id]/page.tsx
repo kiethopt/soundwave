@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import {
   ArrowLeft,
@@ -23,8 +22,7 @@ export default function ArtistDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const router = useRouter();
-  const [artist, setArtist] = useState<any>(null);
+  const [artist, setArtist] = useState<ArtistProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -38,8 +36,13 @@ export default function ArtistDetail({
         if (!token) throw new Error('No authentication token found');
 
         const response = await api.admin.getArtistById(id, token);
-        console.log('Artist data:', response);
         if (!response) throw new Error('Artist not found');
+
+        // Kiểm tra role của artist
+        if (response.role !== 'ARTIST') {
+          throw new Error('This user is not an artist');
+        }
+
         setArtist(response);
       } catch (err) {
         console.error('Error fetching artist:', err);
@@ -61,7 +64,15 @@ export default function ArtistDetail({
 
       const response = await api.admin.verifyArtist({ userId: id }, token);
       if (response && response.user) {
-        setArtist(response.user);
+        setArtist((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            isVerified: true,
+            verifiedAt: new Date().toISOString(),
+            role: 'ARTIST',
+          };
+        });
       }
     } catch (err) {
       console.error('Error verifying artist:', err);
@@ -81,10 +92,13 @@ export default function ArtistDetail({
       const response = await api.artists.updateMonthlyListeners(id, token);
 
       if (response && response.artistProfile) {
-        setArtist((prev: ArtistProfile) => ({
-          ...prev,
-          monthlyListeners: response.artistProfile.monthlyListeners,
-        }));
+        setArtist((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            monthlyListeners: response.artistProfile.monthlyListeners,
+          };
+        });
       } else {
         throw new Error('Invalid response format');
       }
@@ -173,10 +187,10 @@ export default function ArtistDetail({
                 <h1 className="text-4xl font-bold tracking-tight text-white">
                   {artist.artistName || artist.user?.name}
                 </h1>
-                {artist.isVerified && (
+                {artist.isVerified && artist.role === 'ARTIST' && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-500/10 text-green-500">
                     <Check className="w-4 h-4 mr-1" />
-                    Verified
+                    Verified Artist
                   </span>
                 )}
               </div>
@@ -270,7 +284,7 @@ export default function ArtistDetail({
                     </Link>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {artist.albums?.map((album: any) => (
+                    {artist.albums?.map((album) => (
                       <div
                         key={album.id}
                         className="bg-white/[0.03] rounded-lg p-4 hover:bg-white/[0.05] transition-colors"
@@ -296,6 +310,7 @@ export default function ArtistDetail({
                             </Link>
                             <p className="text-sm text-white/60">
                               {album.totalTracks} tracks ·{' '}
+                              {/* Sử dụng totalTracks từ API */}
                               {formatDuration(album.duration)}
                             </p>
                             <p className="text-sm text-white/60">
@@ -323,7 +338,7 @@ export default function ArtistDetail({
                     </Link>
                   </div>
                   <div className="space-y-2">
-                    {artist.tracks?.map((track: any) => (
+                    {artist.tracks?.map((track) => (
                       <div
                         key={track.id}
                         className="bg-white/[0.03] rounded-lg p-4 hover:bg-white/[0.05] transition-colors"
@@ -359,7 +374,7 @@ export default function ArtistDetail({
                               {track.title}
                             </h3>
                             <p className="text-sm text-white/60">
-                              {track.album?.title || 'Single'} ·{' '}
+                              {track.album?.title || 'Single'} ·
                               {formatDuration(track.duration)}
                             </p>
                           </div>

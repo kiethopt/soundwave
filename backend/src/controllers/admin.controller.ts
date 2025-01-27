@@ -10,7 +10,7 @@ import {
 } from '../middleware/cache.middleware';
 import { sessionService } from 'src/services/session.service';
 import {
-  artistProfileForUserSelect,
+  artistProfileSelect,
   genreSelect,
   userSelect,
 } from 'src/utils/prisma-selects';
@@ -83,14 +83,17 @@ export const createArtist = async (req: Request, res: Response) => {
         password: hashedPassword,
         name,
         avatar: avatarUrl,
-        role: Role.ARTIST,
+        role: Role.USER,
         artistProfile: {
           create: {
             artistName: artistName || name,
             bio: bio || null,
             avatar: avatarUrl,
+            role: Role.ARTIST,
             socialMediaLinks: parsedSocialMediaLinks,
             monthlyListeners: 0,
+            isVerified: true, // Artist được tạo bởi ADMIN mặc định là verified
+            verifiedAt: new Date(),
           },
         },
       },
@@ -127,10 +130,14 @@ export const getAllUsers = async (
       return;
     }
 
+    // Lấy tất cả người dùng, không phân biệt role
     const users = await prisma.user.findMany({
       skip: offset,
       take: limitNumber,
       select: userSelect,
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
 
     const totalUsers = await prisma.user.count();
@@ -404,25 +411,7 @@ export const updateUser = async (
     // Lấy thông tin người dùng hiện tại
     const currentUser = await prisma.user.findUnique({
       where: { id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        username: true,
-        role: true,
-        artistProfile: {
-          select: {
-            id: true,
-            artistName: true,
-            bio: true,
-            socialMediaLinks: true,
-            monthlyListeners: true,
-            isVerified: true,
-            verificationRequestedAt: true,
-            verifiedAt: true,
-          },
-        },
-      },
+      select: userSelect,
     });
 
     if (!currentUser) {
@@ -508,7 +497,6 @@ export const updateUser = async (
 
     // Cập nhật dữ liệu user
     const updateData: any = {
-      ...(role && { role }),
       ...(name && { name }),
       ...(email && { email }),
       ...(username && { username }),
@@ -530,6 +518,7 @@ export const updateUser = async (
             isVerified: true,
             verifiedAt: new Date(),
             verificationRequestedAt: null,
+            role: Role.ARTIST,
           },
         });
       }
@@ -673,21 +662,25 @@ export const getAllArtists = async (
     const { page = 1, limit = 10 } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    const artists = await prisma.user.findMany({
-      where: { role: Role.ARTIST },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        avatar: true,
-        role: true,
-        createdAt: true,
-        ...artistProfileForUserSelect,
+    // Tìm kiếm ArtistProfile thay vì User
+    const artists = await prisma.artistProfile.findMany({
+      where: {
+        role: Role.ARTIST,
+        isVerified: true,
+      },
+      skip: offset,
+      take: Number(limit),
+      select: artistProfileSelect,
+      orderBy: {
+        createdAt: 'desc',
       },
     });
 
-    const totalArtists = await prisma.user.count({
-      where: { role: Role.ARTIST },
+    const totalArtists = await prisma.artistProfile.count({
+      where: {
+        role: Role.ARTIST,
+        isVerified: true,
+      },
     });
 
     res.json({
@@ -716,83 +709,7 @@ export const getArtistById = async (
     // Tìm ArtistProfile và join với User
     const artist = await prisma.artistProfile.findUnique({
       where: { id },
-      select: {
-        id: true,
-        artistName: true,
-        bio: true,
-        avatar: true,
-        socialMediaLinks: true,
-        monthlyListeners: true,
-        isVerified: true,
-        verificationRequestedAt: true,
-        verifiedAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
-            role: true,
-          },
-        },
-        genres: {
-          select: {
-            genre: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        albums: {
-          select: {
-            id: true,
-            title: true,
-            coverUrl: true,
-            releaseDate: true,
-            duration: true,
-            type: true,
-            isActive: true,
-            totalTracks: true,
-            tracks: {
-              select: {
-                id: true,
-                title: true,
-                duration: true,
-                releaseDate: true,
-                trackNumber: true,
-                coverUrl: true,
-                audioUrl: true,
-                playCount: true,
-                type: true,
-                isActive: true,
-              },
-            },
-          },
-        },
-        tracks: {
-          select: {
-            id: true,
-            title: true,
-            duration: true,
-            releaseDate: true,
-            trackNumber: true,
-            coverUrl: true,
-            audioUrl: true,
-            playCount: true,
-            type: true,
-            isActive: true,
-            album: {
-              select: {
-                id: true,
-                title: true,
-                coverUrl: true,
-              },
-            },
-          },
-        },
-      },
+      select: artistProfileSelect,
     });
 
     if (!artist) {
@@ -1024,17 +941,12 @@ export const approveArtistRequest = async (
       return;
     }
 
-    // Cập nhật role của User thành ARTIST và xác thực ArtistProfile
+    // Cập nhật role của ArtistProfile thành ARTIST và xác thực ArtistProfile
     await prisma.$transaction([
-      prisma.user.update({
-        where: { id: artistProfile.userId },
-        data: {
-          role: Role.ARTIST,
-        },
-      }),
       prisma.artistProfile.update({
         where: { id: requestId },
         data: {
+          role: Role.ARTIST,
           isVerified: true,
           verifiedAt: new Date(),
           verificationRequestedAt: null,
@@ -1045,25 +957,7 @@ export const approveArtistRequest = async (
     // Lấy lại thông tin người dùng sau khi cập nhật
     const updatedUser = await prisma.user.findUnique({
       where: { id: artistProfile.userId },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        name: true,
-        role: true,
-        artistProfile: {
-          select: {
-            id: true,
-            artistName: true,
-            bio: true,
-            avatar: true,
-            socialMediaLinks: true,
-            monthlyListeners: true,
-            isVerified: true,
-            verifiedAt: true,
-          },
-        },
-      },
+      select: userSelect,
     });
 
     // Clear cache
@@ -1290,7 +1184,12 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
     const [totalUsers, totalArtists, totalArtistRequests, mostActiveArtist] =
       await Promise.all([
         prisma.user.count(),
-        prisma.user.count({ where: { role: Role.ARTIST } }),
+        prisma.artistProfile.count({
+          where: {
+            role: Role.ARTIST,
+            isVerified: true,
+          },
+        }),
         prisma.artistProfile.count({
           where: {
             verificationRequestedAt: { not: null },
@@ -1298,6 +1197,10 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
           },
         }),
         prisma.artistProfile.findFirst({
+          where: {
+            role: Role.ARTIST,
+            isVerified: true,
+          },
           orderBy: [
             { monthlyListeners: 'desc' },
             { tracks: { _count: 'desc' } },
@@ -1306,7 +1209,11 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
             id: true,
             artistName: true,
             monthlyListeners: true,
-            _count: { select: { tracks: true } },
+            _count: {
+              select: {
+                tracks: true,
+              },
+            },
           },
         }),
       ]);
@@ -1317,10 +1224,10 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
       totalArtists,
       totalArtistRequests,
       trendingArtist: {
-        id: mostActiveArtist?.id,
-        name: mostActiveArtist?.artistName,
-        monthlyListeners: mostActiveArtist?.monthlyListeners,
-        trackCount: mostActiveArtist?._count.tracks,
+        id: mostActiveArtist?.id || '',
+        artistName: mostActiveArtist?.artistName || '',
+        monthlyListeners: mostActiveArtist?.monthlyListeners || 0,
+        trackCount: mostActiveArtist?._count.tracks || 0,
       },
       updatedAt: new Date().toISOString(),
     };

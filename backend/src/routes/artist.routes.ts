@@ -17,7 +17,7 @@ const router = express.Router();
 router.get(
   '/profiles',
   authenticate,
-  authorize([Role.ADMIN]),
+  authorize([Role.ADMIN, Role.ARTIST]),
   getAllArtistsProfile
 );
 

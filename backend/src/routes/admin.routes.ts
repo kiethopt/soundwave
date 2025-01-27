@@ -43,14 +43,24 @@ router.get(
 // Quản lý người dùng
 router.get('/users', queryRateLimiter, authorize([Role.ADMIN]), getAllUsers);
 router.get('/users/:id', authorize([Role.ADMIN]), getUserById);
-router.put('/users/:id', updateUser);
-router.delete('/users/:id', deleteUser);
+router.put('/users/:id', authorize([Role.ADMIN]), updateUser);
+router.delete('/users/:id', authorize([Role.ADMIN]), deleteUser);
 router.post('/users/:id/deactivate', authorize([Role.ADMIN]), deactivateUser);
 
 // Quản lý nghệ sĩ
-router.get('/artists', queryRateLimiter, getAllArtists);
-router.get('/artists/:id', getArtistById);
-router.post('/artists', upload.single('avatar'), createArtist);
+router.get(
+  '/artists',
+  queryRateLimiter,
+  authorize([Role.ADMIN]),
+  getAllArtists
+);
+router.get('/artists/:id', authorize([Role.ADMIN, Role.ARTIST]), getArtistById);
+router.post(
+  '/artists',
+  authorize([Role.ADMIN]),
+  upload.single('avatar'),
+  createArtist
+);
 router.get(
   '/artist-requests',
   queryRateLimiter,
@@ -78,7 +88,15 @@ router.put('/genres/:id', updateGenre);
 router.delete('/genres/:id', deleteGenre);
 
 // Duyệt yêu cầu trở thành Artist
-router.post('/artist-requests/approve', approveArtistRequest);
-router.post('/artist-requests/reject', rejectArtistRequest);
+router.post(
+  '/artist-requests/approve',
+  authorize([Role.ADMIN]),
+  approveArtistRequest
+);
+router.post(
+  '/artist-requests/reject',
+  authorize([Role.ADMIN]),
+  rejectArtistRequest
+);
 
 export default router;

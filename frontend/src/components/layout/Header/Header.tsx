@@ -7,6 +7,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { User } from '@/types';
 import pusher from '@/utils/pusher';
+import { api } from '@/utils/api';
+import { toast } from 'react-toastify';
 
 export default function Header({
   isSidebarOpen,
@@ -104,16 +106,62 @@ export default function Header({
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('userToken');
-    localStorage.removeItem('userData');
-    setIsAuthenticated(false);
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('userToken');
+      const sessionId = localStorage.getItem('sessionId');
+
+      if (token) {
+        // Thêm session ID vào header khi gọi API logout
+        await api.auth.logout(token);
+      }
+
+      // Luôn xóa dữ liệu local storage, kể cả khi API call thất bại
+      localStorage.clear(); // Xóa tất cả dữ liệu
+
+      setIsAuthenticated(false);
+      setUserData(null);
+
+      // Chuyển hướng về trang login
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Logout error:', error);
+
+      // Vẫn xóa dữ liệu và chuyển hướng nếu có lỗi
+      localStorage.clear();
+      setIsAuthenticated(false);
+      setUserData(null);
+      window.location.href = '/login';
+    }
   };
 
   const handleBellClick = () => {
     setNotificationCount(0);
     localStorage.setItem('notificationCount', '0');
+  };
+
+  const handleSwitchProfile = async () => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) return;
+
+      const response = await api.auth.switchProfile(token);
+
+      // Cập nhật userData trong localStorage
+      localStorage.setItem('userData', JSON.stringify(response.user));
+
+      // Cập nhật state
+      setUserData(response.user);
+
+      toast.success(`Switched to ${response.user.currentProfile} profile`);
+
+      // Refresh trang để cập nhật UI
+      window.location.reload();
+    } catch (error) {
+      console.error('Error switching profile:', error);
+      toast.error('Failed to switch profile');
+    }
+    setShowDropdown(false);
   };
 
   return (
@@ -203,7 +251,7 @@ export default function Header({
                 />
               </button>
 
-              {/* Dropdown Menu - Adjusted for mobile */}
+              {/* Dropdown Menu */}
               {showDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-[#282828] rounded-md shadow-lg py-1 z-50">
                   {/* Show Bell and Settings in dropdown on mobile and small tablets */}
@@ -229,6 +277,7 @@ export default function Header({
                     </button>
                     <div className="border-t border-white/10 my-1"></div>
                   </div>
+
                   <Link
                     href="/account"
                     className="block px-4 py-2 text-sm text-white hover:bg-white/10"
@@ -243,8 +292,23 @@ export default function Header({
                   >
                     Profile
                   </Link>
-                  {/* Thêm option "Become an Artist" chỉ khi role là USER */}
-                  {userData?.role === 'USER' && (
+
+                  {/* Switch Profile Option */}
+                  {userData?.artistProfile?.isVerified && (
+                    <>
+                      <button
+                        onClick={handleSwitchProfile}
+                        className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10"
+                      >
+                        Switch to{' '}
+                        {userData.currentProfile === 'USER' ? 'Artist' : 'User'}{' '}
+                        Profile
+                      </button>
+                    </>
+                  )}
+
+                  {/* Become an Artist Option */}
+                  {userData?.role === 'USER' && !userData?.artistProfile && (
                     <Link
                       href="/request-artist"
                       className="block px-4 py-2 text-sm text-white hover:bg-white/10"
@@ -253,6 +317,7 @@ export default function Header({
                       Become an Artist
                     </Link>
                   )}
+
                   <div className="border-t border-white/10 my-1"></div>
                   <button
                     onClick={() => {

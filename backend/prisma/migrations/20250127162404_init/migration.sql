@@ -31,6 +31,7 @@ CREATE TABLE "users" (
     "name" TEXT,
     "avatar" TEXT,
     "role" "Role" NOT NULL DEFAULT 'USER',
+    "currentProfile" TEXT NOT NULL DEFAULT 'USER',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -47,6 +48,7 @@ CREATE TABLE "artist_profiles" (
     "artistName" TEXT NOT NULL,
     "bio" TEXT,
     "avatar" TEXT,
+    "role" "Role" NOT NULL DEFAULT 'ARTIST',
     "socialMediaLinks" JSONB,
     "monthlyListeners" INTEGER NOT NULL DEFAULT 0,
     "isVerified" BOOLEAN NOT NULL DEFAULT false,
@@ -75,8 +77,8 @@ CREATE TABLE "albums" (
     "title" TEXT NOT NULL,
     "coverUrl" TEXT,
     "releaseDate" TIMESTAMP(3) NOT NULL,
-    "trackCount" INTEGER NOT NULL,
     "duration" INTEGER NOT NULL DEFAULT 0,
+    "totalTracks" INTEGER NOT NULL DEFAULT 0,
     "type" "AlbumType" NOT NULL DEFAULT 'ALBUM',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -157,7 +159,8 @@ CREATE TABLE "notifications" (
     "message" TEXT NOT NULL,
     "isRead" BOOLEAN NOT NULL DEFAULT false,
     "recipientType" "RecipientType" NOT NULL,
-    "recipientId" TEXT NOT NULL,
+    "userId" TEXT,
+    "artistId" TEXT,
     "senderId" TEXT,
     "count" INTEGER DEFAULT 1,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -186,7 +189,8 @@ CREATE TABLE "events" (
 CREATE TABLE "user_follow" (
     "id" TEXT NOT NULL,
     "followerId" TEXT NOT NULL,
-    "followingId" TEXT NOT NULL,
+    "followingUserId" TEXT,
+    "followingArtistId" TEXT,
     "followingType" "FollowingType" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -365,7 +369,10 @@ CREATE UNIQUE INDEX "genres_name_key" ON "genres"("name");
 CREATE INDEX "genres_name_idx" ON "genres"("name");
 
 -- CreateIndex
-CREATE INDEX "notifications_recipientId_idx" ON "notifications"("recipientId");
+CREATE INDEX "notifications_userId_idx" ON "notifications"("userId");
+
+-- CreateIndex
+CREATE INDEX "notifications_artistId_idx" ON "notifications"("artistId");
 
 -- CreateIndex
 CREATE INDEX "notifications_senderId_idx" ON "notifications"("senderId");
@@ -395,10 +402,16 @@ CREATE UNIQUE INDEX "events_title_artistId_key" ON "events"("title", "artistId")
 CREATE INDEX "user_follow_followerId_idx" ON "user_follow"("followerId");
 
 -- CreateIndex
-CREATE INDEX "user_follow_followingId_idx" ON "user_follow"("followingId");
+CREATE INDEX "user_follow_followingUserId_idx" ON "user_follow"("followingUserId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_follow_followerId_followingId_followingType_key" ON "user_follow"("followerId", "followingId", "followingType");
+CREATE INDEX "user_follow_followingArtistId_idx" ON "user_follow"("followingArtistId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_follow_followerId_followingUserId_followingType_key" ON "user_follow"("followerId", "followingUserId", "followingType");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_follow_followerId_followingArtistId_followingType_key" ON "user_follow"("followerId", "followingArtistId", "followingType");
 
 -- CreateIndex
 CREATE INDEX "album_genre_albumId_idx" ON "album_genre"("albumId");
@@ -473,10 +486,10 @@ ALTER TABLE "histories" ADD CONSTRAINT "histories_userId_fkey" FOREIGN KEY ("use
 ALTER TABLE "playlists" ADD CONSTRAINT "playlists_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_recipientId_fkey" FOREIGN KEY ("recipientId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "notifications" ADD CONSTRAINT "notifications_artist_recipientId_fkey" FOREIGN KEY ("recipientId") REFERENCES "artist_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artist_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "events" ADD CONSTRAINT "events_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artist_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -485,10 +498,10 @@ ALTER TABLE "events" ADD CONSTRAINT "events_artistId_fkey" FOREIGN KEY ("artistI
 ALTER TABLE "user_follow" ADD CONSTRAINT "user_follow_followerId_fkey" FOREIGN KEY ("followerId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_follow" ADD CONSTRAINT "user_follow_following_user_fkey" FOREIGN KEY ("followingId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user_follow" ADD CONSTRAINT "user_follow_followingUserId_fkey" FOREIGN KEY ("followingUserId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_follow" ADD CONSTRAINT "user_follow_following_artist_fkey" FOREIGN KEY ("followingId") REFERENCES "artist_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user_follow" ADD CONSTRAINT "user_follow_followingArtistId_fkey" FOREIGN KEY ("followingArtistId") REFERENCES "artist_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "album_genre" ADD CONSTRAINT "album_genre_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "albums"("id") ON DELETE CASCADE ON UPDATE CASCADE;

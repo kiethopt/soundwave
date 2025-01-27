@@ -213,17 +213,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
-    // Validate dữ liệu đăng nhập
     const validationError = validateLoginData({ email, password });
     if (validationError) {
       res.status(400).json({ message: validationError });
       return;
     }
 
-    // Tìm người dùng theo email
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { ...userSelect, password: true, role: true, isActive: true },
+      select: { ...userSelect, password: true, isActive: true },
     });
 
     if (!user) {
@@ -231,7 +229,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Kiểm tra trạng thái tài khoản trước khi cho phép đăng nhập
     if (!user.isActive) {
       res.status(403).json({
         message:
@@ -240,37 +237,80 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Kiểm tra mật khẩu
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       res.status(401).json({ message: 'Invalid email or password' });
       return;
     }
 
-    // Cập nhật thời gian đăng nhập cuối cùng
-    await prisma.user.update({
+    // Cập nhật lastLoginAt và currentProfile
+    const updatedUser = await prisma.user.update({
       where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+      data: {
+        lastLoginAt: new Date(),
+        currentProfile: user.role === Role.ADMIN ? 'ADMIN' : 'USER', // Nếu là ADMIN thì currentProfile là ADMIN
+      },
+      select: userSelect,
     });
 
-    // Tạo JWT token
-    const token = generateToken(user.id, user.role, user.artistProfile);
+    // Sử dụng role thực tế của user (USER hoặc ADMIN)
+    const token = generateToken(user.id, user.role);
 
-    // Tạo session mới
-    const sessionId = await sessionService.createSession(user);
+    const sessionId = await sessionService.createSession({
+      ...updatedUser,
+      password: user.password,
+    });
 
-    // Loại bỏ password khỏi phản hồi
-    const { password: _, ...userWithoutPassword } = user;
+    // Trả về response với role thực tế của user
+    const userResponse = {
+      ...updatedUser,
+      password: undefined,
+    };
 
     res.json({
       message: 'Login successful',
       token,
       sessionId,
-      user: userWithoutPassword,
+      user: userResponse,
     });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Đăng xuất (Logout)
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const sessionId = req.header('Session-ID');
+
+    if (!userId || !sessionId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    try {
+      // Reset currentProfile về USER khi logout, trừ khi là ADMIN
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          currentProfile: req.user?.role === Role.ADMIN ? 'ADMIN' : 'USER',
+        },
+      });
+    } catch (error) {
+      // Nếu update thất bại (ví dụ user không tồn tại), vẫn tiếp tục xóa session
+      console.error('Error updating user profile:', error);
+    }
+
+    // Xóa session hiện tại
+    await sessionService.removeUserSession(userId, sessionId);
+
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Vẫn trả về success nếu có lỗi để đảm bảo client xóa được token
+    res.json({ message: 'Logged out successfully' });
   }
 };
 
@@ -384,5 +424,75 @@ const sendEmail = async (
   } catch (error) {
     console.error('Error sending email:', error);
     throw new Error('Failed to send email');
+  }
+};
+
+// Hàm để switch profile sang Artist
+export const switchProfile = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const sessionId = req.header('Session-ID');
+
+    if (!userId || !sessionId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: userSelect,
+    });
+
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    // Kiểm tra nếu user là ADMIN thì không cho phép chuyển đổi profile
+    if (user.role === Role.ADMIN) {
+      res.status(403).json({
+        message: 'Admin profile cannot be switched',
+      });
+      return;
+    }
+
+    // Kiểm tra xem user có artist profile được verify hay không
+    if (!user.artistProfile || !user.artistProfile.isVerified) {
+      res.status(403).json({
+        message: 'You do not have a verified artist profile',
+      });
+      return;
+    }
+
+    // Chỉ thay đổi currentProfile, giữ nguyên role là USER
+    const newProfile = user.currentProfile === 'USER' ? 'ARTIST' : 'USER';
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        currentProfile: newProfile,
+      },
+      select: userSelect,
+    });
+
+    // Cập nhật session với currentProfile mới nhưng giữ nguyên role USER
+    await sessionService.updateSessionProfile(userId, sessionId, newProfile);
+
+    const userResponse = {
+      ...updatedUser,
+      role: Role.USER, // Luôn giữ role là USER
+      password: undefined,
+    };
+
+    res.json({
+      message: 'Profile switched successfully',
+      user: userResponse,
+    });
+  } catch (error) {
+    console.error('Switch profile error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };

@@ -4,18 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Users, User } from 'lucide-react';
 import { api } from '@/utils/api';
-
-interface Stats {
-  totalUsers: number;
-  totalArtists: number;
-  totalArtistRequests: number;
-  trendingArtist: {
-    id: string;
-    name: string;
-    monthlyListeners: number;
-    trackCount: number;
-  };
-}
+import { Stats } from '@/types';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats>({
@@ -24,7 +13,7 @@ export default function AdminDashboard() {
     totalArtistRequests: 0,
     trendingArtist: {
       id: '',
-      name: '',
+      artistName: '',
       monthlyListeners: 0,
       trackCount: 0,
     },
@@ -46,7 +35,12 @@ export default function AdminDashboard() {
           totalUsers: data.totalUsers,
           totalArtists: data.totalArtists,
           totalArtistRequests: data.totalArtistRequests,
-          trendingArtist: data.trendingArtist,
+          trendingArtist: {
+            id: data.trendingArtist.id,
+            artistName: data.trendingArtist.artistName,
+            monthlyListeners: data.trendingArtist.monthlyListeners,
+            trackCount: data.trendingArtist.trackCount,
+          },
         });
       } catch (err) {
         console.error('Error fetching stats:', err);
@@ -120,7 +114,9 @@ export default function AdminDashboard() {
         <div className="mt-8">
           <h2 className="text-xl font-bold mb-4">Trending Artist</h2>
           <div className="p-6 bg-white/5 rounded-lg">
-            <h3 className="text-lg font-bold">{stats.trendingArtist.name}</h3>
+            <h3 className="text-lg font-bold">
+              {stats.trendingArtist.artistName}
+            </h3>
             <p className="text-white/60">
               Monthly Listeners: {stats.trendingArtist.monthlyListeners}
             </p>

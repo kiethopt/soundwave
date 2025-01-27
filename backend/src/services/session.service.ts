@@ -1,4 +1,4 @@
-import { User } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 import pusher from '../config/pusher';
 import { client as redis } from '../middleware/cache.middleware';
 import { randomUUID } from 'crypto';
@@ -7,13 +7,21 @@ class SessionService {
   private readonly SESSION_TTL = 24 * 60 * 60; // 24 hours in seconds
 
   // Lưu trữ session trong Redis với format: userId:sessionId
-  private async saveSession(userId: string, sessionId: string): Promise<void> {
+  private async saveSession(
+    userId: string,
+    sessionId: string,
+    role: Role,
+    currentProfile: string = 'USER'
+  ): Promise<void> {
     await redis.hSet(
       `user_sessions:${userId}`,
       sessionId,
-      Date.now().toString()
+      JSON.stringify({
+        role,
+        currentProfile,
+        createdAt: Date.now(),
+      })
     );
-    // Thêm TTL cho session
     await redis.expire(`user_sessions:${userId}`, this.SESSION_TTL);
   }
 
@@ -34,7 +42,7 @@ class SessionService {
   // Tạo session mới khi user login
   async createSession(user: User): Promise<string> {
     const sessionId = randomUUID();
-    await this.saveSession(user.id, sessionId);
+    await this.saveSession(user.id, sessionId, Role.USER, user.currentProfile);
     return sessionId;
   }
 
@@ -53,6 +61,25 @@ class SessionService {
     // Refresh session TTL khi validate thành công
     await redis.expire(`user_sessions:${userId}`, this.SESSION_TTL);
     return true;
+  }
+
+  // Cập nhật role trong session khi chuyển đổi profile
+  async updateSessionProfile(
+    userId: string,
+    sessionId: string,
+    currentProfile: string
+  ): Promise<void> {
+    const sessionData = {
+      role: Role.USER, // Role luôn là USER
+      currentProfile,
+      createdAt: Date.now(),
+    };
+    await redis.hSet(
+      `user_sessions:${userId}`,
+      sessionId,
+      JSON.stringify(sessionData)
+    );
+    await redis.expire(`user_sessions:${userId}`, this.SESSION_TTL);
   }
 
   // Xử lý khi admin deactivate user

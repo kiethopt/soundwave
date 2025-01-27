@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
 import pusher from '@/utils/pusher';
+import { toast } from 'react-toastify';
 
 type FilterType = 'all' | 'albums' | 'tracks' | 'artists' | 'users';
 
@@ -157,18 +158,18 @@ function SearchContent() {
       }
 
       const user = JSON.parse(userDataStr);
-      const isAlbum = 'trackCount' in item;
+      const isAlbum = 'tracks' in item;
       const itemId = item.id;
 
       // Gọi API để thông báo bắt đầu phát nhạc
       await api.session.handleAudioPlay(user.id, sessionId, token);
 
-      // Xử lý phát nhạc
+      // Dừng audio hiện tại nếu có
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.currentTime = trackCurrentTimes[itemId] || 0;
       }
 
+      // Nếu đang phát item này thì dừng lại
       if ((isAlbum ? currentlyPlayingAlbum : currentlyPlaying) === itemId) {
         setTrackCurrentTimes({
           ...trackCurrentTimes,
@@ -182,31 +183,52 @@ function SearchContent() {
       }
 
       let response;
-      if (isAlbum) {
-        response = await api.albums.playAlbum(itemId, token);
-      } else {
-        response = await api.tracks.play(itemId, token);
-      }
-
-      const audio = new Audio(response.track.audioUrl);
-      audioRef.current = audio;
-      audio.currentTime = trackCurrentTimes[itemId] || 0;
-      await audio.play();
-
-      audio.onended = () => {
+      try {
         if (isAlbum) {
-          setCurrentlyPlayingAlbum(null);
+          response = await api.albums.playAlbum(itemId, token);
+        } else {
+          response = await api.tracks.play(itemId, token);
         }
-        setCurrentlyPlaying(null);
-      };
 
-      if (isAlbum) {
-        setCurrentlyPlayingAlbum(itemId);
-      } else {
-        setCurrentlyPlaying(itemId);
+        if (!response?.track?.audioUrl) {
+          throw new Error('No audio URL found');
+        }
+
+        const audio = new Audio(response.track.audioUrl);
+        audioRef.current = audio;
+        audio.currentTime = trackCurrentTimes[itemId] || 0;
+
+        // Thêm xử lý lỗi khi phát audio
+        audio.onerror = (e) => {
+          console.error('Audio playback error:', e);
+          toast.error('Error playing audio. Please try again.');
+          if (isAlbum) {
+            setCurrentlyPlayingAlbum(null);
+          }
+          setCurrentlyPlaying(null);
+        };
+
+        await audio.play();
+
+        if (isAlbum) {
+          setCurrentlyPlayingAlbum(itemId);
+        } else {
+          setCurrentlyPlaying(itemId);
+        }
+
+        audio.onended = () => {
+          if (isAlbum) {
+            setCurrentlyPlayingAlbum(null);
+          }
+          setCurrentlyPlaying(null);
+        };
+      } catch (error) {
+        console.error('Error playing audio:', error);
+        toast.error('Error playing audio. Please try again.');
       }
     } catch (error) {
-      console.error('Error playing audio:', error);
+      console.error('Error in handlePlayPause:', error);
+      toast.error('An error occurred. Please try again.');
     }
   };
 

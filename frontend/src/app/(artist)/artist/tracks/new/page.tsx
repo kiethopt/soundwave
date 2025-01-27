@@ -3,8 +3,8 @@
 import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
-import { ArrowLeft } from '@/components/ui/Icons';
 import Link from 'next/link';
+import { ArrowLeft } from '@/components/ui/Icons';
 import { toast } from 'react-toastify';
 
 export default function NewTrack({
@@ -12,12 +12,12 @@ export default function NewTrack({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params);
   const router = useRouter();
+  const { id } = use(params);
   const [isLoading, setIsLoading] = useState(false);
   const [trackData, setTrackData] = useState({
     title: '',
-    type: 'SINGLE', // Mặc định là SINGLE
+    type: 'SINGLE',
     releaseDate: '',
   });
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -50,15 +50,14 @@ export default function NewTrack({
 
       const formData = new FormData();
       formData.append('title', trackData.title);
-      formData.append('type', 'SINGLE'); // Luôn gửi là SINGLE
+      formData.append('type', 'SINGLE');
       formData.append('releaseDate', trackData.releaseDate);
-      formData.append('artistId', id);
       if (audioFile) formData.append('audioFile', audioFile);
       if (coverFile) formData.append('coverFile', coverFile);
 
       await api.tracks.create(formData, token);
       toast.success('Track created successfully');
-      router.push(`/admin/artists/${id}`);
+      router.push('/artist/tracks');
     } catch (error) {
       console.error('Error creating track:', error);
       toast.error('Failed to create track');
@@ -71,7 +70,7 @@ export default function NewTrack({
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex items-center justify-between mb-6">
         <Link
-          href={`/admin/artists/${id}`}
+          href="/artist/tracks"
           className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />

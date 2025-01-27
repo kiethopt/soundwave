@@ -104,7 +104,11 @@ export default function AlbumDetailPage() {
         if (!token) return;
 
         const response = await api.artists.getAllArtistsProfile(token, 1, 100);
-        setArtists(response.artists);
+        const verifiedArtists = response.artists.filter(
+          (artist: ArtistProfile) =>
+            artist.isVerified && artist.role === 'ARTIST'
+        );
+        setArtists(verifiedArtists);
       } catch (err) {
         console.error('Error fetching artists:', err);
       }
@@ -184,13 +188,15 @@ export default function AlbumDetailPage() {
       setNewTracks((prevTracks) => [...prevTracks, ...files]);
 
       const newTrackDetails = { ...trackDetails };
-      files.forEach((file) => {
+      const existingTrackCount = album?.tracks?.length || 0;
+
+      files.forEach((file, index) => {
         if (!newTrackDetails[file.name]) {
           newTrackDetails[file.name] = {
             title: file.name.replace(/\.[^/.]+$/, ''),
             artist: album?.artist.id || '',
             featuredArtists: [],
-            trackNumber: (album?.tracks?.length || 0) + newTracks.length + 1,
+            trackNumber: existingTrackCount + index + 1,
             releaseDate:
               album?.releaseDate || new Date().toISOString().split('T')[0],
           };
@@ -311,6 +317,7 @@ export default function AlbumDetailPage() {
                 }));
               }}
               artists={artists}
+              existingTrackCount={album?.tracks?.length || 0}
             />
           </div>
         </div>
