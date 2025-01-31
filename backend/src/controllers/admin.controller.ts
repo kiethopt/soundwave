@@ -1181,48 +1181,52 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Thực hiện các truy vấn song song
-    const [totalUsers, totalArtists, totalArtistRequests, mostActiveArtist] =
-      await Promise.all([
-        prisma.user.count(),
-        prisma.artistProfile.count({
-          where: {
-            role: Role.ARTIST,
-            isVerified: true,
-          },
-        }),
-        prisma.artistProfile.count({
-          where: {
-            verificationRequestedAt: { not: null },
-            isVerified: false,
-          },
-        }),
-        prisma.artistProfile.findFirst({
-          where: {
-            role: Role.ARTIST,
-            isVerified: true,
-          },
-          orderBy: [
-            { monthlyListeners: 'desc' },
-            { tracks: { _count: 'desc' } },
-          ],
-          select: {
-            id: true,
-            artistName: true,
-            monthlyListeners: true,
-            _count: {
-              select: {
-                tracks: true,
-              },
+    const [
+      totalUsers,
+      totalArtists,
+      totalArtistRequests,
+      mostActiveArtist,
+      totalGenres,
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.artistProfile.count({
+        where: {
+          role: Role.ARTIST,
+          isVerified: true,
+        },
+      }),
+      prisma.artistProfile.count({
+        where: {
+          verificationRequestedAt: { not: null },
+          isVerified: false,
+        },
+      }),
+      prisma.artistProfile.findFirst({
+        where: {
+          role: Role.ARTIST,
+          isVerified: true,
+        },
+        orderBy: [{ monthlyListeners: 'desc' }, { tracks: { _count: 'desc' } }],
+        select: {
+          id: true,
+          artistName: true,
+          monthlyListeners: true,
+          _count: {
+            select: {
+              tracks: true,
             },
           },
-        }),
-      ]);
+        },
+      }),
+      prisma.genre.count(),
+    ]);
 
     // Chuẩn bị dữ liệu thống kê
     const statsData = {
       totalUsers,
       totalArtists,
       totalArtistRequests,
+      totalGenres,
       trendingArtist: {
         id: mostActiveArtist?.id || '',
         artistName: mostActiveArtist?.artistName || '',

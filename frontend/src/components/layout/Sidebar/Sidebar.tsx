@@ -1,17 +1,19 @@
 import Link from 'next/link';
 import {
-  Home,
-  Search,
   Library,
-  Plus,
+  AddSimple,
   Music,
   Album,
   Users,
   XIcon,
+  Requests,
+  Home,
+  Left,
+  Right,
 } from '@/components/ui/Icons';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function Sidebar({
   isOpen,
@@ -21,12 +23,26 @@ export default function Sidebar({
   onClose: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [userRole, setUserRole] = useState<'USER' | 'ADMIN'>('USER');
   const [hasArtistProfile, setHasArtistProfile] = useState(false);
   const [isArtistVerified, setIsArtistVerified] = useState(false);
   const [currentProfile, setCurrentProfile] = useState<'USER' | 'ARTIST'>(
     'USER'
   );
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const savedCollapsedState = localStorage.getItem('sidebarCollapsed');
+    if (savedCollapsedState) {
+      setIsCollapsed(JSON.parse(savedCollapsedState));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed));
+  }, [isCollapsed]);
 
   useEffect(() => {
     const userData = localStorage.getItem('userData');
@@ -36,14 +52,24 @@ export default function Sidebar({
       setCurrentProfile(user.currentProfile);
       setHasArtistProfile(!!user.artistProfile);
       setIsArtistVerified(user.artistProfile?.isVerified || false);
+      setIsAuthenticated(true);
+    } else {
+      setIsAuthenticated(false);
     }
   }, []);
 
   const isActive = (path: string) => pathname === path;
 
+  const handleCreatePlaylist = () => {
+    if (!isAuthenticated) {
+      router.push('/login');
+    } else {
+      router.push('/create-playlist');
+    }
+  };
+
   return (
     <>
-      {/* Mobile Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
@@ -51,71 +77,106 @@ export default function Sidebar({
         />
       )}
 
-      {/* Sidebar */}
       <div
         className={`
           fixed md:static inset-y-0 left-0 z-50
-          w-64 bg-[#121212] transform transition-transform duration-300 ease-in-out
+          bg-[#121212] transform transition-transform duration-300 ease-in-out
           md:transform-none md:transition-none
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0 md:flex-shrink-0
+          ${isCollapsed ? 'w-20' : 'w-64'}
         `}
       >
-        <div className="px-6 py-4">
-          <div className="flex justify-end md:hidden mb-4">
+        <div className="h-full flex flex-col">
+          <div
+            className={`md:hidden p-4 ${
+              isCollapsed ? 'flex justify-center' : 'flex justify-end'
+            }`}
+          >
             <button
               onClick={onClose}
-              className="text-white/60 hover:text-white p-1"
+              className="text-white/60 hover:text-white p-1 flex items-center justify-center w-8 h-8 rounded-full bg-white/10"
             >
               <XIcon className="w-6 h-6" />
             </button>
           </div>
 
-          {/* Existing Sidebar Content */}
-          <nav className="space-y-6">
-            {/* Main Navigation */}
-            <div className="space-y-2">
-              <Link
-                href="/"
-                className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                  isActive('/') ? 'bg-white/10' : 'hover:bg-white/10'
-                }`}
-              >
-                <Home className="w-6 h-6" />
-                <span>Home</span>
-              </Link>
-
-              <Link
-                href="/search"
-                className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                  isActive('/search') ? 'bg-white/10' : 'hover:bg-white/10'
-                }`}
-              >
-                <Search className="w-6 h-6" />
-                <span>Search</span>
-              </Link>
-            </div>
-
-            {/* Library Section */}
-            <div className="space-y-2 pt-4 mt-4 border-t border-white/10">
-              <div className="flex items-center justify-between px-3">
-                <div className="flex items-center gap-3">
-                  <Library className="w-6 h-6" />
-                  <span>Your Library</span>
-                </div>
-                <Plus className="w-5 h-5" />
+          <nav className="flex-1 px-4">
+            {/* Library Section - Aligned with header */}
+            <div className="h-[72px] -mx-4 border-b border-white/10">
+              <div className="h-full flex items-center gap-4 px-7">
+                {isCollapsed ? (
+                  <Library className="w-6 h-6 text-white/70 hover:text-white transition-colors" />
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 text-white/70 hover:text-white transition-colors">
+                      <Library className="w-6 h-6" />
+                      <span className="text-sm font-medium">Your Library</span>
+                    </div>
+                    <AddSimple className="w-5 h-5 ml-auto" />
+                  </>
+                )}
               </div>
-              {/* Playlists content */}
             </div>
+
+            {/* Playlists */}
+            {currentProfile === 'USER' && (
+              <div className="mt-4">
+                {isAuthenticated ? (
+                  [
+                    {
+                      id: 1,
+                      name: 'Playlist 1',
+                      coverImage: '/images/default-avatar.jpg',
+                    },
+                  ].map((playlist) => (
+                    <div key={playlist.id} className="mb-2">
+                      {isCollapsed ? (
+                        <img
+                          src={playlist.coverImage || '/placeholder.svg'}
+                          alt={playlist.name}
+                          className="w-12 h-12 rounded-md mx-auto"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors hover:bg-white/10">
+                          <img
+                            src={playlist.coverImage || '/placeholder.svg'}
+                            alt={playlist.name}
+                            className="w-12 h-12 rounded-md"
+                          />
+                          <span>{playlist.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <button
+                    onClick={handleCreatePlaylist}
+                    className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors hover:bg-white/10 w-full text-left"
+                  >
+                    {isCollapsed ? (
+                      <AddSimple className="w-6 h-6 shrink-0 mx-auto" />
+                    ) : (
+                      <>
+                        <AddSimple className="w-6 h-6 shrink-0" />
+                        <span>Create Playlist</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Artist Section */}
             {hasArtistProfile &&
               isArtistVerified &&
               currentProfile === 'ARTIST' && (
-                <div className="space-y-2 pt-4 mt-4 border-t border-white/10">
-                  <div className="px-3 text-sm font-medium text-white/70">
-                    Artist Dashboard
-                  </div>
+                <div className="mt-4 space-y-2">
+                  {!isCollapsed && (
+                    <div className="px-3 text-sm font-medium text-white/70">
+                      Artist Dashboard
+                    </div>
+                  )}
                   <Link
                     href="/artist/albums"
                     className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
@@ -124,8 +185,14 @@ export default function Sidebar({
                         : 'hover:bg-white/10'
                     }`}
                   >
-                    <Album className="w-6 h-6" />
-                    <span>Albums</span>
+                    {isCollapsed ? (
+                      <Album className="w-6 h-6 shrink-0 mx-auto" />
+                    ) : (
+                      <>
+                        <Album className="w-6 h-6 shrink-0" />
+                        <span>Albums</span>
+                      </>
+                    )}
                   </Link>
                   <Link
                     href="/artist/tracks"
@@ -135,37 +202,40 @@ export default function Sidebar({
                         : 'hover:bg-white/10'
                     }`}
                   >
-                    <Music className="w-6 h-6" />
-                    <span>Tracks</span>
+                    {isCollapsed ? (
+                      <Music className="w-6 h-6 shrink-0 mx-auto" />
+                    ) : (
+                      <>
+                        <Music className="w-6 h-6 shrink-0" />
+                        <span>Tracks</span>
+                      </>
+                    )}
                   </Link>
                 </div>
               )}
 
             {/* Admin Section */}
             {userRole === 'ADMIN' && (
-              <div className="space-y-2 pt-4 mt-4 border-t border-white/10">
-                <div className="px-3 text-sm font-medium text-white/70">
-                  Admin Dashboard
-                </div>
+              <div className="mt-4 space-y-2">
+                {!isCollapsed && (
+                  <div className="px-3 text-sm font-medium text-white/70">
+                    Admin Dashboard
+                  </div>
+                )}
                 <Link
                   href="/admin"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
                     isActive('/admin') ? 'bg-white/10' : 'hover:bg-white/10'
                   }`}
                 >
-                  <Home className="w-6 h-6" />
-                  <span>Dashboard</span>
-                </Link>
-                <Link
-                  href="/admin/artists"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                    pathname.startsWith('/admin/artists')
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/10'
-                  }`}
-                >
-                  <User className="w-6 h-6" />
-                  <span>Artists</span>
+                  {isCollapsed ? (
+                    <Home className="w-6 h-6 shrink-0 mx-auto" />
+                  ) : (
+                    <>
+                      <Home className="w-6 h-6 shrink-0" />
+                      <span>Dashboard</span>
+                    </>
+                  )}
                 </Link>
                 <Link
                   href="/admin/artist-requests"
@@ -175,23 +245,82 @@ export default function Sidebar({
                       : 'hover:bg-white/10'
                   }`}
                 >
-                  <User className="w-6 h-6" />
-                  <span>Artist Requests</span>
+                  {isCollapsed ? (
+                    <Requests className="w-6 h-6 shrink-0 mx-auto" />
+                  ) : (
+                    <>
+                      <Requests className="w-6 h-6 shrink-0" />
+                      <span>Artist Requests</span>
+                    </>
+                  )}
                 </Link>
                 <Link
                   href="/admin/users"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                    isActive('/admin/users')
+                    pathname.startsWith('/admin/users')
                       ? 'bg-white/10'
                       : 'hover:bg-white/10'
                   }`}
                 >
-                  <Users className="w-6 h-6" />
-                  <span>Users</span>
+                  {isCollapsed ? (
+                    <Users className="w-6 h-6 shrink-0 mx-auto" />
+                  ) : (
+                    <>
+                      <Users className="w-6 h-6 shrink-0" />
+                      <span>Users</span>
+                    </>
+                  )}
+                </Link>
+                <Link
+                  href="/admin/artists"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    pathname.startsWith('/admin/artists')
+                      ? 'bg-white/10'
+                      : 'hover:bg-white/10'
+                  }`}
+                >
+                  {isCollapsed ? (
+                    <Users className="w-6 h-6 shrink-0 mx-auto" />
+                  ) : (
+                    <>
+                      <Users className="w-6 h-6 shrink-0" />
+                      <span>Artists</span>
+                    </>
+                  )}
+                </Link>
+                <Link
+                  href="/admin/genres"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    pathname.startsWith('/admin/genres')
+                      ? 'bg-white/10'
+                      : 'hover:bg-white/10'
+                  }`}
+                >
+                  {isCollapsed ? (
+                    <Music className="w-6 h-6 shrink-0 mx-auto" />
+                  ) : (
+                    <>
+                      <Music className="w-6 h-6 shrink-0" />
+                      <span>Genres</span>
+                    </>
+                  )}
                 </Link>
               </div>
             )}
           </nav>
+
+          <div className="p-4">
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            >
+              {isCollapsed ? (
+                <Right className="w-5 h-5" />
+              ) : (
+                <Left className="w-5 h-5" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </>

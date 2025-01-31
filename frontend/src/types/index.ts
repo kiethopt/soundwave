@@ -273,6 +273,7 @@ export interface Stats {
   totalUsers: number;
   totalArtists: number;
   totalArtistRequests: number;
+  totalGenres: number;
   trendingArtist: {
     id: string;
     artistName: string;

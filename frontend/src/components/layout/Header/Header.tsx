@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Home, Menu, Search, Settings } from '@/components/ui/Icons';
+import {
+  Notifications,
+  DiscoverFilled,
+  DiscoverOutline,
+  Home,
+  Menu,
+  Search,
+  Settings,
+} from '@/components/ui/Icons';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -9,6 +17,7 @@ import { User } from '@/types';
 import pusher from '@/utils/pusher';
 import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
+import React from 'react';
 
 export default function Header({
   isSidebarOpen,
@@ -102,7 +111,11 @@ export default function Header({
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      if (!isAuthenticated) {
+        router.push('/login');
+      } else {
+        router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      }
     }
   };
 
@@ -111,26 +124,29 @@ export default function Header({
       const token = localStorage.getItem('userToken');
       const sessionId = localStorage.getItem('sessionId');
 
-      if (token) {
-        // Thêm session ID vào header khi gọi API logout
+      if (token && sessionId) {
+        // Gửi cả token và sessionId lên server
         await api.auth.logout(token);
+
+        // Ngắt kết nối Pusher
+        pusher.disconnect();
       }
 
-      // Luôn xóa dữ liệu local storage, kể cả khi API call thất bại
-      localStorage.clear(); // Xóa tất cả dữ liệu
+      // Xóa tất cả dữ liệu local storage
+      localStorage.clear();
 
+      // Reset state
       setIsAuthenticated(false);
       setUserData(null);
 
-      // Chuyển hướng về trang login
+      // Chuyển hướng và reload để clear cache
       window.location.href = '/login';
     } catch (error) {
       console.error('Logout error:', error);
 
-      // Vẫn xóa dữ liệu và chuyển hướng nếu có lỗi
+      // Đảm bảo cleanup ngay cả khi có lỗi
+      pusher.disconnect();
       localStorage.clear();
-      setIsAuthenticated(false);
-      setUserData(null);
       window.location.href = '/login';
     }
   };
@@ -165,7 +181,7 @@ export default function Header({
   };
 
   return (
-    <header className="h-16 bg-[#111111] flex items-center justify-between px-2 md:px-4 lg:px-6">
+    <header className="h-[70px] bg-[#111111] flex items-center justify-between px-2 md:px-4 lg:px-6">
       {/* Left side - Navigation */}
       <div className="flex items-center gap-2 md:gap-4 lg:gap-6">
         {/* Mobile Menu Button */}
@@ -196,7 +212,12 @@ export default function Header({
                 : 'text-white/70 hover:text-white'
             }`}
           >
-            <span>Discover</span>
+            {isActive('/discover') ? (
+              <DiscoverFilled className="w-5 h-5" />
+            ) : (
+              <DiscoverOutline className="w-5 h-5" />
+            )}
+            <span className="hidden lg:inline">Discover</span>
           </Link>
         </div>
       </div>
@@ -204,7 +225,7 @@ export default function Header({
       {/* Center - Search */}
       <div className="flex-1 max-w-[400px] px-2 md:px-4">
         <form onSubmit={handleSearch} className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/40" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/40" />
           <input
             type="text"
             value={searchQuery}
@@ -225,7 +246,7 @@ export default function Header({
               onClick={handleBellClick}
             >
               <div className="relative">
-                <Bell className="w-5 h-5 text-white" />
+                <Notifications className="w-5 h-5 text-white" />
                 {notificationCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
                     {notificationCount > 99 ? '99+' : notificationCount}
@@ -254,13 +275,13 @@ export default function Header({
               {/* Dropdown Menu */}
               {showDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-[#282828] rounded-md shadow-lg py-1 z-50">
-                  {/* Show Bell and Settings in dropdown on mobile and small tablets */}
+                  {/* Show Notifications and Settings in dropdown on mobile and small tablets */}
                   <div className="lg:hidden">
                     <button
                       className="flex items-center w-full px-4 py-2 text-sm text-white hover:bg-white/10"
                       onClick={() => setShowDropdown(false)}
                     >
-                      <Bell className="w-4 h-4 mr-3" />
+                      <Notifications className="w-4 h-4 mr-3" />
                       Notifications
                       {notificationCount > 0 && (
                         <span className="ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">

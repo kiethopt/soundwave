@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import pusher from '@/utils/pusher';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import type React from 'react'; // Added import for React
 
 export default function RootLayout({
   children,
@@ -54,8 +55,8 @@ export default function RootLayout({
   }, [router]);
 
   return (
-    <html lang="vi" suppressHydrationWarning={true}>
-      <body className={isAuthPage ? '' : 'bg-[#222222]'}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={isAuthPage ? '' : 'bg-[#111]'} suppressHydrationWarning>
         {isAuthPage ? (
           <main>{children}</main>
         ) : (
@@ -83,7 +84,7 @@ export default function RootLayout({
                 </div>
 
                 {/* Content Area */}
-                <main className="flex-1 overflow-y-auto p-2 md:p-4">
+                <main className="flex-1 p-4 md:p-8 rounded-lg bg-[#111111] border border-white/10 overflow-y-auto">
                   {children}
                 </main>
               </div>

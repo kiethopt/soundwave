@@ -6,7 +6,7 @@ import { api } from '@/utils/api';
 import {
   Search,
   Music,
-  Plus,
+  AddSimple,
   Trash2,
   Eye,
   EyeOff,
@@ -142,7 +142,7 @@ export default function ArtistAlbums() {
           href="/artist/albums/new"
           className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90"
         >
-          <Plus className="w-4 h-4" />
+          <AddSimple className="w-4 h-4" />
           New Album
         </Link>
       </div>

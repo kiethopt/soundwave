@@ -42,5 +42,9 @@ export default function AdminLayout({
     return <div>Loading...</div>;
   }
 
-  return <div className="p-4">{children}</div>;
+  return (
+    <div className="p-4 h-full overflow-y-auto" suppressHydrationWarning>
+      {children}
+    </div>
+  );
 }

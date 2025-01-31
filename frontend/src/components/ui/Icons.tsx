@@ -1,66 +1,4 @@
-export const Home = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M12.97 2.59a1.5 1.5 0 00-1.94 0l-7.5 6.363A1.5 1.5 0 003 10.097V19.5A1.5 1.5 0 004.5 21h4.75a.75.75 0 00.75-.75V14h4v6.25c0 .414.336.75.75.75h4.75a1.5 1.5 0 001.5-1.5v-9.403a1.5 1.5 0 00-.53-1.144l-7.5-6.363z" />
-  </svg>
-);
-
-export const Search = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z" />
-  </svg>
-);
-
-export const Library = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    {...props}
-  >
-    <path
-      d="M7 6V18"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M11 6V18"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M15 18V6L19 9V18H15Z"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-export const Plus = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path
-      fillRule="evenodd"
-      d="M12 3.75a.75.75 0 01.75.75v6.75h6.75a.75.75 0 010 1.5h-6.75v6.75a.75.75 0 01-1.5 0v-6.75H4.5a.75.75 0 010-1.5h6.75V4.5a.75.75 0 01.75-.75z"
-      clipRule="evenodd"
-    />
-  </svg>
-);
-
-export const Bell = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path
-      fillRule="evenodd"
-      d="M12 2.25A6.75 6.75 0 005.25 9v.75a8.217 8.217 0 01-2.119 5.52.75.75 0 00.298 1.206c1.544.57 3.16.99 4.831 1.243a3.75 3.75 0 107.48 0 24.583 24.583 0 004.83-1.244.75.75 0 00.298-1.205 8.217 8.217 0 01-2.118-5.52V9A6.75 6.75 0 0012 2.25zM9.75 18c0-.034 0-.067.002-.1a25.05 25.05 0 004.496 0l.002.1a2.25 2.25 0 11-4.5 0z"
-      clipRule="evenodd"
-    />
-  </svg>
-);
-
+// Settings Icon
 export const Settings = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path
@@ -71,12 +9,14 @@ export const Settings = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Music Icon
 export const Music = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path d="M19.952 1.651a.75.75 0 01.298.599V16.303a3 3 0 01-2.176 2.884l-1.32.377a2.553 2.553 0 11-1.403-4.909l2.311-.66a1.5 1.5 0 001.088-1.442V6.994l-9 2.572v9.737a3 3 0 01-2.176 2.884l-1.32.377a2.553 2.553 0 11-1.402-4.909l2.31-.66a1.5 1.5 0 001.088-1.442V5.25a.75.75 0 01.544-.721l10.5-3a.75.75 0 01.658.122z" />
   </svg>
 );
 
+// Album Icon
 export const Album = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -101,25 +41,28 @@ export const Album = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Users Icon
 export const Users = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path d="M4.5 6.375a4.125 4.125 0 118.25 0 4.125 4.125 0 01-8.25 0zM14.25 8.625a3.375 3.375 0 116.75 0 3.375 3.375 0 01-6.75 0zM1.5 19.125a7.125 7.125 0 0114.25 0v.003l-.001.119a.75.75 0 01-.363.63 13.067 13.067 0 01-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 01-.364-.63l-.001-.122zM17.25 19.128l-.001.144a2.25 2.25 0 01-.233.96 10.088 10.088 0 005.06-1.01.75.75 0 00.42-.643 4.875 4.875 0 00-6.957-4.611 8.586 8.586 0 011.71 5.157v.003z" />
   </svg>
 );
 
+// Play Icon
 export const Play = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path d="M8 5.14v14l11-7-11-7z" />
   </svg>
 );
 
-// Chỉnh lại icon Pause để giống Spotify hơn
+// Pause Icon
 export const Pause = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
     <path d="M6 4h4v16H6zm8 0h4v16h-4z" />
   </svg>
 );
 
+// Grip Vertical Icon
 export const GripVertical = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -148,6 +91,7 @@ export const GripVertical = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Menu Icon
 export const Menu = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
     <path
@@ -159,6 +103,7 @@ export const Menu = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// X Icon
 export const XIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
     <path
@@ -170,6 +115,7 @@ export const XIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// More Vertical Icon
 export const MoreVertical = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -186,6 +132,7 @@ export const MoreVertical = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Calendar Icon
 export const Calendar = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -203,21 +150,7 @@ export const Calendar = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export const ArrowLeft = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
-    <line x1="19" y1="12" x2="5" y2="12" />
-    <polyline points="12 19 5 12 12 5" />
-  </svg>
-);
-
+// Eye Icon
 export const Eye = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -233,6 +166,7 @@ export const Eye = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Eye Off Icon
 export const EyeOff = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -248,6 +182,7 @@ export const EyeOff = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Trash Icon
 export const Trash2 = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -265,6 +200,7 @@ export const Trash2 = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Edit Icon
 export const Edit = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -280,6 +216,7 @@ export const Edit = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Key Icon
 export const Key = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -294,6 +231,7 @@ export const Key = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Power Icon
 export const Power = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -309,6 +247,7 @@ export const Power = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// User Icon
 export const User = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -321,5 +260,585 @@ export const User = (props: React.SVGProps<SVGSVGElement>) => (
   >
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+// Home Icon
+export const Home = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <polyline points="9 22 9 12 15 12 15 22" />
+  </svg>
+);
+
+// Search Icon
+export const Search = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+);
+
+// Library Icon
+export const Library = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 41 42"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M23.5514 29.6706V12.3838L29.3137 16.373V29.6706H23.5514Z"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12.0269 12.3838V29.6706"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M17.7891 12.3838V29.6706"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Add to Library Icon
+export const AddToLibrary = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 42 42"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M12.4377 20.9V29.6706"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M18.2 20.9V29.6706"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M23.9622 29.6706V12.3838L26.8434 14.3784L29.7245 16.373V29.6706H23.9622Z"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12.7081 14.8692H15.2338M17.7595 14.8692H15.2338M15.2338 14.8692V12.3435M15.2338 14.8692V17.3948"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// AI Icon
+export const AIIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 41 41"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M16.7941 26.4766C16.6453 25.8998 16.3447 25.3734 15.9235 24.9522C15.5023 24.531 14.9759 24.2304 14.3991 24.0816L4.17409 21.4449C3.99964 21.3954 3.84611 21.2903 3.73678 21.1457C3.62745 21.001 3.5683 20.8246 3.5683 20.6432C3.5683 20.4619 3.62745 20.2855 3.73678 20.1408C3.84611 19.9962 3.99964 19.8911 4.17409 19.8416L14.3991 17.2033C14.9757 17.0546 15.5019 16.7542 15.9231 16.3333C16.3443 15.9124 16.645 15.3864 16.7941 14.8099L19.4308 4.58492C19.4798 4.40978 19.5847 4.25549 19.7296 4.14557C19.8745 4.03566 20.0514 3.97617 20.2333 3.97617C20.4151 3.97617 20.592 4.03566 20.7369 4.14557C20.8818 4.25549 20.9867 4.40978 21.0358 4.58492L23.6708 14.8099C23.8196 15.3867 24.1202 15.9131 24.5414 16.3343C24.9626 16.7555 25.489 17.0561 26.0658 17.2049L36.2908 19.8399C36.4666 19.8884 36.6217 19.9933 36.7322 20.1384C36.8427 20.2835 36.9025 20.4609 36.9025 20.6432C36.9025 20.8256 36.8427 21.003 36.7322 21.1481C36.6217 21.2932 36.4666 21.3981 36.2908 21.4466L26.0658 24.0816C25.489 24.2304 24.9626 24.531 24.5414 24.9522C24.1202 25.3734 23.8196 25.8998 23.6708 26.4766L21.0341 36.7016C20.9851 36.8767 20.8801 37.031 20.7352 37.1409C20.5903 37.2508 20.4135 37.3103 20.2316 37.3103C20.0497 37.3103 19.8729 37.2508 19.728 37.1409C19.5831 37.031 19.4781 36.8767 19.4291 36.7016L16.7941 26.4766Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M33.5658 5.64325V12.3099"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M36.8991 8.97658H30.2324"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M6.89908 28.9766V32.3099"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M8.56576 30.6432H5.23242"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// More Icon
+export const More = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 41 41"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <circle cx="12.1973" cy="20.4381" r="1.68378" fill="currentColor" />
+    <circle cx="20.6162" cy="20.4381" r="1.68378" fill="currentColor" />
+    <circle cx="29.0351" cy="20.4381" r="1.68378" fill="currentColor" />
+  </svg>
+);
+
+// Discover Icon (Not Filled)
+export const DiscoverOutline = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 42 41"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M20.7838 9.26189L21.2875 11.0562C22.5131 15.4215 25.9245 18.8329 30.2899 20.0585L32.0841 20.5622L30.2899 21.0659C25.9245 22.2915 22.5131 25.7029 21.2875 30.0682L20.7838 31.8625L20.2801 30.0682C19.0545 25.7029 15.6431 22.2915 11.2778 21.0659L9.4835 20.5622L11.2778 20.0585C15.6431 18.8329 19.0545 15.4215 20.2801 11.0562L20.7838 9.26189Z"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+  </svg>
+);
+
+// Discover Icon (Filled)
+export const DiscoverFilled = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 41 41"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M20.1946 9.26189L20.6984 11.0562C21.9239 15.4215 25.3353 18.8329 29.7007 20.0585L31.4949 20.5622L29.7007 21.0659C25.3353 22.2915 21.9239 25.7029 20.6984 30.0682L20.1946 31.8625L19.6909 30.0682C18.4654 25.7029 15.0539 22.2915 10.6886 21.0659L8.89433 20.5622L10.6886 20.0585C15.0539 18.8329 18.4654 15.4215 19.6909 11.0562L20.1946 9.26189Z"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+  </svg>
+);
+
+// Add Simple Icon
+export const AddSimple = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 25 25"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M12.4378 5.47251V12.6162M12.4378 19.7599V12.6162M12.4378 12.6162L5.29413 12.6162M12.4378 12.6162H19.5815"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Loop Icon
+export const Loop = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 28 28"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M9.81759 19.7421H7.29191C5.43206 19.7421 3.92435 18.2344 3.92435 16.3745V9.63936C3.92435 7.77951 5.43206 6.2718 7.29191 6.2718H20.7622C22.622 6.2718 24.1298 7.77951 24.1298 9.63936V16.3745C24.1298 18.2344 22.622 19.7421 20.7622 19.7421H14.0271M14.0271 19.7421L17.3946 16.3745M14.0271 19.7421L17.3946 23.1096"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Navigation Arrows
+export const ArrowLeft = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 21"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M19.4799 10.6164L5.1677 10.6164M5.1677 10.6164L11.0609 16.5096M5.1677 10.6164L11.0609 4.72316"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const ArrowRight = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 25 21"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M5.57849 10.6163H19.8907M19.8907 10.6163L13.9974 4.72304M19.8907 10.6163L13.9974 16.5095"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Hide Icon
+export const Hide = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 22 21"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M20.3419 10.6163C20.3419 12.9655 19.4683 15.1086 18.0269 16.7416C16.3288 18.6656 13.8469 19.8771 11.0811 19.8771C5.96649 19.8771 1.82029 15.7309 1.82029 10.6163C1.82029 8.24385 2.71126 6.08156 4.17818 4.44259C5.8751 2.54664 8.33843 1.35544 11.0811 1.35544C16.1957 1.35544 20.3419 5.50165 20.3419 10.6163Z"
+      stroke="currentColor"
+      strokeWidth="1.68378"
+    />
+  </svg>
+);
+
+// Like Icons
+export const LikeOutline = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 42 41"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M22.7125 13.9786L20.8487 15.7845L18.9848 13.9786C17.0305 12.0849 13.8953 12.1895 12.0715 14.2091C10.3017 16.1689 10.058 19.1043 11.6606 21.203C11.8575 21.4609 12.0512 21.7079 12.2354 21.934C13.4019 23.365 15.9469 25.8639 17.222 27.205C18.1641 28.1958 19.011 29.0221 19.6489 29.624C20.3226 30.2596 21.3626 30.2457 22.0376 29.6115C23.214 28.5061 25.0179 26.7844 26.2886 25.448C27.5637 24.1069 28.2954 23.365 29.4619 21.934C29.6461 21.7079 29.8398 21.4609 30.0367 21.203C31.6393 19.1043 31.3956 16.1689 29.6258 14.2091C27.802 12.1895 24.6668 12.0849 22.7125 13.9786Z"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const LikeFilled = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 41 41"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M22.1233 13.9786L20.2594 15.7845L18.3956 13.9786C16.4413 12.0849 13.3061 12.1895 11.4822 14.2091C9.71249 16.1689 9.46884 19.1043 11.0714 21.203C11.2683 21.4609 11.462 21.7079 11.6462 21.934C12.8127 23.365 15.3577 25.8639 16.6328 27.205C17.5749 28.1958 18.4218 29.0221 19.0597 29.624C19.7334 30.2596 20.7734 30.2457 21.4484 29.6115C22.6248 28.5061 24.4287 26.7844 25.6994 25.448C26.9745 24.1069 27.7062 23.365 28.8727 21.934C29.0569 21.7079 29.2506 21.4609 29.4475 21.203C31.0501 19.1043 30.8064 16.1689 29.0366 14.2091C27.2128 12.1895 24.0776 12.0849 22.1233 13.9786Z"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Close Icon
+export const Close = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 18 18"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M14.0784 3.56479L9.02706 8.61614M3.97571 13.6675L9.02706 8.61614M9.02706 8.61614L3.97571 3.56479M9.02706 8.61614L14.0784 13.6675"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Pin Icons (Outline)
+export const PinOutline = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 41 41"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M29.3209 16.8358L30.8388 18.3536M29.3209 16.8358L22.6206 23.5361C22.4974 23.6593 22.4191 23.8201 22.3981 23.9929L22.0634 26.7462C21.9851 27.3908 21.1987 27.6621 20.7395 27.2029L16.811 23.2744M29.3209 16.8358L23.2496 10.7644M21.7318 9.24658L23.2496 10.7644M23.2496 10.7644L16.5492 17.4648C16.4261 17.5879 16.2653 17.6662 16.0925 17.6872L13.3392 18.0219C12.6946 18.1003 12.4233 18.8867 12.8824 19.3458L16.811 23.2744M16.811 23.2744L11.6432 28.4422"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Pin Icons (Filled)
+export const PinFilled = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 41 41"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M29.7318 16.8358L31.2496 18.3536M29.7318 16.8358L23.0314 23.5361C22.9083 23.6593 22.83 23.8201 22.809 23.9929L22.4743 26.7462C22.3959 27.3908 21.6095 27.6621 21.1504 27.2029L17.2218 23.2744M29.7318 16.8358L23.6604 10.7644M22.1426 9.24658L23.6604 10.7644M23.6604 10.7644L16.96 17.4648C16.8369 17.5879 16.6761 17.6662 16.5033 17.6872L13.75 18.0219C13.1054 18.1003 12.8341 18.8867 13.2933 19.3458L17.2218 23.2744M17.2218 23.2744L12.054 28.4422"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Shuffle Icon
+export const Shuffle = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 23 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M2.21094 4.62842V4.62842C3.79057 4.62842 5.26746 5.4115 6.15382 6.71901L6.98945 7.95168L8.11587 9.61331M20.8573 17.9214H15.9324C14.6121 17.9214 13.3442 17.4044 12.4003 16.4812L11.4717 15.5729M20.8573 17.9214L17.365 21.4662M20.8573 17.9214L17.365 14.3766"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M2.21094 19.9508V19.9508C3.79448 19.9508 5.27905 19.1805 6.1908 17.8858L12.3636 9.11991C13.3098 7.7763 14.8504 6.97692 16.4937 6.97692H20.8573M20.8573 6.97692L17.365 3.43211M20.8573 6.97692L17.365 10.5217"
+      stroke="currentColor"
+      strokeWidth="2.02054"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Directional Icons
+export const Up = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 18 18"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M13.954 10.8891L8.90269 5.83775L3.85134 10.8891"
+      stroke="currentColor"
+      strokeWidth="2.3573"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const Down = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 17 18"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M3.44067 7.52148L8.49203 12.5728L13.5434 7.52148"
+      stroke="currentColor"
+      strokeWidth="2.3573"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const Right = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 18 18"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M7.39732 14.2567L12.4487 9.20536L7.39732 4.15401"
+      stroke="currentColor"
+      strokeWidth="2.3573"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const Left = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 18 18"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M10.3541 4.15399L5.3028 9.20534L10.3541 14.2567"
+      stroke="currentColor"
+      strokeWidth="2.3573"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Playback Control Icons
+export const Prev = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 25 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M7.20807 7.15392V17.2566"
+      stroke="currentColor"
+      strokeWidth="2.52568"
+      strokeLinecap="round"
+    />
+    <path
+      d="M9.21648 13.4938C8.27754 12.8914 8.27754 11.5193 9.21648 10.917L16.2164 6.42652C17.2352 5.77298 18.5736 6.50454 18.5736 7.71492V16.6958C18.5736 17.9062 17.2352 18.6378 16.2164 17.9842L9.21648 13.4938Z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
+export const Next = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M16.9 7.15392V17.2566"
+      stroke="currentColor"
+      strokeWidth="2.52568"
+      strokeLinecap="round"
+    />
+    <path
+      d="M14.8915 10.9169C15.8305 11.5193 15.8305 12.8914 14.8916 13.4937L7.89164 17.9842C6.87286 18.6377 5.53442 17.9062 5.53442 16.6958L5.53442 7.7149C5.53442 6.50451 6.87286 5.77295 7.89164 6.4265L14.8915 10.9169Z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
+// Notifications Icon
+export const Notifications = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 25 26"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M20.2844 17.9181H5.22872C4.03907 17.9181 3.38918 16.5305 4.15078 15.6166L5.40529 14.1112C5.62066 13.8528 5.72819 13.5259 5.72492 13.1895C5.70427 11.0701 6.07634 3.18495 12.7566 3.18495C19.4368 3.18495 19.8088 11.0701 19.7882 13.1895C19.7849 13.5259 19.8925 13.8528 20.1078 14.1112L21.3623 15.6166C22.1239 16.5305 21.4741 17.9181 20.2844 17.9181Z"
+      stroke="currentColor"
+      strokeWidth="1.6838"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M9.24872 20.7243C9.24872 20.7243 9.95029 22.829 12.7566 22.829C15.5629 22.829 16.2645 20.7243 16.2645 20.7243"
+      stroke="currentColor"
+      strokeWidth="1.6838"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Spinner Icon
+export const Spinner = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <circle
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="4"
+      fill="none"
+      strokeLinecap="round"
+      className="opacity-25"
+    />
+    <path
+      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      fill="currentColor"
+      className="opacity-75"
+    />
+  </svg>
+);
+
+// Requests Icon
+export const Requests = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <polyline points="16 11 18 13 22 9" />
   </svg>
 );

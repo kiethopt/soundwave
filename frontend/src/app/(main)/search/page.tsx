@@ -4,7 +4,7 @@ import { Suspense, useRef, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Track, Album, Artist, User } from '@/types';
 import { api } from '@/utils/api';
-import { Pause, Play, Plus } from '@/components/ui/Icons';
+import { Pause, Play, AddSimple } from '@/components/ui/Icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -391,7 +391,7 @@ function SearchContent() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuItem>
-                              <Plus className="w-4 h-4 mr-2" />
+                              <AddSimple className="w-4 h-4 mr-2" />
                               Add to playlist
                             </DropdownMenuItem>
                             <DropdownMenuItem>
@@ -464,7 +464,7 @@ function SearchContent() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuItem>
-                              <Plus className="w-4 h-4 mr-2" />
+                              <AddSimple className="w-4 h-4 mr-2" />
                               Add to playlist
                             </DropdownMenuItem>
                             <DropdownMenuItem>
