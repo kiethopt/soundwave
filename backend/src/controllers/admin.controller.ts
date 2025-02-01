@@ -8,12 +8,12 @@ import {
   client,
   setCache,
 } from '../middleware/cache.middleware';
-import { sessionService } from 'src/services/session.service';
+import { sessionService } from '../services/session.service';
 import {
   artistProfileSelect,
   genreSelect,
   userSelect,
-} from 'src/utils/prisma-selects';
+} from '../utils/prisma-selects';
 
 // Tạo 1 artist mới
 export const createArtist = async (req: Request, res: Response) => {

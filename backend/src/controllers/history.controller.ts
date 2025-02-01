@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { HistoryType } from '@prisma/client';
-import { historySelect } from 'src/utils/prisma-selects';
+import { historySelect } from '../utils/prisma-selects';
 
 // Lưu lịch sử nghe nhạc
 export const savePlayHistory = async (

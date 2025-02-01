@@ -1,21 +1,13 @@
 import { Request, Response } from 'express';
-import {
-  clearCacheForEntity,
-  client,
-  setCache,
-} from '../middleware/cache.middleware';
+import { clearCacheForEntity } from '../middleware/cache.middleware';
 import prisma from '../config/db';
 import {
   uploadFile,
   CloudinaryUploadResult,
 } from '../services/cloudinary.service';
 import { Role, AlbumType, Prisma, HistoryType } from '@prisma/client';
-import { sessionService } from 'src/services/session.service';
-import {
-  albumSelect,
-  historySelect,
-  trackSelect,
-} from 'src/utils/prisma-selects';
+import { sessionService } from '../services/session.service';
+import { albumSelect, trackSelect } from '../utils/prisma-selects';
 
 // Function để kiểm tra quyền
 const canManageAlbum = (user: any, albumArtistId: string): boolean => {
