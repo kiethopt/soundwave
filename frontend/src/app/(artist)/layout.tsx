@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function ArtistLayout({
@@ -10,7 +8,6 @@ export default function ArtistLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -20,7 +17,7 @@ export default function ArtistLayout({
         const token = localStorage.getItem('userToken');
 
         if (!userData || !token) {
-          router.push('/login');
+          window.location.href = '/login';
           return;
         }
 
@@ -29,28 +26,27 @@ export default function ArtistLayout({
           !user.artistProfile?.isVerified ||
           user.currentProfile !== 'ARTIST'
         ) {
-          router.push('/');
+          window.location.href = '/';
           return;
         }
 
         setIsLoading(false);
       } catch (error) {
         console.error('Error checking artist access:', error);
-        router.push('/login');
+        window.location.href = '/login';
       }
     };
 
     checkArtistAccess();
-  }, [router]);
+  }, []);
 
   if (isLoading) {
     return <div className="p-4">Loading...</div>;
   }
 
   return (
-    <div className="p-4 h-full overflow-y-auto" suppressHydrationWarning>
+    <div className="p-6" suppressHydrationWarning>
       {children}
-      <ToastContainer />
     </div>
   );
 }

@@ -60,8 +60,8 @@ export default function ArtistDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Artist Dashboard</h1>
+    <div className="space-y-6" suppressHydrationWarning>
+      <h1 className="text-3xl font-bold">Artist Dashboard</h1>
       <h2 className="text-white/60">Welcome to your artist dashboard</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

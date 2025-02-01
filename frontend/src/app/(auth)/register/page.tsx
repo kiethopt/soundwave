@@ -42,7 +42,10 @@ export default function RegisterPage() {
   );
 
   return (
-    <div className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4">
+    <div
+      className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4"
+      suppressHydrationWarning
+    >
       <h1 className="text-2xl font-bold text-white mb-8">
         Create Your Account
       </h1>

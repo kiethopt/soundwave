@@ -70,40 +70,49 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={isAuthPage ? '' : 'bg-[#111]'} suppressHydrationWarning>
-        {isAuthPage ? (
-          <main>{children}</main>
-        ) : (
-          <div className="flex flex-col h-screen text-white">
-            {/* Mobile Header */}
-            <div className="md:hidden">
-              <Header
-                isSidebarOpen={isSidebarOpen}
-                onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              />
-            </div>
+        <div suppressHydrationWarning>
+          {isAuthPage ? (
+            <main>{children}</main>
+          ) : (
+            <div className="flex flex-col h-screen text-white">
+              {/* Mobile Header */}
+              <div className="md:hidden">
+                <Header
+                  isSidebarOpen={isSidebarOpen}
+                  onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                />
+              </div>
 
-            <div className="flex flex-1 overflow-hidden">
-              {/* Sidebar */}
-              <Sidebar
-                isOpen={isSidebarOpen}
-                onClose={() => setIsSidebarOpen(false)}
-              />
+              <div className="flex flex-1">
+                {/* Sidebar */}
+                <Sidebar
+                  isOpen={isSidebarOpen}
+                  onClose={() => setIsSidebarOpen(false)}
+                />
 
-              {/* Main Content */}
-              <div className="flex-1 flex flex-col min-h-0">
-                {/* Desktop Header */}
-                <div className="hidden md:block">
-                  <Header />
+                {/* Main Content */}
+                <div className="flex-1 flex flex-col min-h-0">
+                  {/* Desktop Header */}
+                  <div className="hidden md:block">
+                    <Header />
+                  </div>
+
+                  {/* Content Area */}
+                  <main className="flex-1 relative">
+                    <div className="absolute inset-0 overflow-y-auto">
+                      <div
+                        className="min-h-full m-2 p-2 rounded-lg bg-[#111111]"
+                        suppressHydrationWarning
+                      >
+                        {children}
+                      </div>
+                    </div>
+                  </main>
                 </div>
-
-                {/* Content Area */}
-                <main className="flex-1 p-4 md:p-8 rounded-lg bg-[#111111] border border-white/10 overflow-y-auto">
-                  {children}
-                </main>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
         <ToastContainer />
       </body>
     </html>

@@ -81,13 +81,14 @@ export default function Sidebar({
         className={`
           fixed md:static inset-y-0 left-0 z-50
           bg-[#121212] transform transition-transform duration-300 ease-in-out
-          md:transform-none md:transition-none
+          md:transform-none md:transition-none border-r border-white/10
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0 md:flex-shrink-0
           ${isCollapsed ? 'w-20' : 'w-64'}
         `}
+        suppressHydrationWarning
       >
-        <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col" suppressHydrationWarning>
           <div
             className={`md:hidden p-4 ${
               isCollapsed ? 'flex justify-center' : 'flex justify-end'
@@ -186,7 +187,7 @@ export default function Sidebar({
                     }`}
                   >
                     {isCollapsed ? (
-                      <span className="w-6 h-6 mx-auto">🏠</span>
+                      <Home className="w-6 h-6 shrink-0" />
                     ) : (
                       <>
                         <Home className="w-6 h-6 shrink-0" />

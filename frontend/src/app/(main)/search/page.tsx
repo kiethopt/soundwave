@@ -23,7 +23,7 @@ function LoadingUI() {
   return (
     <div>
       <div className="w-full border-b border-white/10">
-        <div className="flex gap-8 px-6">
+        <div className="flex gap-6 px-2">
           {[...Array(3)].map((_, i) => (
             <div
               key={i}
@@ -233,7 +233,7 @@ function SearchContent() {
   };
 
   return (
-    <div>
+    <div suppressHydrationWarning>
       {/* Filter Bar */}
       <div className="w-full border-b border-white/10">
         <div className="flex gap-8 px-6">
@@ -241,7 +241,7 @@ function SearchContent() {
             <button
               key={button.value}
               onClick={() => setActiveFilter(button.value)}
-              className={`py-3 text-sm font-medium transition-colors relative ${
+              className={`py-2.5 text-sm font-medium transition-colors relative ${
                 activeFilter === button.value
                   ? 'text-white'
                   : 'text-white/70 hover:text-white'

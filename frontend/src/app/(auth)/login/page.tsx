@@ -58,7 +58,10 @@ function LoginForm() {
   );
 
   return (
-    <div className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4">
+    <div
+      className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4"
+      suppressHydrationWarning
+    >
       <h1 className="text-2xl font-bold text-white mb-8">
         Login to Your Account
       </h1>

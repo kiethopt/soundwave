@@ -87,7 +87,7 @@ export default function AdminGenres() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div className="container mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">

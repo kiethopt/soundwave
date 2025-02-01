@@ -34,7 +34,10 @@ export default function ForgotPasswordPage() {
   );
 
   return (
-    <div className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4">
+    <div
+      className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4"
+      suppressHydrationWarning
+    >
       <h1 className="text-2xl font-bold text-white mb-8">Forgot Password</h1>
       {message && (
         <div className="bg-green-500/10 text-green-500 p-3 rounded-md mb-4">
