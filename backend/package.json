@@ -24,12 +24,12 @@
     "@types/nodemailer": "^6.4.17",
     "@types/pusher-js": "^4.2.2",
     "@types/uuid": "^10.0.0",
-    "prisma": "^6.2.1",
+    "prisma": "^6.3.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },
   "dependencies": {
-    "@prisma/client": "^6.1.0",
+    "@prisma/client": "^6.3.0",
     "@sendgrid/mail": "^8.1.4",
     "@types/fs-extra": "^11.0.4",
     "axios": "^1.7.9",

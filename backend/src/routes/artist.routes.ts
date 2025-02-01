@@ -21,6 +21,13 @@ router.get(
   getAllArtistsProfile
 );
 
+router.get(
+  '/profile/:id',
+  authenticate,
+  authorize([Role.ADMIN, Role.ARTIST]),
+  getArtistProfile
+);
+
 router.put(
   '/profile/:id',
   authenticate,

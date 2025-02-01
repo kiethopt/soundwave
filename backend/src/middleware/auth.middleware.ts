@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt, { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { Role } from '@prisma/client';
 import prisma from '../config/db';
-import { userSelect } from 'src/utils/prisma-selects';
+import { userSelect } from '../utils/prisma-selects';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
