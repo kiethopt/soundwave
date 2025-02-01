@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import pusher from '@/utils/pusher';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import type React from 'react'; // Added import for React
+import type React from 'react';
 
 export default function RootLayout({
   children,
@@ -27,6 +27,19 @@ export default function RootLayout({
       pathname?.includes('/forgot-password'),
     [pathname]
   );
+
+  // Chuyển hướng nếu đang ở trang gốc ("/")
+  useEffect(() => {
+    const userDataStr = localStorage.getItem('userData');
+    if (userDataStr && pathname === '/') {
+      const user = JSON.parse(userDataStr);
+      if (user.currentProfile === 'ARTIST') {
+        router.replace('/artist/dashboard');
+      } else if (user.currentProfile === 'ADMIN') {
+        router.replace('/admin/dashboard');
+      }
+    }
+  }, [pathname, router]);
 
   useEffect(() => {
     const userDataStr = localStorage.getItem('userData');

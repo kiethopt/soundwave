@@ -38,9 +38,11 @@ function LoginForm() {
           localStorage.setItem('userData', JSON.stringify(response.user));
 
           if (response.user.role === 'ADMIN') {
-            router.push('/admin');
+            // Chuyển hướng đến dashboard của Admin
+            router.push('/admin/dashboard');
           } else if (response.user.role === 'ARTIST') {
-            router.push('/artist/albums');
+            // Chuyển hướng đến dashboard của Artist
+            router.push('/artist/dashboard');
           } else {
             router.push('/');
           }

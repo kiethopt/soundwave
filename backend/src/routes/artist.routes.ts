@@ -57,4 +57,12 @@ router.get(
   getArtistAlbums
 );
 
+// Chỉ cho phép ARTIST (và ADMIN nếu muốn) truy cập API này
+router.get(
+  '/stats',
+  authenticate,
+  authorize([Role.ARTIST, Role.ADMIN]),
+  getArtistStats
+);
+
 export default router;

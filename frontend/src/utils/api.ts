@@ -103,9 +103,8 @@ export const api = {
       );
     },
 
-    logout: async (token: string) => {
-      return fetchWithAuth('/api/auth/logout', { method: 'POST' }, token);
-    },
+    logout: async (token: string) =>
+      fetchWithAuth('/api/auth/logout', { method: 'POST' }, token),
   },
 
   session: {
@@ -407,6 +406,12 @@ export const api = {
         { method: 'GET' },
         token
       ),
+  },
+
+  // API dành riêng cho Artist (chú ý: thuộc tính "artist" mới được thêm vào)
+  artist: {
+    getStats: async (token: string) =>
+      fetchWithAuth('/api/artist/stats', { method: 'GET' }, token),
   },
 
   tracks: {

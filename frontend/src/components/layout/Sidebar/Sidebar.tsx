@@ -178,6 +178,23 @@ export default function Sidebar({
                     </div>
                   )}
                   <Link
+                    href="/artist/dashboard"
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                      pathname.startsWith('/artist/dashboard')
+                        ? 'bg-white/10'
+                        : 'hover:bg-white/10'
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <span className="w-6 h-6 mx-auto">🏠</span>
+                    ) : (
+                      <>
+                        <Home className="w-6 h-6 shrink-0" />
+                        <span>Dashboard</span>
+                      </>
+                    )}
+                  </Link>
+                  <Link
                     href="/artist/albums"
                     className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
                       pathname.startsWith('/artist/albums')
@@ -223,9 +240,11 @@ export default function Sidebar({
                   </div>
                 )}
                 <Link
-                  href="/admin"
+                  href="/admin/dashboard"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                    isActive('/admin') ? 'bg-white/10' : 'hover:bg-white/10'
+                    isActive('/admin/dashboard')
+                      ? 'bg-white/10'
+                      : 'hover:bg-white/10'
                   }`}
                 >
                   {isCollapsed ? (
