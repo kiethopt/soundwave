@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import multer, { FileFilterCallback } from 'multer';
+import multer from 'multer';
 
 // Cấu hình multer để lưu file tạm thời trong memory
 const storage = multer.memoryStorage();
@@ -13,7 +13,7 @@ const upload = multer({
   fileFilter: (
     req: Request,
     file: Express.Multer.File,
-    cb: FileFilterCallback
+    cb: multer.FileFilterCallback
   ) => {
     if (
       file.mimetype.startsWith('image/') ||

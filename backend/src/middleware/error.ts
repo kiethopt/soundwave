@@ -7,6 +7,13 @@ import {
   NotBeforeError,
 } from 'jsonwebtoken';
 
+interface CustomError extends Error {
+  code?: string;
+  meta?: {
+    target?: string[];
+  };
+}
+
 export const errorHandler = (
   err: Error,
   req: Request,

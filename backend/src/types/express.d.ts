@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Role, AlbumType } from '@prisma/client';
 import { File } from 'multer';
 
 declare global {
@@ -42,25 +42,6 @@ declare global {
         audioFile?: File[];
         coverFile?: File[];
       };
-    }
-
-    interface Multer {
-      File: {
-        fieldname: string;
-        originalname: string;
-        encoding: string;
-        mimetype: string;
-        size: number;
-        destination: string;
-        filename: string;
-        path: string;
-        buffer: Buffer;
-      };
-    }
-
-    interface Error {
-      code?: string;
-      status?: number;
     }
   }
 }
