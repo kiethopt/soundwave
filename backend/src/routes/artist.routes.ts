@@ -10,6 +10,7 @@ import {
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload from '../middleware/upload.middleware';
+import { cacheMiddleware } from 'src/middleware/cache.middleware';
 
 const router = express.Router();
 
@@ -50,12 +51,15 @@ router.get(
   getArtistTracks
 );
 
-router.get(
-  '/albums/:id',
-  authenticate,
-  authorize([Role.ADMIN, Role.ARTIST]),
-  getArtistAlbums
-);
+// router.get(
+//   '/albums/:id',
+//   authenticate,
+//   // authorize([Role.ADMIN, Role.ARTIST]),
+//   cacheMiddleware,
+//   getArtistAlbums
+// );
+
+router.get('/:id/albums', authenticate, cacheMiddleware, getArtistAlbums);
 
 // Chỉ cho phép ARTIST (và ADMIN nếu muốn) truy cập API này
 router.get(

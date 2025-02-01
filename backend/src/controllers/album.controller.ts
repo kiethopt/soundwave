@@ -817,87 +817,74 @@ export const playAlbum = async (req: Request, res: Response): Promise<void> => {
 
     await sessionService.handleAudioPlay(user.id, sessionId);
 
-    // Lấy album với đầy đủ thông tin track theo trackSelect
+    // Lấy album và track đầu tiên
     const album = await prisma.album.findFirst({
       where: {
         id: albumId,
         isActive: true,
       },
-      select: {
-        id: true,
-        title: true,
-        coverUrl: true,
-        type: true,
-        artist: {
-          select: {
-            id: true,
-            artistName: true,
-            avatar: true,
-            isVerified: true,
-          },
-        },
+      include: {
         tracks: {
-          where: {
-            isActive: true,
-          },
-          orderBy: {
-            trackNumber: 'asc',
-          },
-          select: {
-            ...trackSelect,
-            artist: {
-              select: {
-                id: true,
-                artistName: true,
-                avatar: true,
-                isVerified: true,
-              },
-            },
-            featuredArtists: {
-              select: {
-                artistProfile: {
-                  select: {
-                    id: true,
-                    artistName: true,
-                    avatar: true,
-                    isVerified: true,
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
+          where: { isActive: true },
+          orderBy: { trackNumber: 'asc' },
+          take: 1,
+          select: trackSelect,
         },
       },
     });
 
-    if (!album) {
-      res.status(404).json({ message: 'Album not found' });
-      return;
-    }
-
-    if (!album.tracks || album.tracks.length === 0) {
-      res.status(404).json({ message: 'No active tracks found in this album' });
+    if (!album || album.tracks.length === 0) {
+      res.status(404).json({ message: 'Album or tracks not found' });
       return;
     }
 
     const firstTrack = album.tracks[0];
 
-    // Đảm bảo firstTrack có đầy đủ thông tin cần thiết
-    if (!firstTrack || !firstTrack.audioUrl) {
-      res.status(404).json({ message: 'Track not found or invalid' });
-      return;
+    // Logic tính monthly listeners
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+    const existingListen = await prisma.history.findFirst({
+      where: {
+        userId: user.id,
+        track: { artistId: firstTrack.artistId },
+        createdAt: { gte: lastMonth },
+      },
+    });
+
+    if (!existingListen) {
+      await prisma.artistProfile.update({
+        where: { id: firstTrack.artistId },
+        data: { monthlyListeners: { increment: 1 } },
+      });
     }
+
+    // Sử dụng upsert thay vì createMany
+    await prisma.history.upsert({
+      where: {
+        userId_trackId_type: {
+          userId: user.id,
+          trackId: firstTrack.id,
+          type: 'PLAY',
+        },
+      },
+      update: {
+        playCount: { increment: 1 },
+        updatedAt: new Date(),
+      },
+      create: {
+        type: 'PLAY',
+        trackId: firstTrack.id,
+        userId: user.id,
+        duration: firstTrack.duration,
+        completed: true,
+        playCount: 1,
+      },
+    });
 
     res.json({
       message: 'Album playback started',
       track: firstTrack,
-      album: album,
     });
   } catch (error) {
     console.error('Play album error:', error);

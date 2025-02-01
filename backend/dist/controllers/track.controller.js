@@ -783,14 +783,7 @@ const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             where: {
                 id: trackId,
                 isActive: true,
-                OR: [
-                    { album: null },
-                    {
-                        album: {
-                            isActive: true,
-                        },
-                    },
-                ],
+                OR: [{ album: null }, { album: { isActive: true } }],
             },
             select: prisma_selects_1.trackSelect,
         });
@@ -798,6 +791,42 @@ const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             res.status(404).json({ message: 'Track not found' });
             return;
         }
+        const lastMonth = new Date();
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        const existingListen = yield db_1.default.history.findFirst({
+            where: {
+                userId: user.id,
+                track: { artistId: track.artistId },
+                createdAt: { gte: lastMonth },
+            },
+        });
+        if (!existingListen) {
+            yield db_1.default.artistProfile.update({
+                where: { id: track.artistId },
+                data: { monthlyListeners: { increment: 1 } },
+            });
+        }
+        yield db_1.default.history.upsert({
+            where: {
+                userId_trackId_type: {
+                    userId: user.id,
+                    trackId: track.id,
+                    type: 'PLAY',
+                },
+            },
+            update: {
+                playCount: { increment: 1 },
+                updatedAt: new Date(),
+            },
+            create: {
+                type: 'PLAY',
+                trackId: track.id,
+                userId: user.id,
+                duration: track.duration,
+                completed: true,
+                playCount: 1,
+            },
+        });
         res.json({
             message: 'Track playback started',
             track: track,

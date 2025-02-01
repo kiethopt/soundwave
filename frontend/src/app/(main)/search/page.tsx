@@ -69,6 +69,9 @@ function SearchContent() {
   const [currentlyPlayingAlbum, setCurrentlyPlayingAlbum] = useState<
     string | null
   >(null);
+  const [currentlyPlayingArtist, setCurrentlyPlayingArtist] = useState<
+    string | null
+  >(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [trackCurrentTimes, setTrackCurrentTimes] = useState<{
     [key: string]: number;
@@ -146,7 +149,7 @@ function SearchContent() {
   }, []);
 
   // Xử lý play/pause track hoặc album
-  const handlePlayPause = async (item: Track | Album) => {
+  const handlePlayPause = async (item: Track | Album | Artist) => {
     try {
       const token = localStorage.getItem('userToken');
       const sessionId = localStorage.getItem('sessionId');
@@ -158,6 +161,71 @@ function SearchContent() {
       }
 
       const user = JSON.parse(userDataStr);
+
+      // Xử lý phát nhạc cho Artist
+      if ('artistProfile' in item) {
+        try {
+          // Nếu đang phát artist này thì dừng lại
+          if (currentlyPlayingArtist === item.artistProfile.id) {
+            if (audioRef.current) {
+              audioRef.current.pause();
+            }
+            setCurrentlyPlayingArtist(null);
+            setCurrentlyPlayingAlbum(null);
+            return;
+          }
+
+          // Lấy album mới nhất của nghệ sĩ
+          const artistAlbums = await api.artists.getAlbums(
+            item.artistProfile.id,
+            token
+          );
+          if (!artistAlbums || artistAlbums.length === 0) {
+            toast.error('No albums found for this artist');
+            return;
+          }
+
+          // Sắp xếp album theo ngày phát hành (mới nhất trước)
+          const latestAlbum = artistAlbums.sort(
+            (a: Album, b: Album) =>
+              new Date(b.releaseDate).getTime() -
+              new Date(a.releaseDate).getTime()
+          )[0];
+
+          // Phát album mới nhất
+          const response = await api.albums.playAlbum(latestAlbum.id, token);
+          if (!response?.track?.audioUrl) {
+            throw new Error('No audio URL found');
+          }
+
+          // Dừng audio hiện tại nếu có
+          if (audioRef.current) {
+            audioRef.current.pause();
+          }
+
+          // Tạo audio mới và phát
+          const audio = new Audio(response.track.audioUrl);
+          audioRef.current = audio;
+          audio.currentTime = trackCurrentTimes[latestAlbum.id] || 0;
+
+          await audio.play();
+          setCurrentlyPlayingArtist(item.artistProfile.id);
+          setCurrentlyPlayingAlbum(latestAlbum.id);
+          setCurrentlyPlaying(null);
+
+          audio.onended = () => {
+            setCurrentlyPlayingArtist(null);
+            setCurrentlyPlayingAlbum(null);
+            setCurrentlyPlaying(null);
+          };
+        } catch (error) {
+          console.error('Error playing artist:', error);
+          toast.error('Error playing artist. Please try again.');
+        }
+        return;
+      }
+
+      // Xử lý phát nhạc cho Track hoặc Album
       const isAlbum = 'tracks' in item;
       const itemId = item.id;
 
@@ -179,6 +247,7 @@ function SearchContent() {
           setCurrentlyPlayingAlbum(null);
         }
         setCurrentlyPlaying(null);
+        setCurrentlyPlayingArtist(null);
         return;
       }
 
@@ -206,6 +275,7 @@ function SearchContent() {
             setCurrentlyPlayingAlbum(null);
           }
           setCurrentlyPlaying(null);
+          setCurrentlyPlayingArtist(null);
         };
 
         await audio.play();
@@ -215,12 +285,14 @@ function SearchContent() {
         } else {
           setCurrentlyPlaying(itemId);
         }
+        setCurrentlyPlayingArtist(null);
 
         audio.onended = () => {
           if (isAlbum) {
             setCurrentlyPlayingAlbum(null);
           }
           setCurrentlyPlaying(null);
+          setCurrentlyPlayingArtist(null);
         };
       } catch (error) {
         console.error('Error playing audio:', error);
@@ -266,22 +338,42 @@ function SearchContent() {
                 <h2 className="text-2xl font-bold mb-4">Artists</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {results.artists.map((artist) => (
-                    <div key={artist.id} className="bg-white/5 p-4 rounded-lg">
-                      <img
-                        src={
-                          artist.artistProfile?.avatar ||
-                          '/images/default-avatar.png'
-                        }
-                        alt={artist.artistProfile?.artistName || 'Artist'}
-                        className="w-full aspect-square object-cover rounded-md mb-4"
-                      />
-                      <h3 className="text-white font-medium truncate">
-                        {artist.artistProfile?.artistName}
-                      </h3>
-                      <p className="text-white/60 text-sm truncate">
-                        {artist.artistProfile?.monthlyListeners.toLocaleString()}{' '}
-                        monthly listeners
-                      </p>
+                    <div
+                      key={artist.id}
+                      className="group relative p-4 rounded-lg hover:bg-white/5 transition-colors"
+                    >
+                      <div className="relative">
+                        <div className="aspect-square mb-4">
+                          <img
+                            src={
+                              artist.artistProfile?.avatar ||
+                              '/images/default-avatar.png'
+                            }
+                            alt={artist.artistProfile?.artistName || 'Artist'}
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        </div>
+                        <button
+                          onClick={() => handlePlayPause(artist)}
+                          className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity shadow-lg transform translate-y-2 group-hover:translate-y-0"
+                        >
+                          {currentlyPlayingArtist ===
+                          artist.artistProfile?.id ? (
+                            <Pause className="w-6 h-6 text-white" />
+                          ) : (
+                            <Play className="w-6 h-6 text-white" />
+                          )}
+                        </button>
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-white font-medium truncate hover:underline cursor-pointer">
+                          {artist.artistProfile?.artistName}
+                        </h3>
+                        <p className="text-white/60 text-sm truncate">
+                          {artist.artistProfile?.monthlyListeners.toLocaleString()}{' '}
+                          monthly listeners
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -337,16 +429,16 @@ function SearchContent() {
                 <h2 className="text-2xl font-bold mb-4">Tracks</h2>
                 <div className="md:grid md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {/* Mobile List View */}
-                  <div className="block md:hidden space-y-2">
+                  <div className="block md:hidden space-y-2 mb-10">
                     {results.tracks.map((track) => (
                       <div
                         key={track.id}
                         className={`flex items-center gap-3 p-2 rounded-lg group
-                          ${
-                            currentlyPlaying === track.id
-                              ? 'bg-white/5'
-                              : 'hover:bg-white/5'
-                          }`}
+                        ${
+                          currentlyPlaying === track.id
+                            ? 'bg-white/5'
+                            : 'hover:bg-white/5'
+                        }`}
                       >
                         <div className="relative flex-shrink-0">
                           <img
@@ -376,11 +468,16 @@ function SearchContent() {
                             {track.title}
                           </h3>
                           <p className="text-white/60 text-sm truncate">
-                            {track.artist
-                              ? typeof track.artist === 'string'
-                                ? track.artist
-                                : track.artist.artistName
-                              : 'Unknown Artist'}
+                            {[
+                              track.artist
+                                ? typeof track.artist === 'string'
+                                  ? track.artist
+                                  : track.artist.artistName
+                                : 'Unknown Artist',
+                              ...(track.featuredArtists?.map(
+                                (fa) => fa.artistProfile.artistName
+                              ) || []),
+                            ].join(', ')}
                           </p>
                         </div>
                         <DropdownMenu>
@@ -414,11 +511,11 @@ function SearchContent() {
                     <div
                       key={track.id}
                       className={`hidden md:block bg-white/5 p-4 rounded-lg group relative
-                        ${
-                          currentlyPlaying === track.id
-                            ? 'bg-white/5'
-                            : 'hover:bg-white/5'
-                        }`}
+                      ${
+                        currentlyPlaying === track.id
+                          ? 'bg-white/5'
+                          : 'hover:bg-white/5'
+                      }`}
                     >
                       <div className="relative">
                         <img
@@ -449,11 +546,16 @@ function SearchContent() {
                             {track.title}
                           </h3>
                           <p className="text-white/60 text-sm truncate">
-                            {track.artist
-                              ? typeof track.artist === 'string'
-                                ? track.artist
-                                : track.artist.artistName
-                              : 'Unknown Artist'}
+                            {[
+                              track.artist
+                                ? typeof track.artist === 'string'
+                                  ? track.artist
+                                  : track.artist.artistName
+                                : 'Unknown Artist',
+                              ...(track.featuredArtists?.map(
+                                (fa) => fa.artistProfile.artistName
+                              ) || []),
+                            ].join(', ')}
                           </p>
                         </div>
                         <DropdownMenu>
@@ -492,18 +594,27 @@ function SearchContent() {
                 <h2 className="text-2xl font-bold mb-4">Users</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {results.users.map((user) => (
-                    <div key={user.id} className="bg-white/5 p-4 rounded-lg">
-                      <img
-                        src={user.avatar || '/images/default-avatar.png'}
-                        alt={user.name || 'User'}
-                        className="w-full aspect-square object-cover rounded-md mb-4"
-                      />
-                      <h3 className="text-white font-medium truncate">
-                        {user.name}
-                      </h3>
-                      <p className="text-white/60 text-sm truncate">
-                        {user.username}
-                      </p>
+                    <div
+                      key={user.id}
+                      className="group relative p-4 rounded-lg hover:bg-white/5 transition-colors"
+                    >
+                      <div className="relative">
+                        <div className="aspect-square mb-4">
+                          <img
+                            src={user.avatar || '/images/default-avatar.png'}
+                            alt={user.name || 'User'}
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <h3 className="text-white font-medium truncate hover:underline cursor-pointer">
+                          {user.name}
+                        </h3>
+                        <p className="text-white/60 text-sm truncate">
+                          {user.username || 'No username'}
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>

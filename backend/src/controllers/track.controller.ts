@@ -983,19 +983,11 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
 
     await sessionService.handleAudioPlay(user.id, sessionId);
 
-    // Thêm điều kiện isActive cho track và album nếu track thuộc album
     const track = await prisma.track.findFirst({
       where: {
         id: trackId,
         isActive: true,
-        OR: [
-          { album: null },
-          {
-            album: {
-              isActive: true,
-            },
-          },
-        ],
+        OR: [{ album: null }, { album: { isActive: true } }],
       },
       select: trackSelect,
     });
@@ -1004,6 +996,48 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
       res.status(404).json({ message: 'Track not found' });
       return;
     }
+
+    // Logic tính monthly listeners
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+    const existingListen = await prisma.history.findFirst({
+      where: {
+        userId: user.id,
+        track: { artistId: track.artistId },
+        createdAt: { gte: lastMonth },
+      },
+    });
+
+    if (!existingListen) {
+      await prisma.artistProfile.update({
+        where: { id: track.artistId },
+        data: { monthlyListeners: { increment: 1 } },
+      });
+    }
+
+    // Lưu lịch sử phát nhạc
+    await prisma.history.upsert({
+      where: {
+        userId_trackId_type: {
+          userId: user.id,
+          trackId: track.id,
+          type: 'PLAY',
+        },
+      },
+      update: {
+        playCount: { increment: 1 },
+        updatedAt: new Date(),
+      },
+      create: {
+        type: 'PLAY',
+        trackId: track.id,
+        userId: user.id,
+        duration: track.duration,
+        completed: true,
+        playCount: 1,
+      },
+    });
 
     res.json({
       message: 'Track playback started',

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateArtistProfile = exports.getArtistStats = exports.getArtistTracks = exports.getArtistAlbums = exports.getArtistProfile = exports.getAllArtistsProfile = void 0;
+exports.getArtistStats = exports.updateArtistProfile = exports.getArtistTracks = exports.getArtistAlbums = exports.getArtistProfile = exports.getAllArtistsProfile = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cloudinary_service_1 = require("../services/cloudinary.service");
@@ -164,6 +164,9 @@ const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function
                 return;
             }
         }
+        if (user.id === artistProfile.userId) {
+            whereCondition = { artistId: id };
+        }
         const albums = yield db_1.default.album.findMany({
             where: whereCondition,
             select: prisma_selects_1.albumSelect,
@@ -214,68 +217,6 @@ const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function
     }
 });
 exports.getArtistTracks = getArtistTracks;
-const getArtistStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const { id } = req.params;
-    const user = req.user;
-    try {
-        const artistProfile = yield db_1.default.artistProfile.findUnique({
-            where: { id },
-            select: {
-                id: true,
-                monthlyListeners: true,
-                isVerified: true,
-                userId: true,
-            },
-        });
-        if (!artistProfile) {
-            res.status(404).json({ message: 'Artist not found' });
-            return;
-        }
-        let whereCondition = { artistId: id };
-        if ((user === null || user === void 0 ? void 0 : user.role) !== client_1.Role.ADMIN && (user === null || user === void 0 ? void 0 : user.id) !== artistProfile.userId) {
-            whereCondition.isActive = true;
-            if (!((_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified)) {
-                res.status(403).json({ message: 'Forbidden' });
-                return;
-            }
-        }
-        const totalAlbums = yield db_1.default.album.count({
-            where: whereCondition,
-        });
-        const totalTracks = yield db_1.default.track.count({
-            where: whereCondition,
-        });
-        const totalPlays = yield db_1.default.track.aggregate({
-            where: whereCondition,
-            _sum: {
-                playCount: true,
-            },
-        });
-        console.log('Artist Stats:', {
-            artistId: id,
-            requestUserId: user === null || user === void 0 ? void 0 : user.id,
-            artistUserId: artistProfile.userId,
-            isAdmin: (user === null || user === void 0 ? void 0 : user.role) === client_1.Role.ADMIN,
-            whereCondition,
-            totalAlbums,
-            totalTracks,
-            totalPlays: totalPlays._sum.playCount,
-            monthlyListeners: artistProfile.monthlyListeners,
-        });
-        res.json({
-            totalAlbums,
-            totalTracks,
-            totalPlays: totalPlays._sum.playCount || 0,
-            monthlyListeners: artistProfile.monthlyListeners,
-        });
-    }
-    catch (error) {
-        console.error('Error fetching artist stats:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getArtistStats = getArtistStats;
 const updateArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const { bio, socialMediaLinks, genreIds, isVerified, artistName } = req.body;
@@ -385,4 +326,40 @@ const updateArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, func
     }
 });
 exports.updateArtistProfile = updateArtistProfile;
+const getArtistStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = req.user;
+        if (!user || !user.artistProfile) {
+            res.status(403).json({ message: 'Forbidden' });
+            return;
+        }
+        const artistProfileId = user.artistProfile.id;
+        const artistStats = yield db_1.default.artistProfile.findUnique({
+            where: { id: artistProfileId },
+            select: {
+                monthlyListeners: true,
+                _count: {
+                    select: {
+                        albums: true,
+                        tracks: true,
+                    },
+                },
+            },
+        });
+        if (!artistStats) {
+            res.status(404).json({ message: 'Artist profile not found' });
+            return;
+        }
+        res.json({
+            monthlyListeners: artistStats.monthlyListeners,
+            albumCount: artistStats._count.albums,
+            trackCount: artistStats._count.tracks,
+        });
+    }
+    catch (error) {
+        console.error('Get artist stats error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getArtistStats = getArtistStats;
 //# sourceMappingURL=artist.controller.js.map

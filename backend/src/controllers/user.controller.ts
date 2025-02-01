@@ -220,8 +220,8 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
       prisma.user.findMany({
         where: {
           isActive: true,
-          role: Role.ARTIST,
           artistProfile: {
+            isActive: true,
             OR: [
               {
                 artistName: { contains: searchQuery, mode: 'insensitive' },

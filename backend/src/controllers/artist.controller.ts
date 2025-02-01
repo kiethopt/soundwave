@@ -190,14 +190,20 @@ export const getArtistAlbums = async (
 
     let whereCondition: any = { artistId: id };
 
-    // Nếu không phải ADMIN hoặc chính artist đó
+    // Nếu là user thường: chỉ xem album active
     if (user.role !== Role.ADMIN && user.id !== artistProfile.userId) {
       whereCondition.isActive = true;
-      // Nếu artist chưa được verify thì không cho xem albums
+
+      // Kiểm tra artist đã verify chưa
       if (!artistProfile.isVerified) {
         res.status(403).json({ message: 'Artist is not verified' });
         return;
       }
+    }
+
+    // Nếu là chính artist: xem cả active và inactive
+    if (user.id === artistProfile.userId) {
+      whereCondition = { artistId: id };
     }
 
     const albums = await prisma.album.findMany({

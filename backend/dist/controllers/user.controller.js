@@ -181,8 +181,8 @@ const searchAll = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             db_1.default.user.findMany({
                 where: {
                     isActive: true,
-                    role: client_1.Role.ARTIST,
                     artistProfile: {
+                        isActive: true,
                         OR: [
                             {
                                 artistName: { contains: searchQuery, mode: 'insensitive' },

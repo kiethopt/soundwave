@@ -388,8 +388,8 @@ export const api = {
     getTracks: async (id: string, token: string) =>
       fetchWithAuth(`/api/artist/tracks/${id}`, { method: 'GET' }, token),
 
-    getAlbums: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/albums/${id}`, { method: 'GET' }, token),
+    getAlbums: (artistId: string, token: string) =>
+      fetchWithAuth(`/api/artist/${artistId}/albums`, { method: 'GET' }, token),
 
     updateMonthlyListeners: async (id: string, token: string) =>
       fetchWithAuth(
