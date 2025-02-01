@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import multer from 'multer';
+import multer, { FileFilterCallback } from 'multer';
 
 // Cấu hình multer để lưu file tạm thời trong memory
 const storage = multer.memoryStorage();
@@ -8,10 +8,13 @@ const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // Giới hạn 10MB
+    fileSize: 10 * 1024 * 1024,
   },
-  fileFilter: (req, file, cb) => {
-    // Chấp nhận file ảnh và audio
+  fileFilter: (
+    req: Request,
+    file: Express.Multer.File,
+    cb: FileFilterCallback
+  ) => {
     if (
       file.mimetype.startsWith('image/') ||
       file.mimetype.startsWith('audio/')
@@ -24,7 +27,7 @@ const upload = multer({
 });
 
 export const handleUploadError = (
-  err: Error,
+  err: Error & { code?: string },
   req: Request,
   res: Response,
   next: NextFunction

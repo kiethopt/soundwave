@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -12,97 +45,183 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchTrack = exports.deleteTrack = exports.updateTrack = exports.getTracksByArtist = exports.getTrackById = exports.getAllTracks = exports.createTrack = void 0;
+exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
 const db_1 = __importDefault(require("../config/db"));
-const discord_service_1 = require("../services/discord.service");
-const trackSelect = {
-    id: true,
-    title: true,
-    artist: true,
-    featuredArtists: true,
-    duration: true,
-    releaseDate: true,
-    trackNumber: true,
-    coverUrl: true,
-    audioUrl: true,
-    audioMessageId: true,
-    album: {
-        select: {
-            id: true,
-            title: true,
-            coverUrl: true,
-        },
-    },
-    uploadedBy: {
-        select: {
-            id: true,
-            username: true,
-            name: true,
-        },
-    },
-    discordMessageId: true,
-    createdAt: true,
-    updatedAt: true,
+const cloudinary_service_1 = require("../services/cloudinary.service");
+const client_1 = require("@prisma/client");
+const cache_middleware_1 = require("../middleware/cache.middleware");
+const session_service_1 = require("../services/session.service");
+const prisma_selects_1 = require("../utils/prisma-selects");
+const canManageTrack = (user, trackArtistId) => {
+    var _a, _b, _c;
+    if (!user)
+        return false;
+    if (user.role === client_1.Role.ADMIN)
+        return true;
+    return (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
+        ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) === client_1.Role.ARTIST &&
+        ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id) === trackArtistId);
+};
+const validateTrackData = (data, isSingleTrack = true, validateRequired = true) => {
+    const { title, duration, releaseDate, trackNumber, coverUrl, audioUrl, type, featuredArtists, } = data;
+    if (validateRequired) {
+        if (!(title === null || title === void 0 ? void 0 : title.trim()))
+            return 'Title is required';
+        if (duration === undefined || duration < 0)
+            return 'Duration must be a non-negative number';
+        if (!releaseDate || isNaN(Date.parse(releaseDate)))
+            return 'Valid release date is required';
+        if (!(coverUrl === null || coverUrl === void 0 ? void 0 : coverUrl.trim()))
+            return 'Cover URL is required';
+        if (!(audioUrl === null || audioUrl === void 0 ? void 0 : audioUrl.trim()))
+            return 'Audio URL is required';
+    }
+    else {
+        if (title !== undefined && !title.trim())
+            return 'Title cannot be empty';
+        if (duration !== undefined && duration < 0)
+            return 'Duration must be a non-negative number';
+        if (releaseDate !== undefined && isNaN(Date.parse(releaseDate)))
+            return 'Invalid release date format';
+    }
+    if (type && !Object.values(client_1.AlbumType).includes(type))
+        return 'Invalid track type';
+    if (!isSingleTrack && trackNumber !== undefined && trackNumber <= 0) {
+        return 'Track number must be a positive integer';
+    }
+    if (featuredArtists) {
+        if (!Array.isArray(featuredArtists)) {
+            return 'Featured artists must be an array';
+        }
+        for (const artistProfileId of featuredArtists) {
+            if (typeof artistProfileId !== 'string' || !artistProfileId.trim()) {
+                return 'Each featured artist ID must be a non-empty string';
+            }
+        }
+    }
+    return null;
+};
+const validateFile = (file, isAudio = false) => {
+    const maxSize = 5 * 1024 * 1024;
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    const allowedAudioTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3'];
+    const maxFileNameLength = 100;
+    if (file.size > maxSize) {
+        return 'File size too large. Maximum allowed size is 5MB.';
+    }
+    if (isAudio) {
+        if (!allowedAudioTypes.includes(file.mimetype)) {
+            return `Invalid audio file type. Only ${allowedAudioTypes.join(', ')} are allowed.`;
+        }
+    }
+    else {
+        if (!allowedImageTypes.includes(file.mimetype)) {
+            return `Invalid image file type. Only ${allowedImageTypes.join(', ')} are allowed.`;
+        }
+    }
+    if (file.originalname.length > maxFileNameLength) {
+        return `File name too long. Maximum allowed length is ${maxFileNameLength} characters.`;
+    }
+    const invalidChars = /[<>:"/\\|?*]/g;
+    if (invalidChars.test(file.originalname)) {
+        return 'File name contains invalid characters.';
+    }
+    return null;
 };
 const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c, _d;
     try {
-        const { title, artist, featuredArtists, duration, releaseDate, albumId } = req.body;
-        const files = req.files;
-        const audioFile = (_a = files === null || files === void 0 ? void 0 : files['audio']) === null || _a === void 0 ? void 0 : _a[0];
-        const coverFile = (_b = files === null || files === void 0 ? void 0 : files['cover']) === null || _b === void 0 ? void 0 : _b[0];
         const user = req.user;
-        if (!(user === null || user === void 0 ? void 0 : user.id)) {
+        if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
+        const { title, releaseDate, trackNumber, albumId, featuredArtists, genreIds, artistId, } = req.body;
+        const finalArtistId = user.role === 'ADMIN' ? artistId : (_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id;
+        if (!finalArtistId) {
+            res.status(400).json({
+                message: user.role === 'ADMIN'
+                    ? 'Artist ID is required'
+                    : 'Only verified artists can create tracks',
+            });
+            return;
+        }
+        if (user.role !== 'ADMIN' && !((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isVerified)) {
+            res.status(403).json({
+                message: 'Only verified artists can create tracks',
+            });
+            return;
+        }
+        if (!req.files) {
+            res.status(400).json({ message: 'No files uploaded' });
+            return;
+        }
+        const files = req.files;
+        const audioFile = (_c = files.audioFile) === null || _c === void 0 ? void 0 : _c[0];
+        const coverFile = (_d = files.coverFile) === null || _d === void 0 ? void 0 : _d[0];
         if (!audioFile) {
             res.status(400).json({ message: 'Audio file is required' });
             return;
         }
-        let albumData = null;
-        if (albumId) {
-            albumData = yield db_1.default.album.findUnique({
-                where: { id: albumId },
-                select: { coverUrl: true },
-            });
+        if (audioFile) {
+            const audioValidationError = validateFile(audioFile, true);
+            if (audioValidationError) {
+                res.status(400).json({ message: audioValidationError });
+                return;
+            }
         }
-        const audioUpload = yield (0, discord_service_1.uploadTrack)(audioFile.buffer, audioFile.originalname, true, !!albumId);
-        let coverUrl;
         if (coverFile) {
-            const coverUpload = yield (0, discord_service_1.uploadTrack)(coverFile.buffer, coverFile.originalname, false, false, true);
-            coverUrl = coverUpload.url;
+            const coverValidationError = validateFile(coverFile, false);
+            if (coverValidationError) {
+                res.status(400).json({ message: coverValidationError });
+                return;
+            }
         }
-        else if (albumData === null || albumData === void 0 ? void 0 : albumData.coverUrl) {
-            coverUrl = albumData.coverUrl;
-        }
-        const metadata = {
-            title,
-            artist,
-            featuredArtists: featuredArtists || null,
-            duration: parseInt(duration),
-            releaseDate: new Date(releaseDate).toISOString().split('T')[0],
-            albumId: albumId || null,
-            type: 'track',
-        };
-        const metadataUpload = yield (0, discord_service_1.saveMetadata)(metadata);
+        const audioUpload = yield (0, cloudinary_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto');
+        const coverUrl = coverFile
+            ? (yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image')).secure_url
+            : null;
+        const mm = yield Promise.resolve().then(() => __importStar(require('music-metadata')));
+        const metadata = yield mm.parseBuffer(audioFile.buffer);
+        const duration = Math.floor(metadata.format.duration || 0);
+        const featuredArtistsArray = featuredArtists
+            ? featuredArtists.split(',').map((id) => id.trim())
+            : [];
+        const genreIdsArray = genreIds
+            ? genreIds.split(',').map((id) => id.trim())
+            : [];
         const track = yield db_1.default.track.create({
             data: {
                 title,
-                artist,
-                featuredArtists: featuredArtists || null,
-                duration: parseInt(duration),
+                duration,
                 releaseDate: new Date(releaseDate),
+                trackNumber: trackNumber ? Number(trackNumber) : null,
                 coverUrl,
-                audioUrl: audioUpload.url,
-                audioMessageId: audioUpload.messageId,
-                albumId: albumId || undefined,
-                uploadedBy: {
-                    connect: { id: user.id },
-                },
-                discordMessageId: metadataUpload.messageId,
+                audioUrl: audioUpload.secure_url,
+                artistId: finalArtistId,
+                albumId: albumId || null,
+                type: albumId ? undefined : 'SINGLE',
+                featuredArtists: featuredArtistsArray.length > 0
+                    ? {
+                        create: featuredArtistsArray.map((artistProfileId) => ({
+                            artistProfileId,
+                        })),
+                    }
+                    : undefined,
+                genres: genreIdsArray.length > 0
+                    ? {
+                        create: genreIdsArray.map((genreId) => ({
+                            genreId,
+                        })),
+                    }
+                    : undefined,
             },
-            select: trackSelect,
+            select: prisma_selects_1.trackSelect,
+        });
+        yield (0, cache_middleware_1.clearCacheForEntity)('track', {
+            userId: finalArtistId,
+            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
+            clearSearch: true,
         });
         res.status(201).json({
             message: 'Track created successfully',
@@ -111,100 +230,119 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
     catch (error) {
         console.error('Create track error:', error);
-        res.status(500).json({
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development'
-                ? error instanceof Error
-                    ? error.message
-                    : String(error)
-                : undefined,
-        });
+        res.status(500).json({ message: 'Internal server error' });
     }
 });
 exports.createTrack = createTrack;
-const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
-        const tracks = yield db_1.default.track.findMany({
-            where: {
-                isActive: true,
-                albumId: null,
-            },
-            select: trackSelect,
-            orderBy: { createdAt: 'desc' },
-        });
-        const mappedTracks = tracks.map((track) => {
-            var _a;
-            return (Object.assign(Object.assign({}, track), { coverUrl: track.coverUrl || ((_a = track.album) === null || _a === void 0 ? void 0 : _a.coverUrl) || null }));
-        });
-        res.json(mappedTracks);
-    }
-    catch (error) {
-        console.error('Get tracks error:', error);
-        res.status(500).json({
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-        });
-    }
-});
-exports.getAllTracks = getAllTracks;
-const getTrackById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
+        const user = req.user;
         const { id } = req.params;
-        const track = yield db_1.default.track.findUnique({
-            where: { id, isActive: true },
-            select: trackSelect,
-        });
-        if (!track) {
-            res.status(404).json({ message: 'Track không tồn tại' });
+        const { title, duration, releaseDate, trackNumber, albumId, featuredArtists, genreIds, } = req.body;
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized: User not found' });
             return;
         }
-        res.json(track);
-    }
-    catch (error) {
-        console.error('Get track error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getTrackById = getTrackById;
-const getTracksByArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { artist } = req.params;
-        const tracks = yield db_1.default.track.findMany({
-            where: {
-                artist: {
-                    contains: artist,
-                    mode: 'insensitive',
-                },
-                isActive: true,
-            },
-            select: trackSelect,
-        });
-        res.json(tracks);
-    }
-    catch (error) {
-        console.error('Get tracks by artist error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getTracksByArtist = getTracksByArtist;
-const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const { title, artist, duration, albumId } = req.body;
-        const track = yield db_1.default.track.update({
+        const track = yield db_1.default.track.findUnique({
             where: { id },
-            data: {
-                title,
-                artist,
-                duration,
-                albumId,
-                updatedAt: new Date(),
-            },
-            select: trackSelect,
+            select: { artistId: true },
+        });
+        if (!track) {
+            res.status(404).json({ message: 'Track not found' });
+            return;
+        }
+        if (!canManageTrack(user, track.artistId)) {
+            res.status(403).json({
+                message: 'You can only update your own tracks',
+                code: 'NOT_TRACK_OWNER',
+            });
+            return;
+        }
+        const files = req.files;
+        const updateData = {};
+        if ((_a = files === null || files === void 0 ? void 0 : files.audioFile) === null || _a === void 0 ? void 0 : _a[0]) {
+            const audioFile = files.audioFile[0];
+            const audioValidationError = validateFile(audioFile, true);
+            if (audioValidationError) {
+                res.status(400).json({ message: audioValidationError });
+                return;
+            }
+            const audioUpload = yield (0, cloudinary_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto');
+            updateData.audioUrl = audioUpload.secure_url;
+            const mm = yield Promise.resolve().then(() => __importStar(require('music-metadata')));
+            const metadata = yield mm.parseBuffer(audioFile.buffer);
+            updateData.duration = Math.floor(metadata.format.duration || 0);
+        }
+        if ((_b = files === null || files === void 0 ? void 0 : files.coverFile) === null || _b === void 0 ? void 0 : _b[0]) {
+            const coverFile = files.coverFile[0];
+            const coverValidationError = validateFile(coverFile, false);
+            if (coverValidationError) {
+                res.status(400).json({ message: coverValidationError });
+                return;
+            }
+            const coverUpload = yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
+            updateData.coverUrl = coverUpload.secure_url;
+        }
+        const validationError = validateTrackData({
+            title,
+            duration: updateData.duration || duration,
+            releaseDate,
+            trackNumber,
+            coverUrl: updateData.coverUrl || 'placeholder',
+            audioUrl: updateData.audioUrl || 'placeholder',
+        }, true, false);
+        if (validationError) {
+            res.status(400).json({ message: validationError });
+            return;
+        }
+        if (title !== undefined)
+            updateData.title = title;
+        if (duration !== undefined && !updateData.duration) {
+            updateData.duration = Number(duration);
+        }
+        if (releaseDate !== undefined)
+            updateData.releaseDate = new Date(releaseDate);
+        if (trackNumber !== undefined)
+            updateData.trackNumber = Number(trackNumber);
+        if (albumId !== undefined)
+            updateData.albumId = albumId || null;
+        if (featuredArtists) {
+            const featuredArtistsArray = Array.isArray(featuredArtists)
+                ? featuredArtists
+                : featuredArtists.split(',').map((id) => id.trim());
+            updateData.featuredArtists = {
+                deleteMany: {},
+                create: featuredArtistsArray.map((artistProfileId) => ({
+                    artistProfileId,
+                })),
+            };
+        }
+        if (genreIds) {
+            const genreIdsArray = Array.isArray(genreIds)
+                ? genreIds
+                : genreIds.split(',').map((id) => id.trim());
+            updateData.genres = {
+                deleteMany: {},
+                create: genreIdsArray.map((genreId) => ({
+                    genreId,
+                })),
+            };
+        }
+        const updatedTrack = yield db_1.default.track.update({
+            where: { id },
+            data: updateData,
+            select: prisma_selects_1.trackSelect,
+        });
+        yield (0, cache_middleware_1.clearCacheForEntity)('track', {
+            userId: track.artistId,
+            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
+            entityId: id,
+            clearSearch: true,
         });
         res.json({
-            message: 'Track đã được cập nhật thành công',
-            track,
+            message: 'Track updated successfully',
+            track: updatedTrack,
         });
     }
     catch (error) {
@@ -215,12 +353,37 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.updateTrack = updateTrack;
 const deleteTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const user = req.user;
         const { id } = req.params;
-        yield db_1.default.track.update({
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized: User not found' });
+            return;
+        }
+        const track = yield db_1.default.track.findUnique({
             where: { id },
-            data: { isActive: false },
+            select: { artistId: true },
         });
-        res.json({ message: 'Track đã được xóa thành công' });
+        if (!track) {
+            res.status(404).json({ message: 'Track not found' });
+            return;
+        }
+        if (!canManageTrack(user, track.artistId)) {
+            res.status(403).json({
+                message: 'You can only delete your own tracks',
+                code: 'NOT_TRACK_OWNER',
+            });
+            return;
+        }
+        yield db_1.default.track.delete({
+            where: { id },
+        });
+        yield (0, cache_middleware_1.clearCacheForEntity)('track', {
+            userId: track.artistId,
+            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
+            entityId: id,
+            clearSearch: true,
+        });
+        res.json({ message: 'Track deleted successfully' });
     }
     catch (error) {
         console.error('Delete track error:', error);
@@ -228,40 +391,118 @@ const deleteTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.deleteTrack = deleteTrack;
+const toggleTrackVisibility = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const user = req.user;
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized: User not found' });
+            return;
+        }
+        const track = yield db_1.default.track.findUnique({
+            where: { id },
+            select: { artistId: true, isActive: true },
+        });
+        if (!track) {
+            res.status(404).json({ message: 'Track not found' });
+            return;
+        }
+        if (!canManageTrack(user, track.artistId)) {
+            res.status(403).json({
+                message: 'You can only toggle visibility of your own tracks',
+                code: 'NOT_TRACK_OWNER',
+            });
+            return;
+        }
+        const updatedTrack = yield db_1.default.track.update({
+            where: { id },
+            data: { isActive: !track.isActive },
+            select: prisma_selects_1.trackSelect,
+        });
+        yield (0, cache_middleware_1.clearCacheForEntity)('track', {
+            entityId: id,
+            clearSearch: true,
+        });
+        res.json({
+            message: `Track ${updatedTrack.isActive ? 'activated' : 'hidden'} successfully`,
+            track: updatedTrack,
+        });
+    }
+    catch (error) {
+        console.error('Toggle track visibility error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.toggleTrackVisibility = toggleTrackVisibility;
 const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { q } = req.query;
-        const tracks = yield db_1.default.track.findMany({
-            where: {
-                isActive: true,
-                OR: [
-                    {
-                        title: {
-                            contains: String(q),
-                            mode: 'insensitive',
-                        },
+        const user = req.user;
+        if (!q) {
+            res.status(400).json({ message: 'Query is required' });
+            return;
+        }
+        const searchQuery = String(q).trim();
+        if (user) {
+            const existingHistory = yield db_1.default.history.findFirst({
+                where: {
+                    userId: user.id,
+                    type: client_1.HistoryType.SEARCH,
+                    query: {
+                        equals: searchQuery,
+                        mode: 'insensitive',
                     },
-                    {
-                        artist: {
-                            contains: String(q),
-                            mode: 'insensitive',
-                        },
+                },
+            });
+            if (existingHistory) {
+                yield db_1.default.history.update({
+                    where: { id: existingHistory.id },
+                    data: { updatedAt: new Date() },
+                });
+            }
+            else {
+                yield db_1.default.history.create({
+                    data: {
+                        type: client_1.HistoryType.SEARCH,
+                        query: searchQuery,
+                        userId: user.id,
                     },
-                ],
+                });
+            }
+        }
+        const searchConditions = [
+            { title: { contains: searchQuery, mode: 'insensitive' } },
+            {
+                artist: { artistName: { contains: searchQuery, mode: 'insensitive' } },
             },
-            select: Object.assign(Object.assign({}, trackSelect), { album: {
-                    select: {
-                        id: true,
-                        title: true,
-                        coverUrl: true,
+            {
+                featuredArtists: {
+                    some: {
+                        artistProfile: {
+                            artistName: { contains: searchQuery, mode: 'insensitive' },
+                        },
                     },
-                } }),
+                },
+            },
+        ];
+        const isActiveCondition = !((_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)
+            ? { isActive: true }
+            : {
+                OR: [
+                    { isActive: true },
+                    { AND: [{ isActive: false }, { artistId: user.artistProfile.id }] },
+                ],
+            };
+        const whereClause = {
+            AND: [isActiveCondition, { OR: searchConditions }],
+        };
+        const tracks = yield db_1.default.track.findMany({
+            where: whereClause,
+            select: prisma_selects_1.trackSelect,
+            orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
         });
-        const mappedTracks = tracks.map((track) => {
-            var _a;
-            return (Object.assign(Object.assign({}, track), { coverUrl: track.coverUrl || ((_a = track.album) === null || _a === void 0 ? void 0 : _a.coverUrl) || null }));
-        });
-        res.json(mappedTracks);
+        res.json(tracks);
     }
     catch (error) {
         console.error('Search track error:', error);
@@ -269,4 +510,302 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.searchTrack = searchTrack;
+const getTracksByType = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { type } = req.params;
+        let { page = 1, limit = 10 } = req.query;
+        const user = req.user;
+        page = Math.max(1, parseInt(page));
+        limit = Math.min(100, Math.max(1, parseInt(limit)));
+        const offset = (page - 1) * limit;
+        if (!Object.values(client_1.AlbumType).includes(type)) {
+            res.status(400).json({ message: 'Invalid track type' });
+            return;
+        }
+        const whereClause = {
+            type: type,
+        };
+        if (!user || !((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+            whereClause.isActive = true;
+        }
+        else {
+            whereClause.OR = [
+                { isActive: true },
+                {
+                    AND: [
+                        { isActive: false },
+                        { artistId: user.artistProfile.id },
+                    ],
+                },
+            ];
+        }
+        const tracks = yield db_1.default.track.findMany({
+            where: whereClause,
+            select: prisma_selects_1.trackSelect,
+            orderBy: { createdAt: 'desc' },
+            skip: offset,
+            take: Number(limit),
+        });
+        const totalTracks = yield db_1.default.track.count({ where: whereClause });
+        res.json({
+            tracks,
+            pagination: {
+                total: totalTracks,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(totalTracks / Number(limit)),
+            },
+        });
+    }
+    catch (error) {
+        console.error('Get tracks by type error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getTracksByType = getTracksByType;
+const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    try {
+        const user = req.user;
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        if (user.role !== client_1.Role.ADMIN &&
+            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) ||
+                ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) !== client_1.Role.ARTIST)) {
+            res.status(403).json({
+                message: 'Forbidden: Only admins or verified artists can access this resource',
+            });
+            return;
+        }
+        const { page = 1, limit = 10 } = req.query;
+        const offset = (Number(page) - 1) * Number(limit);
+        const whereClause = {};
+        if (user.role !== client_1.Role.ADMIN && ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id)) {
+            whereClause.artistId = user.artistProfile.id;
+        }
+        const tracks = yield db_1.default.track.findMany({
+            skip: offset,
+            take: Number(limit),
+            where: whereClause,
+            select: prisma_selects_1.trackSelect,
+            orderBy: { createdAt: 'desc' },
+        });
+        const totalTracks = yield db_1.default.track.count({
+            where: whereClause,
+        });
+        res.json({
+            tracks,
+            pagination: {
+                total: totalTracks,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(totalTracks / Number(limit)),
+            },
+        });
+    }
+    catch (error) {
+        console.error('Get all tracks error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getAllTracks = getAllTracks;
+const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { genreId } = req.params;
+        const { page = 1, limit = 10 } = req.query;
+        const user = req.user;
+        const offset = (Number(page) - 1) * Number(limit);
+        const genre = yield db_1.default.genre.findUnique({
+            where: { id: genreId },
+        });
+        if (!genre) {
+            res.status(404).json({ message: 'Genre not found' });
+            return;
+        }
+        const whereClause = {
+            genres: {
+                some: {
+                    genreId: genreId,
+                },
+            },
+        };
+        if (!user || !((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+            whereClause.isActive = true;
+        }
+        else {
+            whereClause.OR = [
+                { isActive: true },
+                {
+                    AND: [
+                        { isActive: false },
+                        { artistId: user.artistProfile.id },
+                    ],
+                },
+            ];
+        }
+        const tracks = yield db_1.default.track.findMany({
+            where: whereClause,
+            select: Object.assign(Object.assign({}, prisma_selects_1.trackSelect), { genres: {
+                    where: {
+                        genreId: genreId,
+                    },
+                    select: {
+                        genre: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                } }),
+            orderBy: { createdAt: 'desc' },
+            skip: offset,
+            take: Number(limit),
+        });
+        const totalTracks = yield db_1.default.track.count({
+            where: whereClause,
+        });
+        res.json({
+            tracks,
+            pagination: {
+                total: totalTracks,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(totalTracks / Number(limit)),
+            },
+        });
+    }
+    catch (error) {
+        console.error('Get tracks by genre error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getTracksByGenre = getTracksByGenre;
+const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { type, genreId } = req.params;
+        const { page = 1, limit = 10 } = req.query;
+        const user = req.user;
+        const offset = (Number(page) - 1) * Number(limit);
+        if (!Object.values(client_1.AlbumType).includes(type)) {
+            res.status(400).json({ message: 'Invalid track type' });
+            return;
+        }
+        const genre = yield db_1.default.genre.findUnique({
+            where: { id: genreId },
+        });
+        if (!genre) {
+            res.status(404).json({ message: 'Genre not found' });
+            return;
+        }
+        const whereClause = {
+            type: type,
+            genres: {
+                some: {
+                    genreId: genreId,
+                },
+            },
+        };
+        if (!user || !((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+            whereClause.isActive = true;
+        }
+        else {
+            whereClause.OR = [
+                { isActive: true },
+                {
+                    AND: [
+                        { isActive: false },
+                        { artistId: user.artistProfile.id },
+                    ],
+                },
+            ];
+        }
+        const tracks = yield db_1.default.track.findMany({
+            where: whereClause,
+            select: Object.assign(Object.assign({}, prisma_selects_1.trackSelect), { genres: {
+                    where: {
+                        genreId: genreId,
+                    },
+                    select: {
+                        genre: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                } }),
+            orderBy: { createdAt: 'desc' },
+            skip: offset,
+            take: Number(limit),
+        });
+        const totalTracks = yield db_1.default.track.count({
+            where: whereClause,
+        });
+        res.json({
+            tracks,
+            pagination: {
+                total: totalTracks,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(totalTracks / Number(limit)),
+            },
+        });
+    }
+    catch (error) {
+        console.error('Get tracks by type and genre error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getTracksByTypeAndGenre = getTracksByTypeAndGenre;
+const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { trackId } = req.params;
+        const user = req.user;
+        const sessionId = req.header('Session-ID');
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        if (!sessionId ||
+            !(yield session_service_1.sessionService.validateSession(user.id, sessionId))) {
+            res.status(401).json({ message: 'Invalid or expired session' });
+            return;
+        }
+        yield session_service_1.sessionService.handleAudioPlay(user.id, sessionId);
+        const track = yield db_1.default.track.findFirst({
+            where: {
+                id: trackId,
+                isActive: true,
+                OR: [
+                    { album: null },
+                    {
+                        album: {
+                            isActive: true,
+                        },
+                    },
+                ],
+            },
+            select: prisma_selects_1.trackSelect,
+        });
+        if (!track) {
+            res.status(404).json({ message: 'Track not found' });
+            return;
+        }
+        res.json({
+            message: 'Track playback started',
+            track: track,
+        });
+    }
+    catch (error) {
+        console.error('Play track error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.playTrack = playTrack;
 //# sourceMappingURL=track.controller.js.map

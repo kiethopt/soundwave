@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -12,199 +45,159 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchAlbum = exports.deleteAlbum = exports.reorderAlbumTracks = exports.updateAlbum = exports.uploadAlbumTracks = exports.createAlbum = exports.getAlbumTracks = exports.getAlbumsByArtist = exports.getAlbumById = exports.getAllAlbums = void 0;
+exports.playAlbum = exports.getAlbumById = exports.getAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = void 0;
+const cache_middleware_1 = require("../middleware/cache.middleware");
 const db_1 = __importDefault(require("../config/db"));
-const discord_service_1 = require("../services/discord.service");
-const albumSelect = {
-    id: true,
-    title: true,
-    artist: true,
-    releaseDate: true,
-    trackCount: true,
-    coverUrl: true,
-    uploadedBy: {
-        select: {
-            id: true,
-            username: true,
-            name: true,
-        },
-    },
-    tracks: {
-        where: { isActive: true },
-        orderBy: { trackNumber: 'asc' },
-        select: {
-            id: true,
-            title: true,
-            artist: true,
-            featuredArtists: true,
-            duration: true,
-            trackNumber: true,
-            audioUrl: true,
-            audioMessageId: true,
-            discordMessageId: true,
-        },
-    },
-    discordMessageId: true,
-    createdAt: true,
-    updatedAt: true,
+const cloudinary_service_1 = require("../services/cloudinary.service");
+const client_1 = require("@prisma/client");
+const session_service_1 = require("../services/session.service");
+const prisma_selects_1 = require("../utils/prisma-selects");
+const canManageAlbum = (user, albumArtistId) => {
+    var _a, _b, _c;
+    if (!user)
+        return false;
+    if (user.role === client_1.Role.ADMIN)
+        return true;
+    return (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
+        ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) === client_1.Role.ARTIST &&
+        ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id) === albumArtistId);
 };
-const validateAlbumData = (title, artist, releaseDate) => {
-    if (!title || title.trim().length === 0) {
-        return 'Title không được để trống';
+const validateAlbumData = (data) => {
+    const { title, releaseDate, type } = data;
+    if (!(title === null || title === void 0 ? void 0 : title.trim()))
+        return 'Title is required';
+    if (!releaseDate || isNaN(Date.parse(releaseDate)))
+        return 'Valid release date is required';
+    if (type && !Object.values(client_1.AlbumType).includes(type))
+        return 'Invalid album type';
+    return null;
+};
+const validateFile = (file) => {
+    const maxSize = 5 * 1024 * 1024;
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    const maxFileNameLength = 100;
+    if (file.size > maxSize) {
+        return 'File size too large. Maximum allowed size is 5MB.';
     }
-    if (!artist || artist.trim().length === 0) {
-        return 'Artist không được để trống';
+    if (!allowedTypes.includes(file.mimetype)) {
+        return `Invalid file type. Only ${allowedTypes.join(', ')} are allowed.`;
     }
-    if (!releaseDate || isNaN(Date.parse(releaseDate))) {
-        return 'Release date không hợp lệ';
+    if (file.originalname.length > maxFileNameLength) {
+        return `File name too long. Maximum allowed length is ${maxFileNameLength} characters.`;
+    }
+    const invalidChars = /[<>:"/\\|?*]/g;
+    if (invalidChars.test(file.originalname)) {
+        return 'File name contains invalid characters.';
     }
     return null;
 };
-const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const albums = yield db_1.default.album.findMany({
-            where: {
-                isActive: true,
-            },
-            select: albumSelect,
-            orderBy: {
-                createdAt: 'desc',
-            },
-        });
-        res.json(albums);
-    }
-    catch (error) {
-        console.error('Get all albums error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getAllAlbums = getAllAlbums;
-const getAlbumById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const album = yield db_1.default.album.findUnique({
-            where: {
-                id,
-                isActive: true,
-            },
-            select: albumSelect,
-        });
-        if (!album) {
-            res.status(404).json({ message: 'Album không tồn tại' });
-            return;
-        }
-        res.json(album);
-    }
-    catch (error) {
-        console.error('Get album by id error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getAlbumById = getAlbumById;
-const getAlbumsByArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { artist } = req.params;
-        const albums = yield db_1.default.album.findMany({
-            where: {
-                artist: {
-                    contains: artist,
-                    mode: 'insensitive',
-                },
-                isActive: true,
-            },
-            select: albumSelect,
-            orderBy: {
-                releaseDate: 'desc',
-            },
-        });
-        res.json(albums);
-    }
-    catch (error) {
-        console.error('Get albums by artist error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getAlbumsByArtist = getAlbumsByArtist;
-const getAlbumTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const album = yield db_1.default.album.findUnique({
-            where: {
-                id,
-                isActive: true,
-            },
-            select: {
-                tracks: {
-                    where: { isActive: true },
-                    orderBy: { trackNumber: 'asc' },
-                    select: {
-                        id: true,
-                        title: true,
-                        artist: true,
-                        featuredArtists: true,
-                        duration: true,
-                        trackNumber: true,
-                        audioUrl: true,
-                        discordMessageId: true,
-                    },
-                },
-            },
-        });
-        if (!album) {
-            res.status(404).json({ message: 'Album không tồn tại' });
-            return;
-        }
-        res.json(album.tracks);
-    }
-    catch (error) {
-        console.error('Get album tracks error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getAlbumTracks = getAlbumTracks;
 const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const { title, artist, releaseDate } = req.body;
-        const coverFile = req.file;
         const user = req.user;
-        if (!(user === null || user === void 0 ? void 0 : user.id)) {
-            res.status(401).json({ message: 'Unauthorized' });
+        if (!user) {
+            res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        const validationError = validateAlbumData(title, artist, releaseDate);
+        const { title, releaseDate, type = client_1.AlbumType.ALBUM, genres = [], artistId, } = req.body;
+        const coverFile = req.file;
+        const validationError = validateAlbumData({ title, releaseDate, type });
         if (validationError) {
             res.status(400).json({ message: validationError });
             return;
         }
-        if (!coverFile) {
-            res.status(400).json({ message: 'Cover image là bắt buộc' });
+        if (coverFile) {
+            const fileValidationError = validateFile(coverFile);
+            if (fileValidationError) {
+                res.status(400).json({ message: fileValidationError });
+                return;
+            }
+        }
+        let targetArtistProfileId;
+        let targetArtist;
+        if (user.role === client_1.Role.ADMIN && artistId) {
+            targetArtist = yield db_1.default.artistProfile.findFirst({
+                where: {
+                    id: artistId,
+                    isVerified: true,
+                    role: client_1.Role.ARTIST,
+                },
+                include: {
+                    user: true,
+                },
+            });
+            if (!targetArtist) {
+                res
+                    .status(404)
+                    .json({ message: 'Artist profile not found or not verified' });
+                return;
+            }
+            targetArtistProfileId = targetArtist.id;
+        }
+        else if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
+            user.artistProfile.role === client_1.Role.ARTIST) {
+            targetArtistProfileId = user.artistProfile.id;
+            targetArtist = {
+                user: user,
+            };
+        }
+        else {
+            res.status(403).json({ message: 'Not authorized to create albums' });
             return;
         }
-        const { messageId: coverMessageId, url: coverUrl } = yield (0, discord_service_1.uploadTrack)(coverFile.buffer, coverFile.originalname, false, true, true);
-        const metadata = {
-            title,
-            artist,
-            releaseDate,
-            trackCount: 0,
-            type: 'album',
-        };
-        const { messageId: metadataMessageId } = yield (0, discord_service_1.saveMetadata)(metadata);
+        const genreIds = Array.isArray(genres)
+            ? genres
+            : genres.split(',').map((g) => g.trim());
+        const existingGenres = yield db_1.default.genre.findMany({
+            where: { id: { in: genreIds } },
+        });
+        if (existingGenres.length !== genreIds.length) {
+            res.status(400).json({ message: 'One or more genres do not exist' });
+            return;
+        }
+        let coverUrl = null;
+        if (coverFile) {
+            const coverUpload = yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
+            coverUrl = coverUpload.secure_url;
+        }
         const album = yield db_1.default.album.create({
             data: {
                 title,
-                artist,
-                releaseDate: new Date(releaseDate),
-                trackCount: 0,
                 coverUrl,
-                discordMessageId: metadataMessageId,
-                uploadedBy: {
-                    connect: { id: user.id },
+                releaseDate: new Date(releaseDate),
+                type,
+                duration: 0,
+                totalTracks: 0,
+                artistId: targetArtistProfileId,
+                genres: {
+                    create: genreIds.map((genreId) => ({
+                        genre: { connect: { id: genreId } },
+                    })),
                 },
             },
-            select: albumSelect,
+            select: prisma_selects_1.albumSelect,
         });
+        yield Promise.all([
+            (0, cache_middleware_1.clearCacheForEntity)('album', {
+                userId: targetArtist.user.id,
+                clearSearch: true,
+            }),
+            (0, cache_middleware_1.clearCacheForEntity)('album', {
+                adminId: user.id,
+                clearSearch: true,
+            }),
+            (0, cache_middleware_1.clearCacheForEntity)('album', {
+                clearSearch: true,
+            }),
+            (0, cache_middleware_1.clearCacheForEntity)('search', {
+                clearSearch: true,
+            }),
+            (0, cache_middleware_1.clearCacheForEntity)('user', {
+                clearSearch: true,
+            }),
+        ]);
         res.status(201).json({
-            message: 'Album đã được tạo thành công',
+            message: 'Album created successfully',
             album,
         });
     }
@@ -214,130 +207,236 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.createAlbum = createAlbum;
-const uploadAlbumTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const { id } = req.params;
-        const files = req.files;
         const user = req.user;
-        if (!(user === null || user === void 0 ? void 0 : user.id)) {
-            res.status(401).json({ message: 'Unauthorized' });
+        const { albumId } = req.params;
+        if (!user) {
+            res.status(403).json({ message: 'Forbidden' });
             return;
         }
         const album = yield db_1.default.album.findUnique({
-            where: { id },
-            include: {
+            where: { id: albumId },
+            select: {
+                artistId: true,
+                type: true,
+                coverUrl: true,
+                isActive: true,
                 tracks: {
-                    where: { isActive: true },
-                    orderBy: { trackNumber: 'asc' },
+                    select: { trackNumber: true },
                 },
             },
         });
         if (!album) {
-            res.status(404).json({ message: 'Album không tồn tại' });
+            res.status(404).json({ message: 'Album not found' });
             return;
         }
-        const uploadedTracks = yield Promise.all(files.map((file, index) => __awaiter(void 0, void 0, void 0, function* () {
-            const { messageId: audioMessageId, url: audioUrl } = yield (0, discord_service_1.uploadTrack)(file.buffer, file.originalname, true, true, false);
-            const title = req.body[`title_${index}`] ||
-                file.originalname.replace(/\.[^/.]+$/, '');
-            const artist = req.body[`artist_${index}`] || album.artist;
-            const featuredArtists = req.body[`featuredArtists_${index}`] || null;
-            const duration = parseInt(req.body[`duration_${index}`]) || 0;
-            const trackNumber = parseInt(req.body[`trackNumber_${index}`]) ||
-                album.tracks.length + index + 1;
-            const metadata = {
-                title,
-                artist,
-                featuredArtists,
-                duration,
-                releaseDate: album.releaseDate.toISOString().split('T')[0],
-                albumId: album.id,
-                type: 'track',
-            };
-            const { messageId: metadataMessageId } = yield (0, discord_service_1.saveMetadata)(metadata);
-            return db_1.default.track.create({
-                data: {
-                    title,
-                    artist,
-                    featuredArtists,
-                    duration,
-                    releaseDate: album.releaseDate,
-                    trackNumber,
-                    audioUrl,
-                    audioMessageId,
-                    album: { connect: { id: album.id } },
-                    uploadedBy: { connect: { id: user.id } },
-                    discordMessageId: metadataMessageId,
-                },
-                select: {
-                    id: true,
-                    title: true,
-                    artist: true,
-                    featuredArtists: true,
-                    duration: true,
-                    trackNumber: true,
-                    audioUrl: true,
-                    audioMessageId: true,
-                    discordMessageId: true,
-                },
+        if (user.role !== client_1.Role.ADMIN &&
+            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) ||
+                user.artistProfile.role !== client_1.Role.ARTIST ||
+                user.artistProfile.id !== album.artistId)) {
+            res.status(403).json({
+                message: 'You can only add tracks to your own albums',
             });
-        })));
-        const updatedAlbum = yield db_1.default.album.update({
-            where: { id },
-            data: {
-                trackCount: {
-                    increment: files.length,
-                },
-            },
-            select: albumSelect,
+            return;
+        }
+        if (!req.files || !Array.isArray(req.files)) {
+            res.status(400).json({ message: 'No files uploaded' });
+            return;
+        }
+        const files = req.files;
+        if (!files || !files.length) {
+            res.status(400).json({ message: 'No files uploaded' });
+            return;
+        }
+        const existingTracks = yield db_1.default.track.findMany({
+            where: { albumId },
+            select: { trackNumber: true },
         });
-        yield (0, discord_service_1.updateAlbumMetadata)(updatedAlbum.discordMessageId, {
-            title: updatedAlbum.title,
-            artist: updatedAlbum.artist,
-            releaseDate: updatedAlbum.releaseDate.toISOString().split('T')[0],
-            trackCount: updatedAlbum.trackCount,
-            type: 'album',
+        const maxTrackNumber = existingTracks.length > 0
+            ? Math.max(...existingTracks.map((t) => t.trackNumber || 0))
+            : 0;
+        const titles = Array.isArray(req.body.title)
+            ? req.body.title
+            : [req.body.title];
+        const releaseDates = Array.isArray(req.body.releaseDate)
+            ? req.body.releaseDate
+            : [req.body.releaseDate];
+        const featuredArtists = Array.isArray(req.body.featuredArtists)
+            ? req.body.featuredArtists.map((artists) => artists.split(','))
+            : req.body.featuredArtists
+                ? [req.body.featuredArtists.split(',')]
+                : [];
+        const mm = yield Promise.resolve().then(() => __importStar(require('music-metadata')));
+        const createdTracks = yield Promise.all(files.map((file, index) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a;
+            try {
+                const metadata = yield mm.parseBuffer(file.buffer);
+                const duration = Math.floor(metadata.format.duration || 0);
+                const uploadResult = yield (0, cloudinary_service_1.uploadFile)(file.buffer, 'tracks', 'auto');
+                const existingTrack = yield db_1.default.track.findFirst({
+                    where: {
+                        title: titles[index],
+                        artistId: album.artistId,
+                    },
+                });
+                if (existingTrack) {
+                    throw new Error(`Track with title "${titles[index]}" already exists for this artist.`);
+                }
+                const newTrackNumber = maxTrackNumber + index + 1;
+                const track = yield db_1.default.track.create({
+                    data: Object.assign({ title: titles[index], duration, releaseDate: new Date(releaseDates[index] || Date.now()), trackNumber: newTrackNumber, coverUrl: album.coverUrl, audioUrl: uploadResult.secure_url, artistId: album.artistId, albumId, type: album.type, isActive: album.isActive }, (((_a = featuredArtists[index]) === null || _a === void 0 ? void 0 : _a.length) && {
+                        featuredArtists: {
+                            create: featuredArtists[index].map((artistProfileId) => ({
+                                artistProfile: {
+                                    connect: { id: artistProfileId.trim() },
+                                },
+                            })),
+                        },
+                    })),
+                    select: prisma_selects_1.trackSelect,
+                });
+                return track;
+            }
+            catch (err) {
+                console.error('Error processing track:', err);
+                throw err;
+            }
+        })));
+        const tracks = yield db_1.default.track.findMany({
+            where: { albumId },
+            select: { duration: true },
+        });
+        const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+        const updatedAlbum = yield db_1.default.album.update({
+            where: { id: albumId },
+            data: {
+                duration: totalDuration,
+                totalTracks: tracks.length,
+            },
+            select: prisma_selects_1.albumSelect,
+        });
+        yield (0, cache_middleware_1.clearCacheForEntity)('album', {
+            userId: album.artistId,
+            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
+            entityId: albumId,
+            clearSearch: true,
         });
         res.status(201).json({
-            message: 'Tracks uploaded successfully',
-            tracks: uploadedTracks,
+            message: 'Tracks added to album successfully',
+            album: updatedAlbum,
+            tracks: createdTracks,
         });
     }
     catch (error) {
-        console.error('Upload album tracks error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        console.error('Add tracks to album error:', error);
+        if (error instanceof Error) {
+            res.status(400).json({ message: error.message });
+        }
+        else {
+            res.status(500).json({ message: 'Internal server error' });
+        }
     }
 });
-exports.uploadAlbumTracks = uploadAlbumTracks;
+exports.addTracksToAlbum = addTracksToAlbum;
 const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { title, artist, releaseDate } = req.body;
-        const validationError = validateAlbumData(title, artist, releaseDate);
-        if (validationError) {
-            res.status(400).json({ message: validationError });
+        const { title, releaseDate, type, genres } = req.body;
+        const coverFile = req.file;
+        const user = req.user;
+        if (!user) {
+            res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        const album = yield db_1.default.album.update({
+        const album = yield db_1.default.album.findUnique({
             where: { id },
-            data: {
-                title,
-                artist,
-                releaseDate: new Date(releaseDate),
-                updatedAt: new Date(),
-            },
-            select: albumSelect,
+            select: { artistId: true, coverUrl: true },
         });
-        yield (0, discord_service_1.updateAlbumMetadata)(album.discordMessageId, {
-            title: album.title,
-            artist: album.artist,
-            releaseDate: album.releaseDate.toISOString().split('T')[0],
-            trackCount: album.trackCount,
-            type: 'album',
+        if (!album) {
+            res.status(404).json({ message: 'Album not found' });
+            return;
+        }
+        if (!canManageAlbum(user, album.artistId)) {
+            res.status(403).json({ message: 'You can only update your own albums' });
+            return;
+        }
+        if (title || releaseDate || type) {
+            const validationError = validateAlbumData({
+                title: title || '',
+                releaseDate: releaseDate || new Date(),
+                type: type || undefined,
+            });
+            if (validationError) {
+                res.status(400).json({ message: validationError });
+                return;
+            }
+        }
+        if (coverFile) {
+            const fileValidationError = validateFile(coverFile);
+            if (fileValidationError) {
+                res.status(400).json({ message: fileValidationError });
+                return;
+            }
+        }
+        let coverUrl;
+        if (coverFile) {
+            const coverUpload = yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
+            coverUrl = coverUpload.secure_url;
+        }
+        const updateData = {};
+        if (title)
+            updateData.title = title;
+        if (releaseDate)
+            updateData.releaseDate = new Date(releaseDate);
+        if (type) {
+            updateData.type = type;
+            updateData.tracks = {
+                updateMany: {
+                    where: { albumId: id },
+                    data: { type },
+                },
+            };
+        }
+        if (coverUrl)
+            updateData.coverUrl = coverUrl;
+        if (genres) {
+            const genreIds = Array.isArray(genres)
+                ? genres
+                : genres.split(',').map((g) => g.trim());
+            if (genreIds.length > 0) {
+                const existingGenres = yield db_1.default.genre.findMany({
+                    where: { id: { in: genreIds } },
+                });
+                if (existingGenres.length !== genreIds.length) {
+                    res.status(400).json({ message: 'One or more genres do not exist' });
+                    return;
+                }
+                yield db_1.default.albumGenre.deleteMany({
+                    where: { albumId: id },
+                });
+                updateData.genres = {
+                    create: genreIds.map((genreId) => ({
+                        genre: { connect: { id: genreId } },
+                    })),
+                };
+            }
+        }
+        const updatedAlbum = yield db_1.default.album.update({
+            where: { id },
+            data: updateData,
+            select: prisma_selects_1.albumSelect,
+        });
+        yield (0, cache_middleware_1.clearCacheForEntity)('album', {
+            userId: album.artistId,
+            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
+            entityId: id,
+            clearSearch: true,
         });
         res.json({
-            message: 'Album đã được cập nhật thành công',
-            album,
+            message: 'Album updated successfully',
+            album: updatedAlbum,
         });
     }
     catch (error) {
@@ -346,38 +445,36 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.updateAlbum = updateAlbum;
-const reorderAlbumTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const { tracks } = req.body;
-        yield db_1.default.$transaction(tracks.map((track) => db_1.default.track.update({
-            where: { id: track.id },
-            data: { trackNumber: track.trackNumber },
-        })));
-        const updatedAlbum = yield db_1.default.album.findUnique({
-            where: { id },
-            select: albumSelect,
-        });
-        res.json(updatedAlbum);
-    }
-    catch (error) {
-        console.error('Reorder tracks error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.reorderAlbumTracks = reorderAlbumTracks;
 const deleteAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        yield db_1.default.album.update({
+        const user = req.user;
+        if (!user) {
+            res.status(403).json({ message: 'Forbidden' });
+            return;
+        }
+        const album = yield db_1.default.album.findUnique({
             where: { id },
-            data: { isActive: false },
+            select: { artistId: true },
         });
-        yield db_1.default.track.updateMany({
-            where: { albumId: id },
-            data: { isActive: false },
+        if (!album) {
+            res.status(404).json({ message: 'Album not found' });
+            return;
+        }
+        if (!canManageAlbum(user, album.artistId)) {
+            res.status(403).json({ message: 'You can only delete your own albums' });
+            return;
+        }
+        yield db_1.default.album.delete({
+            where: { id },
         });
-        res.json({ message: 'Album đã được xóa thành công' });
+        yield (0, cache_middleware_1.clearCacheForEntity)('album', {
+            userId: album.artistId,
+            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
+            entityId: id,
+            clearSearch: true,
+        });
+        res.json({ message: 'Album deleted successfully' });
     }
     catch (error) {
         console.error('Delete album error:', error);
@@ -385,32 +482,108 @@ const deleteAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.deleteAlbum = deleteAlbum;
+const toggleAlbumVisibility = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const user = req.user;
+        if (!user) {
+            res.status(403).json({ message: 'Forbidden' });
+            return;
+        }
+        const album = yield db_1.default.album.findUnique({
+            where: { id },
+            select: { artistId: true, isActive: true },
+        });
+        if (!album) {
+            res.status(404).json({ message: 'Album not found' });
+            return;
+        }
+        if (!canManageAlbum(user, album.artistId)) {
+            res.status(403).json({ message: 'You can only toggle your own albums' });
+            return;
+        }
+        const updatedAlbum = yield db_1.default.album.update({
+            where: { id },
+            data: { isActive: !album.isActive },
+            select: prisma_selects_1.albumSelect,
+        });
+        yield (0, cache_middleware_1.clearCacheForEntity)('album', {
+            entityId: id,
+            clearSearch: true,
+        });
+        res.json({
+            message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'} successfully`,
+            album: updatedAlbum,
+        });
+    }
+    catch (error) {
+        console.error('Toggle album error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.toggleAlbumVisibility = toggleAlbumVisibility;
 const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { q } = req.query;
+        const user = req.user;
         if (!q) {
             res.status(400).json({ message: 'Query is required' });
             return;
         }
+        const searchQuery = String(q).trim();
+        if (user) {
+            const existingHistory = yield db_1.default.history.findFirst({
+                where: {
+                    userId: user.id,
+                    type: client_1.HistoryType.SEARCH,
+                    query: {
+                        equals: searchQuery,
+                        mode: 'insensitive',
+                    },
+                },
+            });
+            if (existingHistory) {
+                yield db_1.default.history.update({
+                    where: { id: existingHistory.id },
+                    data: { updatedAt: new Date() },
+                });
+            }
+            else {
+                yield db_1.default.history.create({
+                    data: {
+                        type: client_1.HistoryType.SEARCH,
+                        query: searchQuery,
+                        userId: user.id,
+                    },
+                });
+            }
+        }
+        const whereClause = {
+            OR: [
+                { title: { contains: searchQuery, mode: 'insensitive' } },
+                {
+                    artist: {
+                        artistName: { contains: searchQuery, mode: 'insensitive' },
+                    },
+                },
+            ],
+        };
+        if (!user || user.role !== client_1.Role.ADMIN) {
+            if (((_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
+                (user === null || user === void 0 ? void 0 : user.currentProfile) === 'ARTIST') {
+                whereClause.OR = [
+                    { isActive: true },
+                    { AND: [{ isActive: false }, { artistId: user.artistProfile.id }] },
+                ];
+            }
+            else {
+                whereClause.isActive = true;
+            }
+        }
         const albums = yield db_1.default.album.findMany({
-            where: {
-                isActive: true,
-                OR: [
-                    {
-                        title: {
-                            contains: String(q),
-                            mode: 'insensitive',
-                        },
-                    },
-                    {
-                        artist: {
-                            contains: String(q),
-                            mode: 'insensitive',
-                        },
-                    },
-                ],
-            },
-            select: albumSelect,
+            where: whereClause,
+            select: prisma_selects_1.albumSelect,
         });
         res.json(albums);
     }
@@ -420,4 +593,164 @@ const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.searchAlbum = searchAlbum;
+const getAllAlbums = (req) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const user = req.user;
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+    if (!user) {
+        throw new Error('Unauthorized');
+    }
+    if (user.role !== client_1.Role.ADMIN &&
+        (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) || user.artistProfile.role !== client_1.Role.ARTIST)) {
+        throw new Error('Only verified artists and admins can view all albums');
+    }
+    const whereClause = {};
+    if (user.role !== client_1.Role.ADMIN && ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.id)) {
+        whereClause.OR = [
+            { artistId: user.artistProfile.id },
+            {
+                tracks: {
+                    some: {
+                        featuredArtists: {
+                            some: { artistProfileId: user.artistProfile.id },
+                        },
+                    },
+                },
+            },
+        ];
+    }
+    const [albums, totalAlbums] = yield Promise.all([
+        db_1.default.album.findMany({
+            skip: offset,
+            take: Number(limit),
+            where: whereClause,
+            select: prisma_selects_1.albumSelect,
+            orderBy: { createdAt: 'desc' },
+        }),
+        db_1.default.album.count({ where: whereClause }),
+    ]);
+    return {
+        albums,
+        pagination: {
+            total: totalAlbums,
+            page: Number(page),
+            limit: Number(limit),
+            totalPages: Math.ceil(totalAlbums / Number(limit)),
+        },
+    };
+});
+exports.getAllAlbums = getAllAlbums;
+const getAlbumById = (req) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const user = req.user;
+    const album = yield db_1.default.album.findUnique({
+        where: { id },
+        select: prisma_selects_1.albumSelect,
+    });
+    if (!album) {
+        throw new Error('Album not found');
+    }
+    if (!album.isActive) {
+        const canManage = canManageAlbum(user, album.artist.id);
+        if (!canManage) {
+            throw new Error('Album not found');
+        }
+    }
+    return album;
+});
+exports.getAlbumById = getAlbumById;
+const playAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { albumId } = req.params;
+        const user = req.user;
+        const sessionId = req.header('Session-ID');
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        if (!sessionId ||
+            !(yield session_service_1.sessionService.validateSession(user.id, sessionId))) {
+            res.status(401).json({ message: 'Invalid or expired session' });
+            return;
+        }
+        yield session_service_1.sessionService.handleAudioPlay(user.id, sessionId);
+        const album = yield db_1.default.album.findFirst({
+            where: {
+                id: albumId,
+                isActive: true,
+            },
+            select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+                type: true,
+                artist: {
+                    select: {
+                        id: true,
+                        artistName: true,
+                        avatar: true,
+                        isVerified: true,
+                    },
+                },
+                tracks: {
+                    where: {
+                        isActive: true,
+                    },
+                    orderBy: {
+                        trackNumber: 'asc',
+                    },
+                    select: Object.assign(Object.assign({}, prisma_selects_1.trackSelect), { artist: {
+                            select: {
+                                id: true,
+                                artistName: true,
+                                avatar: true,
+                                isVerified: true,
+                            },
+                        }, featuredArtists: {
+                            select: {
+                                artistProfile: {
+                                    select: {
+                                        id: true,
+                                        artistName: true,
+                                        avatar: true,
+                                        isVerified: true,
+                                        user: {
+                                            select: {
+                                                id: true,
+                                                name: true,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        } }),
+                },
+            },
+        });
+        if (!album) {
+            res.status(404).json({ message: 'Album not found' });
+            return;
+        }
+        if (!album.tracks || album.tracks.length === 0) {
+            res.status(404).json({ message: 'No active tracks found in this album' });
+            return;
+        }
+        const firstTrack = album.tracks[0];
+        if (!firstTrack || !firstTrack.audioUrl) {
+            res.status(404).json({ message: 'Track not found or invalid' });
+            return;
+        }
+        res.json({
+            message: 'Album playback started',
+            track: firstTrack,
+            album: album,
+        });
+    }
+    catch (error) {
+        console.error('Play album error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.playAlbum = playAlbum;
 //# sourceMappingURL=album.controller.js.map

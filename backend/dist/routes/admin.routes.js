@@ -1,0 +1,35 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const admin_controller_1 = require("../controllers/admin.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const client_1 = require("@prisma/client");
+const rateLimit_middleware_1 = require("../middleware/rateLimit.middleware");
+const upload_middleware_1 = __importDefault(require("../middleware/upload.middleware"));
+const cache_middleware_1 = require("../middleware/cache.middleware");
+const router = express_1.default.Router();
+router.use(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]));
+router.get('/stats', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), cache_middleware_1.cacheMiddleware, rateLimit_middleware_1.queryRateLimiter, admin_controller_1.getStats);
+router.get('/users', rateLimit_middleware_1.queryRateLimiter, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllUsers);
+router.get('/users/:id', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getUserById);
+router.put('/users/:id', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.updateUser);
+router.delete('/users/:id', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.deleteUser);
+router.post('/users/:id/deactivate', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.deactivateUser);
+router.get('/artists', rateLimit_middleware_1.queryRateLimiter, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllArtists);
+router.get('/artists/:id', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), admin_controller_1.getArtistById);
+router.post('/artists', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), upload_middleware_1.default.single('avatar'), admin_controller_1.createArtist);
+router.get('/artist-requests', rateLimit_middleware_1.queryRateLimiter, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getArtistRequests);
+router.get('/artist-requests/:id', rateLimit_middleware_1.queryRateLimiter, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getArtistRequestDetails);
+router.post('/artists/verify', admin_controller_1.verifyArtist);
+router.post('/artists/:id/update-monthly-listeners', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), admin_controller_1.updateMonthlyListeners);
+router.get('/genres', rateLimit_middleware_1.queryRateLimiter, admin_controller_1.getAllGenres);
+router.post('/genres', admin_controller_1.createGenre);
+router.put('/genres/:id', admin_controller_1.updateGenre);
+router.delete('/genres/:id', admin_controller_1.deleteGenre);
+router.post('/artist-requests/approve', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.approveArtistRequest);
+router.post('/artist-requests/reject', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.rejectArtistRequest);
+exports.default = router;
+//# sourceMappingURL=admin.routes.js.map

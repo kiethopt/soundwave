@@ -8,71 +8,168 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
-                t[p[i]] = s[p[i]];
-        }
-    return t;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.purgeAllData = exports.deleteUser = exports.activateUser = exports.deactivateUser = exports.updateUser = exports.getUserByUsername = exports.getUserById = exports.getAllUsers = exports.login = exports.register = void 0;
-const db_1 = __importDefault(require("../config/db"));
+exports.switchProfile = exports.resetPassword = exports.requestPasswordReset = exports.logout = exports.login = exports.register = exports.registerAdmin = exports.validateToken = void 0;
+const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const discord_service_1 = require("../services/discord.service");
-const userSelect = {
-    id: true,
-    email: true,
-    username: true,
-    name: true,
-    avatar: true,
-    role: true,
-    isActive: true,
-    createdAt: true,
-    updatedAt: true,
-};
-if (!process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET is not defined in environment variables');
+const db_1 = __importDefault(require("../config/db"));
+const client_1 = require("@prisma/client");
+const uuid_1 = require("uuid");
+const date_fns_1 = require("date-fns");
+const mail_1 = __importDefault(require("@sendgrid/mail"));
+const cache_middleware_1 = require("../middleware/cache.middleware");
+const session_service_1 = require("../services/session.service");
+const prisma_selects_1 = require("../utils/prisma-selects");
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error('Missing JWT_SECRET in environment variables');
 }
-const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return 'Invalid email format';
+    }
+    return null;
+};
+const validateRegisterData = (data) => {
+    const { email, password, username } = data;
+    if (!(email === null || email === void 0 ? void 0 : email.trim()))
+        return 'Email is required';
+    const emailValidationError = validateEmail(email);
+    if (emailValidationError)
+        return emailValidationError;
+    if (!(password === null || password === void 0 ? void 0 : password.trim()))
+        return 'Password is required';
+    if (password.length < 6)
+        return 'Password must be at least 6 characters';
+    if (!(username === null || username === void 0 ? void 0 : username.trim()))
+        return 'Username is required';
+    if (username.length < 3)
+        return 'Username must be at least 3 characters';
+    if (/\s/.test(username))
+        return 'Username cannot contain spaces';
+    return null;
+};
+const validateLoginData = (data) => {
+    const { email, password } = data;
+    if (!(email === null || email === void 0 ? void 0 : email.trim()))
+        return 'Email is required';
+    if (!(password === null || password === void 0 ? void 0 : password.trim()))
+        return 'Password is required';
+    return null;
+};
+const generateToken = (userId, role, artistProfile) => {
+    return jsonwebtoken_1.default.sign({
+        id: userId,
+        role,
+    }, JWT_SECRET, { expiresIn: '24h' });
+};
+const validateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        const { email, username, password, name, isAdmin } = req.body;
-        const existingUser = yield db_1.default.user.findFirst({
-            where: {
-                OR: [{ email }, { username }],
-            },
-        });
-        if (existingUser) {
-            res.status(400).json({ message: 'Email hoặc username đã tồn tại!' });
+        const token = (_a = req.header('Authorization')) === null || _a === void 0 ? void 0 : _a.replace('Bearer ', '');
+        if (!token) {
+            res.status(401).json({ message: 'Access denied. No token provided.' });
             return;
         }
+        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        const user = yield db_1.default.user.findUnique({
+            where: { id: decoded.id },
+            select: prisma_selects_1.userSelect,
+        });
+        if (!user) {
+            res.status(404).json({ message: 'User not found' });
+            return;
+        }
+        res.json({
+            message: 'Token is valid',
+            user,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+exports.validateToken = validateToken;
+const registerAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email, password, name, username } = req.body;
+        const validationError = validateRegisterData({ email, password, username });
+        if (validationError) {
+            res.status(400).json({ message: validationError });
+            return;
+        }
+        const existingUser = yield db_1.default.user.findUnique({ where: { email } });
+        if (existingUser) {
+            res.status(400).json({ message: 'Email already exists' });
+            return;
+        }
+        if (username) {
+            const existingUsername = yield db_1.default.user.findUnique({
+                where: { username },
+            });
+            if (existingUsername) {
+                res.status(400).json({ message: 'Username already exists' });
+                return;
+            }
+        }
+        const hashedPassword = yield bcrypt_1.default.hash(password, 10);
         const user = yield db_1.default.user.create({
             data: {
                 email,
-                username,
-                password,
+                password: hashedPassword,
                 name,
-                role: isAdmin ? 'ADMIN' : 'USER',
+                username,
+                role: client_1.Role.ADMIN,
             },
-            select: userSelect,
+            select: prisma_selects_1.userSelect,
         });
-        yield (0, discord_service_1.sendUserNotification)(username);
-        res.status(201).json({
-            message: 'User mới đã được tạo thành công',
-            user: {
-                id: user.id,
-                email: user.email,
-                username: user.username,
-                name: user.name,
+        res.status(201).json({ message: 'Admin registered successfully', user });
+    }
+    catch (error) {
+        console.error('Register admin error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.registerAdmin = registerAdmin;
+const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email, password, name, username } = req.body;
+        const validationError = validateRegisterData({ email, password, username });
+        if (validationError) {
+            res.status(400).json({ message: validationError });
+            return;
+        }
+        const existingUser = yield db_1.default.user.findUnique({ where: { email } });
+        if (existingUser) {
+            res.status(400).json({ message: 'Email already exists' });
+            return;
+        }
+        if (username) {
+            const existingUsername = yield db_1.default.user.findUnique({
+                where: { username },
+            });
+            if (existingUsername) {
+                res.status(400).json({ message: 'Username already exists' });
+                return;
+            }
+        }
+        const hashedPassword = yield bcrypt_1.default.hash(password, 10);
+        const user = yield db_1.default.user.create({
+            data: {
+                email,
+                password: hashedPassword,
+                name,
+                username,
+                role: client_1.Role.USER,
             },
+            select: prisma_selects_1.userSelect,
         });
+        yield (0, cache_middleware_1.clearCacheForEntity)('user', { clearSearch: true });
+        res.status(201).json({ message: 'User registered successfully', user });
     }
     catch (error) {
         console.error('Register error:', error);
@@ -83,37 +180,46 @@ exports.register = register;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = req.body;
+        const validationError = validateLoginData({ email, password });
+        if (validationError) {
+            res.status(400).json({ message: validationError });
+            return;
+        }
         const user = yield db_1.default.user.findUnique({
             where: { email },
-            select: {
-                id: true,
-                email: true,
-                username: true,
-                password: true,
-                name: true,
-                avatar: true,
-                role: true,
-                isActive: true,
-            },
+            select: Object.assign(Object.assign({}, prisma_selects_1.userSelect), { password: true, isActive: true }),
         });
         if (!user) {
-            res.status(404).json({ message: 'User không tồn tại trong hệ thống.' });
+            res.status(400).json({ message: 'Invalid email or password' });
             return;
         }
         if (!user.isActive) {
-            res
-                .status(403)
-                .json({ message: 'Tài khoản đã bị khóa. Vui lòng liên hệ Admin.' });
+            res.status(403).json({
+                message: 'Your account has been deactivated. Please contact administrator.',
+            });
             return;
         }
-        const token = jsonwebtoken_1.default.sign({ userId: user.id }, process.env.JWT_SECRET, {
-            expiresIn: '24h',
+        const isValidPassword = yield bcrypt_1.default.compare(password, user.password);
+        if (!isValidPassword) {
+            res.status(401).json({ message: 'Invalid email or password' });
+            return;
+        }
+        const updatedUser = yield db_1.default.user.update({
+            where: { id: user.id },
+            data: {
+                lastLoginAt: new Date(),
+                currentProfile: user.role === client_1.Role.ADMIN ? 'ADMIN' : 'USER',
+            },
+            select: prisma_selects_1.userSelect,
         });
-        const { password: _ } = user, userWithoutPassword = __rest(user, ["password"]);
+        const token = generateToken(user.id, user.role);
+        const sessionId = yield session_service_1.sessionService.createSession(Object.assign(Object.assign({}, updatedUser), { password: user.password }));
+        const userResponse = Object.assign(Object.assign({}, updatedUser), { password: undefined });
         res.json({
-            message: 'Đăng nhập thành công',
-            user: userWithoutPassword,
+            message: 'Login successful',
             token,
+            sessionId,
+            user: userResponse,
         });
     }
     catch (error) {
@@ -122,184 +228,158 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.login = login;
-const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
-        const users = yield db_1.default.user.findMany();
-        res.json(users);
-    }
-    catch (error) {
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getAllUsers = getAllUsers;
-const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const user = yield db_1.default.user.findUnique({
-            where: { id },
-            select: userSelect,
-        });
-        if (!user) {
-            res
-                .status(404)
-                .json({ message: 'Không tìm thấy user này trong hệ thống.' });
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const sessionId = req.header('Session-ID');
+        if (!userId || !sessionId) {
+            res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        res.json(user);
+        try {
+            yield db_1.default.user.update({
+                where: { id: userId },
+                data: {
+                    currentProfile: ((_b = req.user) === null || _b === void 0 ? void 0 : _b.role) === client_1.Role.ADMIN ? 'ADMIN' : 'USER',
+                },
+            });
+        }
+        catch (error) {
+            console.error('Error updating user profile:', error);
+        }
+        yield session_service_1.sessionService.removeUserSession(userId, sessionId);
+        res.json({ message: 'Logged out successfully' });
     }
     catch (error) {
+        console.error('Logout error:', error);
+        res.json({ message: 'Logged out successfully' });
+    }
+});
+exports.logout = logout;
+const requestPasswordReset = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email } = req.body;
+        const user = yield db_1.default.user.findUnique({ where: { email } });
+        if (!user) {
+            res.status(404).json({ message: 'User not found' });
+            return;
+        }
+        const resetToken = (0, uuid_1.v4)();
+        const resetTokenExpiry = (0, date_fns_1.addHours)(new Date(), 1);
+        yield db_1.default.user.update({
+            where: { id: user.id },
+            data: {
+                passwordResetToken: resetToken,
+                passwordResetExpires: resetTokenExpiry,
+            },
+        });
+        const resetLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/reset-password?token=${resetToken}`;
+        yield sendEmail(user.email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
+        res.json({ message: 'Password reset email sent successfully' });
+    }
+    catch (error) {
+        console.error('Request password reset error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
-exports.getUserById = getUserById;
-const getUserByUsername = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+exports.requestPasswordReset = requestPasswordReset;
+const resetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { username } = req.params;
-        const user = yield db_1.default.user.findUnique({
-            where: { username },
-            select: userSelect,
+        const { token, newPassword } = req.body;
+        const user = yield db_1.default.user.findFirst({
+            where: {
+                passwordResetToken: token,
+                passwordResetExpires: { gt: new Date() },
+            },
         });
         if (!user) {
-            res.status(404).json({
-                message: `Không tìm thấy user với username: ${username}`,
+            res.status(400).json({ message: 'Invalid or expired token' });
+            return;
+        }
+        const hashedPassword = yield bcrypt_1.default.hash(newPassword, 10);
+        yield db_1.default.user.update({
+            where: { id: user.id },
+            data: {
+                password: hashedPassword,
+                passwordResetToken: null,
+                passwordResetExpires: null,
+            },
+        });
+        res.json({ message: 'Password reset successfully' });
+    }
+    catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.resetPassword = resetPassword;
+const sendEmail = (to, subject, text) => __awaiter(void 0, void 0, void 0, function* () {
+    mail_1.default.setApiKey(process.env.SENDGRID_API_KEY);
+    const msg = {
+        to,
+        from: process.env.EMAIL_USER,
+        subject,
+        text,
+        html: `<p>${text}</p>`,
+    };
+    try {
+        yield mail_1.default.send(msg);
+        console.log('Email sent successfully to:', to);
+    }
+    catch (error) {
+        console.error('Error sending email:', error);
+        throw new Error('Failed to send email');
+    }
+});
+const switchProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const sessionId = req.header('Session-ID');
+        if (!userId || !sessionId) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const user = yield db_1.default.user.findUnique({
+            where: { id: userId },
+            select: prisma_selects_1.userSelect,
+        });
+        if (!user) {
+            res.status(404).json({ message: 'User not found' });
+            return;
+        }
+        if (user.role === client_1.Role.ADMIN) {
+            res.status(403).json({
+                message: 'Admin profile cannot be switched',
             });
             return;
         }
-        res.json(user);
-    }
-    catch (error) {
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getUserByUsername = getUserByUsername;
-const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { username } = req.params;
-        const { name, email, avatar } = req.body;
-        const existingUser = yield db_1.default.user.findUnique({
-            where: { username },
-        });
-        if (!existingUser) {
-            res.status(404).json({ message: 'User không tồn tại' });
+        if (!user.artistProfile || !user.artistProfile.isVerified) {
+            res.status(403).json({
+                message: 'You do not have a verified artist profile',
+            });
             return;
         }
+        const newProfile = user.currentProfile === 'USER' ? 'ARTIST' : 'USER';
         const updatedUser = yield db_1.default.user.update({
-            where: { username },
+            where: { id: userId },
             data: {
-                name,
-                email,
-                avatar,
-                updatedAt: new Date(),
+                currentProfile: newProfile,
             },
-            select: userSelect,
+            select: prisma_selects_1.userSelect,
         });
+        yield session_service_1.sessionService.updateSessionProfile(userId, sessionId, newProfile);
+        const userResponse = Object.assign(Object.assign({}, updatedUser), { role: client_1.Role.USER, password: undefined });
         res.json({
-            message: 'Cập nhật user thành công',
-            user: updatedUser,
+            message: 'Profile switched successfully',
+            user: userResponse,
         });
     }
     catch (error) {
-        console.error('Update user error:', error);
+        console.error('Switch profile error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
-exports.updateUser = updateUser;
-const deactivateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { username } = req.params;
-        const existingUser = yield db_1.default.user.findUnique({
-            where: { username },
-        });
-        if (!existingUser) {
-            res.status(404).json({ message: 'User không tồn tại' });
-            return;
-        }
-        yield db_1.default.user.update({
-            where: { username },
-            data: {
-                isActive: false,
-                updatedAt: new Date(),
-            },
-        });
-        res.json({
-            message: 'Đã vô hiệu hóa tài khoản thành công',
-        });
-    }
-    catch (error) {
-        console.error('Deactivate user error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.deactivateUser = deactivateUser;
-const activateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { username } = req.params;
-        const existingUser = yield db_1.default.user.findUnique({
-            where: { username },
-        });
-        if (!existingUser) {
-            res.status(404).json({ message: 'User không tồn tại' });
-            return;
-        }
-        yield db_1.default.user.update({
-            where: { username },
-            data: {
-                isActive: true,
-                updatedAt: new Date(),
-            },
-        });
-        res.json({
-            message: 'Đã kích hoạt lại tài khoản thành công',
-        });
-    }
-    catch (error) {
-        console.error('Activate user error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.activateUser = activateUser;
-const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { username } = req.params;
-        const existingUser = yield db_1.default.user.findUnique({
-            where: { username },
-        });
-        if (!existingUser) {
-            res.status(404).json({ message: 'User không tồn tại.' });
-            return;
-        }
-        yield db_1.default.user.delete({
-            where: { username },
-        });
-        res.json({
-            message: 'Đã xóa tài khoản thành công',
-        });
-    }
-    catch (error) {
-        console.error('Delete user error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.deleteUser = deleteUser;
-const purgeAllData = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    try {
-        yield db_1.default.track.deleteMany();
-        yield db_1.default.album.deleteMany();
-        yield db_1.default.user.deleteMany({
-            where: {
-                NOT: {
-                    id: (_a = req.user) === null || _a === void 0 ? void 0 : _a.id,
-                },
-            },
-        });
-        yield (0, discord_service_1.deleteAllDiscordMessages)();
-        res.json({ message: 'All data purged successfully' });
-    }
-    catch (error) {
-        console.error('Purge data error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.purgeAllData = purgeAllData;
+exports.switchProfile = switchProfile;
 //# sourceMappingURL=auth.controller.js.map

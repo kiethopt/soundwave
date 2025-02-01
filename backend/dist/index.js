@@ -3,33 +3,37 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+require("module-alias/register");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const http_1 = __importDefault(require("http"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
+const session_routes_1 = __importDefault(require("./routes/session.routes"));
 const album_routes_1 = __importDefault(require("./routes/album.routes"));
 const track_routes_1 = __importDefault(require("./routes/track.routes"));
+const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
+const history_routes_1 = __importDefault(require("./routes/history.routes"));
+const artist_routes_1 = __importDefault(require("./routes/artist.routes"));
+const user_routes_1 = __importDefault(require("./routes/user.routes"));
 const error_1 = require("./middleware/error");
-const db_1 = __importDefault(require("./config/db"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
-db_1.default
-    .$connect()
-    .then(() => {
-    console.log('Successfully connected to database');
-})
-    .catch((error) => {
-    console.error('Database connection error:', error);
-    process.exit(1);
-});
+const server = http_1.default.createServer(app);
 app.use((0, cors_1.default)());
-app.use(express_1.default.json());
+app.use(express_1.default.json({ limit: '50mb' }));
+app.use(express_1.default.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/api/auth', auth_routes_1.default);
-app.use('/api', album_routes_1.default);
-app.use('/api', track_routes_1.default);
+app.use('/api/session', session_routes_1.default);
+app.use('/api/albums', album_routes_1.default);
+app.use('/api/tracks', track_routes_1.default);
+app.use('/api/admin', admin_routes_1.default);
+app.use('/api/history', history_routes_1.default);
+app.use('/api/artist', artist_routes_1.default);
+app.use('/api/user', user_routes_1.default);
 app.use(error_1.errorHandler);
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
 //# sourceMappingURL=index.js.map
