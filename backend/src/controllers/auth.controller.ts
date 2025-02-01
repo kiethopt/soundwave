@@ -7,8 +7,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { addHours } from 'date-fns';
 import sgMail from '@sendgrid/mail';
 import { clearCacheForEntity } from '../middleware/cache.middleware';
-import { sessionService } from 'src/services/session.service';
-import { userSelect } from 'src/utils/prisma-selects';
+import { sessionService } from '../services/session.service';
+import { userSelect } from '../utils/prisma-selects';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
