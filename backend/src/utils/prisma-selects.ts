@@ -147,6 +147,7 @@ export const artistProfileSelect = {
   socialMediaLinks: true,
   monthlyListeners: true,
   isVerified: true,
+  isActive: true,
   verificationRequestedAt: true,
   verifiedAt: true,
   createdAt: true,
@@ -219,6 +220,7 @@ export const artistProfileForUserSelect = {
       socialMediaLinks: true,
       monthlyListeners: true,
       isVerified: true,
+      isActive: true,
       verificationRequestedAt: true,
       verifiedAt: true,
       genres: {
@@ -254,6 +256,7 @@ export const userSelect = {
       id: true,
       artistName: true,
       isVerified: true,
+      isActive: true,
       verificationRequestedAt: true,
       role: true, // Role ARTIST ở đây
       albums: {

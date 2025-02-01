@@ -571,6 +571,35 @@ export const deleteUser = async (
   }
 };
 
+// Xóa nghệ sĩ
+export const deleteArtist = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Xóa toàn bộ dữ liệu liên quan
+    await prisma.$transaction([
+      prisma.track.deleteMany({ where: { artistId: id } }),
+      prisma.album.deleteMany({ where: { artistId: id } }),
+      prisma.artistProfile.delete({ where: { id } }),
+    ]);
+
+    // Clear cache
+    await Promise.all([
+      clearCacheForEntity('artist', { entityId: id, clearSearch: true }),
+      clearCacheForEntity('album', { clearSearch: true }),
+      clearCacheForEntity('track', { clearSearch: true }),
+    ]);
+
+    res.json({ message: 'Artist deleted permanently' });
+  } catch (error) {
+    console.error('Delete artist error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Deactivate user (Khóa tài khoản người dùng)
 export const deactivateUser = async (
   req: Request,
@@ -649,6 +678,57 @@ export const deactivateUser = async (
     });
   } catch (error) {
     console.error('Deactivate user error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Deactivate artist (Khóa tài khoản nghệ sĩ)
+export const deactivateArtist = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    const artist = await prisma.artistProfile.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!artist) {
+      res.status(404).json({ message: 'Artist not found' });
+      return;
+    }
+
+    // Cập nhật trạng thái user và artist profile
+    const [updatedUser] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: artist.userId },
+        data: {
+          isActive,
+          ...(!isActive ? { currentProfile: 'USER' } : {}), // Reset profile nếu deactivate
+        },
+        select: userSelect,
+      }),
+      prisma.artistProfile.update({
+        where: { id },
+        data: { isActive },
+      }),
+    ]);
+
+    // Clear cache
+    await Promise.all([
+      clearCacheForEntity('user', { entityId: artist.userId }),
+      clearCacheForEntity('artist', { entityId: id }),
+    ]);
+
+    res.json({
+      message: `Artist ${isActive ? 'activated' : 'deactivated'} successfully`,
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('Deactivate artist error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

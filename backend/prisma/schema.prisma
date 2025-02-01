@@ -50,6 +50,7 @@ model ArtistProfile {
   socialMediaLinks        Json?
   monthlyListeners        Int       @default(0) @db.Integer
   isVerified              Boolean   @default(false)
+  isActive                Boolean   @default(true)
   verificationRequestedAt DateTime?
   verifiedAt              DateTime?
   createdAt               DateTime  @default(now())

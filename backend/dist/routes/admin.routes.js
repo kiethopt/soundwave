@@ -17,7 +17,9 @@ router.get('/users', rateLimit_middleware_1.queryRateLimiter, (0, auth_middlewar
 router.get('/users/:id', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getUserById);
 router.put('/users/:id', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.updateUser);
 router.delete('/users/:id', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.deleteUser);
-router.post('/users/:id/deactivate', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.deactivateUser);
+router.delete('/artists/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.deleteArtist);
+router.patch('/users/:id/deactivate', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.deactivateUser);
+router.patch('/artists/:id/deactivate', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.deactivateArtist);
 router.get('/artists', rateLimit_middleware_1.queryRateLimiter, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllArtists);
 router.get('/artists/:id', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), admin_controller_1.getArtistById);
 router.post('/artists', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), upload_middleware_1.default.single('avatar'), admin_controller_1.createArtist);

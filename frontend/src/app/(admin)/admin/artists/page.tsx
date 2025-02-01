@@ -2,10 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
-import { User } from 'lucide-react';
+import { User, MoreVertical, Power, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { ArtistProfile } from '@/types';
-import { AddSimple, Search, Spinner } from '@/components/ui/Icons';
+import { Search, Spinner } from '@/components/ui/Icons';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'react-toastify';
 
 export default function AdminArtists() {
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
@@ -14,6 +22,7 @@ export default function AdminArtists() {
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const limit = 10;
 
   const fetchArtists = async (page: number, query: string = '') => {
@@ -44,6 +53,75 @@ export default function AdminArtists() {
     e.preventDefault();
     setPage(1);
     fetchArtists(1, searchInput);
+  };
+
+  const handleDeactivateArtist = async (
+    artistId: string,
+    currentStatus: boolean
+  ) => {
+    try {
+      setActionLoading(artistId);
+      const token = localStorage.getItem('userToken');
+      if (!token) return;
+
+      // Gọi API với giá trị isActive mới
+      await api.admin.deactivateArtist(
+        artistId,
+        { isActive: !currentStatus },
+        token
+      );
+
+      // Cập nhật state với giá trị mới
+      setArtists((prev) =>
+        prev.map((artist) =>
+          artist.id === artistId
+            ? {
+                ...artist,
+                isActive: !currentStatus,
+                // Reset current profile nếu deactivate
+                user: {
+                  ...artist.user,
+                  currentProfile: !currentStatus
+                    ? 'USER'
+                    : artist.user.currentProfile,
+                },
+              }
+            : artist
+        )
+      );
+
+      toast.success(
+        `Artist ${!currentStatus ? 'activated' : 'deactivated'} successfully`
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Operation failed');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteArtist = async (artistId: string) => {
+    if (!confirm('Are you sure you want to delete this artist?')) return;
+
+    try {
+      setActionLoading(artistId);
+      const token = localStorage.getItem('userToken');
+      if (!token) return;
+
+      await api.admin.deleteArtist(artistId, token);
+
+      setArtists((prevArtists) =>
+        prevArtists.filter((artist) => artist.id !== artistId)
+      );
+      toast.success('Artist deleted successfully');
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to delete artist';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const formatDate = (dateString: string): string => {
@@ -120,6 +198,9 @@ export default function AdminArtists() {
                 <th className="px-6 py-4 text-left text-sm font-semibold">
                   Created At
                 </th>
+                <th className="px-6 py-4 text-right text-sm font-semibold">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.08]">
@@ -148,6 +229,9 @@ export default function AdminArtists() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="h-4 bg-white/10 rounded w-24 animate-pulse" />
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="h-6 w-6 bg-white/10 rounded-full animate-pulse" />
                         </td>
                       </tr>
                     ))
@@ -186,18 +270,60 @@ export default function AdminArtists() {
                         {artist.monthlyListeners.toLocaleString() ?? 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 text-xs rounded-full ${
-                            artist.isVerified
-                              ? 'bg-green-500/10 text-green-500'
-                              : 'bg-yellow-500/10 text-yellow-500'
-                          }`}
-                        >
-                          {artist.isVerified ? 'Verified' : 'Unverified'}
-                        </span>
+                        <div className="flex gap-2">
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full ${
+                              artist.isVerified
+                                ? 'bg-blue-500/10 text-blue-500'
+                                : 'bg-yellow-500/10 text-yellow-500'
+                            }`}
+                          >
+                            {artist.isVerified ? 'Verified' : 'Unverified'}
+                          </span>
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full ${
+                              artist.isActive
+                                ? 'bg-green-500/10 text-green-500'
+                                : 'bg-red-500/10 text-red-500'
+                            }`}
+                          >
+                            {artist.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {formatDate(artist.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                            <MoreVertical className="w-5 h-5" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="bg-[#282828] border-white/10 text-white">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                handleDeactivateArtist(
+                                  artist.id,
+                                  artist.isActive
+                                )
+                              }
+                              disabled={actionLoading === artist.id}
+                              className="cursor-pointer hover:bg-white/10"
+                            >
+                              <Power className="w-4 h-4 mr-2" />
+                              {artist.isActive ? 'Deactivate' : 'Activate'}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteArtist(artist.id)}
+                              disabled={actionLoading === artist.id}
+                              className="text-red-400 cursor-pointer hover:bg-red-500/20"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Artist
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}

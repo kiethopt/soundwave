@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStats = exports.updateMonthlyListeners = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateUser = exports.deleteUser = exports.updateUser = exports.getArtistRequestDetails = exports.getArtistRequests = exports.getUserById = exports.getAllUsers = exports.createArtist = void 0;
+exports.getStats = exports.updateMonthlyListeners = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateArtist = exports.deactivateUser = exports.deleteArtist = exports.deleteUser = exports.updateUser = exports.getArtistRequestDetails = exports.getArtistRequests = exports.getUserById = exports.getAllUsers = exports.createArtist = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cloudinary_service_1 = require("../services/cloudinary.service");
@@ -472,6 +472,27 @@ const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.deleteUser = deleteUser;
+const deleteArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        yield db_1.default.$transaction([
+            db_1.default.track.deleteMany({ where: { artistId: id } }),
+            db_1.default.album.deleteMany({ where: { artistId: id } }),
+            db_1.default.artistProfile.delete({ where: { id } }),
+        ]);
+        yield Promise.all([
+            (0, cache_middleware_1.clearCacheForEntity)('artist', { entityId: id, clearSearch: true }),
+            (0, cache_middleware_1.clearCacheForEntity)('album', { clearSearch: true }),
+            (0, cache_middleware_1.clearCacheForEntity)('track', { clearSearch: true }),
+        ]);
+        res.json({ message: 'Artist deleted permanently' });
+    }
+    catch (error) {
+        console.error('Delete artist error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.deleteArtist = deleteArtist;
 const deactivateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
@@ -535,6 +556,44 @@ const deactivateUser = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.deactivateUser = deactivateUser;
+const deactivateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const { isActive } = req.body;
+        const artist = yield db_1.default.artistProfile.findUnique({
+            where: { id },
+            include: { user: true },
+        });
+        if (!artist) {
+            res.status(404).json({ message: 'Artist not found' });
+            return;
+        }
+        const [updatedUser] = yield db_1.default.$transaction([
+            db_1.default.user.update({
+                where: { id: artist.userId },
+                data: Object.assign({ isActive }, (!isActive ? { currentProfile: 'USER' } : {})),
+                select: prisma_selects_1.userSelect,
+            }),
+            db_1.default.artistProfile.update({
+                where: { id },
+                data: { isActive },
+            }),
+        ]);
+        yield Promise.all([
+            (0, cache_middleware_1.clearCacheForEntity)('user', { entityId: artist.userId }),
+            (0, cache_middleware_1.clearCacheForEntity)('artist', { entityId: id }),
+        ]);
+        res.json({
+            message: `Artist ${isActive ? 'activated' : 'deactivated'} successfully`,
+            user: updatedUser,
+        });
+    }
+    catch (error) {
+        console.error('Deactivate artist error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.deactivateArtist = deactivateArtist;
 const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { page = 1, limit = 10 } = req.query;

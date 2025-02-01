@@ -34,11 +34,9 @@ const fetchWithAuth = async (
       errorMessage = errorResponse.message || errorMessage;
       errorCode = errorResponse.code || '';
 
-      // Xử lý các error code đặc biệt
-      if (errorCode === 'SWITCH_TO_ARTIST_PROFILE') {
-        toast.warning(errorMessage);
-        window.location.href = '/';
-        return;
+      // Thêm xử lý error code cho tài khoản bị khóa
+      if (errorCode === 'ARTIST_DEACTIVATED') {
+        errorMessage = 'Your artist account has been deactivated';
       }
     } catch (e) {
       errorMessage = errorText;
@@ -209,6 +207,9 @@ export const api = {
     deleteUser: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/users/${id}`, { method: 'DELETE' }, token),
 
+    deleteArtist: async (id: string, token: string) =>
+      fetchWithAuth(`/api/admin/artists/${id}`, { method: 'DELETE' }, token),
+
     deactivateUser: async (
       id: string,
       data: { isActive: boolean },
@@ -217,9 +218,20 @@ export const api = {
       fetchWithAuth(
         `/api/admin/users/${id}/deactivate`,
         {
-          method: 'POST',
+          method: 'PATCH',
           body: JSON.stringify(data),
         },
+        token
+      ),
+
+    deactivateArtist: async (
+      id: string,
+      data: { isActive: boolean },
+      token: string
+    ) =>
+      fetchWithAuth(
+        `/api/admin/artists/${id}/deactivate`,
+        { method: 'PATCH', body: JSON.stringify(data) },
         token
       ),
 

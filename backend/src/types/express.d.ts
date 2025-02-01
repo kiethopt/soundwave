@@ -22,6 +22,7 @@ declare global {
           id: string;
           artistName: string;
           isVerified: boolean;
+          isActive: boolean;
           verificationRequestedAt: Date | null;
           role: Role;
           albums: Array<{

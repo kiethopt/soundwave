@@ -333,7 +333,7 @@ const sendEmail = (to, subject, text) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 const switchProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b, _c;
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
         const sessionId = req.header('Session-ID');
@@ -343,37 +343,34 @@ const switchProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         }
         const user = yield db_1.default.user.findUnique({
             where: { id: userId },
-            select: prisma_selects_1.userSelect,
+            include: { artistProfile: true },
         });
         if (!user) {
             res.status(404).json({ message: 'User not found' });
             return;
         }
-        if (user.role === client_1.Role.ADMIN) {
+        if (user.artistProfile && !user.artistProfile.isActive) {
             res.status(403).json({
-                message: 'Admin profile cannot be switched',
+                message: 'Artist profile has been deactivated. Please contact admin.',
             });
             return;
         }
-        if (!user.artistProfile || !user.artistProfile.isVerified) {
+        if (!((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isVerified) || !((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.isActive)) {
             res.status(403).json({
-                message: 'You do not have a verified artist profile',
+                message: 'You do not have a verified and active artist profile',
             });
             return;
         }
         const newProfile = user.currentProfile === 'USER' ? 'ARTIST' : 'USER';
         const updatedUser = yield db_1.default.user.update({
             where: { id: userId },
-            data: {
-                currentProfile: newProfile,
-            },
+            data: { currentProfile: newProfile },
             select: prisma_selects_1.userSelect,
         });
         yield session_service_1.sessionService.updateSessionProfile(userId, sessionId, newProfile);
-        const userResponse = Object.assign(Object.assign({}, updatedUser), { role: client_1.Role.USER, password: undefined });
         res.json({
             message: 'Profile switched successfully',
-            user: userResponse,
+            user: updatedUser,
         });
     }
     catch (error) {

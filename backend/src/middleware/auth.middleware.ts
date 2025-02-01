@@ -31,6 +31,14 @@ export const authenticate = async (
       return;
     }
 
+    if (!user.isActive) {
+      res.status(403).json({
+        message: 'Your account has been deactivated',
+        code: 'ACCOUNT_DEACTIVATED',
+      });
+      return;
+    }
+
     req.user = user;
     next();
   } catch (error) {
@@ -68,6 +76,7 @@ export const authorize = (roles: Role[]) => {
         // Kiểm tra nếu user có artistProfile nhưng chưa switch sang profile ARTIST
         if (
           user.artistProfile?.isVerified &&
+          user.artistProfile?.isActive &&
           user.currentProfile !== 'ARTIST'
         ) {
           res.status(403).json({
@@ -80,7 +89,8 @@ export const authorize = (roles: Role[]) => {
         // Kiểm tra quyền ARTIST thông qua currentProfile và artistProfile
         if (
           user.currentProfile === 'ARTIST' &&
-          user.artistProfile?.isVerified
+          user.artistProfile?.isVerified &&
+          user.artistProfile?.isActive
         ) {
           return next();
         }

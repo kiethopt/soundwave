@@ -163,6 +163,15 @@ export default function Header({
 
       const response = await api.auth.switchProfile(token);
 
+      // Kiểm tra trạng thái artist profile trước khi switch
+      if (
+        response.user.artistProfile &&
+        !response.user.artistProfile.isActive
+      ) {
+        toast.error('Your artist account has been deactivated');
+        return;
+      }
+
       // Cập nhật userData trong localStorage
       localStorage.setItem('userData', JSON.stringify(response.user));
 
@@ -175,7 +184,14 @@ export default function Header({
       window.location.reload();
     } catch (error) {
       console.error('Error switching profile:', error);
-      toast.error('Failed to switch profile');
+      // Xử lý thông báo lỗi cụ thể
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to switch profile';
+      toast.error(
+        errorMessage.includes('deactivated')
+          ? 'Your account has been deactivated'
+          : errorMessage
+      );
     }
     setShowDropdown(false);
   };

@@ -146,6 +146,7 @@ exports.artistProfileSelect = {
     socialMediaLinks: true,
     monthlyListeners: true,
     isVerified: true,
+    isActive: true,
     verificationRequestedAt: true,
     verifiedAt: true,
     createdAt: true,
@@ -217,6 +218,7 @@ exports.artistProfileForUserSelect = {
             socialMediaLinks: true,
             monthlyListeners: true,
             isVerified: true,
+            isActive: true,
             verificationRequestedAt: true,
             verifiedAt: true,
             genres: {
@@ -251,6 +253,7 @@ exports.userSelect = {
             id: true,
             artistName: true,
             isVerified: true,
+            isActive: true,
             verificationRequestedAt: true,
             role: true,
             albums: {

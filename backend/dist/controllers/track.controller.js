@@ -53,14 +53,15 @@ const cache_middleware_1 = require("../middleware/cache.middleware");
 const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const canManageTrack = (user, trackArtistId) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     if (!user)
         return false;
     if (user.role === client_1.Role.ADMIN)
         return true;
     return (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
-        ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) === client_1.Role.ARTIST &&
-        ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id) === trackArtistId);
+        ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isActive) &&
+        ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.role) === client_1.Role.ARTIST &&
+        ((_d = user.artistProfile) === null || _d === void 0 ? void 0 : _d.id) === trackArtistId);
 };
 const validateTrackData = (data, isSingleTrack = true, validateRequired = true) => {
     const { title, duration, releaseDate, trackNumber, coverUrl, audioUrl, type, featuredArtists, } = data;
@@ -495,7 +496,7 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 ],
             };
         const whereClause = {
-            AND: [isActiveCondition, { OR: searchConditions }],
+            AND: [{ isActive: true }, { artist: { isActive: true } }],
         };
         const tracks = yield db_1.default.track.findMany({
             where: whereClause,

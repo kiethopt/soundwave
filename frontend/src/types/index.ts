@@ -76,6 +76,7 @@ export interface ArtistProfile {
   };
   monthlyListeners: number;
   isVerified: boolean;
+  isActive: boolean;
   verificationRequestedAt?: string;
   verifiedAt?: string;
   createdAt: string;

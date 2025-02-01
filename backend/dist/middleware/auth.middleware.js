@@ -35,6 +35,13 @@ const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
             res.status(401).json({ message: 'Invalid token' });
             return;
         }
+        if (!user.isActive) {
+            res.status(403).json({
+                message: 'Your account has been deactivated',
+                code: 'ACCOUNT_DEACTIVATED',
+            });
+            return;
+        }
         req.user = user;
         next();
     }
@@ -45,7 +52,7 @@ const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
 exports.authenticate = authenticate;
 const authorize = (roles) => {
     return (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-        var _a, _b;
+        var _a, _b, _c, _d;
         try {
             const user = req.user;
             if (!user) {
@@ -64,6 +71,7 @@ const authorize = (roles) => {
             }
             if (roles.includes(client_1.Role.ARTIST)) {
                 if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
+                    ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isActive) &&
                     user.currentProfile !== 'ARTIST') {
                     res.status(403).json({
                         message: 'Please switch to Artist profile to access this page',
@@ -72,7 +80,8 @@ const authorize = (roles) => {
                     return;
                 }
                 if (user.currentProfile === 'ARTIST' &&
-                    ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isVerified)) {
+                    ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.isVerified) &&
+                    ((_d = user.artistProfile) === null || _d === void 0 ? void 0 : _d.isActive)) {
                     return next();
                 }
             }

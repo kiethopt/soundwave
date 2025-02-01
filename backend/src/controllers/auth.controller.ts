@@ -443,7 +443,7 @@ export const switchProfile = async (
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: userSelect,
+      include: { artistProfile: true },
     });
 
     if (!user) {
@@ -451,18 +451,18 @@ export const switchProfile = async (
       return;
     }
 
-    // Kiểm tra nếu user là ADMIN thì không cho phép chuyển đổi profile
-    if (user.role === Role.ADMIN) {
+    // Kiểm tra trạng thái active của artist profile
+    if (user.artistProfile && !user.artistProfile.isActive) {
       res.status(403).json({
-        message: 'Admin profile cannot be switched',
+        message: 'Artist profile has been deactivated. Please contact admin.',
       });
       return;
     }
 
-    // Kiểm tra xem user có artist profile được verify hay không
-    if (!user.artistProfile || !user.artistProfile.isVerified) {
+    // Kiểm tra verify và active status
+    if (!user.artistProfile?.isVerified || !user.artistProfile?.isActive) {
       res.status(403).json({
-        message: 'You do not have a verified artist profile',
+        message: 'You do not have a verified and active artist profile',
       });
       return;
     }
@@ -472,24 +472,16 @@ export const switchProfile = async (
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: {
-        currentProfile: newProfile,
-      },
+      data: { currentProfile: newProfile },
       select: userSelect,
     });
 
-    // Cập nhật session với currentProfile mới nhưng giữ nguyên role USER
+    // Cập nhật session
     await sessionService.updateSessionProfile(userId, sessionId, newProfile);
-
-    const userResponse = {
-      ...updatedUser,
-      role: Role.USER, // Luôn giữ role là USER
-      password: undefined,
-    };
 
     res.json({
       message: 'Profile switched successfully',
-      user: userResponse,
+      user: updatedUser,
     });
   } catch (error) {
     console.error('Switch profile error:', error);

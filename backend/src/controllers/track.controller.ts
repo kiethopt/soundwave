@@ -16,6 +16,7 @@ const canManageTrack = (user: any, trackArtistId: string): boolean => {
   // Kiểm tra user có artistProfile đã verify và có role ARTIST không
   return (
     user.artistProfile?.isVerified &&
+    user.artistProfile?.isActive &&
     user.artistProfile?.role === Role.ARTIST &&
     user.artistProfile?.id === trackArtistId
   );
@@ -627,7 +628,7 @@ export const searchTrack = async (
         };
 
     const whereClause: Prisma.TrackWhereInput = {
-      AND: [isActiveCondition, { OR: searchConditions }],
+      AND: [{ isActive: true }, { artist: { isActive: true } }],
     };
 
     const tracks = await prisma.track.findMany({
