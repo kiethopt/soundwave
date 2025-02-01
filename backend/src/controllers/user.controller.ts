@@ -7,7 +7,7 @@ import {
   searchAlbumSelect,
   searchTrackSelect,
   userSelect,
-} from 'src/utils/prisma-selects';
+} from '../utils/prisma-selects';
 
 // Hàm validation cho dữ liệu nghệ sĩ
 const validateArtistData = (data: any): string | null => {

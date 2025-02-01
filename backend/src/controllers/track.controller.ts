@@ -4,7 +4,7 @@ import { uploadFile } from '../services/cloudinary.service';
 import { AlbumType, Role, HistoryType, Prisma } from '@prisma/client';
 import { clearCacheForEntity, setCache } from '../middleware/cache.middleware';
 import { sessionService } from '../services/session.service';
-import { historySelect, trackSelect } from '../utils/prisma-selects';
+import { trackSelect } from '../utils/prisma-selects';
 
 // Function để kiểm tra quyền
 const canManageTrack = (user: any, trackArtistId: string): boolean => {
