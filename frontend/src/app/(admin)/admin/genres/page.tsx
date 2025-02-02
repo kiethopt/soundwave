@@ -2,9 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
-import { Edit, Search, Spinner, Trash2 } from '@/components/ui/Icons';
+import {
+  Edit,
+  MoreVertical,
+  Search,
+  Spinner,
+  Trash2,
+} from '@/components/ui/Icons';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/layout/Button/Button';
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 
 export default function AdminGenres() {
   const [genres, setGenres] = useState<any[]>([]);
@@ -87,7 +100,7 @@ export default function AdminGenres() {
   };
 
   return (
-    <div className="container mx-auto space-y-8">
+    <div className="container mx-auto space-y-8" suppressHydrationWarning>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
@@ -158,22 +171,28 @@ export default function AdminGenres() {
                         {new Date(genre.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditGenre(genre)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteGenre(genre.id)}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                            <MoreVertical className="w-5 h-5" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="bg-[#282828] border-white/10 text-white">
+                            <DropdownMenuItem
+                              onClick={() => handleEditGenre(genre)}
+                              className="cursor-pointer hover:bg-white/10"
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Genre
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteGenre(genre.id)}
+                              className="text-red-400 cursor-pointer hover:bg-red-500/20"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Genre
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}

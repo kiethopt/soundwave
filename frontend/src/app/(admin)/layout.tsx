@@ -16,6 +16,7 @@ export default function AdminLayout({
       try {
         const userData = localStorage.getItem('userData');
         const token = localStorage.getItem('userToken');
+        const currentPath = window.location.pathname;
 
         if (!userData || !token) {
           router.push('/login');
@@ -23,7 +24,9 @@ export default function AdminLayout({
         }
 
         const user = JSON.parse(userData);
-        if (user.role !== 'ADMIN') {
+
+        // Chỉ chặn nếu đang ở route admin và không phải là admin
+        if (currentPath.startsWith('/admin') && user.role !== 'ADMIN') {
           router.push('/');
           return;
         }

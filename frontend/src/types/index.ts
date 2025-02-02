@@ -128,6 +128,7 @@ export interface ArtistRequest {
     name: string;
     email: string;
   };
+  isVerified: boolean;
 }
 
 export interface Album {

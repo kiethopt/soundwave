@@ -10,6 +10,10 @@ import {
   Home,
   Left,
   Right,
+  Genres,
+  LibraryOutline,
+  LibraryFilled,
+  HomeOutline,
 } from '@/components/ui/Icons';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -107,14 +111,22 @@ export default function Sidebar({
             <div className="h-[72px] -mx-4 border-b border-white/10">
               <div className="h-full flex items-center gap-4 px-7">
                 {isCollapsed ? (
-                  <Library className="w-6 h-6 text-white/70 hover:text-white transition-colors" />
+                  <div className="group">
+                    <LibraryOutline className="w-7 h-7 text-white/70 group-hover:hidden transition-colors" />
+                    <LibraryFilled className="w-7 h-7 text-white hidden group-hover:block transition-colors" />
+                  </div>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2 text-white/70 hover:text-white transition-colors">
-                      <Library className="w-6 h-6" />
-                      <span className="text-sm font-medium">Your Library</span>
+                    <div className="flex items-center gap-3 text-white/70 hover:text-white group">
+                      <div className="relative">
+                        <LibraryOutline className="w-7 h-7 group-hover:hidden" />
+                        <LibraryFilled className="w-7 h-7 hidden group-hover:block" />
+                      </div>
+                      <span className="text-base font-medium">
+                        Your Library
+                      </span>
                     </div>
-                    <AddSimple className="w-5 h-5 ml-auto" />
+                    <AddSimple className="w-6 h-6 ml-auto hover:text-white" />
                   </>
                 )}
               </div>
@@ -187,10 +199,10 @@ export default function Sidebar({
                     }`}
                   >
                     {isCollapsed ? (
-                      <Home className="w-6 h-6 shrink-0" />
+                      <HomeOutline className="w-6 h-6 shrink-0" />
                     ) : (
                       <>
-                        <Home className="w-6 h-6 shrink-0" />
+                        <HomeOutline className="w-6 h-6 shrink-0" />
                         <span>Dashboard</span>
                       </>
                     )}
@@ -249,10 +261,10 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
-                    <Home className="w-6 h-6 shrink-0 mx-auto" />
+                    <HomeOutline className="w-6 h-6 shrink-0 mx-auto" />
                   ) : (
                     <>
-                      <Home className="w-6 h-6 shrink-0" />
+                      <HomeOutline className="w-6 h-6 shrink-0" />
                       <span>Dashboard</span>
                     </>
                   )}
@@ -320,7 +332,7 @@ export default function Sidebar({
                     <Music className="w-6 h-6 shrink-0 mx-auto" />
                   ) : (
                     <>
-                      <Music className="w-6 h-6 shrink-0" />
+                      <Genres className="w-6 h-6 shrink-0" />
                       <span>Genres</span>
                     </>
                   )}

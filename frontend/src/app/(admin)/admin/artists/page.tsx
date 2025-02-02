@@ -139,13 +139,15 @@ export default function AdminArtists() {
   };
 
   return (
-    <div className="container mx-auto space-y-8">
+    <div className="container mx-auto space-y-8" suppressHydrationWarning>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
             Artist Management
           </h1>
-          <p className="text-white/60 mt-2">Create and manage your artists</p>
+          <p className="text-white/60 mt-2">
+            Manage and monitor artist profiles
+          </p>
         </div>
         <div className="flex items-center gap-4">
           <form onSubmit={handleSearch} className="relative">

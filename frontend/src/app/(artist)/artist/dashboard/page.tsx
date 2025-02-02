@@ -89,7 +89,7 @@ export default function ArtistDashboard() {
         </Link>
         <div className="p-6 bg-white/5 rounded-lg">
           <div className="flex items-center justify-between mb-4">
-            <Users className="w-8 h-8 text-white/60" />
+            <Users className="w-8 h-8" />
             <span className="text-2xl font-bold">{stats.monthlyListeners}</span>
           </div>
           <h3 className="text-xl font-bold">Monthly Listeners</h3>

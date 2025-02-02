@@ -10,6 +10,8 @@ import {
   Search,
   Settings,
   Library,
+  HomeOutline,
+  HomeFilled,
 } from '@/components/ui/Icons';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -200,8 +202,13 @@ export default function Header({
                   ? 'text-white bg-[#282828]'
                   : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
               }`}
+              suppressHydrationWarning
             >
-              <Home className="w-5 h-5" />
+              {isActive('/') ? (
+                <HomeFilled className="w-5 h-5" />
+              ) : (
+                <HomeOutline className="w-5 h-5" />
+              )}
               <span className="hidden lg:inline">Home</span>
             </Link>
 
@@ -375,7 +382,11 @@ export default function Header({
               isActive('/') ? 'text-[#8B6450]' : 'text-white/70'
             }`}
           >
-            <Home className="w-6 h-6" />
+            {isActive('/') ? (
+              <HomeFilled className="w-6 h-6" />
+            ) : (
+              <HomeOutline className="w-6 h-6" />
+            )}
             <span className="text-xs">Home</span>
           </Link>
 

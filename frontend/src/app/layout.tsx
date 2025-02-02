@@ -28,19 +28,6 @@ export default function RootLayout({
     [pathname]
   );
 
-  // Chuyển hướng nếu đang ở trang gốc ("/")
-  useEffect(() => {
-    const userDataStr = localStorage.getItem('userData');
-    if (userDataStr && pathname === '/') {
-      const user = JSON.parse(userDataStr);
-      if (user.currentProfile === 'ARTIST') {
-        router.replace('/artist/dashboard');
-      } else if (user.currentProfile === 'ADMIN') {
-        router.replace('/admin/dashboard');
-      }
-    }
-  }, [pathname, router]);
-
   useEffect(() => {
     const userDataStr = localStorage.getItem('userData');
     if (userDataStr) {
@@ -76,14 +63,14 @@ export default function RootLayout({
           ) : (
             <div className="flex flex-col h-screen text-white">
               {/* Mobile Header */}
-              <div className="md:hidden">
+              <div className="md:hidden" suppressHydrationWarning>
                 <Header
                   isSidebarOpen={isSidebarOpen}
                   onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
                 />
               </div>
 
-              <div className="flex flex-1">
+              <div className="flex flex-1" suppressHydrationWarning>
                 {/* Sidebar */}
                 <Sidebar
                   isOpen={isSidebarOpen}
@@ -91,14 +78,17 @@ export default function RootLayout({
                 />
 
                 {/* Main Content */}
-                <div className="flex-1 flex flex-col min-h-0">
+                <div
+                  className="flex-1 flex flex-col min-h-0"
+                  suppressHydrationWarning
+                >
                   {/* Desktop Header */}
                   <div className="hidden md:block">
                     <Header />
                   </div>
 
                   {/* Content Area */}
-                  <main className="flex-1 relative">
+                  <main className="flex-1 relative" suppressHydrationWarning>
                     <div className="absolute inset-0 overflow-y-auto">
                       <div
                         className="min-h-full m-2 p-2 rounded-lg bg-[#111111]"

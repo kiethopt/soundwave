@@ -3,11 +3,19 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
-import { User, Check, X, Eye } from 'lucide-react';
+import { User, Check, X, Eye, MoreVertical } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ArtistRequest } from '@/types';
 import { toast } from 'react-toastify';
 import { Search, Spinner } from '@/components/ui/Icons';
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import Link from 'next/link';
 
 export default function ArtistRequests() {
   const [requests, setRequests] = useState<ArtistRequest[]>([]);
@@ -98,7 +106,7 @@ export default function ArtistRequests() {
   };
 
   return (
-    <div className="container mx-auto space-y-8">
+    <div className="container mx-auto space-y-8" suppressHydrationWarning>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Artist Requests</h1>
@@ -141,7 +149,7 @@ export default function ArtistRequests() {
                 <th className="px-6 py-4 text-left text-sm font-semibold">
                   Requested At
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
+                <th className="px-6 py-4 text-right text-sm font-semibold">
                   Actions
                 </th>
               </tr>
@@ -187,9 +195,12 @@ export default function ArtistRequests() {
                               <User className="w-6 h-6 text-white/60" />
                             )}
                           </div>
-                          <span className="ml-3 font-medium">
+                          <Link
+                            href={`/admin/artist-requests/${request.id}`}
+                            className="ml-3 font-medium hover:underline"
+                          >
                             {request.artistName}
-                          </span>
+                          </Link>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -198,27 +209,36 @@ export default function ArtistRequests() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {formatDate(request.verificationRequestedAt)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleViewDetails(request.id)}
-                            className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleApprove(request.id)}
-                            className="bg-green-500 text-white px-3 py-1 rounded-md hover:bg-green-600"
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleReject(request.id)}
-                            className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                            <MoreVertical className="w-5 h-5" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="bg-[#282828] border-white/10 text-white">
+                            <DropdownMenuItem
+                              onClick={() => handleViewDetails(request.id)}
+                              className="cursor-pointer hover:bg-white/10"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleApprove(request.id)}
+                              className="cursor-pointer hover:bg-white/10 text-green-400"
+                            >
+                              <Check className="w-4 h-4 mr-2" />
+                              Approve Request
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuItem
+                              onClick={() => handleReject(request.id)}
+                              className="text-red-400 cursor-pointer hover:bg-red-500/20"
+                            >
+                              <X className="w-4 h-4 mr-2" />
+                              Reject Request
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}

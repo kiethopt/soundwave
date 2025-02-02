@@ -37,11 +37,10 @@ function LoginForm() {
           localStorage.setItem('sessionId', response.sessionId);
           localStorage.setItem('userData', JSON.stringify(response.user));
 
+          // Điều hướng mặc định sau login
           if (response.user.role === 'ADMIN') {
-            // Chuyển hướng đến dashboard của Admin
             router.push('/admin/dashboard');
-          } else if (response.user.role === 'ARTIST') {
-            // Chuyển hướng đến dashboard của Artist
+          } else if (response.user.artistProfile?.isVerified) {
             router.push('/artist/dashboard');
           } else {
             router.push('/');
@@ -50,7 +49,6 @@ function LoginForm() {
           setError(response.message || 'An error occurred');
         }
       } catch (err: any) {
-        // Hiển thị thông báo lỗi từ backend
         setError(err.message || 'An unexpected error occurred');
       }
     },
