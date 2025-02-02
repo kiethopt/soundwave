@@ -1,14 +1,21 @@
 'use client';
 
 import { Album, ArtistProfile, Track } from '@/types';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import TrackUploadForm from '@/components/admin/TrackUploadForm';
-import { ArrowLeftIcon, Calendar, Music } from 'lucide-react';
+import {
+  ArrowLeft,
+  Calendar,
+  Music,
+  Disc,
+  Check,
+  Verified,
+} from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/utils/api';
 import { useParams } from 'next/navigation';
+import { useDominantColor } from '@/hooks/useDominantColor';
 
-// Component TrackList
 const TrackList = ({
   tracks,
   albumId,
@@ -25,7 +32,7 @@ const TrackList = ({
   };
 
   return (
-    <div className="w-full bg-black/20 rounded-lg overflow-hidden">
+    <div className="w-full bg-black/20 rounded-xl overflow-hidden border border-white/10 backdrop-blur-sm">
       <div className="px-6 py-4 border-b border-white/10">
         <div className="grid grid-cols-[16px_4fr_2fr_minmax(120px,1fr)] gap-4 text-sm text-white/60">
           <div className="text-center">#</div>
@@ -46,25 +53,44 @@ const TrackList = ({
                 <img
                   src={track.coverUrl || albumCoverUrl}
                   alt={track.title}
-                  className="w-10 h-10 object-cover rounded"
+                  className="w-10 h-10 object-cover rounded-lg border border-white/10"
                 />
               ) : (
-                <div className="w-10 h-10 bg-white/10 rounded"></div>
+                <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                  <Disc className="w-5 h-5 text-white/60" />
+                </div>
               )}
-              <span>{track.title}</span>
+              <span className="font-medium">{track.title}</span>
             </div>
             <div>
-              <div>{track.artist.artistName}</div>
-              {track.featuredArtists && track.featuredArtists.length > 0 && (
-                <div className="text-sm text-white/60">
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/admin/artists/${track.artist.id}`}
+                  className="text-white/90 hover:underline hover:text-white"
+                >
+                  {track.artist.artistName}
+                </Link>
+              </div>
+              {track.featuredArtists?.length > 0 && (
+                <div className="text-sm text-white/60 mt-1">
                   feat.{' '}
-                  {track.featuredArtists
-                    .map(({ artistProfile }) => artistProfile.artistName)
-                    .join(', ')}
+                  {track.featuredArtists.map(({ artistProfile }, index) => (
+                    <React.Fragment key={artistProfile.id}>
+                      {index > 0 && ', '}
+                      <Link
+                        href={`/admin/artists/${artistProfile.id}`}
+                        className="hover:underline hover:text-white"
+                      >
+                        {artistProfile.artistName}
+                      </Link>
+                    </React.Fragment>
+                  ))}
                 </div>
               )}
             </div>
-            <div className="text-left">{formatDuration(track.duration)}</div>
+            <div className="text-left text-white/80">
+              {formatDuration(track.duration)}
+            </div>
           </div>
         ))}
       </div>
@@ -75,6 +101,7 @@ const TrackList = ({
 export default function AlbumDetailPage() {
   const { id, albumId } = useParams();
   const [album, setAlbum] = useState<Album | null>(null);
+  const { dominantColor } = useDominantColor(album?.coverUrl);
   const [isUploading, setIsUploading] = useState(false);
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
   const [newTracks, setNewTracks] = useState<File[]>([]);
@@ -216,79 +243,100 @@ export default function AlbumDetailPage() {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-500/10 text-red-500 rounded">
+      <div className="p-4 bg-red-500/10 text-red-500 rounded-lg">
         Error: {error}
       </div>
     );
   }
 
   if (!album) {
-    return <div>Album not found</div>;
+    return <div className="text-white/80 p-6">Album not found</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-neutral-800 to-neutral-950 rounded-lg">
-      <div className="max-w-7xl mx-auto p-10">
+    <div
+      className="min-h-screen rounded-lg"
+      style={{
+        background: dominantColor
+          ? `linear-gradient(to bottom, ${dominantColor}33 0%, #121212 100%)`
+          : 'linear-gradient(to bottom, #2c2c2c 0%, #121212 100%)',
+      }}
+    >
+      <div className="max-w-7xl mx-auto p-6">
         <div className="flex items-center gap-4 mb-8">
           <Link
             href={`/admin/artists/${id}`}
-            className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors group"
           >
-            <ArrowLeftIcon className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
             <span>Back to Albums</span>
           </Link>
         </div>
 
         <div className="flex flex-col md:flex-row gap-8 items-start mb-8">
           {album.coverUrl && (
-            <img
-              src={album.coverUrl}
-              alt={album.title}
-              className="w-48 h-48 object-cover rounded-lg shadow-xl"
-            />
-          )}
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold mb-4">{album.title}</h1>
-            <div className="flex flex-col gap-2 text-white/60">
-              <div className="flex items-center gap-2">
-                <p className="text-xl text-white">{album.artist.artistName}</p>
-                {album.artist.isVerified && (
-                  <span className="text-blue-500">✓</span>
-                )}
-              </div>
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  {new Date(album.releaseDate).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Music className="w-4 h-4" />
-                  {album.totalTracks || 0} tracks
-                </div>
-              </div>
-              {album.genres && album.genres.length > 0 && (
-                <div className="flex gap-2 mt-2">
-                  {album.genres.map(({ genre }) => (
-                    <span
-                      key={genre.id}
-                      className="px-2 py-1 bg-white/10 rounded-full text-sm"
-                    >
-                      {genre.name}
-                    </span>
-                  ))}
-                </div>
-              )}
+            <div className="relative group">
+              <img
+                src={album.coverUrl}
+                alt={album.title}
+                className="w-48 h-48 object-cover rounded-xl shadow-2xl border-4 border-white/10"
+              />
             </div>
+          )}
+          <div className="flex-1 space-y-4">
+            <h1 className="text-4xl font-bold text-white">{album.title}</h1>
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/admin/artists/${album.artist.id}`}
+                  className="flex items-center gap-2 hover:underline"
+                >
+                  <span className="text-white/90">
+                    {album.artist.artistName}
+                  </span>
+                  {album.artist.isVerified && (
+                    <Verified className="w-5 h-5 text-[#2E77D0]" />
+                  )}
+                </Link>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6 text-white/60">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                {new Date(album.releaseDate).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <Music className="w-5 h-5" />
+                {album.totalTracks || 0} tracks
+              </div>
+            </div>
+
+            {album.genres?.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {album.genres.map(({ genre }) => (
+                  <span
+                    key={genre.id}
+                    className="px-3 py-1 bg-white/10 rounded-full text-sm text-white/80"
+                  >
+                    {genre.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {album.tracks && album.tracks.length > 0 && (
+        {album.tracks?.length > 0 && (
           <div className="mb-12">
-            <h2 className="text-xl font-semibold mb-4">Tracks</h2>
+            <h2 className="text-2xl font-semibold text-white mb-6">
+              Track List
+            </h2>
             <TrackList
               tracks={album.tracks}
               albumId={album.id}
@@ -298,8 +346,10 @@ export default function AlbumDetailPage() {
         )}
 
         <div className="mt-12">
-          <h2 className="text-xl font-semibold mb-6">Upload New Tracks</h2>
-          <div className="bg-white/5 rounded-md p-6 backdrop-blur-sm">
+          <h2 className="text-2xl font-semibold text-white mb-6">
+            Upload New Tracks
+          </h2>
+          <div className="bg-white/5 rounded-xl p-6 backdrop-blur-sm border border-white/10">
             <TrackUploadForm
               album={album}
               newTracks={newTracks}
@@ -317,17 +367,17 @@ export default function AlbumDetailPage() {
                 }));
               }}
               artists={artists}
-              existingTrackCount={album?.tracks?.length || 0}
+              existingTrackCount={album.tracks?.length || 0}
             />
           </div>
         </div>
 
         {message.text && (
           <div
-            className={`mt-4 p-4 rounded-md ${
+            className={`mt-6 p-4 rounded-lg ${
               message.type === 'error'
-                ? 'bg-red-500/10 text-red-500'
-                : 'bg-green-500/10 text-green-500'
+                ? 'bg-red-500/10 text-red-400'
+                : 'bg-green-500/10 text-green-400'
             }`}
           >
             {message.text}

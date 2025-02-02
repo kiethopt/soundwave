@@ -138,9 +138,9 @@ export default function ArtistRequestDetails({
       <div className="flex items-center justify-between mb-8">
         <Link
           href="/admin/artist-requests"
-          className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors group"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
           <span>Back to Requests</span>
         </Link>
 

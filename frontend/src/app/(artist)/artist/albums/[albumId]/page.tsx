@@ -395,7 +395,7 @@ export default function AlbumDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-800 to-neutral-950 rounded-lg">
-      <div className="max-w-7xl mx-auto p-10">
+      <div className="max-w-7xl mx-auto p-6">
         {/* Header section */}
         <div className="flex items-center justify-between mb-8">
           <Link

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { ArtistProfile } from '@/types';
+import { cn } from '@/lib/utils';
 
 export default function ArtistDetail({
   params,
@@ -139,40 +140,41 @@ export default function ArtistDetail({
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto space-y-6">
       <div className="flex items-center">
         <Link
           href="/admin/artists"
-          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors group"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
           <span>Back to Artists</span>
         </Link>
       </div>
 
-      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] p-6">
+      <div className="bg-[#121212] rounded-xl overflow-hidden border border-white/10 p-6 backdrop-blur-sm">
         <div className="grid gap-6 md:grid-cols-[240px_1fr]">
-          {/* Artist Info - Left Column */}
+          {/* Left Column */}
           <div className="space-y-4">
-            {artist.avatar ? (
-              <div className="relative w-60 h-60">
+            <div className="relative group">
+              {artist.avatar ? (
                 <img
                   src={artist.avatar}
                   alt={artist.artistName}
-                  className="w-full h-full rounded-lg object-cover"
+                  className="w-60 h-60 rounded-xl object-cover shadow-xl border-4 border-white/10"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.onerror = null;
                     target.src = '/images/default-avatar.jpg';
                   }}
                 />
-              </div>
-            ) : (
-              <div className="w-60 h-60 rounded-lg bg-white/[0.03] flex items-center justify-center">
-                <User className="w-20 h-20 text-white/60" />
-              </div>
-            )}
-            <div className="bg-white/[0.03] rounded-lg p-4">
+              ) : (
+                <div className="w-60 h-60 rounded-xl bg-gradient-to-br from-[#2c2c2c] to-[#1a1a1a] flex items-center justify-center">
+                  <User className="w-20 h-20 text-white/60" />
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
               <p className="text-sm text-white/60 mb-1">Monthly Listeners</p>
               <p className="text-2xl font-bold text-white">
                 {artist.monthlyListeners?.toLocaleString() ?? 0}
@@ -180,52 +182,50 @@ export default function ArtistDetail({
             </div>
           </div>
 
-          {/* Artist Info - Right Column */}
+          {/* Right Column */}
           <div className="space-y-6">
+            {/* Header Section */}
             <div className="space-y-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-4xl font-bold tracking-tight text-white">
                   {artist.artistName || artist.user?.name}
                 </h1>
-                {artist.isVerified && artist.role === 'ARTIST' && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-500/10 text-green-500">
-                    <Check className="w-4 h-4 mr-1" />
+                {artist.isVerified && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                    <Check className="w-4 h-4 mr-1.5" />
                     Verified Artist
                   </span>
                 )}
               </div>
 
               {artist.bio && (
-                <p className="text-white/60 text-lg leading-relaxed">
+                <p className="text-white/60 text-lg leading-relaxed max-w-3xl">
                   {artist.bio}
                 </p>
               )}
             </div>
 
-            <div className="flex flex-wrap gap-4">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3">
               <button
                 onClick={handleVerify}
                 disabled={artist.isVerified || isUpdating}
-                className={`min-w-[200px] px-4 py-2 rounded-md ${
+                className={cn(
+                  'flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all',
                   artist.isVerified
-                    ? 'bg-green-600 hover:bg-green-700'
-                    : 'bg-[#A57865] hover:bg-[#7d5d50]'
-                } text-white`}
+                    ? 'bg-green-500/10 text-green-400 cursor-not-allowed'
+                    : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20'
+                )}
               >
                 {isUpdating ? (
                   <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    <RefreshCw className="w-5 h-5 animate-spin" />
                     Verifying...
-                  </>
-                ) : artist.isVerified ? (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    Verified Artist
                   </>
                 ) : (
                   <>
-                    <Check className="w-4 h-4 mr-2" />
-                    Verify Artist
+                    <Check className="w-5 h-5" />
+                    {artist.isVerified ? 'Verified' : 'Verify Artist'}
                   </>
                 )}
               </button>
@@ -233,35 +233,35 @@ export default function ArtistDetail({
               <button
                 onClick={handleUpdateMonthlyListeners}
                 disabled={isUpdating}
-                className="min-w-[200px] px-4 py-2 bg-white/10 rounded-md hover:bg-white/20 text-white"
+                className="flex items-center gap-2 px-5 py-2.5 bg-white/5 text-white/90 rounded-xl hover:bg-white/10 border border-white/10 transition-all"
               >
                 <RefreshCw
-                  className={`w-4 h-4 mr-2 ${isUpdating ? 'animate-spin' : ''}`}
+                  className={`w-5 h-5 ${isUpdating ? 'animate-spin' : ''}`}
                 />
-                Update Monthly Listeners
+                Update Listeners
               </button>
             </div>
 
             {/* Tab Navigation */}
-            <div className="border-b border-white/[0.08] mt-8">
+            <div className="border-b border-white/10 mt-8">
               <div className="flex gap-8">
                 <button
                   onClick={() => setActiveTab('albums')}
-                  className={`pb-4 px-1 ${
+                  className={`pb-4 px-1 font-medium ${
                     activeTab === 'albums'
                       ? 'border-b-2 border-white text-white'
-                      : 'text-white/60'
-                  }`}
+                      : 'text-white/60 hover:text-white/80'
+                  } transition-colors`}
                 >
                   Albums ({artist.albums?.length || 0})
                 </button>
                 <button
                   onClick={() => setActiveTab('tracks')}
-                  className={`pb-4 px-1 ${
+                  className={`pb-4 px-1 font-medium ${
                     activeTab === 'tracks'
                       ? 'border-b-2 border-white text-white'
-                      : 'text-white/60'
-                  }`}
+                      : 'text-white/60 hover:text-white/80'
+                  } transition-colors`}
                 >
                   Tracks ({artist.tracks?.length || 0})
                 </button>
@@ -273,7 +273,8 @@ export default function ArtistDetail({
               {/* Albums Tab */}
               {activeTab === 'albums' && (
                 <div className="space-y-6">
-                  <div className="flex justify-between items-center">
+                  {/* Commented New Album Button */}
+                  {/* <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold">Albums</h2>
                     <Link
                       href={`/admin/artists/${id}/albums/new`}
@@ -282,22 +283,23 @@ export default function ArtistDetail({
                       <Plus className="w-4 h-4" />
                       New Album
                     </Link>
-                  </div>
+                  </div> */}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {artist.albums?.map((album) => (
                       <div
                         key={album.id}
-                        className="bg-white/[0.03] rounded-lg p-4 hover:bg-white/[0.05] transition-colors"
+                        className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors border border-white/10"
                       >
                         <div className="flex items-center gap-4">
                           {album.coverUrl ? (
                             <img
                               src={album.coverUrl}
                               alt={album.title}
-                              className="w-16 h-16 rounded-md object-cover"
+                              className="w-16 h-16 rounded-lg object-cover"
                             />
                           ) : (
-                            <div className="w-16 h-16 rounded-md bg-white/[0.03] flex items-center justify-center">
+                            <div className="w-16 h-16 rounded-lg bg-white/10 flex items-center justify-center">
                               <Disc className="w-8 h-8 text-white/60" />
                             </div>
                           )}
@@ -308,9 +310,8 @@ export default function ArtistDetail({
                             >
                               {album.title}
                             </Link>
-                            <p className="text-sm text-white/60">
+                            <p className="text-sm text-white/60 mt-1">
                               {album.totalTracks} tracks ·{' '}
-                              {/* Sử dụng totalTracks từ API */}
                               {formatDuration(album.duration)}
                             </p>
                             <p className="text-sm text-white/60">
@@ -327,7 +328,8 @@ export default function ArtistDetail({
               {/* Tracks Tab */}
               {activeTab === 'tracks' && (
                 <div className="space-y-6">
-                  <div className="flex justify-between items-center">
+                  {/* Commented New Track Button */}
+                  {/* <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold">Tracks</h2>
                     <Link
                       href={`/admin/artists/${id}/tracks/new`}
@@ -336,12 +338,13 @@ export default function ArtistDetail({
                       <Plus className="w-4 h-4" />
                       New Track
                     </Link>
-                  </div>
+                  </div> */}
+
                   <div className="space-y-2">
                     {artist.tracks?.map((track) => (
                       <div
                         key={track.id}
-                        className="bg-white/[0.03] rounded-lg p-4 hover:bg-white/[0.05] transition-colors"
+                        className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors border border-white/10"
                       >
                         <div className="flex items-center gap-4">
                           <button
@@ -350,7 +353,7 @@ export default function ArtistDetail({
                                 playingTrackId === track.id ? null : track.id
                               )
                             }
-                            className="text-white/60 hover:text-white"
+                            className="text-white/60 hover:text-white transition-colors"
                           >
                             {playingTrackId === track.id ? (
                               <Pause className="w-6 h-6" />
@@ -365,7 +368,7 @@ export default function ArtistDetail({
                               className="w-12 h-12 rounded-md object-cover"
                             />
                           ) : (
-                            <div className="w-12 h-12 rounded-md bg-white/[0.03] flex items-center justify-center">
+                            <div className="w-12 h-12 rounded-md bg-white/10 flex items-center justify-center">
                               <Music className="w-6 h-6 text-white/60" />
                             </div>
                           )}
@@ -374,7 +377,7 @@ export default function ArtistDetail({
                               {track.title}
                             </h3>
                             <p className="text-sm text-white/60">
-                              {track.album?.title || 'Single'} ·
+                              {track.album?.title || 'Single'} ·{' '}
                               {formatDuration(track.duration)}
                             </p>
                           </div>
