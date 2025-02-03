@@ -267,88 +267,6 @@ export const getArtistTracks = async (
   }
 };
 
-// export const getArtistStats = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   const { id } = req.params;
-//   const user = req.user;
-
-//   try {
-//     // Lấy thông tin artist profile
-//     const artistProfile = await prisma.artistProfile.findUnique({
-//       where: { id },
-//       select: {
-//         id: true,
-//         monthlyListeners: true,
-//         isVerified: true,
-//         userId: true, // Thêm userId để kiểm tra ownership
-//       },
-//     });
-
-//     if (!artistProfile) {
-//       res.status(404).json({ message: 'Artist not found' });
-//       return;
-//     }
-
-//     // Xác định điều kiện truy vấn dựa trên quyền
-//     let whereCondition: any = { artistId: id };
-
-//     // Nếu không phải ADMIN hoặc không phải chính artist đó
-//     if (user?.role !== Role.ADMIN && user?.id !== artistProfile.userId) {
-//       // Chỉ xem được albums/tracks đang active
-//       whereCondition.isActive = true;
-
-//       // Kiểm tra xem user có phải là artist được verify không
-//       if (!user?.artistProfile?.isVerified) {
-//         res.status(403).json({ message: 'Forbidden' });
-//         return;
-//       }
-//     }
-
-//     // Đếm số lượng albums (bao gồm cả albums ẩn nếu là owner hoặc admin)
-//     const totalAlbums = await prisma.album.count({
-//       where: whereCondition,
-//     });
-
-//     // Đếm số lượng tracks (bao gồm cả tracks ẩn nếu là owner hoặc admin)
-//     const totalTracks = await prisma.track.count({
-//       where: whereCondition,
-//     });
-
-//     // Tính tổng số lượt play (bao gồm cả tracks ẩn nếu là owner hoặc admin)
-//     const totalPlays = await prisma.track.aggregate({
-//       where: whereCondition,
-//       _sum: {
-//         playCount: true,
-//       },
-//     });
-
-//     // Log để debug
-//     console.log('Artist Stats:', {
-//       artistId: id,
-//       requestUserId: user?.id,
-//       artistUserId: artistProfile.userId,
-//       isAdmin: user?.role === Role.ADMIN,
-//       whereCondition,
-//       totalAlbums,
-//       totalTracks,
-//       totalPlays: totalPlays._sum.playCount,
-//       monthlyListeners: artistProfile.monthlyListeners,
-//     });
-
-//     res.json({
-//       totalAlbums,
-//       totalTracks,
-//       totalPlays: totalPlays._sum.playCount || 0,
-//       monthlyListeners: artistProfile.monthlyListeners,
-//     });
-//   } catch (error) {
-//     console.error('Error fetching artist stats:', error);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// };
-
 export const updateArtistProfile = async (
   req: Request,
   res: Response
@@ -491,6 +409,7 @@ export const updateArtistProfile = async (
  *  - monthlyListeners: Số người nghe hàng tháng
  *  - albumCount: Số album mà artist có
  *  - trackCount: Số track của artist
+ *  - topTracks: 5 track có playCount cao nhất của artist
  */
 export const getArtistStats = async (
   req: Request,
@@ -498,14 +417,14 @@ export const getArtistStats = async (
 ): Promise<void> => {
   try {
     const user = req.user;
-    // Kiểm tra user có profile artist hay không
+    // Kiểm tra người dùng có profile artist hay không
     if (!user || !user.artistProfile) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
     const artistProfileId = user.artistProfile.id;
 
-    // Lấy số liệu thống kê: monthlyListeners, số album, số track
+    // Lấy thông tin: monthlyListeners, số album và số track của artist
     const artistStats = await prisma.artistProfile.findUnique({
       where: { id: artistProfileId },
       select: {
@@ -524,10 +443,19 @@ export const getArtistStats = async (
       return;
     }
 
+    // Truy vấn danh sách Top Tracks: lấy 5 track có playCount cao nhất của artist
+    const topTracks = await prisma.track.findMany({
+      where: { artistId: artistProfileId },
+      select: trackSelect,
+      orderBy: { playCount: 'desc' },
+      take: 5,
+    });
+
     res.json({
       monthlyListeners: artistStats.monthlyListeners,
       albumCount: artistStats._count.albums,
       trackCount: artistStats._count.tracks,
+      topTracks,
     });
   } catch (error) {
     console.error('Get artist stats error:', error);

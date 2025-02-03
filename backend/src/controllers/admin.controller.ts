@@ -10,8 +10,12 @@ import {
 } from '../middleware/cache.middleware';
 import { sessionService } from '../services/session.service';
 import {
+  albumSelect,
   artistProfileSelect,
+  artistRequestDetailsSelect,
+  artistRequestSelect,
   genreSelect,
+  searchTrackSelect,
   userSelect,
 } from '../utils/prisma-selects';
 
@@ -120,14 +124,18 @@ export const getAllUsers = async (
     const limitNumber = Number(limit);
     const offset = (pageNumber - 1) * limitNumber;
 
-    // Tạo cache key dựa trên tham số phân trang
-    const cacheKey = `users:list:${page}:${limit}`;
+    // Sử dụng req.originalUrl làm cache key
+    const cacheKey = req.originalUrl;
 
-    // Thử lấy dữ liệu từ cache
-    const cachedData = await client.get(cacheKey);
-    if (cachedData) {
-      res.json(JSON.parse(cachedData));
-      return;
+    // Nếu cache được bật, thử lấy dữ liệu từ cache
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
     }
 
     // Lấy tất cả người dùng, không phân biệt role
@@ -152,8 +160,11 @@ export const getAllUsers = async (
       },
     };
 
-    // Lưu vào cache với thời gian sống là 5 phút
-    await client.setEx(cacheKey, 300, JSON.stringify(response));
+    // Lưu vào cache nếu caching được bật
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      console.log(`[Redis] Caching data for key: ${cacheKey}`);
+      await client.setEx(cacheKey, 300, JSON.stringify(response));
+    }
 
     res.json(response);
   } catch (error) {
@@ -169,6 +180,17 @@ export const getUserById = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const cacheKey = req.originalUrl;
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    }
 
     const user = await prisma.user.findUnique({
       where: { id },
@@ -178,6 +200,11 @@ export const getUserById = async (
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
+    }
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      console.log(`[Redis] Caching data for key: ${cacheKey}`);
+      await client.setEx(cacheKey, 300, JSON.stringify(user));
     }
 
     res.json(user);
@@ -195,6 +222,17 @@ export const getArtistRequests = async (
   try {
     const { page = 1, limit = 10 } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
+    const cacheKey = req.originalUrl;
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    }
 
     const requests = await prisma.artistProfile.findMany({
       where: {
@@ -203,73 +241,7 @@ export const getArtistRequests = async (
       },
       skip: offset,
       take: Number(limit),
-      select: {
-        id: true,
-        artistName: true,
-        avatar: true,
-        socialMediaLinks: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        verificationRequestedAt: true,
-        albums: {
-          select: {
-            id: true,
-            title: true,
-            coverUrl: true,
-            releaseDate: true,
-            duration: true,
-            type: true,
-            isActive: true,
-            createdAt: true,
-            updatedAt: true,
-            tracks: {
-              select: {
-                id: true,
-                title: true,
-                duration: true,
-                releaseDate: true,
-                trackNumber: true,
-                coverUrl: true,
-                audioUrl: true,
-                playCount: true,
-                type: true,
-                isActive: true,
-              },
-            },
-            _count: {
-              select: {
-                tracks: true,
-              },
-            },
-          },
-        },
-        tracks: {
-          select: {
-            id: true,
-            title: true,
-            duration: true,
-            releaseDate: true,
-            trackNumber: true,
-            coverUrl: true,
-            audioUrl: true,
-            playCount: true,
-            type: true,
-            isActive: true,
-            album: {
-              select: {
-                id: true,
-                title: true,
-                coverUrl: true,
-              },
-            },
-          },
-        },
-      },
+      select: artistRequestSelect,
     });
 
     const totalRequests = await prisma.artistProfile.count({
@@ -279,7 +251,7 @@ export const getArtistRequests = async (
       },
     });
 
-    res.json({
+    const response = {
       requests,
       pagination: {
         total: totalRequests,
@@ -287,7 +259,14 @@ export const getArtistRequests = async (
         limit: Number(limit),
         totalPages: Math.ceil(totalRequests / Number(limit)),
       },
-    });
+    };
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      console.log(`[Redis] Caching data for key: ${cacheKey}`);
+      await client.setEx(cacheKey, 300, JSON.stringify(response));
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Get artist requests error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -308,76 +287,30 @@ export const getArtistRequestDetails = async (
       return;
     }
 
+    const cacheKey = req.originalUrl;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    }
+
     const request = await prisma.artistProfile.findUnique({
       where: { id },
-      select: {
-        id: true,
-        artistName: true,
-        bio: true,
-        avatar: true,
-        socialMediaLinks: true,
-        verificationRequestedAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        albums: {
-          select: {
-            id: true,
-            title: true,
-            coverUrl: true,
-            releaseDate: true,
-            duration: true,
-            type: true,
-            isActive: true,
-            createdAt: true,
-            updatedAt: true,
-            tracks: {
-              select: {
-                id: true,
-                title: true,
-                duration: true,
-                releaseDate: true,
-                trackNumber: true,
-                coverUrl: true,
-                audioUrl: true,
-                playCount: true,
-                type: true,
-                isActive: true,
-              },
-            },
-          },
-        },
-        tracks: {
-          select: {
-            id: true,
-            title: true,
-            duration: true,
-            releaseDate: true,
-            trackNumber: true,
-            coverUrl: true,
-            audioUrl: true,
-            playCount: true,
-            type: true,
-            isActive: true,
-            album: {
-              select: {
-                id: true,
-                title: true,
-                coverUrl: true,
-              },
-            },
-          },
-        },
-      },
+      select: artistRequestDetailsSelect,
     });
 
     if (!request) {
       res.status(404).json({ message: 'Request not found' });
       return;
+    }
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      console.log(`[Redis] Caching data for key: ${cacheKey}`);
+      await client.setEx(cacheKey, 300, JSON.stringify(request));
     }
 
     res.json(request);
@@ -741,8 +674,18 @@ export const getAllArtists = async (
   try {
     const { page = 1, limit = 10 } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
+    const cacheKey = req.originalUrl;
 
-    // Tìm kiếm ArtistProfile thay vì User
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    }
+
     const artists = await prisma.artistProfile.findMany({
       where: {
         role: Role.ARTIST,
@@ -763,7 +706,7 @@ export const getAllArtists = async (
       },
     });
 
-    res.json({
+    const response = {
       artists,
       pagination: {
         total: totalArtists,
@@ -771,7 +714,14 @@ export const getAllArtists = async (
         limit: Number(limit),
         totalPages: Math.ceil(totalArtists / Number(limit)),
       },
-    });
+    };
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      console.log(`[Redis] Caching data for key: ${cacheKey}`);
+      await client.setEx(cacheKey, 300, JSON.stringify(response));
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Get all artists error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -785,11 +735,47 @@ export const getArtistById = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const {
+      albumPage = 1,
+      albumLimit = 6,
+      trackPage = 1,
+      trackLimit = 10,
+    } = req.query;
+    const cacheKey = req.originalUrl;
 
-    // Tìm ArtistProfile và join với User
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    }
+
     const artist = await prisma.artistProfile.findUnique({
       where: { id },
-      select: artistProfileSelect,
+      select: {
+        ...artistProfileSelect,
+        albums: {
+          skip: (Number(albumPage) - 1) * Number(albumLimit),
+          take: Number(albumLimit),
+          orderBy: { releaseDate: 'desc' },
+          select: artistProfileSelect.albums.select,
+        },
+        tracks: {
+          skip: (Number(trackPage) - 1) * Number(trackLimit),
+          take: Number(trackLimit),
+          orderBy: { releaseDate: 'desc' },
+          select: artistProfileSelect.tracks.select,
+        },
+        _count: {
+          select: {
+            albums: true,
+            tracks: true,
+          },
+        },
+      },
     });
 
     if (!artist) {
@@ -797,7 +783,31 @@ export const getArtistById = async (
       return;
     }
 
-    res.json(artist);
+    const { _count, ...artistData } = artist;
+    const response = {
+      ...artistData,
+      albums: {
+        data: artist.albums,
+        total: _count.albums,
+        page: Number(albumPage),
+        limit: Number(albumLimit),
+        totalPages: Math.ceil(_count.albums / Number(albumLimit)),
+      },
+      tracks: {
+        data: artist.tracks,
+        total: _count.tracks,
+        page: Number(trackPage),
+        limit: Number(trackLimit),
+        totalPages: Math.ceil(_count.tracks / Number(trackLimit)),
+      },
+    };
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      console.log(`[Redis] Caching data for key: ${cacheKey}`);
+      await client.setEx(cacheKey, 300, JSON.stringify(response));
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Get artist by id error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -812,6 +822,17 @@ export const getAllGenres = async (
   try {
     const { page = 1, limit = 10 } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
+    const cacheKey = req.originalUrl;
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    }
 
     const genres = await prisma.genre.findMany({
       skip: offset,
@@ -821,7 +842,7 @@ export const getAllGenres = async (
 
     const totalGenres = await prisma.genre.count();
 
-    res.json({
+    const response = {
       genres,
       pagination: {
         total: totalGenres,
@@ -829,7 +850,14 @@ export const getAllGenres = async (
         limit: Number(limit),
         totalPages: Math.ceil(totalGenres / Number(limit)),
       },
-    });
+    };
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      console.log(`[Redis] Caching data for key: ${cacheKey}`);
+      await client.setEx(cacheKey, 300, JSON.stringify(response));
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Get all genres error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -1252,15 +1280,16 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Kiểm tra cache trước
-    const cachedStats = await client.get(cacheKey);
-    if (cachedStats) {
-      console.log('Serving stats from cache');
-      res.json(JSON.parse(cachedStats));
-      return;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedStats = await client.get(cacheKey);
+      if (cachedStats) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedStats));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
     }
 
-    // Thực hiện các truy vấn song song
     const [
       totalUsers,
       totalArtists,
@@ -1301,7 +1330,6 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
       prisma.genre.count(),
     ]);
 
-    // Chuẩn bị dữ liệu thống kê
     const statsData = {
       totalUsers,
       totalArtists,
@@ -1316,8 +1344,10 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
       updatedAt: new Date().toISOString(),
     };
 
-    // Lưu vào cache với thời hạn 5 phút
-    await setCache(cacheKey, statsData, 300);
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      console.log(`[Redis] Caching data for key: ${cacheKey}`);
+      await client.setEx(cacheKey, 300, JSON.stringify(statsData));
+    }
 
     res.json(statsData);
   } catch (error) {

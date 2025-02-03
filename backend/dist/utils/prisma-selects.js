@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchTrackSelect = exports.searchAlbumSelect = exports.genreSelect = exports.historySelect = exports.userSelect = exports.artistProfileForUserSelect = exports.artistProfileSelect = exports.trackSelect = exports.albumSelect = void 0;
+exports.artistRequestDetailsSelect = exports.artistRequestSelect = exports.searchTrackSelect = exports.searchAlbumSelect = exports.genreSelect = exports.historySelect = exports.userSelect = exports.artistProfileForUserSelect = exports.artistProfileSelect = exports.trackSelect = exports.albumSelect = void 0;
 exports.albumSelect = {
     id: true,
     title: true,
@@ -533,6 +533,41 @@ exports.searchTrackSelect = {
                 },
             },
         },
+    },
+};
+exports.artistRequestSelect = {
+    id: true,
+    artistName: true,
+    avatar: true,
+    socialMediaLinks: true,
+    verificationRequestedAt: true,
+    user: {
+        select: {
+            id: true,
+            name: true,
+            email: true,
+        },
+    },
+};
+exports.artistRequestDetailsSelect = {
+    id: true,
+    artistName: true,
+    bio: true,
+    avatar: true,
+    socialMediaLinks: true,
+    verificationRequestedAt: true,
+    user: {
+        select: {
+            id: true,
+            name: true,
+            email: true,
+        },
+    },
+    albums: {
+        select: exports.albumSelect,
+    },
+    tracks: {
+        select: exports.trackSelect,
     },
 };
 //# sourceMappingURL=prisma-selects.js.map

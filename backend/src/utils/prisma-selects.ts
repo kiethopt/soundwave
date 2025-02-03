@@ -543,3 +543,40 @@ export const searchTrackSelect = {
     },
   },
 } satisfies Prisma.TrackSelect;
+
+export const artistRequestSelect = {
+  id: true,
+  artistName: true,
+  avatar: true,
+  socialMediaLinks: true,
+  verificationRequestedAt: true,
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+};
+
+export const artistRequestDetailsSelect = {
+  id: true,
+  artistName: true,
+  bio: true,
+  avatar: true,
+  socialMediaLinks: true,
+  verificationRequestedAt: true,
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  albums: {
+    select: albumSelect,
+  },
+  tracks: {
+    select: trackSelect,
+  },
+};

@@ -827,6 +827,10 @@ const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 playCount: 1,
             },
         });
+        yield db_1.default.track.update({
+            where: { id: track.id },
+            data: { playCount: { increment: 1 } },
+        });
         res.json({
             message: 'Track playback started',
             track: track,

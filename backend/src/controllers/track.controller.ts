@@ -1039,6 +1039,12 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
       },
     });
 
+    // *** FIX: Tăng playCount của track trong bảng track ***
+    await prisma.track.update({
+      where: { id: track.id },
+      data: { playCount: { increment: 1 } },
+    });
+
     res.json({
       message: 'Track playback started',
       track: track,

@@ -1,6 +1,6 @@
 'use client';
 
-import type { Album, ArtistProfile, Track } from '@/types';
+import type { Album, ArtistProfile, Track, TrackEditForm } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/utils/api';
@@ -14,15 +14,9 @@ import {
   MoreVertical,
   Eye,
   EyeOff,
+  Verified, // Đã import icon Verified từ file Icons.tsx
 } from '@/components/ui/Icons';
-
-// Add new interface for track edit form
-interface TrackEditForm {
-  title: string;
-  releaseDate: string;
-  trackNumber: number;
-  featuredArtists: string[];
-}
+import { useDominantColor } from '@/hooks/useDominantColor';
 
 export default function AlbumDetailPage() {
   const { albumId } = useParams();
@@ -58,6 +52,7 @@ export default function AlbumDetailPage() {
     trackNumber: 0,
     featuredArtists: [],
   });
+  const { dominantColor } = useDominantColor(album?.coverUrl);
 
   useEffect(() => {
     if (albumId) {
@@ -191,7 +186,7 @@ export default function AlbumDetailPage() {
         );
       }
 
-      // Optimistic update with proper typing
+      // Optimistic update với kiểu dữ liệu hợp lệ
       const updatedTracks = album.tracks.map((t) => {
         if (t.id === editingTrack.id) {
           return {
@@ -394,15 +389,22 @@ export default function AlbumDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-neutral-800 to-neutral-950 rounded-lg">
+    <div
+      className="min-h-screen rounded-lg"
+      style={{
+        background: dominantColor
+          ? `linear-gradient(180deg, ${dominantColor} 0%, ${dominantColor}99 15%, ${dominantColor}40 30%, #121212 100%)`
+          : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
+      }}
+    >
       <div className="max-w-7xl mx-auto p-6">
         {/* Header section */}
         <div className="flex items-center justify-between mb-8">
           <Link
             href="/artist/albums"
-            className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors group"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
             <span>Back to Albums</span>
           </Link>
           <button
@@ -427,9 +429,8 @@ export default function AlbumDetailPage() {
             <div className="flex flex-col gap-2 text-white/60">
               <div className="flex items-center gap-2">
                 <p className="text-xl text-white">{album.artist.artistName}</p>
-                {album.artist.isVerified && (
-                  <span className="text-blue-500">✓</span>
-                )}
+                {/* Sử dụng icon Verified thay vì dấu ✓ */}
+                {album.artist.isVerified && <Verified className="w-5 h-5" />}
               </div>
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
@@ -668,16 +669,14 @@ export default function AlbumDetailPage() {
                       className="w-full px-3 py-2 bg-[#1a1a1a] text-white border border-white/10 rounded-md appearance-none pr-8 focus:outline-none focus:border-white/30"
                       required
                     >
-                      <option value="ALBUM" className="bg-[#1a1a1a] text-white">
-                        Album
-                      </option>
-                      <option value="EP" className="bg-[#1a1a1a] text-white">
-                        EP
-                      </option>
+                      <option value="">Select type</option>
+                      <option value="ALBUM">Album</option>
+                      <option value="EP">EP</option>
+                      <option value="SINGLE">Single</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                       <svg
-                        className="w-4 h-4 text-white/60"
+                        className="w-4 h-4"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"

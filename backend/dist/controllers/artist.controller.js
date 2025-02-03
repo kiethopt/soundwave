@@ -350,10 +350,17 @@ const getArtistStats = (req, res) => __awaiter(void 0, void 0, void 0, function*
             res.status(404).json({ message: 'Artist profile not found' });
             return;
         }
+        const topTracks = yield db_1.default.track.findMany({
+            where: { artistId: artistProfileId },
+            select: prisma_selects_1.trackSelect,
+            orderBy: { playCount: 'desc' },
+            take: 5,
+        });
         res.json({
             monthlyListeners: artistStats.monthlyListeners,
             albumCount: artistStats._count.albums,
             trackCount: artistStats._count.tracks,
+            topTracks,
         });
     }
     catch (error) {

@@ -1,0 +1,49 @@
+Folder PATH listing
+Volume serial number is 2CFF-A7F1
+E:.
+|   layout.tsx
+|   tree.txt
+|   
+\---admin
+    +---artist-requests
+    |   |   page.tsx
+    |   |   
+    |   \---[id]
+    |           page.tsx
+    |           
+    +---artists
+    |   |   page.tsx
+    |   |   
+    |   +---new
+    |   |       page.tsx
+    |   |       
+    |   +---[...id]
+    |   |       page.tsx
+    |   |       
+    |   \---[id]
+    |       |   page.tsx
+    |       |   
+    |       +---albums
+    |       |   |   page.tsx
+    |       |   |   
+    |       |   +---new
+    |       |   |       page.tsx
+    |       |   |       
+    |       |   \---[albumId]
+    |       |           page.tsx
+    |       |           
+    |       \---tracks
+    |           |   page.tsx
+    |           |   
+    |           \---new
+    |                   page.tsx
+    |                   
+    +---dashboard
+    |       page.tsx
+    |       
+    +---genres
+    |       page.tsx
+    |       
+    \---users
+            page.tsx
+            

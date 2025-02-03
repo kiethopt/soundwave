@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import {
   createTrack,
   getTracksByType,
@@ -49,17 +49,11 @@ router.get('/genre/:genreId', authenticate, getTracksByGenre);
 // Route lấy danh sách tracks theo type và genre (PUBLIC)
 router.get('/type/:type/genre/:genreId', authenticate, getTracksByTypeAndGenre);
 
-// Route tìm kiếm track (PUBLIC)
+// Route tìm kiếm track (PUBLIC - vẫn cần cache)
 router.get('/search', authenticate, cacheMiddleware, searchTrack);
 
-// Route nghe nhạc
-router.post(
-  '/:trackId/play',
-  authenticate,
-  sessionMiddleware,
-  cacheMiddleware,
-  playTrack
-);
+// Route nghe nhạc (KHÔNG áp dụng cache để đảm bảo cập nhật playCount)
+router.post('/:trackId/play', authenticate, sessionMiddleware, playTrack);
 
 // Route cập nhật track (ADMIN & ARTIST only)
 router.put(

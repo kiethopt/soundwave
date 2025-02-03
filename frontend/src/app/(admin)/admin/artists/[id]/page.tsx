@@ -1,20 +1,20 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { api } from '@/utils/api';
 import {
   ArrowLeft,
   User,
-  Check,
   RefreshCw,
   Disc,
   Music,
-  Plus,
   Play,
   Pause,
 } from 'lucide-react';
-import Link from 'next/link';
-import { ArtistProfile } from '@/types';
+import { Verified } from '@/components/ui/Icons';
+import { ArtistProfile, Album, Track } from '@/types';
 import { cn } from '@/lib/utils';
 
 export default function ArtistDetail({
@@ -23,28 +23,74 @@ export default function ArtistDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Lấy query param phân trang (mặc định là 1 nếu không có)
+  const albumPage = Number(searchParams.get('albumPage')) || 1;
+  const trackPage = Number(searchParams.get('trackPage')) || 1;
+
   const [artist, setArtist] = useState<ArtistProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'albums' | 'tracks'>('albums');
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const albumPageRef = useRef<HTMLInputElement>(null);
+  const trackPageRef = useRef<HTMLInputElement>(null);
+
+  // Hàm cập nhật query param theo key và value
+  const updateQueryParam = (param: string, value: number) => {
+    const current = new URLSearchParams(searchParams.toString());
+    current.set(param, value.toString());
+    router.push(`/admin/artists/${id}?${current.toString()}`);
+  };
+
+  const handleAlbumPrev = () => {
+    if (albumPage > 1) updateQueryParam('albumPage', albumPage - 1);
+  };
+
+  const handleAlbumNext = () => {
+    if (artist?.albums && albumPage < (artist.albums.totalPages ?? 1))
+      updateQueryParam('albumPage', albumPage + 1);
+  };
+
+  const handleTrackPrev = () => {
+    if (trackPage > 1) updateQueryParam('trackPage', trackPage - 1);
+  };
+
+  const handleTrackNext = () => {
+    if (artist?.tracks && trackPage < (artist.tracks.totalPages ?? 1))
+      updateQueryParam('trackPage', trackPage + 1);
+  };
 
   useEffect(() => {
     const fetchArtist = async () => {
       try {
         const token = localStorage.getItem('userToken');
         if (!token) throw new Error('No authentication token found');
-
-        const response = await api.admin.getArtistById(id, token);
+        const queryString = `?albumPage=${albumPage}&albumLimit=6&trackPage=${trackPage}&trackLimit=10`;
+        const response = await api.admin.getArtistById(
+          `${id}${queryString}`,
+          token
+        );
         if (!response) throw new Error('Artist not found');
 
-        // Kiểm tra role của artist
         if (response.role !== 'ARTIST') {
           throw new Error('This user is not an artist');
         }
-
         setArtist(response);
+
+        if (response.albums && response.albums.totalPages < albumPage) {
+          const current = new URLSearchParams(searchParams.toString());
+          current.delete('albumPage');
+          router.replace(`/admin/artists/${id}?${current.toString()}`);
+        }
+        if (response.tracks && response.tracks.totalPages < trackPage) {
+          const current = new URLSearchParams(searchParams.toString());
+          current.delete('trackPage');
+          router.replace(`/admin/artists/${id}?${current.toString()}`);
+        }
       } catch (err) {
         console.error('Error fetching artist:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch artist');
@@ -54,7 +100,7 @@ export default function ArtistDetail({
     };
 
     fetchArtist();
-  }, [id]);
+  }, [id, albumPage, trackPage, router, searchParams]);
 
   const handleVerify = async () => {
     try {
@@ -191,13 +237,11 @@ export default function ArtistDetail({
                   {artist.artistName || artist.user?.name}
                 </h1>
                 {artist.isVerified && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-500/10 text-green-400 border border-green-500/20">
-                    <Check className="w-4 h-4 mr-1.5" />
-                    Verified Artist
+                  <span title="Verified Artist">
+                    <Verified className="w-6 h-6" />
                   </span>
                 )}
               </div>
-
               {artist.bio && (
                 <p className="text-white/60 text-lg leading-relaxed max-w-3xl">
                   {artist.bio}
@@ -224,7 +268,7 @@ export default function ArtistDetail({
                   </>
                 ) : (
                   <>
-                    <Check className="w-5 h-5" />
+                    <RefreshCw className="w-5 h-5" />
                     {artist.isVerified ? 'Verified' : 'Verify Artist'}
                   </>
                 )}
@@ -253,7 +297,7 @@ export default function ArtistDetail({
                       : 'text-white/60 hover:text-white/80'
                   } transition-colors`}
                 >
-                  Albums ({artist.albums?.length || 0})
+                  Albums ({artist.albums?.total ?? 0})
                 </button>
                 <button
                   onClick={() => setActiveTab('tracks')}
@@ -263,7 +307,7 @@ export default function ArtistDetail({
                       : 'text-white/60 hover:text-white/80'
                   } transition-colors`}
                 >
-                  Tracks ({artist.tracks?.length || 0})
+                  Tracks ({artist.tracks?.total ?? 0})
                 </button>
               </div>
             </div>
@@ -273,121 +317,222 @@ export default function ArtistDetail({
               {/* Albums Tab */}
               {activeTab === 'albums' && (
                 <div className="space-y-6">
-                  {/* Commented New Album Button */}
-                  {/* <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold">Albums</h2>
-                    <Link
-                      href={`/admin/artists/${id}/albums/new`}
-                      className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full hover:bg-white/20"
-                    >
-                      <Plus className="w-4 h-4" />
-                      New Album
-                    </Link>
-                  </div> */}
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {artist.albums?.map((album) => (
-                      <div
-                        key={album.id}
-                        className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors border border-white/10"
-                      >
-                        <div className="flex items-center gap-4">
-                          {album.coverUrl ? (
-                            <img
-                              src={album.coverUrl}
-                              alt={album.title}
-                              className="w-16 h-16 rounded-lg object-cover"
-                            />
-                          ) : (
-                            <div className="w-16 h-16 rounded-lg bg-white/10 flex items-center justify-center">
-                              <Disc className="w-8 h-8 text-white/60" />
+                  {artist.albums?.data && artist.albums.data.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {(artist.albums.data || []).map((album: Album) => (
+                        <div
+                          key={album.id}
+                          className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors border border-white/10"
+                        >
+                          <div className="flex items-center gap-4">
+                            {album.coverUrl ? (
+                              <img
+                                src={album.coverUrl}
+                                alt={album.title}
+                                className="w-16 h-16 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 rounded-lg bg-white/10 flex items-center justify-center">
+                                <Disc className="w-8 h-8 text-white/60" />
+                              </div>
+                            )}
+                            <div>
+                              <Link
+                                href={`/admin/artists/${id}/albums/${album.id}`}
+                                className="text-lg font-semibold text-white hover:underline"
+                              >
+                                {album.title}
+                              </Link>
+                              <p className="text-sm text-white/60 mt-1">
+                                {album.totalTracks} tracks ·{' '}
+                                {formatDuration(album.duration)}
+                              </p>
+                              <p className="text-sm text-white/60">
+                                {new Date(album.releaseDate).getFullYear()}
+                              </p>
                             </div>
-                          )}
-                          <div>
-                            <Link
-                              href={`/admin/artists/${id}/albums/${album.id}`}
-                              className="text-lg font-semibold text-white hover:underline"
-                            >
-                              {album.title}
-                            </Link>
-                            <p className="text-sm text-white/60 mt-1">
-                              {album.totalTracks} tracks ·{' '}
-                              {formatDuration(album.duration)}
-                            </p>
-                            <p className="text-sm text-white/60">
-                              {new Date(album.releaseDate).getFullYear()}
-                            </p>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-white">No albums found on this page.</p>
+                  )}
+                  {artist.albums && artist.albums.total > 0 && (
+                    <div className="flex items-center justify-center gap-4 mt-4">
+                      <button
+                        onClick={handleAlbumPrev}
+                        disabled={albumPage <= 1}
+                        className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                      >
+                        Previous
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-white/60">Page</span>
+                        <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
+                          <span className="text-white font-medium">
+                            {albumPage}
+                          </span>
+                        </div>
+                        <span className="text-white/60">
+                          of {artist.albums?.totalPages ?? 1}
+                        </span>
+
+                        <div className="flex items-center gap-2 ml-4">
+                          <input
+                            type="number"
+                            min={1}
+                            max={artist.albums?.totalPages ?? 1}
+                            defaultValue={albumPage}
+                            ref={albumPageRef}
+                            className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                            placeholder="Page"
+                          />
+                          <button
+                            onClick={() => {
+                              const page = albumPageRef.current
+                                ? parseInt(albumPageRef.current.value, 10)
+                                : NaN;
+                              if (
+                                !isNaN(page) &&
+                                page >= 1 &&
+                                page <= (artist.albums?.totalPages ?? 1)
+                              ) {
+                                updateQueryParam('albumPage', page);
+                              }
+                            }}
+                            className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+                          >
+                            Go
+                          </button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+
+                      <button
+                        onClick={handleAlbumNext}
+                        disabled={albumPage >= (artist.albums?.totalPages ?? 1)}
+                        className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Tracks Tab */}
               {activeTab === 'tracks' && (
                 <div className="space-y-6">
-                  {/* Commented New Track Button */}
-                  {/* <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold">Tracks</h2>
-                    <Link
-                      href={`/admin/artists/${id}/tracks/new`}
-                      className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full hover:bg-white/20"
-                    >
-                      <Plus className="w-4 h-4" />
-                      New Track
-                    </Link>
-                  </div> */}
-
-                  <div className="space-y-2">
-                    {artist.tracks?.map((track) => (
-                      <div
-                        key={track.id}
-                        className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors border border-white/10"
-                      >
-                        <div className="flex items-center gap-4">
-                          <button
-                            onClick={() =>
-                              setPlayingTrackId(
-                                playingTrackId === track.id ? null : track.id
-                              )
-                            }
-                            className="text-white/60 hover:text-white transition-colors"
-                          >
-                            {playingTrackId === track.id ? (
-                              <Pause className="w-6 h-6" />
+                  {artist.tracks?.data && artist.tracks.data.length > 0 ? (
+                    <div className="space-y-2">
+                      {(artist.tracks.data || []).map((track: Track) => (
+                        <div
+                          key={track.id}
+                          className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors border border-white/10"
+                        >
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={() =>
+                                setPlayingTrackId(
+                                  playingTrackId === track.id ? null : track.id
+                                )
+                              }
+                              className="text-white/60 hover:text-white transition-colors"
+                            >
+                              {playingTrackId === track.id ? (
+                                <Pause className="w-6 h-6" />
+                              ) : (
+                                <Play className="w-6 h-6" />
+                              )}
+                            </button>
+                            {track.coverUrl ? (
+                              <img
+                                src={track.coverUrl}
+                                alt={track.title}
+                                className="w-12 h-12 rounded-md object-cover"
+                              />
                             ) : (
-                              <Play className="w-6 h-6" />
+                              <div className="w-12 h-12 rounded-md bg-white/10 flex items-center justify-center">
+                                <Music className="w-6 h-6 text-white/60" />
+                              </div>
                             )}
-                          </button>
-                          {track.coverUrl ? (
-                            <img
-                              src={track.coverUrl}
-                              alt={track.title}
-                              className="w-12 h-12 rounded-md object-cover"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-md bg-white/10 flex items-center justify-center">
-                              <Music className="w-6 h-6 text-white/60" />
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-white">
+                                {track.title}
+                              </h3>
+                              <p className="text-sm text-white/60">
+                                {track.album?.title || 'Single'} ·{' '}
+                                {formatDuration(track.duration)}
+                              </p>
                             </div>
-                          )}
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-white">
-                              {track.title}
-                            </h3>
-                            <p className="text-sm text-white/60">
-                              {track.album?.title || 'Single'} ·{' '}
-                              {formatDuration(track.duration)}
-                            </p>
-                          </div>
-                          <div className="text-sm text-white/60">
-                            {track.playCount.toLocaleString()} plays
+                            <div className="text-sm text-white/60">
+                              {track.playCount.toLocaleString()} plays
+                            </div>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-white">No tracks found on this page.</p>
+                  )}
+                  {artist.tracks && artist.tracks.total > 0 && (
+                    <div className="flex items-center justify-center gap-4 mt-4">
+                      <button
+                        onClick={handleTrackPrev}
+                        disabled={trackPage <= 1}
+                        className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-white/60">Page</span>
+                        <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
+                          <span className="text-white font-medium">
+                            {trackPage}
+                          </span>
+                        </div>
+                        <span className="text-white/60">
+                          of {artist.tracks?.totalPages ?? 1}
+                        </span>
+                        <div className="flex items-center gap-2 ml-4">
+                          <input
+                            type="number"
+                            min={1}
+                            max={artist.tracks?.totalPages ?? 1}
+                            defaultValue={trackPage}
+                            ref={trackPageRef}
+                            className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                            placeholder="Page"
+                          />
+                          <button
+                            onClick={() => {
+                              const page = trackPageRef.current
+                                ? parseInt(trackPageRef.current.value, 10)
+                                : NaN;
+                              if (
+                                !isNaN(page) &&
+                                page >= 1 &&
+                                page <= (artist.tracks?.totalPages ?? 1)
+                              ) {
+                                updateQueryParam('trackPage', page);
+                              }
+                            }}
+                            className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+                          >
+                            Go
+                          </button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                      <button
+                        onClick={handleTrackNext}
+                        disabled={trackPage >= (artist.tracks?.totalPages ?? 1)}
+                        className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

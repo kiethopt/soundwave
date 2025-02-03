@@ -8,6 +8,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -101,11 +112,15 @@ const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const pageNumber = Number(page);
         const limitNumber = Number(limit);
         const offset = (pageNumber - 1) * limitNumber;
-        const cacheKey = `users:list:${page}:${limit}`;
-        const cachedData = yield cache_middleware_1.client.get(cacheKey);
-        if (cachedData) {
-            res.json(JSON.parse(cachedData));
-            return;
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
         }
         const users = yield db_1.default.user.findMany({
             skip: offset,
@@ -125,7 +140,10 @@ const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 totalPages: Math.ceil(totalUsers / limitNumber),
             },
         };
-        yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            console.log(`[Redis] Caching data for key: ${cacheKey}`);
+            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
+        }
         res.json(response);
     }
     catch (error) {
@@ -137,6 +155,16 @@ exports.getAllUsers = getAllUsers;
 const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        }
         const user = yield db_1.default.user.findUnique({
             where: { id },
             select: prisma_selects_1.userSelect,
@@ -144,6 +172,10 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!user) {
             res.status(404).json({ message: 'User not found' });
             return;
+        }
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            console.log(`[Redis] Caching data for key: ${cacheKey}`);
+            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(user));
         }
         res.json(user);
     }
@@ -157,6 +189,16 @@ const getArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, functi
     try {
         const { page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        }
         const requests = yield db_1.default.artistProfile.findMany({
             where: {
                 verificationRequestedAt: { not: null },
@@ -164,73 +206,7 @@ const getArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, functi
             },
             skip: offset,
             take: Number(limit),
-            select: {
-                id: true,
-                artistName: true,
-                avatar: true,
-                socialMediaLinks: true,
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                    },
-                },
-                verificationRequestedAt: true,
-                albums: {
-                    select: {
-                        id: true,
-                        title: true,
-                        coverUrl: true,
-                        releaseDate: true,
-                        duration: true,
-                        type: true,
-                        isActive: true,
-                        createdAt: true,
-                        updatedAt: true,
-                        tracks: {
-                            select: {
-                                id: true,
-                                title: true,
-                                duration: true,
-                                releaseDate: true,
-                                trackNumber: true,
-                                coverUrl: true,
-                                audioUrl: true,
-                                playCount: true,
-                                type: true,
-                                isActive: true,
-                            },
-                        },
-                        _count: {
-                            select: {
-                                tracks: true,
-                            },
-                        },
-                    },
-                },
-                tracks: {
-                    select: {
-                        id: true,
-                        title: true,
-                        duration: true,
-                        releaseDate: true,
-                        trackNumber: true,
-                        coverUrl: true,
-                        audioUrl: true,
-                        playCount: true,
-                        type: true,
-                        isActive: true,
-                        album: {
-                            select: {
-                                id: true,
-                                title: true,
-                                coverUrl: true,
-                            },
-                        },
-                    },
-                },
-            },
+            select: prisma_selects_1.artistRequestSelect,
         });
         const totalRequests = yield db_1.default.artistProfile.count({
             where: {
@@ -238,7 +214,7 @@ const getArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 isVerified: false,
             },
         });
-        res.json({
+        const response = {
             requests,
             pagination: {
                 total: totalRequests,
@@ -246,7 +222,12 @@ const getArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 limit: Number(limit),
                 totalPages: Math.ceil(totalRequests / Number(limit)),
             },
-        });
+        };
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            console.log(`[Redis] Caching data for key: ${cacheKey}`);
+            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
+        }
+        res.json(response);
     }
     catch (error) {
         console.error('Get artist requests error:', error);
@@ -263,75 +244,27 @@ const getArtistRequestDetails = (req, res) => __awaiter(void 0, void 0, void 0, 
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        }
         const request = yield db_1.default.artistProfile.findUnique({
             where: { id },
-            select: {
-                id: true,
-                artistName: true,
-                bio: true,
-                avatar: true,
-                socialMediaLinks: true,
-                verificationRequestedAt: true,
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                    },
-                },
-                albums: {
-                    select: {
-                        id: true,
-                        title: true,
-                        coverUrl: true,
-                        releaseDate: true,
-                        duration: true,
-                        type: true,
-                        isActive: true,
-                        createdAt: true,
-                        updatedAt: true,
-                        tracks: {
-                            select: {
-                                id: true,
-                                title: true,
-                                duration: true,
-                                releaseDate: true,
-                                trackNumber: true,
-                                coverUrl: true,
-                                audioUrl: true,
-                                playCount: true,
-                                type: true,
-                                isActive: true,
-                            },
-                        },
-                    },
-                },
-                tracks: {
-                    select: {
-                        id: true,
-                        title: true,
-                        duration: true,
-                        releaseDate: true,
-                        trackNumber: true,
-                        coverUrl: true,
-                        audioUrl: true,
-                        playCount: true,
-                        type: true,
-                        isActive: true,
-                        album: {
-                            select: {
-                                id: true,
-                                title: true,
-                                coverUrl: true,
-                            },
-                        },
-                    },
-                },
-            },
+            select: prisma_selects_1.artistRequestDetailsSelect,
         });
         if (!request) {
             res.status(404).json({ message: 'Request not found' });
             return;
+        }
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            console.log(`[Redis] Caching data for key: ${cacheKey}`);
+            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(request));
         }
         res.json(request);
     }
@@ -598,6 +531,16 @@ const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     try {
         const { page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        }
         const artists = yield db_1.default.artistProfile.findMany({
             where: {
                 role: client_1.Role.ARTIST,
@@ -616,7 +559,7 @@ const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 isVerified: true,
             },
         });
-        res.json({
+        const response = {
             artists,
             pagination: {
                 total: totalArtists,
@@ -624,7 +567,12 @@ const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 limit: Number(limit),
                 totalPages: Math.ceil(totalArtists / Number(limit)),
             },
-        });
+        };
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            console.log(`[Redis] Caching data for key: ${cacheKey}`);
+            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
+        }
+        res.json(response);
     }
     catch (error) {
         console.error('Get all artists error:', error);
@@ -635,15 +583,59 @@ exports.getAllArtists = getAllArtists;
 const getArtistById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
+        const { albumPage = 1, albumLimit = 6, trackPage = 1, trackLimit = 10, } = req.query;
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        }
         const artist = yield db_1.default.artistProfile.findUnique({
             where: { id },
-            select: prisma_selects_1.artistProfileSelect,
+            select: Object.assign(Object.assign({}, prisma_selects_1.artistProfileSelect), { albums: {
+                    skip: (Number(albumPage) - 1) * Number(albumLimit),
+                    take: Number(albumLimit),
+                    orderBy: { releaseDate: 'desc' },
+                    select: prisma_selects_1.artistProfileSelect.albums.select,
+                }, tracks: {
+                    skip: (Number(trackPage) - 1) * Number(trackLimit),
+                    take: Number(trackLimit),
+                    orderBy: { releaseDate: 'desc' },
+                    select: prisma_selects_1.artistProfileSelect.tracks.select,
+                }, _count: {
+                    select: {
+                        albums: true,
+                        tracks: true,
+                    },
+                } }),
         });
         if (!artist) {
             res.status(404).json({ message: 'Artist not found' });
             return;
         }
-        res.json(artist);
+        const { _count } = artist, artistData = __rest(artist, ["_count"]);
+        const response = Object.assign(Object.assign({}, artistData), { albums: {
+                data: artist.albums,
+                total: _count.albums,
+                page: Number(albumPage),
+                limit: Number(albumLimit),
+                totalPages: Math.ceil(_count.albums / Number(albumLimit)),
+            }, tracks: {
+                data: artist.tracks,
+                total: _count.tracks,
+                page: Number(trackPage),
+                limit: Number(trackLimit),
+                totalPages: Math.ceil(_count.tracks / Number(trackLimit)),
+            } });
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            console.log(`[Redis] Caching data for key: ${cacheKey}`);
+            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
+        }
+        res.json(response);
     }
     catch (error) {
         console.error('Get artist by id error:', error);
@@ -655,13 +647,23 @@ const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     try {
         const { page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        }
         const genres = yield db_1.default.genre.findMany({
             skip: offset,
             take: Number(limit),
             select: prisma_selects_1.genreSelect,
         });
         const totalGenres = yield db_1.default.genre.count();
-        res.json({
+        const response = {
             genres,
             pagination: {
                 total: totalGenres,
@@ -669,7 +671,12 @@ const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 limit: Number(limit),
                 totalPages: Math.ceil(totalGenres / Number(limit)),
             },
-        });
+        };
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            console.log(`[Redis] Caching data for key: ${cacheKey}`);
+            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
+        }
+        res.json(response);
     }
     catch (error) {
         console.error('Get all genres error:', error);
@@ -997,11 +1004,14 @@ const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        const cachedStats = yield cache_middleware_1.client.get(cacheKey);
-        if (cachedStats) {
-            console.log('Serving stats from cache');
-            res.json(JSON.parse(cachedStats));
-            return;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedStats = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedStats) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedStats));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
         }
         const [totalUsers, totalArtists, totalArtistRequests, mostActiveArtist, totalGenres,] = yield Promise.all([
             db_1.default.user.count(),
@@ -1049,7 +1059,10 @@ const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             },
             updatedAt: new Date().toISOString(),
         };
-        yield (0, cache_middleware_1.setCache)(cacheKey, statsData, 300);
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            console.log(`[Redis] Caching data for key: ${cacheKey}`);
+            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(statsData));
+        }
         res.json(statsData);
     }
     catch (error) {

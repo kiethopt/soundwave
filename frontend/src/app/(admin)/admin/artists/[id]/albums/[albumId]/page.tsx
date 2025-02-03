@@ -2,19 +2,12 @@
 
 import { Album, ArtistProfile, Track } from '@/types';
 import React, { useEffect, useState } from 'react';
-import TrackUploadForm from '@/components/admin/TrackUploadForm';
-import {
-  ArrowLeft,
-  Calendar,
-  Music,
-  Disc,
-  Check,
-  Verified,
-} from 'lucide-react';
+import { ArrowLeft, Calendar, Music, Disc } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/utils/api';
 import { useParams } from 'next/navigation';
 import { useDominantColor } from '@/hooks/useDominantColor';
+import { Verified } from '@/components/ui/Icons';
 
 const TrackList = ({
   tracks,
@@ -257,9 +250,15 @@ export default function AlbumDetailPage() {
     <div
       className="min-h-screen rounded-lg"
       style={{
+        // Chỉnh lại gradient nền: nếu có dominantColor thì dùng màu chủ đạo
+        // không còn dùng thêm alpha "33" để cho màu hiện rõ hơn
         background: dominantColor
-          ? `linear-gradient(to bottom, ${dominantColor}33 0%, #121212 100%)`
-          : 'linear-gradient(to bottom, #2c2c2c 0%, #121212 100%)',
+          ? `linear-gradient(180deg, 
+            ${dominantColor} 0%, 
+            ${dominantColor}99 15%,
+            ${dominantColor}40 30%,
+            #121212 100%)`
+          : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
       }}
     >
       <div className="max-w-7xl mx-auto p-6">
@@ -295,9 +294,7 @@ export default function AlbumDetailPage() {
                   <span className="text-white/90">
                     {album.artist.artistName}
                   </span>
-                  {album.artist.isVerified && (
-                    <Verified className="w-5 h-5 text-[#2E77D0]" />
-                  )}
+                  {album.artist.isVerified && <Verified className="w-5 h-5" />}
                 </Link>
               </div>
             </div>
@@ -345,6 +342,7 @@ export default function AlbumDetailPage() {
           </div>
         )}
 
+        {/*
         <div className="mt-12">
           <h2 className="text-2xl font-semibold text-white mb-6">
             Upload New Tracks
@@ -371,6 +369,7 @@ export default function AlbumDetailPage() {
             />
           </div>
         </div>
+        */}
 
         {message.text && (
           <div

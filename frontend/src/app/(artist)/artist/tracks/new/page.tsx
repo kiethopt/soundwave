@@ -71,9 +71,9 @@ export default function NewTrack({
       <div className="flex items-center justify-between mb-6">
         <Link
           href="/artist/tracks"
-          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors group"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
           <span>Back to Tracks</span>
         </Link>
         <h1 className="text-3xl font-bold tracking-tight">Add New Track</h1>

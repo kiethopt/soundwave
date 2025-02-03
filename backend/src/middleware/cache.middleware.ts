@@ -27,40 +27,54 @@ export const cacheMiddleware = (
   next: NextFunction
 ): void => {
   if (process.env.USE_REDIS_CACHE === 'false') {
+    console.log('[Redis] Cache is disabled - bypassing middleware');
     next();
     return;
   }
 
   const key = req.originalUrl;
-  client
-    .get(key)
-    .then((cachedData) => {
+  let responseSent = false;
+
+  (async () => {
+    try {
+      console.log(`[Redis] Checking cache for key: ${key}`);
+      const cachedData = await client.get(key);
       if (cachedData) {
-        console.log('Serving from cache:', key);
+        console.log(`[Redis] Cache hit for key: ${key}`);
         res.json(JSON.parse(cachedData));
+        responseSent = true;
         return;
       }
+      console.log(`[Redis] Cache miss for key: ${key}`);
 
       const originalJson = res.json;
       res.json = function (body: any) {
-        setCache(key, body);
-        return originalJson.call(res, body);
+        if (!responseSent) {
+          console.log(`[Redis] Caching data for key: ${key}`);
+          setCache(key, body).catch((error) =>
+            console.error('[Redis] Cache save error:', error)
+          );
+        }
+        return originalJson.call(this, body);
       };
+
       next();
-    })
-    .catch((error) => {
-      console.error('Redis error:', error);
+    } catch (error) {
+      console.error('[Redis] Middleware error:', error);
       next();
-    });
+    }
+  })();
 };
 
 export const setCache = async (key: string, data: any, ttl: number = 600) => {
   if (process.env.USE_REDIS_CACHE === 'false') return;
 
   try {
+    console.log(`[Redis] Setting cache for key: ${key} (TTL: ${ttl}s)`);
     await client.set(key, JSON.stringify(data), { EX: ttl });
+    console.log(`[Redis] Cache set successfully for key: ${key}`);
   } catch (error) {
-    console.error('Error setting cache:', error);
+    console.error('[Redis] Error setting cache:', error);
   }
 };
 
@@ -76,23 +90,24 @@ export const clearCacheForEntity = async (
   if (process.env.USE_REDIS_CACHE === 'false') return;
 
   try {
-    // Tạo danh sách patterns cần xóa
+    console.log(`[Redis] Clearing cache for entity: ${entity}`);
+
+    // Tạo danh sách các pattern cần xóa
     const patterns = [
-      `/api/${entity}s*`, // Xóa cache của entity
+      `/api/${entity}s*`, // Xóa cache của entity (số nhiều)
       ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
-      `/api/${entity}s/play*`, // Thêm pattern cho route play
-      `/api/${entity}/play*`, // Thêm pattern cho route play (số ít)
+      `/api/${entity}s/play*`, // Pattern cho route play (số nhiều)
+      `/api/${entity}/play*`, // Pattern cho route play (số ít)
     ];
 
-    // Nếu clearSearch = true, thêm các pattern liên quan đến tìm kiếm
     if (options.clearSearch) {
       patterns.push(
-        '/api/search*', // Cache của các route search
-        '/api/*/search*', // Cache của các route search con
+        '/api/search*', // Cache các route search tổng
+        '/api/*/search*', // Cache các route search con
         '/search-all*', // Cache của searchAll
         '/api/users/search-all*', // Cache của user search
-        '/api/user/search-all*', // Cache của user search
-        `/api/${entity}s/search*`, // Cache của entity search
+        '/api/user/search-all*', // Cache của user search (số ít)
+        `/api/${entity}s/search*`, // Cache của entity search (số nhiều)
         `/api/${entity}/search*` // Cache của entity search (số ít)
       );
     }
@@ -101,12 +116,14 @@ export const clearCacheForEntity = async (
     for (const pattern of patterns) {
       const keys = await client.keys(pattern);
       if (keys.length) {
-        console.log(`Clearing cache for pattern: ${pattern}, keys:`, keys);
+        console.log(
+          `[Redis] Clearing ${keys.length} keys for pattern: ${pattern}`
+        );
         await Promise.all(keys.map((key) => client.del(key)));
       }
     }
 
-    // Xóa thêm các cache liên quan đến play và search
+    // Xóa thêm cache liên quan đến play và search
     const additionalPatterns = [
       '*play*', // Bất kỳ key nào có chứa 'play'
       '*search*', // Bất kỳ key nào có chứa 'search'
@@ -123,6 +140,6 @@ export const clearCacheForEntity = async (
       }
     }
   } catch (error) {
-    console.error(`Error clearing ${entity} cache:`, error);
+    console.error(`[Redis] Error clearing ${entity} cache:`, error);
   }
 };

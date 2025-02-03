@@ -31,39 +31,50 @@ exports.client.on('error', (err) => console.log('Redis Client Error', err));
 }))();
 const cacheMiddleware = (req, res, next) => {
     if (process.env.USE_REDIS_CACHE === 'false') {
+        console.log('[Redis] Cache is disabled - bypassing middleware');
         next();
         return;
     }
     const key = req.originalUrl;
-    exports.client
-        .get(key)
-        .then((cachedData) => {
-        if (cachedData) {
-            console.log('Serving from cache:', key);
-            res.json(JSON.parse(cachedData));
-            return;
+    let responseSent = false;
+    (() => __awaiter(void 0, void 0, void 0, function* () {
+        try {
+            console.log(`[Redis] Checking cache for key: ${key}`);
+            const cachedData = yield exports.client.get(key);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${key}`);
+                res.json(JSON.parse(cachedData));
+                responseSent = true;
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${key}`);
+            const originalJson = res.json;
+            res.json = function (body) {
+                if (!responseSent) {
+                    console.log(`[Redis] Caching data for key: ${key}`);
+                    (0, exports.setCache)(key, body).catch((error) => console.error('[Redis] Cache save error:', error));
+                }
+                return originalJson.call(this, body);
+            };
+            next();
         }
-        const originalJson = res.json;
-        res.json = function (body) {
-            (0, exports.setCache)(key, body);
-            return originalJson.call(res, body);
-        };
-        next();
-    })
-        .catch((error) => {
-        console.error('Redis error:', error);
-        next();
-    });
+        catch (error) {
+            console.error('[Redis] Middleware error:', error);
+            next();
+        }
+    }))();
 };
 exports.cacheMiddleware = cacheMiddleware;
 const setCache = (key_1, data_1, ...args_1) => __awaiter(void 0, [key_1, data_1, ...args_1], void 0, function* (key, data, ttl = 600) {
     if (process.env.USE_REDIS_CACHE === 'false')
         return;
     try {
+        console.log(`[Redis] Setting cache for key: ${key} (TTL: ${ttl}s)`);
         yield exports.client.set(key, JSON.stringify(data), { EX: ttl });
+        console.log(`[Redis] Cache set successfully for key: ${key}`);
     }
     catch (error) {
-        console.error('Error setting cache:', error);
+        console.error('[Redis] Error setting cache:', error);
     }
 });
 exports.setCache = setCache;
@@ -71,6 +82,7 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
     if (process.env.USE_REDIS_CACHE === 'false')
         return;
     try {
+        console.log(`[Redis] Clearing cache for entity: ${entity}`);
         const patterns = [
             `/api/${entity}s*`,
             ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
@@ -83,7 +95,7 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
         for (const pattern of patterns) {
             const keys = yield exports.client.keys(pattern);
             if (keys.length) {
-                console.log(`Clearing cache for pattern: ${pattern}, keys:`, keys);
+                console.log(`[Redis] Clearing ${keys.length} keys for pattern: ${pattern}`);
                 yield Promise.all(keys.map((key) => exports.client.del(key)));
             }
         }
@@ -100,7 +112,7 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
         }
     }
     catch (error) {
-        console.error(`Error clearing ${entity} cache:`, error);
+        console.error(`[Redis] Error clearing ${entity} cache:`, error);
     }
 });
 exports.clearCacheForEntity = clearCacheForEntity;

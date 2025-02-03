@@ -68,7 +68,7 @@ export interface ArtistProfile {
   artistName: string;
   bio?: string;
   avatar?: string;
-  role: 'ARTIST'; // Role luôn là ARTIST
+  role: 'ARTIST';
   socialMediaLinks?: {
     facebook?: string;
     instagram?: string;
@@ -84,8 +84,20 @@ export interface ArtistProfile {
   user: User;
   userId: string;
   genres?: Genre[];
-  albums?: Album[];
-  tracks?: Track[];
+  albums?: {
+    data: Album[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  tracks?: {
+    data: Track[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
   events?: Event[];
   followers?: UserFollow[];
   notifications?: Notification[];
@@ -282,4 +294,11 @@ export interface Stats {
     monthlyListeners: number;
     trackCount: number;
   };
+}
+
+export interface TrackEditForm {
+  title: string;
+  releaseDate: string;
+  trackNumber: number;
+  featuredArtists: string[];
 }
