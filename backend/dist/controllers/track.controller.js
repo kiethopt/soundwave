@@ -236,74 +236,16 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 });
 exports.createTrack = createTrack;
 const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
     try {
-        const user = req.user;
         const { id } = req.params;
-        const { title, duration, releaseDate, trackNumber, albumId, featuredArtists, genreIds, } = req.body;
-        if (!user) {
-            res.status(401).json({ message: 'Unauthorized: User not found' });
-            return;
-        }
-        const track = yield db_1.default.track.findUnique({
-            where: { id },
-            select: { artistId: true },
-        });
-        if (!track) {
-            res.status(404).json({ message: 'Track not found' });
-            return;
-        }
-        if (!canManageTrack(user, track.artistId)) {
-            res.status(403).json({
-                message: 'You can only update your own tracks',
-                code: 'NOT_TRACK_OWNER',
-            });
-            return;
-        }
-        const files = req.files;
+        const { title, releaseDate, type, trackNumber, albumId, featuredArtists, genreIds, } = req.body;
         const updateData = {};
-        if ((_a = files === null || files === void 0 ? void 0 : files.audioFile) === null || _a === void 0 ? void 0 : _a[0]) {
-            const audioFile = files.audioFile[0];
-            const audioValidationError = validateFile(audioFile, true);
-            if (audioValidationError) {
-                res.status(400).json({ message: audioValidationError });
-                return;
-            }
-            const audioUpload = yield (0, cloudinary_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto');
-            updateData.audioUrl = audioUpload.secure_url;
-            const mm = yield Promise.resolve().then(() => __importStar(require('music-metadata')));
-            const metadata = yield mm.parseBuffer(audioFile.buffer);
-            updateData.duration = Math.floor(metadata.format.duration || 0);
-        }
-        if ((_b = files === null || files === void 0 ? void 0 : files.coverFile) === null || _b === void 0 ? void 0 : _b[0]) {
-            const coverFile = files.coverFile[0];
-            const coverValidationError = validateFile(coverFile, false);
-            if (coverValidationError) {
-                res.status(400).json({ message: coverValidationError });
-                return;
-            }
-            const coverUpload = yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
-            updateData.coverUrl = coverUpload.secure_url;
-        }
-        const validationError = validateTrackData({
-            title,
-            duration: updateData.duration || duration,
-            releaseDate,
-            trackNumber,
-            coverUrl: updateData.coverUrl || 'placeholder',
-            audioUrl: updateData.audioUrl || 'placeholder',
-        }, true, false);
-        if (validationError) {
-            res.status(400).json({ message: validationError });
-            return;
-        }
         if (title !== undefined)
             updateData.title = title;
-        if (duration !== undefined && !updateData.duration) {
-            updateData.duration = Number(duration);
-        }
         if (releaseDate !== undefined)
             updateData.releaseDate = new Date(releaseDate);
+        if (type !== undefined)
+            updateData.type = type;
         if (trackNumber !== undefined)
             updateData.trackNumber = Number(trackNumber);
         if (albumId !== undefined)
@@ -336,8 +278,7 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             select: prisma_selects_1.trackSelect,
         });
         yield (0, cache_middleware_1.clearCacheForEntity)('track', {
-            userId: track.artistId,
-            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
+            userId: updatedTrack.artistId,
             entityId: id,
             clearSearch: true,
         });
@@ -380,7 +321,6 @@ const deleteTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         });
         yield (0, cache_middleware_1.clearCacheForEntity)('track', {
             userId: track.artistId,
-            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
             entityId: id,
             clearSearch: true,
         });
@@ -436,7 +376,6 @@ const toggleTrackVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
 });
 exports.toggleTrackVisibility = toggleTrackVisibility;
 const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
         const { q } = req.query;
         const user = req.user;
@@ -449,11 +388,8 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             const existingHistory = yield db_1.default.history.findFirst({
                 where: {
                     userId: user.id,
-                    type: client_1.HistoryType.SEARCH,
-                    query: {
-                        equals: searchQuery,
-                        mode: 'insensitive',
-                    },
+                    type: 'SEARCH',
+                    query: { equals: searchQuery, mode: client_1.Prisma.QueryMode.insensitive },
                 },
             });
             if (existingHistory) {
@@ -465,7 +401,7 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             else {
                 yield db_1.default.history.create({
                     data: {
-                        type: client_1.HistoryType.SEARCH,
+                        type: 'SEARCH',
                         query: searchQuery,
                         userId: user.id,
                     },
@@ -473,30 +409,34 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             }
         }
         const searchConditions = [
-            { title: { contains: searchQuery, mode: 'insensitive' } },
+            { title: { contains: searchQuery, mode: client_1.Prisma.QueryMode.insensitive } },
             {
-                artist: { artistName: { contains: searchQuery, mode: 'insensitive' } },
+                artist: {
+                    artistName: {
+                        contains: searchQuery,
+                        mode: client_1.Prisma.QueryMode.insensitive,
+                    },
+                },
             },
             {
                 featuredArtists: {
                     some: {
                         artistProfile: {
-                            artistName: { contains: searchQuery, mode: 'insensitive' },
+                            artistName: {
+                                contains: searchQuery,
+                                mode: client_1.Prisma.QueryMode.insensitive,
+                            },
                         },
                     },
                 },
             },
         ];
-        const isActiveCondition = !((_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)
-            ? { isActive: true }
-            : {
-                OR: [
-                    { isActive: true },
-                    { AND: [{ isActive: false }, { artistId: user.artistProfile.id }] },
-                ],
-            };
         const whereClause = {
-            AND: [{ isActive: true }, { artist: { isActive: true } }],
+            AND: [
+                { isActive: true },
+                { artist: { isActive: true } },
+                { OR: searchConditions },
+            ],
         };
         const tracks = yield db_1.default.track.findMany({
             where: whereClause,
@@ -514,9 +454,18 @@ exports.searchTrack = searchTrack;
 const getTracksByType = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        }
         const { type } = req.params;
         let { page = 1, limit = 10 } = req.query;
-        const user = req.user;
         page = Math.max(1, parseInt(page));
         limit = Math.min(100, Math.max(1, parseInt(limit)));
         const offset = (page - 1) * limit;
@@ -524,21 +473,14 @@ const getTracksByType = (req, res) => __awaiter(void 0, void 0, void 0, function
             res.status(400).json({ message: 'Invalid track type' });
             return;
         }
-        const whereClause = {
-            type: type,
-        };
-        if (!user || !((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+        const whereClause = { type: type };
+        if (!req.user || !((_a = req.user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
             whereClause.isActive = true;
         }
         else {
             whereClause.OR = [
                 { isActive: true },
-                {
-                    AND: [
-                        { isActive: false },
-                        { artistId: user.artistProfile.id },
-                    ],
-                },
+                { AND: [{ isActive: false }, { artistId: req.user.artistProfile.id }] },
             ];
         }
         const tracks = yield db_1.default.track.findMany({
@@ -549,7 +491,7 @@ const getTracksByType = (req, res) => __awaiter(void 0, void 0, void 0, function
             take: Number(limit),
         });
         const totalTracks = yield db_1.default.track.count({ where: whereClause });
-        res.json({
+        const result = {
             tracks,
             pagination: {
                 total: totalTracks,
@@ -557,7 +499,9 @@ const getTracksByType = (req, res) => __awaiter(void 0, void 0, void 0, function
                 limit: Number(limit),
                 totalPages: Math.ceil(totalTracks / Number(limit)),
             },
-        });
+        };
+        yield (0, cache_middleware_1.setCache)(cacheKey, result);
+        res.json(result);
     }
     catch (error) {
         console.error('Get tracks by type error:', error);
@@ -568,14 +512,23 @@ exports.getTracksByType = getTracksByType;
 const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     try {
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        }
         const user = req.user;
         if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
         if (user.role !== client_1.Role.ADMIN &&
-            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) ||
-                ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) !== client_1.Role.ARTIST)) {
+            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) || ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) !== 'ARTIST')) {
             res.status(403).json({
                 message: 'Forbidden: Only admins or verified artists can access this resource',
             });
@@ -597,7 +550,7 @@ const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         const totalTracks = yield db_1.default.track.count({
             where: whereClause,
         });
-        res.json({
+        const result = {
             tracks,
             pagination: {
                 total: totalTracks,
@@ -605,7 +558,9 @@ const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 limit: Number(limit),
                 totalPages: Math.ceil(totalTracks / Number(limit)),
             },
-        });
+        };
+        yield (0, cache_middleware_1.setCache)(cacheKey, result);
+        res.json(result);
     }
     catch (error) {
         console.error('Get all tracks error:', error);
@@ -616,9 +571,18 @@ exports.getAllTracks = getAllTracks;
 const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        }
         const { genreId } = req.params;
         const { page = 1, limit = 10 } = req.query;
-        const user = req.user;
         const offset = (Number(page) - 1) * Number(limit);
         const genre = yield db_1.default.genre.findUnique({
             where: { id: genreId },
@@ -634,18 +598,13 @@ const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 },
             },
         };
-        if (!user || !((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+        if (!req.user || !((_a = req.user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
             whereClause.isActive = true;
         }
         else {
             whereClause.OR = [
                 { isActive: true },
-                {
-                    AND: [
-                        { isActive: false },
-                        { artistId: user.artistProfile.id },
-                    ],
-                },
+                { AND: [{ isActive: false }, { artistId: req.user.artistProfile.id }] },
             ];
         }
         const tracks = yield db_1.default.track.findMany({
@@ -670,7 +629,7 @@ const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, functio
         const totalTracks = yield db_1.default.track.count({
             where: whereClause,
         });
-        res.json({
+        const result = {
             tracks,
             pagination: {
                 total: totalTracks,
@@ -678,7 +637,9 @@ const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 limit: Number(limit),
                 totalPages: Math.ceil(totalTracks / Number(limit)),
             },
-        });
+        };
+        yield (0, cache_middleware_1.setCache)(cacheKey, result);
+        res.json(result);
     }
     catch (error) {
         console.error('Get tracks by genre error:', error);
@@ -689,9 +650,18 @@ exports.getTracksByGenre = getTracksByGenre;
 const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        const cacheKey = req.originalUrl;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        }
         const { type, genreId } = req.params;
         const { page = 1, limit = 10 } = req.query;
-        const user = req.user;
         const offset = (Number(page) - 1) * Number(limit);
         if (!Object.values(client_1.AlbumType).includes(type)) {
             res.status(400).json({ message: 'Invalid track type' });
@@ -712,18 +682,13 @@ const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, 
                 },
             },
         };
-        if (!user || !((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+        if (!req.user || !((_a = req.user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
             whereClause.isActive = true;
         }
         else {
             whereClause.OR = [
                 { isActive: true },
-                {
-                    AND: [
-                        { isActive: false },
-                        { artistId: user.artistProfile.id },
-                    ],
-                },
+                { AND: [{ isActive: false }, { artistId: req.user.artistProfile.id }] },
             ];
         }
         const tracks = yield db_1.default.track.findMany({
@@ -734,10 +699,7 @@ const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, 
                     },
                     select: {
                         genre: {
-                            select: {
-                                id: true,
-                                name: true,
-                            },
+                            select: { id: true, name: true },
                         },
                     },
                 } }),
@@ -748,7 +710,7 @@ const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, 
         const totalTracks = yield db_1.default.track.count({
             where: whereClause,
         });
-        res.json({
+        const result = {
             tracks,
             pagination: {
                 total: totalTracks,
@@ -756,7 +718,9 @@ const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, 
                 limit: Number(limit),
                 totalPages: Math.ceil(totalTracks / Number(limit)),
             },
-        });
+        };
+        yield (0, cache_middleware_1.setCache)(cacheKey, result);
+        res.json(result);
     }
     catch (error) {
         console.error('Get tracks by type and genre error:', error);

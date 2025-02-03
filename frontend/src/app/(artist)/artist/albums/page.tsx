@@ -14,6 +14,14 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
+import { MoreVertical } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function ArtistAlbums() {
   const router = useRouter();
@@ -246,26 +254,36 @@ export default function ArtistAlbums() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => toggleAlbumVisibility(album.id)}
-                            className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
-                            title={album.isActive ? 'Hide Album' : 'Show Album'}
-                          >
-                            {album.isActive ? (
-                              <EyeOff className="w-4 h-4" />
-                            ) : (
-                              <Eye className="w-4 h-4" />
-                            )}
-                          </button>
-                          <button
-                            onClick={() => setAlbumToDelete(album)}
-                            className="p-1.5 hover:bg-white/10 rounded-full text-red-500 transition-colors"
-                            title="Delete Album"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                            <MoreVertical className="w-5 h-5" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="bg-[#282828] border border-white/10 text-white">
+                            <DropdownMenuItem
+                              onClick={() => toggleAlbumVisibility(album.id)}
+                            >
+                              {album.isActive ? (
+                                <>
+                                  <EyeOff className="w-4 h-4 mr-2" />
+                                  Hide Album
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Show Album
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuItem
+                              onClick={() => setAlbumToDelete(album)}
+                              className="text-red-400"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Album
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}

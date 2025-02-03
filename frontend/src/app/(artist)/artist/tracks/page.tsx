@@ -17,6 +17,14 @@ import {
 import Link from 'next/link';
 import AudioPlayer from '@/components/ui/AudioPlayer';
 import { toast } from 'react-toastify';
+import { MoreVertical } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function ArtistTracks() {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -276,33 +284,42 @@ export default function ArtistTracks() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => toggleTrackVisibility(track.id)}
-                          className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
-                          title={track.isActive ? 'Hide Track' : 'Show Track'}
-                        >
-                          {track.isActive ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleEditTrack(track)}
-                          className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
-                          title="Edit Track"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setTrackToDelete(track)}
-                          className="p-1.5 hover:bg-white/10 rounded-full text-red-500 transition-colors"
-                          title="Delete Track"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                          <MoreVertical className="w-5 h-5" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="bg-[#282828] border border-white/10 text-white">
+                          <DropdownMenuItem
+                            onClick={() => toggleTrackVisibility(track.id)}
+                          >
+                            {track.isActive ? (
+                              <>
+                                <EyeOff className="w-4 h-4 mr-2" />
+                                Hide Track
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-4 h-4 mr-2" />
+                                Show Track
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleEditTrack(track)}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Track
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-white/10" />
+                          <DropdownMenuItem
+                            onClick={() => setTrackToDelete(track)}
+                            className="text-red-400"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Track
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}

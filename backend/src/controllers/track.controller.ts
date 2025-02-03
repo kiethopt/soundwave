@@ -2,7 +2,11 @@ import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { uploadFile } from '../services/cloudinary.service';
 import { AlbumType, Role, HistoryType, Prisma } from '@prisma/client';
-import { clearCacheForEntity, setCache } from '../middleware/cache.middleware';
+import {
+  clearCacheForEntity,
+  client,
+  setCache,
+} from '../middleware/cache.middleware';
 import { sessionService } from '../services/session.service';
 import { trackSelect } from '../utils/prisma-selects';
 
@@ -282,110 +286,22 @@ export const updateTrack = async (
   res: Response
 ): Promise<void> => {
   try {
-    const user = req.user;
     const { id } = req.params;
     const {
       title,
-      duration,
       releaseDate,
+      type,
       trackNumber,
       albumId,
       featuredArtists,
       genreIds,
     } = req.body;
 
-    // Kiểm tra xem user có tồn tại không
-    if (!user) {
-      res.status(401).json({ message: 'Unauthorized: User not found' });
-      return;
-    }
-
-    // Lấy thông tin track hiện tại
-    const track = await prisma.track.findUnique({
-      where: { id },
-      select: { artistId: true },
-    });
-
-    if (!track) {
-      res.status(404).json({ message: 'Track not found' });
-      return;
-    }
-
-    // Kiểm tra quyền sở hữu track
-    if (!canManageTrack(user, track.artistId)) {
-      res.status(403).json({
-        message: 'You can only update your own tracks',
-        code: 'NOT_TRACK_OWNER',
-      });
-      return;
-    }
-
-    // Xử lý files nếu có
-    const files = req.files as {
-      audioFile?: Express.Multer.File[];
-      coverFile?: Express.Multer.File[];
-    };
-
-    // Tạo object data để update
     const updateData: any = {};
-
-    // Upload và cập nhật audioUrl nếu có file audio mới
-    if (files?.audioFile?.[0]) {
-      const audioFile = files.audioFile[0];
-      // Validate file audio
-      const audioValidationError = validateFile(audioFile, true);
-      if (audioValidationError) {
-        res.status(400).json({ message: audioValidationError });
-        return;
-      }
-      const audioUpload = await uploadFile(audioFile.buffer, 'tracks', 'auto');
-      updateData.audioUrl = audioUpload.secure_url;
-
-      // Cập nhật duration nếu có file audio mới
-      const mm = await import('music-metadata');
-      const metadata = await mm.parseBuffer(audioFile.buffer);
-      updateData.duration = Math.floor(metadata.format.duration || 0);
-    }
-
-    // Upload và cập nhật coverUrl nếu có file cover mới
-    if (files?.coverFile?.[0]) {
-      const coverFile = files.coverFile[0];
-      // Validate file cover
-      const coverValidationError = validateFile(coverFile, false);
-      if (coverValidationError) {
-        res.status(400).json({ message: coverValidationError });
-        return;
-      }
-      const coverUpload = await uploadFile(coverFile.buffer, 'covers', 'image');
-      updateData.coverUrl = coverUpload.secure_url;
-    }
-
-    // Validation với validateRequired = false vì đây là update
-    const validationError = validateTrackData(
-      {
-        title,
-        duration: updateData.duration || duration,
-        releaseDate,
-        trackNumber,
-        coverUrl: updateData.coverUrl || 'placeholder',
-        audioUrl: updateData.audioUrl || 'placeholder',
-      },
-      true,
-      false
-    );
-
-    if (validationError) {
-      res.status(400).json({ message: validationError });
-      return;
-    }
-
-    // Cập nhật các trường thông thường
     if (title !== undefined) updateData.title = title;
-    if (duration !== undefined && !updateData.duration) {
-      updateData.duration = Number(duration);
-    }
     if (releaseDate !== undefined)
       updateData.releaseDate = new Date(releaseDate);
+    if (type !== undefined) updateData.type = type;
     if (trackNumber !== undefined) updateData.trackNumber = Number(trackNumber);
     if (albumId !== undefined) updateData.albumId = albumId || null;
 
@@ -424,10 +340,9 @@ export const updateTrack = async (
       select: trackSelect,
     });
 
-    // Xóa cache
+    // Xóa cache liên quan đến track (user, admin, và cả cache tìm kiếm)
     await clearCacheForEntity('track', {
-      userId: track.artistId,
-      adminId: user.role === Role.ADMIN ? user.id : undefined,
+      userId: updatedTrack.artistId,
       entityId: id,
       clearSearch: true,
     });
@@ -451,13 +366,11 @@ export const deleteTrack = async (
     const user = req.user;
     const { id } = req.params;
 
-    // Kiểm tra xem user có tồn tại không
     if (!user) {
       res.status(401).json({ message: 'Unauthorized: User not found' });
       return;
     }
 
-    // Lấy thông tin track hiện tại
     const track = await prisma.track.findUnique({
       where: { id },
       select: { artistId: true },
@@ -468,7 +381,6 @@ export const deleteTrack = async (
       return;
     }
 
-    // Kiểm tra quyền sở hữu track
     if (!canManageTrack(user, track.artistId)) {
       res.status(403).json({
         message: 'You can only delete your own tracks',
@@ -477,15 +389,13 @@ export const deleteTrack = async (
       return;
     }
 
-    // Hard delete track
     await prisma.track.delete({
       where: { id },
     });
 
-    // Xóa cache của route GET all tracks, cache tìm kiếm và cache của track cụ thể
+    // Xóa cache của track sau khi xóa
     await clearCacheForEntity('track', {
       userId: track.artistId,
-      adminId: user.role === Role.ADMIN ? user.id : undefined,
       entityId: id,
       clearSearch: true,
     });
@@ -506,7 +416,6 @@ export const toggleTrackVisibility = async (
     const { id } = req.params;
     const user = req.user;
 
-    // Kiểm tra xem user có tồn tại không
     if (!user) {
       res.status(401).json({ message: 'Unauthorized: User not found' });
       return;
@@ -522,7 +431,6 @@ export const toggleTrackVisibility = async (
       return;
     }
 
-    // Kiểm tra quyền sở hữu track
     if (!canManageTrack(user, track.artistId)) {
       res.status(403).json({
         message: 'You can only toggle visibility of your own tracks',
@@ -537,7 +445,7 @@ export const toggleTrackVisibility = async (
       select: trackSelect,
     });
 
-    // Clear toàn bộ cache liên quan đến track và search
+    // Xóa cache liên quan đến track
     await clearCacheForEntity('track', {
       entityId: id,
       clearSearch: true,
@@ -576,11 +484,8 @@ export const searchTrack = async (
       const existingHistory = await prisma.history.findFirst({
         where: {
           userId: user.id,
-          type: HistoryType.SEARCH,
-          query: {
-            equals: searchQuery,
-            mode: 'insensitive',
-          },
+          type: 'SEARCH',
+          query: { equals: searchQuery, mode: Prisma.QueryMode.insensitive },
         },
       });
 
@@ -592,7 +497,7 @@ export const searchTrack = async (
       } else {
         await prisma.history.create({
           data: {
-            type: HistoryType.SEARCH,
+            type: 'SEARCH',
             query: searchQuery,
             userId: user.id,
           },
@@ -600,35 +505,36 @@ export const searchTrack = async (
       }
     }
 
-    // Điều kiện tìm kiếm
-    const searchConditions: Prisma.TrackWhereInput[] = [
-      { title: { contains: searchQuery, mode: 'insensitive' } },
+    const searchConditions = [
+      { title: { contains: searchQuery, mode: Prisma.QueryMode.insensitive } },
       {
-        artist: { artistName: { contains: searchQuery, mode: 'insensitive' } },
+        artist: {
+          artistName: {
+            contains: searchQuery,
+            mode: Prisma.QueryMode.insensitive,
+          },
+        },
       },
       {
         featuredArtists: {
           some: {
             artistProfile: {
-              artistName: { contains: searchQuery, mode: 'insensitive' },
+              artistName: {
+                contains: searchQuery,
+                mode: Prisma.QueryMode.insensitive,
+              },
             },
           },
         },
       },
     ];
 
-    // Điều kiện isActive
-    const isActiveCondition: Prisma.TrackWhereInput = !user?.artistProfile?.id
-      ? { isActive: true }
-      : {
-          OR: [
-            { isActive: true },
-            { AND: [{ isActive: false }, { artistId: user.artistProfile.id }] },
-          ],
-        };
-
-    const whereClause: Prisma.TrackWhereInput = {
-      AND: [{ isActive: true }, { artist: { isActive: true } }],
+    const whereClause = {
+      AND: [
+        { isActive: true },
+        { artist: { isActive: true } },
+        { OR: searchConditions },
+      ],
     };
 
     const tracks = await prisma.track.findMany({
@@ -650,11 +556,21 @@ export const getTracksByType = async (
   res: Response
 ): Promise<void> => {
   try {
+    // --- Cache check ---
+    const cacheKey = req.originalUrl;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    }
+    // --------------------
+
     const { type } = req.params;
     let { page = 1, limit = 10 } = req.query;
-    const user = req.user;
-
-    // Validate pagination
     page = Math.max(1, parseInt(page as string));
     limit = Math.min(100, Math.max(1, parseInt(limit as string)));
     const offset = (page - 1) * limit;
@@ -664,23 +580,14 @@ export const getTracksByType = async (
       return;
     }
 
-    // Xây dựng điều kiện where
-    const whereClause: Prisma.TrackWhereInput = {
-      type: type as AlbumType,
-    };
+    const whereClause: any = { type: type as AlbumType };
 
-    // Thêm điều kiện isActive và quyền sở hữu
-    if (!user || !user.artistProfile?.id) {
-      whereClause.isActive = true; // Public chỉ thấy track active
+    if (!req.user || !req.user.artistProfile?.id) {
+      whereClause.isActive = true;
     } else {
       whereClause.OR = [
-        { isActive: true }, // Track active của mọi người
-        {
-          AND: [
-            { isActive: false }, // Track inactive
-            { artistId: user.artistProfile.id }, // Của chính nghệ sĩ
-          ],
-        },
+        { isActive: true },
+        { AND: [{ isActive: false }, { artistId: req.user.artistProfile.id }] },
       ];
     }
 
@@ -694,7 +601,7 @@ export const getTracksByType = async (
 
     const totalTracks = await prisma.track.count({ where: whereClause });
 
-    res.json({
+    const result = {
       tracks,
       pagination: {
         total: totalTracks,
@@ -702,7 +609,12 @@ export const getTracksByType = async (
         limit: Number(limit),
         totalPages: Math.ceil(totalTracks / Number(limit)),
       },
-    });
+    };
+
+    // --- Set result into cache ---
+    await setCache(cacheKey, result);
+    // -----------------------------
+    res.json(result);
   } catch (error) {
     console.error('Get tracks by type error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -715,19 +627,28 @@ export const getAllTracks = async (
   res: Response
 ): Promise<void> => {
   try {
-    const user = req.user;
+    // --- Cache check ---
+    const cacheKey = req.originalUrl;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    }
+    // --------------------
 
-    // Kiểm tra xác thực
+    const user = req.user;
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    // Kiểm tra quyền truy cập
     if (
       user.role !== Role.ADMIN &&
-      (!user.artistProfile?.isVerified ||
-        user.artistProfile?.role !== Role.ARTIST)
+      (!user.artistProfile?.isVerified || user.artistProfile?.role !== 'ARTIST')
     ) {
       res.status(403).json({
         message:
@@ -739,10 +660,7 @@ export const getAllTracks = async (
     const { page = 1, limit = 10 } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    // Tạo điều kiện whereClause
-    const whereClause: Prisma.TrackWhereInput = {};
-
-    // Nếu là ARTIST, chỉ lấy track của chính họ
+    const whereClause: any = {};
     if (user.role !== Role.ADMIN && user.artistProfile?.id) {
       whereClause.artistId = user.artistProfile.id;
     }
@@ -759,7 +677,7 @@ export const getAllTracks = async (
       where: whereClause,
     });
 
-    res.json({
+    const result = {
       tracks,
       pagination: {
         total: totalTracks,
@@ -767,7 +685,12 @@ export const getAllTracks = async (
         limit: Number(limit),
         totalPages: Math.ceil(totalTracks / Number(limit)),
       },
-    });
+    };
+
+    // --- Set result into cache ---
+    await setCache(cacheKey, result);
+    // -----------------------------
+    res.json(result);
   } catch (error) {
     console.error('Get all tracks error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -780,12 +703,23 @@ export const getTracksByGenre = async (
   res: Response
 ): Promise<void> => {
   try {
+    // --- Cache check ---
+    const cacheKey = req.originalUrl;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    }
+    // --------------------
+
     const { genreId } = req.params;
     const { page = 1, limit = 10 } = req.query;
-    const user = req.user;
     const offset = (Number(page) - 1) * Number(limit);
 
-    // Kiểm tra xem genreId có tồn tại không
     const genre = await prisma.genre.findUnique({
       where: { id: genreId },
     });
@@ -795,38 +729,30 @@ export const getTracksByGenre = async (
       return;
     }
 
-    // Xây dựng điều kiện where
-    const whereClause: Prisma.TrackWhereInput = {
+    const whereClause: any = {
       genres: {
         some: {
-          genreId: genreId, // Chỉ lấy các track có chứa genreId này
+          genreId: genreId,
         },
       },
     };
 
-    // Thêm điều kiện isActive và quyền sở hữu
-    if (!user || !user.artistProfile?.id) {
-      whereClause.isActive = true; // Public chỉ thấy track active
+    if (!req.user || !req.user.artistProfile?.id) {
+      whereClause.isActive = true;
     } else {
       whereClause.OR = [
-        { isActive: true }, // Track active của mọi người
-        {
-          AND: [
-            { isActive: false }, // Track inactive
-            { artistId: user.artistProfile.id }, // Của chính nghệ sĩ
-          ],
-        },
+        { isActive: true },
+        { AND: [{ isActive: false }, { artistId: req.user.artistProfile.id }] },
       ];
     }
 
-    // Lấy danh sách tracks với phân trang
     const tracks = await prisma.track.findMany({
       where: whereClause,
       select: {
         ...trackSelect,
         genres: {
           where: {
-            genreId: genreId, // Chỉ lấy genre đang tìm kiếm
+            genreId: genreId,
           },
           select: {
             genre: {
@@ -838,18 +764,16 @@ export const getTracksByGenre = async (
           },
         },
       },
-      orderBy: { createdAt: 'desc' }, // Sắp xếp theo thời gian tạo mới nhất
+      orderBy: { createdAt: 'desc' },
       skip: offset,
       take: Number(limit),
     });
 
-    // Đếm tổng số tracks
     const totalTracks = await prisma.track.count({
       where: whereClause,
     });
 
-    // Trả về kết quả với thông tin phân trang
-    res.json({
+    const result = {
       tracks,
       pagination: {
         total: totalTracks,
@@ -857,7 +781,12 @@ export const getTracksByGenre = async (
         limit: Number(limit),
         totalPages: Math.ceil(totalTracks / Number(limit)),
       },
-    });
+    };
+
+    // --- Set result into cache ---
+    await setCache(cacheKey, result);
+    // -----------------------------
+    res.json(result);
   } catch (error) {
     console.error('Get tracks by genre error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -870,18 +799,28 @@ export const getTracksByTypeAndGenre = async (
   res: Response
 ): Promise<void> => {
   try {
+    // --- Cache check ---
+    const cacheKey = req.originalUrl;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    }
+    // --------------------
+
     const { type, genreId } = req.params;
     const { page = 1, limit = 10 } = req.query;
-    const user = req.user;
     const offset = (Number(page) - 1) * Number(limit);
 
-    // Kiểm tra xem type có hợp lệ không
     if (!Object.values(AlbumType).includes(type as AlbumType)) {
       res.status(400).json({ message: 'Invalid track type' });
       return;
     }
 
-    // Kiểm tra xem genreId có tồn tại không
     const genre = await prisma.genre.findUnique({
       where: { id: genreId },
     });
@@ -891,62 +830,49 @@ export const getTracksByTypeAndGenre = async (
       return;
     }
 
-    // Xây dựng điều kiện where
-    const whereClause: Prisma.TrackWhereInput = {
+    const whereClause: any = {
       type: type as AlbumType,
       genres: {
         some: {
-          genreId: genreId, // Chỉ lấy các track có chứa genreId này
+          genreId: genreId,
         },
       },
     };
 
-    // Thêm điều kiện isActive và quyền sở hữu
-    if (!user || !user.artistProfile?.id) {
-      whereClause.isActive = true; // Public chỉ thấy track active
+    if (!req.user || !req.user.artistProfile?.id) {
+      whereClause.isActive = true;
     } else {
       whereClause.OR = [
-        { isActive: true }, // Track active của mọi người
-        {
-          AND: [
-            { isActive: false }, // Track inactive
-            { artistId: user.artistProfile.id }, // Của chính nghệ sĩ
-          ],
-        },
+        { isActive: true },
+        { AND: [{ isActive: false }, { artistId: req.user.artistProfile.id }] },
       ];
     }
 
-    // Lấy danh sách tracks với phân trang
     const tracks = await prisma.track.findMany({
       where: whereClause,
       select: {
         ...trackSelect,
         genres: {
           where: {
-            genreId: genreId, // Chỉ lấy genre đang tìm kiếm
+            genreId: genreId,
           },
           select: {
             genre: {
-              select: {
-                id: true,
-                name: true,
-              },
+              select: { id: true, name: true },
             },
           },
         },
       },
-      orderBy: { createdAt: 'desc' }, // Sắp xếp theo thời gian tạo mới nhất
+      orderBy: { createdAt: 'desc' },
       skip: offset,
       take: Number(limit),
     });
 
-    // Đếm tổng số tracks
     const totalTracks = await prisma.track.count({
       where: whereClause,
     });
 
-    // Trả về kết quả với thông tin phân trang
-    res.json({
+    const result = {
       tracks,
       pagination: {
         total: totalTracks,
@@ -954,7 +880,12 @@ export const getTracksByTypeAndGenre = async (
         limit: Number(limit),
         totalPages: Math.ceil(totalTracks / Number(limit)),
       },
-    });
+    };
+
+    // --- Set result into cache ---
+    await setCache(cacheKey, result);
+    // -----------------------------
+    res.json(result);
   } catch (error) {
     console.error('Get tracks by type and genre error:', error);
     res.status(500).json({ message: 'Internal server error' });
