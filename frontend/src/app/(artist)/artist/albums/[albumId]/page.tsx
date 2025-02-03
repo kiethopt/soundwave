@@ -14,7 +14,7 @@ import {
   MoreVertical,
   Eye,
   EyeOff,
-  Verified, // Đã import icon Verified từ file Icons.tsx
+  Verified,
 } from '@/components/ui/Icons';
 import { useDominantColor } from '@/hooks/useDominantColor';
 
@@ -465,7 +465,7 @@ export default function AlbumDetailPage() {
         {/* Tracks section */}
         {album.tracks && album.tracks.length > 0 && (
           <div className="mb-12">
-            <h2 className="text-xl font-semibold mb-4">Tracks</h2>
+            {/* <h2 className="text-xl font-semibold mb-4">Tracks</h2> */}
             <div className="w-full bg-black/20 rounded-lg overflow-visible">
               <div className="px-6 py-4 border-b border-white/10">
                 <div className="grid grid-cols-[16px_4fr_2fr_minmax(120px,1fr)_100px_48px] gap-4 text-sm text-white/60">

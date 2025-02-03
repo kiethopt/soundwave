@@ -331,9 +331,9 @@ export default function AlbumDetailPage() {
 
         {album.tracks?.length > 0 && (
           <div className="mb-12">
-            <h2 className="text-2xl font-semibold text-white mb-6">
+            {/* <h2 className="text-2xl font-semibold text-white mb-6">
               Track List
-            </h2>
+            </h2> */}
             <TrackList
               tracks={album.tracks}
               albumId={album.id}
