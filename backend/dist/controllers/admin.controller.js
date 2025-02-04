@@ -840,6 +840,7 @@ const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, fun
             (0, cache_middleware_1.clearCacheForEntity)('stats', {}),
             (0, cache_middleware_1.clearCacheForEntity)('album', { clearSearch: true }),
             (0, cache_middleware_1.clearCacheForEntity)('track', { clearSearch: true }),
+            (0, cache_middleware_1.clearCacheForEntity)('artist-requests', { clearSearch: true }),
         ]);
         yield session_service_1.sessionService.handleArtistRequestApproval(artistProfile.user.id);
         res.json({
@@ -886,6 +887,7 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
         yield db_1.default.artistProfile.delete({
             where: { id: requestId },
         });
+        yield (0, cache_middleware_1.clearCacheForEntity)('artist-requests', { clearSearch: true });
         yield session_service_1.sessionService.handleArtistRequestRejection(artistProfile.user.id);
         res.json({
             message: 'Artist role request rejected successfully',

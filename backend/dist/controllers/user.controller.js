@@ -121,6 +121,7 @@ const requestArtistRole = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 },
             },
         });
+        yield (0, cache_middleware_1.clearCacheForEntity)('artist-requests', { clearSearch: true });
         res.json({ message: 'Artist role request submitted successfully' });
     }
     catch (error) {

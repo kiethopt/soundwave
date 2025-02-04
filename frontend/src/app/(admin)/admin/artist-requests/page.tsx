@@ -1,10 +1,9 @@
-// frontend\src\app\(admin)\admin\artist-requests\page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import { User, Check, X, Eye, MoreVertical } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { ArtistRequest } from '@/types';
 import { toast } from 'react-toastify';
 import { Search, Spinner } from '@/components/ui/Icons';
@@ -22,9 +21,43 @@ export default function ArtistRequests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Nếu query param "page" có giá trị "1" hoặc nhỏ hơn 1, loại bỏ nó để URL gọn
+  useEffect(() => {
+    const pageStr = searchParams.get('page');
+    const pageNumber = Number(pageStr);
+    if (pageStr === '1' || pageNumber < 1) {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('page');
+      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+      router.replace(`/admin/artist-requests${queryStr}`);
+    }
+  }, [searchParams, router]);
+
+  const pageFromURL = Number(searchParams.get('page'));
+  const currentPage = isNaN(pageFromURL) || pageFromURL < 1 ? 1 : pageFromURL;
+
+  // Dùng ref cho input "Go to page"
+  const pageInputRef = useRef<HTMLInputElement>(null);
+
+  // Hàm cập nhật query param "page"
+  const updateQueryParam = (param: string, value: number) => {
+    if (totalPages === 1 && value !== 1) return;
+    if (value < 1) value = 1;
+    if (value > totalPages) value = totalPages;
+    const current = new URLSearchParams(searchParams.toString());
+    if (value === 1) {
+      current.delete(param);
+    } else {
+      current.set(param, value.toString());
+    }
+    const queryStr = current.toString() ? `?${current.toString()}` : '';
+    router.push(`/admin/artist-requests${queryStr}`);
+  };
 
   const fetchRequests = async (page: number, query: string = '') => {
     try {
@@ -44,13 +77,13 @@ export default function ArtistRequests() {
   };
 
   useEffect(() => {
-    fetchRequests(page, searchInput);
-  }, [page, searchInput]);
+    fetchRequests(currentPage, searchInput);
+  }, [currentPage, searchInput]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(1);
-    fetchRequests(1, searchInput);
+    // Khi tìm kiếm, reset về trang 1 qua việc cập nhật query param "page"
+    updateQueryParam('page', 1);
   };
 
   const formatDate = (dateString: string): string => {
@@ -71,7 +104,7 @@ export default function ArtistRequests() {
 
       await api.admin.approveArtistRequest(requestId, token);
       toast.success('Artist request approved successfully!');
-      fetchRequests(page, searchInput);
+      fetchRequests(currentPage, searchInput);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to approve request'
@@ -93,7 +126,7 @@ export default function ArtistRequests() {
       } else {
         toast.error('Failed to update request status');
       }
-      fetchRequests(page, searchInput);
+      fetchRequests(currentPage, searchInput);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to reject request'
@@ -255,20 +288,49 @@ export default function ArtistRequests() {
 
         {/* Pagination */}
         {totalPages > 0 && (
-          <div className="flex justify-between items-center p-4 border-t border-white/[0.08]">
+          <div className="flex items-center justify-center gap-4 p-4 border-t border-white/[0.08]">
             <button
-              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              disabled={page === 1}
+              onClick={() => updateQueryParam('page', currentPage - 1)}
+              disabled={currentPage === 1}
               className="px-4 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-white/60">Page</span>
+              <div className="bg-white/5 px-3 py-1 rounded-md border border-white/10">
+                <span className="text-white font-medium">{currentPage}</span>
+              </div>
+              <span className="text-white/60">of {totalPages}</span>
+
+              <div className="flex items-center gap-2 ml-4">
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  defaultValue={currentPage}
+                  ref={pageInputRef}
+                  className="w-16 px-3 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                  placeholder="Page"
+                />
+                <button
+                  onClick={() => {
+                    const page = pageInputRef.current
+                      ? parseInt(pageInputRef.current.value, 10)
+                      : NaN;
+                    if (!isNaN(page)) {
+                      updateQueryParam('page', page);
+                    }
+                  }}
+                  className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+                >
+                  Go
+                </button>
+              </div>
+            </div>
             <button
-              onClick={() => setPage((prev) => prev + 1)}
-              disabled={page === totalPages}
+              onClick={() => updateQueryParam('page', currentPage + 1)}
+              disabled={currentPage === totalPages}
               className="px-4 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next

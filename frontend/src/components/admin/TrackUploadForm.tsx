@@ -129,7 +129,7 @@ const TrackUploadForm = ({
         type="submit"
         disabled={isUploading || newTracks.length === 0}
         className="w-full bg-white text-black rounded-full py-2 px-4 font-medium
-          hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed"
+    hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isUploading ? 'Uploading...' : 'Upload Tracks'}
       </button>

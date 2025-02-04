@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import type { User } from '@/types';
 import { api } from '@/utils/api';
 import {
@@ -10,8 +11,6 @@ import {
   Trash2,
   Power,
   User as UserIcon,
-  ArrowLeft,
-  ArrowRight,
   Spinner,
 } from '@/components/ui/Icons';
 import {
@@ -31,10 +30,50 @@ export default function AdminUsers() {
   const [searchInput, setSearchInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
 
+  // Sử dụng URL query param cho số trang
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Nếu query param "page" có giá trị "1" hoặc nhỏ hơn 1, loại bỏ nó để URL được gọn
+  useEffect(() => {
+    const pageStr = searchParams.get('page');
+    const pageNumber = Number(pageStr);
+    if (pageStr === '1' || pageNumber < 1) {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('page');
+      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+      router.replace(`/admin/users${queryStr}`);
+    }
+  }, [searchParams, router]);
+
+  // Lấy số trang hiện tại từ URL, đảm bảo rằng giá trị luôn tối thiểu là 1
+  const pageFromURL = Number(searchParams.get('page'));
+  const currentPage = isNaN(pageFromURL) || pageFromURL < 1 ? 1 : pageFromURL;
+
+  // Hàm cập nhật query param "page"
+  // Nếu chỉ có 1 trang và giá trị mới khác 1 thì không chuyển trang,
+  // nếu giá trị vượt quá totalPages thì chuyển về totalPages.
+  const updateQueryParam = (param: string, value: number) => {
+    if (totalPages === 1 && value !== 1) return;
+    if (value < 1) value = 1;
+    if (value > totalPages) value = totalPages;
+    const current = new URLSearchParams(searchParams.toString());
+    if (value === 1) {
+      current.delete(param);
+    } else {
+      current.set(param, value.toString());
+    }
+    const queryStr = current.toString() ? `?${current.toString()}` : '';
+    router.push(`/admin/users${queryStr}`);
+  };
+
+  // useRef cho input "Go to page"
+  const pageInputRef = useRef<HTMLInputElement>(null);
+
+  // Gọi API lấy danh sách user theo số trang và limit, trả về full response (có pagination)
   const fetchUsers = async (page: number, query: string = '') => {
     try {
       setLoading(true);
@@ -42,25 +81,24 @@ export default function AdminUsers() {
       if (!token) return;
 
       const response = await api.admin.getAllUsers(token, page, limit);
-
+      // Các API có thể trả về data theo nhiều cách khác nhau
       const usersArray = Array.isArray(response)
         ? response
         : response?.data || response?.users || [];
 
       setUsers(usersArray);
       setTotalPages(response.pagination?.totalPages || 1);
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : 'Failed to fetch users'
-      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch users');
     } finally {
       setLoading(false);
     }
   };
 
+  // Mỗi khi currentPage hoặc searchInput thay đổi, gọi API
   useEffect(() => {
-    fetchUsers(page, searchInput);
-  }, [page, searchInput]);
+    fetchUsers(currentPage, searchInput);
+  }, [currentPage, searchInput]);
 
   const handleUserStatus = async (userId: string, isActive: boolean) => {
     try {
@@ -132,6 +170,13 @@ export default function AdminUsers() {
     }
   };
 
+  // Khi tìm kiếm, reset về trang 1 qua việc cập nhật query param "page"
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateQueryParam('page', 1);
+  };
+
+  // Filter hiển thị user thuộc role "USER" dựa trên searchInput
   const filteredUsers = users.filter(
     (user) =>
       user.role === 'USER' &&
@@ -139,12 +184,6 @@ export default function AdminUsers() {
         user.username?.toLowerCase().includes(searchInput.toLowerCase()) ||
         user.name?.toLowerCase().includes(searchInput.toLowerCase()))
   );
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    fetchUsers(1, searchInput);
-  };
 
   return (
     <div className="container mx-auto space-y-8" suppressHydrationWarning>
@@ -320,25 +359,54 @@ export default function AdminUsers() {
 
         {/* Pagination */}
         {totalPages > 0 && (
-          <div className="flex justify-between items-center p-4 border-t border-white/[0.08]">
+          <div className="flex items-center justify-center gap-4 p-4 border-t border-white/[0.08]">
             <button
-              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              disabled={page === 1}
-              className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => updateQueryParam('page', currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
             >
-              <ArrowLeft className="w-4 h-4" />
               Previous
             </button>
-            <span>
-              Page {page} of {Math.max(totalPages, 1)}
-            </span>
+
+            <div className="flex items-center gap-2">
+              <span className="text-white/60">Page</span>
+              <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
+                <span className="text-white font-medium">{currentPage}</span>
+              </div>
+              <span className="text-white/60">of {totalPages}</span>
+
+              <div className="flex items-center gap-2 ml-4">
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  defaultValue={currentPage}
+                  ref={pageInputRef}
+                  className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                  placeholder="Page"
+                />
+                <button
+                  onClick={() => {
+                    const page = pageInputRef.current
+                      ? parseInt(pageInputRef.current.value, 10)
+                      : NaN;
+                    if (!isNaN(page)) {
+                      updateQueryParam('page', page);
+                    }
+                  }}
+                  className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+                >
+                  Go
+                </button>
+              </div>
+            </div>
+
             <button
-              onClick={() => setPage((prev) => prev + 1)}
-              disabled={page === totalPages}
-              className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => updateQueryParam('page', currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
             >
               Next
-              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         )}

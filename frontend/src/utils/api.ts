@@ -188,7 +188,7 @@ export const api = {
         `/api/admin/users?page=${page}&limit=${limit}`,
         { method: 'GET' },
         token
-      ).then((res) => res.data || res.users || []),
+      ),
 
     getUserById: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/users/${id}`, { method: 'GET' }, token),

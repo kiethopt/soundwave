@@ -26,9 +26,35 @@ export default function ArtistDetail({
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Lấy query param phân trang (mặc định là 1 nếu không có)
-  const albumPage = Number(searchParams.get('albumPage')) || 1;
-  const trackPage = Number(searchParams.get('trackPage')) || 1;
+  // Xử lý URL cho query param "albumPage":
+  // Nếu giá trị âm hoặc bằng "1" => loại bỏ param khỏi URL
+  useEffect(() => {
+    const albumPageParam = Number(searchParams.get('albumPage'));
+    if (albumPageParam < 1 || searchParams.get('albumPage') === '1') {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('albumPage');
+      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+      router.replace(`/admin/artists/${id}${queryStr}`);
+    }
+  }, [searchParams, router, id]);
+
+  // Xử lý URL cho query param "trackPage":
+  // Nếu giá trị âm hoặc bằng "1" => loại bỏ param khỏi URL
+  useEffect(() => {
+    const trackPageParam = Number(searchParams.get('trackPage'));
+    if (trackPageParam < 1 || searchParams.get('trackPage') === '1') {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('trackPage');
+      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+      router.replace(`/admin/artists/${id}${queryStr}`);
+    }
+  }, [searchParams, router, id]);
+
+  // Dùng giá trị đã làm sạch cho phân trang (nếu giá trị không hợp lệ thì ép về 1)
+  const albumPageParam = Number(searchParams.get('albumPage'));
+  const sanitizedAlbumPage = albumPageParam > 0 ? albumPageParam : 1;
+  const trackPageParam = Number(searchParams.get('trackPage'));
+  const sanitizedTrackPage = trackPageParam > 0 ? trackPageParam : 1;
 
   const [artist, setArtist] = useState<ArtistProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -39,29 +65,40 @@ export default function ArtistDetail({
   const albumPageRef = useRef<HTMLInputElement>(null);
   const trackPageRef = useRef<HTMLInputElement>(null);
 
-  // Hàm cập nhật query param theo key và value
+  // Hàm cập nhật query param theo key và value.
+  // Nếu value < 1 thì chuyển về 1 và loại bỏ param khỏi URL.
   const updateQueryParam = (param: string, value: number) => {
+    if (value < 1) {
+      value = 1;
+    }
     const current = new URLSearchParams(searchParams.toString());
-    current.set(param, value.toString());
-    router.push(`/admin/artists/${id}?${current.toString()}`);
+    if (value === 1) {
+      current.delete(param);
+    } else {
+      current.set(param, value.toString());
+    }
+    const queryStr = current.toString() ? `?${current.toString()}` : '';
+    router.push(`/admin/artists/${id}${queryStr}`);
   };
 
   const handleAlbumPrev = () => {
-    if (albumPage > 1) updateQueryParam('albumPage', albumPage - 1);
+    if (sanitizedAlbumPage > 1)
+      updateQueryParam('albumPage', sanitizedAlbumPage - 1);
   };
 
   const handleAlbumNext = () => {
-    if (artist?.albums && albumPage < (artist.albums.totalPages ?? 1))
-      updateQueryParam('albumPage', albumPage + 1);
+    if (artist?.albums && sanitizedAlbumPage < (artist.albums.totalPages ?? 1))
+      updateQueryParam('albumPage', sanitizedAlbumPage + 1);
   };
 
   const handleTrackPrev = () => {
-    if (trackPage > 1) updateQueryParam('trackPage', trackPage - 1);
+    if (sanitizedTrackPage > 1)
+      updateQueryParam('trackPage', sanitizedTrackPage - 1);
   };
 
   const handleTrackNext = () => {
-    if (artist?.tracks && trackPage < (artist.tracks.totalPages ?? 1))
-      updateQueryParam('trackPage', trackPage + 1);
+    if (artist?.tracks && sanitizedTrackPage < (artist.tracks.totalPages ?? 1))
+      updateQueryParam('trackPage', sanitizedTrackPage + 1);
   };
 
   useEffect(() => {
@@ -69,7 +106,7 @@ export default function ArtistDetail({
       try {
         const token = localStorage.getItem('userToken');
         if (!token) throw new Error('No authentication token found');
-        const queryString = `?albumPage=${albumPage}&albumLimit=6&trackPage=${trackPage}&trackLimit=10`;
+        const queryString = `?albumPage=${sanitizedAlbumPage}&albumLimit=6&trackPage=${sanitizedTrackPage}&trackLimit=10`;
         const response = await api.admin.getArtistById(
           `${id}${queryString}`,
           token
@@ -81,15 +118,30 @@ export default function ArtistDetail({
         }
         setArtist(response);
 
-        if (response.albums && response.albums.totalPages < albumPage) {
+        // Nếu số trang vượt quá tổng số pages trả về, xóa param khỏi URL.
+        if (
+          response.albums &&
+          response.albums.totalPages < sanitizedAlbumPage
+        ) {
           const current = new URLSearchParams(searchParams.toString());
           current.delete('albumPage');
-          router.replace(`/admin/artists/${id}?${current.toString()}`);
+          router.replace(
+            `/admin/artists/${id}${
+              current.toString() ? '?' + current.toString() : ''
+            }`
+          );
         }
-        if (response.tracks && response.tracks.totalPages < trackPage) {
+        if (
+          response.tracks &&
+          response.tracks.totalPages < sanitizedTrackPage
+        ) {
           const current = new URLSearchParams(searchParams.toString());
           current.delete('trackPage');
-          router.replace(`/admin/artists/${id}?${current.toString()}`);
+          router.replace(
+            `/admin/artists/${id}${
+              current.toString() ? '?' + current.toString() : ''
+            }`
+          );
         }
       } catch (err) {
         console.error('Error fetching artist:', err);
@@ -100,7 +152,7 @@ export default function ArtistDetail({
     };
 
     fetchArtist();
-  }, [id, albumPage, trackPage, router, searchParams]);
+  }, [id, sanitizedAlbumPage, sanitizedTrackPage, router, searchParams]);
 
   const handleVerify = async () => {
     try {
@@ -344,7 +396,7 @@ export default function ArtistDetail({
                                 {album.title}
                               </Link>
                               <p className="text-sm text-white/60 mt-1">
-                                {album.totalTracks} tracks ·{' '}
+                                {album.totalTracks} tracks &middot;{' '}
                                 {formatDuration(album.duration)}
                               </p>
                               <p className="text-sm text-white/60">
@@ -362,7 +414,7 @@ export default function ArtistDetail({
                     <div className="flex items-center justify-center gap-4 mt-4">
                       <button
                         onClick={handleAlbumPrev}
-                        disabled={albumPage <= 1}
+                        disabled={sanitizedAlbumPage <= 1}
                         className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
                       >
                         Previous
@@ -372,19 +424,18 @@ export default function ArtistDetail({
                         <span className="text-white/60">Page</span>
                         <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
                           <span className="text-white font-medium">
-                            {albumPage}
+                            {sanitizedAlbumPage}
                           </span>
                         </div>
                         <span className="text-white/60">
                           of {artist.albums?.totalPages ?? 1}
                         </span>
-
                         <div className="flex items-center gap-2 ml-4">
                           <input
                             type="number"
                             min={1}
                             max={artist.albums?.totalPages ?? 1}
-                            defaultValue={albumPage}
+                            defaultValue={sanitizedAlbumPage}
                             ref={albumPageRef}
                             className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
                             placeholder="Page"
@@ -411,7 +462,9 @@ export default function ArtistDetail({
 
                       <button
                         onClick={handleAlbumNext}
-                        disabled={albumPage >= (artist.albums?.totalPages ?? 1)}
+                        disabled={
+                          sanitizedAlbumPage >= (artist.albums?.totalPages ?? 1)
+                        }
                         className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
                       >
                         Next
@@ -462,7 +515,7 @@ export default function ArtistDetail({
                                 {track.title}
                               </h3>
                               <p className="text-sm text-white/60">
-                                {track.album?.title || 'Single'} ·{' '}
+                                {track.album?.title || 'Single'} &middot;{' '}
                                 {formatDuration(track.duration)}
                               </p>
                             </div>
@@ -480,7 +533,7 @@ export default function ArtistDetail({
                     <div className="flex items-center justify-center gap-4 mt-4">
                       <button
                         onClick={handleTrackPrev}
-                        disabled={trackPage <= 1}
+                        disabled={sanitizedTrackPage <= 1}
                         className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
                       >
                         Previous
@@ -489,7 +542,7 @@ export default function ArtistDetail({
                         <span className="text-white/60">Page</span>
                         <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
                           <span className="text-white font-medium">
-                            {trackPage}
+                            {sanitizedTrackPage}
                           </span>
                         </div>
                         <span className="text-white/60">
@@ -500,7 +553,7 @@ export default function ArtistDetail({
                             type="number"
                             min={1}
                             max={artist.tracks?.totalPages ?? 1}
-                            defaultValue={trackPage}
+                            defaultValue={sanitizedTrackPage}
                             ref={trackPageRef}
                             className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
                             placeholder="Page"
@@ -526,7 +579,9 @@ export default function ArtistDetail({
                       </div>
                       <button
                         onClick={handleTrackNext}
-                        disabled={trackPage >= (artist.tracks?.totalPages ?? 1)}
+                        disabled={
+                          sanitizedTrackPage >= (artist.tracks?.totalPages ?? 1)
+                        }
                         className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
                       >
                         Next

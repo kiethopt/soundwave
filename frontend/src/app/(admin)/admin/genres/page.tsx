@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import {
   Edit,
@@ -24,13 +25,47 @@ export default function AdminGenres() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [editingGenre, setEditingGenre] = useState<{
     id: string;
     name: string;
   } | null>(null);
   const limit = 10;
+
+  // Sử dụng hooks của Next để làm việc với URL query params
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Nếu query param "page" có giá trị "1" hoặc nhỏ hơn 1, loại bỏ nó để URL được gọn
+  useEffect(() => {
+    const pageStr = searchParams.get('page');
+    const pageNumber = Number(pageStr);
+    if (pageStr === '1' || pageNumber < 1) {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('page');
+      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+      router.replace(`/admin/genres${queryStr}`);
+    }
+  }, [searchParams, router]);
+
+  // Lấy số trang hiện tại từ URL, đảm bảo trả về giá trị tối thiểu là 1
+  const pageFromURL = Number(searchParams.get('page'));
+  const currentPage = pageFromURL > 0 ? pageFromURL : 1;
+
+  // Hàm cập nhật query param "page"
+  const updateQueryParam = (param: string, value: number) => {
+    if (totalPages === 1 && value !== 1) return;
+    if (value < 1) value = 1;
+    if (value > totalPages) value = totalPages;
+    const current = new URLSearchParams(searchParams.toString());
+    if (value === 1) {
+      current.delete(param);
+    } else {
+      current.set(param, value.toString());
+    }
+    const queryStr = current.toString() ? `?${current.toString()}` : '';
+    router.push(`/admin/genres${queryStr}`);
+  };
 
   const fetchGenres = async (page: number, query: string = '') => {
     try {
@@ -48,14 +83,15 @@ export default function AdminGenres() {
     }
   };
 
+  // Gọi API mỗi khi currentPage (lấy từ URL) hoặc searchInput thay đổi
   useEffect(() => {
-    fetchGenres(page, searchInput);
-  }, [page, searchInput]);
+    fetchGenres(currentPage, searchInput);
+  }, [currentPage, searchInput]);
 
+  // Khi submit form tìm kiếm, reset về trang 1 bằng cách cập nhật query param "page"
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(1);
-    fetchGenres(1, searchInput);
+    updateQueryParam('page', 1);
   };
 
   const handleDeleteGenre = async (genreId: string) => {
@@ -65,7 +101,7 @@ export default function AdminGenres() {
 
       await api.admin.deleteGenre(genreId, token);
       toast.success('Genre deleted successfully');
-      fetchGenres(page, searchInput);
+      fetchGenres(currentPage, searchInput);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to delete genre'
@@ -91,13 +127,16 @@ export default function AdminGenres() {
       );
       toast.success('Genre updated successfully');
       setEditingGenre(null);
-      fetchGenres(page, searchInput);
+      fetchGenres(currentPage, searchInput);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to update genre'
       );
     }
   };
+
+  // useRef cho input "Go to page" trong pagination
+  const pageInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="container mx-auto space-y-8" suppressHydrationWarning>
@@ -210,18 +249,46 @@ export default function AdminGenres() {
         {totalPages > 0 && (
           <div className="flex justify-between items-center p-4 border-t border-white/[0.08]">
             <button
-              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              disabled={page === 1}
+              onClick={() => updateQueryParam('page', currentPage - 1)}
+              disabled={currentPage === 1}
               className="px-4 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-white/60">Page</span>
+              <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
+                <span className="text-white font-medium">{currentPage}</span>
+              </div>
+              <span className="text-white/60">of {totalPages}</span>
+              <div className="flex items-center gap-2 ml-4">
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  defaultValue={currentPage}
+                  ref={pageInputRef}
+                  className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                  placeholder="Page"
+                />
+                <button
+                  onClick={() => {
+                    const page = pageInputRef.current
+                      ? parseInt(pageInputRef.current.value, 10)
+                      : NaN;
+                    if (!isNaN(page)) {
+                      updateQueryParam('page', page);
+                    }
+                  }}
+                  className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+                >
+                  Go
+                </button>
+              </div>
+            </div>
             <button
-              onClick={() => setPage((prev) => prev + 1)}
-              disabled={page === totalPages}
+              onClick={() => updateQueryParam('page', currentPage + 1)}
+              disabled={currentPage === totalPages}
               className="px-4 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next

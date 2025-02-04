@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { api } from '@/utils/api';
 import { User, MoreVertical, Power, Trash2 } from 'lucide-react';
-import Link from 'next/link';
 import { ArtistProfile } from '@/types';
 import { Search, Spinner } from '@/components/ui/Icons';
 import {
@@ -20,11 +21,50 @@ export default function AdminArtists() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const limit = 10;
 
+  // Sử dụng router và searchParams để quản lý query param "page"
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Nếu query param "page" có giá trị nhỏ hơn 1 hoặc bằng "1", loại bỏ nó để đảm bảo URL luôn sạch
+  useEffect(() => {
+    const pageStr = searchParams.get('page');
+    const pageNumber = Number(pageStr);
+    if (pageStr === '1' || pageNumber < 1) {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('page');
+      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+      router.replace(`/admin/artists${queryStr}`);
+    }
+  }, [searchParams, router]);
+
+  // Lấy số trang hiện tại từ URL (mặc định là 1 nếu không có)
+  const currentPage = Number(searchParams.get('page')) || 1;
+
+  // Hàm cập nhật query param
+  // Nếu totalPages === 1 và giá trị cập nhật khác 1, thì không update để tránh chuyển sang trang không có dữ liệu.
+  // Nếu giá trị vượt quá totalPages, sẽ gán lại bằng totalPages.
+  const updateQueryParam = (param: string, value: number) => {
+    if (totalPages === 1 && value !== 1) {
+      // Nếu chỉ có 1 trang, không cho chuyển sang trang khác
+      return;
+    }
+    if (value < 1) value = 1;
+    if (value > totalPages) value = totalPages;
+    const current = new URLSearchParams(searchParams.toString());
+    if (value === 1) {
+      current.delete(param);
+    } else {
+      current.set(param, value.toString());
+    }
+    const queryStr = current.toString() ? `?${current.toString()}` : '';
+    router.push(`/admin/artists${queryStr}`);
+  };
+
+  // Gọi API lấy danh sách artist với số trang và limit được truyền qua query param
   const fetchArtists = async (page: number, query: string = '') => {
     try {
       setLoading(true);
@@ -45,14 +85,15 @@ export default function AdminArtists() {
     }
   };
 
+  // Khi currentPage (lấy từ URL) hoặc searchInput thay đổi, gọi API lại
   useEffect(() => {
-    fetchArtists(page, searchInput);
-  }, [page, searchInput]);
+    fetchArtists(currentPage, searchInput);
+  }, [currentPage, searchInput]);
 
+  // Khi tìm kiếm, reset về trang 1 (bằng cách update query param "page")
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(1);
-    fetchArtists(1, searchInput);
+    updateQueryParam('page', 1);
   };
 
   const handleDeactivateArtist = async (
@@ -138,6 +179,9 @@ export default function AdminArtists() {
     }
   };
 
+  // Dùng cho input "Go to page" của pagination
+  const pageInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className="container mx-auto space-y-8" suppressHydrationWarning>
       <div className="flex items-center justify-between">
@@ -165,14 +209,6 @@ export default function AdminArtists() {
               <Search className="text-white/40 w-5 h-5" />
             </button>
           </form>
-          {/* Optional */}
-          {/* <Link
-            href="/admin/artists/new"
-            className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90"
-          >
-            <AddSimple className="w-4 h-4" />
-            New Artist
-          </Link> */}
         </div>
       </div>
 
@@ -269,7 +305,7 @@ export default function AdminArtists() {
                         {artist.user.email}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {artist.monthlyListeners.toLocaleString() ?? 0}
+                        {artist.monthlyListeners.toLocaleString() || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex gap-2">
@@ -342,21 +378,52 @@ export default function AdminArtists() {
 
         {/* Pagination */}
         {totalPages > 0 && (
-          <div className="flex justify-between items-center p-4 border-t border-white/[0.08]">
+          <div className="flex items-center justify-center gap-4 p-4 border-t border-white/[0.08]">
             <button
-              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              disabled={page === 1}
-              className="px-4 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => updateQueryParam('page', currentPage - 1)}
+              disabled={currentPage <= 1}
+              className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
             >
               Previous
             </button>
-            <span>
-              Page {page} of {totalPages}
-            </span>
+
+            <div className="flex items-center gap-2">
+              <span className="text-white/60">Page</span>
+              <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
+                <span className="text-white font-medium">{currentPage}</span>
+              </div>
+              <span className="text-white/60">of {totalPages}</span>
+
+              <div className="flex items-center gap-2 ml-4">
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  defaultValue={currentPage}
+                  ref={pageInputRef}
+                  className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                  placeholder="Page"
+                />
+                <button
+                  onClick={() => {
+                    const page = pageInputRef.current
+                      ? parseInt(pageInputRef.current.value, 10)
+                      : NaN;
+                    if (!isNaN(page)) {
+                      updateQueryParam('page', page);
+                    }
+                  }}
+                  className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+                >
+                  Go
+                </button>
+              </div>
+            </div>
+
             <button
-              onClick={() => setPage((prev) => prev + 1)}
-              disabled={page === totalPages}
-              className="px-4 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => updateQueryParam('page', currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
             >
               Next
             </button>
