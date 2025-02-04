@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import type { Track } from '@/types';
 import { api } from '@/utils/api';
 import {
@@ -27,7 +28,40 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export default function ArtistTracks() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Nếu query param "page" có giá trị nhỏ hơn 1 (âm) thì tự động chuyển về trang 1 (loại bỏ param)
+  useEffect(() => {
+    const pageParam = Number(searchParams.get('page'));
+    if (pageParam < 1) {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('page');
+      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+      router.replace(`/artist/tracks${queryStr}`);
+    }
+  }, [searchParams, router]);
+
+  // Nếu query param "page" bằng "1" thì tự động loại bỏ nó khỏi URL (dù người dùng nhập thủ công)
+  useEffect(() => {
+    if (searchParams.get('page') === '1') {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('page');
+      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+      router.replace(`/artist/tracks${queryStr}`);
+    }
+  }, [searchParams, router]);
+
+  // Lấy trang hiện tại (nếu không có, mặc định là 1)
+  const currentPage = Number(searchParams.get('page')) || 1;
+
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 1,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
@@ -35,37 +69,108 @@ export default function ArtistTracks() {
   const [trackToDelete, setTrackToDelete] = useState<Track | null>(null);
   const [trackToEdit, setTrackToEdit] = useState<Track | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const pageInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch tracks data
-  const fetchTracks = useCallback(async (query = '') => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = localStorage.getItem('userToken');
-
-      if (!token) {
-        throw new Error('No authentication token found');
+  // Kiểm tra quyền truy cập của Artist khi mount
+  useEffect(() => {
+    const checkAccess = () => {
+      const userData = localStorage.getItem('userData');
+      if (!userData) {
+        router.push('/login');
+        return;
       }
+      const user = JSON.parse(userData);
+      if (!user.artistProfile?.isVerified) {
+        toast.error('You need a verified artist profile to access this page');
+        router.push('/');
+        return;
+      }
+      if (user.currentProfile !== 'ARTIST') {
+        toast.error('Please switch to artist profile to access this page');
+        router.push('/');
+        return;
+      }
+    };
 
-      const response = query
-        ? await api.tracks.search(query, token)
-        : await api.tracks.getAll(token, 1, 100);
-      setTracks(query ? response : response.tracks);
-    } catch (err) {
-      console.error('Error fetching tracks:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch tracks');
-    } finally {
-      setLoading(false);
+    checkAccess();
+  }, [router]);
+
+  // Hàm update query param "page"
+  // Nếu page === 1 thì xóa đi parameter "page" để URL trả về dạng "/artist/tracks"
+  const updateQueryParam = (param: string, value: number) => {
+    if (value < 1) {
+      value = 1;
     }
-  }, []);
+    const current = new URLSearchParams(searchParams.toString());
+    if (value === 1) {
+      current.delete(param);
+    } else {
+      current.set(param, value.toString());
+    }
+    const queryStr = current.toString() ? `?${current.toString()}` : '';
+    router.push(`/artist/tracks${queryStr}`);
+  };
 
+  // Fetch tracks data có phân trang (sử dụng search API nếu có query, ngược lại dùng API lấy tracks của Artist)
+  const fetchTracks = useCallback(
+    async (query: string, page: number) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = localStorage.getItem('userToken');
+        const userData = localStorage.getItem('userData');
+
+        if (!token || !userData) {
+          throw new Error('Authentication required');
+        }
+
+        const user = JSON.parse(userData);
+        const artistId = user.artistProfile?.id;
+
+        if (!artistId) {
+          throw new Error('Artist profile not found');
+        }
+
+        const limit = 10;
+        let data;
+        if (query) {
+          data = await api.tracks.search(query, token, page, limit);
+        } else {
+          data = await api.artists.getTracks(artistId, token, page, limit);
+        }
+
+        // Nếu page hiện tại vượt quá tổng số pages trả về, reset về page 1 (URL không có param)
+        if (data.pagination && data.pagination.totalPages < page) {
+          const current = new URLSearchParams(searchParams.toString());
+          current.delete('page');
+          router.replace(
+            `/artist/tracks${
+              current.toString() ? '?' + current.toString() : ''
+            }`
+          );
+          return;
+        }
+
+        setTracks(data.tracks);
+        setPagination(data.pagination);
+      } catch (err) {
+        console.error('Error fetching tracks:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch tracks');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [router, searchParams]
+  );
+
+  // Debounce search input và re-fetch khi currentPage thay đổi
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      fetchTracks(searchInput);
+      fetchTracks(searchInput, currentPage);
     }, 300);
 
     return () => clearTimeout(debounceTimer);
-  }, [searchInput, fetchTracks]);
+  }, [searchInput, currentPage, fetchTracks]);
 
   const handlePlayPause = async (track: Track) => {
     if (playingTrack?.id === track.id) {
@@ -157,6 +262,15 @@ export default function ArtistTracks() {
     }
   };
 
+  const handlePrevPage = () => {
+    if (currentPage > 1) updateQueryParam('page', currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < (pagination.totalPages ?? 1))
+      updateQueryParam('page', currentPage + 1);
+  };
+
   return (
     <div className="container mx-auto space-y-8" suppressHydrationWarning>
       <div className="flex items-center justify-between">
@@ -197,13 +311,13 @@ export default function ArtistTracks() {
           ) : error ? (
             <div className="p-6 text-center text-red-500">{error}</div>
           ) : tracks.length > 0 ? (
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead className="bg-white/[0.03]">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider w-1/4">
                     Title
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider w-1/5">
                     Album
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
@@ -252,11 +366,21 @@ export default function ArtistTracks() {
                             <Music className="w-6 h-6 text-white/60" />
                           </div>
                         )}
-                        <span className="font-medium">{track.title}</span>
+                        <span
+                          className="font-medium truncate max-w-[150px]"
+                          title={track.title}
+                        >
+                          {track.title}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {track.album?.title || 'Single'}
+                      <span
+                        // className="truncate max-w-[150px]"
+                        title={track.album?.title || 'Single'}
+                      >
+                        {track.album?.title || 'Single'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {formatDuration(track.duration)}
@@ -333,6 +457,66 @@ export default function ArtistTracks() {
           )}
         </div>
       </div>
+
+      {/* Phân trang */}
+      {pagination.total > 0 && (
+        <div className="flex items-center justify-center gap-4 mt-4">
+          <button
+            onClick={handlePrevPage}
+            disabled={currentPage <= 1}
+            className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+          >
+            Previous
+          </button>
+
+          <div className="flex items-center gap-2">
+            <span className="text-white/60">Page</span>
+            <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
+              <span className="text-white font-medium">{currentPage}</span>
+            </div>
+            <span className="text-white/60">of {pagination.totalPages}</span>
+
+            <div className="flex items-center gap-2 ml-4">
+              <input
+                type="number"
+                min={1}
+                max={pagination.totalPages}
+                defaultValue={currentPage}
+                ref={pageInputRef}
+                className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                placeholder="Page"
+              />
+              <button
+                onClick={() => {
+                  const page = pageInputRef.current
+                    ? parseInt(pageInputRef.current.value, 10)
+                    : NaN;
+                  if (
+                    !isNaN(page) &&
+                    page >= 1 &&
+                    page <= pagination.totalPages
+                  ) {
+                    updateQueryParam('page', page);
+                  } else if (!isNaN(page) && page < 1) {
+                    updateQueryParam('page', 1);
+                  }
+                }}
+                className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+              >
+                Go
+              </button>
+            </div>
+          </div>
+
+          <button
+            onClick={handleNextPage}
+            disabled={currentPage >= pagination.totalPages}
+            className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {/* Audio Player */}
       {playingTrack && (

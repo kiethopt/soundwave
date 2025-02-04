@@ -377,7 +377,8 @@ const toggleTrackVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
 exports.toggleTrackVisibility = toggleTrackVisibility;
 const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { q } = req.query;
+        const { q, page = 1, limit = 10 } = req.query;
+        const offset = (Number(page) - 1) * Number(limit);
         const user = req.user;
         if (!q) {
             res.status(400).json({ message: 'Query is required' });
@@ -438,12 +439,27 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 { OR: searchConditions },
             ],
         };
-        const tracks = yield db_1.default.track.findMany({
-            where: whereClause,
-            select: prisma_selects_1.trackSelect,
-            orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
+        const [tracks, total] = yield Promise.all([
+            db_1.default.track.findMany({
+                where: whereClause,
+                skip: offset,
+                take: Number(limit),
+                select: prisma_selects_1.trackSelect,
+                orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
+            }),
+            db_1.default.track.count({
+                where: whereClause,
+            }),
+        ]);
+        res.json({
+            tracks,
+            pagination: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
+            },
         });
-        res.json(tracks);
     }
     catch (error) {
         console.error('Search track error:', error);

@@ -525,7 +525,8 @@ exports.toggleAlbumVisibility = toggleAlbumVisibility;
 const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const { q } = req.query;
+        const { q, page = 1, limit = 10 } = req.query;
+        const offset = (Number(page) - 1) * Number(limit);
         const user = req.user;
         if (!q) {
             res.status(400).json({ message: 'Query is required' });
@@ -581,11 +582,24 @@ const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 whereClause.isActive = true;
             }
         }
-        const albums = yield db_1.default.album.findMany({
-            where: whereClause,
-            select: prisma_selects_1.albumSelect,
+        const [albums, total] = yield Promise.all([
+            db_1.default.album.findMany({
+                where: whereClause,
+                skip: offset,
+                take: Number(limit),
+                select: prisma_selects_1.albumSelect,
+            }),
+            db_1.default.album.count({ where: whereClause }),
+        ]);
+        res.json({
+            albums,
+            pagination: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
+            },
         });
-        res.json(albums);
     }
     catch (error) {
         console.error('Search album error:', error);

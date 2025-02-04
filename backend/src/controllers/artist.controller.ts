@@ -170,6 +170,8 @@ export const getArtistAlbums = async (
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+  const offset = (Number(page) - 1) * Number(limit);
   const user = req.user;
 
   if (!user) {
@@ -206,13 +208,28 @@ export const getArtistAlbums = async (
       whereCondition = { artistId: id };
     }
 
-    const albums = await prisma.album.findMany({
-      where: whereCondition,
-      select: albumSelect,
-      orderBy: { releaseDate: 'desc' },
-    });
+    const [albums, total] = await Promise.all([
+      prisma.album.findMany({
+        where: whereCondition,
+        skip: offset,
+        take: Number(limit),
+        select: albumSelect,
+        orderBy: { releaseDate: 'desc' },
+      }),
+      prisma.album.count({
+        where: whereCondition,
+      }),
+    ]);
 
-    res.json(albums);
+    res.json({
+      albums,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
   } catch (error) {
     console.error('Error fetching artist albums:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -224,6 +241,8 @@ export const getArtistTracks = async (
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+  const offset = (Number(page) - 1) * Number(limit);
   const user = req.user;
 
   if (!user) {
@@ -244,23 +263,36 @@ export const getArtistTracks = async (
 
     let whereCondition: any = { artistId: id };
 
-    // Nếu không phải ADMIN hoặc chính artist đó
     if (user.role !== Role.ADMIN && user.id !== artistProfile.userId) {
       whereCondition.isActive = true;
-      // Nếu artist chưa được verify thì không cho xem tracks
       if (!artistProfile.isVerified) {
         res.status(403).json({ message: 'Artist is not verified' });
         return;
       }
     }
 
-    const tracks = await prisma.track.findMany({
-      where: whereCondition,
-      select: trackSelect,
-      orderBy: { releaseDate: 'desc' },
-    });
+    const [tracks, total] = await Promise.all([
+      prisma.track.findMany({
+        where: whereCondition,
+        skip: offset,
+        take: Number(limit),
+        select: trackSelect,
+        orderBy: { releaseDate: 'desc' },
+      }),
+      prisma.track.count({
+        where: whereCondition,
+      }),
+    ]);
 
-    res.json(tracks);
+    res.json({
+      tracks,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
   } catch (error) {
     console.error('Error fetching artist tracks:', error);
     res.status(500).json({ message: 'Internal server error' });

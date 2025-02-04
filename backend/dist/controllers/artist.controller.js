@@ -142,6 +142,8 @@ const getArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, functio
 exports.getArtistProfile = getArtistProfile;
 const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
     const user = req.user;
     if (!user) {
         res.status(401).json({ message: 'Unauthorized' });
@@ -167,12 +169,27 @@ const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function
         if (user.id === artistProfile.userId) {
             whereCondition = { artistId: id };
         }
-        const albums = yield db_1.default.album.findMany({
-            where: whereCondition,
-            select: prisma_selects_1.albumSelect,
-            orderBy: { releaseDate: 'desc' },
+        const [albums, total] = yield Promise.all([
+            db_1.default.album.findMany({
+                where: whereCondition,
+                skip: offset,
+                take: Number(limit),
+                select: prisma_selects_1.albumSelect,
+                orderBy: { releaseDate: 'desc' },
+            }),
+            db_1.default.album.count({
+                where: whereCondition,
+            }),
+        ]);
+        res.json({
+            albums,
+            pagination: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
+            },
         });
-        res.json(albums);
     }
     catch (error) {
         console.error('Error fetching artist albums:', error);
@@ -182,6 +199,8 @@ const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function
 exports.getArtistAlbums = getArtistAlbums;
 const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
     const user = req.user;
     if (!user) {
         res.status(401).json({ message: 'Unauthorized' });
@@ -204,12 +223,27 @@ const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function
                 return;
             }
         }
-        const tracks = yield db_1.default.track.findMany({
-            where: whereCondition,
-            select: prisma_selects_1.trackSelect,
-            orderBy: { releaseDate: 'desc' },
+        const [tracks, total] = yield Promise.all([
+            db_1.default.track.findMany({
+                where: whereCondition,
+                skip: offset,
+                take: Number(limit),
+                select: prisma_selects_1.trackSelect,
+                orderBy: { releaseDate: 'desc' },
+            }),
+            db_1.default.track.count({
+                where: whereCondition,
+            }),
+        ]);
+        res.json({
+            tracks,
+            pagination: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
+            },
         });
-        res.json(tracks);
     }
     catch (error) {
         console.error('Error fetching artist tracks:', error);

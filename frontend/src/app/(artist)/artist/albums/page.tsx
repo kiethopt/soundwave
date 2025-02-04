@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import type { Album } from '@/types';
 import { api } from '@/utils/api';
 import {
@@ -12,7 +13,6 @@ import {
   EyeOff,
 } from '@/components/ui/Icons';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import { MoreVertical } from 'lucide-react';
 import {
@@ -25,13 +25,46 @@ import {
 
 export default function ArtistAlbums() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Nếu query param "page" có giá trị nhỏ hơn 1 (âm) thì tự động chuyển về trang 1 (loại bỏ param)
+  useEffect(() => {
+    const pageParam = Number(searchParams.get('page'));
+    if (pageParam < 1) {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('page');
+      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+      router.replace(`/artist/albums${queryStr}`);
+    }
+  }, [searchParams, router]);
+
+  // Nếu query param "page" bằng "1" thì tự động loại bỏ nó (dù người dùng nhập thủ công)
+  useEffect(() => {
+    if (searchParams.get('page') === '1') {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('page');
+      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+      router.replace(`/artist/albums${queryStr}`);
+    }
+  }, [searchParams, router]);
+
+  // Get the current page (defaults to 1 if missing)
+  const currentPage = Number(searchParams.get('page')) || 1;
   const [albums, setAlbums] = useState<Album[]>([]);
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 1,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [albumToDelete, setAlbumToDelete] = useState<Album | null>(null);
+  const pageInputRef = useRef<HTMLInputElement>(null);
 
-  // Kiểm tra quyền truy cập
+  // Check artist access on mount
   useEffect(() => {
     const checkAccess = () => {
       const userData = localStorage.getItem('userData');
@@ -39,15 +72,12 @@ export default function ArtistAlbums() {
         router.push('/login');
         return;
       }
-
       const user = JSON.parse(userData);
       if (!user.artistProfile?.isVerified) {
         toast.error('You need a verified artist profile to access this page');
         router.push('/');
         return;
       }
-
-      // Kiểm tra currentProfile
       if (user.currentProfile !== 'ARTIST') {
         toast.error('Please switch to artist profile to access this page');
         router.push('/');
@@ -58,46 +88,79 @@ export default function ArtistAlbums() {
     checkAccess();
   }, [router]);
 
-  // Fetch albums data
-  const fetchAlbums = useCallback(async (query = '') => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = localStorage.getItem('userToken');
-      const userData = localStorage.getItem('userData');
-
-      if (!token || !userData) {
-        throw new Error('Authentication required');
-      }
-
-      const user = JSON.parse(userData);
-      const artistId = user.artistProfile?.id;
-
-      if (!artistId) {
-        throw new Error('Artist profile not found');
-      }
-
-      // Sử dụng API search nếu có query, ngược lại lấy tất cả albums
-      const data = query
-        ? await api.albums.search(query, token)
-        : await api.artists.getAlbums(artistId, token);
-      setAlbums(data);
-    } catch (err) {
-      console.error('Error fetching albums:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch albums');
-    } finally {
-      setLoading(false);
+  // Update query param "page" on navigation.
+  // Nếu page === 1 thì xóa đi parameter "page" để URL trở về dạng "/artist/albums".
+  const updateQueryParam = (param: string, value: number) => {
+    if (value < 1) {
+      value = 1;
     }
-  }, []);
+    const current = new URLSearchParams(searchParams.toString());
+    if (value === 1) {
+      current.delete(param);
+    } else {
+      current.set(param, value.toString());
+    }
+    const queryStr = current.toString() ? `?${current.toString()}` : '';
+    router.push(`/artist/albums${queryStr}`);
+  };
 
-  // Thêm useEffect để theo dõi searchInput
+  // Fetch albums data (using search if query provided, otherwise getting the artist’s albums)
+  const fetchAlbums = useCallback(
+    async (query: string, page: number) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const token = localStorage.getItem('userToken');
+        const userData = localStorage.getItem('userData');
+
+        if (!token || !userData) {
+          throw new Error('Authentication required');
+        }
+
+        const user = JSON.parse(userData);
+        const artistId = user.artistProfile?.id;
+
+        if (!artistId) {
+          throw new Error('Artist profile not found');
+        }
+
+        const limit = 10;
+        const data = query
+          ? await api.albums.search(query, token, page, limit)
+          : await api.artists.getAlbums(artistId, token, page, limit);
+
+        // Nếu page vượt quá tổng số pages trả về, reset về page 1 (URL không có param)
+        if (data.pagination && data.pagination.totalPages < page) {
+          const current = new URLSearchParams(searchParams.toString());
+          current.delete('page');
+          router.replace(
+            `/artist/albums${
+              current.toString() ? '?' + current.toString() : ''
+            }`
+          );
+          return;
+        }
+
+        setAlbums(data.albums);
+        setPagination(data.pagination);
+      } catch (err) {
+        console.error('Error fetching albums:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch albums');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [router, searchParams]
+  );
+
+  // Debounce the search input and re-fetch when currentPage changes
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      fetchAlbums(searchInput);
-    }, 300); // Đợi 300ms sau khi người dùng ngừng gõ
+      fetchAlbums(searchInput, currentPage);
+    }, 300);
 
     return () => clearTimeout(debounceTimer);
-  }, [searchInput, fetchAlbums]);
+  }, [searchInput, currentPage, fetchAlbums]);
 
   const toggleAlbumVisibility = async (albumId: string) => {
     try {
@@ -106,7 +169,7 @@ export default function ArtistAlbums() {
 
       const response = await api.albums.toggleVisibility(albumId, token);
 
-      // Cập nhật state albums sau khi toggle
+      // Update the local albums state after toggling visibility
       setAlbums(
         albums.map((album) =>
           album.id === albumId ? { ...album, isActive: !album.isActive } : album
@@ -133,6 +196,15 @@ export default function ArtistAlbums() {
       console.error('Error deleting album:', err);
       toast.error('Failed to delete album');
     }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) updateQueryParam('page', currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < (pagination.totalPages ?? 1))
+      updateQueryParam('page', currentPage + 1);
   };
 
   return (
@@ -220,6 +292,7 @@ export default function ArtistAlbums() {
                           )}
                           <Link
                             href={`/artist/albums/${album.id}`}
+                            title={album.title}
                             className="font-medium hover:underline"
                           >
                             {album.title}
@@ -298,6 +371,65 @@ export default function ArtistAlbums() {
           )}
         </div>
       </div>
+
+      {pagination.total > 0 && (
+        <div className="flex items-center justify-center gap-4 mt-4">
+          <button
+            onClick={handlePrevPage}
+            disabled={currentPage <= 1}
+            className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+          >
+            Previous
+          </button>
+
+          <div className="flex items-center gap-2">
+            <span className="text-white/60">Page</span>
+            <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
+              <span className="text-white font-medium">{currentPage}</span>
+            </div>
+            <span className="text-white/60">of {pagination.totalPages}</span>
+
+            <div className="flex items-center gap-2 ml-4">
+              <input
+                type="number"
+                min={1}
+                max={pagination.totalPages}
+                defaultValue={currentPage}
+                ref={pageInputRef}
+                className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                placeholder="Page"
+              />
+              <button
+                onClick={() => {
+                  const page = pageInputRef.current
+                    ? parseInt(pageInputRef.current.value, 10)
+                    : NaN;
+                  if (
+                    !isNaN(page) &&
+                    page >= 1 &&
+                    page <= pagination.totalPages
+                  ) {
+                    updateQueryParam('page', page);
+                  } else if (!isNaN(page) && page < 1) {
+                    updateQueryParam('page', 1);
+                  }
+                }}
+                className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+              >
+                Go
+              </button>
+            </div>
+          </div>
+
+          <button
+            onClick={handleNextPage}
+            disabled={currentPage >= pagination.totalPages}
+            className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       {albumToDelete && (

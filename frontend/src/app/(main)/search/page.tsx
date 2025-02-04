@@ -178,7 +178,9 @@ function SearchContent() {
           // Lấy album mới nhất của nghệ sĩ
           const artistAlbums = await api.artists.getAlbums(
             item.artistProfile.id,
-            token
+            token,
+            1,
+            10
           );
           if (!artistAlbums || artistAlbums.length === 0) {
             toast.error('No albums found for this artist');

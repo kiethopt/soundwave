@@ -469,7 +469,8 @@ export const searchTrack = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { q } = req.query;
+    const { q, page = 1, limit = 10 } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
     const user = req.user;
 
     if (!q) {
@@ -537,13 +538,28 @@ export const searchTrack = async (
       ],
     };
 
-    const tracks = await prisma.track.findMany({
-      where: whereClause,
-      select: trackSelect,
-      orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
-    });
+    const [tracks, total] = await Promise.all([
+      prisma.track.findMany({
+        where: whereClause,
+        skip: offset,
+        take: Number(limit),
+        select: trackSelect,
+        orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
+      }),
+      prisma.track.count({
+        where: whereClause,
+      }),
+    ]);
 
-    res.json(tracks);
+    res.json({
+      tracks,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
   } catch (error) {
     console.error('Search track error:', error);
     res.status(500).json({ message: 'Internal server error' });

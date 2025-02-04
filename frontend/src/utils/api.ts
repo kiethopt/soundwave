@@ -385,11 +385,19 @@ export const api = {
     getStats: async (id: string, token: string) =>
       fetchWithAuth(`/api/artist/stats/${id}`, { method: 'GET' }, token),
 
-    getTracks: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/tracks/${id}`, { method: 'GET' }, token),
+    getTracks: async (id: string, token: string, page: number, limit: number) =>
+      fetchWithAuth(
+        `/api/artist/tracks/${id}?page=${page}&limit=${limit}`,
+        { method: 'GET' },
+        token
+      ),
 
-    getAlbums: (artistId: string, token: string) =>
-      fetchWithAuth(`/api/artist/${artistId}/albums`, { method: 'GET' }, token),
+    getAlbums: (artistId: string, token: string, page: number, limit: number) =>
+      fetchWithAuth(
+        `/api/artist/${artistId}/albums?page=${page}&limit=${limit}`,
+        { method: 'GET' },
+        token
+      ),
 
     updateMonthlyListeners: async (id: string, token: string) =>
       fetchWithAuth(
@@ -451,8 +459,12 @@ export const api = {
         token
       ),
 
-    search: async (query: string, token: string) =>
-      fetchWithAuth(`/api/tracks/search?q=${query}`, { method: 'GET' }, token),
+    search: async (query: string, token: string, page: number, limit: number) =>
+      fetchWithAuth(
+        `/api/tracks/search?q=${query}&page=${page}&limit=${limit}`,
+        { method: 'GET' },
+        token
+      ),
 
     play: async (trackId: string, token: string) =>
       fetchWithAuth(`/api/tracks/${trackId}/play`, { method: 'POST' }, token),
@@ -527,8 +539,12 @@ export const api = {
       );
     },
 
-    search: async (query: string, token: string) =>
-      fetchWithAuth(`/api/albums/search?q=${query}`, { method: 'GET' }, token),
+    search: async (query: string, token: string, page: number, limit: number) =>
+      fetchWithAuth(
+        `/api/albums/search?q=${query}&page=${page}&limit=${limit}`,
+        { method: 'GET' },
+        token
+      ),
 
     playAlbum: async (albumId: string, token: string) =>
       fetchWithAuth(`/api/albums/${albumId}/play`, { method: 'POST' }, token),
