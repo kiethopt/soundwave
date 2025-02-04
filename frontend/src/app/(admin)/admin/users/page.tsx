@@ -186,23 +186,28 @@ export default function AdminUsers() {
   );
 
   return (
-    <div className="container mx-auto space-y-8" suppressHydrationWarning>
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto space-y-8 mb-16" suppressHydrationWarning>
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-          <p className="text-white/60 mt-2">Manage and monitor user accounts</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+            User Management
+          </h1>
+          <p className="text-white/60 mt-2 text-sm md:text-base">
+            Manage and monitor user accounts
+          </p>
         </div>
-        <form onSubmit={handleSearch} className="relative">
+        <form onSubmit={handleSearch} className="relative w-full md:w-auto">
           <input
             type="text"
             placeholder="Search users..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-12 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 w-64"
+            className="w-full md:w-64 pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 text-sm"
           />
           <button
             type="submit"
-            className="absolute left-4 top-1/2 transform -translate-y-1/2"
+            className="absolute left-3 top-1/2 transform -translate-y-1/2"
           >
             <Search className="text-white/40 w-5 h-5" />
           </button>
@@ -210,12 +215,14 @@ export default function AdminUsers() {
       </div>
 
       {error && (
-        <div className="bg-red-500/20 text-red-400 p-3 rounded-lg">{error}</div>
+        <div className="bg-red-500/20 text-red-400 p-3 rounded-lg text-sm">
+          {error}
+        </div>
       )}
 
       <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] relative">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[600px]">
             <thead className="bg-white/5 border-b border-white/[0.08]">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
@@ -359,30 +366,68 @@ export default function AdminUsers() {
 
         {/* Pagination */}
         {totalPages > 0 && (
-          <div className="flex items-center justify-center gap-4 p-4 border-t border-white/[0.08]">
+          <div className="flex items-center justify-center gap-2 p-4 border-t border-white/[0.08]">
             <button
               onClick={() => updateQueryParam('page', currentPage - 1)}
-              disabled={currentPage <= 1}
-              className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+              disabled={currentPage === 1}
+              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Previous
             </button>
 
-            <div className="flex items-center gap-2">
+            {/* Mobile Pagination */}
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                  {currentPage} of {totalPages}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                  <div className="space-y-3">
+                    <div className="text-xs text-white/60">Go to page:</div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        defaultValue={currentPage}
+                        ref={pageInputRef}
+                        className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                        placeholder="Page"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const page = pageInputRef.current
+                          ? parseInt(pageInputRef.current.value, 10)
+                          : NaN;
+                        if (!isNaN(page)) {
+                          updateQueryParam('page', page);
+                        }
+                      }}
+                      className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                    >
+                      Go to Page
+                    </button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Desktop Pagination */}
+            <div className="hidden md:flex items-center gap-2 text-sm">
               <span className="text-white/60">Page</span>
-              <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
+              <div className="bg-white/5 px-3 py-1 rounded-md border border-white/[0.1]">
                 <span className="text-white font-medium">{currentPage}</span>
               </div>
               <span className="text-white/60">of {totalPages}</span>
-
-              <div className="flex items-center gap-2 ml-4">
+              <div className="flex items-center gap-2">
                 <input
                   type="number"
                   min={1}
                   max={totalPages}
                   defaultValue={currentPage}
                   ref={pageInputRef}
-                  className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                  className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
                   placeholder="Page"
                 />
                 <button
@@ -394,7 +439,7 @@ export default function AdminUsers() {
                       updateQueryParam('page', page);
                     }
                   }}
-                  className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+                  className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
                 >
                   Go
                 </button>
@@ -403,8 +448,8 @@ export default function AdminUsers() {
 
             <button
               onClick={() => updateQueryParam('page', currentPage + 1)}
-              disabled={currentPage >= totalPages}
-              className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Next
             </button>

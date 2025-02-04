@@ -26,7 +26,7 @@ export default function ArtistRequests() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Nếu query param "page" có giá trị "1" hoặc nhỏ hơn 1, loại bỏ nó để URL gọn
+  // Nếu query param "page" có giá trị "1" hoặc nhỏ hơn 1 thì loại bỏ nó để URL gọn
   useEffect(() => {
     const pageStr = searchParams.get('page');
     const pageNumber = Number(pageStr);
@@ -82,7 +82,7 @@ export default function ArtistRequests() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Khi tìm kiếm, reset về trang 1 qua việc cập nhật query param "page"
+    // Khi tìm kiếm, reset về trang 1
     updateQueryParam('page', 1);
   };
 
@@ -139,25 +139,27 @@ export default function ArtistRequests() {
   };
 
   return (
-    <div className="container mx-auto space-y-8" suppressHydrationWarning>
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto space-y-8 mb-16" suppressHydrationWarning>
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Artist Requests</h1>
-          <p className="text-white/60 mt-2">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+            Artist Requests
+          </h1>
+          <p className="text-white/60 mt-2 text-sm md:text-base">
             Manage artist requests from users
           </p>
         </div>
-        <form onSubmit={handleSearch} className="relative">
+        <form onSubmit={handleSearch} className="relative w-full md:w-auto">
           <input
             type="text"
             placeholder="Search requests..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-12 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 w-64"
+            className="w-full md:w-64 pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 text-sm"
           />
           <button
             type="submit"
-            className="absolute left-4 top-1/2 transform -translate-y-1/2"
+            className="absolute left-3 top-1/2 transform -translate-y-1/2"
           >
             <Search className="text-white/40 w-5 h-5" />
           </button>
@@ -170,7 +172,7 @@ export default function ArtistRequests() {
 
       <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] relative">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[600px]">
             <thead className="bg-white/5 border-b border-white/[0.08]">
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold">
@@ -193,7 +195,7 @@ export default function ArtistRequests() {
                     .fill(0)
                     .map((_, i) => (
                       <tr key={i}>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-3 md:px-6 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
                             <div className="space-y-2">
@@ -202,20 +204,20 @@ export default function ArtistRequests() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 md:px-6 py-2">
                           <div className="h-4 bg-white/10 rounded w-48 animate-pulse" />
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 md:px-6 py-2">
                           <div className="h-4 bg-white/10 rounded w-24 animate-pulse" />
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-3 md:px-6 py-2 text-right">
                           <div className="h-6 w-6 bg-white/10 rounded-full animate-pulse" />
                         </td>
                       </tr>
                     ))
                 : requests.map((request) => (
                     <tr key={request.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 md:px-6 py-2 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-10 h-10 rounded-full bg-white/[0.03] flex items-center justify-center">
                             {request.avatar ? (
@@ -230,34 +232,34 @@ export default function ArtistRequests() {
                           </div>
                           <Link
                             href={`/admin/artist-requests/${request.id}`}
-                            className="ml-3 font-medium hover:underline"
+                            className="ml-3 font-medium hover:underline text-sm"
                           >
                             {request.artistName}
                           </Link>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 md:px-6 py-2 whitespace-nowrap text-sm">
                         {request.user.email}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 md:px-6 py-2 whitespace-nowrap text-sm">
                         {formatDate(request.verificationRequestedAt)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <td className="px-3 md:px-6 py-2 whitespace-nowrap text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
                             <MoreVertical className="w-5 h-5" />
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent className="bg-[#282828] border-white/10 text-white">
+                          <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white">
                             <DropdownMenuItem
                               onClick={() => handleViewDetails(request.id)}
-                              className="cursor-pointer hover:bg-white/10"
+                              className="cursor-pointer hover:bg-white/10 text-sm"
                             >
                               <Eye className="w-4 h-4 mr-2" />
                               View Details
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleApprove(request.id)}
-                              className="cursor-pointer hover:bg-white/10 text-green-400"
+                              className="cursor-pointer hover:bg-white/10 text-green-400 text-sm"
                             >
                               <Check className="w-4 h-4 mr-2" />
                               Approve Request
@@ -265,7 +267,7 @@ export default function ArtistRequests() {
                             <DropdownMenuSeparator className="bg-white/10" />
                             <DropdownMenuItem
                               onClick={() => handleReject(request.id)}
-                              className="text-red-400 cursor-pointer hover:bg-red-500/20"
+                              className="cursor-pointer hover:bg-red-500/20 text-red-400 text-sm"
                             >
                               <X className="w-4 h-4 mr-2" />
                               Reject Request
@@ -277,40 +279,79 @@ export default function ArtistRequests() {
                   ))}
             </tbody>
           </table>
-
-          {!loading && requests.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
-              <User className="w-12 h-12 mb-4" />
-              <p>No requests found</p>
-            </div>
-          )}
         </div>
+
+        {!loading && requests.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
+            <User className="w-12 h-12 mb-4" />
+            <p>No requests found</p>
+          </div>
+        )}
 
         {/* Pagination */}
         {totalPages > 0 && (
-          <div className="flex items-center justify-center gap-4 p-4 border-t border-white/[0.08]">
+          <div className="flex items-center justify-center gap-2 p-4 border-t border-white/[0.08]">
             <button
               onClick={() => updateQueryParam('page', currentPage - 1)}
               disabled={currentPage === 1}
-              className="px-4 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Previous
             </button>
-            <div className="flex items-center gap-2">
+
+            {/* Mobile Pagination */}
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                  {currentPage} of {totalPages}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                  <div className="space-y-3">
+                    <div className="text-xs text-white/60">Go to page:</div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        defaultValue={currentPage}
+                        ref={pageInputRef}
+                        className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                        placeholder="Page"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const page = pageInputRef.current
+                          ? parseInt(pageInputRef.current.value, 10)
+                          : NaN;
+                        if (!isNaN(page)) {
+                          updateQueryParam('page', page);
+                        }
+                      }}
+                      className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                    >
+                      Go to Page
+                    </button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Desktop Pagination */}
+            <div className="hidden md:flex items-center gap-2 text-sm">
               <span className="text-white/60">Page</span>
-              <div className="bg-white/5 px-3 py-1 rounded-md border border-white/10">
+              <div className="bg-white/5 px-3 py-1 rounded-md border border-white/[0.1]">
                 <span className="text-white font-medium">{currentPage}</span>
               </div>
               <span className="text-white/60">of {totalPages}</span>
-
-              <div className="flex items-center gap-2 ml-4">
+              <div className="flex items-center gap-2">
                 <input
                   type="number"
                   min={1}
                   max={totalPages}
                   defaultValue={currentPage}
                   ref={pageInputRef}
-                  className="w-16 px-3 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                  className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
                   placeholder="Page"
                 />
                 <button
@@ -322,16 +363,17 @@ export default function ArtistRequests() {
                       updateQueryParam('page', page);
                     }
                   }}
-                  className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+                  className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
                 >
                   Go
                 </button>
               </div>
             </div>
+
             <button
               onClick={() => updateQueryParam('page', currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="px-4 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Next
             </button>
