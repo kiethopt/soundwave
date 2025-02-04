@@ -1049,7 +1049,7 @@ export const approveArtistRequest = async (
       return;
     }
 
-    // Cập nhật role của ArtistProfile thành ARTIST và xác thực ArtistProfile
+    // Cập nhật ArtistProfile: chuyển thành ARTIST, xác thực và xóa trường verificationRequestedAt
     await prisma.$transaction([
       prisma.artistProfile.update({
         where: { id: requestId },
@@ -1068,13 +1068,14 @@ export const approveArtistRequest = async (
       select: userSelect,
     });
 
-    // Clear cache
+    // Clear cache: thêm clear cache cho admin artist requests
     await Promise.all([
       clearCacheForEntity('artist', { clearSearch: true }),
       clearCacheForEntity('user', { clearSearch: true }),
       clearCacheForEntity('stats', {}),
       clearCacheForEntity('album', { clearSearch: true }),
       clearCacheForEntity('track', { clearSearch: true }),
+      clearCacheForEntity('artist-requests', { clearSearch: true }),
     ]);
 
     await sessionService.handleArtistRequestApproval(artistProfile.user.id);
@@ -1133,6 +1134,9 @@ export const rejectArtistRequest = async (
     await prisma.artistProfile.delete({
       where: { id: requestId },
     });
+
+    // Clear cache: xóa cache cho danh sách artist requests
+    await clearCacheForEntity('artist-requests', { clearSearch: true });
 
     // Gửi thông báo realtime qua Pusher
     await sessionService.handleArtistRequestRejection(artistProfile.user.id);

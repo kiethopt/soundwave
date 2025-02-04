@@ -1,7 +1,11 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { FollowingType, HistoryType, Role } from '@prisma/client';
-import { client, setCache } from '../middleware/cache.middleware';
+import {
+  clearCacheForEntity,
+  client,
+  setCache,
+} from '../middleware/cache.middleware';
 import { uploadFile } from '../services/cloudinary.service';
 import {
   searchAlbumSelect,
@@ -148,6 +152,9 @@ export const requestArtistRole = async (
         },
       },
     });
+
+    // Clear cache: xóa cache các route liên quan đến Artist Requests
+    await clearCacheForEntity('artist-requests', { clearSearch: true });
 
     res.json({ message: 'Artist role request submitted successfully' });
   } catch (error) {
