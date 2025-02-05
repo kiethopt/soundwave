@@ -27,7 +27,7 @@ export default function ArtistAlbums() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Nếu query param "page" có giá trị nhỏ hơn 1 (âm) thì tự động chuyển về trang 1 (loại bỏ param)
+  // Ensure valid page param
   useEffect(() => {
     const pageParam = Number(searchParams.get('page'));
     if (pageParam < 1) {
@@ -38,7 +38,6 @@ export default function ArtistAlbums() {
     }
   }, [searchParams, router]);
 
-  // Nếu query param "page" bằng "1" thì tự động loại bỏ nó (dù người dùng nhập thủ công)
   useEffect(() => {
     if (searchParams.get('page') === '1') {
       const newParams = new URLSearchParams(searchParams.toString());
@@ -48,10 +47,8 @@ export default function ArtistAlbums() {
     }
   }, [searchParams, router]);
 
-  // Get the current page (defaults to 1 if missing)
   const currentPage = Number(searchParams.get('page')) || 1;
   const [albums, setAlbums] = useState<Album[]>([]);
-  // Pagination state
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -64,7 +61,7 @@ export default function ArtistAlbums() {
   const [albumToDelete, setAlbumToDelete] = useState<Album | null>(null);
   const pageInputRef = useRef<HTMLInputElement>(null);
 
-  // Check artist access on mount
+  // Check artist's access on mount
   useEffect(() => {
     const checkAccess = () => {
       const userData = localStorage.getItem('userData');
@@ -89,11 +86,8 @@ export default function ArtistAlbums() {
   }, [router]);
 
   // Update query param "page" on navigation.
-  // Nếu page === 1 thì xóa đi parameter "page" để URL trở về dạng "/artist/albums".
   const updateQueryParam = (param: string, value: number) => {
-    if (value < 1) {
-      value = 1;
-    }
+    if (value < 1) value = 1;
     const current = new URLSearchParams(searchParams.toString());
     if (value === 1) {
       current.delete(param);
@@ -104,7 +98,7 @@ export default function ArtistAlbums() {
     router.push(`/artist/albums${queryStr}`);
   };
 
-  // Fetch albums data (using search if query provided, otherwise getting the artist’s albums)
+  // Fetch albums (using search if available, otherwise the artist's albums)
   const fetchAlbums = useCallback(
     async (query: string, page: number) => {
       try {
@@ -129,7 +123,7 @@ export default function ArtistAlbums() {
           ? await api.albums.search(query, token, page, limit)
           : await api.artists.getAlbums(artistId, token, page, limit);
 
-        // Nếu page vượt quá tổng số pages trả về, reset về page 1 (URL không có param)
+        // If page exceeds totalPages, reset URL to page 1
         if (data.pagination && data.pagination.totalPages < page) {
           const current = new URLSearchParams(searchParams.toString());
           current.delete('page');
@@ -153,7 +147,7 @@ export default function ArtistAlbums() {
     [router, searchParams]
   );
 
-  // Debounce the search input and re-fetch when currentPage changes
+  // Debounce the search input and re-fetch when currentPage/searchInput change
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
       fetchAlbums(searchInput, currentPage);
@@ -162,6 +156,12 @@ export default function ArtistAlbums() {
     return () => clearTimeout(debounceTimer);
   }, [searchInput, currentPage, fetchAlbums]);
 
+  // On form submit, reset page to 1
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateQueryParam('page', 1);
+  };
+
   const toggleAlbumVisibility = async (albumId: string) => {
     try {
       const token = localStorage.getItem('userToken');
@@ -169,7 +169,7 @@ export default function ArtistAlbums() {
 
       const response = await api.albums.toggleVisibility(albumId, token);
 
-      // Update the local albums state after toggling visibility
+      // Update local state
       setAlbums(
         albums.map((album) =>
           album.id === albumId ? { ...album, isActive: !album.isActive } : album
@@ -208,27 +208,42 @@ export default function ArtistAlbums() {
   };
 
   return (
-    <div className="container mx-auto space-y-8" suppressHydrationWarning>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Album Management
-          </h1>
-          <p className="text-white/60 mt-2">
-            Create and manage your music albums
-          </p>
+    <div
+      className="container mx-auto space-y-8 p-4 mb-16"
+      suppressHydrationWarning
+    >
+      {/* Header Section */}
+      <div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Album Management
+            </h1>
+            <p className="text-white/60 mt-2">
+              Create and manage your music albums
+            </p>
+          </div>
+          <Link
+            href="/artist/albums/new"
+            className="hidden md:flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90"
+          >
+            <AddSimple className="w-4 h-4" />
+            New Album
+          </Link>
         </div>
+        {/* Mobile New Album Button */}
         <Link
           href="/artist/albums/new"
-          className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90"
+          className="md:hidden flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90 w-fit mt-4"
         >
           <AddSimple className="w-4 h-4" />
           New Album
         </Link>
       </div>
 
-      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08]">
-        <div className="p-6 border-b border-white/[0.08]">
+      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] relative">
+        {/* Search Bar - Desktop */}
+        <div className="hidden md:block p-6 border-b border-white/[0.08]">
           <div className="relative w-64">
             <input
               type="text"
@@ -241,128 +256,140 @@ export default function ArtistAlbums() {
           </div>
         </div>
 
+        {/* Mobile Search */}
+        <div className="md:hidden p-4">
+          <div className="relative w-full">
+            <input
+              type="text"
+              placeholder="Search albums..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 text-sm"
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
             </div>
+          ) : error ? (
+            <div className="p-6 text-center text-red-500">{error}</div>
           ) : albums.length > 0 ? (
-            <div className="min-w-full overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-white/[0.03]">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                      Title
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider hidden md:table-cell">
-                      Release Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider hidden sm:table-cell">
-                      Total Tracks
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider hidden sm:table-cell">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.08]">
-                  {albums.map((album) => (
-                    <tr
-                      key={album.id}
-                      className="hover:bg-white/[0.03] transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          {album.coverUrl ? (
-                            <img
-                              src={album.coverUrl || '/placeholder.svg'}
-                              alt={album.title}
-                              className="w-10 h-10 rounded-md mr-3 object-cover"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-md mr-3 bg-white/[0.03] flex items-center justify-center">
-                              <Music className="w-6 h-6 text-white/60" />
-                            </div>
-                          )}
-                          <Link
-                            href={`/artist/albums/${album.id}`}
-                            title={album.title}
-                            className="font-medium hover:underline"
-                          >
-                            {album.title}
-                          </Link>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
-                        {new Date(album.releaseDate).toLocaleDateString(
-                          'en-GB'
+            <table className="w-full">
+              <thead className="bg-white/[0.03]">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider w-[300px]">
+                    Title
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider hidden md:table-cell">
+                    Release Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider hidden sm:table-cell">
+                    Total Tracks
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider hidden sm:table-cell">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.08]">
+                {albums.map((album) => (
+                  <tr
+                    key={album.id}
+                    className="hover:bg-white/[0.03] transition-colors"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center">
+                        {album.coverUrl ? (
+                          <img
+                            src={album.coverUrl || '/placeholder.svg'}
+                            alt={album.title}
+                            className="w-10 h-10 rounded-md mr-3 object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-md mr-3 bg-white/[0.03] flex items-center justify-center">
+                            <Music className="w-6 h-6 text-white/60" />
+                          </div>
                         )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                        {album.totalTracks}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
-                        {album.type}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            album.isActive
-                              ? 'bg-green-500/10 text-green-500'
-                              : 'bg-yellow-500/10 text-yellow-500'
-                          }`}
+                        <Link
+                          href={`/artist/albums/${album.id}`}
+                          title={album.title}
+                          className="font-medium hover:underline truncate"
                         >
-                          {album.isActive ? (
-                            <Eye className="w-3 h-3 mr-1" />
-                          ) : (
-                            <EyeOff className="w-3 h-3 mr-1" />
-                          )}
-                          {album.isActive ? 'Active' : 'Hidden'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
-                            <MoreVertical className="w-5 h-5" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="bg-[#282828] border border-white/10 text-white">
-                            <DropdownMenuItem
-                              onClick={() => toggleAlbumVisibility(album.id)}
-                            >
-                              {album.isActive ? (
-                                <>
-                                  <EyeOff className="w-4 h-4 mr-2" />
-                                  Hide Album
-                                </>
-                              ) : (
-                                <>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  Show Album
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-white/10" />
-                            <DropdownMenuItem
-                              onClick={() => setAlbumToDelete(album)}
-                              className="text-red-400"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete Album
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          {album.title}
+                        </Link>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
+                      {new Date(album.releaseDate).toLocaleDateString('en-GB')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                      {album.totalTracks}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
+                      {album.type}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          album.isActive
+                            ? 'bg-green-500/10 text-green-500'
+                            : 'bg-yellow-500/10 text-yellow-500'
+                        }`}
+                      >
+                        {album.isActive ? (
+                          <Eye className="w-3 h-3 mr-1" />
+                        ) : (
+                          <EyeOff className="w-3 h-3 mr-1" />
+                        )}
+                        {album.isActive ? 'Active' : 'Hidden'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                          <MoreVertical className="w-5 h-5" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="bg-[#282828] border border-white/10 text-white">
+                          <DropdownMenuItem
+                            onClick={() => toggleAlbumVisibility(album.id)}
+                          >
+                            {album.isActive ? (
+                              <>
+                                <EyeOff className="w-4 h-4 mr-2" />
+                                Hide Album
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-4 h-4 mr-2" />
+                                Show Album
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-white/10" />
+                          <DropdownMenuItem
+                            onClick={() => setAlbumToDelete(album)}
+                            className="text-red-400"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Album
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
               <Music className="w-12 h-12 mb-4" />
@@ -370,68 +397,100 @@ export default function ArtistAlbums() {
             </div>
           )}
         </div>
+
+        {/* Responsive Pagination */}
+        {pagination.total > 0 && (
+          <div className="flex items-center justify-center gap-2 p-4 border-t border-white/[0.08]">
+            <button
+              onClick={handlePrevPage}
+              disabled={currentPage <= 1}
+              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              Previous
+            </button>
+
+            {/* Mobile Pagination */}
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                  {currentPage} of {pagination.totalPages}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                  <div className="space-y-3">
+                    <div className="text-xs text-white/60">Go to page:</div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={pagination.totalPages}
+                        defaultValue={currentPage}
+                        ref={pageInputRef}
+                        className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                        placeholder="Page"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const page = pageInputRef.current
+                          ? parseInt(pageInputRef.current.value, 10)
+                          : NaN;
+                        if (!isNaN(page)) {
+                          updateQueryParam('page', page);
+                        }
+                      }}
+                      className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                    >
+                      Go to Page
+                    </button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Desktop Pagination */}
+            <div className="hidden md:flex items-center gap-2 text-sm">
+              <span className="text-white/60">Page</span>
+              <div className="bg-white/5 px-3 py-1 rounded-md border border-white/[0.1]">
+                <span className="text-white font-medium">{currentPage}</span>
+              </div>
+              <span className="text-white/60">of {pagination.totalPages}</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={pagination.totalPages}
+                  defaultValue={currentPage}
+                  ref={pageInputRef}
+                  className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                  placeholder="Page"
+                />
+                <button
+                  onClick={() => {
+                    const page = pageInputRef.current
+                      ? parseInt(pageInputRef.current.value, 10)
+                      : NaN;
+                    if (!isNaN(page)) {
+                      updateQueryParam('page', page);
+                    }
+                  }}
+                  className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                >
+                  Go
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage >= pagination.totalPages}
+              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
-      {pagination.total > 0 && (
-        <div className="flex items-center justify-center gap-4 mt-4">
-          <button
-            onClick={handlePrevPage}
-            disabled={currentPage <= 1}
-            className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
-          >
-            Previous
-          </button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-white/60">Page</span>
-            <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
-              <span className="text-white font-medium">{currentPage}</span>
-            </div>
-            <span className="text-white/60">of {pagination.totalPages}</span>
-
-            <div className="flex items-center gap-2 ml-4">
-              <input
-                type="number"
-                min={1}
-                max={pagination.totalPages}
-                defaultValue={currentPage}
-                ref={pageInputRef}
-                className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
-                placeholder="Page"
-              />
-              <button
-                onClick={() => {
-                  const page = pageInputRef.current
-                    ? parseInt(pageInputRef.current.value, 10)
-                    : NaN;
-                  if (
-                    !isNaN(page) &&
-                    page >= 1 &&
-                    page <= pagination.totalPages
-                  ) {
-                    updateQueryParam('page', page);
-                  } else if (!isNaN(page) && page < 1) {
-                    updateQueryParam('page', 1);
-                  }
-                }}
-                className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
-              >
-                Go
-              </button>
-            </div>
-          </div>
-
-          <button
-            onClick={handleNextPage}
-            disabled={currentPage >= pagination.totalPages}
-            className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
-          >
-            Next
-          </button>
-        </div>
-      )}
-
-      {/* Delete Confirmation Dialog */}
       {albumToDelete && (
         <div className="fixed inset-0 bg-[#404045]/50 flex items-center justify-center z-50">
           <div className="bg-[#121212] p-6 rounded-lg max-w-md w-full mx-4">

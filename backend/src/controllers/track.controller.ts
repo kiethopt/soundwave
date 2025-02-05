@@ -480,7 +480,7 @@ export const searchTrack = async (
 
     const searchQuery = String(q).trim();
 
-    // Lưu lịch sử tìm kiếm nếu người dùng đã đăng nhập
+    // Save search history if the user is logged in
     if (user) {
       const existingHistory = await prisma.history.findFirst({
         where: {
@@ -506,6 +506,7 @@ export const searchTrack = async (
       }
     }
 
+    // Build search conditions on title and artist name (also including featured artists)
     const searchConditions = [
       { title: { contains: searchQuery, mode: Prisma.QueryMode.insensitive } },
       {
@@ -530,13 +531,23 @@ export const searchTrack = async (
       },
     ];
 
-    const whereClause = {
-      AND: [
-        { isActive: true },
-        { artist: { isActive: true } },
-        { OR: searchConditions },
-      ],
-    };
+    // For artist management (logged-in artist) restrict search to only the artist's own tracks.
+    // Otherwise (i.e. for public searches) only show active tracks from active artists.
+    let whereClause: any;
+    if (user && user.currentProfile === 'ARTIST' && user.artistProfile?.id) {
+      whereClause = {
+        artistId: user.artistProfile.id,
+        OR: searchConditions,
+      };
+    } else {
+      whereClause = {
+        AND: [
+          { isActive: true },
+          { artist: { isActive: true } },
+          { OR: searchConditions },
+        ],
+      };
+    }
 
     const [tracks, total] = await Promise.all([
       prisma.track.findMany({
@@ -546,9 +557,7 @@ export const searchTrack = async (
         select: trackSelect,
         orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
       }),
-      prisma.track.count({
-        where: whereClause,
-      }),
+      prisma.track.count({ where: whereClause }),
     ]);
 
     res.json({

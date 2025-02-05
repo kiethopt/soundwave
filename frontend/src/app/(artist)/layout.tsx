@@ -45,7 +45,7 @@ export default function ArtistLayout({
   }
 
   return (
-    <div className="p-2" suppressHydrationWarning>
+    <div className="h-full" suppressHydrationWarning>
       {children}
     </div>
   );

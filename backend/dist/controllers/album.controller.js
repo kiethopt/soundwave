@@ -523,7 +523,7 @@ const toggleAlbumVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
 });
 exports.toggleAlbumVisibility = toggleAlbumVisibility;
 const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b;
     try {
         const { q, page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
@@ -570,8 +570,11 @@ const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 },
             ],
         };
+        if ((user === null || user === void 0 ? void 0 : user.currentProfile) === 'ARTIST' && ((_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+            whereClause.artistId = user.artistProfile.id;
+        }
         if (!user || user.role !== client_1.Role.ADMIN) {
-            if (((_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
+            if (((_b = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _b === void 0 ? void 0 : _b.isVerified) &&
                 (user === null || user === void 0 ? void 0 : user.currentProfile) === 'ARTIST') {
                 whereClause.OR = [
                     { isActive: true },

@@ -689,6 +689,11 @@ export const searchAlbum = async (
       ],
     };
 
+    // Thêm điều kiện lọc theo artist nếu người dùng là artist
+    if (user?.currentProfile === 'ARTIST' && user?.artistProfile?.id) {
+      whereClause.artistId = user.artistProfile.id;
+    }
+
     // Thêm điều kiện isActive và quyền sở hữu
     if (!user || user.role !== Role.ADMIN) {
       if (

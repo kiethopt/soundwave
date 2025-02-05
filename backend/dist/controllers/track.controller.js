@@ -376,6 +376,7 @@ const toggleTrackVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
 });
 exports.toggleTrackVisibility = toggleTrackVisibility;
 const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { q, page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
@@ -432,13 +433,22 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 },
             },
         ];
-        const whereClause = {
-            AND: [
-                { isActive: true },
-                { artist: { isActive: true } },
-                { OR: searchConditions },
-            ],
-        };
+        let whereClause;
+        if (user && user.currentProfile === 'ARTIST' && ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+            whereClause = {
+                artistId: user.artistProfile.id,
+                OR: searchConditions,
+            };
+        }
+        else {
+            whereClause = {
+                AND: [
+                    { isActive: true },
+                    { artist: { isActive: true } },
+                    { OR: searchConditions },
+                ],
+            };
+        }
         const [tracks, total] = yield Promise.all([
             db_1.default.track.findMany({
                 where: whereClause,
@@ -447,9 +457,7 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 select: prisma_selects_1.trackSelect,
                 orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
             }),
-            db_1.default.track.count({
-                where: whereClause,
-            }),
+            db_1.default.track.count({ where: whereClause }),
         ]);
         res.json({
             tracks,

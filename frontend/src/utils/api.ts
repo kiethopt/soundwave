@@ -416,7 +416,6 @@ export const api = {
       ),
   },
 
-  // API dành riêng cho Artist (chú ý: thuộc tính "artist" mới được thêm vào)
   artist: {
     getStats: async (token: string) =>
       fetchWithAuth('/api/artist/stats', { method: 'GET' }, token),
