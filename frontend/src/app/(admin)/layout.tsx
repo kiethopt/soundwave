@@ -46,7 +46,7 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="p-2 " suppressHydrationWarning>
+    <div className="h-full" suppressHydrationWarning>
       {children}
     </div>
   );

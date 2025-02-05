@@ -15,8 +15,17 @@ import {
   Eye,
   EyeOff,
   Verified,
+  Edit,
+  Trash2,
 } from '@/components/ui/Icons';
 import { useDominantColor } from '@/hooks/useDominantColor';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function AlbumDetailPage() {
   const { albumId } = useParams();
@@ -390,16 +399,20 @@ export default function AlbumDetailPage() {
 
   return (
     <div
-      className="min-h-screen rounded-lg"
+      className="rounded-lg"
       style={{
         background: dominantColor
-          ? `linear-gradient(180deg, ${dominantColor} 0%, ${dominantColor}99 15%, ${dominantColor}40 30%, #121212 100%)`
+          ? `linear-gradient(180deg, 
+            ${dominantColor} 0%, 
+            ${dominantColor}99 15%,
+            ${dominantColor}40 30%,
+            #121212 100%)`
           : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
       }}
     >
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header section */}
-        <div className="flex items-center justify-between mb-8">
+      <div className="max-w-8xl mx-auto px-4 md:px-6 py-6 mb-16 md:mb-0">
+        {/* Header with Back button and Edit button */}
+        <div className="flex items-center justify-between mb-6">
           <Link
             href="/artist/albums"
             className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors group"
@@ -415,43 +428,56 @@ export default function AlbumDetailPage() {
           </button>
         </div>
 
-        {/* Album info section */}
-        <div className="flex flex-col md:flex-row gap-8 items-start mb-8">
+        {/* Main Container */}
+        <div className="flex flex-col items-center md:items-start md:flex-row gap-8">
+          {/* Album Cover */}
           {album.coverUrl && (
-            <img
-              src={album.coverUrl || '/placeholder.svg'}
-              alt={album.title}
-              className="w-48 h-48 object-cover rounded-lg shadow-xl"
-            />
+            <div className="w-[280px] md:w-[220px] flex-shrink-0">
+              <img
+                src={album.coverUrl}
+                alt={album.title}
+                className="w-full aspect-square object-cover rounded-xl shadow-2xl"
+              />
+            </div>
           )}
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold mb-4">{album.title}</h1>
-            <div className="flex flex-col gap-2 text-white/60">
-              <div className="flex items-center gap-2">
-                <p className="text-xl text-white">{album.artist.artistName}</p>
-                {/* Sử dụng icon Verified thay vì dấu ✓ */}
+
+          {/* Album Info */}
+          <div className="w-full flex flex-col gap-4">
+            <div className="text-center md:text-left">
+              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+                {album.title}
+              </h1>
+
+              <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
+                <span className="text-white/90 text-lg">
+                  {album.artist.artistName}
+                </span>
                 {album.artist.isVerified && <Verified className="w-5 h-5" />}
               </div>
-              <div className="flex items-center gap-6">
+
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 text-base text-white/60">
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  {new Date(album.releaseDate).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                  })}
+                  <Calendar className="w-5 h-5" />
+                  <span>
+                    {new Date(album.releaseDate).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Music className="w-4 h-4" />
-                  {album.totalTracks || 0} tracks
+                  <Music className="w-5 h-5" />
+                  <span>{album.totalTracks || 0} tracks</span>
                 </div>
               </div>
-              {album.genres && album.genres.length > 0 && (
-                <div className="flex gap-2 mt-2">
+
+              {album.genres?.length > 0 && (
+                <div className="flex gap-2 flex-wrap justify-center md:justify-start mt-4">
                   {album.genres.map(({ genre }) => (
                     <span
                       key={genre.id}
-                      className="px-2 py-1 bg-white/10 rounded-full text-sm"
+                      className="px-3 py-1 bg-white/10 rounded-full text-sm text-white/80"
                     >
                       {genre.name}
                     </span>
@@ -462,45 +488,40 @@ export default function AlbumDetailPage() {
           </div>
         </div>
 
-        {/* Tracks section */}
-        {album.tracks && album.tracks.length > 0 && (
-          <div className="mb-12">
-            {/* <h2 className="text-xl font-semibold mb-4">Tracks</h2> */}
-            <div className="w-full bg-black/20 rounded-lg overflow-visible">
-              <div className="px-6 py-4 border-b border-white/10">
-                <div className="grid grid-cols-[16px_4fr_2fr_minmax(120px,1fr)_100px_48px] gap-4 text-sm text-white/60">
+        {/* Track List */}
+        {album.tracks?.length > 0 && (
+          <div className="mt-6">
+            <div className="w-full bg-black/20 rounded-xl overflow-hidden border border-white/10 backdrop-blur-sm">
+              {/* Header - Desktop only */}
+              <div className="hidden md:block px-6 py-4 border-b border-white/10">
+                <div className="grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 text-sm text-white/60">
                   <div className="text-center">#</div>
                   <div>Title</div>
                   <div>Artists</div>
-                  <div className="text-left">Duration</div>
-                  <div className="text-center">Status</div>
+                  <div className="text-right">Duration</div>
                   <div></div>
                 </div>
               </div>
+
               <div className="divide-y divide-white/10">
                 {album.tracks.map((track) => (
-                  <div
-                    key={track.id}
-                    className="grid grid-cols-[16px_4fr_2fr_minmax(120px,1fr)_100px_48px] gap-4 items-center px-6 py-4 hover:bg-white/5 transition-colors group relative"
-                  >
-                    <div className="text-center">{track.trackNumber}</div>
-                    <div className="flex items-center gap-3">
-                      {track.coverUrl || album.coverUrl ? (
-                        <img
-                          src={track.coverUrl || album.coverUrl}
-                          alt={track.title}
-                          className="w-10 h-10 object-cover rounded"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-white/10 rounded"></div>
-                      )}
-                      <span>{track.title}</span>
-                    </div>
-                    <div>
-                      <div>{track.artist.artistName}</div>
-                      {track.featuredArtists &&
-                        track.featuredArtists.length > 0 && (
-                          <div className="text-sm text-white/60">
+                  <div key={track.id}>
+                    {/* Desktop Layout */}
+                    <div className="hidden md:grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 px-6 py-4 hover:bg-white/5 group">
+                      <div className="flex items-center justify-center text-white/60">
+                        {track.trackNumber}
+                      </div>
+                      <div className="flex items-center min-w-0">
+                        <span className="font-medium truncate">
+                          {track.title}
+                        </span>
+                      </div>
+                      <div className="flex flex-col justify-center min-w-0">
+                        <div className="truncate">
+                          {track.artist.artistName}
+                        </div>
+                        {track.featuredArtists?.length > 0 && (
+                          <div className="text-sm text-white/60 truncate">
                             feat.{' '}
                             {track.featuredArtists
                               .map(
@@ -509,72 +530,122 @@ export default function AlbumDetailPage() {
                               .join(', ')}
                           </div>
                         )}
-                    </div>
-                    <div className="text-left">
-                      {Math.floor(track.duration / 60)}:
-                      {(track.duration % 60).toString().padStart(2, '0')}
-                    </div>
-                    <div className="text-center">
-                      <span
-                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          track.isActive
-                            ? 'bg-green-500/10 text-green-500'
-                            : 'bg-red-500/10 text-red-500'
-                        }`}
-                      >
-                        {track.isActive ? (
-                          <Eye className="w-3 h-3 mr-1" />
-                        ) : (
-                          <EyeOff className="w-3 h-3 mr-1" />
-                        )}
-                        {track.isActive ? 'Active' : 'Hidden'}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveTrackMenu((prev) =>
-                            prev === track.id ? null : track.id
-                          );
-                        }}
-                        className="track-menu-button p-2 hover:bg-white/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-
-                      {activeTrackMenu === track.id && (
-                        <div
-                          className="track-menu absolute w-48 bg-[#282828] rounded-md shadow-lg z-[100] border border-white/10"
-                          style={{
-                            right: '100%',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            marginRight: '0.5rem',
-                          }}
-                        >
-                          <div className="py-1">
-                            <button
+                      </div>
+                      <div className="flex items-center justify-end text-white/60">
+                        {Math.floor(track.duration / 60)}:
+                        {(track.duration % 60).toString().padStart(2, '0')}
+                      </div>
+                      <div className="flex items-center justify-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 hover:bg-white/10 p-2 rounded-full transition-all">
+                            <MoreVertical className="w-4 h-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="bg-[#282828] border border-white/10 text-white">
+                            <DropdownMenuItem
                               onClick={() => handleEditTrack(track)}
-                              className="w-full px-4 py-2 text-left text-sm hover:bg-white/10 transition-colors"
                             >
+                              <Edit className="w-4 h-4 mr-2" />
                               Edit Track
-                            </button>
-                            <button
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               onClick={() => handleToggleTrackVisibility(track)}
-                              className="w-full px-4 py-2 text-left text-sm hover:bg-white/10 transition-colors"
                             >
-                              {track.isActive ? 'Hide Track' : 'Show Track'}
-                            </button>
-                            <button
+                              {track.isActive ? (
+                                <>
+                                  <EyeOff className="w-4 h-4 mr-2" />
+                                  Hide Track
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Show Track
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuItem
                               onClick={() => handleDeleteTrack(track)}
-                              className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-white/10 transition-colors"
+                              className="text-red-400"
                             >
+                              <Trash2 className="w-4 h-4 mr-2" />
                               Delete Track
-                            </button>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+
+                    {/* Mobile Layout */}
+                    <div className="md:hidden p-4 hover:bg-white/5">
+                      <div className="flex items-center gap-4">
+                        <span className="text-white/60 w-8 text-center">
+                          {track.trackNumber}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">
+                            {track.title}
+                          </div>
+                          <div className="text-sm text-white/60 truncate">
+                            {track.artist.artistName}
+                            {track.featuredArtists?.length > 0 && (
+                              <span className="text-white/40">
+                                {' '}
+                                • feat.{' '}
+                                {track.featuredArtists
+                                  .map(
+                                    ({ artistProfile }) =>
+                                      artistProfile.artistName
+                                  )
+                                  .join(', ')}
+                              </span>
+                            )}
                           </div>
                         </div>
-                      )}
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-white/60">
+                            {Math.floor(track.duration / 60)}:
+                            {(track.duration % 60).toString().padStart(2, '0')}
+                          </span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                              <MoreVertical className="w-4 h-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="bg-[#282828] border border-white/10 text-white">
+                              <DropdownMenuItem
+                                onClick={() => handleEditTrack(track)}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Track
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleToggleTrackVisibility(track)
+                                }
+                              >
+                                {track.isActive ? (
+                                  <>
+                                    <EyeOff className="w-4 h-4 mr-2" />
+                                    Hide Track
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    Show Track
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-white/10" />
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteTrack(track)}
+                                className="text-red-400"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Track
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -583,10 +654,10 @@ export default function AlbumDetailPage() {
           </div>
         )}
 
-        {/* Upload section */}
+        {/* Upload New Tracks Section */}
         <div className="mt-12">
           <h2 className="text-xl font-semibold mb-6">Upload New Tracks</h2>
-          <div className="bg-white/5 rounded-md p-6 backdrop-blur-sm">
+          <div className="bg-white/5 rounded-xl p-6 backdrop-blur-sm border border-white/10">
             <TrackUploadForm
               album={album}
               newTracks={newTracks}
@@ -604,7 +675,7 @@ export default function AlbumDetailPage() {
                 }));
               }}
               artists={artists}
-              existingTrackCount={album?.tracks?.length || 0}
+              existingTrackCount={album.tracks?.length || 0}
             />
           </div>
         </div>
@@ -612,10 +683,10 @@ export default function AlbumDetailPage() {
         {/* Message display */}
         {message.text && (
           <div
-            className={`mt-4 p-4 rounded-md ${
+            className={`mt-4 p-4 rounded-lg ${
               message.type === 'error'
-                ? 'bg-red-500/10 text-red-500'
-                : 'bg-green-500/10 text-green-500'
+                ? 'bg-red-500/10 text-red-400'
+                : 'bg-green-500/10 text-green-400'
             }`}
           >
             {message.text}
@@ -624,8 +695,8 @@ export default function AlbumDetailPage() {
 
         {/* Edit Album Dialog */}
         {showEditDialog && (
-          <div className="fixed inset-0 bg-[#404045]/50 flex items-center justify-center z-50">
-            <div className="bg-[#121212] p-6 rounded-lg max-w-md w-full mx-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#121212] p-6 rounded-lg max-w-md w-full">
               <h3 className="text-xl font-bold mb-4">Edit Album</h3>
               <form onSubmit={handleEditSubmit} className="space-y-4">
                 <div>
@@ -731,8 +802,8 @@ export default function AlbumDetailPage() {
 
         {/* Edit Track Dialog */}
         {showEditTrackDialog && editingTrack && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-[#121212] p-6 rounded-lg max-w-md w-full mx-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#121212] p-6 rounded-lg max-w-md w-full">
               <h3 className="text-xl font-bold mb-4">Edit Track</h3>
               <form onSubmit={handleEditTrackSubmit} className="space-y-4">
                 <div>

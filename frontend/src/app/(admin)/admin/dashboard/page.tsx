@@ -93,7 +93,7 @@ export default function AdminDashboard() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6 min-h-full sm:p-0 mb-16">
+    <div className="flex flex-col gap-4 sm:gap-6 min-h-full p-4 mb-16 md:mb-0">
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
         <div>

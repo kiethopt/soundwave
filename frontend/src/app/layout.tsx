@@ -91,7 +91,7 @@ export default function RootLayout({
                   <main className="flex-1 relative" suppressHydrationWarning>
                     <div className="absolute inset-0 overflow-y-auto">
                       <div
-                        className="min-h-full m-2 p-2 rounded-lg bg-[#111111]"
+                        className="min-h-full p-2 rounded-lg bg-[#111111]"
                         suppressHydrationWarning
                       >
                         {children}

@@ -16,6 +16,12 @@ import {
 import { Verified } from '@/components/ui/Icons';
 import { ArtistProfile, Album, Track } from '@/types';
 import { cn } from '@/lib/utils';
+// Import DropdownMenu các thành phần để dùng cho mobile pagination
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+} from '@/components/ui/dropdown-menu';
 
 export default function ArtistDetail({
   params,
@@ -238,7 +244,7 @@ export default function ArtistDetail({
   }
 
   return (
-    <div className="container mx-auto space-y-6">
+    <div className="container mx-auto space-y-6 p-4 h-full mb-16 md:mb-0">
       <div className="flex items-center">
         <Link
           href="/admin/artists"
@@ -249,7 +255,7 @@ export default function ArtistDetail({
         </Link>
       </div>
 
-      <div className="bg-[#121212] rounded-xl overflow-hidden border border-white/10 p-6 backdrop-blur-sm">
+      <div className="bg-[#121212] rounded-xl overflow-hidden border border-white/10 p-6 backdrop-blur-sm relative">
         <div className="grid gap-6 md:grid-cols-[240px_1fr]">
           {/* Left Column */}
           <div className="space-y-4">
@@ -258,7 +264,7 @@ export default function ArtistDetail({
                 <img
                   src={artist.avatar}
                   alt={artist.artistName}
-                  className="w-60 h-60 rounded-xl object-cover shadow-xl border-4 border-white/10"
+                  className="w-full md:w-60 h-60 rounded-xl object-cover shadow-xl border-4 border-white/10"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.onerror = null;
@@ -266,48 +272,50 @@ export default function ArtistDetail({
                   }}
                 />
               ) : (
-                <div className="w-60 h-60 rounded-xl bg-gradient-to-br from-[#2c2c2c] to-[#1a1a1a] flex items-center justify-center">
-                  <User className="w-20 h-20 text-white/60" />
+                <div className="w-full md:w-60 h-60 rounded-xl bg-gradient-to-br from-[#2c2c2c] to-[#1a1a1a] flex items-center justify-center">
+                  <User className="w-16 h-16 md:w-20 md:h-20 text-white/60" />
                 </div>
               )}
             </div>
 
             <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-              <p className="text-sm text-white/60 mb-1">Monthly Listeners</p>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-xs md:text-sm text-white/60 mb-1">
+                Monthly Listeners
+              </p>
+              <p className="text-xl md:text-2xl font-bold text-white">
                 {artist.monthlyListeners?.toLocaleString() ?? 0}
               </p>
             </div>
           </div>
 
           {/* Right Column */}
-          <div className="space-y-6">
+          <div className="space-y-6 flex flex-col">
             {/* Header Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-4xl font-bold tracking-tight text-white">
+            <div className="space-y-3 md:space-y-4">
+              <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+                <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white">
                   {artist.artistName || artist.user?.name}
                 </h1>
                 {artist.isVerified && (
                   <span title="Verified Artist">
-                    <Verified className="w-6 h-6" />
+                    <Verified className="w-5 h-5 md:w-6 md:h-6" />
                   </span>
                 )}
               </div>
               {artist.bio && (
-                <p className="text-white/60 text-lg leading-relaxed max-w-3xl">
+                <p className="text-white/60 text-sm md:text-lg leading-relaxed max-w-3xl">
                   {artist.bio}
                 </p>
               )}
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={handleVerify}
                 disabled={artist.isVerified || isUpdating}
                 className={cn(
-                  'flex items-center gap-2 px-5 py-2.5 rounded-xl transition-all',
+                  'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm transition-all',
                   artist.isVerified
                     ? 'bg-green-500/10 text-green-400 cursor-not-allowed'
                     : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20'
@@ -315,13 +323,15 @@ export default function ArtistDetail({
               >
                 {isUpdating ? (
                   <>
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    Verifying...
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Verifying...</span>
                   </>
                 ) : (
                   <>
-                    <RefreshCw className="w-5 h-5" />
-                    {artist.isVerified ? 'Verified' : 'Verify Artist'}
+                    <RefreshCw className="w-4 h-4" />
+                    <span>
+                      {artist.isVerified ? 'Verified' : 'Verify Artist'}
+                    </span>
                   </>
                 )}
               </button>
@@ -329,21 +339,21 @@ export default function ArtistDetail({
               <button
                 onClick={handleUpdateMonthlyListeners}
                 disabled={isUpdating}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white/5 text-white/90 rounded-xl hover:bg-white/10 border border-white/10 transition-all"
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-white/5 text-white/90 rounded-lg hover:bg-white/10 border border-white/10 transition-all text-sm"
               >
                 <RefreshCw
-                  className={`w-5 h-5 ${isUpdating ? 'animate-spin' : ''}`}
+                  className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`}
                 />
-                Update Listeners
+                <span>Update Listeners</span>
               </button>
             </div>
 
             {/* Tab Navigation */}
-            <div className="border-b border-white/10 mt-8">
-              <div className="flex gap-8">
+            <div className="border-b border-white/10">
+              <div className="flex gap-4">
                 <button
                   onClick={() => setActiveTab('albums')}
-                  className={`pb-4 px-1 font-medium ${
+                  className={`pb-3 px-1 text-sm font-medium ${
                     activeTab === 'albums'
                       ? 'border-b-2 border-white text-white'
                       : 'text-white/60 hover:text-white/80'
@@ -353,7 +363,7 @@ export default function ArtistDetail({
                 </button>
                 <button
                   onClick={() => setActiveTab('tracks')}
-                  className={`pb-4 px-1 font-medium ${
+                  className={`pb-3 px-1 text-sm font-medium ${
                     activeTab === 'tracks'
                       ? 'border-b-2 border-white text-white'
                       : 'text-white/60 hover:text-white/80'
@@ -365,41 +375,41 @@ export default function ArtistDetail({
             </div>
 
             {/* Content Area */}
-            <div className="mt-6">
+            <div className="flex-1 min-h-0">
               {/* Albums Tab */}
               {activeTab === 'albums' && (
                 <div className="space-y-6">
                   {artist.albums?.data && artist.albums.data.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {(artist.albums.data || []).map((album: Album) => (
                         <div
                           key={album.id}
-                          className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors border border-white/10"
+                          className="bg-white/5 rounded-lg p-2 hover:bg-white/10 transition-colors border border-white/10"
                         >
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-3">
                             {album.coverUrl ? (
                               <img
                                 src={album.coverUrl}
                                 alt={album.title}
-                                className="w-16 h-16 rounded-lg object-cover"
+                                className="w-12 h-12 rounded-md object-cover"
                               />
                             ) : (
-                              <div className="w-16 h-16 rounded-lg bg-white/10 flex items-center justify-center">
-                                <Disc className="w-8 h-8 text-white/60" />
+                              <div className="w-12 h-12 rounded-md bg-white/10 flex items-center justify-center">
+                                <Disc className="w-6 h-6 text-white/60" />
                               </div>
                             )}
-                            <div>
+                            <div className="min-w-0 flex-1">
                               <Link
                                 href={`/admin/artists/${id}/albums/${album.id}`}
-                                className="text-lg font-semibold text-white hover:underline"
+                                className="text-sm font-semibold text-white hover:underline truncate block"
                               >
                                 {album.title}
                               </Link>
-                              <p className="text-sm text-white/60 mt-1">
+                              <p className="text-xs text-white/60 mt-0.5 truncate">
                                 {album.totalTracks} tracks &middot;{' '}
                                 {formatDuration(album.duration)}
                               </p>
-                              <p className="text-sm text-white/60">
+                              <p className="text-xs text-white/60 truncate">
                                 {new Date(album.releaseDate).getFullYear()}
                               </p>
                             </div>
@@ -410,17 +420,80 @@ export default function ArtistDetail({
                   ) : (
                     <p className="text-white">No albums found on this page.</p>
                   )}
-                  {artist.albums && artist.albums.total > 0 && (
-                    <div className="flex items-center justify-center gap-4 mt-4">
-                      <button
-                        onClick={handleAlbumPrev}
-                        disabled={sanitizedAlbumPage <= 1}
-                        className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
-                      >
-                        Previous
-                      </button>
 
-                      <div className="flex items-center gap-2">
+                  {/* Album Pagination */}
+                  {artist.albums && artist.albums.total > 0 && (
+                    <>
+                      {/* Mobile Pagination */}
+                      <div className="flex md:hidden items-center justify-center gap-2 mt-4">
+                        <button
+                          onClick={handleAlbumPrev}
+                          disabled={sanitizedAlbumPage <= 1}
+                          className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Previous
+                        </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                            {sanitizedAlbumPage} of{' '}
+                            {artist.albums?.totalPages ?? 1}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                            <div className="space-y-3">
+                              <div className="text-xs text-white/60">
+                                Go to page:
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={artist.albums?.totalPages ?? 1}
+                                  defaultValue={sanitizedAlbumPage}
+                                  ref={albumPageRef}
+                                  className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                                  placeholder="Page"
+                                />
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const page = albumPageRef.current
+                                    ? parseInt(albumPageRef.current.value, 10)
+                                    : NaN;
+                                  if (
+                                    !isNaN(page) &&
+                                    page >= 1 &&
+                                    page <= (artist.albums?.totalPages ?? 1)
+                                  ) {
+                                    updateQueryParam('albumPage', page);
+                                  }
+                                }}
+                                className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                              >
+                                Go
+                              </button>
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <button
+                          onClick={handleAlbumNext}
+                          disabled={
+                            sanitizedAlbumPage >=
+                            (artist.albums?.totalPages ?? 1)
+                          }
+                          className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Next
+                        </button>
+                      </div>
+                      {/* Desktop Pagination */}
+                      <div className="hidden md:flex items-center justify-center gap-2 mt-4 text-sm">
+                        <button
+                          onClick={handleAlbumPrev}
+                          disabled={sanitizedAlbumPage <= 1}
+                          className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                        >
+                          Previous
+                        </button>
                         <span className="text-white/60">Page</span>
                         <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
                           <span className="text-white font-medium">
@@ -430,14 +503,14 @@ export default function ArtistDetail({
                         <span className="text-white/60">
                           of {artist.albums?.totalPages ?? 1}
                         </span>
-                        <div className="flex items-center gap-2 ml-4">
+                        <div className="flex items-center gap-2">
                           <input
                             type="number"
                             min={1}
                             max={artist.albums?.totalPages ?? 1}
                             defaultValue={sanitizedAlbumPage}
                             ref={albumPageRef}
-                            className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                            className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
                             placeholder="Page"
                           />
                           <button
@@ -453,23 +526,23 @@ export default function ArtistDetail({
                                 updateQueryParam('albumPage', page);
                               }
                             }}
-                            className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+                            className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
                           >
                             Go
                           </button>
                         </div>
+                        <button
+                          onClick={handleAlbumNext}
+                          disabled={
+                            sanitizedAlbumPage >=
+                            (artist.albums?.totalPages ?? 1)
+                          }
+                          className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                        >
+                          Next
+                        </button>
                       </div>
-
-                      <button
-                        onClick={handleAlbumNext}
-                        disabled={
-                          sanitizedAlbumPage >= (artist.albums?.totalPages ?? 1)
-                        }
-                        className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
-                      >
-                        Next
-                      </button>
-                    </div>
+                    </>
                   )}
                 </div>
               )}
@@ -478,48 +551,48 @@ export default function ArtistDetail({
               {activeTab === 'tracks' && (
                 <div className="space-y-6">
                   {artist.tracks?.data && artist.tracks.data.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {(artist.tracks.data || []).map((track: Track) => (
                         <div
                           key={track.id}
-                          className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors border border-white/10"
+                          className="bg-white/5 rounded-md p-2 hover:bg-white/10 transition-colors border border-white/10 flex items-center gap-2"
                         >
-                          <div className="flex items-center gap-4">
-                            <button
-                              onClick={() =>
-                                setPlayingTrackId(
-                                  playingTrackId === track.id ? null : track.id
-                                )
-                              }
-                              className="text-white/60 hover:text-white transition-colors"
-                            >
-                              {playingTrackId === track.id ? (
-                                <Pause className="w-6 h-6" />
-                              ) : (
-                                <Play className="w-6 h-6" />
-                              )}
-                            </button>
-                            {track.coverUrl ? (
-                              <img
-                                src={track.coverUrl}
-                                alt={track.title}
-                                className="w-12 h-12 rounded-md object-cover"
-                              />
+                          <button
+                            onClick={() =>
+                              setPlayingTrackId(
+                                playingTrackId === track.id ? null : track.id
+                              )
+                            }
+                            className="text-white/60 hover:text-white transition-colors flex-shrink-0"
+                          >
+                            {playingTrackId === track.id ? (
+                              <Pause className="w-4 h-4" />
                             ) : (
-                              <div className="w-12 h-12 rounded-md bg-white/10 flex items-center justify-center">
-                                <Music className="w-6 h-6 text-white/60" />
-                              </div>
+                              <Play className="w-4 h-4" />
                             )}
-                            <div className="flex-1">
-                              <h3 className="font-semibold text-white">
+                          </button>
+                          {track.coverUrl ? (
+                            <img
+                              src={track.coverUrl}
+                              alt={track.title}
+                              className="w-8 h-8 rounded-md object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
+                              <Music className="w-4 h-4 text-white/60" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1 grid grid-cols-[1fr_auto] items-center gap-2">
+                            <div className="min-w-0">
+                              <h3 className="text-sm font-medium text-white truncate">
                                 {track.title}
                               </h3>
-                              <p className="text-sm text-white/60">
+                              <p className="text-xs text-white/60 truncate">
                                 {track.album?.title || 'Single'} &middot;{' '}
                                 {formatDuration(track.duration)}
                               </p>
                             </div>
-                            <div className="text-sm text-white/60">
+                            <div className="text-xs text-white/60 flex-shrink-0">
                               {track.playCount.toLocaleString()} plays
                             </div>
                           </div>
@@ -529,16 +602,80 @@ export default function ArtistDetail({
                   ) : (
                     <p className="text-white">No tracks found on this page.</p>
                   )}
+
+                  {/* Track Pagination */}
                   {artist.tracks && artist.tracks.total > 0 && (
-                    <div className="flex items-center justify-center gap-4 mt-4">
-                      <button
-                        onClick={handleTrackPrev}
-                        disabled={sanitizedTrackPage <= 1}
-                        className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
-                      >
-                        Previous
-                      </button>
-                      <div className="flex items-center gap-2">
+                    <div className="mt-6">
+                      {/* Mobile Pagination */}
+                      <div className="flex md:hidden items-center justify-center gap-2">
+                        <button
+                          onClick={handleTrackPrev}
+                          disabled={sanitizedTrackPage <= 1}
+                          className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Previous
+                        </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                            {sanitizedTrackPage} of{' '}
+                            {artist.tracks?.totalPages ?? 1}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                            <div className="space-y-3">
+                              <div className="text-xs text-white/60">
+                                Go to page:
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={artist.tracks?.totalPages ?? 1}
+                                  defaultValue={sanitizedTrackPage}
+                                  ref={trackPageRef}
+                                  className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                                  placeholder="Page"
+                                />
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const page = trackPageRef.current
+                                    ? parseInt(trackPageRef.current.value, 10)
+                                    : NaN;
+                                  if (
+                                    !isNaN(page) &&
+                                    page >= 1 &&
+                                    page <= (artist.tracks?.totalPages ?? 1)
+                                  ) {
+                                    updateQueryParam('trackPage', page);
+                                  }
+                                }}
+                                className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                              >
+                                Go
+                              </button>
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <button
+                          onClick={handleTrackNext}
+                          disabled={
+                            sanitizedTrackPage >=
+                            (artist.tracks?.totalPages ?? 1)
+                          }
+                          className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Next
+                        </button>
+                      </div>
+                      {/* Desktop Pagination */}
+                      <div className="hidden md:flex items-center justify-center gap-2 text-sm">
+                        <button
+                          onClick={handleTrackPrev}
+                          disabled={sanitizedTrackPage <= 1}
+                          className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                        >
+                          Previous
+                        </button>
                         <span className="text-white/60">Page</span>
                         <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
                           <span className="text-white font-medium">
@@ -548,14 +685,14 @@ export default function ArtistDetail({
                         <span className="text-white/60">
                           of {artist.tracks?.totalPages ?? 1}
                         </span>
-                        <div className="flex items-center gap-2 ml-4">
+                        <div className="flex items-center gap-2">
                           <input
                             type="number"
                             min={1}
                             max={artist.tracks?.totalPages ?? 1}
                             defaultValue={sanitizedTrackPage}
                             ref={trackPageRef}
-                            className="w-16 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50"
+                            className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
                             placeholder="Page"
                           />
                           <button
@@ -571,21 +708,22 @@ export default function ArtistDetail({
                                 updateQueryParam('trackPage', page);
                               }
                             }}
-                            className="px-3 py-1 rounded-lg bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors"
+                            className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
                           >
                             Go
                           </button>
                         </div>
+                        <button
+                          onClick={handleTrackNext}
+                          disabled={
+                            sanitizedTrackPage >=
+                            (artist.tracks?.totalPages ?? 1)
+                          }
+                          className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                        >
+                          Next
+                        </button>
                       </div>
-                      <button
-                        onClick={handleTrackNext}
-                        disabled={
-                          sanitizedTrackPage >= (artist.tracks?.totalPages ?? 1)
-                        }
-                        className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
-                      >
-                        Next
-                      </button>
                     </div>
                   )}
                 </div>

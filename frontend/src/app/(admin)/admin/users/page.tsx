@@ -186,7 +186,10 @@ export default function AdminUsers() {
   );
 
   return (
-    <div className="container mx-auto space-y-8 mb-16" suppressHydrationWarning>
+    <div
+      className="container mx-auto space-y-8 p-4 mb-16"
+      suppressHydrationWarning
+    >
       {/* Header Section */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
