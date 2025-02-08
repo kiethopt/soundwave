@@ -6,7 +6,6 @@ import { Role } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { addHours } from 'date-fns';
 import sgMail from '@sendgrid/mail';
-import { clearCacheForEntity } from '../middleware/cache.middleware';
 import { sessionService } from '../services/session.service';
 import { userSelect } from '../utils/prisma-selects';
 
