@@ -20,7 +20,6 @@ const client_1 = require("@prisma/client");
 const uuid_1 = require("uuid");
 const date_fns_1 = require("date-fns");
 const mail_1 = __importDefault(require("@sendgrid/mail"));
-const cache_middleware_1 = require("../middleware/cache.middleware");
 const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -67,6 +66,11 @@ const generateToken = (userId, role, artistProfile) => {
         role,
     }, JWT_SECRET, { expiresIn: '24h' });
 };
+const cacheConfig = {
+    short: { ttl: 300, swr: 60 },
+    medium: { ttl: 1800, swr: 300 },
+    long: { ttl: 3600, swr: 600 },
+};
 const validateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -79,6 +83,7 @@ const validateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, func
         const user = yield db_1.default.user.findUnique({
             where: { id: decoded.id },
             select: prisma_selects_1.userSelect,
+            cacheStrategy: cacheConfig.medium,
         });
         if (!user) {
             res.status(404).json({ message: 'User not found' });
@@ -168,7 +173,6 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             },
             select: prisma_selects_1.userSelect,
         });
-        yield (0, cache_middleware_1.clearCacheForEntity)('user', { clearSearch: true });
         res.status(201).json({ message: 'User registered successfully', user });
     }
     catch (error) {

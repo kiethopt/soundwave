@@ -31,6 +31,11 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
+const cacheConfig = {
+    short: { ttl: 300, swr: 60 },
+    medium: { ttl: 1800, swr: 300 },
+    long: { ttl: 3600, swr: 600 },
+};
 const createArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { name, email, artistName, bio, genres, socialMediaLinks } = req.body;
@@ -373,10 +378,6 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 select: prisma_selects_1.userSelect,
             });
         }));
-        yield (0, cache_middleware_1.clearCacheForEntity)('user', { entityId: id, clearSearch: true });
-        if (isVerifyingArtistRequest) {
-            yield (0, cache_middleware_1.clearCacheForEntity)('artist', { clearSearch: true });
-        }
         res.json({
             message: 'User updated successfully',
             user: updatedUser,
@@ -412,11 +413,6 @@ const deleteArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             db_1.default.track.deleteMany({ where: { artistId: id } }),
             db_1.default.album.deleteMany({ where: { artistId: id } }),
             db_1.default.artistProfile.delete({ where: { id } }),
-        ]);
-        yield Promise.all([
-            (0, cache_middleware_1.clearCacheForEntity)('artist', { entityId: id, clearSearch: true }),
-            (0, cache_middleware_1.clearCacheForEntity)('album', { clearSearch: true }),
-            (0, cache_middleware_1.clearCacheForEntity)('track', { clearSearch: true }),
         ]);
         res.json({ message: 'Artist deleted permanently' });
     }
@@ -463,16 +459,6 @@ const deactivateUser = (req, res) => __awaiter(void 0, void 0, void 0, function*
         if (keys.length) {
             yield Promise.all(keys.map((key) => cache_middleware_1.client.del(key)));
         }
-        yield Promise.all([
-            (0, cache_middleware_1.clearCacheForEntity)('user', {
-                entityId: id,
-                clearSearch: true,
-            }),
-            (0, cache_middleware_1.clearCacheForEntity)('stats', {}),
-            user.role === client_1.Role.ARTIST
-                ? (0, cache_middleware_1.clearCacheForEntity)('artist', { clearSearch: true })
-                : null,
-        ]);
         if (!isActive) {
             yield session_service_1.sessionService.handleUserDeactivation(user.id);
         }
@@ -511,10 +497,6 @@ const deactivateArtist = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 where: { id },
                 data: { isActive },
             }),
-        ]);
-        yield Promise.all([
-            (0, cache_middleware_1.clearCacheForEntity)('user', { entityId: artist.userId }),
-            (0, cache_middleware_1.clearCacheForEntity)('artist', { entityId: id }),
         ]);
         res.json({
             message: `Artist ${isActive ? 'activated' : 'deactivated'} successfully`,
@@ -834,14 +816,6 @@ const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, fun
             where: { id: artistProfile.userId },
             select: prisma_selects_1.userSelect,
         });
-        yield Promise.all([
-            (0, cache_middleware_1.clearCacheForEntity)('artist', { clearSearch: true }),
-            (0, cache_middleware_1.clearCacheForEntity)('user', { clearSearch: true }),
-            (0, cache_middleware_1.clearCacheForEntity)('stats', {}),
-            (0, cache_middleware_1.clearCacheForEntity)('album', { clearSearch: true }),
-            (0, cache_middleware_1.clearCacheForEntity)('track', { clearSearch: true }),
-            (0, cache_middleware_1.clearCacheForEntity)('artist-requests', { clearSearch: true }),
-        ]);
         yield session_service_1.sessionService.handleArtistRequestApproval(artistProfile.user.id);
         res.json({
             message: 'Artist role approved successfully',
@@ -887,7 +861,6 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
         yield db_1.default.artistProfile.delete({
             where: { id: requestId },
         });
-        yield (0, cache_middleware_1.clearCacheForEntity)('artist-requests', { clearSearch: true });
         yield session_service_1.sessionService.handleArtistRequestRejection(artistProfile.user.id);
         res.json({
             message: 'Artist role request rejected successfully',

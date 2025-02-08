@@ -1,10 +1,51 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import prisma from '../config/db';
 import { userSelect } from '../utils/prisma-selects';
+import { clearCacheForEntity } from './cache.middleware';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Tạo extension cho auth operations
+export const authExtension = Prisma.defineExtension((client) => {
+  return client.$extends({
+    query: {
+      user: {
+        async create({ args, query }) {
+          const result = await query(args);
+          await Promise.all([
+            clearCacheForEntity('user', { clearSearch: true }),
+            clearCacheForEntity('stats', {}),
+          ]);
+          return result;
+        },
+        async update({ args, query }) {
+          const result = await query(args);
+          await Promise.all([
+            clearCacheForEntity('user', {
+              entityId: args.where.id,
+              clearSearch: true,
+            }),
+            clearCacheForEntity('stats', {}),
+          ]);
+          return result;
+        },
+        async delete({ args, query }) {
+          const result = await query(args);
+          await Promise.all([
+            clearCacheForEntity('user', {
+              entityId: args.where.id,
+              clearSearch: true,
+            }),
+            clearCacheForEntity('stats', {}),
+          ]);
+          return result;
+        },
+      },
+    },
+  });
+});
 
 // Middleware xác thực
 export const authenticate = async (

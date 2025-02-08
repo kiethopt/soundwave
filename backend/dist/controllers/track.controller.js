@@ -219,11 +219,6 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: prisma_selects_1.trackSelect,
         });
-        yield (0, cache_middleware_1.clearCacheForEntity)('track', {
-            userId: finalArtistId,
-            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
-            clearSearch: true,
-        });
         res.status(201).json({
             message: 'Track created successfully',
             track,
@@ -277,11 +272,6 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             data: updateData,
             select: prisma_selects_1.trackSelect,
         });
-        yield (0, cache_middleware_1.clearCacheForEntity)('track', {
-            userId: updatedTrack.artistId,
-            entityId: id,
-            clearSearch: true,
-        });
         res.json({
             message: 'Track updated successfully',
             track: updatedTrack,
@@ -319,11 +309,6 @@ const deleteTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         yield db_1.default.track.delete({
             where: { id },
         });
-        yield (0, cache_middleware_1.clearCacheForEntity)('track', {
-            userId: track.artistId,
-            entityId: id,
-            clearSearch: true,
-        });
         res.json({ message: 'Track deleted successfully' });
     }
     catch (error) {
@@ -359,10 +344,6 @@ const toggleTrackVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
             where: { id },
             data: { isActive: !track.isActive },
             select: prisma_selects_1.trackSelect,
-        });
-        yield (0, cache_middleware_1.clearCacheForEntity)('track', {
-            entityId: id,
-            clearSearch: true,
         });
         res.json({
             message: `Track ${updatedTrack.isActive ? 'activated' : 'hidden'} successfully`,

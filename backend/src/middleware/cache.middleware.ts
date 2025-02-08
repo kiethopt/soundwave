@@ -95,20 +95,45 @@ export const clearCacheForEntity = async (
     // Tạo danh sách các pattern cần xóa
     const patterns = [
       `/api/${entity}s*`, // Xóa cache của entity (số nhiều)
+      `/api/${entity}/*`, // Xóa cache của entity (số ít)
       ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
-      `/api/${entity}s/play*`, // Pattern cho route play (số nhiều)
-      `/api/${entity}/play*`, // Pattern cho route play (số ít)
     ];
+
+    if (entity === 'user') {
+      patterns.push(
+        '/api/admin/users*',
+        '/admin/api/users*',
+        '/api/users/search*'
+      );
+    }
+
+    if (entity === 'artist') {
+      patterns.push('/api/admin/artists*', '/api/artists*', '/api/artist/*');
+    }
+
+    if (entity === 'artist-requests') {
+      patterns.push(
+        '/api/admin/artist-requests*',
+        '/api/artist-requests*',
+        '/api/users/check-artist-request*'
+      );
+    }
+
+    if (entity === 'album') {
+      patterns.push('/api/admin/albums*', '/api/albums*', '/api/album/*');
+    }
+
+    if (entity === 'track') {
+      patterns.push('/api/admin/tracks*', '/api/tracks*', '/api/track/*');
+    }
 
     if (options.clearSearch) {
       patterns.push(
-        '/api/search*', // Cache các route search tổng
-        '/api/*/search*', // Cache các route search con
-        '/search-all*', // Cache của searchAll
-        '/api/users/search-all*', // Cache của user search
-        '/api/user/search-all*', // Cache của user search (số ít)
-        `/api/${entity}s/search*`, // Cache của entity search (số nhiều)
-        `/api/${entity}/search*` // Cache của entity search (số ít)
+        '/api/search*',
+        '/api/*/search*',
+        '/search-all*',
+        `/api/${entity}s/search*`,
+        `/api/${entity}/search*`
       );
     }
 
@@ -123,20 +148,12 @@ export const clearCacheForEntity = async (
       }
     }
 
-    // Xóa thêm cache liên quan đến play và search
-    const additionalPatterns = [
-      '*play*', // Bất kỳ key nào có chứa 'play'
-      '*search*', // Bất kỳ key nào có chứa 'search'
-    ];
-
-    for (const pattern of additionalPatterns) {
-      const keys = await client.keys(pattern);
-      if (keys.length) {
-        console.log(
-          `Clearing additional cache for pattern: ${pattern}, keys:`,
-          keys
-        );
-        await Promise.all(keys.map((key) => client.del(key)));
+    // Xóa thêm cache stats
+    if (entity === 'user' || entity === 'stats') {
+      const statsKeys = await client.keys('/api/admin/stats*');
+      if (statsKeys.length) {
+        console.log(`[Redis] Clearing stats cache`);
+        await Promise.all(statsKeys.map((key) => client.del(key)));
       }
     }
   } catch (error) {

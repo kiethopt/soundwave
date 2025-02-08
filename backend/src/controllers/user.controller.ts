@@ -153,9 +153,6 @@ export const requestArtistRole = async (
       },
     });
 
-    // Clear cache: xóa cache các route liên quan đến Artist Requests
-    await clearCacheForEntity('artist-requests', { clearSearch: true });
-
     res.json({ message: 'Artist role request submitted successfully' });
   } catch (error) {
     console.error('Request artist role error:', error);

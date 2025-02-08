@@ -19,6 +19,13 @@ import {
   userSelect,
 } from '../utils/prisma-selects';
 
+// Helper function để tạo cache strategy
+const cacheConfig = {
+  short: { ttl: 300, swr: 60 }, // 5 phút cache + 1 phút stale
+  medium: { ttl: 1800, swr: 300 }, // 30 phút cache + 5 phút stale
+  long: { ttl: 3600, swr: 600 }, // 1 giờ cache + 10 phút stale
+};
+
 // Tạo 1 artist mới
 export const createArtist = async (req: Request, res: Response) => {
   try {
@@ -146,6 +153,7 @@ export const getAllUsers = async (
       orderBy: {
         createdAt: 'desc',
       },
+      // cacheStrategy: cacheConfig.short,
     });
 
     const totalUsers = await prisma.user.count();
@@ -463,12 +471,6 @@ export const updateUser = async (
       });
     });
 
-    // Clear cache
-    await clearCacheForEntity('user', { entityId: id, clearSearch: true });
-    if (isVerifyingArtistRequest) {
-      await clearCacheForEntity('artist', { clearSearch: true });
-    }
-
     res.json({
       message: 'User updated successfully',
       user: updatedUser,
@@ -520,11 +522,11 @@ export const deleteArtist = async (
     ]);
 
     // Clear cache
-    await Promise.all([
-      clearCacheForEntity('artist', { entityId: id, clearSearch: true }),
-      clearCacheForEntity('album', { clearSearch: true }),
-      clearCacheForEntity('track', { clearSearch: true }),
-    ]);
+    // await Promise.all([
+    //   clearCacheForEntity('artist', { entityId: id, clearSearch: true }),
+    //   clearCacheForEntity('album', { clearSearch: true }),
+    //   clearCacheForEntity('track', { clearSearch: true }),
+    // ]);
 
     res.json({ message: 'Artist deleted permanently' });
   } catch (error) {
@@ -586,18 +588,6 @@ export const deactivateUser = async (
       await Promise.all(keys.map((key) => client.del(key)));
     }
 
-    // Clear cache của user cụ thể và các cache liên quan
-    await Promise.all([
-      clearCacheForEntity('user', {
-        entityId: id,
-        clearSearch: true,
-      }),
-      clearCacheForEntity('stats', {}),
-      user.role === Role.ARTIST
-        ? clearCacheForEntity('artist', { clearSearch: true })
-        : null,
-    ]);
-
     // Chỉ gửi thông báo Pusher khi deactivate tài khoản
     if (!isActive) {
       await sessionService.handleUserDeactivation(user.id);
@@ -648,12 +638,6 @@ export const deactivateArtist = async (
         where: { id },
         data: { isActive },
       }),
-    ]);
-
-    // Clear cache
-    await Promise.all([
-      clearCacheForEntity('user', { entityId: artist.userId }),
-      clearCacheForEntity('artist', { entityId: id }),
     ]);
 
     res.json({
@@ -1015,13 +999,11 @@ export const approveArtistRequest = async (
     const { requestId } = req.body;
     const admin = req.user;
 
-    // Chỉ ADMIN mới có thể duyệt yêu cầu
     if (!admin || admin.role !== Role.ADMIN) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
 
-    // Tìm ArtistProfile bằng requestId
     const artistProfile = await prisma.artistProfile.findUnique({
       where: { id: requestId },
       include: {
@@ -1037,7 +1019,6 @@ export const approveArtistRequest = async (
       },
     });
 
-    // Kiểm tra xem yêu cầu có tồn tại và chưa được xác thực không
     if (
       !artistProfile ||
       !artistProfile.verificationRequestedAt ||
@@ -1062,21 +1043,10 @@ export const approveArtistRequest = async (
       }),
     ]);
 
-    // Lấy lại thông tin người dùng sau khi cập nhật
     const updatedUser = await prisma.user.findUnique({
       where: { id: artistProfile.userId },
       select: userSelect,
     });
-
-    // Clear cache: thêm clear cache cho admin artist requests
-    await Promise.all([
-      clearCacheForEntity('artist', { clearSearch: true }),
-      clearCacheForEntity('user', { clearSearch: true }),
-      clearCacheForEntity('stats', {}),
-      clearCacheForEntity('album', { clearSearch: true }),
-      clearCacheForEntity('track', { clearSearch: true }),
-      clearCacheForEntity('artist-requests', { clearSearch: true }),
-    ]);
 
     await sessionService.handleArtistRequestApproval(artistProfile.user.id);
 
@@ -1096,7 +1066,7 @@ export const rejectArtistRequest = async (
   res: Response
 ): Promise<void> => {
   try {
-    console.log('[Admin] Starting reject artist request process'); // Log debug
+    console.log('[Admin] Starting reject artist request process');
     const { requestId } = req.body;
     const admin = req.user;
 
@@ -1130,15 +1100,11 @@ export const rejectArtistRequest = async (
       return;
     }
 
-    // Xóa artist profile
+    // Xóa artist profile - sẽ tự động clear cache thông qua extension
     await prisma.artistProfile.delete({
       where: { id: requestId },
     });
 
-    // Clear cache: xóa cache cho danh sách artist requests
-    await clearCacheForEntity('artist-requests', { clearSearch: true });
-
-    // Gửi thông báo realtime qua Pusher
     await sessionService.handleArtistRequestRejection(artistProfile.user.id);
 
     res.json({
@@ -1284,6 +1250,7 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Nếu caching được bật, thử lấy dữ liệu từ cache
     if (process.env.USE_REDIS_CACHE === 'true') {
       const cachedStats = await client.get(cacheKey);
       if (cachedStats) {
@@ -1348,6 +1315,7 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
       updatedAt: new Date().toISOString(),
     };
 
+    // Lưu vào Redis nếu caching được bật
     if (process.env.USE_REDIS_CACHE === 'true') {
       console.log(`[Redis] Caching data for key: ${cacheKey}`);
       await client.setEx(cacheKey, 300, JSON.stringify(statsData));

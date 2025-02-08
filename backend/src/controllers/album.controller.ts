@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { clearCacheForEntity } from '../middleware/cache.middleware';
 import prisma from '../config/db';
 import {
   uploadFile,
@@ -183,31 +182,6 @@ export const createAlbum = async (
       select: albumSelect,
     });
 
-    // Clear cache
-    await Promise.all([
-      // Clear cache cho artist
-      clearCacheForEntity('album', {
-        userId: targetArtist.user.id,
-        clearSearch: true,
-      }),
-      // Clear cache cho admin
-      clearCacheForEntity('album', {
-        adminId: user.id,
-        clearSearch: true,
-      }),
-      // Clear cache cho user thường
-      clearCacheForEntity('album', {
-        clearSearch: true,
-      }),
-      // Clear cache cho các route liên quan
-      clearCacheForEntity('search', {
-        clearSearch: true,
-      }),
-      clearCacheForEntity('user', {
-        clearSearch: true,
-      }),
-    ]);
-
     res.status(201).json({
       message: 'Album created successfully',
       album,
@@ -380,13 +354,6 @@ export const addTracksToAlbum = async (
       select: albumSelect,
     });
 
-    await clearCacheForEntity('album', {
-      userId: album.artistId,
-      adminId: user.role === Role.ADMIN ? user.id : undefined,
-      entityId: albumId,
-      clearSearch: true,
-    });
-
     res.status(201).json({
       message: 'Tracks added to album successfully',
       album: updatedAlbum,
@@ -515,13 +482,6 @@ export const updateAlbum = async (
       select: albumSelect,
     });
 
-    await clearCacheForEntity('album', {
-      userId: album.artistId,
-      adminId: user.role === Role.ADMIN ? user.id : undefined,
-      entityId: id,
-      clearSearch: true,
-    });
-
     res.json({
       message: 'Album updated successfully',
       album: updatedAlbum,
@@ -565,13 +525,6 @@ export const deleteAlbum = async (
       where: { id },
     });
 
-    await clearCacheForEntity('album', {
-      userId: album.artistId,
-      adminId: user.role === Role.ADMIN ? user.id : undefined,
-      entityId: id,
-      clearSearch: true,
-    });
-
     res.json({ message: 'Album deleted successfully' });
   } catch (error) {
     console.error('Delete album error:', error);
@@ -612,11 +565,6 @@ export const toggleAlbumVisibility = async (
       where: { id },
       data: { isActive: !album.isActive },
       select: albumSelect,
-    });
-
-    await clearCacheForEntity('album', {
-      entityId: id,
-      clearSearch: true,
     });
 
     res.json({

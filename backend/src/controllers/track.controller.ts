@@ -1,12 +1,8 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { uploadFile } from '../services/cloudinary.service';
-import { AlbumType, Role, HistoryType, Prisma } from '@prisma/client';
-import {
-  clearCacheForEntity,
-  client,
-  setCache,
-} from '../middleware/cache.middleware';
+import { AlbumType, Role, Prisma } from '@prisma/client';
+import { client, setCache } from '../middleware/cache.middleware';
 import { sessionService } from '../services/session.service';
 import { trackSelect } from '../utils/prisma-selects';
 
@@ -263,13 +259,6 @@ export const createTrack = async (
       select: trackSelect,
     });
 
-    // Clear cache
-    await clearCacheForEntity('track', {
-      userId: finalArtistId,
-      adminId: user.role === Role.ADMIN ? user.id : undefined,
-      clearSearch: true,
-    });
-
     res.status(201).json({
       message: 'Track created successfully',
       track,
@@ -340,13 +329,6 @@ export const updateTrack = async (
       select: trackSelect,
     });
 
-    // Xóa cache liên quan đến track (user, admin, và cả cache tìm kiếm)
-    await clearCacheForEntity('track', {
-      userId: updatedTrack.artistId,
-      entityId: id,
-      clearSearch: true,
-    });
-
     res.json({
       message: 'Track updated successfully',
       track: updatedTrack,
@@ -393,13 +375,6 @@ export const deleteTrack = async (
       where: { id },
     });
 
-    // Xóa cache của track sau khi xóa
-    await clearCacheForEntity('track', {
-      userId: track.artistId,
-      entityId: id,
-      clearSearch: true,
-    });
-
     res.json({ message: 'Track deleted successfully' });
   } catch (error) {
     console.error('Delete track error:', error);
@@ -443,12 +418,6 @@ export const toggleTrackVisibility = async (
       where: { id },
       data: { isActive: !track.isActive },
       select: trackSelect,
-    });
-
-    // Xóa cache liên quan đến track
-    await clearCacheForEntity('track', {
-      entityId: id,
-      clearSearch: true,
     });
 
     res.json({

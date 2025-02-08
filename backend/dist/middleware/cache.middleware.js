@@ -85,12 +85,26 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
         console.log(`[Redis] Clearing cache for entity: ${entity}`);
         const patterns = [
             `/api/${entity}s*`,
+            `/api/${entity}/*`,
             ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
-            `/api/${entity}s/play*`,
-            `/api/${entity}/play*`,
         ];
+        if (entity === 'user') {
+            patterns.push('/api/admin/users*', '/admin/api/users*', '/api/users/search*');
+        }
+        if (entity === 'artist') {
+            patterns.push('/api/admin/artists*', '/api/artists*', '/api/artist/*');
+        }
+        if (entity === 'artist-requests') {
+            patterns.push('/api/admin/artist-requests*', '/api/artist-requests*', '/api/users/check-artist-request*');
+        }
+        if (entity === 'album') {
+            patterns.push('/api/admin/albums*', '/api/albums*', '/api/album/*');
+        }
+        if (entity === 'track') {
+            patterns.push('/api/admin/tracks*', '/api/tracks*', '/api/track/*');
+        }
         if (options.clearSearch) {
-            patterns.push('/api/search*', '/api/*/search*', '/search-all*', '/api/users/search-all*', '/api/user/search-all*', `/api/${entity}s/search*`, `/api/${entity}/search*`);
+            patterns.push('/api/search*', '/api/*/search*', '/search-all*', `/api/${entity}s/search*`, `/api/${entity}/search*`);
         }
         for (const pattern of patterns) {
             const keys = yield exports.client.keys(pattern);
@@ -99,15 +113,11 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
                 yield Promise.all(keys.map((key) => exports.client.del(key)));
             }
         }
-        const additionalPatterns = [
-            '*play*',
-            '*search*',
-        ];
-        for (const pattern of additionalPatterns) {
-            const keys = yield exports.client.keys(pattern);
-            if (keys.length) {
-                console.log(`Clearing additional cache for pattern: ${pattern}, keys:`, keys);
-                yield Promise.all(keys.map((key) => exports.client.del(key)));
+        if (entity === 'user' || entity === 'stats') {
+            const statsKeys = yield exports.client.keys('/api/admin/stats*');
+            if (statsKeys.length) {
+                console.log(`[Redis] Clearing stats cache`);
+                yield Promise.all(statsKeys.map((key) => exports.client.del(key)));
             }
         }
     }

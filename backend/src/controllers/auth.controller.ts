@@ -64,6 +64,13 @@ const generateToken = (userId: string, role: Role, artistProfile?: any) => {
   );
 };
 
+// Helper function để tạo cache strategy
+const cacheConfig = {
+  short: { ttl: 300, swr: 60 }, // 5 phút cache + 1 phút stale
+  medium: { ttl: 1800, swr: 300 }, // 30 phút cache + 5 phút stale
+  long: { ttl: 3600, swr: 600 }, // 1 giờ cache + 10 phút stale
+};
+
 // Route kiểm tra token
 export const validateToken = async (
   req: Request,
@@ -84,9 +91,14 @@ export const validateToken = async (
       verificationRequestedAt?: string;
     };
 
+    // Sử dụng cacheStrategy vì:
+    // 1. User data ít thay đổi
+    // 2. Được gọi thường xuyên khi validate token
+    // 3. Không cần real-time accuracy
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: userSelect,
+      cacheStrategy: cacheConfig.medium,
     });
 
     if (!user) {
@@ -195,11 +207,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         username,
         role: Role.USER, // Mặc định là USER
       },
-      select: userSelect, // Sử dụng userSelect để trả về thông tin người dùng
+      select: userSelect,
     });
-
-    // Clear cache sau khi tạo user mới
-    await clearCacheForEntity('user', { clearSearch: true });
 
     res.status(201).json({ message: 'User registered successfully', user });
   } catch (error) {
@@ -219,6 +228,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // KHÔNG sử dụng cache cho login vì:
+    // 1. Security-critical operation
+    // 2. Cần real-time accuracy cho password và isActive status
+    // 3. Không phải high-frequency operation
     const user = await prisma.user.findUnique({
       where: { email },
       select: { ...userSelect, password: true, isActive: true },

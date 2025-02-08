@@ -46,7 +46,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.playAlbum = exports.getAlbumById = exports.getAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = void 0;
-const cache_middleware_1 = require("../middleware/cache.middleware");
 const db_1 = __importDefault(require("../config/db"));
 const cloudinary_service_1 = require("../services/cloudinary.service");
 const client_1 = require("@prisma/client");
@@ -177,25 +176,6 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: prisma_selects_1.albumSelect,
         });
-        yield Promise.all([
-            (0, cache_middleware_1.clearCacheForEntity)('album', {
-                userId: targetArtist.user.id,
-                clearSearch: true,
-            }),
-            (0, cache_middleware_1.clearCacheForEntity)('album', {
-                adminId: user.id,
-                clearSearch: true,
-            }),
-            (0, cache_middleware_1.clearCacheForEntity)('album', {
-                clearSearch: true,
-            }),
-            (0, cache_middleware_1.clearCacheForEntity)('search', {
-                clearSearch: true,
-            }),
-            (0, cache_middleware_1.clearCacheForEntity)('user', {
-                clearSearch: true,
-            }),
-        ]);
         res.status(201).json({
             message: 'Album created successfully',
             album,
@@ -317,12 +297,6 @@ const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, functio
             },
             select: prisma_selects_1.albumSelect,
         });
-        yield (0, cache_middleware_1.clearCacheForEntity)('album', {
-            userId: album.artistId,
-            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
-            entityId: albumId,
-            clearSearch: true,
-        });
         res.status(201).json({
             message: 'Tracks added to album successfully',
             album: updatedAlbum,
@@ -428,12 +402,6 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             data: updateData,
             select: prisma_selects_1.albumSelect,
         });
-        yield (0, cache_middleware_1.clearCacheForEntity)('album', {
-            userId: album.artistId,
-            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
-            entityId: id,
-            clearSearch: true,
-        });
         res.json({
             message: 'Album updated successfully',
             album: updatedAlbum,
@@ -468,12 +436,6 @@ const deleteAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         yield db_1.default.album.delete({
             where: { id },
         });
-        yield (0, cache_middleware_1.clearCacheForEntity)('album', {
-            userId: album.artistId,
-            adminId: user.role === client_1.Role.ADMIN ? user.id : undefined,
-            entityId: id,
-            clearSearch: true,
-        });
         res.json({ message: 'Album deleted successfully' });
     }
     catch (error) {
@@ -506,10 +468,6 @@ const toggleAlbumVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
             where: { id },
             data: { isActive: !album.isActive },
             select: prisma_selects_1.albumSelect,
-        });
-        yield (0, cache_middleware_1.clearCacheForEntity)('album', {
-            entityId: id,
-            clearSearch: true,
         });
         res.json({
             message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'} successfully`,

@@ -10,7 +10,7 @@ import {
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload from '../middleware/upload.middleware';
-import { cacheMiddleware } from 'src/middleware/cache.middleware';
+import { cacheMiddleware } from '../middleware/cache.middleware';
 
 const router = express.Router();
 

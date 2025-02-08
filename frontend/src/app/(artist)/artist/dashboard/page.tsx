@@ -112,7 +112,10 @@ export default function ArtistDashboard() {
   }
 
   return (
-    <div className="flex flex-col gap-6 h-full" suppressHydrationWarning>
+    <div
+      className="flex flex-col gap-6 p-4 mb-16 md:mb-0 h-full"
+      suppressHydrationWarning
+    >
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
