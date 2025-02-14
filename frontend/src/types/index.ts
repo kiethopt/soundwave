@@ -12,13 +12,19 @@ export interface TrackUploadFormProps {
   album: Album;
   newTracks: File[];
   trackDetails: {
-    [key: string]: FormData;
+    [key: string]: {
+      title: string;
+      artist: string;
+      featuredArtists: string[];
+      trackNumber: number;
+      releaseDate: string;
+    };
   };
   isUploading: boolean;
-  onFileChange: (e: ChangeEvent<HTMLInputElement>) => void;
-  onSubmit: (e: FormEvent) => void;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSubmit: (e: React.FormEvent) => void;
   onTrackDetailChange: (fileName: string, field: string, value: any) => void;
-  artists?: ArtistProfile[];
+  artists: ArtistProfile[];
 }
 
 // API Types

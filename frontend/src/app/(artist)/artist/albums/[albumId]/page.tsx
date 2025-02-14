@@ -26,6 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function AlbumDetailPage() {
   const { albumId } = useParams();
@@ -62,6 +63,7 @@ export default function AlbumDetailPage() {
     featuredArtists: [],
   });
   const { dominantColor } = useDominantColor(album?.coverUrl);
+  const { theme } = useTheme();
 
   useEffect(() => {
     if (albumId) {
@@ -406,7 +408,9 @@ export default function AlbumDetailPage() {
             ${dominantColor} 0%, 
             ${dominantColor}99 15%,
             ${dominantColor}40 30%,
-            #121212 100%)`
+            ${theme === 'light' ? '#ffffff' : '#121212'} 100%)`
+          : theme === 'light'
+          ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
           : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
       }}
     >
@@ -415,16 +419,26 @@ export default function AlbumDetailPage() {
         <div className="flex items-center justify-between mb-6">
           <Link
             href="/artist/albums"
-            className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors group"
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              theme === 'light'
+                ? 'bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow'
+                : 'bg-black/20 hover:bg-black/30 text-white/80 hover:text-white'
+            }`}
           >
             <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
-            <span>Back to Albums</span>
+            <span>Back</span>
           </Link>
           <button
             onClick={() => setShowEditDialog(true)}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            className={`p-2 rounded-full transition-colors ${
+              theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
+            }`}
           >
-            <MoreVertical className="w-5 h-5" />
+            <MoreVertical
+              className={`w-5 h-5 ${
+                theme === 'light' ? 'text-gray-700' : 'text-white'
+              }`}
+            />
           </button>
         </div>
 
@@ -444,19 +458,31 @@ export default function AlbumDetailPage() {
           {/* Album Info */}
           <div className="w-full flex flex-col gap-4">
             <div className="text-center md:text-left">
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+              <h1
+                className={`text-3xl md:text-4xl font-bold mb-2 ${
+                  theme === 'light' ? 'text-gray-900' : 'text-white'
+                }`}
+              >
                 {album.title}
               </h1>
 
               <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
-                <span className="text-white/90 text-lg">
+                <span
+                  className={
+                    theme === 'light' ? 'text-gray-900' : 'text-white/90'
+                  }
+                >
                   {album.artist.artistName}
                 </span>
                 {album.artist.isVerified && <Verified className="w-5 h-5" />}
               </div>
 
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 text-base text-white/60">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 text-base">
+                <div
+                  className={`flex items-center gap-2 ${
+                    theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                  }`}
+                >
                   <Calendar className="w-5 h-5" />
                   <span>
                     {new Date(album.releaseDate).toLocaleDateString('en-US', {
@@ -466,7 +492,11 @@ export default function AlbumDetailPage() {
                     })}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div
+                  className={`flex items-center gap-2 ${
+                    theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                  }`}
+                >
                   <Music className="w-5 h-5" />
                   <span>{album.totalTracks || 0} tracks</span>
                 </div>
@@ -477,7 +507,11 @@ export default function AlbumDetailPage() {
                   {album.genres.map(({ genre }) => (
                     <span
                       key={genre.id}
-                      className="px-3 py-1 bg-white/10 rounded-full text-sm text-white/80"
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        theme === 'light'
+                          ? 'bg-gray-200 text-gray-800'
+                          : 'bg-white/10 text-white/80'
+                      }`}
                     >
                       {genre.name}
                     </span>
@@ -491,10 +525,24 @@ export default function AlbumDetailPage() {
         {/* Track List */}
         {album.tracks?.length > 0 && (
           <div className="mt-6">
-            <div className="w-full bg-black/20 rounded-xl overflow-hidden border border-white/10 backdrop-blur-sm">
+            <div
+              className={`w-full rounded-xl overflow-hidden border backdrop-blur-sm ${
+                theme === 'light'
+                  ? 'bg-white/80 border-gray-200'
+                  : 'bg-black/20 border-white/10'
+              }`}
+            >
               {/* Header - Desktop only */}
-              <div className="hidden md:block px-6 py-4 border-b border-white/10">
-                <div className="grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 text-sm text-white/60">
+              <div
+                className={`hidden md:block px-6 py-4 border-b ${
+                  theme === 'light' ? 'border-gray-200' : 'border-white/10'
+                }`}
+              >
+                <div
+                  className={`grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 text-sm ${
+                    theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                  }`}
+                >
                   <div className="text-center">#</div>
                   <div>Title</div>
                   <div>Artists</div>
@@ -503,25 +551,53 @@ export default function AlbumDetailPage() {
                 </div>
               </div>
 
-              <div className="divide-y divide-white/10">
+              <div
+                className={`divide-y ${
+                  theme === 'light' ? 'divide-gray-200' : 'divide-white/10'
+                }`}
+              >
                 {album.tracks.map((track) => (
                   <div key={track.id}>
                     {/* Desktop Layout */}
-                    <div className="hidden md:grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 px-6 py-4 hover:bg-white/5 group">
-                      <div className="flex items-center justify-center text-white/60">
+                    <div
+                      className={`hidden md:grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 px-6 py-4 group ${
+                        theme === 'light'
+                          ? 'hover:bg-gray-50'
+                          : 'hover:bg-white/5'
+                      }`}
+                    >
+                      <div
+                        className={`flex items-center justify-center ${
+                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                        }`}
+                      >
                         {track.trackNumber}
                       </div>
                       <div className="flex items-center min-w-0">
-                        <span className="font-medium truncate">
+                        <span
+                          className={`font-medium truncate ${
+                            theme === 'light' ? 'text-gray-900' : 'text-white'
+                          }`}
+                        >
                           {track.title}
                         </span>
                       </div>
                       <div className="flex flex-col justify-center min-w-0">
-                        <div className="truncate">
+                        <div
+                          className={`truncate ${
+                            theme === 'light' ? 'text-gray-900' : 'text-white'
+                          }`}
+                        >
                           {track.artist.artistName}
                         </div>
                         {track.featuredArtists?.length > 0 && (
-                          <div className="text-sm text-white/60 truncate">
+                          <div
+                            className={`text-sm truncate ${
+                              theme === 'light'
+                                ? 'text-gray-500'
+                                : 'text-white/60'
+                            }`}
+                          >
                             feat.{' '}
                             {track.featuredArtists
                               .map(
@@ -531,24 +607,50 @@ export default function AlbumDetailPage() {
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center justify-end text-white/60">
+                      <div
+                        className={`flex items-center justify-end ${
+                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                        }`}
+                      >
                         {Math.floor(track.duration / 60)}:
                         {(track.duration % 60).toString().padStart(2, '0')}
                       </div>
                       <div className="flex items-center justify-center">
                         <DropdownMenu>
-                          <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 hover:bg-white/10 p-2 rounded-full transition-all">
+                          <DropdownMenuTrigger
+                            className={`opacity-0 group-hover:opacity-100 p-2 rounded-full transition-all ${
+                              theme === 'light'
+                                ? 'hover:bg-gray-200'
+                                : 'hover:bg-white/10'
+                            }`}
+                          >
                             <MoreVertical className="w-4 h-4" />
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent className="bg-[#282828] border border-white/10 text-white">
+                          <DropdownMenuContent
+                            className={
+                              theme === 'light'
+                                ? 'bg-white border border-gray-200'
+                                : 'bg-[#282828] border border-white/10'
+                            }
+                          >
                             <DropdownMenuItem
                               onClick={() => handleEditTrack(track)}
+                              className={
+                                theme === 'light'
+                                  ? 'text-gray-700'
+                                  : 'text-white'
+                              }
                             >
                               <Edit className="w-4 h-4 mr-2" />
                               Edit Track
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleToggleTrackVisibility(track)}
+                              className={
+                                theme === 'light'
+                                  ? 'text-gray-700'
+                                  : 'text-white'
+                              }
                             >
                               {track.isActive ? (
                                 <>
@@ -562,10 +664,16 @@ export default function AlbumDetailPage() {
                                 </>
                               )}
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuSeparator
+                              className={
+                                theme === 'light'
+                                  ? 'bg-gray-200'
+                                  : 'bg-white/10'
+                              }
+                            />
                             <DropdownMenuItem
                               onClick={() => handleDeleteTrack(track)}
-                              className="text-red-400"
+                              className="text-red-500"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
                               Delete Track
@@ -576,19 +684,47 @@ export default function AlbumDetailPage() {
                     </div>
 
                     {/* Mobile Layout */}
-                    <div className="md:hidden p-4 hover:bg-white/5">
+                    <div
+                      className={`md:hidden p-4 ${
+                        theme === 'light'
+                          ? 'hover:bg-gray-50'
+                          : 'hover:bg-white/5'
+                      }`}
+                    >
                       <div className="flex items-center gap-4">
-                        <span className="text-white/60 w-8 text-center">
+                        <span
+                          className={
+                            theme === 'light'
+                              ? 'text-gray-500'
+                              : 'text-white/60'
+                          }
+                        >
                           {track.trackNumber}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">
+                          <div
+                            className={`font-medium truncate ${
+                              theme === 'light' ? 'text-gray-900' : 'text-white'
+                            }`}
+                          >
                             {track.title}
                           </div>
-                          <div className="text-sm text-white/60 truncate">
+                          <div
+                            className={`text-sm truncate ${
+                              theme === 'light'
+                                ? 'text-gray-500'
+                                : 'text-white/60'
+                            }`}
+                          >
                             {track.artist.artistName}
                             {track.featuredArtists?.length > 0 && (
-                              <span className="text-white/40">
+                              <span
+                                className={
+                                  theme === 'light'
+                                    ? 'text-gray-400'
+                                    : 'text-white/40'
+                                }
+                              >
                                 {' '}
                                 • feat.{' '}
                                 {track.featuredArtists
@@ -602,17 +738,40 @@ export default function AlbumDetailPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-sm text-white/60">
+                          <span
+                            className={`text-sm ${
+                              theme === 'light'
+                                ? 'text-gray-500'
+                                : 'text-white/60'
+                            }`}
+                          >
                             {Math.floor(track.duration / 60)}:
                             {(track.duration % 60).toString().padStart(2, '0')}
                           </span>
                           <DropdownMenu>
-                            <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                            <DropdownMenuTrigger
+                              className={`p-2 rounded-full ${
+                                theme === 'light'
+                                  ? 'hover:bg-gray-200'
+                                  : 'hover:bg-white/10'
+                              }`}
+                            >
                               <MoreVertical className="w-4 h-4" />
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent className="bg-[#282828] border border-white/10 text-white">
+                            <DropdownMenuContent
+                              className={
+                                theme === 'light'
+                                  ? 'bg-white border border-gray-200'
+                                  : 'bg-[#282828] border border-white/10'
+                              }
+                            >
                               <DropdownMenuItem
                                 onClick={() => handleEditTrack(track)}
+                                className={
+                                  theme === 'light'
+                                    ? 'text-gray-700'
+                                    : 'text-white'
+                                }
                               >
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit Track
@@ -620,6 +779,11 @@ export default function AlbumDetailPage() {
                               <DropdownMenuItem
                                 onClick={() =>
                                   handleToggleTrackVisibility(track)
+                                }
+                                className={
+                                  theme === 'light'
+                                    ? 'text-gray-700'
+                                    : 'text-white'
                                 }
                               >
                                 {track.isActive ? (
@@ -634,10 +798,16 @@ export default function AlbumDetailPage() {
                                   </>
                                 )}
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator className="bg-white/10" />
+                              <DropdownMenuSeparator
+                                className={
+                                  theme === 'light'
+                                    ? 'bg-gray-200'
+                                    : 'bg-white/10'
+                                }
+                              />
                               <DropdownMenuItem
                                 onClick={() => handleDeleteTrack(track)}
-                                className="text-red-400"
+                                className="text-red-500"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Delete Track
@@ -656,8 +826,20 @@ export default function AlbumDetailPage() {
 
         {/* Upload New Tracks Section */}
         <div className="mt-12">
-          <h2 className="text-xl font-semibold mb-6">Upload New Tracks</h2>
-          <div className="bg-white/5 rounded-xl p-6 backdrop-blur-sm border border-white/10">
+          <h2
+            className={`text-xl font-semibold mb-6 ${
+              theme === 'light' ? 'text-gray-900' : 'text-white'
+            }`}
+          >
+            Upload New Tracks
+          </h2>
+          <div
+            className={`rounded-xl p-6 backdrop-blur-sm border ${
+              theme === 'light'
+                ? 'bg-white border-gray-200'
+                : 'bg-white/5 border-white/10'
+            }`}
+          >
             <TrackUploadForm
               album={album}
               newTracks={newTracks}
@@ -685,8 +867,8 @@ export default function AlbumDetailPage() {
           <div
             className={`mt-4 p-4 rounded-lg ${
               message.type === 'error'
-                ? 'bg-red-500/10 text-red-400'
-                : 'bg-green-500/10 text-green-400'
+                ? 'bg-red-50 text-red-500 border border-red-200'
+                : 'bg-green-50 text-green-500 border border-green-200'
             }`}
           >
             {message.text}
@@ -696,11 +878,25 @@ export default function AlbumDetailPage() {
         {/* Edit Album Dialog */}
         {showEditDialog && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#121212] p-6 rounded-lg max-w-md w-full">
-              <h3 className="text-xl font-bold mb-4">Edit Album</h3>
+            <div
+              className={`max-w-md w-full p-6 rounded-lg ${
+                theme === 'light' ? 'bg-white' : 'bg-[#121212]'
+              }`}
+            >
+              <h3
+                className={`text-xl font-bold mb-4 ${
+                  theme === 'light' ? 'text-gray-900' : 'text-white'
+                }`}
+              >
+                Edit Album
+              </h3>
               <form onSubmit={handleEditSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
+                  >
                     Title
                   </label>
                   <input
@@ -709,13 +905,21 @@ export default function AlbumDetailPage() {
                     onChange={(e) =>
                       setEditForm({ ...editForm, title: e.target.value })
                     }
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
+                        ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                        : 'bg-white/5 border-white/10 focus:ring-white/20'
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
+                  >
                     Release Date
                   </label>
                   <input
@@ -724,20 +928,34 @@ export default function AlbumDetailPage() {
                     onChange={(e) =>
                       setEditForm({ ...editForm, releaseDate: e.target.value })
                     }
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
+                        ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                        : 'bg-white/5 border-white/10 focus:ring-white/20'
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Type</label>
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
+                  >
+                    Type
+                  </label>
                   <div className="relative">
                     <select
                       value={editForm.type}
                       onChange={(e) =>
                         setEditForm({ ...editForm, type: e.target.value })
                       }
-                      className="w-full px-3 py-2 bg-[#1a1a1a] text-white border border-white/10 rounded-md appearance-none pr-8 focus:outline-none focus:border-white/30"
+                      className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 appearance-none ${
+                        theme === 'light'
+                          ? 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500/20'
+                          : 'bg-white/5 border-white/10 text-white focus:ring-white/20'
+                      }`}
                       required
                     >
                       <option value="">Select type</option>
@@ -747,7 +965,9 @@ export default function AlbumDetailPage() {
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                       <svg
-                        className="w-4 h-4"
+                        className={`w-4 h-4 ${
+                          theme === 'light' ? 'text-gray-400' : 'text-white/60'
+                        }`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -764,7 +984,11 @@ export default function AlbumDetailPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
+                  >
                     Cover Image
                   </label>
                   <input
@@ -776,7 +1000,11 @@ export default function AlbumDetailPage() {
                         coverFile: e.target.files?.[0] || null,
                       })
                     }
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
+                        ? 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500/20'
+                        : 'bg-white/5 border-white/10 text-white focus:ring-white/20'
+                    }`}
                   />
                 </div>
 
@@ -784,13 +1012,21 @@ export default function AlbumDetailPage() {
                   <button
                     type="button"
                     onClick={() => setShowEditDialog(false)}
-                    className="px-4 py-2 text-sm font-medium text-white/60 hover:text-white"
+                    className={`px-4 py-2 text-sm font-medium rounded-lg ${
+                      theme === 'light'
+                        ? 'text-gray-600 hover:text-gray-900'
+                        : 'text-white/60 hover:text-white'
+                    }`}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-sm font-medium bg-white text-black rounded-md hover:bg-white/90"
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      theme === 'light'
+                        ? 'bg-gray-900 text-white hover:bg-gray-800'
+                        : 'bg-white text-black hover:bg-white/90'
+                    }`}
                   >
                     Save Changes
                   </button>
@@ -803,11 +1039,25 @@ export default function AlbumDetailPage() {
         {/* Edit Track Dialog */}
         {showEditTrackDialog && editingTrack && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#121212] p-6 rounded-lg max-w-md w-full">
-              <h3 className="text-xl font-bold mb-4">Edit Track</h3>
+            <div
+              className={`max-w-md w-full p-6 rounded-lg ${
+                theme === 'light' ? 'bg-white' : 'bg-[#121212]'
+              }`}
+            >
+              <h3
+                className={`text-xl font-bold mb-4 ${
+                  theme === 'light' ? 'text-gray-900' : 'text-white'
+                }`}
+              >
+                Edit Track
+              </h3>
               <form onSubmit={handleEditTrackSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
+                  >
                     Title
                   </label>
                   <input
@@ -819,13 +1069,21 @@ export default function AlbumDetailPage() {
                         title: e.target.value,
                       })
                     }
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
+                        ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                        : 'bg-white/5 border-white/10 focus:ring-white/20'
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
+                  >
                     Release Date
                   </label>
                   <input
@@ -837,13 +1095,21 @@ export default function AlbumDetailPage() {
                         releaseDate: e.target.value,
                       })
                     }
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
+                        ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                        : 'bg-white/5 border-white/10 focus:ring-white/20'
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
+                  >
                     Track Number
                   </label>
                   <input
@@ -855,14 +1121,22 @@ export default function AlbumDetailPage() {
                         trackNumber: Number.parseInt(e.target.value),
                       })
                     }
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
+                        ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                        : 'bg-white/5 border-white/10 focus:ring-white/20'
+                    }`}
                     required
                     min="1"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
+                  >
                     Featured Artists
                   </label>
                   <select
@@ -878,7 +1152,11 @@ export default function AlbumDetailPage() {
                         featuredArtists: selectedArtists,
                       });
                     }}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md"
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
+                        ? 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500/20'
+                        : 'bg-white/5 border-white/10 text-white focus:ring-white/20'
+                    }`}
                   >
                     {artists.map((artist) => (
                       <option key={artist.id} value={artist.id}>
@@ -892,13 +1170,21 @@ export default function AlbumDetailPage() {
                   <button
                     type="button"
                     onClick={() => setShowEditTrackDialog(false)}
-                    className="px-4 py-2 text-sm font-medium text-white/60 hover:text-white"
+                    className={`px-4 py-2 text-sm font-medium rounded-lg ${
+                      theme === 'light'
+                        ? 'text-gray-600 hover:text-gray-900'
+                        : 'text-white/60 hover:text-white'
+                    }`}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-sm font-medium bg-white text-black rounded-md hover:bg-white/90"
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      theme === 'light'
+                        ? 'bg-gray-900 text-white hover:bg-gray-800'
+                        : 'bg-white text-black hover:bg-white/90'
+                    }`}
                   >
                     Save Changes
                   </button>

@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Image from 'next/image';
 import { toast } from 'react-toastify';
-import { Button } from '@/components/layout/Button/Button';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
@@ -32,6 +32,7 @@ export default function AdminUsers() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
+  const { theme } = useTheme();
 
   // Sử dụng URL query param cho số trang
   const searchParams = useSearchParams();
@@ -193,10 +194,18 @@ export default function AdminUsers() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+          <h1
+            className={`text-2xl md:text-3xl font-bold tracking-tight ${
+              theme === 'light' ? 'text-gray-900' : 'text-white'
+            }`}
+          >
             User Management
           </h1>
-          <p className="text-white/60 mt-2 text-sm md:text-base">
+          <p
+            className={`mt-2 text-sm md:text-base ${
+              theme === 'light' ? 'text-gray-600' : 'text-white/60'
+            }`}
+          >
             Manage and monitor user accounts
           </p>
         </div>
@@ -206,13 +215,21 @@ export default function AdminUsers() {
             placeholder="Search users..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full md:w-64 pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 text-sm"
+            className={`w-full md:w-64 pl-10 pr-4 py-2 ${
+              theme === 'light'
+                ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
+                : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+            } border rounded-md focus:outline-none focus:ring-2 text-sm`}
           />
           <button
             type="submit"
             className="absolute left-3 top-1/2 transform -translate-y-1/2"
           >
-            <Search className="text-white/40 w-5 h-5" />
+            <Search
+              className={`${
+                theme === 'light' ? 'text-gray-400' : 'text-white/40'
+              } w-5 h-5`}
+            />
           </button>
         </form>
       </div>
@@ -223,29 +240,65 @@ export default function AdminUsers() {
         </div>
       )}
 
-      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] relative">
+      <div
+        className={`rounded-lg overflow-hidden border ${
+          theme === 'light'
+            ? 'bg-white border-gray-200'
+            : 'bg-[#121212] border-white/[0.08]'
+        } relative`}
+      >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
-            <thead className="bg-white/5 border-b border-white/[0.08]">
+            <thead
+              className={`${
+                theme === 'light'
+                  ? 'bg-gray-50 border-gray-200'
+                  : 'bg-white/5 border-white/[0.08]'
+              } border-b`}
+            >
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
+                <th
+                  className={`px-6 py-4 text-left text-sm font-semibold ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
                   User
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
+                <th
+                  className={`px-6 py-4 text-left text-sm font-semibold ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
                   Email
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
+                <th
+                  className={`px-6 py-4 text-left text-sm font-semibold ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
                   Status
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
+                <th
+                  className={`px-6 py-4 text-left text-sm font-semibold ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
                   Joined
                 </th>
-                <th className="px-6 py-4 text-right text-sm font-semibold">
+                <th
+                  className={`px-6 py-4 text-right text-sm font-semibold ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.08]">
+            <tbody
+              className={`divide-y ${
+                theme === 'light' ? 'divide-gray-200' : 'divide-white/[0.04]'
+              }`}
+            >
               {loading
                 ? Array(5)
                     .fill(0)
@@ -253,24 +306,58 @@ export default function AdminUsers() {
                       <tr key={i}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
+                            <div
+                              className={`w-8 h-8 rounded-full ${
+                                theme === 'light'
+                                  ? 'bg-gray-200'
+                                  : 'bg-white/10'
+                              } animate-pulse`}
+                            />
                             <div className="space-y-2">
-                              <div className="h-4 bg-white/10 rounded w-32 animate-pulse" />
-                              <div className="h-3 bg-white/10 rounded w-24 animate-pulse" />
+                              <div
+                                className={`h-4 rounded w-32 animate-pulse ${
+                                  theme === 'light'
+                                    ? 'bg-gray-200'
+                                    : 'bg-white/10'
+                                }`}
+                              />
+                              <div
+                                className={`h-3 rounded w-24 animate-pulse ${
+                                  theme === 'light'
+                                    ? 'bg-gray-200'
+                                    : 'bg-white/10'
+                                }`}
+                              />
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="h-4 bg-white/10 rounded w-48 animate-pulse" />
+                          <div
+                            className={`h-4 rounded w-48 animate-pulse ${
+                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
+                            }`}
+                          />
                         </td>
                         <td className="px-6 py-4">
-                          <div className="h-6 bg-white/10 rounded-full w-20 animate-pulse" />
+                          <div
+                            className={`h-6 rounded-full w-20 animate-pulse ${
+                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
+                            }`}
+                          />
                         </td>
                         <td className="px-6 py-4">
-                          <div className="h-4 bg-white/10 rounded w-24 animate-pulse" />
+                          <div
+                            className={`h-4 rounded w-24 animate-pulse ${
+                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
+                            }`}
+                          />
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <div className="h-6 w-6 bg-white/10 rounded-full animate-pulse" />
+                          <div
+                            className={`h-6 w-6 rounded-full animate-pulse ${
+                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
+                            }`}
+                          />
                         </td>
                       </tr>
                     ))
@@ -278,7 +365,11 @@ export default function AdminUsers() {
                     <tr key={user.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">
+                          <div
+                            className={`w-8 h-8 rounded-full overflow-hidden ${
+                              theme === 'light' ? 'bg-gray-100' : 'bg-white/10'
+                            } flex items-center justify-center`}
+                          >
                             {user.avatar ? (
                               <Image
                                 src={user.avatar}
@@ -288,20 +379,42 @@ export default function AdminUsers() {
                                 className="object-cover w-full h-full"
                               />
                             ) : (
-                              <UserIcon className="w-8 h-8 text-white/40 p-1.5" />
+                              <UserIcon
+                                className={`w-8 h-8 ${
+                                  theme === 'light'
+                                    ? 'text-gray-400'
+                                    : 'text-white/40'
+                                } p-1.5`}
+                              />
                             )}
                           </div>
                           <div>
-                            <div className="font-medium">
+                            <div
+                              className={`font-medium ${
+                                theme === 'light'
+                                  ? 'text-gray-900'
+                                  : 'text-white'
+                              }`}
+                            >
                               {user.name || 'Anonymous'}
                             </div>
-                            <div className="text-white/60 text-sm">
+                            <div
+                              className={`text-sm ${
+                                theme === 'light'
+                                  ? 'text-gray-500'
+                                  : 'text-white/60'
+                              }`}
+                            >
                               @{user.username}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap ${
+                          theme === 'light' ? 'text-gray-900' : 'text-white'
+                        }`}
+                      >
                         {user.email}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -315,21 +428,43 @@ export default function AdminUsers() {
                           {user.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap ${
+                          theme === 'light' ? 'text-gray-900' : 'text-white'
+                        }`}
+                      >
                         {new Date(user.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <DropdownMenu>
-                          <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                          <DropdownMenuTrigger
+                            className={`p-2 rounded-full ${
+                              theme === 'light'
+                                ? 'hover:bg-gray-100'
+                                : 'hover:bg-white/10'
+                            }`}
+                          >
                             <MoreVertical className="w-5 h-5" />
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent className="bg-[#282828] border-white/10 text-white">
+                          <DropdownMenuContent
+                            className={`${
+                              theme === 'light'
+                                ? 'bg-white border-gray-200'
+                                : 'bg-[#282828] border-white/10'
+                            } ${
+                              theme === 'light' ? 'text-gray-900' : 'text-white'
+                            }`}
+                          >
                             <DropdownMenuItem
                               onClick={() =>
                                 handleUserStatus(user.id, user.isActive)
                               }
                               disabled={actionLoading === user.id}
-                              className="cursor-pointer hover:bg-white/10"
+                              className={`cursor-pointer ${
+                                theme === 'light'
+                                  ? 'hover:bg-gray-100'
+                                  : 'hover:bg-white/10'
+                              }`}
                             >
                               <Power className="w-4 h-4 mr-2" />
                               {user.isActive ? 'Deactivate' : 'Activate'}
@@ -337,12 +472,22 @@ export default function AdminUsers() {
                             <DropdownMenuItem
                               onClick={() => handleResetPassword(user.id)}
                               disabled={actionLoading === user.id}
-                              className="cursor-pointer hover:bg-white/10"
+                              className={`cursor-pointer ${
+                                theme === 'light'
+                                  ? 'hover:bg-gray-100'
+                                  : 'hover:bg-white/10'
+                              }`}
                             >
                               <Key className="w-4 h-4 mr-2" />
                               Reset Password
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuSeparator
+                              className={
+                                theme === 'light'
+                                  ? 'bg-gray-200'
+                                  : 'bg-white/10'
+                              }
+                            />
                             <DropdownMenuItem
                               onClick={() => handleDeleteUser(user.id)}
                               disabled={actionLoading === user.id}
@@ -360,20 +505,31 @@ export default function AdminUsers() {
           </table>
 
           {!loading && filteredUsers.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
+            <div
+              className={`flex flex-col items-center justify-center h-[400px] ${
+                theme === 'light' ? 'text-gray-500' : 'text-white/60'
+              }`}
+            >
               <UserIcon className="w-12 h-12 mb-4" />
               <p>No users found</p>
             </div>
           )}
         </div>
-
         {/* Pagination */}
         {totalPages > 0 && (
-          <div className="flex items-center justify-center gap-2 p-4 border-t border-white/[0.08]">
+          <div
+            className={`flex items-center justify-center gap-2 p-4 border-t ${
+              theme === 'light' ? 'border-gray-200' : 'border-white/[0.04]'
+            }`}
+          >
             <button
               onClick={() => updateQueryParam('page', currentPage - 1)}
               disabled={currentPage === 1}
-              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                theme === 'light'
+                  ? 'bg-gray-100 hover:bg-gray-200'
+                  : 'bg-white/5 hover:bg-white/10'
+              }`}
             >
               Previous
             </button>
@@ -381,12 +537,30 @@ export default function AdminUsers() {
             {/* Mobile Pagination */}
             <div className="md:hidden">
               <DropdownMenu>
-                <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                <DropdownMenuTrigger
+                  className={`px-3 py-2 rounded-md text-sm ${
+                    theme === 'light'
+                      ? 'bg-gray-100 hover:bg-gray-200'
+                      : 'bg-white/5 hover:bg-white/10'
+                  }`}
+                >
                   {currentPage} of {totalPages}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                <DropdownMenuContent
+                  className={`p-4 w-[200px] ${
+                    theme === 'light'
+                      ? 'bg-white border-gray-200'
+                      : 'bg-[#282828] border-white/[0.1]'
+                  } ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}
+                >
                   <div className="space-y-3">
-                    <div className="text-xs text-white/60">Go to page:</div>
+                    <div
+                      className={`text-xs ${
+                        theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                      }`}
+                    >
+                      Go to page:
+                    </div>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -394,7 +568,11 @@ export default function AdminUsers() {
                         max={totalPages}
                         defaultValue={currentPage}
                         ref={pageInputRef}
-                        className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                        className={`w-full px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
+                          theme === 'light'
+                            ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
+                            : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50'
+                        }`}
                         placeholder="Page"
                       />
                     </div>
@@ -407,7 +585,7 @@ export default function AdminUsers() {
                           updateQueryParam('page', page);
                         }
                       }}
-                      className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                      className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 text-sm"
                     >
                       Go to Page
                     </button>
@@ -418,11 +596,35 @@ export default function AdminUsers() {
 
             {/* Desktop Pagination */}
             <div className="hidden md:flex items-center gap-2 text-sm">
-              <span className="text-white/60">Page</span>
-              <div className="bg-white/5 px-3 py-1 rounded-md border border-white/[0.1]">
-                <span className="text-white font-medium">{currentPage}</span>
+              <span
+                className={
+                  theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                }
+              >
+                Page
+              </span>
+              <div
+                className={`px-3 py-1 rounded-md border ${
+                  theme === 'light'
+                    ? 'bg-gray-50 border-gray-200'
+                    : 'bg-white/5 border-white/[0.1]'
+                }`}
+              >
+                <span
+                  className={`font-medium ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
+                  {currentPage}
+                </span>
               </div>
-              <span className="text-white/60">of {totalPages}</span>
+              <span
+                className={
+                  theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                }
+              >
+                of {totalPages}
+              </span>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -430,7 +632,11 @@ export default function AdminUsers() {
                   max={totalPages}
                   defaultValue={currentPage}
                   ref={pageInputRef}
-                  className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                  className={`w-16 px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
+                    theme === 'light'
+                      ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
+                      : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50'
+                  }`}
                   placeholder="Page"
                 />
                 <button
@@ -442,7 +648,7 @@ export default function AdminUsers() {
                       updateQueryParam('page', page);
                     }
                   }}
-                  className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                  className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 text-sm"
                 >
                   Go
                 </button>
@@ -452,7 +658,11 @@ export default function AdminUsers() {
             <button
               onClick={() => updateQueryParam('page', currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                theme === 'light'
+                  ? 'bg-gray-100 hover:bg-gray-200'
+                  : 'bg-white/5 hover:bg-white/10'
+              }`}
             >
               Next
             </button>
@@ -461,8 +671,16 @@ export default function AdminUsers() {
 
         {/* Loading overlay */}
         {loading && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <Spinner className="w-8 h-8 animate-spin text-white" />
+          <div
+            className={`absolute inset-0 flex items-center justify-center ${
+              theme === 'light' ? 'bg-gray-500/50' : 'bg-black/50'
+            }`}
+          >
+            <Spinner
+              className={`w-8 h-8 animate-spin ${
+                theme === 'light' ? 'text-gray-900' : 'text-white'
+              }`}
+            />
           </div>
         )}
       </div>

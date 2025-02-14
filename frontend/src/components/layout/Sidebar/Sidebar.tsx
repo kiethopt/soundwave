@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import {
-  Library,
   AddSimple,
   Music,
   Album,
@@ -18,6 +17,7 @@ import {
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function Sidebar({
   isOpen,
@@ -36,6 +36,7 @@ export default function Sidebar({
   );
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const savedCollapsedState = localStorage.getItem('sidebarCollapsed');
@@ -64,14 +65,6 @@ export default function Sidebar({
 
   const isActive = (path: string) => pathname === path;
 
-  const handleCreatePlaylist = () => {
-    if (!isAuthenticated) {
-      router.push('/login');
-    } else {
-      router.push('/create-playlist');
-    }
-  };
-
   return (
     <>
       {isOpen && (
@@ -84,15 +77,19 @@ export default function Sidebar({
       <div
         className={`
           fixed md:static inset-y-0 left-0 z-50
-          bg-[#121212] transform transition-transform duration-300 ease-in-out
-          md:transform-none md:transition-none border-r border-white/10
+          transform transition-transform duration-300 ease-in-out
+          md:transform-none md:transition-none
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0 md:flex-shrink-0
           ${isCollapsed ? 'w-20' : 'w-64'}
+          ${
+            theme === 'light'
+              ? 'bg-white border-r border-gray-200'
+              : 'bg-[#121212] border-r border-white/10'
+          }
         `}
-        suppressHydrationWarning
       >
-        <div className="h-full flex flex-col" suppressHydrationWarning>
+        <div className="h-full flex flex-col">
           <div
             className={`md:hidden p-4 ${
               isCollapsed ? 'flex justify-center' : 'flex justify-end'
@@ -100,83 +97,57 @@ export default function Sidebar({
           >
             <button
               onClick={onClose}
-              className="text-white/60 hover:text-white p-1 flex items-center justify-center w-8 h-8 rounded-full bg-white/10"
+              className={`p-1 flex items-center justify-center w-8 h-8 rounded-full ${
+                theme === 'light'
+                  ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-white/10 text-white/60 hover:text-white'
+              }`}
             >
               <XIcon className="w-6 h-6" />
             </button>
           </div>
 
           <nav className="flex-1 px-4">
-            {/* Library Section - Aligned with header */}
-            <div className="h-[72px] -mx-4 border-b border-white/10">
-              <div className="h-full flex items-center gap-4 px-7">
-                {isCollapsed ? (
-                  <div className="group">
-                    <LibraryOutline className="w-7 h-7 text-white/70 group-hover:hidden transition-colors" />
-                    <LibraryFilled className="w-7 h-7 text-white hidden group-hover:block transition-colors" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-3 text-white/70 hover:text-white group">
-                      <div className="relative">
-                        <LibraryOutline className="w-7 h-7 group-hover:hidden" />
-                        <LibraryFilled className="w-7 h-7 hidden group-hover:block" />
-                      </div>
-                      <span className="text-base font-medium">
-                        Your Library
-                      </span>
+            {/* Library Section - Only for regular users */}
+            {currentProfile === 'USER' && userRole === 'USER' && (
+              <div className="h-[72px] -mx-4 border-b border-white/10">
+                <div className="h-full flex items-center gap-4 px-7">
+                  {isCollapsed ? (
+                    <div className="group">
+                      <LibraryOutline
+                        className={`w-7 h-7 ${
+                          theme === 'light'
+                            ? 'text-gray-600 group-hover:hidden'
+                            : 'text-white/70 group-hover:hidden'
+                        }`}
+                      />
+                      <LibraryFilled
+                        className={`w-7 h-7 hidden group-hover:block ${
+                          theme === 'light' ? 'text-gray-900' : 'text-white'
+                        }`}
+                      />
                     </div>
-                    <AddSimple className="w-6 h-6 ml-auto hover:text-white" />
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Playlists */}
-            {currentProfile === 'USER' && (
-              <div className="mt-4">
-                {isAuthenticated ? (
-                  [
-                    {
-                      id: 1,
-                      name: 'Playlist 1',
-                      coverImage: '/images/default-avatar.jpg',
-                    },
-                  ].map((playlist) => (
-                    <div key={playlist.id} className="mb-2">
-                      {isCollapsed ? (
-                        <img
-                          src={playlist.coverImage || '/placeholder.svg'}
-                          alt={playlist.name}
-                          className="w-12 h-12 rounded-md mx-auto"
-                        />
-                      ) : (
-                        <div className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors hover:bg-white/10">
-                          <img
-                            src={playlist.coverImage || '/placeholder.svg'}
-                            alt={playlist.name}
-                            className="w-12 h-12 rounded-md"
-                          />
-                          <span>{playlist.name}</span>
+                  ) : (
+                    <>
+                      <div
+                        className={`flex items-center gap-3 group ${
+                          theme === 'light'
+                            ? 'text-gray-600 hover:text-gray-900'
+                            : 'text-white/70 hover:text-white'
+                        }`}
+                      >
+                        <div className="relative">
+                          <LibraryOutline className="w-7 h-7 group-hover:hidden" />
+                          <LibraryFilled className="w-7 h-7 hidden group-hover:block" />
                         </div>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <button
-                    onClick={handleCreatePlaylist}
-                    className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors hover:bg-white/10 w-full text-left"
-                  >
-                    {isCollapsed ? (
-                      <AddSimple className="w-6 h-6 shrink-0 mx-auto" />
-                    ) : (
-                      <>
-                        <AddSimple className="w-6 h-6 shrink-0" />
-                        <span>Create Playlist</span>
-                      </>
-                    )}
-                  </button>
-                )}
+                        <span className="text-base font-medium">
+                          Your Library
+                        </span>
+                      </div>
+                      <AddSimple className="w-6 h-6 ml-auto hover:text-white" />
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
@@ -186,57 +157,73 @@ export default function Sidebar({
               currentProfile === 'ARTIST' && (
                 <div className="mt-4 space-y-2">
                   {!isCollapsed && (
-                    <div className="px-3 text-sm font-medium text-white/70">
+                    <div
+                      className={`px-3 text-sm font-medium ${
+                        theme === 'light' ? 'text-gray-600' : 'text-white/70'
+                      }`}
+                    >
                       Artist Dashboard
                     </div>
                   )}
                   <Link
                     href="/artist/dashboard"
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md ${
                       pathname.startsWith('/artist/dashboard')
-                        ? 'bg-white/10'
-                        : 'hover:bg-white/10'
+                        ? theme === 'light'
+                          ? 'bg-gray-200 text-gray-900'
+                          : 'bg-white/10 text-white'
+                        : theme === 'light'
+                        ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                        : 'text-white/70 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     {isCollapsed ? (
-                      <HomeOutline className="w-6 h-6 shrink-0" />
+                      <HomeOutline className="w-6 h-6 mx-auto" />
                     ) : (
                       <>
-                        <HomeOutline className="w-6 h-6 shrink-0" />
+                        <HomeOutline className="w-6 h-6" />
                         <span>Dashboard</span>
                       </>
                     )}
                   </Link>
                   <Link
                     href="/artist/albums"
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md ${
                       pathname.startsWith('/artist/albums')
-                        ? 'bg-white/10'
-                        : 'hover:bg-white/10'
+                        ? theme === 'light'
+                          ? 'bg-gray-200 text-gray-900'
+                          : 'bg-white/10 text-white'
+                        : theme === 'light'
+                        ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                        : 'text-white/70 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     {isCollapsed ? (
-                      <Album className="w-6 h-6 shrink-0 mx-auto" />
+                      <Album className="w-6 h-6 mx-auto" />
                     ) : (
                       <>
-                        <Album className="w-6 h-6 shrink-0" />
+                        <Album className="w-6 h-6" />
                         <span>Albums</span>
                       </>
                     )}
                   </Link>
                   <Link
                     href="/artist/tracks"
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md ${
                       pathname.startsWith('/artist/tracks')
-                        ? 'bg-white/10'
-                        : 'hover:bg-white/10'
+                        ? theme === 'light'
+                          ? 'bg-gray-200 text-gray-900'
+                          : 'bg-white/10 text-white'
+                        : theme === 'light'
+                        ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                        : 'text-white/70 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     {isCollapsed ? (
-                      <Music className="w-6 h-6 shrink-0 mx-auto" />
+                      <Music className="w-6 h-6 mx-auto" />
                     ) : (
                       <>
-                        <Music className="w-6 h-6 shrink-0" />
+                        <Music className="w-6 h-6" />
                         <span>Tracks</span>
                       </>
                     )}
@@ -248,91 +235,115 @@ export default function Sidebar({
             {userRole === 'ADMIN' && (
               <div className="mt-4 space-y-2">
                 {!isCollapsed && (
-                  <div className="px-3 text-sm font-medium text-white/70">
+                  <div
+                    className={`px-3 text-sm font-medium ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/70'
+                    }`}
+                  >
                     Admin Dashboard
                   </div>
                 )}
                 <Link
                   href="/admin/dashboard"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
                     isActive('/admin/dashboard')
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/10'
+                      ? theme === 'light'
+                        ? 'bg-gray-200 text-gray-900'
+                        : 'bg-white/10 text-white'
+                      : theme === 'light'
+                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   {isCollapsed ? (
-                    <HomeOutline className="w-6 h-6 shrink-0 mx-auto" />
+                    <HomeOutline className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <HomeOutline className="w-6 h-6 shrink-0" />
+                      <HomeOutline className="w-6 h-6" />
                       <span>Dashboard</span>
                     </>
                   )}
                 </Link>
                 <Link
                   href="/admin/artist-requests"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
                     pathname.startsWith('/admin/artist-requests')
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/10'
+                      ? theme === 'light'
+                        ? 'bg-gray-200 text-gray-900'
+                        : 'bg-white/10 text-white'
+                      : theme === 'light'
+                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   {isCollapsed ? (
-                    <Requests className="w-6 h-6 shrink-0 mx-auto" />
+                    <Requests className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <Requests className="w-6 h-6 shrink-0" />
+                      <Requests className="w-6 h-6" />
                       <span>Artist Requests</span>
                     </>
                   )}
                 </Link>
                 <Link
                   href="/admin/users"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
                     pathname.startsWith('/admin/users')
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/10'
+                      ? theme === 'light'
+                        ? 'bg-gray-200 text-gray-900'
+                        : 'bg-white/10 text-white'
+                      : theme === 'light'
+                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   {isCollapsed ? (
-                    <Users className="w-6 h-6 shrink-0 mx-auto" />
+                    <Users className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <Users className="w-6 h-6 shrink-0" />
+                      <Users className="w-6 h-6" />
                       <span>Users</span>
                     </>
                   )}
                 </Link>
                 <Link
                   href="/admin/artists"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
                     pathname.startsWith('/admin/artists')
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/10'
+                      ? theme === 'light'
+                        ? 'bg-gray-200 text-gray-900'
+                        : 'bg-white/10 text-white'
+                      : theme === 'light'
+                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   {isCollapsed ? (
-                    <Users className="w-6 h-6 shrink-0 mx-auto" />
+                    <Users className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <Users className="w-6 h-6 shrink-0" />
+                      <Users className="w-6 h-6" />
                       <span>Artists</span>
                     </>
                   )}
                 </Link>
                 <Link
                   href="/admin/genres"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
                     pathname.startsWith('/admin/genres')
-                      ? 'bg-white/10'
-                      : 'hover:bg-white/10'
+                      ? theme === 'light'
+                        ? 'bg-gray-200 text-gray-900'
+                        : 'bg-white/10 text-white'
+                      : theme === 'light'
+                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   {isCollapsed ? (
-                    <Music className="w-6 h-6 shrink-0 mx-auto" />
+                    <Genres className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <Genres className="w-6 h-6 shrink-0" />
+                      <Genres className="w-6 h-6" />
                       <span>Genres</span>
                     </>
                   )}
@@ -344,7 +355,11 @@ export default function Sidebar({
           <div className="p-4">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+              className={`w-10 h-10 flex items-center justify-center rounded-full ${
+                theme === 'light'
+                  ? 'bg-gray-200 hover:bg-gray-200 text-gray-600'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
             >
               {isCollapsed ? (
                 <Right className="w-5 h-5" />

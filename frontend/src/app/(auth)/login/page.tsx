@@ -11,15 +11,16 @@ interface LoginFormData {
 }
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: '',
   });
   const [error, setError] = useState<string>('');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const message = searchParams.get('message');
     if (message === 'account_deactivated') {
       setError('Your account has been deactivated. Please contact Admin.');
@@ -33,33 +34,36 @@ function LoginForm() {
         const response = await api.auth.login(formData);
 
         if (response.token && response.user) {
+          // Lưu thông tin người dùng
           localStorage.setItem('userToken', response.token);
           localStorage.setItem('sessionId', response.sessionId);
           localStorage.setItem('userData', JSON.stringify(response.user));
 
-          // Điều hướng mặc định sau login
+          // Điều hướng bằng window.location để reload toàn bộ trang
           if (response.user.role === 'ADMIN') {
-            router.push('/admin/dashboard');
+            window.location.href = '/admin/dashboard';
           } else if (response.user.artistProfile?.isVerified) {
-            router.push('/artist/dashboard');
+            window.location.href = '/artist/dashboard';
           } else {
-            router.push('/');
+            window.location.href = '/';
           }
         } else {
           setError(response.message || 'An error occurred');
         }
       } catch (err: any) {
+        console.error('Login error:', err);
         setError(err.message || 'An unexpected error occurred');
       }
     },
-    [formData, router]
+    [formData]
   );
 
+  if (!mounted) {
+    return null;
+  }
+
   return (
-    <div
-      className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4"
-      suppressHydrationWarning
-    >
+    <div className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4">
       <h1 className="text-2xl font-bold text-white mb-8">
         Login to Your Account
       </h1>

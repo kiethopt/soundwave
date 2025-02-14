@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'react-toastify';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function AdminArtists() {
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
@@ -24,6 +25,7 @@ export default function AdminArtists() {
   const [totalPages, setTotalPages] = useState(1);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const limit = 10;
+  const { theme } = useTheme();
 
   // Sử dụng router và searchParams để quản lý query param "page"
   const searchParams = useSearchParams();
@@ -187,12 +189,21 @@ export default function AdminArtists() {
       className="container mx-auto space-y-8 p-4 mb-16"
       suppressHydrationWarning
     >
+      {/* Header Section */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+          <h1
+            className={`text-2xl md:text-3xl font-bold tracking-tight ${
+              theme === 'light' ? 'text-gray-900' : 'text-white'
+            }`}
+          >
             Artist Management
           </h1>
-          <p className="text-white/60 mt-2 text-sm md:text-base">
+          <p
+            className={`mt-2 text-sm md:text-base ${
+              theme === 'light' ? 'text-gray-600' : 'text-white/60'
+            }`}
+          >
             Manage and monitor artist profiles
           </p>
         </div>
@@ -202,47 +213,72 @@ export default function AdminArtists() {
             placeholder="Search artists..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full md:w-64 pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 text-sm"
+            className={`w-full md:w-64 pl-10 pr-4 py-2 ${
+              theme === 'light'
+                ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
+                : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+            } border rounded-md focus:outline-none focus:ring-2 text-sm`}
           />
           <button
             type="submit"
             className="absolute left-3 top-1/2 transform -translate-y-1/2"
           >
-            <Search className="text-white/40 w-5 h-5" />
+            <Search
+              className={`${
+                theme === 'light' ? 'text-gray-400' : 'text-white/40'
+              } w-5 h-5`}
+            />
           </button>
         </form>
       </div>
 
       {error && (
-        <div className="bg-red-500/20 text-red-400 p-3 rounded-lg">{error}</div>
+        <div className="bg-red-500/20 text-red-400 p-3 rounded-lg text-sm">
+          {error}
+        </div>
       )}
 
-      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] relative">
+      <div
+        className={`rounded-lg overflow-hidden border relative ${
+          theme === 'light'
+            ? 'bg-white border-gray-200'
+            : 'bg-[#121212] border-white/[0.08]'
+        }`}
+      >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
-            <thead className="bg-white/5 border-b border-white/[0.08]">
+            <thead
+              className={`border-b ${
+                theme === 'light'
+                  ? 'bg-gray-50 border-gray-200'
+                  : 'bg-white/5 border-white/[0.08]'
+              }`}
+            >
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Name
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Email
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Monthly Listeners
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Status
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
-                  Created At
-                </th>
-                <th className="px-6 py-4 text-right text-sm font-semibold">
-                  Actions
-                </th>
+                {[
+                  'Name',
+                  'Email',
+                  'Monthly Listeners',
+                  'Status',
+                  'Created At',
+                  'Actions',
+                ].map((header) => (
+                  <th
+                    key={header}
+                    className={`px-6 py-4 text-left text-sm font-semibold ${
+                      theme === 'light' ? 'text-gray-900' : 'text-white'
+                    } ${header === 'Actions' ? 'text-right' : ''}`}
+                  >
+                    {header}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.08]">
+            <tbody
+              className={`divide-y ${
+                theme === 'light' ? 'divide-gray-200' : 'divide-white/[0.08]'
+              }`}
+            >
               {loading
                 ? Array(5)
                     .fill(0)
@@ -250,27 +286,65 @@ export default function AdminArtists() {
                       <tr key={i}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
+                            <div
+                              className={`w-10 h-10 rounded-full animate-pulse ${
+                                theme === 'light'
+                                  ? 'bg-gray-200'
+                                  : 'bg-white/10'
+                              }`}
+                            />
                             <div className="space-y-2">
-                              <div className="h-4 bg-white/10 rounded w-32 animate-pulse" />
-                              <div className="h-3 bg-white/10 rounded w-24 animate-pulse" />
+                              <div
+                                className={`h-4 rounded w-32 animate-pulse ${
+                                  theme === 'light'
+                                    ? 'bg-gray-200'
+                                    : 'bg-white/10'
+                                }`}
+                              />
+                              <div
+                                className={`h-3 rounded w-24 animate-pulse ${
+                                  theme === 'light'
+                                    ? 'bg-gray-200'
+                                    : 'bg-white/10'
+                                }`}
+                              />
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="h-4 bg-white/10 rounded w-48 animate-pulse" />
+                          <div
+                            className={`h-4 rounded w-48 animate-pulse ${
+                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
+                            }`}
+                          />
                         </td>
                         <td className="px-6 py-4">
-                          <div className="h-4 bg-white/10 rounded w-24 animate-pulse" />
+                          <div
+                            className={`h-4 rounded w-24 animate-pulse ${
+                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
+                            }`}
+                          />
                         </td>
                         <td className="px-6 py-4">
-                          <div className="h-6 bg-white/10 rounded-full w-20 animate-pulse" />
+                          <div
+                            className={`h-6 rounded-full w-20 animate-pulse ${
+                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
+                            }`}
+                          />
                         </td>
                         <td className="px-6 py-4">
-                          <div className="h-4 bg-white/10 rounded w-24 animate-pulse" />
+                          <div
+                            className={`h-4 rounded w-24 animate-pulse ${
+                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
+                            }`}
+                          />
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <div className="h-6 w-6 bg-white/10 rounded-full animate-pulse" />
+                          <div
+                            className={`h-6 w-6 rounded-full animate-pulse ${
+                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
+                            }`}
+                          />
                         </td>
                       </tr>
                     ))
@@ -290,22 +364,44 @@ export default function AdminArtists() {
                               }}
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full mr-3 bg-white/[0.03] flex items-center justify-center">
-                              <User className="w-6 h-6 text-white/60" />
+                            <div
+                              className={`w-10 h-10 rounded-full mr-3 flex items-center justify-center ${
+                                theme === 'light'
+                                  ? 'bg-gray-100'
+                                  : 'bg-white/[0.03]'
+                              }`}
+                            >
+                              <User
+                                className={`w-6 h-6 ${
+                                  theme === 'light'
+                                    ? 'text-gray-400'
+                                    : 'text-white/60'
+                                }`}
+                              />
                             </div>
                           )}
                           <Link
                             href={`/admin/artists/${artist.id}`}
-                            className="font-medium truncate hover:underline"
+                            className={`font-medium truncate hover:underline ${
+                              theme === 'light' ? 'text-gray-900' : 'text-white'
+                            }`}
                           >
                             {artist.artistName}
                           </Link>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap ${
+                          theme === 'light' ? 'text-gray-600' : 'text-white'
+                        }`}
+                      >
                         {artist.user.email}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap ${
+                          theme === 'light' ? 'text-gray-600' : 'text-white'
+                        }`}
+                      >
                         {artist.monthlyListeners.toLocaleString() || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -313,7 +409,11 @@ export default function AdminArtists() {
                           <span
                             className={`px-2 py-1 text-xs rounded-full ${
                               artist.isVerified
-                                ? 'bg-blue-500/10 text-blue-500'
+                                ? theme === 'light'
+                                  ? 'bg-blue-50 text-blue-600'
+                                  : 'bg-blue-500/10 text-blue-500'
+                                : theme === 'light'
+                                ? 'bg-yellow-50 text-yellow-600'
                                 : 'bg-yellow-500/10 text-yellow-500'
                             }`}
                           >
@@ -322,7 +422,11 @@ export default function AdminArtists() {
                           <span
                             className={`px-2 py-1 text-xs rounded-full ${
                               artist.isActive
-                                ? 'bg-green-500/10 text-green-500'
+                                ? theme === 'light'
+                                  ? 'bg-green-50 text-green-600'
+                                  : 'bg-green-500/10 text-green-500'
+                                : theme === 'light'
+                                ? 'bg-red-50 text-red-600'
                                 : 'bg-red-500/10 text-red-500'
                             }`}
                           >
@@ -330,15 +434,31 @@ export default function AdminArtists() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap ${
+                          theme === 'light' ? 'text-gray-600' : 'text-white'
+                        }`}
+                      >
                         {formatDate(artist.createdAt)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <DropdownMenu>
-                          <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                          <DropdownMenuTrigger
+                            className={`p-2 rounded-full ${
+                              theme === 'light'
+                                ? 'hover:bg-gray-100'
+                                : 'hover:bg-white/10'
+                            }`}
+                          >
                             <MoreVertical className="w-5 h-5" />
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent className="bg-[#282828] border-white/10 text-white">
+                          <DropdownMenuContent
+                            className={`${
+                              theme === 'light'
+                                ? 'bg-white border-gray-200'
+                                : 'bg-[#282828] border-white/10'
+                            } text-sm`}
+                          >
                             <DropdownMenuItem
                               onClick={() =>
                                 handleDeactivateArtist(
@@ -347,16 +467,26 @@ export default function AdminArtists() {
                                 )
                               }
                               disabled={actionLoading === artist.id}
-                              className="cursor-pointer hover:bg-white/10"
+                              className={`cursor-pointer ${
+                                theme === 'light'
+                                  ? 'hover:bg-gray-100'
+                                  : 'hover:bg-white/10'
+                              }`}
                             >
                               <Power className="w-4 h-4 mr-2" />
                               {artist.isActive ? 'Deactivate' : 'Activate'}
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuSeparator
+                              className={
+                                theme === 'light'
+                                  ? 'bg-gray-200'
+                                  : 'bg-white/10'
+                              }
+                            />
                             <DropdownMenuItem
                               onClick={() => handleDeleteArtist(artist.id)}
                               disabled={actionLoading === artist.id}
-                              className="text-red-400 cursor-pointer hover:bg-red-500/20"
+                              className="text-red-500 cursor-pointer hover:bg-red-50"
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
                               Delete Artist
@@ -370,20 +500,31 @@ export default function AdminArtists() {
           </table>
 
           {!loading && artists.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
+            <div
+              className={`flex flex-col items-center justify-center h-[400px] ${
+                theme === 'light' ? 'text-gray-500' : 'text-white/60'
+              }`}
+            >
               <User className="w-12 h-12 mb-4" />
               <p>No artists found</p>
             </div>
           )}
         </div>
-
         {/* Pagination */}
         {totalPages > 0 && (
-          <div className="flex items-center justify-center gap-2 p-4 border-t border-white/[0.08]">
+          <div
+            className={`flex items-center justify-center gap-2 p-4 border-t ${
+              theme === 'light' ? 'border-gray-200' : 'border-white/[0.08]'
+            }`}
+          >
             <button
               onClick={() => updateQueryParam('page', currentPage - 1)}
               disabled={currentPage === 1}
-              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                theme === 'light'
+                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                  : 'bg-white/5 hover:bg-white/10 text-white'
+              }`}
             >
               Previous
             </button>
@@ -391,12 +532,30 @@ export default function AdminArtists() {
             {/* Mobile Pagination */}
             <div className="md:hidden">
               <DropdownMenu>
-                <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                <DropdownMenuTrigger
+                  className={`px-3 py-2 rounded-md text-sm ${
+                    theme === 'light'
+                      ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                      : 'bg-white/5 hover:bg-white/10 text-white'
+                  }`}
+                >
                   {currentPage} of {totalPages}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                <DropdownMenuContent
+                  className={`p-4 w-[200px] ${
+                    theme === 'light'
+                      ? 'bg-white border-gray-200 text-gray-900'
+                      : 'bg-[#282828] border-white/[0.1] text-white'
+                  }`}
+                >
                   <div className="space-y-3">
-                    <div className="text-xs text-white/60">Go to page:</div>
+                    <div
+                      className={`text-xs ${
+                        theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                      }`}
+                    >
+                      Go to page:
+                    </div>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -404,7 +563,11 @@ export default function AdminArtists() {
                         max={totalPages}
                         defaultValue={currentPage}
                         ref={pageInputRef}
-                        className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                        className={`w-full px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
+                          theme === 'light'
+                            ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
+                            : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50'
+                        }`}
                         placeholder="Page"
                       />
                     </div>
@@ -427,12 +590,22 @@ export default function AdminArtists() {
             </div>
 
             {/* Desktop Pagination */}
-            <div className="hidden md:flex items-center gap-2 text-sm">
-              <span className="text-white/60">Page</span>
-              <div className="bg-white/5 px-3 py-1 rounded-md border border-white/[0.1]">
-                <span className="text-white font-medium">{currentPage}</span>
+            <div
+              className={`hidden md:flex items-center gap-2 text-sm ${
+                theme === 'light' ? 'text-gray-600' : 'text-white/60'
+              }`}
+            >
+              <span>Page</span>
+              <div
+                className={`px-3 py-1 rounded-md border ${
+                  theme === 'light'
+                    ? 'bg-gray-50 border-gray-200 text-gray-900'
+                    : 'bg-white/5 border-white/[0.1] text-white'
+                }`}
+              >
+                <span className="font-medium">{currentPage}</span>
               </div>
-              <span className="text-white/60">of {totalPages}</span>
+              <span>of {totalPages}</span>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -440,7 +613,11 @@ export default function AdminArtists() {
                   max={totalPages}
                   defaultValue={currentPage}
                   ref={pageInputRef}
-                  className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                  className={`w-16 px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
+                    theme === 'light'
+                      ? 'bg-gray-50 border-gray-200 focus:ring-gray-300 text-gray-900'
+                      : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50 text-white'
+                  }`}
                   placeholder="Page"
                 />
                 <button
@@ -462,7 +639,11 @@ export default function AdminArtists() {
             <button
               onClick={() => updateQueryParam('page', currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                theme === 'light'
+                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                  : 'bg-white/5 hover:bg-white/10 text-white'
+              }`}
             >
               Next
             </button>
@@ -471,8 +652,16 @@ export default function AdminArtists() {
 
         {/* Loading overlay */}
         {loading && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <Spinner className="w-8 h-8 animate-spin text-white" />
+          <div
+            className={`absolute inset-0 flex items-center justify-center ${
+              theme === 'light' ? 'bg-gray-500/50' : 'bg-black/50'
+            }`}
+          >
+            <Spinner
+              className={`w-8 h-8 animate-spin ${
+                theme === 'light' ? 'text-gray-900' : 'text-white'
+              }`}
+            />
           </div>
         )}
       </div>

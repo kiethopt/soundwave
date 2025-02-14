@@ -16,12 +16,12 @@ import {
 import { Verified } from '@/components/ui/Icons';
 import { ArtistProfile, Album, Track } from '@/types';
 import { cn } from '@/lib/utils';
-// Import DropdownMenu các thành phần để dùng cho mobile pagination
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
 } from '@/components/ui/dropdown-menu';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function ArtistDetail({
   params,
@@ -31,6 +31,7 @@ export default function ArtistDetail({
   const { id } = use(params);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { theme } = useTheme();
 
   // Xử lý URL cho query param "albumPage":
   // Nếu giá trị âm hoặc bằng "1" => loại bỏ param khỏi URL
@@ -248,23 +249,35 @@ export default function ArtistDetail({
       <div className="flex items-center">
         <Link
           href="/admin/artists"
-          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors group"
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            theme === 'light'
+              ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
+              : 'bg-white/10 hover:bg-white/15 text-white/80 hover:text-white'
+          }`}
         >
           <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-          <span>Back to Artists</span>
+          <span>Back</span>
         </Link>
       </div>
 
-      <div className="bg-[#121212] rounded-xl overflow-hidden border border-white/10 p-6 backdrop-blur-sm relative">
+      <div
+        className={`rounded-xl overflow-hidden border p-6 backdrop-blur-sm relative ${
+          theme === 'light'
+            ? 'bg-white border-gray-200'
+            : 'bg-[#121212] border-white/10'
+        }`}
+      >
         <div className="grid gap-6 md:grid-cols-[240px_1fr]">
           {/* Left Column */}
           <div className="space-y-4">
             <div className="relative group">
-              {artist.avatar ? (
+              {artist?.avatar ? (
                 <img
                   src={artist.avatar}
                   alt={artist.artistName}
-                  className="w-full md:w-60 h-60 rounded-xl object-cover shadow-xl border-4 border-white/10"
+                  className={`w-full md:w-60 h-60 rounded-xl object-cover shadow-xl border-4 ${
+                    theme === 'light' ? 'border-gray-200' : 'border-white/10'
+                  }`}
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.onerror = null;
@@ -272,38 +285,69 @@ export default function ArtistDetail({
                   }}
                 />
               ) : (
-                <div className="w-full md:w-60 h-60 rounded-xl bg-gradient-to-br from-[#2c2c2c] to-[#1a1a1a] flex items-center justify-center">
-                  <User className="w-16 h-16 md:w-20 md:h-20 text-white/60" />
+                <div
+                  className={`w-full md:w-60 h-60 rounded-xl flex items-center justify-center ${
+                    theme === 'light'
+                      ? 'bg-gradient-to-br from-gray-100 to-gray-200'
+                      : 'bg-gradient-to-br from-[#2c2c2c] to-[#1a1a1a]'
+                  }`}
+                >
+                  <User
+                    className={`w-16 h-16 md:w-20 md:h-20 ${
+                      theme === 'light' ? 'text-gray-400' : 'text-white/60'
+                    }`}
+                  />
                 </div>
               )}
             </div>
 
-            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-              <p className="text-xs md:text-sm text-white/60 mb-1">
+            <div
+              className={`rounded-xl p-4 border ${
+                theme === 'light'
+                  ? 'bg-gray-50 border-gray-200'
+                  : 'bg-white/5 border-white/10'
+              }`}
+            >
+              <p
+                className={`text-xs md:text-sm ${
+                  theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                } mb-1`}
+              >
                 Monthly Listeners
               </p>
-              <p className="text-xl md:text-2xl font-bold text-white">
-                {artist.monthlyListeners?.toLocaleString() ?? 0}
+              <p
+                className={`text-xl md:text-2xl font-bold ${
+                  theme === 'light' ? 'text-gray-900' : 'text-white'
+                }`}
+              >
+                {artist?.monthlyListeners?.toLocaleString() ?? 0}
               </p>
             </div>
           </div>
-
           {/* Right Column */}
           <div className="space-y-6 flex flex-col">
             {/* Header Section */}
             <div className="space-y-3 md:space-y-4">
               <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-                <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white">
-                  {artist.artistName || artist.user?.name}
+                <h1
+                  className={`text-2xl md:text-4xl font-bold tracking-tight ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
+                  {artist?.artistName || artist?.user?.name}
                 </h1>
-                {artist.isVerified && (
+                {artist?.isVerified && (
                   <span title="Verified Artist">
                     <Verified className="w-5 h-5 md:w-6 md:h-6" />
                   </span>
                 )}
               </div>
-              {artist.bio && (
-                <p className="text-white/60 text-sm md:text-lg leading-relaxed max-w-3xl">
+              {artist?.bio && (
+                <p
+                  className={`text-sm md:text-lg leading-relaxed max-w-3xl ${
+                    theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                  }`}
+                >
                   {artist.bio}
                 </p>
               )}
@@ -313,11 +357,15 @@ export default function ArtistDetail({
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={handleVerify}
-                disabled={artist.isVerified || isUpdating}
+                disabled={artist?.isVerified || isUpdating}
                 className={cn(
                   'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm transition-all',
-                  artist.isVerified
-                    ? 'bg-green-500/10 text-green-400 cursor-not-allowed'
+                  artist?.isVerified
+                    ? theme === 'light'
+                      ? 'bg-green-50 text-green-600 cursor-not-allowed'
+                      : 'bg-green-500/10 text-green-400 cursor-not-allowed'
+                    : theme === 'light'
+                    ? 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20'
                     : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20'
                 )}
               >
@@ -330,7 +378,7 @@ export default function ArtistDetail({
                   <>
                     <RefreshCw className="w-4 h-4" />
                     <span>
-                      {artist.isVerified ? 'Verified' : 'Verify Artist'}
+                      {artist?.isVerified ? 'Verified' : 'Verify Artist'}
                     </span>
                   </>
                 )}
@@ -339,7 +387,11 @@ export default function ArtistDetail({
               <button
                 onClick={handleUpdateMonthlyListeners}
                 disabled={isUpdating}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-white/5 text-white/90 rounded-lg hover:bg-white/10 border border-white/10 transition-all text-sm"
+                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg hover:bg-opacity-90 border transition-all text-sm ${
+                  theme === 'light'
+                    ? 'bg-gray-100 text-gray-900 border-gray-200 hover:bg-gray-200'
+                    : 'bg-white/5 text-white/90 border-white/10 hover:bg-white/10'
+                }`}
               >
                 <RefreshCw
                   className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`}
@@ -349,42 +401,57 @@ export default function ArtistDetail({
             </div>
 
             {/* Tab Navigation */}
-            <div className="border-b border-white/10">
+            <div
+              className={`border-b ${
+                theme === 'light' ? 'border-gray-200' : 'border-white/10'
+              }`}
+            >
               <div className="flex gap-4">
                 <button
                   onClick={() => setActiveTab('albums')}
-                  className={`pb-3 px-1 text-sm font-medium ${
+                  className={`pb-3 px-1 text-sm font-medium transition-colors ${
                     activeTab === 'albums'
-                      ? 'border-b-2 border-white text-white'
+                      ? theme === 'light'
+                        ? 'border-b-2 border-gray-900 text-gray-900'
+                        : 'border-b-2 border-white text-white'
+                      : theme === 'light'
+                      ? 'text-gray-600 hover:text-gray-900'
                       : 'text-white/60 hover:text-white/80'
-                  } transition-colors`}
+                  }`}
                 >
-                  Albums ({artist.albums?.total ?? 0})
+                  Albums ({artist?.albums?.total ?? 0})
                 </button>
                 <button
                   onClick={() => setActiveTab('tracks')}
-                  className={`pb-3 px-1 text-sm font-medium ${
+                  className={`pb-3 px-1 text-sm font-medium transition-colors ${
                     activeTab === 'tracks'
-                      ? 'border-b-2 border-white text-white'
+                      ? theme === 'light'
+                        ? 'border-b-2 border-gray-900 text-gray-900'
+                        : 'border-b-2 border-white text-white'
+                      : theme === 'light'
+                      ? 'text-gray-600 hover:text-gray-900'
                       : 'text-white/60 hover:text-white/80'
-                  } transition-colors`}
+                  }`}
                 >
-                  Tracks ({artist.tracks?.total ?? 0})
+                  Tracks ({artist?.tracks?.total ?? 0})
                 </button>
               </div>
             </div>
-
             {/* Content Area */}
             <div className="flex-1 min-h-0">
               {/* Albums Tab */}
               {activeTab === 'albums' && (
                 <div className="space-y-6">
-                  {artist.albums?.data && artist.albums.data.length > 0 ? (
+                  {artist?.albums?.data && artist.albums.data.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {(artist.albums.data || []).map((album: Album) => (
                         <div
                           key={album.id}
-                          className="bg-white/5 rounded-lg p-2 hover:bg-white/10 transition-colors border border-white/10"
+                          className={`rounded-lg p-2 border transition-colors ${
+                            theme === 'light'
+                              ? 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                              : 'bg-white/5 hover:bg-white/10 border-white/10'
+                          }`}
                         >
                           <div className="flex items-center gap-3">
                             {album.coverUrl ? (
@@ -394,22 +461,50 @@ export default function ArtistDetail({
                                 className="w-12 h-12 rounded-md object-cover"
                               />
                             ) : (
-                              <div className="w-12 h-12 rounded-md bg-white/10 flex items-center justify-center">
-                                <Disc className="w-6 h-6 text-white/60" />
+                              <div
+                                className={`w-12 h-12 rounded-md flex items-center justify-center ${
+                                  theme === 'light'
+                                    ? 'bg-gray-200'
+                                    : 'bg-white/10'
+                                }`}
+                              >
+                                <Disc
+                                  className={`w-6 h-6 ${
+                                    theme === 'light'
+                                      ? 'text-gray-400'
+                                      : 'text-white/60'
+                                  }`}
+                                />
                               </div>
                             )}
                             <div className="min-w-0 flex-1">
                               <Link
-                                href={`/admin/artists/${id}/albums/${album.id}`}
-                                className="text-sm font-semibold text-white hover:underline truncate block"
+                                href={`/admin/artists/${artist.id}/albums/${album.id}`}
+                                className={`text-sm font-semibold hover:underline truncate block ${
+                                  theme === 'light'
+                                    ? 'text-gray-900'
+                                    : 'text-white'
+                                }`}
                               >
                                 {album.title}
                               </Link>
-                              <p className="text-xs text-white/60 mt-0.5 truncate">
+                              <p
+                                className={`text-xs mt-0.5 truncate ${
+                                  theme === 'light'
+                                    ? 'text-gray-600'
+                                    : 'text-white/60'
+                                }`}
+                              >
                                 {album.totalTracks} tracks &middot;{' '}
                                 {formatDuration(album.duration)}
                               </p>
-                              <p className="text-xs text-white/60 truncate">
+                              <p
+                                className={`text-xs truncate ${
+                                  theme === 'light'
+                                    ? 'text-gray-600'
+                                    : 'text-white/60'
+                                }`}
+                              >
                                 {new Date(album.releaseDate).getFullYear()}
                               </p>
                             </div>
@@ -418,29 +513,57 @@ export default function ArtistDetail({
                       ))}
                     </div>
                   ) : (
-                    <p className="text-white">No albums found on this page.</p>
+                    <p
+                      className={
+                        theme === 'light' ? 'text-gray-600' : 'text-white'
+                      }
+                    >
+                      No albums found on this page.
+                    </p>
                   )}
 
                   {/* Album Pagination */}
-                  {artist.albums && artist.albums.total > 0 && (
+                  {artist?.albums && artist.albums.total > 0 && (
                     <>
                       {/* Mobile Pagination */}
                       <div className="flex md:hidden items-center justify-center gap-2 mt-4">
                         <button
                           onClick={handleAlbumPrev}
                           disabled={sanitizedAlbumPage <= 1}
-                          className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                            theme === 'light'
+                              ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                              : 'bg-white/5 hover:bg-white/10 text-white'
+                          }`}
                         >
                           Previous
                         </button>
                         <DropdownMenu>
-                          <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                          <DropdownMenuTrigger
+                            className={`px-3 py-2 rounded-md text-sm ${
+                              theme === 'light'
+                                ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                                : 'bg-white/5 hover:bg-white/10 text-white'
+                            }`}
+                          >
                             {sanitizedAlbumPage} of{' '}
                             {artist.albums?.totalPages ?? 1}
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                          <DropdownMenuContent
+                            className={`p-4 w-[200px] ${
+                              theme === 'light'
+                                ? 'bg-white border-gray-200 text-gray-900'
+                                : 'bg-[#282828] border-white/[0.1] text-white'
+                            }`}
+                          >
                             <div className="space-y-3">
-                              <div className="text-xs text-white/60">
+                              <div
+                                className={`text-xs ${
+                                  theme === 'light'
+                                    ? 'text-gray-500'
+                                    : 'text-white/60'
+                                }`}
+                              >
                                 Go to page:
                               </div>
                               <div className="flex items-center gap-2">
@@ -450,7 +573,11 @@ export default function ArtistDetail({
                                   max={artist.albums?.totalPages ?? 1}
                                   defaultValue={sanitizedAlbumPage}
                                   ref={albumPageRef}
-                                  className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                                  className={`w-full px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
+                                    theme === 'light'
+                                      ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
+                                      : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50'
+                                  }`}
                                   placeholder="Page"
                                 />
                               </div>
@@ -459,17 +586,13 @@ export default function ArtistDetail({
                                   const page = albumPageRef.current
                                     ? parseInt(albumPageRef.current.value, 10)
                                     : NaN;
-                                  if (
-                                    !isNaN(page) &&
-                                    page >= 1 &&
-                                    page <= (artist.albums?.totalPages ?? 1)
-                                  ) {
+                                  if (!isNaN(page)) {
                                     updateQueryParam('albumPage', page);
                                   }
                                 }}
                                 className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
                               >
-                                Go
+                                Go to Page
                               </button>
                             </div>
                           </DropdownMenuContent>
@@ -480,29 +603,46 @@ export default function ArtistDetail({
                             sanitizedAlbumPage >=
                             (artist.albums?.totalPages ?? 1)
                           }
-                          className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                            theme === 'light'
+                              ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                              : 'bg-white/5 hover:bg-white/10 text-white'
+                          }`}
                         >
                           Next
                         </button>
                       </div>
+
                       {/* Desktop Pagination */}
-                      <div className="hidden md:flex items-center justify-center gap-2 mt-4 text-sm">
+                      <div
+                        className={`hidden md:flex items-center justify-center gap-2 mt-4 text-sm ${
+                          theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                        }`}
+                      >
                         <button
                           onClick={handleAlbumPrev}
                           disabled={sanitizedAlbumPage <= 1}
-                          className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border transition-colors ${
+                            theme === 'light'
+                              ? 'bg-gray-50 text-gray-900 border-gray-200 hover:bg-gray-100'
+                              : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
+                          }`}
                         >
                           Previous
                         </button>
-                        <span className="text-white/60">Page</span>
-                        <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
-                          <span className="text-white font-medium">
+                        <span>Page</span>
+                        <div
+                          className={`px-3 py-1 rounded-lg border ${
+                            theme === 'light'
+                              ? 'bg-gray-50 border-gray-200 text-gray-900'
+                              : 'bg-white/5 border-white/10 text-white'
+                          }`}
+                        >
+                          <span className="font-medium">
                             {sanitizedAlbumPage}
                           </span>
                         </div>
-                        <span className="text-white/60">
-                          of {artist.albums?.totalPages ?? 1}
-                        </span>
+                        <span>of {artist.albums?.totalPages ?? 1}</span>
                         <div className="flex items-center gap-2">
                           <input
                             type="number"
@@ -510,7 +650,11 @@ export default function ArtistDetail({
                             max={artist.albums?.totalPages ?? 1}
                             defaultValue={sanitizedAlbumPage}
                             ref={albumPageRef}
-                            className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                            className={`w-16 px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
+                              theme === 'light'
+                                ? 'bg-gray-50 border-gray-200 focus:ring-gray-300 text-gray-900'
+                                : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50 text-white'
+                            }`}
                             placeholder="Page"
                           />
                           <button
@@ -518,11 +662,7 @@ export default function ArtistDetail({
                               const page = albumPageRef.current
                                 ? parseInt(albumPageRef.current.value, 10)
                                 : NaN;
-                              if (
-                                !isNaN(page) &&
-                                page >= 1 &&
-                                page <= (artist.albums?.totalPages ?? 1)
-                              ) {
+                              if (!isNaN(page)) {
                                 updateQueryParam('albumPage', page);
                               }
                             }}
@@ -537,7 +677,11 @@ export default function ArtistDetail({
                             sanitizedAlbumPage >=
                             (artist.albums?.totalPages ?? 1)
                           }
-                          className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border transition-colors ${
+                            theme === 'light'
+                              ? 'bg-gray-50 text-gray-900 border-gray-200 hover:bg-gray-100'
+                              : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
+                          }`}
                         >
                           Next
                         </button>
@@ -550,12 +694,16 @@ export default function ArtistDetail({
               {/* Tracks Tab */}
               {activeTab === 'tracks' && (
                 <div className="space-y-6">
-                  {artist.tracks?.data && artist.tracks.data.length > 0 ? (
+                  {artist?.tracks?.data && artist.tracks.data.length > 0 ? (
                     <div className="space-y-1">
                       {(artist.tracks.data || []).map((track: Track) => (
                         <div
                           key={track.id}
-                          className="bg-white/5 rounded-md p-2 hover:bg-white/10 transition-colors border border-white/10 flex items-center gap-2"
+                          className={`rounded-md p-2 flex items-center gap-2 border transition-colors ${
+                            theme === 'light'
+                              ? 'bg-gray-50 hover:bg-gray-100 border-gray-200'
+                              : 'bg-white/5 hover:bg-white/10 border-white/10'
+                          }`}
                         >
                           <button
                             onClick={() =>
@@ -563,7 +711,11 @@ export default function ArtistDetail({
                                 playingTrackId === track.id ? null : track.id
                               )
                             }
-                            className="text-white/60 hover:text-white transition-colors flex-shrink-0"
+                            className={`flex-shrink-0 transition-colors ${
+                              theme === 'light'
+                                ? 'text-gray-600 hover:text-gray-900'
+                                : 'text-white/60 hover:text-white'
+                            }`}
                           >
                             {playingTrackId === track.id ? (
                               <Pause className="w-4 h-4" />
@@ -578,21 +730,51 @@ export default function ArtistDetail({
                               className="w-8 h-8 rounded-md object-cover flex-shrink-0"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
-                              <Music className="w-4 h-4 text-white/60" />
+                            <div
+                              className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${
+                                theme === 'light'
+                                  ? 'bg-gray-200'
+                                  : 'bg-white/10'
+                              }`}
+                            >
+                              <Music
+                                className={`w-4 h-4 ${
+                                  theme === 'light'
+                                    ? 'text-gray-400'
+                                    : 'text-white/60'
+                                }`}
+                              />
                             </div>
                           )}
                           <div className="min-w-0 flex-1 grid grid-cols-[1fr_auto] items-center gap-2">
                             <div className="min-w-0">
-                              <h3 className="text-sm font-medium text-white truncate">
+                              <h3
+                                className={`text-sm font-medium truncate ${
+                                  theme === 'light'
+                                    ? 'text-gray-900'
+                                    : 'text-white'
+                                }`}
+                              >
                                 {track.title}
                               </h3>
-                              <p className="text-xs text-white/60 truncate">
+                              <p
+                                className={`text-xs truncate ${
+                                  theme === 'light'
+                                    ? 'text-gray-600'
+                                    : 'text-white/60'
+                                }`}
+                              >
                                 {track.album?.title || 'Single'} &middot;{' '}
                                 {formatDuration(track.duration)}
                               </p>
                             </div>
-                            <div className="text-xs text-white/60 flex-shrink-0">
+                            <div
+                              className={`text-xs flex-shrink-0 ${
+                                theme === 'light'
+                                  ? 'text-gray-600'
+                                  : 'text-white/60'
+                              }`}
+                            >
                               {track.playCount.toLocaleString()} plays
                             </div>
                           </div>
@@ -600,29 +782,57 @@ export default function ArtistDetail({
                       ))}
                     </div>
                   ) : (
-                    <p className="text-white">No tracks found on this page.</p>
+                    <p
+                      className={
+                        theme === 'light' ? 'text-gray-600' : 'text-white'
+                      }
+                    >
+                      No tracks found on this page.
+                    </p>
                   )}
 
                   {/* Track Pagination */}
-                  {artist.tracks && artist.tracks.total > 0 && (
+                  {artist?.tracks && artist.tracks.total > 0 && (
                     <div className="mt-6">
                       {/* Mobile Pagination */}
                       <div className="flex md:hidden items-center justify-center gap-2">
                         <button
                           onClick={handleTrackPrev}
                           disabled={sanitizedTrackPage <= 1}
-                          className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                            theme === 'light'
+                              ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                              : 'bg-white/5 hover:bg-white/10 text-white'
+                          }`}
                         >
                           Previous
                         </button>
                         <DropdownMenu>
-                          <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                          <DropdownMenuTrigger
+                            className={`px-3 py-2 rounded-md text-sm ${
+                              theme === 'light'
+                                ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                                : 'bg-white/5 hover:bg-white/10 text-white'
+                            }`}
+                          >
                             {sanitizedTrackPage} of{' '}
                             {artist.tracks?.totalPages ?? 1}
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                          <DropdownMenuContent
+                            className={`p-4 w-[200px] ${
+                              theme === 'light'
+                                ? 'bg-white border-gray-200 text-gray-900'
+                                : 'bg-[#282828] border-white/[0.1] text-white'
+                            }`}
+                          >
                             <div className="space-y-3">
-                              <div className="text-xs text-white/60">
+                              <div
+                                className={`text-xs ${
+                                  theme === 'light'
+                                    ? 'text-gray-500'
+                                    : 'text-white/60'
+                                }`}
+                              >
                                 Go to page:
                               </div>
                               <div className="flex items-center gap-2">
@@ -632,7 +842,11 @@ export default function ArtistDetail({
                                   max={artist.tracks?.totalPages ?? 1}
                                   defaultValue={sanitizedTrackPage}
                                   ref={trackPageRef}
-                                  className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                                  className={`w-full px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
+                                    theme === 'light'
+                                      ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
+                                      : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50'
+                                  }`}
                                   placeholder="Page"
                                 />
                               </div>
@@ -641,17 +855,13 @@ export default function ArtistDetail({
                                   const page = trackPageRef.current
                                     ? parseInt(trackPageRef.current.value, 10)
                                     : NaN;
-                                  if (
-                                    !isNaN(page) &&
-                                    page >= 1 &&
-                                    page <= (artist.tracks?.totalPages ?? 1)
-                                  ) {
+                                  if (!isNaN(page)) {
                                     updateQueryParam('trackPage', page);
                                   }
                                 }}
                                 className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
                               >
-                                Go
+                                Go to Page
                               </button>
                             </div>
                           </DropdownMenuContent>
@@ -662,29 +872,46 @@ export default function ArtistDetail({
                             sanitizedTrackPage >=
                             (artist.tracks?.totalPages ?? 1)
                           }
-                          className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                          className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+                            theme === 'light'
+                              ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                              : 'bg-white/5 hover:bg-white/10 text-white'
+                          }`}
                         >
                           Next
                         </button>
                       </div>
+
                       {/* Desktop Pagination */}
-                      <div className="hidden md:flex items-center justify-center gap-2 text-sm">
+                      <div
+                        className={`hidden md:flex items-center justify-center gap-2 text-sm ${
+                          theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                        }`}
+                      >
                         <button
                           onClick={handleTrackPrev}
                           disabled={sanitizedTrackPage <= 1}
-                          className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border transition-colors ${
+                            theme === 'light'
+                              ? 'bg-gray-50 text-gray-900 border-gray-200 hover:bg-gray-100'
+                              : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
+                          }`}
                         >
                           Previous
                         </button>
-                        <span className="text-white/60">Page</span>
-                        <div className="bg-white/5 px-3 py-1 rounded-lg border border-white/10">
-                          <span className="text-white font-medium">
+                        <span>Page</span>
+                        <div
+                          className={`px-3 py-1 rounded-lg border ${
+                            theme === 'light'
+                              ? 'bg-gray-50 border-gray-200 text-gray-900'
+                              : 'bg-white/5 border-white/10 text-white'
+                          }`}
+                        >
+                          <span className="font-medium">
                             {sanitizedTrackPage}
                           </span>
                         </div>
-                        <span className="text-white/60">
-                          of {artist.tracks?.totalPages ?? 1}
-                        </span>
+                        <span>of {artist.tracks?.totalPages ?? 1}</span>
                         <div className="flex items-center gap-2">
                           <input
                             type="number"
@@ -692,7 +919,11 @@ export default function ArtistDetail({
                             max={artist.tracks?.totalPages ?? 1}
                             defaultValue={sanitizedTrackPage}
                             ref={trackPageRef}
-                            className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                            className={`w-16 px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
+                              theme === 'light'
+                                ? 'bg-gray-50 border-gray-200 focus:ring-gray-300 text-gray-900'
+                                : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50 text-white'
+                            }`}
                             placeholder="Page"
                           />
                           <button
@@ -700,11 +931,7 @@ export default function ArtistDetail({
                               const page = trackPageRef.current
                                 ? parseInt(trackPageRef.current.value, 10)
                                 : NaN;
-                              if (
-                                !isNaN(page) &&
-                                page >= 1 &&
-                                page <= (artist.tracks?.totalPages ?? 1)
-                              ) {
+                              if (!isNaN(page)) {
                                 updateQueryParam('trackPage', page);
                               }
                             }}
@@ -719,7 +946,11 @@ export default function ArtistDetail({
                             sanitizedTrackPage >=
                             (artist.tracks?.totalPages ?? 1)
                           }
-                          className="px-4 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 transition-colors"
+                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border transition-colors ${
+                            theme === 'light'
+                              ? 'bg-gray-50 text-gray-900 border-gray-200 hover:bg-gray-100'
+                              : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
+                          }`}
                         >
                           Next
                         </button>

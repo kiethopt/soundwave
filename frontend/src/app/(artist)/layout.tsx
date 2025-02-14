@@ -1,5 +1,6 @@
 'use client';
 
+import { useTheme } from '@/contexts/ThemeContext';
 import { useEffect, useState } from 'react';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -9,6 +10,7 @@ export default function ArtistLayout({
   children: React.ReactNode;
 }) {
   const [isLoading, setIsLoading] = useState(true);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const checkArtistAccess = () => {
@@ -45,7 +47,14 @@ export default function ArtistLayout({
   }
 
   return (
-    <div className="h-full" suppressHydrationWarning>
+    <div
+      className={`h-full ${
+        theme === 'light'
+          ? 'bg-gray-50 text-gray-900'
+          : 'bg-[#111111] text-white'
+      }`}
+      suppressHydrationWarning
+    >
       {children}
     </div>
   );

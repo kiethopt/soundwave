@@ -15,8 +15,10 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function ArtistRequests() {
+  const { theme } = useTheme();
   const [requests, setRequests] = useState<ArtistRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +27,25 @@ export default function ArtistRequests() {
 
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Định nghĩa các biến dựa theo theme
+  const textColor = theme === 'light' ? 'text-gray-900' : 'text-white';
+  const subTextColor = theme === 'light' ? 'text-gray-600' : 'text-white/60';
+  const inputBg = theme === 'light' ? 'bg-gray-50' : 'bg-white/[0.07]';
+  const inputBorder =
+    theme === 'light' ? 'border-gray-200' : 'border-white/[0.1]';
+  const cardBg = theme === 'light' ? 'bg-gray-100' : 'bg-white/5';
+  const cardBorder =
+    theme === 'light' ? 'border-gray-200' : 'border-white/[0.08]';
+  const pulseBg = theme === 'light' ? 'bg-gray-200' : 'bg-white/10';
+  const dropdownBg = theme === 'light' ? 'bg-white' : 'bg-[#282828]';
+  const dropdownBorder =
+    theme === 'light' ? 'border-gray-200' : 'border-white/[0.1]';
+  const dropdownText = theme === 'light' ? 'text-gray-900' : 'text-white';
+  const paginationBtnBg = theme === 'light' ? 'bg-gray-200' : 'bg-white/5';
+  const paginationBtnHover =
+    theme === 'light' ? 'hover:bg-gray-300' : 'hover:bg-white/10';
+  const iconColor = theme === 'light' ? 'text-gray-500' : 'text-white/40';
 
   // Nếu query param "page" có giá trị "1" hoặc nhỏ hơn 1 thì loại bỏ nó để URL gọn
   useEffect(() => {
@@ -145,10 +166,12 @@ export default function ArtistRequests() {
     >
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+          <h1
+            className={`text-2xl md:text-3xl font-bold tracking-tight ${textColor}`}
+          >
             Artist Requests
           </h1>
-          <p className="text-white/60 mt-2 text-sm md:text-base">
+          <p className={`mt-2 text-sm md:text-base ${subTextColor}`}>
             Manage artist requests from users
           </p>
         </div>
@@ -158,13 +181,15 @@ export default function ArtistRequests() {
             placeholder="Search requests..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full md:w-64 pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 text-sm"
+            className={`w-full md:w-64 pl-10 pr-4 py-2 ${inputBg} border ${inputBorder} rounded-md focus:outline-none focus:ring-2 ${
+              theme === 'light' ? 'focus:ring-gray-300' : 'focus:ring-white/20'
+            } text-sm`}
           />
           <button
             type="submit"
             className="absolute left-3 top-1/2 transform -translate-y-1/2"
           >
-            <Search className="text-white/40 w-5 h-5" />
+            <Search className={`${iconColor} w-5 h-5`} />
           </button>
         </form>
       </div>
@@ -173,26 +198,44 @@ export default function ArtistRequests() {
         <div className="bg-red-500/20 text-red-400 p-3 rounded-lg">{error}</div>
       )}
 
-      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] relative">
+      <div
+        className={`rounded-lg overflow-hidden border ${cardBg} ${cardBorder} relative`}
+      >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px]">
-            <thead className="bg-white/5 border-b border-white/[0.08]">
+            <thead
+              className={`border-b ${cardBorder} ${
+                theme === 'light' ? 'bg-gray-100' : 'bg-white/5'
+              }`}
+            >
               <tr>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
+                <th
+                  className={`px-6 py-4 text-left text-sm font-semibold ${textColor}`}
+                >
                   Artist Name
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
+                <th
+                  className={`px-6 py-4 text-left text-sm font-semibold ${textColor}`}
+                >
                   Email
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold">
+                <th
+                  className={`px-6 py-4 text-left text-sm font-semibold ${textColor}`}
+                >
                   Requested At
                 </th>
-                <th className="px-6 py-4 text-right text-sm font-semibold">
+                <th
+                  className={`px-6 py-4 text-right text-sm font-semibold ${textColor}`}
+                >
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.08]">
+            <tbody
+              className={`divide-y ${
+                theme === 'light' ? 'divide-gray-200' : 'divide-white/[0.04]'
+              }`}
+            >
               {loading
                 ? Array(5)
                     .fill(0)
@@ -200,21 +243,33 @@ export default function ArtistRequests() {
                       <tr key={i}>
                         <td className="px-3 md:px-6 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
+                            <div
+                              className={`w-10 h-10 rounded-full ${pulseBg} animate-pulse`}
+                            />
                             <div className="space-y-2">
-                              <div className="h-4 bg-white/10 rounded w-32 animate-pulse" />
-                              <div className="h-3 bg-white/10 rounded w-24 animate-pulse" />
+                              <div
+                                className={`h-4 rounded w-32 animate-pulse ${pulseBg}`}
+                              />
+                              <div
+                                className={`h-3 rounded w-24 animate-pulse ${pulseBg}`}
+                              />
                             </div>
                           </div>
                         </td>
                         <td className="px-3 md:px-6 py-2">
-                          <div className="h-4 bg-white/10 rounded w-48 animate-pulse" />
+                          <div
+                            className={`h-4 rounded w-48 animate-pulse ${pulseBg}`}
+                          />
                         </td>
                         <td className="px-3 md:px-6 py-2">
-                          <div className="h-4 bg-white/10 rounded w-24 animate-pulse" />
+                          <div
+                            className={`h-4 rounded w-24 animate-pulse ${pulseBg}`}
+                          />
                         </td>
                         <td className="px-3 md:px-6 py-2 text-right">
-                          <div className="h-6 w-6 bg-white/10 rounded-full animate-pulse" />
+                          <div
+                            className={`h-6 w-6 rounded-full animate-pulse ${pulseBg}`}
+                          />
                         </td>
                       </tr>
                     ))
@@ -222,7 +277,7 @@ export default function ArtistRequests() {
                     <tr key={request.id}>
                       <td className="px-3 md:px-6 py-2 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="w-10 h-10 rounded-full bg-white/[0.03] flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center">
                             {request.avatar ? (
                               <img
                                 src={request.avatar}
@@ -230,12 +285,12 @@ export default function ArtistRequests() {
                                 className="w-10 h-10 rounded-full"
                               />
                             ) : (
-                              <User className="w-6 h-6 text-white/60" />
+                              <User className="w-6 h-6" />
                             )}
                           </div>
                           <Link
                             href={`/admin/artist-requests/${request.id}`}
-                            className="ml-3 font-medium hover:underline text-sm"
+                            className={`ml-3 font-medium text-sm ${textColor} hover:underline`}
                           >
                             {request.artistName}
                           </Link>
@@ -249,10 +304,12 @@ export default function ArtistRequests() {
                       </td>
                       <td className="px-3 md:px-6 py-2 whitespace-nowrap text-right">
                         <DropdownMenu>
-                          <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                          <DropdownMenuTrigger className="p-2 rounded-full hover:bg-white/10">
                             <MoreVertical className="w-5 h-5" />
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white">
+                          <DropdownMenuContent
+                            className={`${dropdownBg} border ${dropdownBorder} ${dropdownText}`}
+                          >
                             <DropdownMenuItem
                               onClick={() => handleViewDetails(request.id)}
                               className="cursor-pointer hover:bg-white/10 text-sm"
@@ -285,19 +342,23 @@ export default function ArtistRequests() {
         </div>
 
         {!loading && requests.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
+          <div className="flex flex-col items-center justify-center h-[400px]">
             <User className="w-12 h-12 mb-4" />
-            <p>No requests found</p>
+            <p className={subTextColor}>No requests found</p>
           </div>
         )}
 
         {/* Pagination */}
         {totalPages > 0 && (
-          <div className="flex items-center justify-center gap-2 p-4 border-t border-white/[0.08]">
+          <div
+            className={`flex items-center justify-center gap-2 p-4 border-t ${
+              theme === 'light' ? 'border-gray-200' : 'border-white/[0.04]'
+            }`}
+          >
             <button
               onClick={() => updateQueryParam('page', currentPage - 1)}
               disabled={currentPage === 1}
-              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className={`px-3 py-2 ${paginationBtnBg} rounded-md ${paginationBtnHover} disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
             >
               Previous
             </button>
@@ -305,12 +366,16 @@ export default function ArtistRequests() {
             {/* Mobile Pagination */}
             <div className="md:hidden">
               <DropdownMenu>
-                <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                <DropdownMenuTrigger
+                  className={`px-3 py-2 ${paginationBtnBg} rounded-md ${paginationBtnHover} text-sm`}
+                >
                   {currentPage} of {totalPages}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                <DropdownMenuContent
+                  className={`${dropdownBg} border ${dropdownBorder} ${dropdownText} p-4 w-[200px]`}
+                >
                   <div className="space-y-3">
-                    <div className="text-xs text-white/60">Go to page:</div>
+                    <div className="text-xs">Go to page:</div>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -318,7 +383,11 @@ export default function ArtistRequests() {
                         max={totalPages}
                         defaultValue={currentPage}
                         ref={pageInputRef}
-                        className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                        className={`w-full px-2 py-1 rounded-md ${inputBg} border ${inputBorder} text-center focus:outline-none focus:ring-2 ${
+                          theme === 'light'
+                            ? 'focus:ring-gray-300'
+                            : 'focus:ring-[#ffaa3b]/50'
+                        } text-sm`}
                         placeholder="Page"
                       />
                     </div>
@@ -342,11 +411,13 @@ export default function ArtistRequests() {
 
             {/* Desktop Pagination */}
             <div className="hidden md:flex items-center gap-2 text-sm">
-              <span className="text-white/60">Page</span>
-              <div className="bg-white/5 px-3 py-1 rounded-md border border-white/[0.1]">
-                <span className="text-white font-medium">{currentPage}</span>
+              <span className={subTextColor}>Page</span>
+              <div className={`px-3 py-1 rounded-md border ${inputBorder}`}>
+                <span className={`font-medium ${textColor}`}>
+                  {currentPage}
+                </span>
               </div>
-              <span className="text-white/60">of {totalPages}</span>
+              <span className={subTextColor}>of {totalPages}</span>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -354,7 +425,11 @@ export default function ArtistRequests() {
                   max={totalPages}
                   defaultValue={currentPage}
                   ref={pageInputRef}
-                  className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                  className={`w-16 px-2 py-1 rounded-md ${inputBg} border ${inputBorder} ${textColor} text-center focus:outline-none focus:ring-2 ${
+                    theme === 'light'
+                      ? 'focus:ring-gray-300'
+                      : 'focus:ring-[#ffaa3b]/50'
+                  } text-sm`}
                   placeholder="Page"
                 />
                 <button
@@ -376,7 +451,7 @@ export default function ArtistRequests() {
             <button
               onClick={() => updateQueryParam('page', currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className={`px-3 py-2 ${paginationBtnBg} rounded-md ${paginationBtnHover} disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
             >
               Next
             </button>
@@ -385,8 +460,16 @@ export default function ArtistRequests() {
 
         {/* Loading overlay */}
         {loading && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <Spinner className="w-8 h-8 animate-spin text-white" />
+          <div
+            className={`absolute inset-0 flex items-center justify-center ${
+              theme === 'light' ? 'bg-gray-500/50' : 'bg-black/50'
+            }`}
+          >
+            <Spinner
+              className={`w-8 h-8 animate-spin ${
+                theme === 'light' ? 'text-gray-900' : 'text-white'
+              }`}
+            />
           </div>
         )}
       </div>

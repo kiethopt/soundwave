@@ -26,10 +26,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-
+import { useTheme } from '@/contexts/ThemeContext';
 export default function ArtistTracks() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { theme } = useTheme();
 
   // Validate and correct the page query param if needed
   useEffect(() => {
@@ -279,14 +280,28 @@ export default function ArtistTracks() {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1
+              className={`text-3xl font-bold tracking-tight ${
+                theme === 'light' ? 'text-gray-900' : 'text-white'
+              }`}
+            >
               Track Management
             </h1>
-            <p className="text-white/60 mt-2">Upload and manage your tracks</p>
+            <p
+              className={
+                theme === 'light' ? 'text-gray-600 mt-2' : 'text-white/60 mt-2'
+              }
+            >
+              Upload and manage your tracks
+            </p>
           </div>
           <Link
             href="/artist/tracks/new"
-            className="hidden md:flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90"
+            className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              theme === 'light'
+                ? 'bg-gray-900 text-white hover:bg-gray-800'
+                : 'bg-white text-black hover:bg-white/90'
+            }`}
           >
             <AddSimple className="w-4 h-4" />
             New Track
@@ -295,25 +310,47 @@ export default function ArtistTracks() {
         {/* Mobile New Track Button */}
         <Link
           href="/artist/tracks/new"
-          className="md:hidden flex items-center gap-2 bg-white text-black px-4 py-2 rounded-full text-sm font-medium hover:bg-white/90 w-fit mt-4"
+          className={`md:hidden flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium w-fit mt-4 transition-colors ${
+            theme === 'light'
+              ? 'bg-gray-900 text-white hover:bg-gray-800'
+              : 'bg-white text-black hover:bg-white/90'
+          }`}
         >
           <AddSimple className="w-4 h-4" />
           New Track
         </Link>
       </div>
 
-      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] relative">
+      <div
+        className={`rounded-lg overflow-hidden border ${
+          theme === 'light'
+            ? 'bg-white border-gray-200'
+            : 'bg-[#121212] border-white/[0.08]'
+        }`}
+      >
         {/* Search Bar - Desktop */}
-        <div className="hidden md:block p-6 border-b border-white/[0.08]">
+        <div
+          className={`hidden md:block p-6 border-b ${
+            theme === 'light' ? 'border-gray-200' : 'border-white/[0.08]'
+          }`}
+        >
           <div className="relative w-64">
             <input
               type="text"
               placeholder="Search tracks..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20"
+              className={`pl-10 pr-4 py-2 w-full rounded-lg border focus:outline-none focus:ring-2 ${
+                theme === 'light'
+                  ? 'bg-gray-50 border-gray-300 focus:ring-gray-300'
+                  : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+              }`}
             />
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
+            <Search
+              className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
+                theme === 'light' ? 'text-gray-400' : 'text-white/40'
+              }`}
+            />
           </div>
         </div>
 
@@ -325,56 +362,111 @@ export default function ArtistTracks() {
               placeholder="Search tracks..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 text-sm"
+              className={`w-full pl-10 pr-4 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 ${
+                theme === 'light'
+                  ? 'bg-gray-50 border-gray-300 focus:ring-gray-300'
+                  : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+              }`}
             />
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
+            <Search
+              className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
+                theme === 'light' ? 'text-gray-400' : 'text-white/40'
+              }`}
+            />
           </div>
         </div>
+
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              <div
+                className={`animate-spin rounded-full h-8 w-8 border-b-2 ${
+                  theme === 'light' ? 'border-gray-900' : 'border-white'
+                }`}
+              ></div>
             </div>
           ) : error ? (
             <div className="p-6 text-center text-red-500">{error}</div>
           ) : tracks.length > 0 ? (
             <table className="w-full table-auto">
-              <thead className="bg-white/[0.03]">
+              <thead
+                className={theme === 'light' ? 'bg-gray-50' : 'bg-white/[0.03]'}
+              >
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider min-w-[200px]">
+                  <th
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[200px] ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
                     Title
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider hidden md:table-cell min-w-[150px]">
+                  <th
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider hidden md:table-cell min-w-[150px] ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
                     Album
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider min-w-[80px]">
+                  <th
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[80px] ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
                     Duration
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider min-w-[80px]">
+                  <th
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[80px] ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider min-w-[80px]">
+                  <th
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[80px] ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
                     Plays
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider min-w-[100px]">
+                  <th
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[100px] ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider min-w-[80px]">
+                  <th
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[80px] ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.08]">
+              <tbody
+                className={`divide-y ${
+                  theme === 'light' ? 'divide-gray-200' : 'divide-white/[0.08]'
+                }`}
+              >
                 {tracks.map((track) => (
                   <tr
                     key={track.id}
-                    className="hover:bg-white/[0.03] transition-colors"
+                    className={`hover:bg-gray-50 transition-colors ${
+                      theme === 'light'
+                        ? 'hover:bg-gray-50'
+                        : 'hover:bg-white/[0.03]'
+                    }`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <button
                           onClick={() => handlePlayPause(track)}
-                          className="mr-3 text-white/60 hover:text-white transition-colors"
+                          className={`mr-3 transition-colors ${
+                            theme === 'light'
+                              ? 'text-gray-400 hover:text-gray-600'
+                              : 'text-white/60 hover:text-white'
+                          }`}
                         >
                           {playingTrack?.id === track.id ? (
                             <Pause className="w-5 h-5" />
@@ -389,37 +481,71 @@ export default function ArtistTracks() {
                             className="w-10 h-10 rounded-md mr-3 object-cover"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-md mr-3 bg-white/[0.03] flex items-center justify-center">
-                            <Music className="w-6 h-6 text-white/60" />
+                          <div
+                            className={`w-10 h-10 rounded-md mr-3 flex items-center justify-center ${
+                              theme === 'light'
+                                ? 'bg-gray-100'
+                                : 'bg-white/[0.03]'
+                            }`}
+                          >
+                            <Music
+                              className={`w-6 h-6 ${
+                                theme === 'light'
+                                  ? 'text-gray-400'
+                                  : 'text-white/60'
+                              }`}
+                            />
                           </div>
                         )}
                         <span
-                          className="font-medium truncate"
+                          className={`font-medium truncate ${
+                            theme === 'light' ? 'text-gray-900' : 'text-white'
+                          }`}
                           title={track.title}
                         >
                           {track.title}
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
+                    <td
+                      className={`px-6 py-4 whitespace-nowrap hidden md:table-cell ${
+                        theme === 'light' ? 'text-gray-900' : 'text-white'
+                      }`}
+                    >
                       <span title={track.album?.title || 'Single'}>
                         {track.album?.title || 'Single'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td
+                      className={`px-6 py-4 whitespace-nowrap ${
+                        theme === 'light' ? 'text-gray-900' : 'text-white'
+                      }`}
+                    >
                       {formatDuration(track.duration)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td
+                      className={`px-6 py-4 whitespace-nowrap ${
+                        theme === 'light' ? 'text-gray-900' : 'text-white'
+                      }`}
+                    >
                       {track.type}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td
+                      className={`px-6 py-4 whitespace-nowrap ${
+                        theme === 'light' ? 'text-gray-900' : 'text-white'
+                      }`}
+                    >
                       {track.playCount.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                           track.isActive
-                            ? 'bg-green-500/10 text-green-500'
+                            ? theme === 'light'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-green-500/10 text-green-500'
+                            : theme === 'light'
+                            ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-yellow-500/10 text-yellow-500'
                         }`}
                       >
@@ -433,12 +559,27 @@ export default function ArtistTracks() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <DropdownMenu>
-                        <DropdownMenuTrigger className="hover:bg-white/10 p-2 rounded-full">
+                        <DropdownMenuTrigger
+                          className={`p-2 rounded-full ${
+                            theme === 'light'
+                              ? 'hover:bg-gray-100'
+                              : 'hover:bg-white/10'
+                          }`}
+                        >
                           <MoreVertical className="w-5 h-5" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent className="bg-[#282828] border border-white/10 text-white">
+                        <DropdownMenuContent
+                          className={
+                            theme === 'light'
+                              ? 'bg-white border border-gray-200'
+                              : 'bg-[#282828] border border-white/10'
+                          }
+                        >
                           <DropdownMenuItem
                             onClick={() => toggleTrackVisibility(track.id)}
+                            className={
+                              theme === 'light' ? 'text-gray-700' : 'text-white'
+                            }
                           >
                             {track.isActive ? (
                               <>
@@ -454,14 +595,21 @@ export default function ArtistTracks() {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleEditTrack(track)}
+                            className={
+                              theme === 'light' ? 'text-gray-700' : 'text-white'
+                            }
                           >
                             <Edit className="w-4 h-4 mr-2" />
                             Edit Track
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator className="bg-white/10" />
+                          <DropdownMenuSeparator
+                            className={
+                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
+                            }
+                          />
                           <DropdownMenuItem
                             onClick={() => setTrackToDelete(track)}
-                            className="text-red-400"
+                            className="text-red-500"
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Delete Track
@@ -474,20 +622,32 @@ export default function ArtistTracks() {
               </tbody>
             </table>
           ) : (
-            <div className="flex flex-col items-center justify-center h-[400px] text-white/60">
+            <div
+              className={`flex flex-col items-center justify-center h-[400px] ${
+                theme === 'light' ? 'text-gray-500' : 'text-white/60'
+              }`}
+            >
               <Music className="w-12 h-12 mb-4" />
               <p>No tracks found</p>
             </div>
           )}
         </div>
 
-        {/* Responsive Pagination */}
+        {/* Pagination Section */}
         {pagination.total > 0 && (
-          <div className="flex items-center justify-center gap-2 p-4 border-t border-white/[0.08]">
+          <div
+            className={`flex items-center justify-center gap-2 p-4 border-t ${
+              theme === 'light' ? 'border-gray-200' : 'border-white/[0.08]'
+            }`}
+          >
             <button
               onClick={handlePrevPage}
               disabled={currentPage <= 1}
-              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className={`px-3 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                theme === 'light'
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:bg-gray-50'
+                  : 'bg-white/5 hover:bg-white/10 disabled:bg-white/5'
+              }`}
             >
               Previous
             </button>
@@ -495,12 +655,32 @@ export default function ArtistTracks() {
             {/* Mobile Pagination */}
             <div className="md:hidden">
               <DropdownMenu>
-                <DropdownMenuTrigger className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 text-sm">
+                <DropdownMenuTrigger
+                  className={`px-3 py-2 rounded-lg text-sm ${
+                    theme === 'light'
+                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-white/5 hover:bg-white/10'
+                  }`}
+                >
                   {currentPage} of {pagination.totalPages}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-[#282828] border border-white/[0.1] text-white p-4 w-[200px]">
+                <DropdownMenuContent
+                  className={`p-4 w-[200px] ${
+                    theme === 'light'
+                      ? 'bg-white border border-gray-200'
+                      : 'bg-[#282828] border border-white/[0.1]'
+                  }`}
+                >
                   <div className="space-y-3">
-                    <div className="text-xs text-white/60">Go to page:</div>
+                    <div
+                      className={
+                        theme === 'light'
+                          ? 'text-gray-600 text-xs'
+                          : 'text-white/60 text-xs'
+                      }
+                    >
+                      Go to page:
+                    </div>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -508,7 +688,11 @@ export default function ArtistTracks() {
                         max={pagination.totalPages}
                         defaultValue={currentPage}
                         ref={pageInputRef}
-                        className="w-full px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                        className={`w-full px-2 py-1 rounded-lg text-center text-sm focus:outline-none focus:ring-2 ${
+                          theme === 'light'
+                            ? 'bg-gray-50 border border-gray-300 focus:ring-blue-500/20 text-gray-900'
+                            : 'bg-white/5 border border-white/[0.1] focus:ring-[#ffaa3b]/50 text-white'
+                        }`}
                         placeholder="Page"
                       />
                     </div>
@@ -521,7 +705,11 @@ export default function ArtistTracks() {
                           updateQueryParam('page', page);
                         }
                       }}
-                      className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                      className={`w-full px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                        theme === 'light'
+                          ? 'bg-gray-900 text-white hover:bg-gray-800'
+                          : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20'
+                      }`}
                     >
                       Go to Page
                     </button>
@@ -532,11 +720,37 @@ export default function ArtistTracks() {
 
             {/* Desktop Pagination */}
             <div className="hidden md:flex items-center gap-2 text-sm">
-              <span className="text-white/60">Page</span>
-              <div className="bg-white/5 px-3 py-1 rounded-md border border-white/[0.1]">
-                <span className="text-white font-medium">{currentPage}</span>
+              <span
+                className={
+                  theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                }
+              >
+                Page
+              </span>
+              <div
+                className={`px-3 py-1 rounded-lg border ${
+                  theme === 'light'
+                    ? 'bg-gray-50 border-gray-300'
+                    : 'bg-white/5 border-white/[0.1]'
+                }`}
+              >
+                <span
+                  className={
+                    theme === 'light'
+                      ? 'text-gray-900 font-medium'
+                      : 'text-white font-medium'
+                  }
+                >
+                  {currentPage}
+                </span>
               </div>
-              <span className="text-white/60">of {pagination.totalPages}</span>
+              <span
+                className={
+                  theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                }
+              >
+                of {pagination.totalPages}
+              </span>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -544,7 +758,11 @@ export default function ArtistTracks() {
                   max={pagination.totalPages}
                   defaultValue={currentPage}
                   ref={pageInputRef}
-                  className="w-16 px-2 py-1 rounded-md bg-white/5 border border-white/[0.1] text-white text-center focus:outline-none focus:ring-2 focus:ring-[#ffaa3b]/50 text-sm"
+                  className={`w-16 px-2 py-1 rounded-lg text-center text-sm focus:outline-none focus:ring-2 ${
+                    theme === 'light'
+                      ? 'bg-gray-50 border border-gray-300 focus:ring-blue-500/20 text-gray-900'
+                      : 'bg-white/5 border border-white/[0.1] focus:ring-[#ffaa3b]/50 text-white'
+                  }`}
                   placeholder="Page"
                 />
                 <button
@@ -556,7 +774,11 @@ export default function ArtistTracks() {
                       updateQueryParam('page', page);
                     }
                   }}
-                  className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                  className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                    theme === 'light'
+                      ? 'bg-gray-900 text-white hover:bg-gray-800'
+                      : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20'
+                  }`}
                 >
                   Go
                 </button>
@@ -566,7 +788,11 @@ export default function ArtistTracks() {
             <button
               onClick={handleNextPage}
               disabled={currentPage >= pagination.totalPages}
-              className="px-3 py-2 bg-white/5 rounded-md hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className={`px-3 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                theme === 'light'
+                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:bg-gray-50'
+                  : 'bg-white/5 hover:bg-white/10 disabled:bg-white/5'
+              }`}
             >
               Next
             </button>
@@ -585,23 +811,41 @@ export default function ArtistTracks() {
 
       {/* Delete Modal */}
       {trackToDelete && (
-        <div className="fixed inset-0 bg-[#404045]/50 flex items-center justify-center z-[9999]">
-          <div className="bg-[#121212] p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold mb-4">Delete Track</h3>
-            <p className="text-white/60 mb-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
+          <div
+            className={`max-w-md w-full mx-4 p-6 rounded-lg ${
+              theme === 'light' ? 'bg-white' : 'bg-[#121212]'
+            }`}
+          >
+            <h3
+              className={`text-xl font-bold mb-4 ${
+                theme === 'light' ? 'text-gray-900' : 'text-white'
+              }`}
+            >
+              Delete Track
+            </h3>
+            <p
+              className={
+                theme === 'light' ? 'text-gray-600 mb-6' : 'text-white/60 mb-6'
+              }
+            >
               Are you sure you want to delete "{trackToDelete.title}"? This
               action cannot be undone.
             </p>
             <div className="flex justify-end gap-4">
               <button
                 onClick={() => setTrackToDelete(null)}
-                className="px-4 py-2 text-sm font-medium text-white/60 hover:text-white"
+                className={`px-4 py-2 text-sm font-medium ${
+                  theme === 'light'
+                    ? 'text-gray-600 hover:text-gray-900'
+                    : 'text-white/60 hover:text-white'
+                }`}
               >
                 Cancel
               </button>
               <button
                 onClick={() => deleteTrack(trackToDelete.id)}
-                className="px-4 py-2 text-sm font-medium bg-red-500 text-white rounded-md hover:bg-red-600"
+                className="px-4 py-2 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600"
               >
                 Delete
               </button>
@@ -612,9 +856,19 @@ export default function ArtistTracks() {
 
       {/* Edit Modal */}
       {showEditModal && trackToEdit && (
-        <div className="fixed inset-0 bg-[#404045]/50 flex items-center justify-center z-[9999]">
-          <div className="bg-[#121212] p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold mb-4">Edit Track</h3>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
+          <div
+            className={`max-w-md w-full mx-4 p-6 rounded-lg ${
+              theme === 'light' ? 'bg-white' : 'bg-[#121212]'
+            }`}
+          >
+            <h3
+              className={`text-xl font-bold mb-4 ${
+                theme === 'light' ? 'text-gray-900' : 'text-white'
+              }`}
+            >
+              Edit Track
+            </h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -625,7 +879,9 @@ export default function ArtistTracks() {
               <div>
                 <label
                   htmlFor="title"
-                  className="block text-sm font-medium text-white/60 mb-1"
+                  className={`block text-sm font-medium mb-1 ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                  }`}
                 >
                   Title
                 </label>
@@ -636,14 +892,20 @@ export default function ArtistTracks() {
                   onChange={(e) =>
                     setTrackToEdit({ ...trackToEdit, title: e.target.value })
                   }
-                  className="w-full px-3 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20"
+                  className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                    theme === 'light'
+                      ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+                  }`}
                   required
                 />
               </div>
               <div>
                 <label
                   htmlFor="type"
-                  className="block text-sm font-medium text-white/60 mb-1"
+                  className={`block text-sm font-medium mb-1 ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                  }`}
                 >
                   Type
                 </label>
@@ -651,7 +913,11 @@ export default function ArtistTracks() {
                   id="type"
                   value={trackToEdit.type}
                   disabled
-                  className="w-full px-3 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20 cursor-not-allowed opacity-50"
+                  className={`w-full px-3 py-2 rounded-lg border cursor-not-allowed opacity-50 ${
+                    theme === 'light'
+                      ? 'bg-gray-50 border-gray-300'
+                      : 'bg-white/[0.07] border-white/[0.1]'
+                  }`}
                 >
                   <option value={trackToEdit.type}>{trackToEdit.type}</option>
                 </select>
@@ -659,7 +925,9 @@ export default function ArtistTracks() {
               <div>
                 <label
                   htmlFor="releaseDate"
-                  className="block text-sm font-medium text-white/60 mb-1"
+                  className={`block text-sm font-medium mb-1 ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                  }`}
                 >
                   Release Date
                 </label>
@@ -673,7 +941,11 @@ export default function ArtistTracks() {
                       releaseDate: e.target.value,
                     })
                   }
-                  className="w-full px-3 py-2 bg-white/[0.07] border border-white/[0.1] rounded-md focus:outline-none focus:ring-2 focus:ring-white/20"
+                  className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                    theme === 'light'
+                      ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+                  }`}
                   required
                 />
               </div>
@@ -681,13 +953,21 @@ export default function ArtistTracks() {
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-white/60 hover:text-white"
+                  className={`px-4 py-2 text-sm font-medium ${
+                    theme === 'light'
+                      ? 'text-gray-600 hover:text-gray-900'
+                      : 'text-white/60 hover:text-white'
+                  }`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium bg-white text-black rounded-md hover:bg-white/90"
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    theme === 'light'
+                      ? 'bg-gray-900 text-white hover:bg-gray-800'
+                      : 'bg-white text-black hover:bg-white/90'
+                  }`}
                 >
                   Save Changes
                 </button>

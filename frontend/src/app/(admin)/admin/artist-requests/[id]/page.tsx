@@ -8,12 +8,14 @@ import Link from 'next/link';
 import { ArtistRequest } from '@/types';
 import { toast } from 'react-toastify';
 import { Facebook, Instagram } from '@/components/ui/Icons';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function ArtistRequestDetails({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { theme } = useTheme();
   const { id } = use(params);
   const router = useRouter();
   const [request, setRequest] = useState<ArtistRequest | null>(null);
@@ -135,54 +137,75 @@ export default function ArtistRequestDetails({
       suppressHydrationWarning
     >
       <div className="flex flex-col space-y-6">
-        {/* Header Section với Back button và Action buttons */}
+        {/* Header Section */}
         <div className="flex flex-col space-y-4">
-          {/* Back Button - Luôn căn trái */}
-          <div>
-            <Link
-              href="/admin/artist-requests"
-              className="inline-flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors group"
-            >
-              <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-              <span>Back to Requests</span>
-            </Link>
-          </div>
+          {/* Back Button and Action Buttons Container */}
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
+            {/* Back Button */}
+            <div className="w-fit">
+              <Link
+                href="/admin/artist-requests"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  theme === 'light'
+                    ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
+                    : 'bg-white/10 hover:bg-white/15 text-white/80 hover:text-white'
+                }`}
+              >
+                <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+                <span>Back</span>
+              </Link>
+            </div>
 
-          {/* Action Buttons - Căn phải trên desktop, căn giữa trên mobile */}
-          <div className="flex sm:justify-end justify-center gap-2">
-            <button
-              onClick={handleApprove}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors text-xs sm:text-sm min-w-[120px] sm:min-w-[140px]"
-            >
-              <Check className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Approve</span>
-            </button>
-            <button
-              onClick={handleReject}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors text-xs sm:text-sm min-w-[120px] sm:min-w-[140px]"
-            >
-              <X className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Reject</span>
-            </button>
+            {/* Action Buttons */}
+            <div className="flex justify-center sm:justify-end gap-2">
+              <button
+                onClick={handleApprove}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-green-500/20 text-green-400 rounded-lg text-xs sm:text-sm min-w-[120px] sm:min-w-[140px]"
+              >
+                <Check className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>Approve</span>
+              </button>
+              <button
+                onClick={handleReject}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-red-500/20 text-red-400 rounded-lg text-xs sm:text-sm min-w-[120px] sm:min-w-[140px]"
+              >
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>Reject</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Main Content Card */}
-        <div className="rounded-xl sm:p-8 p-4 border border-gray-400 bg-white/[0.05]">
+        <div
+          className={`rounded-xl sm:p-8 p-4 border ${
+            theme === 'light' ? 'border-gray-300' : 'border-gray-400'
+          }`}
+        >
           {/* Profile Header */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8">
             {request.avatar && (
               <img
                 src={request.avatar}
                 alt={request.artistName}
-                className="w-32 h-32 sm:w-40 sm:h-40 rounded-2xl object-cover border-2 border-gray-400"
+                className={`w-32 h-32 sm:w-40 sm:h-40 rounded-2xl object-cover border-2 ${
+                  theme === 'light' ? 'border-gray-200' : 'border-gray-400'
+                }`}
               />
             )}
             <div className="space-y-2 text-center sm:text-left">
-              <h1 className="text-2xl sm:text-3xl font-bold">
+              <h1
+                className={`text-2xl sm:text-3xl font-bold ${
+                  theme === 'light' ? 'text-gray-900' : 'text-white'
+                }`}
+              >
                 {request.artistName}
               </h1>
-              <div className="flex flex-col gap-2 text-white/50 text-xs sm:text-sm">
+              <div
+                className={`flex flex-col gap-2 ${
+                  theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                } text-xs sm:text-sm`}
+              >
                 <div className="flex items-center justify-center sm:justify-start gap-2">
                   <span>User:</span>
                   <span className="font-medium">{request.user.name}</span>
@@ -191,7 +214,7 @@ export default function ArtistRequestDetails({
                   <span>Email:</span>
                   <a
                     href={`mailto:${request.user.email}`}
-                    className="font-medium hover:text-white transition-colors"
+                    className="font-medium hover:underline"
                   >
                     {request.user.email}
                   </a>
@@ -204,23 +227,53 @@ export default function ArtistRequestDetails({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Bio Section */}
             <div className="space-y-6">
-              <div className="bg-white/10 p-4 sm:p-6 rounded-xl">
-                <h3 className="text-base sm:text-lg font-semibold mb-4">
+              <div
+                className={`${
+                  theme === 'light'
+                    ? 'bg-gray-100 border border-gray-300'
+                    : 'bg-white/10'
+                } p-4 sm:p-6 rounded-xl`}
+              >
+                <h3
+                  className={`text-base sm:text-lg font-semibold mb-4 ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
                   Artist Bio
                 </h3>
-                <p className="text-white/80 leading-relaxed text-xs sm:text-sm">
+                <p
+                  className={`leading-relaxed text-xs sm:text-sm ${
+                    theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                  }`}
+                >
                   {request.bio || 'No biography provided'}
                 </p>
               </div>
 
               {/* Details Card */}
-              <div className="bg-white/10 p-4 sm:p-6 rounded-xl">
-                <h3 className="text-base sm:text-lg font-semibold mb-4">
+              <div
+                className={`${
+                  theme === 'light'
+                    ? 'bg-gray-100 border border-gray-300'
+                    : 'bg-white/10'
+                } p-4 sm:p-6 rounded-xl`}
+              >
+                <h3
+                  className={`text-base sm:text-lg font-semibold mb-4 ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
                   Request Details
                 </h3>
                 <dl className="space-y-3 text-xs sm:text-sm">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
-                    <dt className="text-white/50">Request Date</dt>
+                    <dt
+                      className={
+                        theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      }
+                    >
+                      Request Date
+                    </dt>
                     <dd className="font-medium">
                       {new Date(
                         request.verificationRequestedAt
@@ -232,7 +285,13 @@ export default function ArtistRequestDetails({
                     </dd>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
-                    <dt className="text-white/50">Status</dt>
+                    <dt
+                      className={
+                        theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      }
+                    >
+                      Status
+                    </dt>
                     <dd
                       className="capitalize px-2 py-1 rounded-full text-center w-fit"
                       style={{
@@ -251,8 +310,18 @@ export default function ArtistRequestDetails({
 
             {/* Social Media Section */}
             {request.socialMediaLinks && (
-              <div className="bg-white/10 p-4 sm:p-6 rounded-xl h-fit">
-                <h3 className="text-base sm:text-lg font-semibold mb-6">
+              <div
+                className={`${
+                  theme === 'light'
+                    ? 'bg-gray-100 border border-gray-300'
+                    : 'bg-white/10'
+                } p-4 sm:p-6 rounded-xl h-fit`}
+              >
+                <h3
+                  className={`text-base sm:text-lg font-semibold mb-6 ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
                   Social Profiles
                 </h3>
                 <div className="space-y-3">
@@ -264,12 +333,16 @@ export default function ArtistRequestDetails({
                       )}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-4 p-4 bg-white/20 hover:bg-white/10 rounded-lg transition-colors text-xs sm:text-sm"
+                      className={`flex items-center gap-4 p-4 ${
+                        theme === 'light'
+                          ? 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                          : 'bg-white/20 hover:bg-white/30'
+                      } rounded-lg text-xs sm:text-sm`}
                     >
                       <Facebook className="w-6 h-6 flex-shrink-0" />
                       <div className="truncate">
                         <p className="font-medium">Facebook</p>
-                        <p className="text-xs text-white/50 truncate">
+                        <p className="text-xs truncate">
                           {request.socialMediaLinks.facebook}
                         </p>
                       </div>
@@ -284,12 +357,16 @@ export default function ArtistRequestDetails({
                       )}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-4 p-4 bg-white/20 hover:bg-white/10 rounded-lg transition-colors text-xs sm:text-sm"
+                      className={`flex items-center gap-4 p-4 ${
+                        theme === 'light'
+                          ? 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                          : 'bg-white/20 hover:bg-white/30'
+                      } rounded-lg text-xs sm:text-sm`}
                     >
                       <Instagram className="w-6 h-6 flex-shrink-0" />
                       <div className="truncate">
                         <p className="font-medium">Instagram</p>
-                        <p className="text-xs text-white/50 truncate">
+                        <p className="text-xs truncate">
                           {request.socialMediaLinks.instagram}
                         </p>
                       </div>
