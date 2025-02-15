@@ -249,13 +249,13 @@ export default function ArtistDetail({
       <div className="flex items-center">
         <Link
           href="/admin/artists"
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
             theme === 'light'
               ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
               : 'bg-white/10 hover:bg-white/15 text-white/80 hover:text-white'
           }`}
         >
-          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+          <ArrowLeft className="w-4 h-4" />
           <span>Back</span>
         </Link>
       </div>
@@ -359,10 +359,10 @@ export default function ArtistDetail({
                 onClick={handleVerify}
                 disabled={artist?.isVerified || isUpdating}
                 className={cn(
-                  'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm transition-all',
+                  'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm',
                   artist?.isVerified
                     ? theme === 'light'
-                      ? 'bg-green-50 text-green-600 cursor-not-allowed'
+                      ? 'bg-green-100 text-green-700 cursor-not-allowed'
                       : 'bg-green-500/10 text-green-400 cursor-not-allowed'
                     : theme === 'light'
                     ? 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20'
@@ -387,7 +387,7 @@ export default function ArtistDetail({
               <button
                 onClick={handleUpdateMonthlyListeners}
                 disabled={isUpdating}
-                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg hover:bg-opacity-90 border transition-all text-sm ${
+                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg hover:bg-opacity-90 border text-sm ${
                   theme === 'light'
                     ? 'bg-gray-100 text-gray-900 border-gray-200 hover:bg-gray-200'
                     : 'bg-white/5 text-white/90 border-white/10 hover:bg-white/10'
@@ -409,7 +409,7 @@ export default function ArtistDetail({
               <div className="flex gap-4">
                 <button
                   onClick={() => setActiveTab('albums')}
-                  className={`pb-3 px-1 text-sm font-medium transition-colors ${
+                  className={`pb-3 px-1 text-sm font-medium ${
                     activeTab === 'albums'
                       ? theme === 'light'
                         ? 'border-b-2 border-gray-900 text-gray-900'
@@ -423,7 +423,7 @@ export default function ArtistDetail({
                 </button>
                 <button
                   onClick={() => setActiveTab('tracks')}
-                  className={`pb-3 px-1 text-sm font-medium transition-colors ${
+                  className={`pb-3 px-1 text-sm font-medium ${
                     activeTab === 'tracks'
                       ? theme === 'light'
                         ? 'border-b-2 border-gray-900 text-gray-900'
@@ -447,7 +447,7 @@ export default function ArtistDetail({
                       {(artist.albums.data || []).map((album: Album) => (
                         <div
                           key={album.id}
-                          className={`rounded-lg p-2 border transition-colors ${
+                          className={`rounded-lg p-2 border ${
                             theme === 'light'
                               ? 'bg-gray-50 hover:bg-gray-100 border-gray-200'
                               : 'bg-white/5 hover:bg-white/10 border-white/10'
@@ -590,7 +590,7 @@ export default function ArtistDetail({
                                     updateQueryParam('albumPage', page);
                                   }
                                 }}
-                                className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                                className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 text-sm"
                               >
                                 Go to Page
                               </button>
@@ -622,7 +622,7 @@ export default function ArtistDetail({
                         <button
                           onClick={handleAlbumPrev}
                           disabled={sanitizedAlbumPage <= 1}
-                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border transition-colors ${
+                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border ${
                             theme === 'light'
                               ? 'bg-gray-50 text-gray-900 border-gray-200 hover:bg-gray-100'
                               : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
@@ -666,7 +666,11 @@ export default function ArtistDetail({
                                 updateQueryParam('albumPage', page);
                               }
                             }}
-                            className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              theme === 'light'
+                                ? 'bg-gray-900 text-white hover:bg-gray-800'
+                                : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20'
+                            }`}
                           >
                             Go
                           </button>
@@ -677,7 +681,7 @@ export default function ArtistDetail({
                             sanitizedAlbumPage >=
                             (artist.albums?.totalPages ?? 1)
                           }
-                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border transition-colors ${
+                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border ${
                             theme === 'light'
                               ? 'bg-gray-50 text-gray-900 border-gray-200 hover:bg-gray-100'
                               : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
@@ -699,7 +703,7 @@ export default function ArtistDetail({
                       {(artist.tracks.data || []).map((track: Track) => (
                         <div
                           key={track.id}
-                          className={`rounded-md p-2 flex items-center gap-2 border transition-colors ${
+                          className={`rounded-md p-2 flex items-center gap-2 border ${
                             theme === 'light'
                               ? 'bg-gray-50 hover:bg-gray-100 border-gray-200'
                               : 'bg-white/5 hover:bg-white/10 border-white/10'
@@ -711,7 +715,7 @@ export default function ArtistDetail({
                                 playingTrackId === track.id ? null : track.id
                               )
                             }
-                            className={`flex-shrink-0 transition-colors ${
+                            className={`flex-shrink-0 ${
                               theme === 'light'
                                 ? 'text-gray-600 hover:text-gray-900'
                                 : 'text-white/60 hover:text-white'
@@ -859,7 +863,7 @@ export default function ArtistDetail({
                                     updateQueryParam('trackPage', page);
                                   }
                                 }}
-                                className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                                className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 text-sm"
                               >
                                 Go to Page
                               </button>
@@ -891,7 +895,7 @@ export default function ArtistDetail({
                         <button
                           onClick={handleTrackPrev}
                           disabled={sanitizedTrackPage <= 1}
-                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border transition-colors ${
+                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border ${
                             theme === 'light'
                               ? 'bg-gray-50 text-gray-900 border-gray-200 hover:bg-gray-100'
                               : 'bg-white/5 text-white border-white/10 hover:bg-white/10'
@@ -935,7 +939,11 @@ export default function ArtistDetail({
                                 updateQueryParam('trackPage', page);
                               }
                             }}
-                            className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                            className={`px-3 py-1 rounded-md text-sm ${
+                              theme === 'light'
+                                ? 'bg-gray-900 text-white hover:bg-gray-800'
+                                : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20'
+                            }`}
                           >
                             Go
                           </button>
@@ -946,7 +954,7 @@ export default function ArtistDetail({
                             sanitizedTrackPage >=
                             (artist.tracks?.totalPages ?? 1)
                           }
-                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border transition-colors ${
+                          className={`px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed border ${
                             theme === 'light'
                               ? 'bg-gray-50 text-gray-900 border-gray-200 hover:bg-gray-100'
                               : 'bg-white/5 text-white border-white/10 hover:bg-white/10'

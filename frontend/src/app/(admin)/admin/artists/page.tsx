@@ -629,7 +629,11 @@ export default function AdminArtists() {
                       updateQueryParam('page', page);
                     }
                   }}
-                  className="px-3 py-1 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
+                  className={`px-3 py-1 rounded-md text-sm ${
+                    theme === 'light'
+                      ? 'bg-gray-900 text-white hover:bg-gray-800'
+                      : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20'
+                  }`}
                 >
                   Go
                 </button>
