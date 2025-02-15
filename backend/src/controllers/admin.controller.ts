@@ -228,36 +228,57 @@ export const getArtistRequests = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      startDate,
+      endDate,
+      status,
+      search,
+    } = req.query;
+
     const offset = (Number(page) - 1) * Number(limit);
     const cacheKey = req.originalUrl;
 
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    // Xây dựng where clause
+    const where: any = {
+      verificationRequestedAt: { not: null }, // Chỉ lấy các request đã được gửi
+    };
+
+    // Filter theo status
+    if (status === 'pending') {
+      where.isVerified = false;
+    }
+
+    // Filter theo khoảng thời gian
+    if (startDate && endDate) {
+      where.verificationRequestedAt = {
+        gte: new Date(startDate as string),
+        lte: new Date(endDate as string),
+      };
+    }
+
+    // Filter theo search term
+    if (search) {
+      where.OR = [
+        { artistName: { contains: search as string, mode: 'insensitive' } },
+        {
+          user: { email: { contains: search as string, mode: 'insensitive' } },
+        },
+      ];
     }
 
     const requests = await prisma.artistProfile.findMany({
-      where: {
-        verificationRequestedAt: { not: null },
-        isVerified: false,
-      },
+      where,
       skip: offset,
       take: Number(limit),
       select: artistRequestSelect,
-    });
-
-    const totalRequests = await prisma.artistProfile.count({
-      where: {
-        verificationRequestedAt: { not: null },
-        isVerified: false,
+      orderBy: {
+        verificationRequestedAt: 'desc',
       },
     });
+
+    const totalRequests = await prisma.artistProfile.count({ where });
 
     const response = {
       requests,
@@ -270,7 +291,6 @@ export const getArtistRequests = async (
     };
 
     if (process.env.USE_REDIS_CACHE === 'true') {
-      console.log(`[Redis] Caching data for key: ${cacheKey}`);
       await client.setEx(cacheKey, 300, JSON.stringify(response));
     }
 

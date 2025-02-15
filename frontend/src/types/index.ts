@@ -27,6 +27,13 @@ export interface TrackUploadFormProps {
   artists: ArtistProfile[];
 }
 
+export interface ArtistRequestFilters {
+  startDate?: Date;
+  endDate?: Date;
+  status?: string;
+  search?: string;
+}
+
 // API Types
 export interface RegisterData {
   email: string;

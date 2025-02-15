@@ -192,33 +192,39 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.getUserById = getUserById;
 const getArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 10, startDate, endDate, status, search, } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
         const cacheKey = req.originalUrl;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        const where = {
+            verificationRequestedAt: { not: null },
+        };
+        if (status === 'pending') {
+            where.isVerified = false;
+        }
+        if (startDate && endDate) {
+            where.verificationRequestedAt = {
+                gte: new Date(startDate),
+                lte: new Date(endDate),
+            };
+        }
+        if (search) {
+            where.OR = [
+                { artistName: { contains: search, mode: 'insensitive' } },
+                {
+                    user: { email: { contains: search, mode: 'insensitive' } },
+                },
+            ];
         }
         const requests = yield db_1.default.artistProfile.findMany({
-            where: {
-                verificationRequestedAt: { not: null },
-                isVerified: false,
-            },
+            where,
             skip: offset,
             take: Number(limit),
             select: prisma_selects_1.artistRequestSelect,
-        });
-        const totalRequests = yield db_1.default.artistProfile.count({
-            where: {
-                verificationRequestedAt: { not: null },
-                isVerified: false,
+            orderBy: {
+                verificationRequestedAt: 'desc',
             },
         });
+        const totalRequests = yield db_1.default.artistProfile.count({ where });
         const response = {
             requests,
             pagination: {
@@ -229,7 +235,6 @@ const getArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, functi
             },
         };
         if (process.env.USE_REDIS_CACHE === 'true') {
-            console.log(`[Redis] Caching data for key: ${cacheKey}`);
             yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
         }
         res.json(response);

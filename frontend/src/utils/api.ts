@@ -1,3 +1,4 @@
+import { ArtistRequestFilters } from '@/types';
 import { toast } from 'react-toastify';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
@@ -120,12 +121,38 @@ export const api = {
   },
 
   admin: {
-    getArtistRequests: async (token: string, page: number, limit: number) =>
-      fetchWithAuth(
-        `/api/admin/artist-requests?page=${page}&limit=${limit}`,
+    getArtistRequests: async (
+      token: string,
+      page: number = 1,
+      limit: number = 10,
+      filters?: ArtistRequestFilters
+    ) => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      if (filters) {
+        if (filters.startDate) {
+          params.append('startDate', filters.startDate.toISOString());
+        }
+        if (filters.endDate) {
+          params.append('endDate', filters.endDate.toISOString());
+        }
+        if (filters.status && filters.status !== 'all') {
+          params.append('status', filters.status);
+        }
+        if (filters.search) {
+          params.append('search', filters.search);
+        }
+      }
+
+      return fetchWithAuth(
+        `/api/admin/artist-requests?${params.toString()}`,
         { method: 'GET' },
         token
-      ),
+      );
+    },
 
     getArtistRequestDetails: async (requestId: string, token: string) =>
       fetchWithAuth(
