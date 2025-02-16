@@ -52,7 +52,7 @@ export function DataTablePagination({
         <Button
           variant={theme === 'dark' ? 'secondary' : 'outline'}
           size="sm"
-          onClick={() => onPageChange?.(pageIndex)}
+          onClick={() => onPageChange?.(pageIndex - 1)}
           disabled={pageIndex === 0}
           className={`${
             theme === 'dark'
@@ -132,11 +132,13 @@ export function DataTablePagination({
         <Button
           variant={theme === 'dark' ? 'secondary' : 'outline'}
           size="sm"
-          onClick={() => onPageChange?.(pageIndex)}
+          onClick={() => onPageChange?.(pageIndex - 1)}
           disabled={pageIndex === 0}
-          className={
-            theme === 'dark' ? 'bg-white/10 hover:bg-white/20 border-0' : ''
-          }
+          className={`${
+            theme === 'dark'
+              ? 'bg-white/10 hover:bg-white/20 text-white disabled:text-white/40 disabled:bg-white/5'
+              : 'bg-white hover:bg-gray-200 text-gray-900 disabled:text-gray-400 disabled:bg-gray-100'
+          }`}
         >
           Previous
         </Button>
@@ -169,7 +171,9 @@ export function DataTablePagination({
             size="sm"
             onClick={handleGoToPage}
             className={
-              theme === 'dark' ? 'bg-white/10 hover:bg-white/20 border-0' : ''
+              theme === 'dark'
+                ? 'bg-white/10 hover:bg-white/20 border-0 text-white'
+                : ''
             }
           >
             Go
@@ -181,9 +185,11 @@ export function DataTablePagination({
           size="sm"
           onClick={() => onPageChange?.(pageIndex + 2)}
           disabled={pageIndex === pageCount - 1}
-          className={
-            theme === 'dark' ? 'bg-white/10 hover:bg-white/20 border-0' : ''
-          }
+          className={`${
+            theme === 'dark'
+              ? 'bg-white/10 hover:bg-white/20 text-white disabled:text-white/40 disabled:bg-white/5'
+              : 'bg-white hover:bg-gray-200 text-gray-900 disabled:text-gray-400 disabled:bg-gray-100'
+          }`}
         >
           Next
         </Button>

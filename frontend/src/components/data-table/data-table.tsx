@@ -5,9 +5,11 @@ import {
   flexRender,
   getCoreRowModel,
   getPaginationRowModel,
+  getSortedRowModel,
   useReactTable,
   RowSelectionState,
   VisibilityState,
+  SortingState,
 } from '@tanstack/react-table';
 import {
   Table,
@@ -19,6 +21,8 @@ import {
 } from '@/components/ui/table';
 import { DataTablePagination } from './data-table-pagination';
 import { DataTableLoading } from './data-table-loading';
+import { Button } from '@/components/ui/button';
+import { ArrowUpDown } from 'lucide-react';
 import React from 'react';
 
 interface DataTableProps<TData, TValue> {
@@ -32,6 +36,7 @@ interface DataTableProps<TData, TValue> {
   onRowSelection?: (rows: TData[]) => void;
   meta?: any;
   theme?: 'light' | 'dark';
+  onSortingChange?: (sorting: SortingState) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -45,6 +50,7 @@ export function DataTable<TData, TValue>({
   onRowSelection,
   meta,
   theme = 'light',
+  onSortingChange,
 }: DataTableProps<TData, TValue>) {
   React.useEffect(() => {
     if (onRowSelection) {
@@ -79,25 +85,48 @@ export function DataTable<TData, TValue>({
                   theme === 'dark' ? 'border-white/[0.08]' : 'border-gray-200'
                 }
               >
-                {headerGroup.headers.map((header: any) => (
-                  <TableHead
-                    key={header.id}
-                    className={`h-10 px-2 text-left align-middle font-medium whitespace-nowrap ${
-                      header.id === 'actions'
-                        ? `sticky right-0 ${
-                            theme === 'dark' ? 'bg-[#121212]' : 'bg-white'
-                          }`
-                        : ''
-                    } ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
-                  >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
+                {headerGroup.headers.map((header: any) => {
+                  const canSort = header.column.getCanSort();
+                  return (
+                    <TableHead
+                      key={header.id}
+                      className={`h-10 px-2 text-left align-middle font-medium whitespace-nowrap ${
+                        header.id === 'actions'
+                          ? `sticky right-0 ${
+                              theme === 'dark' ? 'bg-[#121212]' : 'bg-white'
+                            }`
+                          : ''
+                      } ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
+                    >
+                      {header.isPlaceholder ? null : canSort ? (
+                        <Button
+                          variant="ghost"
+                          className={`-ml-3 h-8 data-[state=open]:bg-accent ${
+                            theme === 'dark'
+                              ? 'hover:bg-white/10 hover:text-white'
+                              : ''
+                          }`}
+                          onClick={() =>
+                            header.column.toggleSorting(
+                              header.column.getIsSorted() === 'asc'
+                            )
+                          }
+                        >
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      ) : (
+                        flexRender(
                           header.column.columnDef.header,
                           header.getContext()
-                        )}
-                  </TableHead>
-                ))}
+                        )
+                      )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>

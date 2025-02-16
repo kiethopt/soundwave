@@ -258,7 +258,9 @@ export const userSelect = {
       isVerified: true,
       isActive: true,
       verificationRequestedAt: true,
-      role: true, // Role ARTIST ở đây
+      role: true, // Role ARTIST
+      socialMediaLinks: true,
+      verifiedAt: true,
       albums: {
         select: {
           id: true,

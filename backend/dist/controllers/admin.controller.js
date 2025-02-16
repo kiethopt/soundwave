@@ -117,27 +117,28 @@ const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const pageNumber = Number(page);
         const limitNumber = Number(limit);
         const offset = (pageNumber - 1) * limitNumber;
-        const cacheKey = req.originalUrl;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-        }
         const users = yield db_1.default.user.findMany({
             skip: offset,
             take: limitNumber,
-            select: prisma_selects_1.userSelect,
+            include: {
+                artistProfile: {
+                    include: {
+                        genres: {
+                            include: {
+                                genre: true,
+                            },
+                        },
+                    },
+                },
+            },
             orderBy: {
                 createdAt: 'desc',
             },
         });
         const totalUsers = yield db_1.default.user.count();
         const response = {
-            users,
+            users: users.map((user) => (Object.assign(Object.assign({}, user), { artistProfile: user.artistProfile
+                    ? Object.assign(Object.assign({}, user.artistProfile), { socialMediaLinks: user.artistProfile.socialMediaLinks || {}, verifiedAt: user.artistProfile.verifiedAt }) : null }))),
             pagination: {
                 total: totalUsers,
                 page: pageNumber,
@@ -146,8 +147,7 @@ const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
         };
         if (process.env.USE_REDIS_CACHE === 'true') {
-            console.log(`[Redis] Caching data for key: ${cacheKey}`);
-            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
+            yield cache_middleware_1.client.setEx(req.originalUrl, 300, JSON.stringify(response));
         }
         res.json(response);
     }

@@ -256,6 +256,8 @@ exports.userSelect = {
             isActive: true,
             verificationRequestedAt: true,
             role: true,
+            socialMediaLinks: true,
+            verifiedAt: true,
             albums: {
                 select: {
                     id: true,

@@ -11,6 +11,8 @@ import {
 import { exportToExcel } from '@/utils/export-to-excel';
 import { debounce } from 'lodash';
 import React from 'react';
+import { DataTableFilter } from './data-table-filter';
+
 interface DataTableToolbarProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
@@ -21,6 +23,10 @@ interface DataTableToolbarProps {
     data: any[];
     columns: { key: string; header: string }[];
     filename: string;
+  };
+  statusFilter?: {
+    value: string[];
+    onChange: (value: string[]) => void;
   };
   table: any;
   theme?: 'light' | 'dark';
@@ -83,6 +89,7 @@ export function DataTableToolbar({
   table,
   theme = 'light',
   searchPlaceholder = 'Search request...',
+  statusFilter,
 }: DataTableToolbarProps) {
   const debouncedSearch = React.useCallback(
     debounce((value: string) => {
@@ -107,7 +114,7 @@ export function DataTableToolbar({
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto">
-      <div className="relative w-[200px] flex-shrink-0">
+      <div className="relative w-[150px] flex-shrink-0">
         <Search
           className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none ${
             theme === 'dark' ? 'text-white/40' : 'text-muted-foreground'
@@ -124,6 +131,37 @@ export function DataTableToolbar({
               : 'bg-white border-gray-300'
           }`}
         />
+      </div>
+
+      <div className="flex items-center gap-2">
+        {statusFilter && (
+          <>
+            <DataTableFilter
+              title="Status"
+              options={[
+                { label: 'Active', value: 'true' },
+                { label: 'Inactive', value: 'false' },
+              ]}
+              value={statusFilter.value}
+              onChange={statusFilter.onChange}
+              theme={theme}
+            />
+            {statusFilter.value.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => statusFilter.onChange([])}
+                className={`h-9 px-2 ${
+                  theme === 'dark'
+                    ? 'bg-white/[0.07] border-white/[0.1] text-white hover:bg-white/[0.1]'
+                    : ''
+                }`}
+              >
+                Reset
+              </Button>
+            )}
+          </>
+        )}
       </div>
 
       <div className="flex items-center gap-2 ml-auto">

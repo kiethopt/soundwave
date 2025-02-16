@@ -131,35 +131,39 @@ export const getAllUsers = async (
     const limitNumber = Number(limit);
     const offset = (pageNumber - 1) * limitNumber;
 
-    // Sử dụng req.originalUrl làm cache key
-    const cacheKey = req.originalUrl;
-
-    // Nếu cache được bật, thử lấy dữ liệu từ cache
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-    }
-
-    // Lấy tất cả người dùng, không phân biệt role
+    // Sử dụng include thay vì select để lấy đầy đủ thông tin nested
     const users = await prisma.user.findMany({
       skip: offset,
       take: limitNumber,
-      select: userSelect,
+      include: {
+        artistProfile: {
+          include: {
+            genres: {
+              include: {
+                genre: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: {
         createdAt: 'desc',
       },
-      // cacheStrategy: cacheConfig.short,
     });
 
     const totalUsers = await prisma.user.count();
 
     const response = {
-      users,
+      users: users.map((user) => ({
+        ...user,
+        artistProfile: user.artistProfile
+          ? {
+              ...user.artistProfile,
+              socialMediaLinks: user.artistProfile.socialMediaLinks || {},
+              verifiedAt: user.artistProfile.verifiedAt,
+            }
+          : null,
+      })),
       pagination: {
         total: totalUsers,
         page: pageNumber,
@@ -168,10 +172,8 @@ export const getAllUsers = async (
       },
     };
 
-    // Lưu vào cache nếu caching được bật
     if (process.env.USE_REDIS_CACHE === 'true') {
-      console.log(`[Redis] Caching data for key: ${cacheKey}`);
-      await client.setEx(cacheKey, 300, JSON.stringify(response));
+      await client.setEx(req.originalUrl, 300, JSON.stringify(response));
     }
 
     res.json(response);

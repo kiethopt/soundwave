@@ -10,13 +10,12 @@ import {
   VisibilityState,
   getCoreRowModel,
   getPaginationRowModel,
+  getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table';
 import { Eye, Check, X, MoreHorizontal } from 'lucide-react';
 import type { ArtistRequest } from '@/types';
 import { toast } from 'react-toastify';
-import { DataTable } from '@/components/data-table/data-table';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -27,9 +26,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { useTheme } from '@/contexts/ThemeContext';
-import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { Checkbox } from '@/components/ui/checkbox';
-
+import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 export default function ArtistRequests() {
   const [requests, setRequests] = useState<ArtistRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +39,6 @@ export default function ArtistRequests() {
   const [endDate, setEndDate] = useState('');
   const [selectedRows, setSelectedRows] = useState<ArtistRequest[]>([]);
 
-  // Add these new states
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -226,6 +224,7 @@ export default function ArtistRequests() {
           </Link>
         );
       },
+      enableSorting: true,
     },
     {
       accessorKey: 'email',
@@ -235,6 +234,7 @@ export default function ArtistRequests() {
           {row.original.user.email}
         </span>
       ),
+      enableSorting: true,
     },
     {
       accessorKey: 'verificationRequestedAt',
@@ -253,6 +253,7 @@ export default function ArtistRequests() {
           )}
         </span>
       ),
+      enableSorting: true,
     },
     {
       id: 'actions',
@@ -299,6 +300,8 @@ export default function ArtistRequests() {
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     state: {
@@ -328,7 +331,7 @@ export default function ArtistRequests() {
 
   return (
     <div
-      className={`container mx-auto space-y-4 p-4 mb-16 ${
+      className={`container mx-auto space-y-4 p-4 pb-20 ${
         theme === 'dark' ? 'text-white' : ''
       }`}
     >
@@ -349,29 +352,12 @@ export default function ArtistRequests() {
         </p>
       </div>
 
-      <div className="space-y-4">
-        <div className="w-full">
-          <DateRangePicker
-            startDate={startDate}
-            endDate={endDate}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-            theme={theme}
-          />
-        </div>
-
-        <DataTableToolbar
-          searchValue={searchInput}
-          onSearchChange={setSearchInput}
-          selectedRowsCount={selectedRows.length}
-          onDelete={handleDeleteSelected}
-          showExport={true}
-          exportData={{
-            data: requests,
-            columns: exportColumns,
-            filename: 'artist-requests',
-          }}
-          table={table}
+      <div className="w-full">
+        <DateRangePicker
+          startDate={startDate}
+          endDate={endDate}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
           theme={theme}
         />
       </div>
@@ -386,7 +372,7 @@ export default function ArtistRequests() {
         </div>
       )}
 
-      <DataTable
+      <DataTableWrapper
         table={table}
         columns={columns}
         data={requests}
@@ -396,6 +382,19 @@ export default function ArtistRequests() {
         onPageChange={(page) => updateQueryParam('page', page + 1)}
         onRowSelection={setSelectedRows}
         theme={theme}
+        toolbar={{
+          searchValue: searchInput,
+          onSearchChange: setSearchInput,
+          selectedRowsCount: selectedRows.length,
+          onDelete: handleDeleteSelected,
+          showExport: true,
+          exportData: {
+            data: requests,
+            columns: exportColumns,
+            filename: 'artist-requests',
+          },
+          searchPlaceholder: 'Search requests...',
+        }}
       />
     </div>
   );

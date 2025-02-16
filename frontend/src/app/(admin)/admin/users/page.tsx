@@ -23,6 +23,19 @@ import {
 import Image from 'next/image';
 import { toast } from 'react-toastify';
 import { useTheme } from '@/contexts/ThemeContext';
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+  VisibilityState,
+} from '@tanstack/react-table';
+import { MoreHorizontal } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
@@ -33,6 +46,14 @@ export default function AdminUsers() {
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
   const { theme } = useTheme();
+
+  // State cho sorting, column filters, column visibility, row selection, selected rows, status filter
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
+  const [selectedRows, setSelectedRows] = useState<User[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
 
   // Sử dụng URL query param cho số trang
   const searchParams = useSearchParams();
@@ -171,6 +192,29 @@ export default function AdminUsers() {
     }
   };
 
+  const handleDeleteSelected = async () => {
+    if (
+      !selectedRows.length ||
+      !confirm(`Delete ${selectedRows.length} selected users?`)
+    )
+      return;
+
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      await Promise.all(
+        selectedRows.map((row) => api.admin.deleteUser(row.id, token))
+      );
+
+      setSelectedRows([]);
+      fetchUsers(currentPage, searchInput);
+      toast.success(`Deleted ${selectedRows.length} users successfully`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Deletion failed');
+    }
+  };
+
   // Khi tìm kiếm, reset về trang 1 qua việc cập nhật query param "page"
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,513 +225,253 @@ export default function AdminUsers() {
   const filteredUsers = users.filter(
     (user) =>
       user.role === 'USER' &&
-      (user.email.toLowerCase().includes(searchInput.toLowerCase()) ||
-        user.username?.toLowerCase().includes(searchInput.toLowerCase()) ||
-        user.name?.toLowerCase().includes(searchInput.toLowerCase()))
+      (searchInput
+        ? user.email.toLowerCase().includes(searchInput.toLowerCase()) ||
+          user.username?.toLowerCase().includes(searchInput.toLowerCase()) ||
+          user.name?.toLowerCase().includes(searchInput.toLowerCase())
+        : true) &&
+      (statusFilter.length === 0 ||
+        statusFilter.includes(user.isActive.toString()))
   );
+
+  const columns: ColumnDef<User>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'name',
+      header: 'User',
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-8 h-8 rounded-full overflow-hidden ${
+                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+              }`}
+            >
+              {user.avatar ? (
+                <Image
+                  src={user.avatar}
+                  alt={user.name || 'User avatar'}
+                  width={32}
+                  height={32}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <UserIcon
+                  className={`w-8 h-8 p-1.5 ${
+                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                  }`}
+                />
+              )}
+            </div>
+            <div>
+              <div
+                className={`font-medium ${
+                  theme === 'dark' ? 'text-white' : ''
+                }`}
+              >
+                {user.name || 'Anonymous'}
+              </div>
+              <div
+                className={theme === 'dark' ? 'text-white/60' : 'text-gray-500'}
+              >
+                @{user.username}
+              </div>
+            </div>
+          </div>
+        );
+      },
+      sortingFn: 'text',
+    },
+    {
+      accessorKey: 'email',
+      header: 'Email',
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'Status',
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.original.isActive
+              ? 'bg-green-500/20 text-green-400'
+              : 'bg-red-500/20 text-red-400'
+          }`}
+        >
+          {row.original.isActive ? 'Active' : 'Inactive'}
+        </span>
+      ),
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Joined',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {new Date(row.original.createdAt).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => handleUserStatus(user.id, user.isActive)}
+              >
+                <Power className="w-4 h-4 mr-2" />
+                {user.isActive ? 'Deactivate' : 'Activate'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleResetPassword(user.id)}>
+                <Key className="w-4 h-4 mr-2" />
+                Reset Password
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleDeleteUser(user.id)}
+                className="text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete User
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
+  const table = useReactTable({
+    data: filteredUsers,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+      pagination: {
+        pageIndex: currentPage - 1,
+        pageSize: 10,
+      },
+    },
+    pageCount: totalPages,
+    manualPagination: true,
+  });
 
   return (
     <div
-      className="container mx-auto space-y-8 p-4 mb-16"
-      suppressHydrationWarning
+      className={`container mx-auto space-y-4 p-4 pb-20 ${
+        theme === 'dark' ? 'text-white' : ''
+      }`}
     >
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h1
-            className={`text-2xl md:text-3xl font-bold tracking-tight ${
-              theme === 'light' ? 'text-gray-900' : 'text-white'
-            }`}
-          >
-            User Management
-          </h1>
-          <p
-            className={`mt-2 text-sm md:text-base ${
-              theme === 'light' ? 'text-gray-600' : 'text-white/60'
-            }`}
-          >
-            Manage and monitor user accounts
-          </p>
-        </div>
-        <form onSubmit={handleSearch} className="relative w-full md:w-auto">
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className={`w-full md:w-64 pl-10 pr-4 py-2 ${
-              theme === 'light'
-                ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
-                : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-            } border rounded-md focus:outline-none focus:ring-2 text-sm`}
-          />
-          <button
-            type="submit"
-            className="absolute left-3 top-1/2 transform -translate-y-1/2"
-          >
-            <Search
-              className={`${
-                theme === 'light' ? 'text-gray-400' : 'text-white/40'
-              } w-5 h-5`}
-            />
-          </button>
-        </form>
+      <div className="mb-6">
+        <h1
+          className={`text-2xl md:text-3xl font-bold tracking-tight ${
+            theme === 'dark' ? 'text-white' : 'text-gray-900'
+          }`}
+        >
+          User Management
+        </h1>
+        <p
+          className={`text-muted-foreground ${
+            theme === 'dark' ? 'text-white/60' : ''
+          }`}
+        >
+          Manage and monitor user accounts
+        </p>
       </div>
 
-      {error && (
-        <div className="bg-red-500/20 text-red-400 p-3 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
-
-      <div
-        className={`rounded-lg overflow-hidden border ${
-          theme === 'light'
-            ? 'bg-white border-gray-200'
-            : 'bg-[#121212] border-white/[0.08]'
-        } relative`}
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[600px]">
-            <thead
-              className={`${
-                theme === 'light'
-                  ? 'bg-gray-50 border-gray-200'
-                  : 'bg-white/5 border-white/[0.08]'
-              } border-b`}
-            >
-              <tr>
-                <th
-                  className={`px-6 py-4 text-left text-sm font-semibold ${
-                    theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
-                >
-                  User
-                </th>
-                <th
-                  className={`px-6 py-4 text-left text-sm font-semibold ${
-                    theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
-                >
-                  Email
-                </th>
-                <th
-                  className={`px-6 py-4 text-left text-sm font-semibold ${
-                    theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
-                >
-                  Status
-                </th>
-                <th
-                  className={`px-6 py-4 text-left text-sm font-semibold ${
-                    theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
-                >
-                  Joined
-                </th>
-                <th
-                  className={`px-6 py-4 text-right text-sm font-semibold ${
-                    theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody
-              className={`divide-y ${
-                theme === 'light' ? 'divide-gray-200' : 'divide-white/[0.04]'
-              }`}
-            >
-              {loading
-                ? Array(5)
-                    .fill(0)
-                    .map((_, i) => (
-                      <tr key={i}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-8 h-8 rounded-full ${
-                                theme === 'light'
-                                  ? 'bg-gray-200'
-                                  : 'bg-white/10'
-                              } animate-pulse`}
-                            />
-                            <div className="space-y-2">
-                              <div
-                                className={`h-4 rounded w-32 animate-pulse ${
-                                  theme === 'light'
-                                    ? 'bg-gray-200'
-                                    : 'bg-white/10'
-                                }`}
-                              />
-                              <div
-                                className={`h-3 rounded w-24 animate-pulse ${
-                                  theme === 'light'
-                                    ? 'bg-gray-200'
-                                    : 'bg-white/10'
-                                }`}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div
-                            className={`h-4 rounded w-48 animate-pulse ${
-                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
-                            }`}
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div
-                            className={`h-6 rounded-full w-20 animate-pulse ${
-                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
-                            }`}
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div
-                            className={`h-4 rounded w-24 animate-pulse ${
-                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
-                            }`}
-                          />
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div
-                            className={`h-6 w-6 rounded-full animate-pulse ${
-                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
-                            }`}
-                          />
-                        </td>
-                      </tr>
-                    ))
-                : filteredUsers.map((user) => (
-                    <tr key={user.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-8 h-8 rounded-full overflow-hidden ${
-                              theme === 'light' ? 'bg-gray-100' : 'bg-white/10'
-                            } flex items-center justify-center`}
-                          >
-                            {user.avatar ? (
-                              <Image
-                                src={user.avatar}
-                                alt={user.name || 'User avatar'}
-                                width={32}
-                                height={32}
-                                className="object-cover w-full h-full"
-                              />
-                            ) : (
-                              <UserIcon
-                                className={`w-8 h-8 ${
-                                  theme === 'light'
-                                    ? 'text-gray-400'
-                                    : 'text-white/40'
-                                } p-1.5`}
-                              />
-                            )}
-                          </div>
-                          <div>
-                            <div
-                              className={`font-medium ${
-                                theme === 'light'
-                                  ? 'text-gray-900'
-                                  : 'text-white'
-                              }`}
-                            >
-                              {user.name || 'Anonymous'}
-                            </div>
-                            <div
-                              className={`text-sm ${
-                                theme === 'light'
-                                  ? 'text-gray-500'
-                                  : 'text-white/60'
-                              }`}
-                            >
-                              @{user.username}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td
-                        className={`px-6 py-4 whitespace-nowrap ${
-                          theme === 'light' ? 'text-gray-900' : 'text-white'
-                        }`}
-                      >
-                        {user.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            user.isActive
-                              ? 'bg-green-500/20 text-green-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}
-                        >
-                          {user.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td
-                        className={`px-6 py-4 whitespace-nowrap ${
-                          theme === 'light' ? 'text-gray-900' : 'text-white'
-                        }`}
-                      >
-                        {new Date(user.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            className={`p-2 rounded-full ${
-                              theme === 'light'
-                                ? 'hover:bg-gray-100'
-                                : 'hover:bg-white/10'
-                            }`}
-                          >
-                            <MoreVertical className="w-5 h-5" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            className={`${
-                              theme === 'light'
-                                ? 'bg-white border-gray-200'
-                                : 'bg-[#282828] border-white/10'
-                            } ${
-                              theme === 'light' ? 'text-gray-900' : 'text-white'
-                            }`}
-                          >
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleUserStatus(user.id, user.isActive)
-                              }
-                              disabled={actionLoading === user.id}
-                              className={`cursor-pointer ${
-                                theme === 'light'
-                                  ? 'hover:bg-gray-100'
-                                  : 'hover:bg-white/10'
-                              }`}
-                            >
-                              <Power className="w-4 h-4 mr-2" />
-                              {user.isActive ? 'Deactivate' : 'Activate'}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleResetPassword(user.id)}
-                              disabled={actionLoading === user.id}
-                              className={`cursor-pointer ${
-                                theme === 'light'
-                                  ? 'hover:bg-gray-100'
-                                  : 'hover:bg-white/10'
-                              }`}
-                            >
-                              <Key className="w-4 h-4 mr-2" />
-                              Reset Password
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator
-                              className={
-                                theme === 'light'
-                                  ? 'bg-gray-200'
-                                  : 'bg-white/10'
-                              }
-                            />
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteUser(user.id)}
-                              disabled={actionLoading === user.id}
-                              className="text-red-400 cursor-pointer hover:bg-red-500/20"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete User
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  ))}
-            </tbody>
-          </table>
-
-          {!loading && filteredUsers.length === 0 && (
-            <div
-              className={`flex flex-col items-center justify-center h-[400px] ${
-                theme === 'light' ? 'text-gray-500' : 'text-white/60'
-              }`}
-            >
-              <UserIcon className="w-12 h-12 mb-4" />
-              <p>No users found</p>
-            </div>
-          )}
-        </div>
-        {/* Pagination */}
-        {totalPages > 0 && (
-          <div
-            className={`flex items-center justify-center gap-2 p-4 border-t ${
-              theme === 'light' ? 'border-gray-200' : 'border-white/[0.04]'
-            }`}
-          >
-            <button
-              onClick={() => updateQueryParam('page', currentPage - 1)}
-              disabled={currentPage === 1}
-              className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
-                theme === 'light'
-                  ? 'bg-gray-100 hover:bg-gray-200'
-                  : 'bg-white/5 hover:bg-white/10'
-              }`}
-            >
-              Previous
-            </button>
-
-            {/* Mobile Pagination */}
-            <div className="md:hidden">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className={`px-3 py-2 rounded-md text-sm ${
-                    theme === 'light'
-                      ? 'bg-gray-100 hover:bg-gray-200'
-                      : 'bg-white/5 hover:bg-white/10'
-                  }`}
-                >
-                  {currentPage} of {totalPages}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className={`p-4 w-[200px] ${
-                    theme === 'light'
-                      ? 'bg-white border-gray-200'
-                      : 'bg-[#282828] border-white/[0.1]'
-                  } ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}
-                >
-                  <div className="space-y-3">
-                    <div
-                      className={`text-xs ${
-                        theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                      }`}
-                    >
-                      Go to page:
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={totalPages}
-                        defaultValue={currentPage}
-                        ref={pageInputRef}
-                        className={`w-full px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
-                          theme === 'light'
-                            ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
-                            : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50'
-                        }`}
-                        placeholder="Page"
-                      />
-                    </div>
-                    <button
-                      onClick={() => {
-                        const page = pageInputRef.current
-                          ? parseInt(pageInputRef.current.value, 10)
-                          : NaN;
-                        if (!isNaN(page)) {
-                          updateQueryParam('page', page);
-                        }
-                      }}
-                      className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 text-sm"
-                    >
-                      Go to Page
-                    </button>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Desktop Pagination */}
-            <div className="hidden md:flex items-center gap-2 text-sm">
-              <span
-                className={
-                  theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                }
-              >
-                Page
-              </span>
-              <div
-                className={`px-3 py-1 rounded-md border ${
-                  theme === 'light'
-                    ? 'bg-gray-50 border-gray-200'
-                    : 'bg-white/5 border-white/[0.1]'
-                }`}
-              >
-                <span
-                  className={`font-medium ${
-                    theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
-                >
-                  {currentPage}
-                </span>
-              </div>
-              <span
-                className={
-                  theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                }
-              >
-                of {totalPages}
-              </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={totalPages}
-                  defaultValue={currentPage}
-                  ref={pageInputRef}
-                  className={`w-16 px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
-                    theme === 'light'
-                      ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
-                      : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50'
-                  }`}
-                  placeholder="Page"
-                />
-                <button
-                  onClick={() => {
-                    const page = pageInputRef.current
-                      ? parseInt(pageInputRef.current.value, 10)
-                      : NaN;
-                    if (!isNaN(page)) {
-                      updateQueryParam('page', page);
-                    }
-                  }}
-                  className={`px-3 py-1 rounded-md text-sm ${
-                    theme === 'light'
-                      ? 'bg-gray-900 text-white hover:bg-gray-800'
-                      : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20'
-                  }`}
-                >
-                  Go
-                </button>
-              </div>
-            </div>
-
-            <button
-              onClick={() => updateQueryParam('page', currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
-                theme === 'light'
-                  ? 'bg-gray-100 hover:bg-gray-200'
-                  : 'bg-white/5 hover:bg-white/10'
-              }`}
-            >
-              Next
-            </button>
-          </div>
-        )}
-
-        {/* Loading overlay */}
-        {loading && (
-          <div
-            className={`absolute inset-0 flex items-center justify-center ${
-              theme === 'light' ? 'bg-gray-500/50' : 'bg-black/50'
-            }`}
-          >
-            <Spinner
-              className={`w-8 h-8 animate-spin ${
-                theme === 'light' ? 'text-gray-900' : 'text-white'
-              }`}
-            />
-          </div>
-        )}
-      </div>
+      <DataTableWrapper
+        table={table}
+        columns={columns}
+        data={filteredUsers}
+        pageCount={totalPages}
+        pageIndex={currentPage - 1}
+        loading={loading}
+        onPageChange={(page) => updateQueryParam('page', page + 1)}
+        onRowSelection={setSelectedRows}
+        theme={theme}
+        toolbar={{
+          searchValue: searchInput,
+          onSearchChange: setSearchInput,
+          selectedRowsCount: selectedRows.length,
+          onDelete: handleDeleteSelected,
+          showExport: true,
+          exportData: {
+            data: filteredUsers,
+            columns: [
+              { key: 'id', header: 'ID' },
+              { key: 'name', header: 'Name' },
+              { key: 'username', header: 'Username' },
+              { key: 'email', header: 'Email' },
+              { key: 'role', header: 'Role' },
+              { key: 'currentProfile', header: 'Current Profile' },
+              { key: 'isActive', header: 'Status' },
+              { key: 'createdAt', header: 'Created At' },
+              { key: 'updatedAt', header: 'Updated At' },
+              { key: 'lastLoginAt', header: 'Last Login' },
+              { key: 'artistProfile.artistName', header: 'Artist Name' },
+              {
+                key: 'artistProfile.monthlyListeners',
+                header: 'Monthly Listeners',
+              },
+              { key: 'artistProfile.isVerified', header: 'Verified Artist' },
+              {
+                key: 'artistProfile.verificationRequestedAt',
+                header: 'Verification Requested',
+              },
+              { key: 'artistProfile.verifiedAt', header: 'Verified At' },
+              {
+                key: 'artistProfile.socialMediaLinks.facebook',
+                header: 'Facebook',
+              },
+              {
+                key: 'artistProfile.socialMediaLinks.instagram',
+                header: 'Instagram',
+              },
+            ],
+            filename: 'users',
+          },
+          searchPlaceholder: 'Search users...',
+          statusFilter: {
+            value: statusFilter,
+            onChange: setStatusFilter,
+          },
+        }}
+      />
     </div>
   );
 }
