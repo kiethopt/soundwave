@@ -139,7 +139,7 @@ export const api = {
         if (filters.endDate) {
           params.append('endDate', filters.endDate.toISOString());
         }
-        if (filters.status && filters.status !== 'all') {
+        if (filters.status) {
           params.append('status', filters.status);
         }
         if (filters.search) {
@@ -210,9 +210,14 @@ export const api = {
         token
       ),
 
-    getAllUsers: async (token: string, page: number, limit: number) =>
+    getAllUsers: async (
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
       fetchWithAuth(
-        `/api/admin/users?page=${page}&limit=${limit}`,
+        `/api/admin/users?${queryParams || `page=${page}&limit=${limit}`}`,
         { method: 'GET' },
         token
       ),
@@ -435,9 +440,14 @@ export const api = {
         token
       ),
 
-    getAllArtistsProfile: async (token: string, page: number, limit: number) =>
+    getAllArtistsProfile: async (
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
       fetchWithAuth(
-        `/api/artist/profiles?page=${page}&limit=${limit}`,
+        `/api/admin/artists?${queryParams || `page=${page}&limit=${limit}`}`,
         { method: 'GET' },
         token
       ),

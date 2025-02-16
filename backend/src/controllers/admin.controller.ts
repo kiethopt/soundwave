@@ -126,32 +126,52 @@ export const getAllUsers = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, search = '', status } = req.query;
     const pageNumber = Number(page);
     const limitNumber = Number(limit);
     const offset = (pageNumber - 1) * limitNumber;
 
-    // Sử dụng include thay vì select để lấy đầy đủ thông tin nested
-    const users = await prisma.user.findMany({
-      skip: offset,
-      take: limitNumber,
-      include: {
-        artistProfile: {
-          include: {
-            genres: {
-              include: {
-                genre: true,
+    // Xây dựng điều kiện where
+    const where: any = {
+      role: 'USER', // Chỉ lấy user thường, không lấy admin
+    };
+
+    // Thêm điều kiện tìm kiếm
+    if (search) {
+      where.OR = [
+        { email: { contains: String(search), mode: 'insensitive' } },
+        { username: { contains: String(search), mode: 'insensitive' } },
+        { name: { contains: String(search), mode: 'insensitive' } },
+      ];
+    }
+
+    // Thêm điều kiện status
+    if (status !== undefined) {
+      where.isActive = status === 'true';
+    }
+
+    const [users, totalUsers] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip: offset,
+        take: limitNumber,
+        include: {
+          artistProfile: {
+            include: {
+              genres: {
+                include: {
+                  genre: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    const totalUsers = await prisma.user.count();
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      prisma.user.count({ where }),
+    ]);
 
     const response = {
       users: users.map((user) => ({
@@ -171,10 +191,6 @@ export const getAllUsers = async (
         totalPages: Math.ceil(totalUsers / limitNumber),
       },
     };
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await client.setEx(req.originalUrl, 300, JSON.stringify(response));
-    }
 
     res.json(response);
   } catch (error) {
@@ -678,41 +694,40 @@ export const getAllArtists = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, search = '', status } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
-    const cacheKey = req.originalUrl;
 
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    // Xây dựng điều kiện where
+    const where: any = {
+      role: Role.ARTIST,
+      isVerified: true,
+    };
+
+    // Thêm điều kiện tìm kiếm
+    if (search) {
+      where.OR = [
+        { artistName: { contains: String(search), mode: 'insensitive' } },
+        { user: { email: { contains: String(search), mode: 'insensitive' } } },
+      ];
     }
 
-    const artists = await prisma.artistProfile.findMany({
-      where: {
-        role: Role.ARTIST,
-        isVerified: true,
-      },
-      skip: offset,
-      take: Number(limit),
-      select: artistProfileSelect,
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    // Thêm điều kiện status
+    if (status !== undefined) {
+      where.isActive = status === 'true';
+    }
 
-    const totalArtists = await prisma.artistProfile.count({
-      where: {
-        role: Role.ARTIST,
-        isVerified: true,
-      },
-    });
+    const [artists, totalArtists] = await Promise.all([
+      prisma.artistProfile.findMany({
+        where,
+        skip: offset,
+        take: Number(limit),
+        select: artistProfileSelect,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.artistProfile.count({ where }),
+    ]);
 
-    const response = {
+    res.json({
       artists,
       pagination: {
         total: totalArtists,
@@ -720,14 +735,7 @@ export const getAllArtists = async (
         limit: Number(limit),
         totalPages: Math.ceil(totalArtists / Number(limit)),
       },
-    };
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      console.log(`[Redis] Caching data for key: ${cacheKey}`);
-      await client.setEx(cacheKey, 300, JSON.stringify(response));
-    }
-
-    res.json(response);
+    });
   } catch (error) {
     console.error('Get all artists error:', error);
     res.status(500).json({ message: 'Internal server error' });

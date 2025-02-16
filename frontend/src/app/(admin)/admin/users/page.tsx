@@ -41,7 +41,6 @@ export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
@@ -92,58 +91,83 @@ export default function AdminUsers() {
     router.push(`/admin/users${queryStr}`);
   };
 
-  // useRef cho input "Go to page"
-  const pageInputRef = useRef<HTMLInputElement>(null);
-
-  // Gọi API lấy danh sách user theo số trang và limit, trả về full response (có pagination)
-  const fetchUsers = async (page: number, query: string = '') => {
+  const fetchUsers = async (page: number) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('userToken');
-      if (!token) return;
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
 
-      const response = await api.admin.getAllUsers(token, page, limit);
-      // Các API có thể trả về data theo nhiều cách khác nhau
-      const usersArray = Array.isArray(response)
-        ? response
-        : response?.data || response?.users || [];
+      // Tạo query params
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
 
-      setUsers(usersArray);
-      setTotalPages(response.pagination?.totalPages || 1);
+      // Thêm search param nếu có
+      if (searchInput) {
+        params.append('search', searchInput);
+      }
+
+      // Thêm status filter nếu có
+      if (statusFilter.length === 1) {
+        params.append('status', statusFilter[0]);
+      }
+
+      const response = await api.admin.getAllUsers(
+        token,
+        page,
+        limit,
+        params.toString()
+      );
+
+      setUsers(response.users);
+      setTotalPages(response.pagination.totalPages);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch users');
+      toast.error(err instanceof Error ? err.message : 'Failed to fetch users');
     } finally {
       setLoading(false);
     }
   };
 
-  // Mỗi khi currentPage hoặc searchInput thay đổi, gọi API
   useEffect(() => {
-    fetchUsers(currentPage, searchInput);
-  }, [currentPage, searchInput]);
+    // Reset về trang 1 khi filter hoặc search thay đổi
+    if (currentPage !== 1) {
+      updateQueryParam('page', 1);
+    } else {
+      fetchUsers(1);
+    }
+  }, [searchInput, statusFilter]);
+
+  useEffect(() => {
+    fetchUsers(currentPage);
+  }, [currentPage]);
 
   const handleUserStatus = async (userId: string, isActive: boolean) => {
     try {
       setActionLoading(userId);
       const token = localStorage.getItem('userToken');
-      if (!token) return;
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
 
       await api.admin.deactivateUser(userId, { isActive: !isActive }, token);
-
       setUsers(
         users.map((user) =>
           user.id === userId ? { ...user, isActive: !isActive } : user
         )
       );
-
       toast.success(
         `User ${isActive ? 'deactivated' : 'activated'} successfully`
       );
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to update user';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      // Chỉ sử dụng toast.error, bỏ setError
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update user'
+      );
     } finally {
       setActionLoading(null);
     }
@@ -153,18 +177,20 @@ export default function AdminUsers() {
     try {
       setActionLoading(userId);
       const token = localStorage.getItem('userToken');
-      if (!token) return;
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
 
       await api.auth.requestPasswordReset(
         users.find((u) => u.id === userId)?.email || ''
       );
-      setError(null);
       toast.success('Password reset email sent successfully');
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to reset password';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      // Chỉ sử dụng toast.error, bỏ setError
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to reset password'
+      );
     } finally {
       setActionLoading(null);
     }
@@ -176,17 +202,19 @@ export default function AdminUsers() {
     try {
       setActionLoading(userId);
       const token = localStorage.getItem('userToken');
-      if (!token) return;
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
 
       await api.admin.deleteUser(userId, token);
-
       setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
       toast.success('User deleted successfully');
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to delete user';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      // Chỉ sử dụng toast.error, bỏ setError
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to delete user'
+      );
     } finally {
       setActionLoading(null);
     }
@@ -208,31 +236,12 @@ export default function AdminUsers() {
       );
 
       setSelectedRows([]);
-      fetchUsers(currentPage, searchInput);
+      fetchUsers(currentPage);
       toast.success(`Deleted ${selectedRows.length} users successfully`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Deletion failed');
     }
   };
-
-  // Khi tìm kiếm, reset về trang 1 qua việc cập nhật query param "page"
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateQueryParam('page', 1);
-  };
-
-  // Filter hiển thị user thuộc role "USER" dựa trên searchInput
-  const filteredUsers = users.filter(
-    (user) =>
-      user.role === 'USER' &&
-      (searchInput
-        ? user.email.toLowerCase().includes(searchInput.toLowerCase()) ||
-          user.username?.toLowerCase().includes(searchInput.toLowerCase()) ||
-          user.name?.toLowerCase().includes(searchInput.toLowerCase())
-        : true) &&
-      (statusFilter.length === 0 ||
-        statusFilter.includes(user.isActive.toString()))
-  );
 
   const columns: ColumnDef<User>[] = [
     {
@@ -368,7 +377,7 @@ export default function AdminUsers() {
   ];
 
   const table = useReactTable({
-    data: filteredUsers,
+    data: users,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -384,7 +393,7 @@ export default function AdminUsers() {
       rowSelection,
       pagination: {
         pageIndex: currentPage - 1,
-        pageSize: 10,
+        pageSize: limit,
       },
     },
     pageCount: totalPages,
@@ -417,7 +426,7 @@ export default function AdminUsers() {
       <DataTableWrapper
         table={table}
         columns={columns}
-        data={filteredUsers}
+        data={users}
         pageCount={totalPages}
         pageIndex={currentPage - 1}
         loading={loading}
@@ -431,7 +440,7 @@ export default function AdminUsers() {
           onDelete: handleDeleteSelected,
           showExport: true,
           exportData: {
-            data: filteredUsers,
+            data: users,
             columns: [
               { key: 'id', header: 'ID' },
               { key: 'name', header: 'Name' },

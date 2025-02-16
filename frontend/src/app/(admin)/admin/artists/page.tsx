@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import type { ArtistProfile } from '@/types';
 import { api } from '@/utils/api';
 import { User, MoreVertical, Power, Trash2 } from 'lucide-react';
-import { ArtistProfile } from '@/types';
-import { Search, Spinner } from '@/components/ui/Icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,24 +12,44 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import Image from 'next/image';
 import { toast } from 'react-toastify';
 import { useTheme } from '@/contexts/ThemeContext';
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+  VisibilityState,
+} from '@tanstack/react-table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
+import Link from 'next/link';
 
 export default function AdminArtists() {
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState('');
-  const [totalPages, setTotalPages] = useState(1);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [totalPages, setTotalPages] = useState(1);
   const limit = 10;
   const { theme } = useTheme();
 
-  // Sử dụng router và searchParams để quản lý query param "page"
+  // State cho sorting, column filters, visibility, row selection, selected rows, status filter
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
+  const [selectedRows, setSelectedRows] = useState<ArtistProfile[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Nếu query param "page" có giá trị nhỏ hơn 1 hoặc bằng "1", loại bỏ nó để đảm bảo URL luôn sạch
+  // URL handling logic
   useEffect(() => {
     const pageStr = searchParams.get('page');
     const pageNumber = Number(pageStr);
@@ -43,17 +61,11 @@ export default function AdminArtists() {
     }
   }, [searchParams, router]);
 
-  // Lấy số trang hiện tại từ URL (mặc định là 1 nếu không có)
-  const currentPage = Number(searchParams.get('page')) || 1;
+  const pageFromURL = Number(searchParams.get('page'));
+  const currentPage = isNaN(pageFromURL) || pageFromURL < 1 ? 1 : pageFromURL;
 
-  // Hàm cập nhật query param
-  // Nếu totalPages === 1 và giá trị cập nhật khác 1, thì không update để tránh chuyển sang trang không có dữ liệu.
-  // Nếu giá trị vượt quá totalPages, sẽ gán lại bằng totalPages.
   const updateQueryParam = (param: string, value: number) => {
-    if (totalPages === 1 && value !== 1) {
-      // Nếu chỉ có 1 trang, không cho chuyển sang trang khác
-      return;
-    }
+    if (totalPages === 1 && value !== 1) return;
     if (value < 1) value = 1;
     if (value > totalPages) value = totalPages;
     const current = new URLSearchParams(searchParams.toString());
@@ -66,78 +78,100 @@ export default function AdminArtists() {
     router.push(`/admin/artists${queryStr}`);
   };
 
-  // Gọi API lấy danh sách artist với số trang và limit được truyền qua query param
-  const fetchArtists = async (page: number, query: string = '') => {
+  // API calls
+  const fetchArtists = async (page: number) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
+
+      // Tạo query params
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      // Thêm search param nếu có
+      if (searchInput) {
+        params.append('search', searchInput);
+      }
+
+      // Thêm status filter nếu có
+      if (statusFilter.length === 1) {
+        params.append('status', statusFilter[0]);
+      }
 
       const response = await api.artists.getAllArtistsProfile(
         token,
         page,
-        limit
+        limit,
+        params.toString()
       );
+
       setArtists(response.artists);
       setTotalPages(response.pagination.totalPages);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch artists');
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to fetch artists'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // Khi currentPage (lấy từ URL) hoặc searchInput thay đổi, gọi API lại
   useEffect(() => {
-    fetchArtists(currentPage, searchInput);
-  }, [currentPage, searchInput]);
+    // Reset về trang 1 khi filter hoặc search thay đổi
+    if (currentPage !== 1) {
+      updateQueryParam('page', 1);
+    } else {
+      fetchArtists(1);
+    }
+  }, [searchInput, statusFilter]);
 
-  // Khi tìm kiếm, reset về trang 1 (bằng cách update query param "page")
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateQueryParam('page', 1);
-  };
+  useEffect(() => {
+    fetchArtists(currentPage);
+  }, [currentPage]);
 
-  const handleDeactivateArtist = async (
-    artistId: string,
-    currentStatus: boolean
-  ) => {
+  const filteredArtists = artists.filter(
+    (artist) =>
+      (searchInput
+        ? artist.artistName.toLowerCase().includes(searchInput.toLowerCase()) ||
+          artist.user.email.toLowerCase().includes(searchInput.toLowerCase())
+        : true) &&
+      (statusFilter.length === 0 ||
+        statusFilter.includes(artist.isActive.toString()))
+  );
+
+  // Action handlers
+  const handleArtistStatus = async (artistId: string, isActive: boolean) => {
     try {
       setActionLoading(artistId);
       const token = localStorage.getItem('userToken');
-      if (!token) return;
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
 
-      // Gọi API với giá trị isActive mới
       await api.admin.deactivateArtist(
         artistId,
-        { isActive: !currentStatus },
+        { isActive: !isActive },
         token
       );
-
-      // Cập nhật state với giá trị mới
       setArtists((prev) =>
         prev.map((artist) =>
-          artist.id === artistId
-            ? {
-                ...artist,
-                isActive: !currentStatus,
-                // Reset current profile nếu deactivate
-                user: {
-                  ...artist.user,
-                  currentProfile: !currentStatus
-                    ? 'USER'
-                    : artist.user.currentProfile,
-                },
-              }
-            : artist
+          artist.id === artistId ? { ...artist, isActive: !isActive } : artist
         )
       );
-
       toast.success(
-        `Artist ${!currentStatus ? 'activated' : 'deactivated'} successfully`
+        `Artist ${isActive ? 'deactivated' : 'activated'} successfully`
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Operation failed');
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update artist'
+      );
     } finally {
       setActionLoading(null);
     }
@@ -149,526 +183,288 @@ export default function AdminArtists() {
     try {
       setActionLoading(artistId);
       const token = localStorage.getItem('userToken');
-      if (!token) return;
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
 
       await api.admin.deleteArtist(artistId, token);
-
-      setArtists((prevArtists) =>
-        prevArtists.filter((artist) => artist.id !== artistId)
-      );
+      setArtists((prev) => prev.filter((artist) => artist.id !== artistId));
       toast.success('Artist deleted successfully');
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to delete artist';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to delete artist'
+      );
     } finally {
       setActionLoading(null);
     }
   };
 
-  const formatDate = (dateString: string): string => {
+  const handleDeleteSelected = async () => {
+    if (
+      !selectedRows.length ||
+      !confirm(`Delete ${selectedRows.length} selected artists?`)
+    )
+      return;
+
     try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Invalid date';
-      return date.toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-    } catch (error) {
-      return 'Invalid date';
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      await Promise.all(
+        selectedRows.map((row) => api.admin.deleteArtist(row.id, token))
+      );
+
+      setSelectedRows([]);
+      fetchArtists(currentPage);
+      toast.success(`Deleted ${selectedRows.length} artists successfully`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Deletion failed');
     }
   };
 
-  // Dùng cho input "Go to page" của pagination
-  const pageInputRef = useRef<HTMLInputElement>(null);
+  // Table columns definition
+  const columns: ColumnDef<ArtistProfile>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'artistName',
+      header: 'Artist',
+      cell: ({ row }) => {
+        const artist = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-8 h-8 rounded-full overflow-hidden ${
+                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+              }`}
+            >
+              {artist.avatar ? (
+                <Image
+                  src={artist.avatar}
+                  alt={artist.artistName}
+                  width={32}
+                  height={32}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <User
+                  className={`w-8 h-8 p-1.5 ${
+                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                  }`}
+                />
+              )}
+            </div>
+            <div>
+              <Link
+                href={`/admin/artists/${artist.id}`}
+                className={`font-medium hover:underline ${
+                  theme === 'dark' ? 'text-white' : ''
+                }`}
+              >
+                {artist.artistName}
+              </Link>
+              <div
+                className={theme === 'dark' ? 'text-white/60' : 'text-gray-500'}
+              >
+                {artist.user.email}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'monthlyListeners',
+      header: 'Monthly Listeners',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {row.original.monthlyListeners.toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'isVerified',
+      header: 'Verification',
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.original.isVerified
+              ? 'bg-blue-500/20 text-blue-400'
+              : 'bg-yellow-500/20 text-yellow-400'
+          }`}
+        >
+          {row.original.isVerified ? 'Verified' : 'Unverified'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'Status',
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.original.isActive
+              ? 'bg-green-500/20 text-green-400'
+              : 'bg-red-500/20 text-red-400'
+          }`}
+        >
+          {row.original.isActive ? 'Active' : 'Inactive'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Joined',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {new Date(row.original.createdAt).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const artist = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <MoreVertical className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => handleArtistStatus(artist.id, artist.isActive)}
+              >
+                <Power className="w-4 h-4 mr-2" />
+                {artist.isActive ? 'Deactivate' : 'Activate'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleDeleteArtist(artist.id)}
+                className="text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Artist
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+
+  const table = useReactTable({
+    data: artists,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+      pagination: {
+        pageIndex: currentPage - 1,
+        pageSize: 10,
+      },
+    },
+    pageCount: totalPages,
+    manualPagination: true,
+  });
 
   return (
     <div
-      className="container mx-auto space-y-8 p-4 mb-16"
-      suppressHydrationWarning
+      className={`container mx-auto space-y-4 p-4 pb-20 ${
+        theme === 'dark' ? 'text-white' : ''
+      }`}
     >
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h1
-            className={`text-2xl md:text-3xl font-bold tracking-tight ${
-              theme === 'light' ? 'text-gray-900' : 'text-white'
-            }`}
-          >
-            Artist Management
-          </h1>
-          <p
-            className={`mt-2 text-sm md:text-base ${
-              theme === 'light' ? 'text-gray-600' : 'text-white/60'
-            }`}
-          >
-            Manage and monitor artist profiles
-          </p>
-        </div>
-        <form onSubmit={handleSearch} className="relative w-full md:w-auto">
-          <input
-            type="text"
-            placeholder="Search artists..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className={`w-full md:w-64 pl-10 pr-4 py-2 ${
-              theme === 'light'
-                ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
-                : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-            } border rounded-md focus:outline-none focus:ring-2 text-sm`}
-          />
-          <button
-            type="submit"
-            className="absolute left-3 top-1/2 transform -translate-y-1/2"
-          >
-            <Search
-              className={`${
-                theme === 'light' ? 'text-gray-400' : 'text-white/40'
-              } w-5 h-5`}
-            />
-          </button>
-        </form>
+      <div className="mb-6">
+        <h1
+          className={`text-2xl md:text-3xl font-bold tracking-tight ${
+            theme === 'dark' ? 'text-white' : 'text-gray-900'
+          }`}
+        >
+          Artist Management
+        </h1>
+        <p
+          className={`text-muted-foreground ${
+            theme === 'dark' ? 'text-white/60' : ''
+          }`}
+        >
+          Manage and monitor artist profiles
+        </p>
       </div>
 
-      {error && (
-        <div className="bg-red-500/20 text-red-400 p-3 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
-
-      <div
-        className={`rounded-lg overflow-hidden border relative ${
-          theme === 'light'
-            ? 'bg-white border-gray-200'
-            : 'bg-[#121212] border-white/[0.08]'
-        }`}
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[600px]">
-            <thead
-              className={`border-b ${
-                theme === 'light'
-                  ? 'bg-gray-50 border-gray-200'
-                  : 'bg-white/5 border-white/[0.08]'
-              }`}
-            >
-              <tr>
-                {[
-                  'Name',
-                  'Email',
-                  'Monthly Listeners',
-                  'Status',
-                  'Created At',
-                  'Actions',
-                ].map((header) => (
-                  <th
-                    key={header}
-                    className={`px-6 py-4 text-left text-sm font-semibold ${
-                      theme === 'light' ? 'text-gray-900' : 'text-white'
-                    } ${header === 'Actions' ? 'text-right' : ''}`}
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody
-              className={`divide-y ${
-                theme === 'light' ? 'divide-gray-200' : 'divide-white/[0.08]'
-              }`}
-            >
-              {loading
-                ? Array(5)
-                    .fill(0)
-                    .map((_, i) => (
-                      <tr key={i}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`w-10 h-10 rounded-full animate-pulse ${
-                                theme === 'light'
-                                  ? 'bg-gray-200'
-                                  : 'bg-white/10'
-                              }`}
-                            />
-                            <div className="space-y-2">
-                              <div
-                                className={`h-4 rounded w-32 animate-pulse ${
-                                  theme === 'light'
-                                    ? 'bg-gray-200'
-                                    : 'bg-white/10'
-                                }`}
-                              />
-                              <div
-                                className={`h-3 rounded w-24 animate-pulse ${
-                                  theme === 'light'
-                                    ? 'bg-gray-200'
-                                    : 'bg-white/10'
-                                }`}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div
-                            className={`h-4 rounded w-48 animate-pulse ${
-                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
-                            }`}
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div
-                            className={`h-4 rounded w-24 animate-pulse ${
-                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
-                            }`}
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div
-                            className={`h-6 rounded-full w-20 animate-pulse ${
-                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
-                            }`}
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div
-                            className={`h-4 rounded w-24 animate-pulse ${
-                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
-                            }`}
-                          />
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div
-                            className={`h-6 w-6 rounded-full animate-pulse ${
-                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
-                            }`}
-                          />
-                        </td>
-                      </tr>
-                    ))
-                : artists.map((artist) => (
-                    <tr key={artist.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {artist.avatar ? (
-                            <img
-                              src={artist.avatar}
-                              alt={artist.artistName}
-                              className="w-10 h-10 rounded-full mr-3 object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.onerror = null;
-                                target.src = '/images/default-avatar.jpg';
-                              }}
-                            />
-                          ) : (
-                            <div
-                              className={`w-10 h-10 rounded-full mr-3 flex items-center justify-center ${
-                                theme === 'light'
-                                  ? 'bg-gray-100'
-                                  : 'bg-white/[0.03]'
-                              }`}
-                            >
-                              <User
-                                className={`w-6 h-6 ${
-                                  theme === 'light'
-                                    ? 'text-gray-400'
-                                    : 'text-white/60'
-                                }`}
-                              />
-                            </div>
-                          )}
-                          <Link
-                            href={`/admin/artists/${artist.id}`}
-                            className={`font-medium truncate hover:underline ${
-                              theme === 'light' ? 'text-gray-900' : 'text-white'
-                            }`}
-                          >
-                            {artist.artistName}
-                          </Link>
-                        </div>
-                      </td>
-                      <td
-                        className={`px-6 py-4 whitespace-nowrap ${
-                          theme === 'light' ? 'text-gray-600' : 'text-white'
-                        }`}
-                      >
-                        {artist.user.email}
-                      </td>
-                      <td
-                        className={`px-6 py-4 whitespace-nowrap ${
-                          theme === 'light' ? 'text-gray-600' : 'text-white'
-                        }`}
-                      >
-                        {artist.monthlyListeners.toLocaleString() || 0}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex gap-2">
-                          <span
-                            className={`px-2 py-1 text-xs rounded-full ${
-                              artist.isVerified
-                                ? theme === 'light'
-                                  ? 'bg-blue-50 text-blue-600'
-                                  : 'bg-blue-500/10 text-blue-500'
-                                : theme === 'light'
-                                ? 'bg-yellow-50 text-yellow-600'
-                                : 'bg-yellow-500/10 text-yellow-500'
-                            }`}
-                          >
-                            {artist.isVerified ? 'Verified' : 'Unverified'}
-                          </span>
-                          <span
-                            className={`px-2 py-1 text-xs rounded-full ${
-                              artist.isActive
-                                ? theme === 'light'
-                                  ? 'bg-green-50 text-green-600'
-                                  : 'bg-green-500/10 text-green-500'
-                                : theme === 'light'
-                                ? 'bg-red-50 text-red-600'
-                                : 'bg-red-500/10 text-red-500'
-                            }`}
-                          >
-                            {artist.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                      </td>
-                      <td
-                        className={`px-6 py-4 whitespace-nowrap ${
-                          theme === 'light' ? 'text-gray-600' : 'text-white'
-                        }`}
-                      >
-                        {formatDate(artist.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            className={`p-2 rounded-full ${
-                              theme === 'light'
-                                ? 'hover:bg-gray-100'
-                                : 'hover:bg-white/10'
-                            }`}
-                          >
-                            <MoreVertical className="w-5 h-5" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            className={`${
-                              theme === 'light'
-                                ? 'bg-white border-gray-200'
-                                : 'bg-[#282828] border-white/10'
-                            } text-sm`}
-                          >
-                            <DropdownMenuItem
-                              onClick={() =>
-                                handleDeactivateArtist(
-                                  artist.id,
-                                  artist.isActive
-                                )
-                              }
-                              disabled={actionLoading === artist.id}
-                              className={`cursor-pointer ${
-                                theme === 'light'
-                                  ? 'hover:bg-gray-100'
-                                  : 'hover:bg-white/10'
-                              }`}
-                            >
-                              <Power className="w-4 h-4 mr-2" />
-                              {artist.isActive ? 'Deactivate' : 'Activate'}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator
-                              className={
-                                theme === 'light'
-                                  ? 'bg-gray-200'
-                                  : 'bg-white/10'
-                              }
-                            />
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteArtist(artist.id)}
-                              disabled={actionLoading === artist.id}
-                              className="text-red-500 cursor-pointer hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete Artist
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  ))}
-            </tbody>
-          </table>
-
-          {!loading && artists.length === 0 && (
-            <div
-              className={`flex flex-col items-center justify-center h-[400px] ${
-                theme === 'light' ? 'text-gray-500' : 'text-white/60'
-              }`}
-            >
-              <User className="w-12 h-12 mb-4" />
-              <p>No artists found</p>
-            </div>
-          )}
-        </div>
-        {/* Pagination */}
-        {totalPages > 0 && (
-          <div
-            className={`flex items-center justify-center gap-2 p-4 border-t ${
-              theme === 'light' ? 'border-gray-200' : 'border-white/[0.08]'
-            }`}
-          >
-            <button
-              onClick={() => updateQueryParam('page', currentPage - 1)}
-              disabled={currentPage === 1}
-              className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
-                theme === 'light'
-                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-                  : 'bg-white/5 hover:bg-white/10 text-white'
-              }`}
-            >
-              Previous
-            </button>
-
-            {/* Mobile Pagination */}
-            <div className="md:hidden">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className={`px-3 py-2 rounded-md text-sm ${
-                    theme === 'light'
-                      ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-                      : 'bg-white/5 hover:bg-white/10 text-white'
-                  }`}
-                >
-                  {currentPage} of {totalPages}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className={`p-4 w-[200px] ${
-                    theme === 'light'
-                      ? 'bg-white border-gray-200 text-gray-900'
-                      : 'bg-[#282828] border-white/[0.1] text-white'
-                  }`}
-                >
-                  <div className="space-y-3">
-                    <div
-                      className={`text-xs ${
-                        theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                      }`}
-                    >
-                      Go to page:
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={totalPages}
-                        defaultValue={currentPage}
-                        ref={pageInputRef}
-                        className={`w-full px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
-                          theme === 'light'
-                            ? 'bg-gray-50 border-gray-200 focus:ring-gray-300'
-                            : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50'
-                        }`}
-                        placeholder="Page"
-                      />
-                    </div>
-                    <button
-                      onClick={() => {
-                        const page = pageInputRef.current
-                          ? parseInt(pageInputRef.current.value, 10)
-                          : NaN;
-                        if (!isNaN(page)) {
-                          updateQueryParam('page', page);
-                        }
-                      }}
-                      className="w-full px-3 py-1.5 rounded-md bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20 transition-colors text-sm"
-                    >
-                      Go to Page
-                    </button>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Desktop Pagination */}
-            <div
-              className={`hidden md:flex items-center gap-2 text-sm ${
-                theme === 'light' ? 'text-gray-600' : 'text-white/60'
-              }`}
-            >
-              <span>Page</span>
-              <div
-                className={`px-3 py-1 rounded-md border ${
-                  theme === 'light'
-                    ? 'bg-gray-50 border-gray-200 text-gray-900'
-                    : 'bg-white/5 border-white/[0.1] text-white'
-                }`}
-              >
-                <span className="font-medium">{currentPage}</span>
-              </div>
-              <span>of {totalPages}</span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={totalPages}
-                  defaultValue={currentPage}
-                  ref={pageInputRef}
-                  className={`w-16 px-2 py-1 rounded-md text-center focus:outline-none focus:ring-2 text-sm ${
-                    theme === 'light'
-                      ? 'bg-gray-50 border-gray-200 focus:ring-gray-300 text-gray-900'
-                      : 'bg-white/5 border-white/[0.1] focus:ring-[#ffaa3b]/50 text-white'
-                  }`}
-                  placeholder="Page"
-                />
-                <button
-                  onClick={() => {
-                    const page = pageInputRef.current
-                      ? parseInt(pageInputRef.current.value, 10)
-                      : NaN;
-                    if (!isNaN(page)) {
-                      updateQueryParam('page', page);
-                    }
-                  }}
-                  className={`px-3 py-1 rounded-md text-sm ${
-                    theme === 'light'
-                      ? 'bg-gray-900 text-white hover:bg-gray-800'
-                      : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20'
-                  }`}
-                >
-                  Go
-                </button>
-              </div>
-            </div>
-
-            <button
-              onClick={() => updateQueryParam('page', currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
-                theme === 'light'
-                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-                  : 'bg-white/5 hover:bg-white/10 text-white'
-              }`}
-            >
-              Next
-            </button>
-          </div>
-        )}
-
-        {/* Loading overlay */}
-        {loading && (
-          <div
-            className={`absolute inset-0 flex items-center justify-center ${
-              theme === 'light' ? 'bg-gray-500/50' : 'bg-black/50'
-            }`}
-          >
-            <Spinner
-              className={`w-8 h-8 animate-spin ${
-                theme === 'light' ? 'text-gray-900' : 'text-white'
-              }`}
-            />
-          </div>
-        )}
-      </div>
+      <DataTableWrapper
+        table={table}
+        columns={columns}
+        data={artists}
+        pageCount={totalPages}
+        pageIndex={currentPage - 1}
+        loading={loading}
+        onPageChange={(page) => updateQueryParam('page', page + 1)}
+        onRowSelection={setSelectedRows}
+        theme={theme}
+        toolbar={{
+          searchValue: searchInput,
+          onSearchChange: setSearchInput,
+          selectedRowsCount: selectedRows.length,
+          onDelete: handleDeleteSelected,
+          showExport: true,
+          exportData: {
+            data: artists,
+            columns: [
+              { key: 'id', header: 'ID' },
+              { key: 'artistName', header: 'Artist Name' },
+              { key: 'user.email', header: 'Email' },
+              { key: 'bio', header: 'Bio' },
+              { key: 'monthlyListeners', header: 'Monthly Listeners' },
+              { key: 'isVerified', header: 'Verified' },
+              { key: 'isActive', header: 'Status' },
+              {
+                key: 'verificationRequestedAt',
+                header: 'Verification Requested',
+              },
+              { key: 'verifiedAt', header: 'Verified At' },
+              { key: 'createdAt', header: 'Created At' },
+              { key: 'updatedAt', header: 'Updated At' },
+              { key: 'socialMediaLinks.facebook', header: 'Facebook' },
+              { key: 'socialMediaLinks.instagram', header: 'Instagram' },
+              { key: 'socialMediaLinks.twitter', header: 'Twitter' },
+            ],
+            filename: 'artists',
+          },
+          searchPlaceholder: 'Search artists...',
+          statusFilter: {
+            value: statusFilter,
+            onChange: setStatusFilter,
+          },
+        }}
+      />
     </div>
   );
 }

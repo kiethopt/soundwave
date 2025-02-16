@@ -14,7 +14,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { Eye, Check, X, MoreHorizontal } from 'lucide-react';
-import type { ArtistRequest } from '@/types';
+import type { ArtistRequest, ArtistRequestFilters } from '@/types';
 import { toast } from 'react-toastify';
 import { Button } from '@/components/ui/button';
 import {
@@ -82,12 +82,19 @@ export default function ArtistRequests() {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      const filters: any = {};
+      // Tạo đối tượng filters
+      const filters: ArtistRequestFilters = {};
+
+      // Thêm search nếu có
+      if (query) {
+        filters.search = query;
+      }
+
+      // Thêm date filters nếu có
       if (startDate && endDate) {
         filters.startDate = new Date(startDate);
         filters.endDate = new Date(endDate);
       }
-      if (query) filters.search = query;
 
       const response = await api.admin.getArtistRequests(
         token,
@@ -95,25 +102,36 @@ export default function ArtistRequests() {
         10,
         filters
       );
+
       setRequests(response.requests);
       setTotalPages(response.pagination.totalPages);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch requests');
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to fetch requests'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    // Reset về trang 1 khi search hoặc date filters thay đổi
+    if (currentPage !== 1) {
+      updateQueryParam('page', 1);
+    } else {
       // Chỉ fetch khi không có date filter hoặc có đủ cả start và end date
       if (!startDate || (startDate && endDate)) {
-        fetchRequests(currentPage, searchInput);
+        fetchRequests(1, searchInput);
       }
-    }, 300);
+    }
+  }, [searchInput, startDate, endDate]);
 
-    return () => clearTimeout(timer);
-  }, [currentPage, searchInput, startDate, endDate]);
+  useEffect(() => {
+    // Chỉ fetch khi không có date filter hoặc có đủ cả start và end date
+    if (!startDate || (startDate && endDate)) {
+      fetchRequests(currentPage, searchInput);
+    }
+  }, [currentPage]);
 
   const handleApprove = async (requestId: string) => {
     try {
@@ -227,7 +245,7 @@ export default function ArtistRequests() {
       enableSorting: true,
     },
     {
-      accessorKey: 'email',
+      accessorKey: 'user.email',
       header: 'Email',
       cell: ({ row }) => (
         <span className={theme === 'dark' ? 'text-white' : ''}>
@@ -361,16 +379,6 @@ export default function ArtistRequests() {
           theme={theme}
         />
       </div>
-
-      {error && (
-        <div
-          className={`bg-destructive/20 text-destructive p-3 rounded-lg ${
-            theme === 'dark' ? 'bg-red-500/20 text-red-400' : ''
-          }`}
-        >
-          {error}
-        </div>
-      )}
 
       <DataTableWrapper
         table={table}
