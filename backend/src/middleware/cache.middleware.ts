@@ -39,18 +39,22 @@ export const cacheMiddleware = (
     try {
       console.log(`[Redis] Checking cache for key: ${key}`);
       const cachedData = await client.get(key);
+
       if (cachedData) {
         console.log(`[Redis] Cache hit for key: ${key}`);
+        console.log('[Redis] Serving data from cache');
         res.json(JSON.parse(cachedData));
         responseSent = true;
         return;
       }
+
       console.log(`[Redis] Cache miss for key: ${key}`);
+      console.log('[Redis] Fetching data from database');
 
       const originalJson = res.json;
       res.json = function (body: any) {
         if (!responseSent) {
-          console.log(`[Redis] Caching data for key: ${key}`);
+          console.log(`[Redis] Caching new data for key: ${key}`);
           setCache(key, body).catch((error) =>
             console.error('[Redis] Cache save error:', error)
           );

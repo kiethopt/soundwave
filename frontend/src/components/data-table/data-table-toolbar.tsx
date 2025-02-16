@@ -23,6 +23,7 @@ interface DataTableToolbarProps {
     data: any[];
     columns: { key: string; header: string }[];
     filename: string;
+    fetchAllData?: () => Promise<any[]>;
   };
   statusFilter?: {
     value: string[];
@@ -98,10 +99,22 @@ export function DataTableToolbar({
     [onSearchChange]
   );
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!exportData) return;
-    const { data, columns, filename } = exportData;
-    exportToExcel(data, columns, filename);
+
+    try {
+      let dataToExport = exportData.data;
+
+      // Nếu có hàm fetchAllData thì lấy toàn bộ dữ liệu
+      if (exportData.fetchAllData) {
+        dataToExport = await exportData.fetchAllData();
+      }
+
+      exportToExcel(dataToExport, exportData.columns, exportData.filename);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Failed to export data');
+    }
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

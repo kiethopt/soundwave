@@ -266,9 +266,14 @@ export const api = {
         token
       ),
 
-    getAllGenres: async (token: string, page: number, limit: number) =>
+    getAllGenres: async (
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
       fetchWithAuth(
-        `/api/admin/genres?page=${page}&limit=${limit}`,
+        `/api/admin/genres?${queryParams || `page=${page}&limit=${limit}`}`,
         { method: 'GET' },
         token
       ),

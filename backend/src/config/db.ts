@@ -4,6 +4,7 @@ import { albumExtension } from '../middleware/album.middleware';
 import { withAccelerate } from '@prisma/extension-accelerate';
 import { authExtension } from '../middleware/auth.middleware';
 import { artistExtension } from '../middleware/artist.middleware';
+import { adminExtension } from 'src/middleware/admin.middleware';
 
 // Tạo Prisma Client và áp dụng extension
 const prisma = new PrismaClient({
@@ -18,6 +19,7 @@ if (!process.env.OPTIMIZE_API_KEY) {
 // Áp dụng extension
 const extendedPrisma = prisma
   .$extends(authExtension)
+  .$extends(adminExtension)
   .$extends(albumExtension)
   .$extends(artistExtension)
   // .$extends(withOptimize({ apiKey: process.env.OPTIMIZE_API_KEY }))

@@ -115,7 +115,7 @@ export function DataTablePagination({
         <Button
           variant={theme === 'dark' ? 'secondary' : 'outline'}
           size="sm"
-          onClick={() => onPageChange?.(pageIndex + 2)}
+          onClick={() => onPageChange?.(pageIndex + 1)}
           disabled={pageIndex === pageCount - 1}
           className={`${
             theme === 'dark'
@@ -183,7 +183,7 @@ export function DataTablePagination({
         <Button
           variant={theme === 'dark' ? 'secondary' : 'outline'}
           size="sm"
-          onClick={() => onPageChange?.(pageIndex + 2)}
+          onClick={() => onPageChange?.(pageIndex + 1)}
           disabled={pageIndex === pageCount - 1}
           className={`${
             theme === 'dark'

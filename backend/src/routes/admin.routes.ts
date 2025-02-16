@@ -96,7 +96,7 @@ router.post(
 );
 
 // Quản lý thể loại nhạc
-router.get('/genres', queryRateLimiter, getAllGenres);
+router.get('/genres', queryRateLimiter, cacheMiddleware, getAllGenres);
 router.post('/genres', createGenre);
 router.put('/genres/:id', updateGenre);
 router.delete('/genres/:id', deleteGenre);

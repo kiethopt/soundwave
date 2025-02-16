@@ -113,29 +113,45 @@ const createArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 exports.createArtist = createArtist;
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 10, search = '', status } = req.query;
         const pageNumber = Number(page);
         const limitNumber = Number(limit);
         const offset = (pageNumber - 1) * limitNumber;
-        const users = yield db_1.default.user.findMany({
-            skip: offset,
-            take: limitNumber,
-            include: {
-                artistProfile: {
-                    include: {
-                        genres: {
-                            include: {
-                                genre: true,
+        const where = {
+            role: 'USER',
+        };
+        if (search) {
+            where.OR = [
+                { email: { contains: String(search), mode: 'insensitive' } },
+                { username: { contains: String(search), mode: 'insensitive' } },
+                { name: { contains: String(search), mode: 'insensitive' } },
+            ];
+        }
+        if (status !== undefined) {
+            where.isActive = status === 'true';
+        }
+        const [users, totalUsers] = yield Promise.all([
+            db_1.default.user.findMany({
+                where,
+                skip: offset,
+                take: limitNumber,
+                include: {
+                    artistProfile: {
+                        include: {
+                            genres: {
+                                include: {
+                                    genre: true,
+                                },
                             },
                         },
                     },
                 },
-            },
-            orderBy: {
-                createdAt: 'desc',
-            },
-        });
-        const totalUsers = yield db_1.default.user.count();
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            }),
+            db_1.default.user.count({ where }),
+        ]);
         const response = {
             users: users.map((user) => (Object.assign(Object.assign({}, user), { artistProfile: user.artistProfile
                     ? Object.assign(Object.assign({}, user.artistProfile), { socialMediaLinks: user.artistProfile.socialMediaLinks || {}, verifiedAt: user.artistProfile.verifiedAt }) : null }))),
@@ -146,9 +162,6 @@ const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 totalPages: Math.ceil(totalUsers / limitNumber),
             },
         };
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            yield cache_middleware_1.client.setEx(req.originalUrl, 300, JSON.stringify(response));
-        }
         res.json(response);
     }
     catch (error) {
@@ -516,37 +529,32 @@ const deactivateArtist = (req, res) => __awaiter(void 0, void 0, void 0, functio
 exports.deactivateArtist = deactivateArtist;
 const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 10, search = '', status } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
-        const cacheKey = req.originalUrl;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        const where = {
+            role: client_1.Role.ARTIST,
+            isVerified: true,
+        };
+        if (search) {
+            where.OR = [
+                { artistName: { contains: String(search), mode: 'insensitive' } },
+                { user: { email: { contains: String(search), mode: 'insensitive' } } },
+            ];
         }
-        const artists = yield db_1.default.artistProfile.findMany({
-            where: {
-                role: client_1.Role.ARTIST,
-                isVerified: true,
-            },
-            skip: offset,
-            take: Number(limit),
-            select: prisma_selects_1.artistProfileSelect,
-            orderBy: {
-                createdAt: 'desc',
-            },
-        });
-        const totalArtists = yield db_1.default.artistProfile.count({
-            where: {
-                role: client_1.Role.ARTIST,
-                isVerified: true,
-            },
-        });
-        const response = {
+        if (status !== undefined) {
+            where.isActive = status === 'true';
+        }
+        const [artists, totalArtists] = yield Promise.all([
+            db_1.default.artistProfile.findMany({
+                where,
+                skip: offset,
+                take: Number(limit),
+                select: prisma_selects_1.artistProfileSelect,
+                orderBy: { createdAt: 'desc' },
+            }),
+            db_1.default.artistProfile.count({ where }),
+        ]);
+        res.json({
             artists,
             pagination: {
                 total: totalArtists,
@@ -554,12 +562,7 @@ const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 limit: Number(limit),
                 totalPages: Math.ceil(totalArtists / Number(limit)),
             },
-        };
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            console.log(`[Redis] Caching data for key: ${cacheKey}`);
-            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
-        }
-        res.json(response);
+        });
     }
     catch (error) {
         console.error('Get all artists error:', error);
@@ -632,37 +635,38 @@ const getArtistById = (req, res) => __awaiter(void 0, void 0, void 0, function* 
 exports.getArtistById = getArtistById;
 const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { page = 1, limit = 10 } = req.query;
-        const offset = (Number(page) - 1) * Number(limit);
-        const cacheKey = req.originalUrl;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+        const { page = 1, limit = 10, search = '' } = req.query;
+        const pageNumber = Number(page);
+        const limitNumber = Number(limit);
+        const offset = (pageNumber - 1) * limitNumber;
+        const where = {};
+        if (search) {
+            where.name = {
+                contains: String(search),
+                mode: 'insensitive',
+            };
         }
-        const genres = yield db_1.default.genre.findMany({
-            skip: offset,
-            take: Number(limit),
-            select: prisma_selects_1.genreSelect,
-        });
-        const totalGenres = yield db_1.default.genre.count();
+        const [genres, totalGenres] = yield Promise.all([
+            db_1.default.genre.findMany({
+                where,
+                skip: offset,
+                take: limitNumber,
+                select: prisma_selects_1.genreSelect,
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            }),
+            db_1.default.genre.count({ where }),
+        ]);
         const response = {
             genres,
             pagination: {
                 total: totalGenres,
-                page: Number(page),
-                limit: Number(limit),
-                totalPages: Math.ceil(totalGenres / Number(limit)),
+                page: pageNumber,
+                limit: limitNumber,
+                totalPages: Math.ceil(totalGenres / limitNumber),
             },
         };
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            console.log(`[Redis] Caching data for key: ${cacheKey}`);
-            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
-        }
         res.json(response);
     }
     catch (error) {

@@ -834,42 +834,44 @@ export const getAllGenres = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
-    const cacheKey = req.originalUrl;
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const pageNumber = Number(page);
+    const limitNumber = Number(limit);
+    const offset = (pageNumber - 1) * limitNumber;
 
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
+    // Xây dựng where clause với điều kiện tìm kiếm
+    const where: any = {};
+    if (search) {
+      where.name = {
+        contains: String(search),
+        mode: 'insensitive',
+      };
     }
 
-    const genres = await prisma.genre.findMany({
-      skip: offset,
-      take: Number(limit),
-      select: genreSelect,
-    });
+    // Sử dụng Promise.all để thực hiện song song các truy vấn
+    const [genres, totalGenres] = await Promise.all([
+      prisma.genre.findMany({
+        where,
+        skip: offset,
+        take: limitNumber,
+        select: genreSelect,
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      prisma.genre.count({ where }),
+    ]);
 
-    const totalGenres = await prisma.genre.count();
-
+    // Cấu trúc response
     const response = {
       genres,
       pagination: {
         total: totalGenres,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(totalGenres / Number(limit)),
+        page: pageNumber,
+        limit: limitNumber,
+        totalPages: Math.ceil(totalGenres / limitNumber),
       },
     };
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      console.log(`[Redis] Caching data for key: ${cacheKey}`);
-      await client.setEx(cacheKey, 300, JSON.stringify(response));
-    }
 
     res.json(response);
   } catch (error) {

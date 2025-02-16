@@ -27,7 +27,7 @@ router.get('/artist-requests', rateLimit_middleware_1.queryRateLimiter, (0, auth
 router.get('/artist-requests/:id', rateLimit_middleware_1.queryRateLimiter, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getArtistRequestDetails);
 router.post('/artists/verify', admin_controller_1.verifyArtist);
 router.post('/artists/:id/update-monthly-listeners', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), admin_controller_1.updateMonthlyListeners);
-router.get('/genres', rateLimit_middleware_1.queryRateLimiter, admin_controller_1.getAllGenres);
+router.get('/genres', rateLimit_middleware_1.queryRateLimiter, cache_middleware_1.cacheMiddleware, admin_controller_1.getAllGenres);
 router.post('/genres', admin_controller_1.createGenre);
 router.put('/genres/:id', admin_controller_1.updateGenre);
 router.delete('/genres/:id', admin_controller_1.deleteGenre);
