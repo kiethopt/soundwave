@@ -1,5 +1,4 @@
 import { ArtistRequestFilters } from '@/types';
-import { toast } from 'react-toastify';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -422,14 +421,36 @@ export const api = {
     getStats: async (id: string, token: string) =>
       fetchWithAuth(`/api/artist/stats/${id}`, { method: 'GET' }, token),
 
-    getTracks: async (id: string, token: string, page: number, limit: number) =>
+    getAllTracks: async (
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
       fetchWithAuth(
-        `/api/artist/tracks/${id}?page=${page}&limit=${limit}`,
+        `/api/tracks?${queryParams || `page=${page}&limit=${limit}`}`,
         { method: 'GET' },
         token
       ),
 
-    getAlbums: (artistId: string, token: string, page: number, limit: number) =>
+    getAllAlbums: async (
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
+      fetchWithAuth(
+        `/api/albums?${queryParams || `page=${page}&limit=${limit}`}`,
+        { method: 'GET' },
+        token
+      ),
+
+    getArtistAlbums: async (
+      artistId: string,
+      token: string,
+      page: number,
+      limit: number
+    ) =>
       fetchWithAuth(
         `/api/artist/${artistId}/albums?page=${page}&limit=${limit}`,
         { method: 'GET' },
@@ -452,7 +473,7 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/admin/artists?${queryParams || `page=${page}&limit=${limit}`}`,
+        `/api/artist/profiles?${queryParams || `page=${page}&limit=${limit}`}`,
         { method: 'GET' },
         token
       ),
@@ -464,9 +485,14 @@ export const api = {
   },
 
   tracks: {
-    getAll: async (token: string, page: number, limit: number) =>
+    getAll: async (
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
       fetchWithAuth(
-        `/api/tracks?page=${page}&limit=${limit}`,
+        `/api/tracks?${queryParams || `page=${page}&limit=${limit}`}`,
         { method: 'GET' },
         token
       ),
@@ -500,9 +526,17 @@ export const api = {
         token
       ),
 
-    search: async (query: string, token: string, page: number, limit: number) =>
+    search: async (
+      query: string,
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
       fetchWithAuth(
-        `/api/tracks/search?q=${query}&page=${page}&limit=${limit}`,
+        `/api/tracks/search?${
+          queryParams || `q=${query}&page=${page}&limit=${limit}`
+        }`,
         { method: 'GET' },
         token
       ),
@@ -546,8 +580,17 @@ export const api = {
   },
 
   albums: {
-    getAll: async (token: string) =>
-      fetchWithAuth('/api/albums', { method: 'GET' }, token),
+    getAll: async (
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
+      fetchWithAuth(
+        `/api/albums?${queryParams || `page=${page}&limit=${limit}`}`,
+        { method: 'GET' },
+        token
+      ),
 
     getById: async (id: string, token: string) =>
       fetchWithAuth(`/api/albums/${id}`, { method: 'GET' }, token),
@@ -580,9 +623,17 @@ export const api = {
       );
     },
 
-    search: async (query: string, token: string, page: number, limit: number) =>
+    search: async (
+      query: string,
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
       fetchWithAuth(
-        `/api/albums/search?q=${query}&page=${page}&limit=${limit}`,
+        `/api/albums/search?${
+          queryParams || `q=${query}&page=${page}&limit=${limit}`
+        }`,
         { method: 'GET' },
         token
       ),

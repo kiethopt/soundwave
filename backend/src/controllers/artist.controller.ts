@@ -108,6 +108,18 @@ export const getAllArtistsProfile = async (
       return;
     }
 
+    // Kiểm tra quyền truy cập
+    if (
+      user.role !== Role.ADMIN &&
+      (!user.artistProfile?.isVerified || user.currentProfile !== 'ARTIST')
+    ) {
+      res.status(403).json({
+        message: 'You do not have permission to perform this action',
+        code: 'SWITCH_TO_ARTIST_PROFILE',
+      });
+      return;
+    }
+
     // Chỉ lấy các artist đã được verify
     const whereCondition = {
       isVerified: true,

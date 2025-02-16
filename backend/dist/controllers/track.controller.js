@@ -515,60 +515,54 @@ const getTracksByType = (req, res) => __awaiter(void 0, void 0, void 0, function
 });
 exports.getTracksByType = getTracksByType;
 const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
+    var _a;
     try {
-        const cacheKey = req.originalUrl;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-        }
         const user = req.user;
         if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        if (user.role !== client_1.Role.ADMIN &&
-            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) || ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) !== 'ARTIST')) {
-            res.status(403).json({
-                message: 'Forbidden: Only admins or verified artists can access this resource',
-            });
-            return;
-        }
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 10, q: search, status } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
         const whereClause = {};
-        if (user.role !== client_1.Role.ADMIN && ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id)) {
+        if (search) {
+            whereClause.OR = [
+                { title: { contains: String(search), mode: 'insensitive' } },
+                {
+                    artist: {
+                        artistName: { contains: String(search), mode: 'insensitive' },
+                    },
+                },
+            ];
+        }
+        if (status) {
+            whereClause.isActive = status === 'true';
+        }
+        if (user.role !== client_1.Role.ADMIN && ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
             whereClause.artistId = user.artistProfile.id;
         }
-        const tracks = yield db_1.default.track.findMany({
-            skip: offset,
-            take: Number(limit),
-            where: whereClause,
-            select: prisma_selects_1.trackSelect,
-            orderBy: { createdAt: 'desc' },
-        });
-        const totalTracks = yield db_1.default.track.count({
-            where: whereClause,
-        });
-        const result = {
+        const [tracks, total] = yield Promise.all([
+            db_1.default.track.findMany({
+                where: whereClause,
+                skip: offset,
+                take: Number(limit),
+                select: prisma_selects_1.trackSelect,
+                orderBy: { createdAt: 'desc' },
+            }),
+            db_1.default.track.count({ where: whereClause }),
+        ]);
+        res.json({
             tracks,
             pagination: {
-                total: totalTracks,
+                total,
                 page: Number(page),
                 limit: Number(limit),
-                totalPages: Math.ceil(totalTracks / Number(limit)),
+                totalPages: Math.ceil(total / Number(limit)),
             },
-        };
-        yield (0, cache_middleware_1.setCache)(cacheKey, result);
-        res.json(result);
+        });
     }
     catch (error) {
-        console.error('Get all tracks error:', error);
+        console.error('Get tracks error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });

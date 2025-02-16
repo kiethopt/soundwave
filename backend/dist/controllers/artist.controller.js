@@ -80,6 +80,7 @@ const validateUpdateArtistProfile = (data) => {
     return null;
 };
 const getAllArtistsProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { page = 1, limit = 10 } = req.query;
         const pageNumber = parseInt(page, 10);
@@ -88,6 +89,14 @@ const getAllArtistsProfile = (req, res) => __awaiter(void 0, void 0, void 0, fun
         const user = req.user;
         if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        if (user.role !== client_1.Role.ADMIN &&
+            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) || user.currentProfile !== 'ARTIST')) {
+            res.status(403).json({
+                message: 'You do not have permission to perform this action',
+                code: 'SWITCH_TO_ARTIST_PROFILE',
+            });
             return;
         }
         const whereCondition = {

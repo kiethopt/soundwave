@@ -568,71 +568,129 @@ const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.searchAlbum = searchAlbum;
-const getAllAlbums = (req) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
-    const user = req.user;
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
-    if (!user) {
-        throw new Error('Unauthorized');
-    }
-    if (user.role !== client_1.Role.ADMIN &&
-        (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) || user.artistProfile.role !== client_1.Role.ARTIST)) {
-        throw new Error('Only verified artists and admins can view all albums');
-    }
-    const whereClause = {};
-    if (user.role !== client_1.Role.ADMIN && ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.id)) {
-        whereClause.OR = [
-            { artistId: user.artistProfile.id },
-            {
-                tracks: {
-                    some: {
-                        featuredArtists: {
-                            some: { artistProfileId: user.artistProfile.id },
+const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    try {
+        const user = req.user;
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        if (user.role !== client_1.Role.ADMIN &&
+            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) || ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) !== 'ARTIST')) {
+            res.status(403).json({
+                message: 'Forbidden: Only admins or verified artists can access this resource',
+            });
+            return;
+        }
+        const { page = 1, limit = 10, q: search, status } = req.query;
+        const offset = (Number(page) - 1) * Number(limit);
+        const whereClause = {};
+        const conditions = [];
+        if (search) {
+            conditions.push({
+                OR: [
+                    { title: { contains: String(search), mode: 'insensitive' } },
+                    {
+                        artist: {
+                            artistName: { contains: String(search), mode: 'insensitive' },
                         },
                     },
-                },
+                ],
+            });
+        }
+        if (status) {
+            whereClause.isActive = status === 'true';
+        }
+        if (user.role !== client_1.Role.ADMIN && ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id)) {
+            conditions.push({
+                OR: [
+                    { artistId: user.artistProfile.id },
+                    {
+                        tracks: {
+                            some: {
+                                featuredArtists: {
+                                    some: { artistProfileId: user.artistProfile.id },
+                                },
+                            },
+                        },
+                    },
+                ],
+            });
+        }
+        if (conditions.length > 0) {
+            whereClause.AND = conditions;
+        }
+        const [albums, total] = yield Promise.all([
+            db_1.default.album.findMany({
+                where: whereClause,
+                skip: offset,
+                take: Number(limit),
+                select: prisma_selects_1.albumSelect,
+                orderBy: { createdAt: 'desc' },
+            }),
+            db_1.default.album.count({ where: whereClause }),
+        ]);
+        res.json({
+            albums,
+            pagination: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
             },
-        ];
+        });
     }
-    const [albums, totalAlbums] = yield Promise.all([
-        db_1.default.album.findMany({
-            skip: offset,
-            take: Number(limit),
-            where: whereClause,
-            select: prisma_selects_1.albumSelect,
-            orderBy: { createdAt: 'desc' },
-        }),
-        db_1.default.album.count({ where: whereClause }),
-    ]);
-    return {
-        albums,
-        pagination: {
-            total: totalAlbums,
-            page: Number(page),
-            limit: Number(limit),
-            totalPages: Math.ceil(totalAlbums / Number(limit)),
-        },
-    };
+    catch (error) {
+        console.error('Get albums error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
 });
 exports.getAllAlbums = getAllAlbums;
-const getAlbumById = (req) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const user = req.user;
-    const album = yield db_1.default.album.findUnique({
-        where: { id },
-        select: prisma_selects_1.albumSelect,
-    });
-    if (!album) {
-        throw new Error('Album not found');
-    }
-    if (!album.isActive) {
-        const canManage = canManageAlbum(user, album.artist.id);
-        if (!canManage) {
-            throw new Error('Album not found');
+const getAlbumById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    try {
+        const { id } = req.params;
+        const user = req.user;
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
         }
+        const album = yield db_1.default.album.findUnique({
+            where: { id },
+            select: prisma_selects_1.albumSelect,
+        });
+        if (!album) {
+            res.status(404).json({ message: 'Album not found' });
+            return;
+        }
+        if (user.role === client_1.Role.ADMIN) {
+            res.json(album);
+            return;
+        }
+        if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) && ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isActive)) {
+            if (user.currentProfile !== 'ARTIST') {
+                res.status(403).json({
+                    message: 'Please switch to Artist profile to access this page',
+                    code: 'SWITCH_TO_ARTIST_PROFILE',
+                });
+                return;
+            }
+            const isOwner = user.artistProfile.id === album.artist.id;
+            const isFeaturedArtist = album.tracks.some((track) => track.featuredArtists.some((fa) => { var _a; return fa.artistProfile.id === ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id); }));
+            if (isOwner || isFeaturedArtist) {
+                res.json(album);
+                return;
+            }
+        }
+        res.status(403).json({
+            message: 'You do not have permission to access this album',
+        });
     }
-    return album;
+    catch (error) {
+        console.error('Get album error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
 });
 exports.getAlbumById = getAlbumById;
 const playAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {

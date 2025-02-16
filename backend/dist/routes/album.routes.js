@@ -51,44 +51,7 @@ router.put('/:id/toggle-visibility', auth_middleware_1.authenticate, (0, auth_mi
 router.post('/:albumId/tracks', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), upload_middleware_1.default.array('tracks'), upload_middleware_1.handleUploadError, album_controller_1.addTracksToAlbum);
 router.get('/search', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, album_controller_1.searchAlbum);
 router.post('/:albumId/play', auth_middleware_1.authenticate, session_middleware_1.sessionMiddleware, cache_middleware_1.cacheMiddleware, album_controller_1.playAlbum);
-router.get('/:id', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, (req, res) => {
-    (0, album_controller_1.getAlbumById)(req)
-        .then((data) => {
-        res.json(data);
-    })
-        .catch((error) => {
-        console.error('Get album error:', error);
-        if (error.message === 'Album not found') {
-            res.status(404).json({ message: 'Album not found' });
-        }
-        else {
-            res.status(500).json({ message: 'Internal server error' });
-        }
-    });
-});
-router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), (req, res) => {
-    (0, album_controller_1.getAllAlbums)(req)
-        .then((data) => {
-        res.json(data);
-    })
-        .catch((error) => {
-        console.error('Get all albums error:', error);
-        if (error instanceof Error) {
-            switch (error.message) {
-                case 'Unauthorized':
-                    res.status(401).json({ message: 'Unauthorized' });
-                    break;
-                case 'Forbidden':
-                    res.status(403).json({ message: 'Forbidden' });
-                    break;
-                default:
-                    res.status(500).json({ message: 'Internal server error' });
-            }
-        }
-        else {
-            res.status(500).json({ message: 'Internal server error' });
-        }
-    });
-});
+router.get('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), cache_middleware_1.cacheMiddleware, album_controller_1.getAlbumById);
+router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), album_controller_1.getAllAlbums);
 exports.default = router;
 //# sourceMappingURL=album.routes.js.map

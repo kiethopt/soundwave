@@ -621,72 +621,62 @@ export const getAllTracks = async (
   res: Response
 ): Promise<void> => {
   try {
-    // --- Cache check ---
-    const cacheKey = req.originalUrl;
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-    }
-    // --------------------
-
     const user = req.user;
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    if (
-      user.role !== Role.ADMIN &&
-      (!user.artistProfile?.isVerified || user.artistProfile?.role !== 'ARTIST')
-    ) {
-      res.status(403).json({
-        message:
-          'Forbidden: Only admins or verified artists can access this resource',
-      });
-      return;
-    }
-
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, q: search, status } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    const whereClause: any = {};
+    // Xây dựng điều kiện where
+    const whereClause: Prisma.TrackWhereInput = {};
+
+    // Thêm điều kiện search nếu có
+    if (search) {
+      whereClause.OR = [
+        { title: { contains: String(search), mode: 'insensitive' } },
+        {
+          artist: {
+            artistName: { contains: String(search), mode: 'insensitive' },
+          },
+        },
+      ];
+    }
+
+    // Thêm điều kiện status nếu có
+    if (status) {
+      whereClause.isActive = status === 'true';
+    }
+
+    // Thêm điều kiện artist nếu user là artist
     if (user.role !== Role.ADMIN && user.artistProfile?.id) {
       whereClause.artistId = user.artistProfile.id;
     }
 
-    const tracks = await prisma.track.findMany({
-      skip: offset,
-      take: Number(limit),
-      where: whereClause,
-      select: trackSelect,
-      orderBy: { createdAt: 'desc' },
-    });
+    const [tracks, total] = await Promise.all([
+      prisma.track.findMany({
+        where: whereClause,
+        skip: offset,
+        take: Number(limit),
+        select: trackSelect,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.track.count({ where: whereClause }),
+    ]);
 
-    const totalTracks = await prisma.track.count({
-      where: whereClause,
-    });
-
-    const result = {
+    res.json({
       tracks,
       pagination: {
-        total: totalTracks,
+        total,
         page: Number(page),
         limit: Number(limit),
-        totalPages: Math.ceil(totalTracks / Number(limit)),
+        totalPages: Math.ceil(total / Number(limit)),
       },
-    };
-
-    // --- Set result into cache ---
-    await setCache(cacheKey, result);
-    // -----------------------------
-    res.json(result);
+    });
   } catch (error) {
-    console.error('Get all tracks error:', error);
+    console.error('Get tracks error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

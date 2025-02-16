@@ -176,7 +176,7 @@ function SearchContent() {
           }
 
           // Lấy album mới nhất của nghệ sĩ
-          const artistAlbums = await api.artists.getAlbums(
+          const artistAlbums = await api.artists.getArtistAlbums(
             item.artistProfile.id,
             token,
             1,

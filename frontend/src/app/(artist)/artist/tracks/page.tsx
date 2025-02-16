@@ -1,24 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { Track } from '@/types';
 import { api } from '@/utils/api';
-import {
-  Search,
-  Music,
-  AddSimple,
-  Play,
-  Pause,
-  Eye,
-  EyeOff,
-  Trash2,
-  Edit,
-} from '@/components/ui/Icons';
-import Link from 'next/link';
-import AudioPlayer from '@/components/ui/AudioPlayer';
-import { toast } from 'react-toastify';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, Eye, EyeOff, Trash2, Music } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,16 +12,48 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import Image from 'next/image';
+import { toast } from 'react-toastify';
 import { useTheme } from '@/contexts/ThemeContext';
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+  VisibilityState,
+} from '@tanstack/react-table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
+import Link from 'next/link';
+
 export default function ArtistTracks() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 10;
   const { theme } = useTheme();
 
-  // Validate and correct the page query param if needed
+  // State cho sorting, column filters, visibility, row selection, selected rows, status filter
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
+  const [selectedRows, setSelectedRows] = useState<Track[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // URL handling logic
   useEffect(() => {
-    const pageParam = Number(searchParams.get('page'));
-    if (pageParam < 1) {
+    const pageStr = searchParams.get('page');
+    const pageNumber = Number(pageStr);
+    if (pageStr === '1' || pageNumber < 1) {
       const newParams = new URLSearchParams(searchParams.toString());
       newParams.delete('page');
       const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
@@ -43,59 +61,13 @@ export default function ArtistTracks() {
     }
   }, [searchParams, router]);
 
-  useEffect(() => {
-    if (searchParams.get('page') === '1') {
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.delete('page');
-      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
-      router.replace(`/artist/tracks${queryStr}`);
-    }
-  }, [searchParams, router]);
+  const pageFromURL = Number(searchParams.get('page'));
+  const currentPage = isNaN(pageFromURL) || pageFromURL < 1 ? 1 : pageFromURL;
 
-  const currentPage = Number(searchParams.get('page')) || 1;
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [pagination, setPagination] = useState({
-    total: 0,
-    page: 1,
-    limit: 10,
-    totalPages: 1,
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchInput, setSearchInput] = useState('');
-  const [playingTrack, setPlayingTrack] = useState<Track | null>(null);
-  const [trackToDelete, setTrackToDelete] = useState<Track | null>(null);
-  const [trackToEdit, setTrackToEdit] = useState<Track | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const pageInputRef = useRef<HTMLInputElement>(null);
-
-  // Check artist's access on mount
-  useEffect(() => {
-    const checkAccess = () => {
-      const userData = localStorage.getItem('userData');
-      if (!userData) {
-        router.push('/login');
-        return;
-      }
-      const user = JSON.parse(userData);
-      if (!user.artistProfile?.isVerified) {
-        toast.error('You need a verified artist profile to access this page');
-        router.push('/');
-        return;
-      }
-      if (user.currentProfile !== 'ARTIST') {
-        toast.error('Please switch to artist profile to access this page');
-        router.push('/');
-        return;
-      }
-    };
-
-    checkAccess();
-  }, [router]);
-
-  // Update query param "page"
   const updateQueryParam = (param: string, value: number) => {
+    if (totalPages === 1 && value !== 1) return;
     if (value < 1) value = 1;
+    if (value > totalPages) value = totalPages;
     const current = new URLSearchParams(searchParams.toString());
     if (value === 1) {
       current.delete(param);
@@ -106,876 +78,380 @@ export default function ArtistTracks() {
     router.push(`/artist/tracks${queryStr}`);
   };
 
-  // Fetch tracks data (search vs. artist's own tracks)
-  const fetchTracks = useCallback(
-    async (query: string, page: number) => {
-      try {
-        setLoading(true);
-        setError(null);
-        const token = localStorage.getItem('userToken');
-        const userData = localStorage.getItem('userData');
-
-        if (!token || !userData) {
-          throw new Error('Authentication required');
-        }
-
-        const user = JSON.parse(userData);
-        const artistId = user.artistProfile?.id;
-        if (!artistId) {
-          throw new Error('Artist profile not found');
-        }
-
-        const limit = 10;
-        let data;
-        if (query) {
-          data = await api.tracks.search(query, token, page, limit);
-        } else {
-          data = await api.artists.getTracks(artistId, token, page, limit);
-        }
-
-        // If page exceeds totalPages, reset URL to page 1
-        if (data.pagination && data.pagination.totalPages < page) {
-          const current = new URLSearchParams(searchParams.toString());
-          current.delete('page');
-          router.replace(
-            `/artist/tracks${
-              current.toString() ? '?' + current.toString() : ''
-            }`
-          );
-          return;
-        }
-
-        setTracks(data.tracks);
-        setPagination(data.pagination);
-      } catch (err) {
-        console.error('Error fetching tracks:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch tracks');
-      } finally {
-        setLoading(false);
+  // API calls
+  const fetchTracks = async (page: number) => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
       }
-    },
-    [router, searchParams]
-  );
 
-  // Debounce search input and re-fetch tracks whenever searchInput or currentPage changes
-  useEffect(() => {
-    const debounceTimer = setTimeout(() => {
-      fetchTracks(searchInput, currentPage);
-    }, 300);
+      // Tạo query params
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
 
-    return () => clearTimeout(debounceTimer);
-  }, [searchInput, currentPage, fetchTracks]);
-
-  // On form submit, reset to page 1
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateQueryParam('page', 1);
-  };
-
-  const handlePlayPause = async (track: Track) => {
-    if (playingTrack?.id === track.id) {
-      setPlayingTrack(null);
-    } else {
-      setPlayingTrack(track);
-      try {
-        const token = localStorage.getItem('userToken');
-        if (token) {
-          await api.tracks.play(track.id, token);
-        }
-      } catch (err) {
-        console.error('Error playing track:', err);
+      // Thêm search param nếu có
+      if (searchInput) {
+        params.append('q', searchInput);
       }
+
+      // Thêm status filter nếu có
+      if (statusFilter.length === 1) {
+        params.append('status', statusFilter[0]);
+      }
+
+      const response = await api.tracks.getAll(
+        token,
+        page,
+        limit,
+        params.toString()
+      );
+      setTracks(response.tracks);
+      setTotalPages(response.pagination.totalPages);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to fetch tracks'
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
-  const formatDuration = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
+  useEffect(() => {
+    // Reset về trang 1 khi filter hoặc search thay đổi
+    if (currentPage !== 1) {
+      updateQueryParam('page', 1);
+    } else {
+      fetchTracks(1);
+    }
+  }, [searchInput, statusFilter]);
 
-  const toggleTrackVisibility = async (trackId: string) => {
+  useEffect(() => {
+    fetchTracks(currentPage);
+  }, [currentPage]);
+
+  // Action handlers
+  const handleTrackVisibility = async (trackId: string, isActive: boolean) => {
     try {
+      setActionLoading(trackId);
       const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
 
-      const response = await api.tracks.toggleVisibility(trackId, token);
-
-      setTracks(
-        tracks.map((track) =>
-          track.id === trackId ? { ...track, isActive: !track.isActive } : track
+      await api.tracks.toggleVisibility(trackId, token);
+      setTracks((prev) =>
+        prev.map((track) =>
+          track.id === trackId ? { ...track, isActive: !isActive } : track
         )
       );
-
-      toast.success(response.message);
-    } catch (err) {
-      console.error('Error toggling track visibility:', err);
-      toast.error('Failed to update track visibility');
+      toast.success(
+        `Track ${isActive ? 'hidden' : 'made visible'} successfully`
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update track'
+      );
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const deleteTrack = async (trackId: string) => {
+  const handleDeleteTrack = async (trackId: string) => {
+    if (!confirm('Are you sure you want to delete this track?')) return;
+
     try {
+      setActionLoading(trackId);
       const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
 
       await api.tracks.delete(trackId, token);
-      setTracks(tracks.filter((track) => track.id !== trackId));
+      setTracks((prev) => prev.filter((track) => track.id !== trackId));
       toast.success('Track deleted successfully');
-      setTrackToDelete(null);
-    } catch (err) {
-      console.error('Error deleting track:', err);
-      toast.error('Failed to delete track');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to delete track'
+      );
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const handleEditTrack = (track: Track) => {
-    setTrackToEdit(track);
-    setShowEditModal(true);
-  };
+  const handleDeleteSelected = async () => {
+    if (
+      !selectedRows.length ||
+      !confirm(`Delete ${selectedRows.length} selected tracks?`)
+    )
+      return;
 
-  const handleUpdateTrack = async (updatedTrack: Track) => {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      const formData = new FormData();
-      formData.append('title', updatedTrack.title);
-      formData.append('releaseDate', updatedTrack.releaseDate);
-      formData.append('type', updatedTrack.type);
+      await Promise.all(
+        selectedRows.map((row) => api.tracks.delete(row.id, token))
+      );
 
-      const response = await api.tracks.update(
-        updatedTrack.id,
-        formData,
-        token
-      );
-      setTracks(
-        tracks.map((track) =>
-          track.id === updatedTrack.id ? response.track : track
-        )
-      );
-      toast.success('Track updated successfully');
-      setShowEditModal(false);
+      setSelectedRows([]);
+      fetchTracks(currentPage);
+      toast.success(`Deleted ${selectedRows.length} tracks successfully`);
     } catch (err) {
-      console.error('Error updating track:', err);
-      toast.error('Failed to update track');
+      toast.error(err instanceof Error ? err.message : 'Deletion failed');
     }
   };
 
-  const handlePrevPage = () => {
-    if (currentPage > 1) updateQueryParam('page', currentPage - 1);
-  };
+  // Table columns definition
+  const columns: ColumnDef<Track>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'title',
+      header: 'Track',
+      cell: ({ row }) => {
+        const track = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-8 h-8 rounded overflow-hidden ${
+                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+              }`}
+            >
+              {track.coverUrl ? (
+                <Image
+                  src={track.coverUrl}
+                  alt={track.title}
+                  width={32}
+                  height={32}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <Music
+                  className={`w-8 h-8 p-1.5 ${
+                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                  }`}
+                />
+              )}
+            </div>
+            <div>
+              <Link
+                href={`/artist/tracks/${track.id}`}
+                className={`font-medium hover:underline ${
+                  theme === 'dark' ? 'text-white' : ''
+                }`}
+              >
+                {track.title}
+              </Link>
+              {track.album && (
+                <div
+                  className={
+                    theme === 'dark' ? 'text-white/60' : 'text-gray-500'
+                  }
+                >
+                  {track.album.title}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'duration',
+      header: 'Duration',
+      cell: ({ row }) => {
+        const minutes = Math.floor(row.original.duration / 60);
+        const seconds = row.original.duration % 60;
+        return (
+          <span className={theme === 'dark' ? 'text-white' : ''}>
+            {`${minutes}:${seconds.toString().padStart(2, '0')}`}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'playCount',
+      header: 'Plays',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {row.original.playCount.toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'Status',
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.original.isActive
+              ? 'bg-green-500/20 text-green-400'
+              : 'bg-red-500/20 text-red-400'
+          }`}
+        >
+          {row.original.isActive ? 'Active' : 'Hidden'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'releaseDate',
+      header: 'Release Date',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {new Date(row.original.releaseDate).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const track = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <MoreVertical className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => handleTrackVisibility(track.id, track.isActive)}
+              >
+                {track.isActive ? (
+                  <>
+                    <EyeOff className="w-4 h-4 mr-2" />
+                    Hide Track
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Show Track
+                  </>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleDeleteTrack(track.id)}
+                className="text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Track
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
 
-  const handleNextPage = () => {
-    if (currentPage < (pagination.totalPages ?? 1))
-      updateQueryParam('page', currentPage + 1);
-  };
+  const table = useReactTable({
+    data: tracks,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+      pagination: {
+        pageIndex: currentPage - 1,
+        pageSize: 10,
+      },
+    },
+    pageCount: totalPages,
+    manualPagination: true,
+  });
 
   return (
     <div
-      className="container mx-auto space-y-8 p-4 mb-16"
-      suppressHydrationWarning
+      className={`container mx-auto space-y-4 p-4 pb-20 ${
+        theme === 'dark' ? 'text-white' : ''
+      }`}
     >
-      {/* Header Section */}
-      <div>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1
-              className={`text-3xl font-bold tracking-tight ${
-                theme === 'light' ? 'text-gray-900' : 'text-white'
-              }`}
-            >
-              Track Management
-            </h1>
-            <p
-              className={
-                theme === 'light' ? 'text-gray-600 mt-2' : 'text-white/60 mt-2'
-              }
-            >
-              Upload and manage your tracks
-            </p>
-          </div>
-          <Link
-            href="/artist/tracks/new"
-            className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              theme === 'light'
-                ? 'bg-gray-900 text-white hover:bg-gray-800'
-                : 'bg-white text-black hover:bg-white/90'
-            }`}
-          >
-            <AddSimple className="w-4 h-4" />
-            New Track
-          </Link>
-        </div>
-        {/* Mobile New Track Button */}
-        <Link
-          href="/artist/tracks/new"
-          className={`md:hidden flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium w-fit mt-4 transition-colors ${
-            theme === 'light'
-              ? 'bg-gray-900 text-white hover:bg-gray-800'
-              : 'bg-white text-black hover:bg-white/90'
+      <div className="mb-6">
+        <h1
+          className={`text-2xl md:text-3xl font-bold tracking-tight ${
+            theme === 'dark' ? 'text-white' : 'text-gray-900'
           }`}
         >
-          <AddSimple className="w-4 h-4" />
-          New Track
-        </Link>
-      </div>
-
-      <div
-        className={`rounded-lg overflow-hidden border ${
-          theme === 'light'
-            ? 'bg-white border-gray-200'
-            : 'bg-[#121212] border-white/[0.08]'
-        }`}
-      >
-        {/* Search Bar - Desktop */}
-        <div
-          className={`hidden md:block p-6 border-b ${
-            theme === 'light' ? 'border-gray-200' : 'border-white/[0.08]'
+          Track Management
+        </h1>
+        <p
+          className={`text-muted-foreground ${
+            theme === 'dark' ? 'text-white/60' : ''
           }`}
         >
-          <div className="relative w-64">
-            <input
-              type="text"
-              placeholder="Search tracks..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className={`pl-10 pr-4 py-2 w-full rounded-lg border focus:outline-none focus:ring-2 ${
-                theme === 'light'
-                  ? 'bg-gray-50 border-gray-300 focus:ring-gray-300'
-                  : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-              }`}
-            />
-            <Search
-              className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
-                theme === 'light' ? 'text-gray-400' : 'text-white/40'
-              }`}
-            />
-          </div>
-        </div>
-
-        {/* Mobile Search */}
-        <div className="md:hidden p-4">
-          <div className="relative w-full">
-            <input
-              type="text"
-              placeholder="Search tracks..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className={`w-full pl-10 pr-4 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 ${
-                theme === 'light'
-                  ? 'bg-gray-50 border-gray-300 focus:ring-gray-300'
-                  : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-              }`}
-            />
-            <Search
-              className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
-                theme === 'light' ? 'text-gray-400' : 'text-white/40'
-              }`}
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="flex items-center justify-center h-32">
-              <div
-                className={`animate-spin rounded-full h-8 w-8 border-b-2 ${
-                  theme === 'light' ? 'border-gray-900' : 'border-white'
-                }`}
-              ></div>
-            </div>
-          ) : error ? (
-            <div className="p-6 text-center text-red-500">{error}</div>
-          ) : tracks.length > 0 ? (
-            <table className="w-full table-auto">
-              <thead
-                className={theme === 'light' ? 'bg-gray-50' : 'bg-white/[0.03]'}
-              >
-                <tr>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[200px] ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
-                  >
-                    Title
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider hidden md:table-cell min-w-[150px] ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
-                  >
-                    Album
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[80px] ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
-                  >
-                    Duration
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[80px] ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
-                  >
-                    Type
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[80px] ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
-                  >
-                    Plays
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[100px] ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
-                  >
-                    Status
-                  </th>
-                  <th
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider min-w-[80px] ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody
-                className={`divide-y ${
-                  theme === 'light' ? 'divide-gray-200' : 'divide-white/[0.08]'
-                }`}
-              >
-                {tracks.map((track) => (
-                  <tr
-                    key={track.id}
-                    className={`hover:bg-gray-50 transition-colors ${
-                      theme === 'light'
-                        ? 'hover:bg-gray-50'
-                        : 'hover:bg-white/[0.03]'
-                    }`}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <button
-                          onClick={() => handlePlayPause(track)}
-                          className={`mr-3 transition-colors ${
-                            theme === 'light'
-                              ? 'text-gray-400 hover:text-gray-600'
-                              : 'text-white/60 hover:text-white'
-                          }`}
-                        >
-                          {playingTrack?.id === track.id ? (
-                            <Pause className="w-5 h-5" />
-                          ) : (
-                            <Play className="w-5 h-5" />
-                          )}
-                        </button>
-                        {track.coverUrl ? (
-                          <img
-                            src={track.coverUrl || '/placeholder.svg'}
-                            alt={track.title}
-                            className="w-10 h-10 rounded-md mr-3 object-cover"
-                          />
-                        ) : (
-                          <div
-                            className={`w-10 h-10 rounded-md mr-3 flex items-center justify-center ${
-                              theme === 'light'
-                                ? 'bg-gray-100'
-                                : 'bg-white/[0.03]'
-                            }`}
-                          >
-                            <Music
-                              className={`w-6 h-6 ${
-                                theme === 'light'
-                                  ? 'text-gray-400'
-                                  : 'text-white/60'
-                              }`}
-                            />
-                          </div>
-                        )}
-                        <span
-                          className={`font-medium truncate ${
-                            theme === 'light' ? 'text-gray-900' : 'text-white'
-                          }`}
-                          title={track.title}
-                        >
-                          {track.title}
-                        </span>
-                      </div>
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap hidden md:table-cell ${
-                        theme === 'light' ? 'text-gray-900' : 'text-white'
-                      }`}
-                    >
-                      <span title={track.album?.title || 'Single'}>
-                        {track.album?.title || 'Single'}
-                      </span>
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap ${
-                        theme === 'light' ? 'text-gray-900' : 'text-white'
-                      }`}
-                    >
-                      {formatDuration(track.duration)}
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap ${
-                        theme === 'light' ? 'text-gray-900' : 'text-white'
-                      }`}
-                    >
-                      {track.type}
-                    </td>
-                    <td
-                      className={`px-6 py-4 whitespace-nowrap ${
-                        theme === 'light' ? 'text-gray-900' : 'text-white'
-                      }`}
-                    >
-                      {track.playCount.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          track.isActive
-                            ? theme === 'light'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-green-500/10 text-green-500'
-                            : theme === 'light'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-yellow-500/10 text-yellow-500'
-                        }`}
-                      >
-                        {track.isActive ? (
-                          <Eye className="w-3 h-3 mr-1" />
-                        ) : (
-                          <EyeOff className="w-3 h-3 mr-1" />
-                        )}
-                        {track.isActive ? 'Active' : 'Hidden'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          className={`p-2 rounded-full ${
-                            theme === 'light'
-                              ? 'hover:bg-gray-100'
-                              : 'hover:bg-white/10'
-                          }`}
-                        >
-                          <MoreVertical className="w-5 h-5" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          className={
-                            theme === 'light'
-                              ? 'bg-white border border-gray-200'
-                              : 'bg-[#282828] border border-white/10'
-                          }
-                        >
-                          <DropdownMenuItem
-                            onClick={() => toggleTrackVisibility(track.id)}
-                            className={
-                              theme === 'light' ? 'text-gray-700' : 'text-white'
-                            }
-                          >
-                            {track.isActive ? (
-                              <>
-                                <EyeOff className="w-4 h-4 mr-2" />
-                                Hide Track
-                              </>
-                            ) : (
-                              <>
-                                <Eye className="w-4 h-4 mr-2" />
-                                Show Track
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleEditTrack(track)}
-                            className={
-                              theme === 'light' ? 'text-gray-700' : 'text-white'
-                            }
-                          >
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Track
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator
-                            className={
-                              theme === 'light' ? 'bg-gray-200' : 'bg-white/10'
-                            }
-                          />
-                          <DropdownMenuItem
-                            onClick={() => setTrackToDelete(track)}
-                            className="text-red-500"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete Track
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div
-              className={`flex flex-col items-center justify-center h-[400px] ${
-                theme === 'light' ? 'text-gray-500' : 'text-white/60'
-              }`}
-            >
-              <Music className="w-12 h-12 mb-4" />
-              <p>No tracks found</p>
-            </div>
-          )}
-        </div>
-
-        {/* Pagination Section */}
-        {pagination.total > 0 && (
-          <div
-            className={`flex items-center justify-center gap-2 p-4 border-t ${
-              theme === 'light' ? 'border-gray-200' : 'border-white/[0.08]'
-            }`}
-          >
-            <button
-              onClick={handlePrevPage}
-              disabled={currentPage <= 1}
-              className={`px-3 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-                theme === 'light'
-                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:bg-gray-50'
-                  : 'bg-white/5 hover:bg-white/10 disabled:bg-white/5'
-              }`}
-            >
-              Previous
-            </button>
-
-            {/* Mobile Pagination */}
-            <div className="md:hidden">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className={`px-3 py-2 rounded-lg text-sm ${
-                    theme === 'light'
-                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      : 'bg-white/5 hover:bg-white/10'
-                  }`}
-                >
-                  {currentPage} of {pagination.totalPages}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  className={`p-4 w-[200px] ${
-                    theme === 'light'
-                      ? 'bg-white border border-gray-200'
-                      : 'bg-[#282828] border border-white/[0.1]'
-                  }`}
-                >
-                  <div className="space-y-3">
-                    <div
-                      className={
-                        theme === 'light'
-                          ? 'text-gray-600 text-xs'
-                          : 'text-white/60 text-xs'
-                      }
-                    >
-                      Go to page:
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={pagination.totalPages}
-                        defaultValue={currentPage}
-                        ref={pageInputRef}
-                        className={`w-full px-2 py-1 rounded-lg text-center text-sm focus:outline-none focus:ring-2 ${
-                          theme === 'light'
-                            ? 'bg-gray-50 border border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                            : 'bg-white/5 border border-white/[0.1] focus:ring-[#ffaa3b]/50 text-white'
-                        }`}
-                        placeholder="Page"
-                      />
-                    </div>
-                    <button
-                      onClick={() => {
-                        const page = pageInputRef.current
-                          ? parseInt(pageInputRef.current.value, 10)
-                          : NaN;
-                        if (!isNaN(page)) {
-                          updateQueryParam('page', page);
-                        }
-                      }}
-                      className={`w-full px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        theme === 'light'
-                          ? 'bg-gray-900 text-white hover:bg-gray-800'
-                          : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20'
-                      }`}
-                    >
-                      Go to Page
-                    </button>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Desktop Pagination */}
-            <div className="hidden md:flex items-center gap-2 text-sm">
-              <span
-                className={
-                  theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                }
-              >
-                Page
-              </span>
-              <div
-                className={`px-3 py-1 rounded-lg border ${
-                  theme === 'light'
-                    ? 'bg-gray-50 border-gray-300'
-                    : 'bg-white/5 border-white/[0.1]'
-                }`}
-              >
-                <span
-                  className={
-                    theme === 'light'
-                      ? 'text-gray-900 font-medium'
-                      : 'text-white font-medium'
-                  }
-                >
-                  {currentPage}
-                </span>
-              </div>
-              <span
-                className={
-                  theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                }
-              >
-                of {pagination.totalPages}
-              </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={pagination.totalPages}
-                  defaultValue={currentPage}
-                  ref={pageInputRef}
-                  className={`w-16 px-2 py-1 rounded-lg text-center text-sm focus:outline-none focus:ring-2 ${
-                    theme === 'light'
-                      ? 'bg-gray-50 border border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                      : 'bg-white/5 border border-white/[0.1] focus:ring-[#ffaa3b]/50 text-white'
-                  }`}
-                  placeholder="Page"
-                />
-                <button
-                  onClick={() => {
-                    const page = pageInputRef.current
-                      ? parseInt(pageInputRef.current.value, 10)
-                      : NaN;
-                    if (!isNaN(page)) {
-                      updateQueryParam('page', page);
-                    }
-                  }}
-                  className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                    theme === 'light'
-                      ? 'bg-gray-900 text-white hover:bg-gray-800'
-                      : 'bg-[#ffaa3b]/10 text-[#ffaa3b] hover:bg-[#ffaa3b]/20 border border-[#ffaa3b]/20'
-                  }`}
-                >
-                  Go
-                </button>
-              </div>
-            </div>
-
-            <button
-              onClick={handleNextPage}
-              disabled={currentPage >= pagination.totalPages}
-              className={`px-3 py-2 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-                theme === 'light'
-                  ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:bg-gray-50'
-                  : 'bg-white/5 hover:bg-white/10 disabled:bg-white/5'
-              }`}
-            >
-              Next
-            </button>
-          </div>
-        )}
+          Manage and monitor your tracks
+        </p>
       </div>
 
-      {/* Audio Player */}
-      {playingTrack && (
-        <AudioPlayer
-          src={playingTrack.audioUrl}
-          isPlaying={true}
-          onEnded={() => setPlayingTrack(null)}
-        />
-      )}
-
-      {/* Delete Modal */}
-      {trackToDelete && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
-          <div
-            className={`max-w-md w-full mx-4 p-6 rounded-lg ${
-              theme === 'light' ? 'bg-white' : 'bg-[#121212]'
-            }`}
-          >
-            <h3
-              className={`text-xl font-bold mb-4 ${
-                theme === 'light' ? 'text-gray-900' : 'text-white'
-              }`}
-            >
-              Delete Track
-            </h3>
-            <p
-              className={
-                theme === 'light' ? 'text-gray-600 mb-6' : 'text-white/60 mb-6'
-              }
-            >
-              Are you sure you want to delete "{trackToDelete.title}"? This
-              action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-4">
-              <button
-                onClick={() => setTrackToDelete(null)}
-                className={`px-4 py-2 text-sm font-medium ${
-                  theme === 'light'
-                    ? 'text-gray-600 hover:text-gray-900'
-                    : 'text-white/60 hover:text-white'
-                }`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => deleteTrack(trackToDelete.id)}
-                className="px-4 py-2 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {showEditModal && trackToEdit && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
-          <div
-            className={`max-w-md w-full mx-4 p-6 rounded-lg ${
-              theme === 'light' ? 'bg-white' : 'bg-[#121212]'
-            }`}
-          >
-            <h3
-              className={`text-xl font-bold mb-4 ${
-                theme === 'light' ? 'text-gray-900' : 'text-white'
-              }`}
-            >
-              Edit Track
-            </h3>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleUpdateTrack(trackToEdit);
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label
-                  htmlFor="title"
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                  }`}
-                >
-                  Title
-                </label>
-                <input
-                  type="text"
-                  id="title"
-                  value={trackToEdit.title}
-                  onChange={(e) =>
-                    setTrackToEdit({ ...trackToEdit, title: e.target.value })
-                  }
-                  className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
-                    theme === 'light'
-                      ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-                  }`}
-                  required
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="type"
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                  }`}
-                >
-                  Type
-                </label>
-                <select
-                  id="type"
-                  value={trackToEdit.type}
-                  disabled
-                  className={`w-full px-3 py-2 rounded-lg border cursor-not-allowed opacity-50 ${
-                    theme === 'light'
-                      ? 'bg-gray-50 border-gray-300'
-                      : 'bg-white/[0.07] border-white/[0.1]'
-                  }`}
-                >
-                  <option value={trackToEdit.type}>{trackToEdit.type}</option>
-                </select>
-              </div>
-              <div>
-                <label
-                  htmlFor="releaseDate"
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                  }`}
-                >
-                  Release Date
-                </label>
-                <input
-                  type="date"
-                  id="releaseDate"
-                  value={trackToEdit.releaseDate.split('T')[0]}
-                  onChange={(e) =>
-                    setTrackToEdit({
-                      ...trackToEdit,
-                      releaseDate: e.target.value,
-                    })
-                  }
-                  className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
-                    theme === 'light'
-                      ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-                  }`}
-                  required
-                />
-              </div>
-              <div className="flex justify-end gap-4 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className={`px-4 py-2 text-sm font-medium ${
-                    theme === 'light'
-                      ? 'text-gray-600 hover:text-gray-900'
-                      : 'text-white/60 hover:text-white'
-                  }`}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    theme === 'light'
-                      ? 'bg-gray-900 text-white hover:bg-gray-800'
-                      : 'bg-white text-black hover:bg-white/90'
-                  }`}
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <DataTableWrapper
+        table={table}
+        columns={columns}
+        data={tracks}
+        pageCount={totalPages}
+        pageIndex={currentPage - 1}
+        loading={loading}
+        onPageChange={(page) => updateQueryParam('page', page + 1)}
+        onRowSelection={setSelectedRows}
+        theme={theme}
+        toolbar={{
+          searchValue: searchInput,
+          onSearchChange: setSearchInput,
+          selectedRowsCount: selectedRows.length,
+          onDelete: handleDeleteSelected,
+          showExport: true,
+          exportData: {
+            data: tracks,
+            columns: [
+              { key: 'id', header: 'ID' },
+              { key: 'title', header: 'Title' },
+              { key: 'duration', header: 'Duration' },
+              { key: 'playCount', header: 'Play Count' },
+              { key: 'isActive', header: 'Status' },
+              { key: 'releaseDate', header: 'Release Date' },
+              { key: 'createdAt', header: 'Created At' },
+              { key: 'updatedAt', header: 'Updated At' },
+            ],
+            filename: 'tracks',
+          },
+          searchPlaceholder: 'Search tracks...',
+          statusFilter: {
+            value: statusFilter,
+            onChange: setStatusFilter,
+          },
+        }}
+      />
     </div>
   );
 }
