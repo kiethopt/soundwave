@@ -102,37 +102,40 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-  if (!audioRef.current) {
-    audioRef.current = new Audio();
-    audioRef.current.volume = volume;
-    audioRef.current.loop = loop;
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.volume = volume;
+      audioRef.current.loop = loop;
 
-    audioRef.current.ontimeupdate = () => {
-      if (audioRef.current!.duration && !isNaN(audioRef.current!.duration)) {
-        setProgress((audioRef.current!.currentTime / audioRef.current!.duration) * 100);
-      }
-    };
+      audioRef.current.ontimeupdate = () => {
+        if (audioRef.current!.duration && !isNaN(audioRef.current!.duration)) {
+          setProgress((audioRef.current!.currentTime / audioRef.current!.duration) * 100);
+        }
+      };
 
-    audioRef.current.onloadedmetadata = () => {
-      setDuration(audioRef.current?.duration || 0);
-    };
+      audioRef.current.onloadedmetadata = () => {
+        setDuration(audioRef.current?.duration || 0);
+      };
 
-    audioRef.current.onended = () => {
-      if (loop) {
-        audioRef.current!.currentTime = 0;
-        audioRef.current!.play().catch((error) => console.error('Error playing track after loop:', error));
-        setIsPlaying(true);
-      } else {
-        setIsPlaying(false);
-        skipNext();
-      }
-    };
-  } else {
-    audioRef.current.volume = volume;
-    audioRef.current.loop = loop;
-  }
-}, [loop, volume, skipNext]);
+      audioRef.current.onended = () => {
+        if (loop) {
+          audioRef.current!.currentTime = 0;
+          audioRef.current!.play().catch((error) => console.error('Error playing track after loop:', error));
+          setIsPlaying(true);
+        } else {
+          setIsPlaying(false);
+          skipNext();
+        }
+      };
+    } else {
+      audioRef.current.volume = volume;
+      audioRef.current.loop = loop;
+    }
+  }, [loop, volume, skipNext]);
 
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [trackQueue]);
 
   return (
     <TrackContext.Provider

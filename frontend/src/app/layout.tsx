@@ -112,7 +112,9 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
           {/* Player Bar */}
           {currentTrack && (
-            <PlayerBar />
+            <div className={currentTrack ? "mt-[108px]" : ""}>
+              <PlayerBar />
+            </div>
           )}
         </div>
       )}

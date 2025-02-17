@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useRef, useState, useEffect } from 'react';
+import { Suspense, useRef, useState, useEffect, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Track, Album, Artist, User } from '@/types';
 import { api } from '@/utils/api';
@@ -16,6 +16,7 @@ import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
 import pusher from '@/utils/pusher';
 import { toast } from 'react-toastify';
 import { useTrack } from '@/contexts/TrackContext';
+import { set } from 'lodash';
 
 type FilterType = 'all' | 'albums' | 'tracks' | 'artists' | 'users';
 
@@ -81,14 +82,9 @@ function SearchContent() {
     toggleShuffle,
     skipNext,
     skipPrevious,
+    trackQueue,
   } = useTrack();
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
-  const [currentlyPlayingAlbum, setCurrentlyPlayingAlbum] = useState<
-    string | null
-  >(null);
-  const [currentlyPlayingArtist, setCurrentlyPlayingArtist] = useState<
-    string | null
-  >(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [trackCurrentTimes, setTrackCurrentTimes] = useState<{
     [key: string]: number;
@@ -152,7 +148,6 @@ function SearchContent() {
           if (audioRef.current) {
             audioRef.current.pause();
             setCurrentlyPlaying(null);
-            setCurrentlyPlayingAlbum(null);
           }
         }
       });
@@ -322,6 +317,9 @@ function SearchContent() {
   //     toast.error('An error occurred. Please try again.');
   //   }
   // };
+  // update current track when track changes
+  
+
 
 
   const handlePlay = async (item: Track | Album | Artist) => {
@@ -333,51 +331,49 @@ function SearchContent() {
       }
   
       if ('audioUrl' in item) {
-        // Track
-        if (currentTrack?.id === item.id) {
+        // Single Track
+        if (currentTrack?.id === item.id && currentlyPlaying === item.id) {
           if (isPlaying) {
             pauseTrack();
             setCurrentlyPlaying(null);
           } else {
             playTrack(item);
-            console.log ('item.id', item.audioUrl);
             setCurrentlyPlaying(item.id);
           }
         } else {
+          trackQueue(results.tracks.filter(track => track.id !== item.id));  
           playTrack(item);
           setCurrentlyPlaying(item.id);
-          setCurrentlyPlayingAlbum(null);
-          setCurrentlyPlayingArtist(null);
         }
       } else if ('tracks' in item) {
         // Album
         if (item.tracks.length > 0) {
           const firstTrack = item.tracks[0];
-          //Check if the first track is the same as the current track
-          if (currentTrack?.id === firstTrack.id && currentlyPlayingAlbum === item.id) {
+  
+          // Check if the first track is already playing
+          if (currentTrack?.id === firstTrack.id && currentlyPlaying === item.id) {
             if (isPlaying) {
               pauseTrack();
-              setCurrentlyPlayingAlbum(null);
+              setCurrentlyPlaying(null);
             } else {
               playTrack(firstTrack);
-              setCurrentlyPlayingAlbum(item.id);
+              setCurrentlyPlaying(item.id);
             }
           } else {
+            // Refresh queue with album tracks
+            trackQueue(item.tracks);
             playTrack(firstTrack);
-            setCurrentlyPlayingAlbum(item.id);
-            setCurrentlyPlaying(null);
-            setCurrentlyPlayingArtist(null);
+            setCurrentlyPlaying(item.id);
           }
         } else {
           toast.error('No tracks found in this album.');
           setCurrentlyPlaying(null);
-          setCurrentlyPlayingAlbum(null);
-          setCurrentlyPlayingArtist(null);
         }
       } else if ('artistProfile' in item) {
-        // Artist - Fetch top tracks and play the first one
+        // 🎤 Artist (Future Implementation)
         // const artistTracks = await api.artists.getTopTracks(item.artistProfile.id, token);
         // if (artistTracks.length > 0) {
+        //   trackQueue(artistTracks);
         //   playTrack(artistTracks[0]);
         //   setCurrentlyPlayingArtist(item.artistProfile.id);
         //   setCurrentlyPlaying(null);
@@ -394,6 +390,7 @@ function SearchContent() {
       toast.error('Error playing track. Please try again.');
     }
   };
+  
   
 
   return (
@@ -449,7 +446,7 @@ function SearchContent() {
                           onClick={() => handlePlay(artist)}
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity shadow-lg transform translate-y-2 group-hover:translate-y-0"
                         >
-                          {currentlyPlayingArtist ===
+                          {currentlyPlaying ===
                           artist.artistProfile?.id ? (
                             <Pause className="w-6 h-6 text-white" />
                           ) : (
@@ -493,7 +490,7 @@ function SearchContent() {
                           onClick={() => handlePlay(album)}
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          {currentlyPlayingAlbum === album.id ? (
+                          {currentlyPlaying === album.id ? (
                             <Pause className="w-6 h-6 text-white" />
                           ) : (
                             <Play className="w-6 h-6 text-white" />
@@ -502,7 +499,7 @@ function SearchContent() {
                       </div>
                       <h3
                         className={`font-medium truncate ${
-                          currentlyPlayingAlbum === album.id
+                          currentlyPlaying === album.id
                             ? 'text-[#A57865]'
                             : 'text-white'
                         }`}
