@@ -436,7 +436,7 @@ export const followUser = async (
     }
 
     // Validate self-follow
-    if (followingType === 'USER' && followingId === user.id) {
+    if ((followingType === 'USER' || followingType === 'ARTIST') && followingId === user.id || followingId === user.artistProfile?.id) {
       res.status(400).json({ message: 'Cannot follow yourself' });
       return;
     }
@@ -589,7 +589,7 @@ export const getFollowers = async (
           followingType: FollowingType.USER,
         },
         {
-          followingArtistId: user.id, // Artist
+          followingArtistId: user?.artistProfile?.id, // Artist
           followingType: FollowingType.ARTIST,
         },
       ],

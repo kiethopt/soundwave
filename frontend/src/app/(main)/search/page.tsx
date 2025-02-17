@@ -317,8 +317,13 @@ function SearchContent() {
   //     toast.error('An error occurred. Please try again.');
   //   }
   // };
-  // update current track when track changes
   
+
+  useEffect(() => {
+    if (currentTrack && 'audioUrl' in currentTrack) {
+      setCurrentlyPlaying(currentTrack.id);
+    }
+  }, [currentTrack]);
 
 
 
@@ -430,6 +435,7 @@ function SearchContent() {
                     <div
                       key={artist.id}
                       className="group relative p-4 rounded-lg hover:bg-white/5 transition-colors"
+                      onClick={() => router.push(`/artist/profile/${artist.artistProfile.id}`)}
                     >
                       <div className="relative">
                         <div className="aspect-square mb-4">

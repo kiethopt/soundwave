@@ -314,28 +314,24 @@ export const api = {
 
     followUserOrArtist: async (
       followingId: string,
-      followingType: 'USER' | 'ARTIST',
       token: string
     ) =>
       fetchWithAuth(
-        '/api/user/follow',
+        `/api/user/follow/${followingId}`,
         {
           method: 'POST',
-          body: JSON.stringify({ followingId, followingType }),
         },
         token
       ),
 
     unfollowUserOrArtist: async (
       followingId: string,
-      followingType: 'USER' | 'ARTIST',
       token: string
     ) =>
       fetchWithAuth(
-        '/api/user/unfollow',
+        `/api/user/unfollow/${followingId}`,
         {
           method: 'DELETE',
-          body: JSON.stringify({ followingId, followingType }),
         },
         token
       ),
