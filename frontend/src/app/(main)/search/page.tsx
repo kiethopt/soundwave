@@ -15,6 +15,7 @@ import {
 import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
 import pusher from '@/utils/pusher';
 import { toast } from 'react-toastify';
+import { useTrack } from '@/contexts/TrackContext';
 
 type FilterType = 'all' | 'albums' | 'tracks' | 'artists' | 'users';
 
@@ -65,6 +66,22 @@ function SearchContent() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
   // Audio states
+  const {
+    currentTrack,
+    isPlaying,
+    volume,
+    progress,
+    loop,
+    shuffle,
+    playTrack,
+    pauseTrack,
+    setVolume,
+    seekTrack,
+    toggleLoop,
+    toggleShuffle,
+    skipNext,
+    skipPrevious,
+  } = useTrack();
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const [currentlyPlayingAlbum, setCurrentlyPlayingAlbum] = useState<
     string | null
@@ -149,162 +166,235 @@ function SearchContent() {
   }, []);
 
   // Xử lý play/pause track hoặc album
-  const handlePlayPause = async (item: Track | Album | Artist) => {
+  // const handlePlayPause = async (item: Track | Album | Artist) => {
+  //   try {
+  //     const token = localStorage.getItem('userToken');
+  //     const sessionId = localStorage.getItem('sessionId');
+  //     const userDataStr = localStorage.getItem('userData');
+
+  //     if (!token || !sessionId || !userDataStr) {
+  //       router.push('/login');
+  //       return;
+  //     }
+
+  //     const user = JSON.parse(userDataStr);
+
+  //     // Xử lý phát nhạc cho Artist
+  //     if ('artistProfile' in item) {
+  //       try {
+  //         // Nếu đang phát artist này thì dừng lại
+  //         if (currentlyPlayingArtist === item.artistProfile.id) {
+  //           if (audioRef.current) {
+  //             audioRef.current.pause();
+  //           }
+  //           setCurrentlyPlayingArtist(null);
+  //           setCurrentlyPlayingAlbum(null);
+  //           return;
+  //         }
+
+  //         // Lấy album mới nhất của nghệ sĩ
+  //         const artistAlbums = await api.artists.getArtistAlbums(
+  //           item.artistProfile.id,
+  //           token,
+  //           1,
+  //           10
+  //         );
+  //         if (!artistAlbums || artistAlbums.length === 0) {
+  //           toast.error('No albums found for this artist');
+  //           return;
+  //         }
+
+  //         // Sắp xếp album theo ngày phát hành (mới nhất trước)
+  //         const latestAlbum = artistAlbums.sort(
+  //           (a: Album, b: Album) =>
+  //             new Date(b.releaseDate).getTime() -
+  //             new Date(a.releaseDate).getTime()
+  //         )[0];
+
+  //         // Phát album mới nhất
+  //         const response = await api.albums.playAlbum(latestAlbum.id, token);
+  //         if (!response?.track?.audioUrl) {
+  //           throw new Error('No audio URL found');
+  //         }
+
+  //         // Dừng audio hiện tại nếu có
+  //         if (audioRef.current) {
+  //           audioRef.current.pause();
+  //         }
+
+  //         // Tạo audio mới và phát
+  //         const audio = new Audio(response.track.audioUrl);
+  //         audioRef.current = audio;
+  //         audio.currentTime = trackCurrentTimes[latestAlbum.id] || 0;
+
+  //         await audio.play();
+  //         setCurrentlyPlayingArtist(item.artistProfile.id);
+  //         setCurrentlyPlayingAlbum(latestAlbum.id);
+  //         setCurrentlyPlaying(null);
+
+  //         audio.onended = () => {
+  //           setCurrentlyPlayingArtist(null);
+  //           setCurrentlyPlayingAlbum(null);
+  //           setCurrentlyPlaying(null);
+  //         };
+  //       } catch (error) {
+  //         console.error('Error playing artist:', error);
+  //         toast.error('Error playing artist. Please try again.');
+  //       }
+  //       return;
+  //     }
+
+  //     // Xử lý phát nhạc cho Track hoặc Album
+  //     const isAlbum = 'tracks' in item;
+  //     const itemId = item.id;
+
+  //     // Gọi API để thông báo bắt đầu phát nhạc
+  //     await api.session.handleAudioPlay(user.id, sessionId, token);
+
+  //     // Dừng audio hiện tại nếu có
+  //     if (audioRef.current) {
+  //       audioRef.current.pause();
+  //     }
+
+  //     // Nếu đang phát item này thì dừng lại
+  //     if ((isAlbum ? currentlyPlayingAlbum : currentlyPlaying) === itemId) {
+  //       setTrackCurrentTimes({
+  //         ...trackCurrentTimes,
+  //         [itemId]: audioRef.current?.currentTime || 0,
+  //       });
+  //       if (isAlbum) {
+  //         setCurrentlyPlayingAlbum(null);
+  //       }
+  //       setCurrentlyPlaying(null);
+  //       setCurrentlyPlayingArtist(null);
+  //       return;
+  //     }
+
+  //     let response;
+  //     try {
+  //       if (isAlbum) {
+  //         response = await api.albums.playAlbum(itemId, token);
+  //       } else {
+  //         response = await api.tracks.play(itemId, token);
+  //       }
+
+  //       if (!response?.track?.audioUrl) {
+  //         throw new Error('No audio URL found');
+  //       }
+
+  //       const audio = new Audio(response.track.audioUrl);
+  //       audioRef.current = audio;
+  //       audio.currentTime = trackCurrentTimes[itemId] || 0;
+
+  //       // Thêm xử lý lỗi khi phát audio
+  //       audio.onerror = (e) => {
+  //         console.error('Audio playback error:', e);
+  //         toast.error('Error playing audio. Please try again.');
+  //         if (isAlbum) {
+  //           setCurrentlyPlayingAlbum(null);
+  //         }
+  //         setCurrentlyPlaying(null);
+  //         setCurrentlyPlayingArtist(null);
+  //       };
+
+  //       await audio.play();
+
+  //       if (isAlbum) {
+  //         setCurrentlyPlayingAlbum(itemId);
+  //       } else {
+  //         setCurrentlyPlaying(itemId);
+  //       }
+  //       setCurrentlyPlayingArtist(null);
+
+  //       audio.onended = () => {
+  //         if (isAlbum) {
+  //           setCurrentlyPlayingAlbum(null);
+  //         }
+  //         setCurrentlyPlaying(null);
+  //         setCurrentlyPlayingArtist(null);
+  //       };
+  //     } catch (error) {
+  //       console.error('Error playing audio:', error);
+  //       toast.error('Error playing audio. Please try again.');
+  //     }
+  //   } catch (error) {
+  //     console.error('Error in handlePlayPause:', error);
+  //     toast.error('An error occurred. Please try again.');
+  //   }
+  // };
+
+
+  const handlePlay = async (item: Track | Album | Artist) => {
     try {
       const token = localStorage.getItem('userToken');
-      const sessionId = localStorage.getItem('sessionId');
-      const userDataStr = localStorage.getItem('userData');
-
-      if (!token || !sessionId || !userDataStr) {
+      if (!token) {
         router.push('/login');
         return;
       }
-
-      const user = JSON.parse(userDataStr);
-
-      // Xử lý phát nhạc cho Artist
-      if ('artistProfile' in item) {
-        try {
-          // Nếu đang phát artist này thì dừng lại
-          if (currentlyPlayingArtist === item.artistProfile.id) {
-            if (audioRef.current) {
-              audioRef.current.pause();
-            }
-            setCurrentlyPlayingArtist(null);
-            setCurrentlyPlayingAlbum(null);
-            return;
-          }
-
-          // Lấy album mới nhất của nghệ sĩ
-          const artistAlbums = await api.artists.getArtistAlbums(
-            item.artistProfile.id,
-            token,
-            1,
-            10
-          );
-          if (!artistAlbums || artistAlbums.length === 0) {
-            toast.error('No albums found for this artist');
-            return;
-          }
-
-          // Sắp xếp album theo ngày phát hành (mới nhất trước)
-          const latestAlbum = artistAlbums.sort(
-            (a: Album, b: Album) =>
-              new Date(b.releaseDate).getTime() -
-              new Date(a.releaseDate).getTime()
-          )[0];
-
-          // Phát album mới nhất
-          const response = await api.albums.playAlbum(latestAlbum.id, token);
-          if (!response?.track?.audioUrl) {
-            throw new Error('No audio URL found');
-          }
-
-          // Dừng audio hiện tại nếu có
-          if (audioRef.current) {
-            audioRef.current.pause();
-          }
-
-          // Tạo audio mới và phát
-          const audio = new Audio(response.track.audioUrl);
-          audioRef.current = audio;
-          audio.currentTime = trackCurrentTimes[latestAlbum.id] || 0;
-
-          await audio.play();
-          setCurrentlyPlayingArtist(item.artistProfile.id);
-          setCurrentlyPlayingAlbum(latestAlbum.id);
-          setCurrentlyPlaying(null);
-
-          audio.onended = () => {
-            setCurrentlyPlayingArtist(null);
-            setCurrentlyPlayingAlbum(null);
+  
+      if ('audioUrl' in item) {
+        // Track
+        if (currentTrack?.id === item.id) {
+          if (isPlaying) {
+            pauseTrack();
             setCurrentlyPlaying(null);
-          };
-        } catch (error) {
-          console.error('Error playing artist:', error);
-          toast.error('Error playing artist. Please try again.');
-        }
-        return;
-      }
-
-      // Xử lý phát nhạc cho Track hoặc Album
-      const isAlbum = 'tracks' in item;
-      const itemId = item.id;
-
-      // Gọi API để thông báo bắt đầu phát nhạc
-      await api.session.handleAudioPlay(user.id, sessionId, token);
-
-      // Dừng audio hiện tại nếu có
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-
-      // Nếu đang phát item này thì dừng lại
-      if ((isAlbum ? currentlyPlayingAlbum : currentlyPlaying) === itemId) {
-        setTrackCurrentTimes({
-          ...trackCurrentTimes,
-          [itemId]: audioRef.current?.currentTime || 0,
-        });
-        if (isAlbum) {
+          } else {
+            playTrack(item);
+            console.log ('item.id', item.audioUrl);
+            setCurrentlyPlaying(item.id);
+          }
+        } else {
+          playTrack(item);
+          setCurrentlyPlaying(item.id);
           setCurrentlyPlayingAlbum(null);
-        }
-        setCurrentlyPlaying(null);
-        setCurrentlyPlayingArtist(null);
-        return;
-      }
-
-      let response;
-      try {
-        if (isAlbum) {
-          response = await api.albums.playAlbum(itemId, token);
-        } else {
-          response = await api.tracks.play(itemId, token);
-        }
-
-        if (!response?.track?.audioUrl) {
-          throw new Error('No audio URL found');
-        }
-
-        const audio = new Audio(response.track.audioUrl);
-        audioRef.current = audio;
-        audio.currentTime = trackCurrentTimes[itemId] || 0;
-
-        // Thêm xử lý lỗi khi phát audio
-        audio.onerror = (e) => {
-          console.error('Audio playback error:', e);
-          toast.error('Error playing audio. Please try again.');
-          if (isAlbum) {
-            setCurrentlyPlayingAlbum(null);
-          }
-          setCurrentlyPlaying(null);
           setCurrentlyPlayingArtist(null);
-        };
-
-        await audio.play();
-
-        if (isAlbum) {
-          setCurrentlyPlayingAlbum(itemId);
-        } else {
-          setCurrentlyPlaying(itemId);
         }
-        setCurrentlyPlayingArtist(null);
-
-        audio.onended = () => {
-          if (isAlbum) {
-            setCurrentlyPlayingAlbum(null);
+      } else if ('tracks' in item) {
+        // Album
+        if (item.tracks.length > 0) {
+          const firstTrack = item.tracks[0];
+          //Check if the first track is the same as the current track
+          if (currentTrack?.id === firstTrack.id && currentlyPlayingAlbum === item.id) {
+            if (isPlaying) {
+              pauseTrack();
+              setCurrentlyPlayingAlbum(null);
+            } else {
+              playTrack(firstTrack);
+              setCurrentlyPlayingAlbum(item.id);
+            }
+          } else {
+            playTrack(firstTrack);
+            setCurrentlyPlayingAlbum(item.id);
+            setCurrentlyPlaying(null);
+            setCurrentlyPlayingArtist(null);
           }
+        } else {
+          toast.error('No tracks found in this album.');
           setCurrentlyPlaying(null);
+          setCurrentlyPlayingAlbum(null);
           setCurrentlyPlayingArtist(null);
-        };
-      } catch (error) {
-        console.error('Error playing audio:', error);
-        toast.error('Error playing audio. Please try again.');
+        }
+      } else if ('artistProfile' in item) {
+        // Artist - Fetch top tracks and play the first one
+        // const artistTracks = await api.artists.getTopTracks(item.artistProfile.id, token);
+        // if (artistTracks.length > 0) {
+        //   playTrack(artistTracks[0]);
+        //   setCurrentlyPlayingArtist(item.artistProfile.id);
+        //   setCurrentlyPlaying(null);
+        //   setCurrentlyPlayingAlbum(null);
+        // } else {
+        //   toast.error('No tracks found for this artist.');
+        //   setCurrentlyPlaying(null);
+        //   setCurrentlyPlayingAlbum(null);
+        //   setCurrentlyPlayingArtist(null);
+        // }
       }
     } catch (error) {
-      console.error('Error in handlePlayPause:', error);
-      toast.error('An error occurred. Please try again.');
+      console.error('Error playing:', error);
+      toast.error('Error playing track. Please try again.');
     }
   };
+  
 
   return (
     <div suppressHydrationWarning>
@@ -349,14 +439,14 @@ function SearchContent() {
                           <img
                             src={
                               artist.artistProfile?.avatar ||
-                              '/images/default-avatar.png'
+                              '/images/default-avatar.jpg'
                             }
                             alt={artist.artistProfile?.artistName || 'Artist'}
                             className="w-full h-full object-cover rounded-full"
                           />
                         </div>
                         <button
-                          onClick={() => handlePlayPause(artist)}
+                          onClick={() => handlePlay(artist)}
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity shadow-lg transform translate-y-2 group-hover:translate-y-0"
                         >
                           {currentlyPlayingArtist ===
@@ -400,7 +490,7 @@ function SearchContent() {
                           className="w-full aspect-square object-cover rounded-md mb-4"
                         />
                         <button
-                          onClick={() => handlePlayPause(album)}
+                          onClick={() => handlePlay(album)}
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           {currentlyPlayingAlbum === album.id ? (
@@ -410,7 +500,13 @@ function SearchContent() {
                           )}
                         </button>
                       </div>
-                      <h3 className="text-white font-medium truncate">
+                      <h3
+                        className={`font-medium truncate ${
+                          currentlyPlayingAlbum === album.id
+                            ? 'text-[#A57865]'
+                            : 'text-white'
+                        }`}
+                      >
                         {album.title}
                       </h3>
                       <p className="text-white/60 text-sm truncate">
@@ -444,12 +540,12 @@ function SearchContent() {
                       >
                         <div className="relative flex-shrink-0">
                           <img
-                            src={track.coverUrl || '/images/default-avatar.png'}
+                            src={track.coverUrl || '/images/default-avatar.jpg'}
                             alt={track.title}
                             className="w-12 h-12 object-cover rounded"
                           />
                           <button
-                            onClick={() => handlePlayPause(track)}
+                            onClick={() => handlePlay(track)}
                             className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded"
                           >
                             {currentlyPlaying === track.id ? (
@@ -521,12 +617,12 @@ function SearchContent() {
                     >
                       <div className="relative">
                         <img
-                          src={track.coverUrl || '/images/default-avatar.png'}
+                          src={track.coverUrl || '/images/default-avatar.jpg'}
                           alt={track.title}
                           className="w-full aspect-square object-cover rounded-md mb-4"
                         />
                         <button
-                          onClick={() => handlePlayPause(track)}
+                          onClick={() => handlePlay(track)} 
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           {currentlyPlaying === track.id ? (
@@ -603,7 +699,7 @@ function SearchContent() {
                       <div className="relative">
                         <div className="aspect-square mb-4">
                           <img
-                            src={user.avatar || '/images/default-avatar.png'}
+                            src={user.avatar || '/images/default-avatar.jpg'}
                             alt={user.name || 'User'}
                             className="w-full h-full object-cover rounded-full"
                           />
@@ -635,20 +731,6 @@ function SearchContent() {
                 else.
               </p>
             )}
-
-          {/* Audio Player */}
-          <audio
-            ref={audioRef}
-            onTimeUpdate={(e) => {
-              if (currentlyPlaying) {
-                setTrackCurrentTimes({
-                  ...trackCurrentTimes,
-                  [currentlyPlaying]: e.currentTarget.currentTime,
-                });
-              }
-            }}
-            onEnded={() => setCurrentlyPlaying(null)}
-          />
         </div>
       </div>
     </div>

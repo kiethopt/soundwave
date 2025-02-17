@@ -4,12 +4,14 @@ import './globals.css';
 import Sidebar from '@/components/layout/Sidebar/Sidebar';
 import Header from '@/components/layout/Header/Header';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import pusher from '@/utils/pusher';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import type React from 'react';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { TrackProvider, useTrack } from '@/contexts/TrackContext'; 
+import PlayerBar from '@/components/layout/PlayerBar/PlayerBar';
 
 // Tạo component con để xử lý theme
 function LayoutContent({ children }: { children: React.ReactNode }) {
@@ -19,6 +21,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const { currentTrack  } = useTrack();
 
   const isAuthPage = useMemo(
     () =>
@@ -106,6 +109,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
               </main>
             </div>
           </div>
+
+          {/* Player Bar */}
+          {currentTrack && (
+            <PlayerBar />
+          )}
         </div>
       )}
     </div>
@@ -121,10 +129,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <ThemeProvider>
-        <body className="bg-[#111]" suppressHydrationWarning>
-          <LayoutContent>{children}</LayoutContent>
-          <ToastContainer />
-        </body>
+        <TrackProvider>
+          <body className="bg-[#111]" suppressHydrationWarning>
+            <LayoutContent>{children}</LayoutContent>
+            <ToastContainer />
+          </body>
+        </TrackProvider>
       </ThemeProvider>
     </html>
   );
