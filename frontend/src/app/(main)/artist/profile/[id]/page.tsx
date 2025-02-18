@@ -21,7 +21,7 @@ export default function ArtistProfilePage({
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [follow, setFollow] = useState(false);
-  const [isOwner, setIsOwner] = useState(false); // ✅ New state to hide follow button
+  const [isOwner, setIsOwner] = useState(false); 
 
   const token = localStorage.getItem('userToken') || '';
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -34,7 +34,6 @@ export default function ArtistProfilePage({
     }
   }, [id, token]);
 
-  // ✅ Check if the user is following OR if the user is the owner
   useEffect(() => {
     const fetchFollowing = async () => {
       const response = await api.user.getFollowing(token);

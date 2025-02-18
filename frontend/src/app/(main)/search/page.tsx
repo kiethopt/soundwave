@@ -82,6 +82,8 @@ function SearchContent() {
     toggleShuffle,
     skipNext,
     skipPrevious,
+    queueType,
+    setQueueType,
     trackQueue,
   } = useTrack();
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
@@ -320,10 +322,11 @@ function SearchContent() {
   
 
   useEffect(() => {
-    if (currentTrack && 'audioUrl' in currentTrack) {
+    if (currentTrack && queueType !== 'album') {
       setCurrentlyPlaying(currentTrack.id);
     }
-  }, [currentTrack]);
+  }, [currentTrack, queueType]);
+  
 
 
 
@@ -346,7 +349,9 @@ function SearchContent() {
             setCurrentlyPlaying(item.id);
           }
         } else {
-          trackQueue(results.tracks.filter(track => track.id !== item.id));  
+          trackQueue(results.tracks);  
+          setQueueType('track');
+          console.log('trackQueue', results.tracks);
           playTrack(item);
           setCurrentlyPlaying(item.id);
         }
@@ -367,6 +372,7 @@ function SearchContent() {
           } else {
             // Refresh queue with album tracks
             trackQueue(item.tracks);
+            setQueueType('album');
             playTrack(firstTrack);
             setCurrentlyPlaying(item.id);
           }

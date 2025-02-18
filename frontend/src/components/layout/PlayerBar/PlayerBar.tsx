@@ -98,7 +98,7 @@ export default function PlayerBar() {
       </div>
 
       {/* Volume Control */}
-      <div className="flex flex-row items-center justify-end space-x-2 hidden md:flex col-span-1">
+      <div className=" items-center justify-end space-x-2 hidden md:flex col-span-1">
         <Volume className="w-5 h-5 text-white" />
         <input
           type="range"
