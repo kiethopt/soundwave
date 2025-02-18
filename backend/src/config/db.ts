@@ -4,7 +4,7 @@ import { albumExtension } from '../middleware/album.middleware';
 import { withAccelerate } from '@prisma/extension-accelerate';
 import { authExtension } from '../middleware/auth.middleware';
 import { artistExtension } from '../middleware/artist.middleware';
-import { adminExtension } from 'src/middleware/admin.middleware';
+import { adminExtension } from '../middleware/admin.middleware';
 
 // Tạo Prisma Client và áp dụng extension
 const prisma = new PrismaClient({
