@@ -108,49 +108,49 @@ export default function PlayerBar() {
         </div>
 
         {/* Progress Bar */}
-<div className="flex w-full items-center justify-between max-w-2xl space-x-4">
-  <span className="text-white text-sm min-w-fit">{formatTime(progress / 100 * duration)}</span>
-  <div className="relative w-full flex items-center group">
-    {/* Background bar */}
-    <div className="absolute w-full h-1 bg-[#383838] rounded-lg" />
-    
-    {/* Progress bar */}
-    <div 
-      className="absolute h-1 bg-white rounded-lg" 
-      style={{ width: `${progress}%` }}
-    />
+        <div className="flex w-full items-center justify-between max-w-2xl space-x-4">
+          <span className="text-white text-sm min-w-fit">{formatTime(progress / 100 * duration)}</span>
+          <div className="relative w-full flex items-center group">
+            {/* Background bar */}
+            <div className="absolute w-full h-1 bg-[#383838] rounded-lg" />
+            
+            {/* Progress bar */}
+            <div 
+              className="absolute h-1 bg-white rounded-lg" 
+              style={{ width: `${progress}%` }}
+            />
 
-    {/* Range input (thumb is hidden until hover) */}
-    <input
-      type="range"
-      value={progress}
-      onChange={(e) => seekTrack(parseFloat(e.target.value))}
-      className="relative w-full h-1 appearance-none cursor-pointer bg-transparent z-10
-        [&::-webkit-slider-thumb]:appearance-none
-        group-hover:[&::-webkit-slider-thumb]:w-3
-        group-hover:[&::-webkit-slider-thumb]:h-3
-        group-hover:[&::-webkit-slider-thumb]:rounded-full
-        group-hover:[&::-webkit-slider-thumb]:bg-white
-        group-hover:[&::-webkit-slider-thumb]:border-none
-        group-hover:[&::-webkit-slider-thumb]:shadow-lg
-        group-hover:[&::-moz-range-thumb]:w-3
-        group-hover:[&::-moz-range-thumb]:h-3
-        group-hover:[&::-moz-range-thumb]:rounded-full
-        group-hover:[&::-moz-range-thumb]:bg-white
-        group-hover:[&::-moz-range-thumb]:border-none
-        group-hover:[&::-moz-range-thumb]:shadow-lg
-        group-hover:[&::-ms-thumb]:w-3
-        group-hover:[&::-ms-thumb]:h-3
-        group-hover:[&::-ms-thumb]:rounded-full
-        group-hover:[&::-ms-thumb]:bg-white
-        group-hover:[&::-ms-thumb]:border-none
-        group-hover:[&::-ms-thumb]:shadow-lg"
-      min="0"
-      max="100"
-    />
-  </div>
-  <span className="text-white text-sm min-w-fit">{formatTime(duration)}</span>
-</div>
+            {/* Range input (thumb is hidden until hover) */}
+            <input
+              type="range"
+              value={progress}
+              onChange={(e) => seekTrack(parseFloat(e.target.value))}
+              className="relative w-full h-1 appearance-none cursor-pointer bg-transparent z-10
+                [&::-webkit-slider-thumb]:appearance-none
+                group-hover:[&::-webkit-slider-thumb]:w-3
+                group-hover:[&::-webkit-slider-thumb]:h-3
+                group-hover:[&::-webkit-slider-thumb]:rounded-full
+                group-hover:[&::-webkit-slider-thumb]:bg-white
+                group-hover:[&::-webkit-slider-thumb]:border-none
+                group-hover:[&::-webkit-slider-thumb]:shadow-lg
+                group-hover:[&::-moz-range-thumb]:w-3
+                group-hover:[&::-moz-range-thumb]:h-3
+                group-hover:[&::-moz-range-thumb]:rounded-full
+                group-hover:[&::-moz-range-thumb]:bg-white
+                group-hover:[&::-moz-range-thumb]:border-none
+                group-hover:[&::-moz-range-thumb]:shadow-lg
+                group-hover:[&::-ms-thumb]:w-3
+                group-hover:[&::-ms-thumb]:h-3
+                group-hover:[&::-ms-thumb]:rounded-full
+                group-hover:[&::-ms-thumb]:bg-white
+                group-hover:[&::-ms-thumb]:border-none
+                group-hover:[&::-ms-thumb]:shadow-lg"
+              min="0"
+              max="100"
+            />
+          </div>
+          <span className="text-white text-sm min-w-fit">{formatTime(duration)}</span>
+        </div>
       </div>
 
       {/* Volume Control */}
