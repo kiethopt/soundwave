@@ -681,6 +681,66 @@ export const getAllTracks = async (
   }
 };
 
+// Lấy track theo ID
+export const getTrackById = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    const track = await prisma.track.findUnique({
+      where: { id },
+      select: trackSelect,
+    });
+
+    if (!track) {
+      res.status(404).json({ message: 'Track not found' });
+      return;
+    }
+
+    // Kiểm tra quyền truy cập
+    if (user?.role === Role.ADMIN) {
+      // ADMIN có thể xem tất cả tracks
+      res.json(track);
+      return;
+    }
+
+    // Kiểm tra nếu track không active
+    if (!track.isActive) {
+      // Kiểm tra nếu user có artistProfile và là chủ sở hữu track
+      if (user?.artistProfile?.id === track.artistId) {
+        // Kiểm tra artist profile có hợp lệ không
+        if (!user.artistProfile.isVerified || !user.artistProfile.isActive) {
+          res.status(403).json({
+            message: 'Your artist profile is not verified or inactive',
+            code: 'INVALID_ARTIST_PROFILE',
+          });
+          return;
+        }
+
+        // Cho phép user xem track dù đang ở profile User hay Artist
+        res.json(track);
+        return;
+      }
+
+      // Các trường hợp khác không được xem track không active
+      res.status(403).json({
+        message: 'You do not have permission to view this track',
+        code: 'TRACK_NOT_ACCESSIBLE',
+      });
+      return;
+    }
+
+    // Track active - cho phép tất cả user xem
+    res.json(track);
+  } catch (error) {
+    console.error('Get track by id error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Lấy danh sách tất cả các tracks theo thể loại
 export const getTracksByGenre = async (
   req: Request,

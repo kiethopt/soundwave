@@ -1,11 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { FollowingType, HistoryType, Role } from '@prisma/client';
-import {
-  clearCacheForEntity,
-  client,
-  setCache,
-} from '../middleware/cache.middleware';
+import { client, setCache } from '../middleware/cache.middleware';
 import { uploadFile } from '../services/cloudinary.service';
 import {
   searchAlbumSelect,
@@ -436,7 +432,11 @@ export const followUser = async (
     }
 
     // Validate self-follow
-    if ((followingType === 'USER' || followingType === 'ARTIST') && followingId === user.id || followingId === user.artistProfile?.id) {
+    if (
+      ((followingType === 'USER' || followingType === 'ARTIST') &&
+        followingId === user.id) ||
+      followingId === user.artistProfile?.id
+    ) {
       res.status(400).json({ message: 'Cannot follow yourself' });
       return;
     }

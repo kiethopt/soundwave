@@ -10,6 +10,7 @@ import {
   searchTrack,
   playTrack,
   toggleTrackVisibility,
+  getTrackById,
 } from '../controllers/track.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -26,6 +27,9 @@ router.get(
   authorize([Role.ADMIN, Role.ARTIST]),
   getAllTracks
 );
+
+// Lấy track theo ID
+router.get('/:id', authenticate, getTrackById);
 
 // Route tạo track (ADMIN & ARTIST only)
 router.post(
