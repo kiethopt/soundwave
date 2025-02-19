@@ -110,14 +110,15 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       setIsPlaying(false);
     }
   };
-  
+
   const seekTrack = (position: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = (position / 100) * audioRef.current.duration;
-      setProgress(position);
+    if (audioRef.current && duration > 0) {
+      const newTime = (position / 100) * duration;
+      audioRef.current.currentTime = newTime;
+            setProgress(position);
     }
   };
-
+  
   const toggleLoop = () => setLoop(!loop);
   const toggleShuffle = () => setShuffle(!shuffle);
 
@@ -184,8 +185,9 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
     const handleTimeUpdate = () => {
       if (audio.duration && !isNaN(audio.duration)) {
-        const currentProgress = (audio.currentTime / audio.duration) * 100;
-        setProgress(currentProgress);
+        requestAnimationFrame(() => {
+          setProgress((audio.currentTime / audio.duration) * 100);
+        });
     
         if (currentTrack && playStartTime && audio.currentTime - lastSavedTime >= 30) {
           const duration = Math.floor(audio.currentTime);
@@ -197,9 +199,9 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    const handleLoadedMetadata = () => {
-      setDuration(audio.duration || 0);
-    }
+    const handleMetadataLoaded = () => {
+      setDuration(audioRef.current?.duration || 0);
+    };
 
     const handleEnded = () => {
       if (currentTrack && playStartTime) {
@@ -220,14 +222,14 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Add event listeners
+    audio.addEventListener('loadedmetadata', handleMetadataLoaded);
     audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('ended', handleEnded);
 
     // Cleanup event listeners
     return () => {
+      audio.removeEventListener('loadedmetadata', handleMetadataLoaded);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
     };
   }, [loop, volume, skipNext, currentTrack, playStartTime, lastSavedTime, saveHistory]);
