@@ -13,7 +13,7 @@ import {
   HomeFilled,
 } from '@/components/ui/Icons';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { User } from '@/types';
 import pusher from '@/utils/pusher';
@@ -21,6 +21,7 @@ import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { set } from 'lodash';
 
 export default function Header({
   isSidebarOpen,
@@ -38,6 +39,7 @@ export default function Header({
   const isActive = (path: string) => pathname === path;
   const [notificationCount, setNotificationCount] = useState(0);
   const { theme, toggleTheme } = useTheme();
+  const router = useRouter();
 
   // Check if user is admin or artist
   const isAdminOrArtist =
@@ -113,11 +115,10 @@ export default function Header({
     e.preventDefault();
     if (searchQuery.trim()) {
       if (!isAuthenticated) {
-        window.location.href = '/login';
+        router.push('/login');
       } else {
-        window.location.href = `/search?q=${encodeURIComponent(
-          searchQuery.trim()
-        )}`;
+        router.push(`/search?q=${encodeURIComponent(searchQuery)}`)
+        setSearchQuery('');
       }
     }
   };
