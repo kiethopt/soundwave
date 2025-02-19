@@ -4,10 +4,7 @@ import { HistoryType } from '@prisma/client';
 import { historySelect } from '../utils/prisma-selects';
 
 // Lưu lịch sử nghe nhạc
-export const savePlayHistory = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const savePlayHistory = async (req: Request, res: Response): Promise<void> => {
   try {
     const { trackId, duration, completed } = req.body;
     const user = req.user;
@@ -22,9 +19,10 @@ export const savePlayHistory = async (
       return;
     }
 
-    // Kiểm tra xem track có tồn tại không
+    // Check if the track exists and get artistId
     const track = await prisma.track.findUnique({
       where: { id: trackId },
+      select: { id: true, artistId: true },
     });
 
     if (!track) {
@@ -32,26 +30,61 @@ export const savePlayHistory = async (
       return;
     }
 
-    // Lưu lịch sử nghe nhạc
-    const history = await prisma.history.create({
-      data: {
+    const artistId = track.artistId;
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+    // Check if the user has listened to any track from this artist in the past month
+    const existingListen = await prisma.history.findFirst({
+      where: {
+        userId: user.id,
+        track: { artistId: artistId },
+        createdAt: { gte: lastMonth },
+      },
+    });
+
+    // Increase artist's monthly listeners only if this is a new listen
+    if (!existingListen) {
+      await prisma.artistProfile.update({
+        where: { id: artistId },
+        data: { monthlyListeners: { increment: 1 } },
+      });
+    }
+
+    // Save play history using upsert
+    const history = await prisma.history.upsert({
+      where: {
+        userId_trackId_type: {
+          userId: user.id,
+          trackId: trackId,
+          type: 'PLAY',
+        },
+      },
+      update: {
+        updatedAt: new Date(),
+        completed, // Update completion status
+        ...(completed && { playCount: { increment: 1 } }), // Increment only if completed
+      },
+      create: {
         type: HistoryType.PLAY,
         duration,
         completed,
         trackId,
         userId: user.id,
-        playCount: 1,
+        playCount: completed ? 1 : 0, // Only set playCount if completed
       },
       select: historySelect,
     });
 
-    // Tăng playCount của track
-    await prisma.track.update({
-      where: { id: trackId },
-      data: {
-        playCount: { increment: 1 },
-      },
-    });
+    // Increment playCount for track only if completed
+    if (completed) {
+      await prisma.track.update({
+        where: { id: trackId },
+        data: {
+          playCount: { increment: 1 },
+        },
+      });
+    }
 
     res.status(201).json({
       message: 'Play history saved successfully',
@@ -62,6 +95,8 @@ export const savePlayHistory = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+
 
 // Lưu lịch sử tìm kiếm
 export const saveSearchHistory = async (

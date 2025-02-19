@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useRef, useEffect, useCallback } from 'react';
 import { Track } from '@/types';
-import { set } from 'lodash';
-
+import { api } from '@/utils/api';
 type TrackContextType = {
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -39,37 +38,71 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const [queueType, setQueueType] = useState<string>('track');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackQueueRef = useRef<Track[]>([]);
+  const token = localStorage.getItem('userToken');
+  const [playStartTime, setPlayStartTime] = useState<number | null>(null);
+  const [lastSavedTime, setLastSavedTime] = useState<number>(0);
   
   // Update ref whenever trackQueue changes
   useEffect(() => {
     trackQueueRef.current = trackQueue;
   }, [trackQueue]);
 
+  const saveHistory = useCallback(async (trackId: string, duration: number, completed: boolean) => {
+    if (!token) return;
+    
+    try {
+      await api.history.savePlayHistory({ trackId, duration, completed }, token);
+    } catch (error) {
+      console.error('Failed to save play history:', error);
+    }
+  }, [token]);
 
-  const playTrack = useCallback((track: Track) => {
+  const playTrack = useCallback(async (track: Track) => {
     if (!track.audioUrl) {
       console.error("Audio URL is missing for this track.");
       return;
     }
-
+  
     if (!audioRef.current) return;
-
-    if (currentTrack?.id !== track.id) {
-      audioRef.current.src = track.audioUrl;
-      setProgress(0);
+  
+    // Check if the same track is being played
+    if (currentTrack?.id === track.id) {
+      audioRef.current.play().catch(error => {
+        console.error("Playback error:", error);
+        setIsPlaying(false);
+      });
+      setIsPlaying(true);
+      return;
     }
-
+  
+    // Reset play tracking state for new track
+    setPlayStartTime(Date.now());
+    setLastSavedTime(0);
+  
+    // Only update src when switching to a new track
+    audioRef.current.src = track.audioUrl;
+    audioRef.current.currentTime = 0;
+    setProgress(0);
+  
     const newIndex = trackQueueRef.current.findIndex((t) => t.id === track.id);
     if (newIndex !== -1) {
       setCurrentIndex(newIndex);
     }
-
+  
     setCurrentTrack(track);
     setIsPlaying(true);
-    
-    audioRef.current.currentTime = 0;
-    audioRef.current.play().catch((error) => console.error('Playback error:', error));
-  }, [currentTrack]);
+  
+    try {
+      await audioRef.current.play();
+      saveHistory(track.id, 0, false).catch(error => {
+        console.error("Failed to save initial play history:", error);
+      });
+    } catch (error) {
+      console.error("Playback error:", error);
+      setIsPlaying(false);
+    }
+  }, [currentTrack, saveHistory]);
+  
 
   const pauseTrack = () => {
     if (audioRef.current) {
@@ -77,14 +110,15 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       setIsPlaying(false);
     }
   };
-  
+
   const seekTrack = (position: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = (position / 100) * audioRef.current.duration;
-      setProgress(position);
+    if (audioRef.current && duration > 0) {
+      const newTime = (position / 100) * duration;
+      audioRef.current.currentTime = newTime;
+            setProgress(position);
     }
   };
-
+  
   const toggleLoop = () => setLoop(!loop);
   const toggleShuffle = () => setShuffle(!shuffle);
 
@@ -151,40 +185,54 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
     const handleTimeUpdate = () => {
       if (audio.duration && !isNaN(audio.duration)) {
-        setProgress((audio.currentTime / audio.duration) * 100);
+        requestAnimationFrame(() => {
+          setProgress((audio.currentTime / audio.duration) * 100);
+        });
+    
+        if (currentTrack && playStartTime && audio.currentTime - lastSavedTime >= 30) {
+          const duration = Math.floor(audio.currentTime);
+          const completed = false; 
+          
+          saveHistory(currentTrack.id, duration, completed);
+          setLastSavedTime(audio.currentTime);
+        }
       }
     };
 
-    const handleLoadedMetadata = () => {
-      setDuration(audio.duration || 0);
+    const handleMetadataLoaded = () => {
+      setDuration(audioRef.current?.duration || 0);
     };
 
     const handleEnded = () => {
+      if (currentTrack && playStartTime) {
+        const duration = Math.floor(audio.duration);
+        saveHistory(currentTrack.id, duration, true);
+      }
+    
       if (loop) {
         audio.currentTime = 0;
         audio.play().catch((error) => console.error('Error playing track after loop:', error));
       } else if (shuffle) {
         setIsPlaying(false);
         skipRandom();
-      } 
-      else {
+      } else {
         setIsPlaying(false);
         skipNext();
       }
     };
 
     // Add event listeners
+    audio.addEventListener('loadedmetadata', handleMetadataLoaded);
     audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('ended', handleEnded);
 
     // Cleanup event listeners
     return () => {
+      audio.removeEventListener('loadedmetadata', handleMetadataLoaded);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [loop, volume, skipNext]);
+  }, [loop, volume, skipNext, currentTrack, playStartTime, lastSavedTime, saveHistory]);
 
   return (
     <TrackContext.Provider
