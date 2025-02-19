@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react';
 import { Pause, Play, Shuffle, Loop, Volume, Prev, Next } from '@/components/ui/Icons';
 import { useTrack } from '@/contexts/TrackContext';
 
@@ -21,6 +20,7 @@ export default function PlayerBar() {
     toggleShuffle,
     skipNext,
     skipPrevious,
+    skipRandom,
   } = useTrack();
 
   const formatTime = (seconds: number) => {
@@ -70,7 +70,7 @@ export default function PlayerBar() {
 
           {/* Previous Button */}
           <button
-            onClick={skipPrevious}
+            onClick={shuffle ? skipRandom : skipPrevious}
             className="p-2 text-white rounded-full hover:bg-[#383838] transition-colors duration-200"
           >
             <Prev className="w-5 h-5" />
@@ -90,7 +90,7 @@ export default function PlayerBar() {
 
           {/* Next Button */}
           <button
-            onClick={skipNext}
+            onClick={shuffle ? skipRandom : skipNext}
             className="p-2 text-white rounded-full hover:bg-[#383838] transition-colors duration-200"
           >
             <Next className="w-5 h-5" />
@@ -117,13 +117,13 @@ export default function PlayerBar() {
             {/* Progress bar */}
             <div 
               className="absolute h-1 bg-white rounded-lg" 
-              style={{ width: `${progress}%` }}
+              style={{ width: `${progress ? progress : 0}%` }}
             />
 
             {/* Range input (thumb is hidden until hover) */}
             <input
               type="range"
-              value={progress}
+              value={isNaN(progress) ? 0 : progress}
               onChange={(e) => seekTrack(parseFloat(e.target.value))}
               className="relative w-full h-1 appearance-none cursor-pointer bg-transparent z-10
                 [&::-webkit-slider-thumb]:appearance-none

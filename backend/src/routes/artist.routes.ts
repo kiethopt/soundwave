@@ -46,7 +46,6 @@ router.get(
 router.get(
   '/tracks/:id',
   authenticate,
-  authorize([Role.ADMIN, Role.ARTIST]),
   getArtistTracks
 );
 

@@ -417,6 +417,9 @@ export const api = {
     getStats: async (id: string, token: string) =>
       fetchWithAuth(`/api/artist/stats/${id}`, { method: 'GET' }, token),
 
+    getTrackByArtistId: async (id: string, token: string) =>
+      fetchWithAuth(`/api/artist/tracks/${id}`, { method: 'GET' }, token),
+
     getAllTracks: async (
       token: string,
       page: number,
@@ -505,6 +508,7 @@ export const api = {
         { method: 'GET' },
         token
       ),
+
 
     create: async (data: FormData, token: string) =>
       fetchWithAuth('/api/tracks', { method: 'POST', body: data }, token),

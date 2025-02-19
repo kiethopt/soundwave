@@ -1,6 +1,9 @@
+'use client';
+
 import { createContext, useContext, useState, ReactNode, useRef, useEffect, useCallback } from 'react';
 import { Track } from '@/types';
 import { api } from '@/utils/api';
+
 type TrackContextType = {
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -36,17 +39,39 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const [trackQueue, setTrackQueue] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [queueType, setQueueType] = useState<string>('track');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const trackQueueRef = useRef<Track[]>([]);
-  const token = localStorage.getItem('userToken');
   const [playStartTime, setPlayStartTime] = useState<number | null>(null);
   const [lastSavedTime, setLastSavedTime] = useState<number>(0);
+  const [token, setToken] = useState<string | null>(null);
   
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const trackQueueRef = useRef<Track[]>([]);
+  const tabId = useRef(Math.random().toString(36).substring(2, 15)).current;
+  const broadcastChannel = useRef<BroadcastChannel | null>(null);
+
+  // Initialize audio and broadcast channel
+  useEffect(() => {
+    audioRef.current = new Audio();
+    broadcastChannel.current = new BroadcastChannel('musicPlayback');
+    const token = localStorage.getItem('userToken');
+    if (token) setToken(token);
+
+    // Clean up function
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (broadcastChannel.current) {
+        broadcastChannel.current.close();
+      }
+    };
+  }, []);
+
   // Update ref whenever trackQueue changes
   useEffect(() => {
     trackQueueRef.current = trackQueue;
   }, [trackQueue]);
-
+  
   const saveHistory = useCallback(async (trackId: string, duration: number, completed: boolean) => {
     if (!token) return;
     
@@ -64,8 +89,12 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     }
   
     if (!audioRef.current) return;
+    
+    // Broadcast a message to other tabs that this tab is playing music
+    if (broadcastChannel.current) {
+      broadcastChannel.current.postMessage({ type: 'play', tabId });
+    }
   
-    // Check if the same track is being played
     if (currentTrack?.id === track.id) {
       audioRef.current.play().catch(error => {
         console.error("Playback error:", error);
@@ -75,11 +104,8 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
   
-    // Reset play tracking state for new track
     setPlayStartTime(Date.now());
     setLastSavedTime(0);
-  
-    // Only update src when switching to a new track
     audioRef.current.src = track.audioUrl;
     audioRef.current.currentTime = 0;
     setProgress(0);
@@ -101,33 +127,32 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       console.error("Playback error:", error);
       setIsPlaying(false);
     }
-  }, [currentTrack, saveHistory]);
+  }, [currentTrack, saveHistory, tabId]);
   
-
-  const pauseTrack = () => {
+  const pauseTrack = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
     }
-  };
+  }, []);
 
-  const seekTrack = (position: number) => {
+  const seekTrack = useCallback((position: number) => {
     if (audioRef.current && duration > 0) {
       const newTime = (position / 100) * duration;
       audioRef.current.currentTime = newTime;
-            setProgress(position);
+      setProgress(position);
     }
-  };
+  }, [duration]);
   
-  const toggleLoop = () => setLoop(!loop);
-  const toggleShuffle = () => setShuffle(!shuffle);
+  const toggleLoop = useCallback(() => setLoop(prev => !prev), []);
+  const toggleShuffle = useCallback(() => setShuffle(prev => !prev), []);
 
-  const setAudioVolume = (newVolume: number) => {
+  const setAudioVolume = useCallback((newVolume: number) => {
     if (audioRef.current) {
       audioRef.current.volume = newVolume;
     }
     setVolume(newVolume);
-  };
+  }, []);
 
   const skipRandom = useCallback(() => {
     if (trackQueueRef.current.length <= 1) return;
@@ -174,15 +199,14 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentIndex, playTrack]);
   
+  // Main audio event listeners and tab synchronization
   useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-    }
+    if (!audioRef.current || !broadcastChannel.current) return;
     
     const audio = audioRef.current;
     audio.volume = volume;
     audio.loop = loop;
-
+  
     const handleTimeUpdate = () => {
       if (audio.duration && !isNaN(audio.duration)) {
         requestAnimationFrame(() => {
@@ -191,18 +215,21 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     
         if (currentTrack && playStartTime && audio.currentTime - lastSavedTime >= 30) {
           const duration = Math.floor(audio.currentTime);
-          const completed = false; 
-          
-          saveHistory(currentTrack.id, duration, completed);
+          saveHistory(currentTrack.id, duration, false);
           setLastSavedTime(audio.currentTime);
         }
       }
     };
-
+  
     const handleMetadataLoaded = () => {
-      setDuration(audioRef.current?.duration || 0);
+      const duration = audio.duration;
+      if (duration && !isNaN(duration)) {
+        setDuration(duration);
+      } else {
+        setDuration(0);
+      }
     };
-
+  
     const handleEnded = () => {
       if (currentTrack && playStartTime) {
         const duration = Math.floor(audio.duration);
@@ -221,18 +248,38 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
+    const handleBroadcastMessage = (event: MessageEvent) => {
+      if (event.data.type === 'play' && event.data.tabId !== tabId) {
+        // If another tab has started playback, pause the current tab
+        pauseTrack();
+      }
+    };
+  
     // Add event listeners
     audio.addEventListener('loadedmetadata', handleMetadataLoaded);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
-
+    broadcastChannel.current.addEventListener('message', handleBroadcastMessage);
+    
+    const handleBeforeUnload = () => {
+      if (broadcastChannel.current) {
+        broadcastChannel.current.postMessage({ type: 'stop', tabId });
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+  
     // Cleanup event listeners
     return () => {
       audio.removeEventListener('loadedmetadata', handleMetadataLoaded);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
+      if (broadcastChannel.current) {
+        broadcastChannel.current.removeEventListener('message', handleBroadcastMessage);
+      }
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [loop, volume, skipNext, currentTrack, playStartTime, lastSavedTime, saveHistory]);
+  }, [loop, volume, skipNext, skipRandom, currentTrack, playStartTime, lastSavedTime, saveHistory, pauseTrack, tabId]);
 
   return (
     <TrackContext.Provider
@@ -249,7 +296,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         setVolume: setAudioVolume,
         trackQueue: setTrackQueue,
         queueType,
-        setQueueType: setQueueType,
+        setQueueType,
         skipRandom,
         seekTrack,
         toggleLoop,
