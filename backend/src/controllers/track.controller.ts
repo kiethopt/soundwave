@@ -6,22 +6,6 @@ import { client, setCache } from '../middleware/cache.middleware';
 import { sessionService } from '../services/session.service';
 import { trackSelect } from '../utils/prisma-selects';
 
-// Function để kiểm tra quyền
-const canManageTrack = (user: any, trackArtistId: string): boolean => {
-  if (!user) return false;
-
-  // ADMIN luôn có quyền
-  if (user.role === Role.ADMIN) return true;
-
-  // Kiểm tra user có artistProfile đã verify và có role ARTIST không
-  return (
-    user.artistProfile?.isVerified &&
-    user.artistProfile?.isActive &&
-    user.artistProfile?.role === Role.ARTIST &&
-    user.artistProfile?.id === trackArtistId
-  );
-};
-
 // Validation functions
 const validateTrackData = (
   data: any,
@@ -78,6 +62,22 @@ const validateTrackData = (
   }
 
   return null; // Track hợp lệ
+};
+
+// Function để kiểm tra quyền
+const canManageTrack = (user: any, trackArtistId: string): boolean => {
+  if (!user) return false;
+
+  // ADMIN luôn có quyền
+  if (user.role === Role.ADMIN) return true;
+
+  // Kiểm tra user có artistProfile đã verify và có role ARTIST không
+  return (
+    user.artistProfile?.isVerified &&
+    user.artistProfile?.isActive &&
+    user.artistProfile?.role === Role.ARTIST &&
+    user.artistProfile?.id === trackArtistId
+  );
 };
 
 // Validation functions cho file

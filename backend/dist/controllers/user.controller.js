@@ -340,6 +340,7 @@ const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.getAllGenres = getAllGenres;
 const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const user = req.user;
         const { id: followingId } = req.params;
@@ -372,7 +373,7 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             res.status(404).json({ message: 'Target not found' });
             return;
         }
-        if (followingType === 'USER' && followingId === user.id) {
+        if ((followingType === 'USER' || followingType === 'ARTIST') && followingId === user.id || followingId === ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
             res.status(400).json({ message: 'Cannot follow yourself' });
             return;
         }
@@ -475,6 +476,7 @@ const unfollowUser = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.unfollowUser = unfollowUser;
 const getFollowers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const user = req.user;
         const { type } = req.query;
@@ -489,7 +491,7 @@ const getFollowers = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                     followingType: client_1.FollowingType.USER,
                 },
                 {
-                    followingArtistId: user.id,
+                    followingArtistId: (_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.id,
                     followingType: client_1.FollowingType.ARTIST,
                 },
             ],
