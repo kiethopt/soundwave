@@ -507,3 +507,44 @@ export const getArtistStats = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+export const getRelatedArtists = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { id },
+      select: { genres: { select: { genreId: true } } },
+    });
+
+    if (!artistProfile) {
+      res.status(404).json({ message: 'Artist not found' });
+      return;
+    }
+
+    const genreIds = artistProfile.genres.map((genre) => genre.genreId);
+
+    const relatedArtist = await prisma.artistProfile.findMany({
+      where: {
+        genres: {
+          some: {
+            genreId: {
+              in: genreIds,
+            },
+          },
+        },
+        isVerified: true,
+        id: { not: id },
+      },
+      select: artistProfileSelect,
+      take: 10,
+    });
+
+    res.json(relatedArtist);
+  } catch (error) {
+    console.error('Get similar artists error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}

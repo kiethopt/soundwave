@@ -423,6 +423,9 @@ export const api = {
     getAlbumByArtistId: async (id: string, token: string) =>
       fetchWithAuth(`/api/artist/albums/${id}`, { method: 'GET' }, token),
 
+    getRelatedArtists: async (id: string, token: string) => 
+      fetchWithAuth(`/api/artist/related/${id}`, { method: 'GET' }, token),
+
     getAllTracks: async (
       token: string,
       page: number,

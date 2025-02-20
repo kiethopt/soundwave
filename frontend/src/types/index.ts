@@ -105,6 +105,8 @@ export interface ArtistProfile {
     totalPages: number;
   };
   tracks?: {
+    some(arg0: (track: any) => boolean): unknown;
+    length: number;
     data: Track[];
     total: number;
     page: number;

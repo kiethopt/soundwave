@@ -6,6 +6,7 @@ import {
   getArtistTracks,
   getArtistAlbums,
   updateArtistProfile,
+  getRelatedArtists,
 } from '../controllers/artist.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -53,6 +54,12 @@ router.get(
   '/albums/:id',
   authenticate,
   getArtistAlbums
+);
+
+router.get(
+  '/related/:id',
+  authenticate,
+  getRelatedArtists
 );
 
 // router.get(
