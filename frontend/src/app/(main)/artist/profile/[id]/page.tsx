@@ -7,6 +7,17 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Album, ArtistProfile, Track } from '@/types';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-toastify';
+import { useDominantColor } from '@/hooks/useDominantColor';
+import { Verified, Play, Pause, AddSimple } from '@/components/ui/Icons';
+import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
+import { useTrack } from '@/contexts/TrackContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function ArtistProfilePage({
   params,
@@ -15,13 +26,33 @@ export default function ArtistProfilePage({
 }) {
   const { theme } = useTheme();
   const { id } = use(params);
-   const router = useRouter();
+  const router = useRouter();
   const [artist, setArtist] = useState<ArtistProfile | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [follow, setFollow] = useState(false);
   const [isOwner, setIsOwner] = useState(false); 
+  const { dominantColor } = useDominantColor(artist?.avatar || '');
+  const {
+    currentTrack,
+    isPlaying,
+    volume,
+    progress,
+    loop,
+    shuffle,
+    playTrack,
+    pauseTrack,
+    setVolume,
+    seekTrack,
+    toggleLoop,
+    toggleShuffle,
+    skipNext,
+    skipPrevious,
+    queueType,
+    setQueueType,
+    trackQueue,
+  } = useTrack();
 
   const token = localStorage.getItem('userToken') || '';
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -46,7 +77,20 @@ export default function ArtistProfilePage({
       }
     };
 
+    const fetchAlbums = async () => {
+      const response = await api.artists.getAlbumByArtistId(id, token);
+      setAlbums(response.albums);
+    }
+
+    const fetchTracks = async () => {
+      const response = await api.artists.getTrackByArtistId(id, token);
+      
+      setTracks(response.tracks);
+    }
+
     fetchFollowing();
+    fetchAlbums();
+    fetchTracks();
   }, [id, token]);
 
   const getArtistData = async (token: string) => {
@@ -82,26 +126,194 @@ export default function ArtistProfilePage({
   };
 
   return (
-    <div>
+    <div
+      className="min-h-screen w-full rounded-lg"
+      style={{
+        background: dominantColor
+          ? `linear-gradient(180deg, 
+              ${dominantColor} 0%, 
+              ${dominantColor}99 15%, 
+              ${dominantColor}40 30%, 
+              ${theme === 'light' ? '#ffffff' : '#121212'} 100%)`
+          : theme === 'light'
+          ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
+          : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
+      }}
+    >
       {artist && (
         <div>
-          <img 
-            src={artist.avatar || 'images/default-avatar.jpg'} 
-            alt="Artist Avatar" 
-            style={{ width: '200px', height: '200px' }} 
-          />
-          <h1>Artist Name: {artist.artistName}</h1>
+          {/* Artist Banner */}
+          <div
+            className="relative w-full h-[370px] flex flex-col items-start justify-end rounded-t-lg"
+            style={{ backgroundColor: dominantColor || undefined }}
+          >
+            <div className='p-8'>
+              <div className="flex items-center space-x-2">
+                <Verified className='w-6 h-6' />
+                <span className='text-sm font-medium'>Verified Artist</span>
+              </div>
+              <h1 className='text-6xl font-bold uppercase py-4' style={{ lineHeight: '1.1' }}>
+                {artist.artistName}
+              </h1>
+              <span className='text-base font-semibold py-6'>
+                {new Intl.NumberFormat('en-US').format(artist.monthlyListeners)} monthly listeners
+              </span>
+            </div>
+          </div>
+  
+          {/* Artist Controls */}
+          <div className="px-2 md:px-8 py-6">
+            {/* Play/Pause Button */}
+            <div className="flex items-center gap-5">
+              <button
+                onClick={(e) => {
+                  isPlaying ? pauseTrack() : (currentTrack && playTrack(currentTrack));
+                }}
+                className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200 ml-2"
+              >
+                {isPlaying ? (
+                  <Pause className="w-6 h-6 text-white" />
+                ) : (
+                  <Play className="w-6 h-6 text-white" />
+                )}
+              </button>
 
-          {!isOwner && ( // ✅ Hide button if user is the owner
-            <Button
-              variant={theme === 'dark' ? 'secondary' : 'outline'}
-              size="sm"
-              onClick={handleFollow}
-              className="flex-shrink-0 justify-center min-w-[80px]"
-            >
-              {follow ? 'Unfollow' : 'Follow'}
-            </Button>
-          )}
+              {!isOwner && (
+                <Button
+                  variant={theme === 'dark' ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={handleFollow}
+                  className="flex-shrink-0 justify-center min-w-[80px]"
+                >
+                  {follow ? 'Unfollow' : 'Follow'}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="px-2 md:px-8">
+            <h2 className="text-2xl font-bold">Popular Tracks</h2>
+            <div className="grid grid-cols-1 gap-4 mt-4">
+              {tracks.map((track, index) => (
+                <div
+                  key={track.id}
+                  className={`grid grid-cols-[48px_52px_2fr_2fr_48px_48px] gap-4 py-2 md:px-2 group cursor-pointer rounded-lg lg:max-w-4xl ${
+                    theme === 'light'
+                      ? 'hover:bg-gray-50'
+                      : 'hover:bg-white/5'
+                  }`}
+                  onClick={() => {
+                    if (currentTrack?.id === track.id && isPlaying) {
+                      pauseTrack();
+                    } else {
+                      playTrack(track);
+                      trackQueue(tracks)
+                    }
+                  }}
+                >
+                  {/* Track Number or Play/Pause Button */}
+                  <div
+                    className={`flex items-center justify-center ${
+                      theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                    }`}
+                  >
+                    {/* Show play/pause button on hover */}
+                    <div className="hidden group-hover:block cursor-pointer">
+                      {currentTrack?.id === track.id && isPlaying ? (
+                        <Pause className="w-5 h-5" /> 
+                      ) : (
+                        <Play className="w-5 h-5" />
+                      )}
+                    </div>
+
+                    {/* Show track number or pause button when not hovering */}
+                    <div className="group-hover:hidden cursor-pointer">
+                      {currentTrack?.id === track.id && isPlaying ? (
+                        <Pause className="w-5 h-5" />
+                      ) : (
+                        index + 1
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Track Cover */}
+                  <div className="flex items-center justify-center">
+                    <img
+                      src={track.coverUrl}
+                      alt={track.title}
+                      className="w-12 h-12 rounded-md"
+                    />
+                  </div>
+
+                  {/* Track Title */}
+                  <div className="flex items-center min-w-0">
+                    <span
+                      className={`font-medium truncate ${currentTrack?.id == track.id ? 'text-[#A57865]' : 'text-white'}`}
+                    >
+                      {track.title}
+                    </span>
+                  </div>
+
+                  {/* Artist Playcount */}
+                  <div className="flex flex-col justify-center min-w-0">
+                    <div
+                      className={`truncate ${
+                        theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                      }`}
+                    >
+                      {new Intl.NumberFormat('en-US').format(track.playCount)}
+                    </div>
+                  </div>
+
+                  {/* Track Duration */}
+                  <div
+                    className={`flex items-center justify-center ${
+                      theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                    }`}
+                  >
+                    {Math.floor(track.duration / 60)}:
+                    {(track.duration % 60).toString().padStart(2, '0')}
+                  </div>
+
+                  {/* Track Options */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button 
+                        className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="w-5 h-5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem 
+                        className='cursor-pointer'
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <AddSimple className="w-4 h-4 mr-2" />
+                          Add to playlist
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className='cursor-pointer'
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Heart className="w-4 h-4 mr-2" />
+                          Add to favorites
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        className='cursor-pointer'
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Share2 className="w-4 h-4 mr-2" />
+                          Share
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ))}
+            </div>  
+          </div>
         </div>
       )}
     </div>

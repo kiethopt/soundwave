@@ -49,6 +49,12 @@ router.get(
   getArtistTracks
 );
 
+router.get(
+  '/albums/:id',
+  authenticate,
+  getArtistAlbums
+);
+
 // router.get(
 //   '/albums/:id',
 //   authenticate,

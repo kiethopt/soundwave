@@ -8,6 +8,7 @@ import {
   artistProfileSelect,
   trackSelect,
 } from '../utils/prisma-selects';
+import exp from 'constants';
 
 // Cho phép tất cả các Artist xem thông tin của nhau
 const canViewArtistData = async (
