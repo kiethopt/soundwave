@@ -34,6 +34,8 @@ export default function ArtistProfilePage({
   const [follow, setFollow] = useState(false);
   const [isOwner, setIsOwner] = useState(false); 
   const { dominantColor } = useDominantColor(artist?.avatar || '');
+  const [showAllTracks, setShowAllTracks] = useState(false);
+
   const {
     currentTrack,
     isPlaying,
@@ -56,6 +58,7 @@ export default function ArtistProfilePage({
 
   const token = localStorage.getItem('userToken') || '';
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+  const displayedTracks = showAllTracks ? tracks : tracks.slice(0, 5);
 
   useEffect(() => {
     if (!token) {
@@ -84,8 +87,11 @@ export default function ArtistProfilePage({
 
     const fetchTracks = async () => {
       const response = await api.artists.getTrackByArtistId(id, token);
-      
-      setTracks(response.tracks);
+      // Sort track by playCount and releaseDate get 10 tracks
+      const sortedTracks = response.tracks
+        .sort((a:any, b:any) => b.playCount - a.playCount)
+        .slice(0, 10);
+      setTracks(sortedTracks);
     }
 
     fetchFollowing();
@@ -191,129 +197,206 @@ export default function ArtistProfilePage({
             </div>
           </div>
 
-          <div className="px-2 md:px-8">
-            <h2 className="text-2xl font-bold">Popular Tracks</h2>
-            <div className="grid grid-cols-1 gap-4 mt-4">
-              {tracks.map((track, index) => (
-                <div
-                  key={track.id}
-                  className={`grid grid-cols-[48px_52px_2fr_2fr_48px_48px] gap-4 py-2 md:px-2 group cursor-pointer rounded-lg lg:max-w-4xl ${
-                    theme === 'light'
-                      ? 'hover:bg-gray-50'
-                      : 'hover:bg-white/5'
-                  }`}
-                  onClick={() => {
-                    if (currentTrack?.id === track.id && isPlaying) {
-                      pauseTrack();
-                    } else {
-                      playTrack(track);
-                      trackQueue(tracks)
-                    }
-                  }}
-                >
-                  {/* Track Number or Play/Pause Button */}
+
+          {/* Track Section */}
+          { tracks.length > 0 && (
+            <div className="px-2 md:px-8">
+              <h2 className="text-2xl font-bold">Popular Tracks</h2>
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                {displayedTracks.map((track, index) => (
                   <div
-                    className={`flex items-center justify-center ${
-                      theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                    key={track.id}
+                    className={`grid grid-cols-[32px_48px_4fr_48px_32px] sm:grid-cols-[32px_48px_2fr_2fr_auto] gap-2 md:gap-4 py-2 md:px-2 group cursor-pointer rounded-lg lg:max-w-4xl ${
+                      theme === 'light'
+                        ? 'hover:bg-gray-50'
+                        : 'hover:bg-white/5'
                     }`}
+                    onClick={() => {
+                      if (currentTrack?.id === track.id && isPlaying && queueType === 'track') {
+                        pauseTrack();
+                      } else {
+                        playTrack(track);
+                        setQueueType('track');
+                        trackQueue(tracks)
+                      }
+                    }}
                   >
-                    {/* Show play/pause button on hover */}
-                    <div className="hidden group-hover:block cursor-pointer">
-                      {currentTrack?.id === track.id && isPlaying ? (
-                        <Pause className="w-5 h-5" /> 
-                      ) : (
-                        <Play className="w-5 h-5" />
-                      )}
-                    </div>
-
-                    {/* Show track number or pause button when not hovering */}
-                    <div className="group-hover:hidden cursor-pointer">
-                      {currentTrack?.id === track.id && isPlaying ? (
-                        <Pause className="w-5 h-5" />
-                      ) : (
-                        index + 1
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Track Cover */}
-                  <div className="flex items-center justify-center">
-                    <img
-                      src={track.coverUrl}
-                      alt={track.title}
-                      className="w-12 h-12 rounded-md"
-                    />
-                  </div>
-
-                  {/* Track Title */}
-                  <div className="flex items-center min-w-0">
-                    <span
-                      className={`font-medium truncate ${currentTrack?.id == track.id ? 'text-[#A57865]' : 'text-white'}`}
-                    >
-                      {track.title}
-                    </span>
-                  </div>
-
-                  {/* Artist Playcount */}
-                  <div className="flex flex-col justify-center min-w-0">
+                    {/* Track Number or Play/Pause Button */}
                     <div
-                      className={`truncate ${
+                      className={`flex items-center justify-center ${
                         theme === 'light' ? 'text-gray-500' : 'text-white/60'
                       }`}
                     >
-                      {new Intl.NumberFormat('en-US').format(track.playCount)}
+                      {/* Show play/pause button on hover */}
+                      <div className="hidden group-hover:block cursor-pointer">
+                        {currentTrack?.id === track.id && isPlaying && queueType === 'track'? (
+                          <Pause className="w-5 h-5" /> 
+                        ) : (
+                          <Play className="w-5 h-5" />
+                        )}
+                      </div>
+
+                      {/* Show track number or pause button when not hovering */}
+                      <div className="group-hover:hidden cursor-pointer">
+                        {currentTrack?.id === track.id && isPlaying && isPlaying && queueType === 'track'? (
+                          <Pause className="w-5 h-5" />
+                        ) : (
+                          index + 1
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Track Duration */}
-                  <div
-                    className={`flex items-center justify-center ${
-                      theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                    }`}
+                    {/* Track Cover */}
+                    <div className="flex items-center justify-center">
+                      <img
+                        src={track.coverUrl}
+                        alt={track.title}
+                        className="w-12 h-12 rounded-md"
+                      />
+                    </div>
+
+                    {/* Track Title and Play Count */}
+                    <div className="flex flex-col md:flex-row md:justify-between items-center min-w-0 w-full">
+                      {/* Track Title */}
+                      <span
+                        className={`font-medium truncate w-full md:w-auto ${
+                          currentTrack?.id == track.id && isPlaying && queueType === 'track'
+                            ? 'text-[#A57865]'
+                            : 'text-white'
+                        }`}
+                      >
+                        {track.title}
+                      </span>
+
+                      {/* Play Count */}
+                      <div
+                        className={`truncate text-sm md:text-base w-full md:w-auto text-start sm:text-right ${
+                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                        }`}
+                      >
+                        {new Intl.NumberFormat('en-US').format(track.playCount)}
+                      </div>
+                    </div>
+
+
+                    {/* Track Duration */}
+                    <div
+                      className={`flex items-center justify-center ${
+                        theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                      }`}
+                    >
+                      {Math.floor(track.duration / 60)}:
+                      {(track.duration % 60).toString().padStart(2, '0')}
+                    </div>
+
+                    {/* Track Options */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button 
+                          className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="w-5 h-5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem 
+                          className='cursor-pointer'
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <AddSimple className="w-4 h-4 mr-2" />
+                            Add to playlist
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className='cursor-pointer'
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Heart className="w-4 h-4 mr-2" />
+                            Add to favorites
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className='cursor-pointer'
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Share2 className="w-4 h-4 mr-2" />
+                            Share
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))}
+              </div> 
+
+               {/* "See More" Button */}
+              {tracks.length > 5 && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => setShowAllTracks(!showAllTracks)}
+                    className="text-[#A57865] hover:underline"
                   >
-                    {Math.floor(track.duration / 60)}:
-                    {(track.duration % 60).toString().padStart(2, '0')}
-                  </div>
-
-                  {/* Track Options */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button 
-                        className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreHorizontal className="w-5 h-5" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem 
-                        className='cursor-pointer'
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <AddSimple className="w-4 h-4 mr-2" />
-                          Add to playlist
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        className='cursor-pointer'
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Heart className="w-4 h-4 mr-2" />
-                          Add to favorites
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        className='cursor-pointer'
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Share2 className="w-4 h-4 mr-2" />
-                          Share
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    {showAllTracks ? 'See Less' : 'See More'}
+                  </button>
                 </div>
-              ))}
-            </div>  
-          </div>
+              )} 
+            </div>
+          )}
+
+          {/* Album Section */}
+          {albums.length > 0 && (
+            <div className="px-2 md:px-8 mt-8">
+              <h2 className="text-2xl font-bold">Albums</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+                {albums.map((album) => (
+                  <div
+                    key={album.id}
+                    className="bg-white/5 p-4 rounded-lg group relative w-full"
+                  >
+                    <div className="relative">
+                      <img
+                        src={album.coverUrl || '/images/default-album.png'}
+                        alt={album.title}
+                        className="w-full aspect-square object-cover rounded-md mb-4"
+                      />
+                      <button
+                        onClick={() => {
+                          if (album.tracks.some(track => track.id === currentTrack?.id) && isPlaying && queueType === 'album') {
+                            pauseTrack();
+                          } else {
+                            playTrack(album.tracks[0]);
+                            setQueueType('album');
+                            trackQueue(album.tracks);
+                          }
+                        }}
+                        className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {album.tracks.some(track => track.id === currentTrack?.id && isPlaying && queueType === 'album') ? (
+                          <Pause className="w-6 h-6 text-white" />
+                        ) : (
+                          <Play className="w-6 h-6 text-white" />
+                        )}
+                      </button>
+                    </div>
+                    <h3
+                      className={`font-medium truncate ${
+                        currentTrack && album.tracks.some(track => track.id === currentTrack.id && isPlaying && queueType === 'album')
+                          ? 'text-[#A57865]'
+                          : 'text-white'
+                      }`}
+                    >
+                      {album.title}
+                    </h3>
+                    <p className="text-white/60 text-sm truncate">
+                      {typeof album.artist === 'string'
+                        ? album.artist
+                        : album.artist?.artistName || 'Unknown Artist'}
+                    </p>
+                  </div>
+                ))}
+              </div>   
+            </div>
+          )}
+
         </div>
       )}
     </div>
