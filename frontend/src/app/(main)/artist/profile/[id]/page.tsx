@@ -8,7 +8,7 @@ import { Album, ArtistProfile, Track } from '@/types';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-toastify';
 import { useDominantColor } from '@/hooks/useDominantColor';
-import { Verified, Play, Pause, AddSimple } from '@/components/ui/Icons';
+import { Verified, Play, Pause, AddSimple, Edit, Music } from '@/components/ui/Icons';
 import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
 import {
@@ -90,7 +90,7 @@ export default function ArtistProfilePage({
       // Sort track by playCount and releaseDate get 10 tracks
       const sortedTracks = response.tracks
         .sort((a:any, b:any) => b.playCount - a.playCount)
-        .slice(0, 10);
+        // .slice(0, 10);
       setTracks(sortedTracks);
     }
 
@@ -169,8 +169,8 @@ export default function ArtistProfilePage({
   
           {/* Artist Controls */}
           <div className="px-2 md:px-8 py-6">
-            {/* Play/Pause Button */}
             <div className="flex items-center gap-5">
+              {/* Play/Pause Button */}
               <button
                 onClick={(e) => {
                   isPlaying ? pauseTrack() : (currentTrack && playTrack(currentTrack));
@@ -184,6 +184,7 @@ export default function ArtistProfilePage({
                 )}
               </button>
 
+              {/* Follow Button (Can't self follow) */}
               {!isOwner && (
                 <Button
                   variant={theme === 'dark' ? 'secondary' : 'outline'}
@@ -193,6 +194,36 @@ export default function ArtistProfilePage({
                 >
                   {follow ? 'Unfollow' : 'Follow'}
                 </Button>
+              )}
+
+              {/* Option */}
+              {isOwner && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button 
+                      className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="w-5 h-5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem 
+                      className='cursor-pointer'
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                        Edit Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      className='cursor-pointer'
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Music className="w-4 h-4 mr-2" />
+                        View Stats
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </div>
