@@ -177,85 +177,79 @@ function SearchContent() {
         if (currentTrack?.id === item.id && currentlyPlaying === item.id) {
           if (isPlaying) {
             pauseTrack();
-            setCurrentlyPlaying(null);
           } else {
             playTrack(item);
             setCurrentlyPlaying(item.id);
           }
         } else {
-          trackQueue(results.tracks);  
+          trackQueue(results.tracks);
           setQueueType('track');
-          console.log('trackQueue', results.tracks);
           playTrack(item);
           setCurrentlyPlaying(item.id);
         }
       } else if ('tracks' in item) {
         // Album
-        if (item.tracks.length > 0) {
-          const firstTrack = item.tracks[0];
-  
-          // Check if the first track is already playing
-          if (currentTrack?.id === firstTrack.id && currentlyPlaying === item.id) {
-            if (isPlaying) {
-              pauseTrack();
-              setCurrentlyPlaying(null);
-            } else {
-              playTrack(firstTrack);
+        if (queueType === 'album' && currentlyPlaying === item.id) {
+          // We're already playing from this album, just toggle play/pause
+          if (isPlaying) {
+            pauseTrack();
+          } else {
+            // Just resume the current track
+            if (currentTrack) {
+              playTrack(currentTrack);
               setCurrentlyPlaying(item.id);
             }
-          } else {
-            // Refresh queue with album tracks
+          }
+        } else {
+          // Start fresh with this album
+          if (item.tracks.length > 0) {
             trackQueue(item.tracks);
             setQueueType('album');
-            playTrack(firstTrack);
+            playTrack(item.tracks[0]);
             setCurrentlyPlaying(item.id);
+          } else {
+            toast.error('No tracks found in this album.');
+            setCurrentlyPlaying(null);
           }
-        } else {
-          toast.error('No tracks found in this album.');
-          setCurrentlyPlaying(null);
         }
       } else if ('artistProfile' in item) {
-        // Artist 
-        const response = await api.artists.getTrackByArtistId(item.artistProfile.id, token);
-
-        // Lấy danh sách tracks từ object
-        const artistTracks = response?.tracks || []; 
-
-        if (!Array.isArray(artistTracks)) {
-          console.error('artistTracks is not an array:', artistTracks);
-          toast.error('Error fetching artist tracks.');
-          return;
-        }
-
-        // Sắp xếp theo lượt phát và ngày phát hành
-        const sortedTracks = artistTracks.sort((a, b) => 
-          (b.playCount - a.playCount) || 
-          (new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime())
-        );
-
-
-        
-        if (sortedTracks.length > 0) {
-          const firstTrack = sortedTracks[0];
-          // Check if the first track is already playing
-          if (currentTrack?.id === firstTrack.id && currentlyPlaying === item.artistProfile.id) {
-            if (isPlaying) {
-              pauseTrack();
-              setCurrentlyPlaying(null);
-            } else {
-              playTrack(firstTrack);
+        // Artist
+        if (queueType === 'artist' && currentlyPlaying === item.artistProfile.id) {
+          // We're already playing from this artist, just toggle play/pause
+          if (isPlaying) {
+            pauseTrack();
+          } else {
+            // Just resume the current track
+            if (currentTrack) {
+              playTrack(currentTrack);
               setCurrentlyPlaying(item.artistProfile.id);
             }
-          } else {
-            // Refresh queue with artist tracks
-            trackQueue(sortedTracks);
-            setQueueType('artist');
-            playTrack(firstTrack);
-            setCurrentlyPlaying(item.artistProfile.id);
           }
         } else {
-          toast.error('No tracks found for this artist.');
-          setCurrentlyPlaying(null);
+          // Load artist tracks for a fresh start
+          const response = await api.artists.getTrackByArtistId(item.artistProfile.id, token);
+          const artistTracks = response?.tracks || [];
+  
+          if (!Array.isArray(artistTracks)) {
+            console.error('artistTracks is not an array:', artistTracks);
+            toast.error('Error fetching artist tracks.');
+            return;
+          }
+  
+          const sortedTracks = artistTracks.sort((a, b) =>
+            (b.playCount - a.playCount) ||
+            (new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime())
+          );
+            
+          if (sortedTracks.length > 0) {
+            trackQueue(sortedTracks);
+            setQueueType('artist');
+            playTrack(sortedTracks[0]);
+            setCurrentlyPlaying(item.artistProfile.id);
+          } else {
+            toast.error('No tracks found for this artist.');
+            setCurrentlyPlaying(null);
+          }
         }
       }
     } catch (error) {
@@ -323,8 +317,7 @@ function SearchContent() {
                           }}
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity shadow-lg transform translate-y-2 group-hover:translate-y-0"
                         >
-                          {currentlyPlaying ===
-                          artist.artistProfile?.id ? (
+                          { currentTrack && queueType === 'artist' && currentTrack.artistId === artist.artistProfile?.id && isPlaying ? (
                             <Pause className="w-6 h-6 text-white" />
                           ) : (
                             <Play className="w-6 h-6 text-white" />
@@ -333,7 +326,7 @@ function SearchContent() {
                       </div>
                       <div className="text-center">
                         <h3 className={`font-medium truncate ${
-                          currentlyPlaying === artist.artistProfile?.id
+                          currentTrack && queueType === 'artist' && currentTrack.artistId === artist.artistProfile?.id
                             ? 'text-[#A57865]'
                             : 'text-white'
                           }`}
@@ -372,7 +365,7 @@ function SearchContent() {
                           onClick={() => handlePlay(album)}
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          {currentlyPlaying === album.id ? (
+                          {currentTrack && album.tracks.some(track => track.id === currentTrack.id) && isPlaying && queueType === 'album' ? (
                             <Pause className="w-6 h-6 text-white" />
                           ) : (
                             <Play className="w-6 h-6 text-white" />
@@ -427,7 +420,7 @@ function SearchContent() {
                             onClick={() => handlePlay(track)}
                             className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded"
                           >
-                            {currentlyPlaying === track.id ? (
+                            { currentTrack && track.id == currentTrack.id && isPlaying && queueType === 'track' ? (
                               <Pause className="w-5 h-5 text-white" />
                             ) : (
                               <Play className="w-5 h-5 text-white" />
