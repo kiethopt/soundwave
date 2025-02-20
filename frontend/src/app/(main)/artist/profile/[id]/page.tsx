@@ -213,18 +213,26 @@ export default function ArtistProfilePage({
           <div className="px-2 md:px-8 py-6">
             <div className="flex items-center gap-5">
               {/* Play/Pause Button */}
-              <button
-                onClick={(e) => {
-                  isPlaying ? pauseTrack() : (currentTrack && playTrack(currentTrack));
-                }}
-                className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200 ml-2"
-              >
-                {isPlaying ? (
-                  <Pause className="w-6 h-6 text-white" />
-                ) : (
-                  <Play className="w-6 h-6 text-white" />
-                )}
-              </button>
+                <button
+                  onClick={(e) => {
+                    if (tracks.length > 0) {
+                      if (isPlaying && queueType === 'track' && currentTrack?.artistId === artist?.id) {
+                        pauseTrack();
+                      } else {
+                        playTrack(tracks[0]);
+                        setQueueType('track');
+                        trackQueue(tracks);
+                      }
+                    }
+                  }}
+                  className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200 ml-2"
+                >
+                  { isPlaying && queueType === 'track' && currentTrack?.artistId === artist?.id ? (
+                    <Pause className="w-6 h-6 text-white" />
+                  ) : (
+                    <Play className="w-6 h-6 text-white" />
+                  )}
+                </button>
 
               {/* Follow Button (Can't self follow) */}
               {!isOwner && (
@@ -333,7 +341,7 @@ export default function ArtistProfilePage({
                       {/* Track Title */}
                       <span
                         className={`font-medium truncate w-full md:w-auto ${
-                          currentTrack?.id == track.id && isPlaying && queueType === 'track'
+                          currentTrack?.id == track.id && queueType === 'track'
                             ? 'text-[#A57865]'
                             : 'text-white'
                         }`}
@@ -435,6 +443,8 @@ export default function ArtistProfilePage({
                         onClick={() => {
                           if (album.tracks.some(track => track.id === currentTrack?.id) && isPlaying && queueType === 'album') {
                             pauseTrack();
+                          } else if (currentTrack && queueType === 'album') {
+                            playTrack(currentTrack);
                           } else {
                             playTrack(album.tracks[0]);
                             setQueueType('album');
@@ -442,7 +452,7 @@ export default function ArtistProfilePage({
                           }
                         }}
                         className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
+                      > 
                         {album.tracks.some(track => track.id === currentTrack?.id && isPlaying && queueType === 'album') ? (
                           <Pause className="w-6 h-6 text-white" />
                         ) : (
@@ -452,7 +462,7 @@ export default function ArtistProfilePage({
                     </div>
                     <h3
                       className={`font-medium truncate ${
-                        currentTrack && album.tracks.some(track => track.id === currentTrack.id && isPlaying && queueType === 'album')
+                        currentTrack && album.tracks.some(track => track.id === currentTrack.id && queueType === 'album')
                           ? 'text-[#A57865]'
                           : 'text-white'
                       }`}
@@ -503,13 +513,15 @@ export default function ArtistProfilePage({
                             }
                             
                             if (artistTracks.length > 0) {
-                              if (isArtistPlaying(relatedArtist.id)) {
+                                if (isArtistPlaying(relatedArtist.id)) {
                                 pauseTrack();
-                              } else {
+                                } else if (currentTrack && queueType === 'artist') {
+                                playTrack(currentTrack);
+                                } else {
                                 playTrack(artistTracks[0]);
                                 setQueueType('artist');
                                 trackQueue(artistTracks);
-                              }
+                                }
                             } else {
                               toast.error("No tracks available for this artist");
                             }
@@ -528,7 +540,7 @@ export default function ArtistProfilePage({
                       </button>
                     </div>
                     <h3 className={`font-medium truncate ${
-                      isArtistPlaying(relatedArtist.id)
+                      artistTracksMap[relatedArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'artist'
                         ? 'text-[#A57865]'
                         : 'text-white'
                       }`}
