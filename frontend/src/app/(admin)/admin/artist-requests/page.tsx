@@ -79,32 +79,35 @@ export default function ArtistRequests() {
   const fetchRequests = async (page: number, query = '') => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
+      // Kiểm tra xem có đang ở client-side không
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('userToken');
+        if (!token) throw new Error('No authentication token found');
 
-      // Tạo đối tượng filters
-      const filters: ArtistRequestFilters = {};
+        // Tạo đối tượng filters
+        const filters: ArtistRequestFilters = {};
 
-      // Thêm search nếu có
-      if (query) {
-        filters.search = query;
+        // Thêm search nếu có
+        if (query) {
+          filters.search = query;
+        }
+
+        // Thêm date filters nếu có
+        if (startDate && endDate) {
+          filters.startDate = new Date(startDate);
+          filters.endDate = new Date(endDate);
+        }
+
+        const response = await api.admin.getArtistRequests(
+          token,
+          page,
+          10,
+          filters
+        );
+
+        setRequests(response.requests);
+        setTotalPages(response.pagination.totalPages);
       }
-
-      // Thêm date filters nếu có
-      if (startDate && endDate) {
-        filters.startDate = new Date(startDate);
-        filters.endDate = new Date(endDate);
-      }
-
-      const response = await api.admin.getArtistRequests(
-        token,
-        page,
-        10,
-        filters
-      );
-
-      setRequests(response.requests);
-      setTotalPages(response.pagination.totalPages);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to fetch requests'

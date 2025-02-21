@@ -398,21 +398,34 @@ export default function ArtistTracks() {
         theme === 'dark' ? 'text-white' : ''
       }`}
     >
-      <div className="mb-6">
-        <h1
-          className={`text-2xl md:text-3xl font-bold tracking-tight ${
-            theme === 'dark' ? 'text-white' : 'text-gray-900'
+      <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
+        <div>
+          <h1
+            className={`text-2xl md:text-3xl font-bold tracking-tight ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}
+          >
+            Track Management
+          </h1>
+          <p
+            className={`text-muted-foreground ${
+              theme === 'dark' ? 'text-white/60' : ''
+            }`}
+          >
+            Manage and monitor your tracks
+          </p>
+        </div>
+
+        <Link
+          href="/artist/tracks/new"
+          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${
+            theme === 'light'
+              ? 'bg-gray-900 text-white hover:bg-gray-800'
+              : 'bg-white text-[#121212] hover:bg-white/90'
           }`}
         >
-          Track Management
-        </h1>
-        <p
-          className={`text-muted-foreground ${
-            theme === 'dark' ? 'text-white/60' : ''
-          }`}
-        >
-          Manage and monitor your tracks
-        </p>
+          New Track
+        </Link>
       </div>
 
       <DataTableWrapper

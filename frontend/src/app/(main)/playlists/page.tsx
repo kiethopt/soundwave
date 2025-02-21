@@ -1,3 +1,5 @@
+import React from 'react';
+
 export default function PlaylistsPage() {
   return (
     <div className="flex items-center justify-center h-full">
