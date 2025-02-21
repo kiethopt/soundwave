@@ -8,29 +8,27 @@ datasource db {
 }
 
 model User {
-  id                   String    @id @default(cuid())
-  email                String    @unique
-  username             String?   @unique
+  id                   String          @id @default(cuid())
+  email                String          @unique
+  username             String?         @unique
   password             String
   name                 String?
   avatar               String?
-  role                 Role      @default(USER) // Chỉ có USER và ADMIN
-  currentProfile       String    @default("USER")
-  isActive             Boolean   @default(true)
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  role                 Role            @default(USER)
+  currentProfile       String          @default("USER")
+  isActive             Boolean         @default(true)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
   lastLoginAt          DateTime?
   passwordResetToken   String?
   passwordResetExpires DateTime?
-
-  // Relations
-  artistProfile ArtistProfile?
-  history       History[]
-  playlists     Playlist[]
-  followed      UserFollow[]    @relation("Follower") // Người dùng này theo dõi người khác
-  followers     UserFollow[]    @relation("FollowingUser") // Người dùng này được người khác theo dõi
-  notifications Notification[]  @relation("UserNotifications") // Thông báo mà người dùng nhận được
-  likedTracks   UserLikeTrack[]
+  artistProfile        ArtistProfile?
+  history              History[]
+  notifications        Notification[]  @relation("UserNotifications")
+  playlists            Playlist[]
+  followed             UserFollow[]    @relation("Follower")
+  followers            UserFollow[]    @relation("FollowingUser")
+  likedTracks          UserLikeTrack[]
 
   @@unique([email, username])
   @@index([email])
@@ -42,32 +40,28 @@ model User {
 }
 
 model ArtistProfile {
-  id                      String    @id @default(cuid())
-  artistName              String    @unique
-  bio                     String?   @db.Text
+  id                      String         @id @default(cuid())
+  artistName              String         @unique
+  bio                     String?
   avatar                  String?
-  role                    Role      @default(ARTIST)
+  role                    Role           @default(ARTIST)
   socialMediaLinks        Json?
-  monthlyListeners        Int       @default(0) @db.Integer
-  isVerified              Boolean   @default(false)
-  isActive                Boolean   @default(true)
+  monthlyListeners        Int            @default(0)
+  isVerified              Boolean        @default(false)
+  isActive                Boolean        @default(true)
   verificationRequestedAt DateTime?
   verifiedAt              DateTime?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
-
-  // Quan hệ one-to-one với User
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String @unique
-
-  // Relations liên quan đến nghệ sĩ
-  genres        ArtistGenre[]
-  albums        Album[]
-  tracks        Track[]
-  events        Event[]
-  TrackArtist   TrackArtist[]
-  followers     UserFollow[]   @relation("FollowingArtist") // Người dùng theo dõi nghệ sĩ
-  notifications Notification[] @relation("ArtistNotifications") // Thông báo mà artist nhận được
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  userId                  String         @unique
+  albums                  Album[]
+  genres                  ArtistGenre[]
+  user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events                  Event[]
+  notifications           Notification[] @relation("ArtistNotifications")
+  TrackArtist             TrackArtist[]
+  tracks                  Track[]
+  followers               UserFollow[]   @relation("FollowingArtist")
 
   @@index([artistName])
   @@index([isVerified])
@@ -76,38 +70,32 @@ model ArtistProfile {
 }
 
 model ArtistGenre {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   artistProfileId String
   genreId         String
-  createdAt       DateTime @default(now())
-
-  // Quan hệ many-to-one với ArtistProfile
-  artistProfile ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
-
-  // Quan hệ many-to-one với Genre
-  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+  artistProfile   ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
+  genre           Genre         @relation(fields: [genreId], references: [id], onDelete: Cascade)
 
   @@unique([artistProfileId, genreId])
   @@map("artist_genre")
 }
 
 model Album {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
   coverUrl    String?
   releaseDate DateTime
-  duration    Int       @default(0) @db.Integer
-  totalTracks Int       @default(0) @db.Integer
-  type        AlbumType @default(ALBUM)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Relations
-  artist   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  artistId String
-  tracks   Track[]
-  genres   AlbumGenre[]
+  duration    Int           @default(0)
+  totalTracks Int           @default(0)
+  type        AlbumType     @default(ALBUM)
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  artistId    String
+  genres      AlbumGenre[]
+  artist      ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  tracks      Track[]
 
   @@unique([title, artistId])
   @@index([title])
@@ -119,28 +107,26 @@ model Album {
 }
 
 model Track {
-  id          String    @id @default(cuid())
-  title       String
-  duration    Int       @default(0) @db.Integer
-  releaseDate DateTime
-  trackNumber Int?      @db.Integer
-  coverUrl    String?
-  audioUrl    String
-  playCount   Int       @default(0) @db.Integer
-  type        AlbumType @default(SINGLE)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Relations
-  artist          ArtistProfile   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  id              String          @id @default(cuid())
+  title           String
+  duration        Int             @default(0)
+  releaseDate     DateTime
+  trackNumber     Int?
+  coverUrl        String?
+  audioUrl        String
+  playCount       Int             @default(0)
+  type            AlbumType       @default(SINGLE)
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   artistId        String
-  featuredArtists TrackArtist[]
-  album           Album?          @relation(fields: [albumId], references: [id], onDelete: Cascade)
   albumId         String?
-  genres          TrackGenre[]
-  playlists       PlaylistTrack[]
   history         History[]
+  playlists       PlaylistTrack[]
+  featuredArtists TrackArtist[]
+  genres          TrackGenre[]
+  album           Album?          @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  artist          ArtistProfile   @relation(fields: [artistId], references: [id], onDelete: Cascade)
   likedBy         UserLikeTrack[]
 
   @@unique([title, artistId])
@@ -158,16 +144,15 @@ model History {
   id        String      @id @default(cuid())
   type      HistoryType
   query     String?
-  duration  Int?        @db.Integer
+  duration  Int?
   completed Boolean?
-  playCount Int?        @db.Integer
+  playCount Int?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
-
-  track   Track?  @relation(fields: [trackId], references: [id], onDelete: Cascade)
-  trackId String?
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId  String
+  trackId   String?
+  userId    String
+  track     Track?      @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId, type])
   @@index([userId])
@@ -186,14 +171,13 @@ model Playlist {
   privacy       PlaylistPrivacy @default(PRIVATE)
   type          PlaylistType    @default(NORMAL)
   isAIGenerated Boolean         @default(false)
-  totalTracks   Int             @default(0) @db.Integer
-  totalDuration Int             @default(0) @db.Integer
+  totalTracks   Int             @default(0)
+  totalDuration Int             @default(0)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
-
-  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId String
-  tracks PlaylistTrack[]
+  userId        String
+  tracks        PlaylistTrack[]
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, type])
   @@unique([name, userId])
@@ -203,23 +187,17 @@ model Playlist {
 }
 
 model Genre {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id             String        @id @default(cuid())
+  name           String        @unique
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
   albums         AlbumGenre[]
-  tracks         TrackGenre[]
   artistProfiles ArtistGenre[]
+  tracks         TrackGenre[]
 
   @@index([name])
   @@map("genres")
 }
-
-/**
- * Trong quan hệ user, tên ràng buộc được đặt là "notifications_user_recipientId_fkey".
- * Trong quan hệ artist, tên ràng buộc được đặt là "notifications_artist_recipientId_fkey".
- */
 
 model Notification {
   id            String           @id @default(cuid())
@@ -227,18 +205,14 @@ model Notification {
   message       String
   isRead        Boolean          @default(false)
   recipientType RecipientType
-  userId        String? // ID của User (nếu recipient là USER)
-  artistId      String? // ID của ArtistProfile (nếu recipient là ARTIST)
+  userId        String?
+  artistId      String?
   senderId      String?
   count         Int?             @default(1)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
-
-  // Quan hệ với User
-  user User? @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
-
-  // Quan hệ với ArtistProfile
-  artist ArtistProfile? @relation("ArtistNotifications", fields: [artistId], references: [id], onDelete: Cascade)
+  artist        ArtistProfile?   @relation("ArtistNotifications", fields: [artistId], references: [id], onDelete: Cascade)
+  user          User?            @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([artistId])
@@ -248,18 +222,17 @@ model Notification {
 }
 
 model Event {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
   description String?
   location    String
   startDate   DateTime
   endDate     DateTime
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  artist   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  artistId String
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  artistId    String
+  artist      ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
   @@unique([title, artistId])
   @@index([artistId])
@@ -270,24 +243,16 @@ model Event {
   @@map("events")
 }
 
-// Bảng trung gian
-
 model UserFollow {
-  id                String        @id @default(cuid())
+  id                String         @id @default(cuid())
   followerId        String
-  followingUserId   String? // Tham chiếu đến User.id khi followingType là USER
-  followingArtistId String? // Tham chiếu đến ArtistProfile.id khi followingType là ARTIST
+  followingUserId   String?
+  followingArtistId String?
   followingType     FollowingType
-  createdAt         DateTime      @default(now())
-
-  // Quan hệ với User (người theo dõi)
-  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
-
-  // Quan hệ với User (nếu followingType là USER)
-  followingUser User? @relation("FollowingUser", fields: [followingUserId], references: [id], onDelete: Cascade)
-
-  // Quan hệ với ArtistProfile (nếu followingType là ARTIST)
-  followingArtist ArtistProfile? @relation("FollowingArtist", fields: [followingArtistId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  follower          User           @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingArtist   ArtistProfile? @relation("FollowingArtist", fields: [followingArtistId], references: [id], onDelete: Cascade)
+  followingUser     User?          @relation("FollowingUser", fields: [followingUserId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, followingUserId, followingType])
   @@unique([followerId, followingArtistId, followingType])
@@ -302,9 +267,8 @@ model AlbumGenre {
   albumId   String
   genreId   String
   createdAt DateTime @default(now())
-
-  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
-  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  album     Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  genre     Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
 
   @@unique([albumId, genreId])
   @@index([albumId])
@@ -317,9 +281,8 @@ model TrackGenre {
   trackId   String
   genreId   String
   createdAt DateTime @default(now())
-
-  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
-  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  genre     Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([trackId, genreId])
   @@index([trackId])
@@ -328,13 +291,12 @@ model TrackGenre {
 }
 
 model TrackArtist {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   trackId         String
   artistProfileId String
-  createdAt       DateTime @default(now())
-
-  track         Track         @relation(fields: [trackId], references: [id], onDelete: Cascade)
-  artistProfile ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+  artistProfile   ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
+  track           Track         @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([trackId, artistProfileId])
   @@index([trackId])
@@ -347,11 +309,9 @@ model PlaylistTrack {
   playlistId String
   trackId    String
   addedAt    DateTime @default(now())
-  trackOrder Int      @db.Integer
-
-  // Relations
-  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
-  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackOrder Int
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([playlistId, trackId])
   @@index([playlistId])
@@ -364,9 +324,8 @@ model UserLikeTrack {
   userId    String
   trackId   String
   createdAt DateTime @default(now())
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId])
   @@index([userId])
@@ -402,11 +361,13 @@ enum PlaylistType {
 }
 
 enum NotificationType {
-  NEW_TRACK // Artist phát hành track mới
-  NEW_ALBUM // Artist phát hành album mới
-  EVENT_REMINDER // Nhắc nhở về sự kiện
-  NEW_FOLLOW // Thông báo có người follow (dùng cho cả user và artist)
+  NEW_TRACK
+  NEW_ALBUM
+  EVENT_REMINDER
+  NEW_FOLLOW
 }
+
+
 
 enum FollowingType {
   USER

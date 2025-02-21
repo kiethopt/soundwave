@@ -396,15 +396,19 @@ export const followUser = async (
   res: Response
 ): Promise<void> => {
   try {
-    const user = req.user;
+    console.log('=== DEBUG: followUser => route called');
+    const user = req.user; // Người đang follow
     const { id: followingId } = req.params;
+
+    console.log('=== DEBUG: user =', user?.id);
+    console.log('=== DEBUG: followingId =', followingId);
 
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    // Kiểm tra tồn tại
+    // Kiểm tra xem đang follow User hay Artist
     const [userExists, artistExists] = await Promise.all([
       prisma.user.findUnique({ where: { id: followingId } }),
       prisma.artistProfile.findUnique({
@@ -414,18 +418,20 @@ export const followUser = async (
     ]);
 
     let followingType: FollowingType;
-    let followData: any = {
+    const followData: any = {
       followerId: user.id,
-      followingType: 'USER' as FollowingType,
+      followingType: 'USER' as FollowingType, // mặc định
     };
 
     if (userExists) {
+      // follow user
       followingType = FollowingType.USER;
       followData.followingUserId = followingId;
     } else if (artistExists) {
+      // follow artist
       followingType = FollowingType.ARTIST;
       followData.followingArtistId = followingId;
-      followData.followingType = 'ARTIST';
+      followData.followingType = FollowingType.ARTIST;
     } else {
       res.status(404).json({ message: 'Target not found' });
       return;
@@ -448,40 +454,39 @@ export const followUser = async (
         OR: [
           {
             followingUserId: followingId,
-            followingType: 'USER',
+            followingType: FollowingType.USER,
           },
           {
             followingArtistId: followingId,
-            followingType: 'ARTIST',
+            followingType: FollowingType.ARTIST,
           },
         ],
       },
     });
-
     if (existingFollow) {
       res.status(400).json({ message: 'Already following' });
       return;
     }
 
+    // Transaction
     await prisma.$transaction(async (tx) => {
-      // Create follow
-      await tx.userFollow.create({
-        data: followData,
+      // 1) Tạo record follow
+      await tx.userFollow.create({ data: followData });
+
+      // 2) Lấy info user (follower) để hiển thị
+      const currentUser = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { username: true, email: true },
       });
+      const followerName = currentUser?.username || currentUser?.email || 'Unknown';
 
-      // Tạo thông báo
+      // 3) Tạo NOTIFICATION cho người được theo dõi
       if (followingType === 'ARTIST') {
-        const currentUser = await tx.user.findUnique({
-          where: { id: user.id },
-          select: { username: true, email: true },
-        });
-
+        console.log('=== DEBUG: followUser => about to create notification for ARTIST');
         await tx.notification.create({
           data: {
             type: 'NEW_FOLLOW',
-            message: `New follower: ${
-              currentUser?.username || currentUser?.email
-            }`,
+            message: `New follower: ${followerName}`,
             recipientType: 'ARTIST',
             artistId: followingId,
             senderId: user.id,
@@ -493,7 +498,36 @@ export const followUser = async (
           where: { id: followingId },
           data: { monthlyListeners: { increment: 1 } },
         });
+      } else {
+        // follow user => Tạo noti cho user bị follow
+        console.log('=== DEBUG: followUser => about to create notification for USER->USER follow');
+        await tx.notification.create({
+          data: {
+            type: 'NEW_FOLLOW',
+            message: `New follower: ${followerName}`,
+            recipientType: 'USER',
+            userId: followingId,
+            senderId: user.id,
+          },
+        });
+        console.log('=== DEBUG: followUser => notification for followed USER created!');
       }
+
+      // 4) Tạo NOTIFICATION cho CHÍNH user (follower)
+      //    để user thấy mình vừa follow ai
+      // await tx.notification.create({
+      //   data: {
+      //     type: 'FOLLOW_CONFIRMATION',
+      //     message:
+      //       followingType === 'ARTIST'
+      //         ? `You are now following artist with id: ${followingId}`
+      //         : `You are now following user with id: ${followingId}`,
+      //     recipientType: 'USER',     // Vì follower luôn là 1 user
+      //     userId: user.id,           // Gửi cho chính user
+      //     senderId: user.id,
+      //   },
+      // });
+      // console.log('=== DEBUG: followUser => notification for the follower created!');
     });
 
     res.json({ message: 'Followed successfully' });
@@ -502,6 +536,7 @@ export const followUser = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
 
 // Hủy theo dõi người dùng
 export const unfollowUser = async (

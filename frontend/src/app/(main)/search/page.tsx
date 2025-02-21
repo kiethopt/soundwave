@@ -558,6 +558,11 @@ function SearchContent() {
             )}
 
           {/* Users Section */}
+          {/* import { useRouter } from 'next/navigation';
+
+          const router = useRouter(); */}
+
+          {/* Users Section */}
           {(activeFilter === 'all' || activeFilter === 'users') &&
             results.users.length > 0 && (
               <div>
@@ -566,7 +571,8 @@ function SearchContent() {
                   {results.users.map((user) => (
                     <div
                       key={user.id}
-                      className="group relative p-4 rounded-lg hover:bg-white/5 transition-colors"
+                      className="group relative p-4 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/user/${user.id}`)}
                     >
                       <div className="relative">
                         <div className="aspect-square mb-4">
@@ -578,7 +584,7 @@ function SearchContent() {
                         </div>
                       </div>
                       <div className="text-center">
-                        <h3 className="text-white font-medium truncate hover:underline cursor-pointer">
+                        <h3 className="text-white font-medium truncate hover:underline">
                           {user.name}
                         </h3>
                         <p className="text-white/60 text-sm truncate">
@@ -590,6 +596,7 @@ function SearchContent() {
                 </div>
               </div>
             )}
+
 
           {/* No Results Message */}
           {!isLoading &&

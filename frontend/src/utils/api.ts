@@ -302,6 +302,18 @@ export const api = {
   },
 
   user: {
+    getUserById: async (id: string, token: string) => {
+      // Gọi API lấy thông tin user
+      // Tuỳ thuộc vào backend route bạn có
+      // Ví dụ: /api/admin/users/:id hoặc /api/user/profile/:id
+      const response = await fetchWithAuth(
+        `/api/user/profile/${id}`,
+        { method: 'GET' },
+        token
+      );
+      return response; // hoặc response.data tuỳ fetchWithAuth
+    },
+
     searchAll: async (query: string, token: string) =>
       fetchWithAuth(
         `/api/user/search-all?q=${query}`,
@@ -652,4 +664,34 @@ export const api = {
     getStats: async (token: string) =>
       fetchWithAuth('/api/admin/stats', { method: 'GET' }, token),
   },
+
+  notifications: {
+    // Lấy danh sách notifications
+    getList: async (token: string) =>
+      fetchWithAuth('/api/notifications', { method: 'GET' }, token),
+
+    // Lấy số lượng thông báo chưa đọc
+    getUnreadCount: async (token: string) =>
+      fetchWithAuth('/api/notifications/unread-count', { method: 'GET' }, token),
+
+    // Đánh dấu 1 thông báo đã đọc
+    markAsRead: async (notificationId: string, token: string) =>
+      fetchWithAuth(
+        `/api/notifications/${notificationId}/read`,
+        { method: 'PATCH' },
+        token
+      ),
+
+    // Đánh dấu tất cả thông báo đã đọc
+    markAllAsRead: async (token: string) =>
+      fetchWithAuth(
+        '/api/notifications/read-all',
+        { method: 'PATCH' },
+        token
+      ),
+  },
+
+
+  // ...Các thuộc tính khác (auth, user, admin, etc.)...
 };
+  

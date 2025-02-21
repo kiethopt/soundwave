@@ -17,7 +17,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { User } from '@/types';
 import pusher from '@/utils/pusher';
-import { api } from '@/utils/api';
+import { api } from '@/utils/api'; // Giả sử bạn có file api
 import { toast } from 'react-toastify';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -38,6 +38,14 @@ export default function Header({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const isActive = (path: string) => pathname === path;
   const [notificationCount, setNotificationCount] = useState(0);
+
+  // ======== Mới thêm cho notifications ========
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]); 
+  // (Bạn có thể định nghĩa type Notification thay vì any[])
+  const notificationRef = useRef<HTMLDivElement>(null);
+  // ============================================
+
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
 
@@ -45,6 +53,9 @@ export default function Header({
   const isAdminOrArtist =
     userData?.role === 'ADMIN' || userData?.currentProfile === 'ARTIST';
 
+  // ==============================
+  // 1) Đoạn code pusher subscribe
+  // ==============================
   useEffect(() => {
     const userDataStr = localStorage.getItem('userData');
     if (!userDataStr) return;
@@ -80,13 +91,26 @@ export default function Header({
     };
   }, []);
 
+  // ==============================
+  // 2) Click outside để đóng dropdown 
+  //    a) Menu user dropdown
+  //    b) Notification dropdown
+  // ==============================
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Click ngoài user dropdown
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setShowDropdown(false);
+      }
+      // Click ngoài notification dropdown
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target as Node)
+      ) {
+        setShowNotifications(false);
       }
     };
 
@@ -94,6 +118,9 @@ export default function Header({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ============================
+  // 3) Check auth
+  // ============================
   useEffect(() => {
     const checkAuth = () => {
       const token = localStorage.getItem('userToken');
@@ -107,10 +134,12 @@ export default function Header({
         setUserData(null);
       }
     };
-
     checkAuth();
   }, []);
 
+  // ============================
+  // 4) Handle search
+  // ============================
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -123,6 +152,9 @@ export default function Header({
     }
   };
 
+  // ============================
+  // 5) Logout
+  // ============================
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem('userToken');
@@ -145,11 +177,39 @@ export default function Header({
     }
   };
 
-  const handleBellClick = () => {
-    setNotificationCount(0);
-    localStorage.setItem('notificationCount', '0');
+  // ==============================
+  // 6) Sự kiện click chuông
+  // ==============================
+  const handleBellClick = async () => {
+    try {
+      // 1. Toggle hiển thị dropdown
+      setShowNotifications((prev) => !prev);
+  
+      // 2. Nếu dropdown sắp được mở => load danh sách notifications
+      if (!showNotifications) {
+        const token = localStorage.getItem('userToken');
+        if (!token) return;
+  
+        // Gọi API lấy danh sách thông báo
+        const notificationsData = await api.notifications.getList(token);
+        console.log('Fetched notifications:', notificationsData);
+        if (notificationsData) {
+          setNotifications(notificationsData);
+        }
+      }
+  
+      // 3. Đặt lại notificationCount = 0
+      setNotificationCount(0);
+      localStorage.setItem('notificationCount', '0');
+    } catch (err) {
+      console.error('Fetch notifications error:', err);
+    }
   };
+  
 
+  // ==============================
+  // 7) Switch profile
+  // ==============================
   const handleSwitchProfile = async () => {
     try {
       const token = localStorage.getItem('userToken');
@@ -276,25 +336,65 @@ export default function Header({
       <div className="flex items-center gap-2 md:gap-4">
         {isAuthenticated ? (
           <>
-            <button
-              className={`p-2 rounded-full relative ${
-                theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-              }`}
-              onClick={handleBellClick}
-            >
-              <div className="relative">
-                <Notifications
-                  className={`w-5 h-5 ${
-                    theme === 'light' ? 'text-gray-700' : 'text-white'
+            {/* Nút chuông Notifications */}
+            <div className="relative" ref={notificationRef}>
+              <button
+                className={`p-2 rounded-full relative ${
+                  theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
+                }`}
+                onClick={handleBellClick}
+              >
+                <div className="relative">
+                  <Notifications
+                    className={`w-5 h-5 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white'
+                    }`}
+                  />
+                  {/* Badge chấm đỏ */}
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                      {notificationCount > 99 ? '99+' : notificationCount}
+                    </span>
+                  )}
+                </div>
+              </button>
+              {/* Dropdown Notifications */}
+              {showNotifications && (
+                <div
+                  className={`absolute right-0 mt-2 w-72 max-h-[300px] overflow-auto rounded-md shadow-lg py-2 z-50 ${
+                    theme === 'light' ? 'bg-white' : 'bg-[#282828]'
                   }`}
-                />
-                {notificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                    {notificationCount > 99 ? '99+' : notificationCount}
-                  </span>
-                )}
-              </div>
-            </button>
+                >
+                  {notifications.length === 0 ? (
+                    <p
+                      className={`px-4 py-2 text-sm ${
+                        theme === 'light'
+                          ? 'text-gray-700'
+                          : 'text-white/70'
+                      }`}
+                    >
+                      No notifications
+                    </p>
+                  ) : (
+                    notifications.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`px-4 py-2 text-sm border-b last:border-b-0 ${
+                          theme === 'light'
+                            ? 'border-gray-200 text-gray-700 hover:bg-gray-100'
+                            : 'border-white/10 text-white hover:bg-white/10'
+                        }`}
+                      >
+                        {/* Tuỳ chỉnh hiển thị nội dung thông báo */}
+                        <p className="line-clamp-2">{item.message}</p>
+                        {/* item.createdAt, etc. */}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
             <button
               className={`p-2 rounded-full ${
                 theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
@@ -369,7 +469,9 @@ export default function Header({
                       }`}
                     >
                       Switch to{' '}
-                      {userData.currentProfile === 'USER' ? 'Artist' : 'User'}{' '}
+                      {userData.currentProfile === 'USER'
+                        ? 'Artist'
+                        : 'User'}{' '}
                       Profile
                     </button>
                   )}

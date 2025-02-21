@@ -342,8 +342,11 @@ exports.getAllGenres = getAllGenres;
 const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        console.log('=== DEBUG: followUser => route called');
         const user = req.user;
         const { id: followingId } = req.params;
+        console.log('=== DEBUG: user =', user === null || user === void 0 ? void 0 : user.id);
+        console.log('=== DEBUG: followingId =', followingId);
         if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
@@ -356,7 +359,7 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             }),
         ]);
         let followingType;
-        let followData = {
+        const followData = {
             followerId: user.id,
             followingType: 'USER',
         };
@@ -367,13 +370,14 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         else if (artistExists) {
             followingType = client_1.FollowingType.ARTIST;
             followData.followingArtistId = followingId;
-            followData.followingType = 'ARTIST';
+            followData.followingType = client_1.FollowingType.ARTIST;
         }
         else {
             res.status(404).json({ message: 'Target not found' });
             return;
         }
-        if ((followingType === 'USER' || followingType === 'ARTIST') && followingId === user.id || followingId === ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+        if ((followingType === 'USER' || followingType === 'ARTIST') &&
+            (followingId === user.id || followingId === ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id))) {
             res.status(400).json({ message: 'Cannot follow yourself' });
             return;
         }
@@ -383,11 +387,11 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 OR: [
                     {
                         followingUserId: followingId,
-                        followingType: 'USER',
+                        followingType: client_1.FollowingType.USER,
                     },
                     {
                         followingArtistId: followingId,
-                        followingType: 'ARTIST',
+                        followingType: client_1.FollowingType.ARTIST,
                     },
                 ],
             },
@@ -397,27 +401,45 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             return;
         }
         yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-            yield tx.userFollow.create({
-                data: followData,
+            yield tx.userFollow.create({ data: followData });
+            const currentUser = yield tx.user.findUnique({
+                where: { id: user.id },
+                select: { username: true, email: true },
             });
+            const followerName = (currentUser === null || currentUser === void 0 ? void 0 : currentUser.username) || (currentUser === null || currentUser === void 0 ? void 0 : currentUser.email) || 'Unknown';
             if (followingType === 'ARTIST') {
-                const currentUser = yield tx.user.findUnique({
-                    where: { id: user.id },
-                    select: { username: true, email: true },
-                });
+                console.log('=== DEBUG: followUser => about to create notification for ARTIST');
+                console.log('followingId =', followingId);
+                console.log('currentUser =', currentUser);
                 yield tx.notification.create({
                     data: {
                         type: 'NEW_FOLLOW',
-                        message: `New follower: ${(currentUser === null || currentUser === void 0 ? void 0 : currentUser.username) || (currentUser === null || currentUser === void 0 ? void 0 : currentUser.email)}`,
+                        message: `New follower: ${followerName}`,
                         recipientType: 'ARTIST',
                         artistId: followingId,
                         senderId: user.id,
                     },
                 });
+                console.log('=== DEBUG: followUser => notification for ARTIST created successfully!');
                 yield tx.artistProfile.update({
                     where: { id: followingId },
                     data: { monthlyListeners: { increment: 1 } },
                 });
+            }
+            else {
+                console.log('=== DEBUG: followUser => about to create notification for USER->USER follow');
+                console.log('followingId =', followingId);
+                console.log('currentUser =', currentUser);
+                yield tx.notification.create({
+                    data: {
+                        type: 'NEW_FOLLOW',
+                        message: `New follower: ${followerName}`,
+                        recipientType: 'USER',
+                        userId: followingId,
+                        senderId: user.id,
+                    },
+                });
+                console.log('=== DEBUG: followUser => notification for followed USER created successfully!');
             }
         }));
         res.json({ message: 'Followed successfully' });

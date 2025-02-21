@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin.routes';
 import historyRoutes from './routes/history.routes';
 import artistRoutes from './routes/artist.routes';
 import userRoutes from './routes/user.routes';
+import notificationRoutes from './routes/notification.routes';
 import { errorHandler } from './middleware/error';
 
 dotenv.config();
@@ -32,6 +33,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/artist', artistRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error Handler
 app.use(errorHandler);
