@@ -7,6 +7,7 @@ import {
   getArtistAlbums,
   updateArtistProfile,
   getRelatedArtists,
+  getRecommendedArtists
 } from '../controllers/artist.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
