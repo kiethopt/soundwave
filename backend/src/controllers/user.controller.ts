@@ -7,7 +7,6 @@ import {
   searchAlbumSelect,
   searchTrackSelect,
   userSelect,
-  artistRequestDetailsSelect,
 } from '../utils/prisma-selects';
 
 // Hàm validation cho dữ liệu nghệ sĩ
