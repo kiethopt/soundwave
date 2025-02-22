@@ -15,6 +15,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload, { handleUploadError } from '../middleware/upload.middleware';
 
+
 const router = express.Router();
 
 router.post('/follow/:id', authenticate, followUser);
