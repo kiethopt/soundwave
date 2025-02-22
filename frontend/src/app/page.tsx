@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'react-toastify';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { useTrack } from '@/contexts/TrackContext';
-import { getRecommendedArtists } from '../../../backend/src/controllers/user.controller';
 import {
   DropdownMenu,
   DropdownMenuContent,

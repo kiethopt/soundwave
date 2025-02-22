@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getArtistStats = exports.updateArtistProfile = exports.getArtistTracks = exports.getArtistAlbums = exports.getArtistProfile = exports.getAllArtistsProfile = void 0;
+exports.getRelatedArtists = exports.getArtistStats = exports.updateArtistProfile = exports.getArtistTracks = exports.getArtistAlbums = exports.getArtistProfile = exports.getAllArtistsProfile = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cloudinary_service_1 = require("../services/cloudinary.service");
@@ -412,4 +412,39 @@ const getArtistStats = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.getArtistStats = getArtistStats;
+const getRelatedArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const artistProfile = yield db_1.default.artistProfile.findUnique({
+            where: { id },
+            select: { genres: { select: { genreId: true } } },
+        });
+        if (!artistProfile) {
+            res.status(404).json({ message: 'Artist not found' });
+            return;
+        }
+        const genreIds = artistProfile.genres.map((genre) => genre.genreId);
+        const relatedArtist = yield db_1.default.artistProfile.findMany({
+            where: {
+                genres: {
+                    some: {
+                        genreId: {
+                            in: genreIds,
+                        },
+                    },
+                },
+                isVerified: true,
+                id: { not: id },
+            },
+            select: prisma_selects_1.artistProfileSelect,
+            take: 10,
+        });
+        res.json(relatedArtist);
+    }
+    catch (error) {
+        console.error('Get similar artists error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getRelatedArtists = getRelatedArtists;
 //# sourceMappingURL=artist.controller.js.map

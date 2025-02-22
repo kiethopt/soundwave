@@ -45,6 +45,7 @@ const cache_middleware_1 = require("../middleware/cache.middleware");
 const session_middleware_1 = require("../middleware/session.middleware");
 const router = express_1.default.Router();
 router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), track_controller_1.getAllTracks);
+router.get('/:id', auth_middleware_1.authenticate, track_controller_1.getTrackById);
 router.post('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), upload_middleware_1.default.fields([
     { name: 'audioFile', maxCount: 1 },
     { name: 'coverFile', maxCount: 1 },

@@ -30,28 +30,55 @@ const savePlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function
         }
         const track = yield db_1.default.track.findUnique({
             where: { id: trackId },
+            select: { id: true, artistId: true },
         });
         if (!track) {
             res.status(404).json({ message: 'Track not found' });
             return;
         }
-        const history = yield db_1.default.history.create({
-            data: {
+        const artistId = track.artistId;
+        const lastMonth = new Date();
+        lastMonth.setMonth(lastMonth.getMonth() - 1);
+        const existingListen = yield db_1.default.history.findFirst({
+            where: {
+                userId: user.id,
+                track: { artistId: artistId },
+                createdAt: { gte: lastMonth },
+            },
+        });
+        if (!existingListen) {
+            yield db_1.default.artistProfile.update({
+                where: { id: artistId },
+                data: { monthlyListeners: { increment: 1 } },
+            });
+        }
+        const history = yield db_1.default.history.upsert({
+            where: {
+                userId_trackId_type: {
+                    userId: user.id,
+                    trackId: trackId,
+                    type: 'PLAY',
+                },
+            },
+            update: Object.assign({ updatedAt: new Date(), completed }, (completed && { playCount: { increment: 1 } })),
+            create: {
                 type: client_1.HistoryType.PLAY,
                 duration,
                 completed,
                 trackId,
                 userId: user.id,
-                playCount: 1,
+                playCount: completed ? 1 : 0,
             },
             select: prisma_selects_1.historySelect,
         });
-        yield db_1.default.track.update({
-            where: { id: trackId },
-            data: {
-                playCount: { increment: 1 },
-            },
-        });
+        if (completed) {
+            yield db_1.default.track.update({
+                where: { id: trackId },
+                data: {
+                    playCount: { increment: 1 },
+                },
+            });
+        }
         res.status(201).json({
             message: 'Play history saved successfully',
             history,
