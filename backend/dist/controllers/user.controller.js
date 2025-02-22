@@ -12,7 +12,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+<<<<<<< HEAD
 exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestArtistRole = void 0;
+=======
+exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestArtistRole = void 0;
+>>>>>>> 5e587fe3267501965d9b93ddff149dd1011f2fe8
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
@@ -784,4 +788,92 @@ const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, fu
     }
 });
 exports.getRecommendedArtists = getRecommendedArtists;
+<<<<<<< HEAD
+=======
+const getTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const albums = yield db_1.default.album.findMany({
+            where: { isActive: true },
+            select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+                type: true,
+                artist: {
+                    select: {
+                        id: true,
+                        artistName: true,
+                    }
+                },
+                tracks: {
+                    where: { isActive: true },
+                    select: {
+                        id: true,
+                        title: true,
+                        coverUrl: true,
+                        duration: true,
+                        audioUrl: true,
+                        playCount: true,
+                    },
+                    orderBy: { trackNumber: 'asc' },
+                },
+            },
+            take: 20,
+        });
+        res.json(albums);
+    }
+    catch (error) {
+        console.error('Get top albums error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getTopAlbums = getTopAlbums;
+const getTopArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const artists = yield db_1.default.artistProfile.findMany({
+            where: { isVerified: true },
+            select: {
+                id: true,
+                artistName: true,
+                avatar: true,
+                monthlyListeners: true,
+                genres: {
+                    select: {
+                        genre: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: { monthlyListeners: 'desc' },
+            take: 20,
+        });
+        res.json(artists);
+    }
+    catch (error) {
+        console.error('Get top artists error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getTopArtists = getTopArtists;
+const getTopTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const tracks = yield db_1.default.track.findMany({
+            where: { isActive: true },
+            select: prisma_selects_1.searchTrackSelect,
+            orderBy: { playCount: 'desc' },
+            take: 20,
+        });
+        res.json(tracks);
+    }
+    catch (error) {
+        console.error('Get top tracks error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getTopTracks = getTopTracks;
+>>>>>>> 5e587fe3267501965d9b93ddff149dd1011f2fe8
 //# sourceMappingURL=user.controller.js.map

@@ -71,7 +71,7 @@ model ArtistProfile {
 
 model ArtistGenre {
   id              String        @id @default(cuid())
-  artistId String
+  artistId        String
   genreId         String
   createdAt       DateTime      @default(now())
   artistProfile   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)

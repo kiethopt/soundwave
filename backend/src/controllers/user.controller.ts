@@ -7,7 +7,6 @@ import {
   searchAlbumSelect,
   searchTrackSelect,
   userSelect,
-  artistRequestDetailsSelect,
 } from '../utils/prisma-selects';
 
 // Hàm validation cho dữ liệu nghệ sĩ
@@ -888,36 +887,65 @@ export const getUserProfile = async (req: Request, res: Response): Promise<void>
 };
 
 
-// Lấy danh sách nghệ sĩ được đề xuất
+// Lấy danh sách nghệ sĩ được đề xuất theo genre trong lịch sử nghe nhạc
 export const getRecommendedArtists = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
     const user = req.user;
+
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    const listeningHistory = await prisma.history.findMany({
-      where: { userId: user.id },
-      select: { track: { select: { artistId: true } } },
+    const history = await prisma.history.findMany({
+      where: {
+        userId: user.id,
+        type: HistoryType.PLAY,
+        playCount: { gt: 0 },
+      },
+      select: {
+        track: {
+          select: {
+            artist: {
+              select: {
+                id: true,
+                artistName: true,
+                avatar: true,
+                genres: {
+                  select: {
+                    genre: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      take: 3,
     });
 
-    if (listeningHistory.length === 0) {
-      res.status(404).json({ message: 'No listening history found' });
-      return;
-    }
-
-    const artistIds = [
-      ...new Set(listeningHistory.filter((history) => history.track !== null).map((history) => history.track!.artistId)),
-    ];
+    const genreIds = history
+      .flatMap((h) => h.track?.artist.genres.map((g) => g.genre.id) || [])
+      .filter((id) => id !== null);
 
     const recommendedArtists = await prisma.artistProfile.findMany({
       where: {
-        id: { in: artistIds },
         isVerified: true,
+        genres: {
+          some: {
+            genreId: {
+              in: genreIds,
+            },
+          },
+        },
       },
       select: {
         id: true,
@@ -942,7 +970,6 @@ export const getRecommendedArtists = async (
           },
         },
       },
-      take: 10,
     });
 
     res.json(recommendedArtists);
@@ -950,4 +977,141 @@ export const getRecommendedArtists = async (
     console.error('Get recommended artists error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-};
+}
+
+// Lấy albums có nhiều lượt nghe nhất chứa track có nhiều người nghe nhất
+export const getTopAlbums = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const albums = await prisma.album.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        title: true,
+        coverUrl: true,
+        type: true,
+        artist: {
+          select: {
+            id: true,
+            artistName: true,
+          }
+        },
+        tracks: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            title: true,
+            coverUrl: true,
+            duration: true,
+            audioUrl: true,
+            playCount: true,
+          },
+          orderBy: { trackNumber: 'asc' },
+        },
+      },
+      take: 20,
+    });
+
+    res.json(albums);
+  } catch (error) {
+    console.error('Get top albums error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// Lấy danh sách nghệ sĩ có nhiều lượt nghe nhất
+export const getTopArtists = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const artists = await prisma.artistProfile.findMany({
+      where: { isVerified: true },
+      select: {
+        id: true,
+        artistName: true,
+        avatar: true,
+        monthlyListeners: true,
+        genres: {
+          select: {
+            genre: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { monthlyListeners: 'desc' },
+      take: 20,
+    });
+
+    res.json(artists);
+  } catch (error) {
+    console.error('Get top artists error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// Lấy danh sách track có nhiều lượt nghe nhất
+export const getTopTracks = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const tracks = await prisma.track.findMany({
+      where: { isActive: true },
+      select: searchTrackSelect,
+      orderBy: { playCount: 'desc' },
+      take: 20,
+    });
+
+    res.json(tracks);
+  } catch (error) {
+    console.error('Get top tracks error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// Lấy danh sách track mới nhất
+export const getNewestTracks = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const tracks = await prisma.track.findMany({
+      where: { isActive: true },
+      select: searchTrackSelect,
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    res.json(tracks);
+  } catch (error) {
+    console.error('Get newest tracks error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// Lấy danh sách album mới nhất
+export const getNewestAlbums = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const albums = await prisma.album.findMany({
+      where: { isActive: true },
+      select: searchAlbumSelect,
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    res.json(albums);
+  } catch (error) {
+    console.error('Get newest albums error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}

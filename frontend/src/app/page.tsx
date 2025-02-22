@@ -18,26 +18,52 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export default function Home() {
-  // const { theme } = useTheme();
-  // const router = useRouter();
-  // const [artist, setArtist] = useState<ArtistProfile | null>(null);
-  // const [albums, setAlbums] = useState<Album[]>([]);
-  // const [tracks, setTracks] = useState<Track[]>([]);
-  // // Track mapping for related artists - key is artist ID, value is array of tracks
+  const { theme } = useTheme();
+  const router = useRouter();
+  const [artist, setArtist] = useState<ArtistProfile | null>(null);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [tracks, setTracks] = useState<Track[]>([]);
+  // Track mapping for related artists - key is artist ID, value is array of tracks
   // const [artistTracksMap, setArtistTracksMap] = useState<Record<string, Track[]>>({});
-  // const [relatedArtists, setRelatedArtists] = useState<ArtistProfile[]>([]);
+  // const [getRecommendedArtists, setRecommendedArtists] = useState<ArtistProfile[]>([]);
   // const [loading, setLoading] = useState(true);
   // const [follow, setFollow] = useState(false);
   // const [isOwner, setIsOwner] = useState(false);
-  // const { dominantColor } = useDominantColor(artist?.avatar || '#A57865');
+  // const { dominantColor } = useDominantColor(artist?.avatar || '');
   // const [ showAllTracks, setShowAllTracks ] = useState(false);
+  // const {
+  //   currentTrack,
+  //   isPlaying,
+  //   volume,
+  //   progress,
+  //   loop,
+  //   shuffle,
+  //   playTrack,
+  //   pauseTrack,
+  //   setVolume,
+  //   seekTrack,
+  //   toggleLoop,
+  //   toggleShuffle,
+  //   skipNext,
+  //   skipPrevious,
+  //   queueType,
+  //   setQueueType,
+  //   trackQueue,
+  // } = useTrack();
+
+  const token = localStorage.getItem('userToken') || '';
+  const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+
+  useEffect(() => {
+    if (!token) {
+      router.push('/login');
+    }
+  }, [token]);
 
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6 p-6">Welcome to Music Website</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Add your content here */}
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
     </div>
   );
 }
