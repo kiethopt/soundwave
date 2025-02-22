@@ -1,20 +1,17 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import Link from 'next/link';
 import { ArrowLeft } from '@/components/ui/Icons';
 import { toast } from 'react-toastify';
 import { useTheme } from '@/contexts/ThemeContext';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { ArtistProfile } from '@/types';
 
-export default function NewTrack({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function NewTrack() {
   const router = useRouter();
-  const { id } = use(params);
   const [isLoading, setIsLoading] = useState(false);
   const [trackData, setTrackData] = useState({
     title: '',
@@ -23,7 +20,30 @@ export default function NewTrack({
   });
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [featuredArtists, setFeaturedArtists] = useState<string[]>([]);
+  const [artistOptions, setArtistOptions] = useState<ArtistProfile[]>([]);
   const { theme } = useTheme();
+
+  useEffect(() => {
+    const fetchArtists = async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) return;
+
+        const response = await api.artists.getAllArtistsProfile(token, 1, 100);
+        const verifiedArtists = response.artists.filter(
+          (artist: ArtistProfile) =>
+            artist.isVerified && artist.role === 'ARTIST'
+        );
+        setArtistOptions(verifiedArtists);
+      } catch (err) {
+        console.error('Error fetching artists:', err);
+        toast.error('Failed to load featured artists');
+      }
+    };
+
+    fetchArtists();
+  }, []);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -56,6 +76,9 @@ export default function NewTrack({
       formData.append('releaseDate', trackData.releaseDate);
       if (audioFile) formData.append('audioFile', audioFile);
       if (coverFile) formData.append('coverFile', coverFile);
+      if (featuredArtists.length > 0) {
+        formData.append('featuredArtists', featuredArtists.join(','));
+      }
 
       await api.tracks.create(formData, token);
       toast.success('Track created successfully');
@@ -101,7 +124,6 @@ export default function NewTrack({
           }`}
         >
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Form fields with updated styling */}
             <div className="space-y-4">
               <div className="space-y-2">
                 <label
@@ -130,7 +152,9 @@ export default function NewTrack({
               <div className="space-y-2">
                 <label
                   htmlFor="type"
-                  className="block text-sm font-medium text-white/60 mb-1"
+                  className={`block text-sm font-medium ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  }`}
                 >
                   Type
                 </label>
@@ -152,7 +176,9 @@ export default function NewTrack({
               <div className="space-y-2">
                 <label
                   htmlFor="releaseDate"
-                  className="block text-sm font-medium text-white/60 mb-1"
+                  className={`block text-sm font-medium ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  }`}
                 >
                   Release Date
                 </label>
@@ -173,8 +199,31 @@ export default function NewTrack({
 
               <div className="space-y-2">
                 <label
+                  htmlFor="featuredArtists"
+                  className={`block text-sm font-medium ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  }`}
+                >
+                  Featured Artists
+                </label>
+                <SearchableSelect
+                  options={artistOptions.map((artist) => ({
+                    id: artist.id,
+                    name: artist.artistName,
+                  }))}
+                  value={featuredArtists}
+                  onChange={(value) => setFeaturedArtists(value as string[])}
+                  placeholder="Select featured artists"
+                  multiple
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
                   htmlFor="audio"
-                  className="block text-sm font-medium text-white/60 mb-1"
+                  className={`block text-sm font-medium ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  }`}
                 >
                   Audio File
                 </label>
@@ -196,7 +245,9 @@ export default function NewTrack({
               <div className="space-y-2">
                 <label
                   htmlFor="cover"
-                  className="block text-sm font-medium text-white/60 mb-1"
+                  className={`block text-sm font-medium ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  }`}
                 >
                   Cover Image
                 </label>

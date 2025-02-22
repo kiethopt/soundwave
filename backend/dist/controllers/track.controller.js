@@ -204,8 +204,8 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 type: albumId ? undefined : 'SINGLE',
                 featuredArtists: featuredArtistsArray.length > 0
                     ? {
-                        create: featuredArtistsArray.map((artistProfileId) => ({
-                            artistProfileId,
+                        create: featuredArtistsArray.map((artistId) => ({
+                            artistId,
                         })),
                     }
                     : undefined,
@@ -251,8 +251,8 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 : featuredArtists.split(',').map((id) => id.trim());
             updateData.featuredArtists = {
                 deleteMany: {},
-                create: featuredArtistsArray.map((artistProfileId) => ({
-                    artistProfileId,
+                create: featuredArtistsArray.map((artistId) => ({
+                    artistId,
                 })),
             };
         }

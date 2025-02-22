@@ -12,11 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-<<<<<<< HEAD
-exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestArtistRole = void 0;
-=======
-exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestArtistRole = void 0;
->>>>>>> 5e587fe3267501965d9b93ddff149dd1011f2fe8
+exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestArtistRole = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
@@ -739,21 +735,50 @@ const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, fu
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const listeningHistory = yield db_1.default.history.findMany({
-            where: { userId: user.id },
-            select: { track: { select: { artistId: true } } },
+        const history = yield db_1.default.history.findMany({
+            where: {
+                userId: user.id,
+                type: client_1.HistoryType.PLAY,
+                playCount: { gt: 0 },
+            },
+            select: {
+                track: {
+                    select: {
+                        artist: {
+                            select: {
+                                id: true,
+                                artistName: true,
+                                avatar: true,
+                                genres: {
+                                    select: {
+                                        genre: {
+                                            select: {
+                                                id: true,
+                                                name: true,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            take: 3,
         });
-        if (listeningHistory.length === 0) {
-            res.status(404).json({ message: 'No listening history found' });
-            return;
-        }
-        const artistIds = [
-            ...new Set(listeningHistory.filter((history) => history.track !== null).map((history) => history.track.artistId)),
-        ];
+        const genreIds = history
+            .flatMap((h) => { var _a; return ((_a = h.track) === null || _a === void 0 ? void 0 : _a.artist.genres.map((g) => g.genre.id)) || []; })
+            .filter((id) => id !== null);
         const recommendedArtists = yield db_1.default.artistProfile.findMany({
             where: {
-                id: { in: artistIds },
                 isVerified: true,
+                genres: {
+                    some: {
+                        genreId: {
+                            in: genreIds,
+                        },
+                    },
+                },
             },
             select: {
                 id: true,
@@ -778,7 +803,6 @@ const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, fu
                     },
                 },
             },
-            take: 10,
         });
         res.json(recommendedArtists);
     }
@@ -788,8 +812,6 @@ const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, fu
     }
 });
 exports.getRecommendedArtists = getRecommendedArtists;
-<<<<<<< HEAD
-=======
 const getTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const albums = yield db_1.default.album.findMany({
@@ -875,5 +897,36 @@ const getTopTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.getTopTracks = getTopTracks;
->>>>>>> 5e587fe3267501965d9b93ddff149dd1011f2fe8
+const getNewestTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const tracks = yield db_1.default.track.findMany({
+            where: { isActive: true },
+            select: prisma_selects_1.searchTrackSelect,
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+        });
+        res.json(tracks);
+    }
+    catch (error) {
+        console.error('Get newest tracks error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getNewestTracks = getNewestTracks;
+const getNewestAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const albums = yield db_1.default.album.findMany({
+            where: { isActive: true },
+            select: prisma_selects_1.searchAlbumSelect,
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+        });
+        res.json(albums);
+    }
+    catch (error) {
+        console.error('Get newest albums error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getNewestAlbums = getNewestAlbums;
 //# sourceMappingURL=user.controller.js.map

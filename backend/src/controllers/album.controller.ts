@@ -740,7 +740,7 @@ export const getAllAlbums = async (
             tracks: {
               some: {
                 featuredArtists: {
-                  some: { artistProfileId: user.artistProfile.id },
+                  some: { artistId: user.artistProfile.id },
                 },
               },
             },

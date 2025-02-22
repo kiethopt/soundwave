@@ -242,8 +242,8 @@ export const createTrack = async (
         featuredArtists:
           featuredArtistsArray.length > 0
             ? {
-                create: featuredArtistsArray.map((artistProfileId: string) => ({
-                  artistProfileId,
+                create: featuredArtistsArray.map((artistId: string) => ({
+                  artistId,
                 })),
               }
             : undefined,
@@ -302,8 +302,8 @@ export const updateTrack = async (
 
       updateData.featuredArtists = {
         deleteMany: {},
-        create: featuredArtistsArray.map((artistProfileId: string) => ({
-          artistProfileId,
+        create: featuredArtistsArray.map((artistId: string) => ({
+          artistId,
         })),
       };
     }

@@ -610,7 +610,7 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                         tracks: {
                             some: {
                                 featuredArtists: {
-                                    some: { artistProfileId: user.artistProfile.id },
+                                    some: { artistId: user.artistProfile.id },
                                 },
                             },
                         },

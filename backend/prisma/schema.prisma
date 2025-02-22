@@ -293,14 +293,14 @@ model TrackGenre {
 model TrackArtist {
   id              String        @id @default(cuid())
   trackId         String
-  artistProfileId String
+  artistId String
   createdAt       DateTime      @default(now())
-  artistProfile   ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
+  artistProfile   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
   track           Track         @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
-  @@unique([trackId, artistProfileId])
+  @@unique([trackId, artistId])
   @@index([trackId])
-  @@index([artistProfileId])
+  @@index([artistId])
   @@map("track_artist")
 }
 
