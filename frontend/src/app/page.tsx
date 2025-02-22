@@ -25,32 +25,32 @@ export default function Home() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
   // Track mapping for related artists - key is artist ID, value is array of tracks
-  const [artistTracksMap, setArtistTracksMap] = useState<Record<string, Track[]>>({});
-  const [getRecommendedArtists, setRecommendedArtists] = useState<ArtistProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [follow, setFollow] = useState(false);
-  const [isOwner, setIsOwner] = useState(false); 
-  const { dominantColor } = useDominantColor(artist?.avatar || '');
-  const [ showAllTracks, setShowAllTracks ] = useState(false);
-  const {
-    currentTrack,
-    isPlaying,
-    volume,
-    progress,
-    loop,
-    shuffle,
-    playTrack,
-    pauseTrack,
-    setVolume,
-    seekTrack,
-    toggleLoop,
-    toggleShuffle,
-    skipNext,
-    skipPrevious,
-    queueType,
-    setQueueType,
-    trackQueue,
-  } = useTrack();
+  // const [artistTracksMap, setArtistTracksMap] = useState<Record<string, Track[]>>({});
+  // const [getRecommendedArtists, setRecommendedArtists] = useState<ArtistProfile[]>([]);
+  // const [loading, setLoading] = useState(true);
+  // const [follow, setFollow] = useState(false);
+  // const [isOwner, setIsOwner] = useState(false); 
+  // const { dominantColor } = useDominantColor(artist?.avatar || '');
+  // const [ showAllTracks, setShowAllTracks ] = useState(false);
+  // const {
+  //   currentTrack,
+  //   isPlaying,
+  //   volume,
+  //   progress,
+  //   loop,
+  //   shuffle,
+  //   playTrack,
+  //   pauseTrack,
+  //   setVolume,
+  //   seekTrack,
+  //   toggleLoop,
+  //   toggleShuffle,
+  //   skipNext,
+  //   skipPrevious,
+  //   queueType,
+  //   setQueueType,
+  //   trackQueue,
+  // } = useTrack();
 
   const token = localStorage.getItem('userToken') || '';
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
