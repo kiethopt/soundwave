@@ -10,6 +10,11 @@ import {
   editProfile,
   checkArtistRequest,
   getRecommendedArtists,
+  getNewestAlbums,
+  getNewestTracks,
+  getTopTracks,
+  getTopArtists,
+  getTopAlbums,
   getUserProfile,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
@@ -54,11 +59,46 @@ router.get(
   checkArtistRequest
 );
 
-// 
+// Route lấy danh sách Artist được đề xuất
 router.get(
-  '/recommended',
+  '/recommendedArtists',
   authenticate,
   getRecommendedArtists
+);
+
+// Route lấy danh sách Album mới nhất
+router.get(
+  '/newestAlbums',
+  authenticate,
+  getNewestAlbums
+);
+
+// Route lấy danh sách Track mới nhất
+router.get(
+  '/newestTracks',
+  authenticate,
+  getNewestTracks
+);
+
+// Route lấy danh sách Track phổ biến nhất
+router.get(
+  '/topTracks',
+  authenticate,
+  getTopTracks
+);
+
+// Route lấy danh sách Artist phổ biến nhất
+router.get(
+  '/topArtists',
+  authenticate,
+  getTopArtists
+);
+
+// Route lấy danh sách Album phổ biến nhất
+router.get(
+  '/topAlbums',
+  authenticate,
+  getTopAlbums
 );
 
 export default router;
