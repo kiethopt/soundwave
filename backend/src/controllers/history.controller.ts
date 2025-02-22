@@ -4,7 +4,10 @@ import { HistoryType } from '@prisma/client';
 import { historySelect } from '../utils/prisma-selects';
 
 // Lưu lịch sử nghe nhạc
-export const savePlayHistory = async (req: Request, res: Response): Promise<void> => {
+export const savePlayHistory = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { trackId, duration, completed } = req.body;
     const user = req.user;
@@ -95,8 +98,6 @@ export const savePlayHistory = async (req: Request, res: Response): Promise<void
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
-
 
 // Lưu lịch sử tìm kiếm
 export const saveSearchHistory = async (

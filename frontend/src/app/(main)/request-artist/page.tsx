@@ -128,9 +128,13 @@ export default function RequestArtistPage() {
 
     try {
       const token = localStorage.getItem('userToken');
-      if (!token) {
-        throw new Error('No authentication token found');
+      const userDataStr = localStorage.getItem('userData');
+
+      if (!token || !userDataStr) {
+        throw new Error('No authentication token or user data found');
       }
+
+      const userData = JSON.parse(userDataStr);
 
       if (formData.avatarFile && formData.avatarFile.size > 5 * 1024 * 1024) {
         throw new Error('File size exceeds the limit of 5MB');
@@ -168,13 +172,13 @@ export default function RequestArtistPage() {
 
       // Hiển thị thông báo thành công
       toast.success('Your request has been submitted successfully!', {
-        autoClose: 2000, // Thời gian hiển thị thông báo (2 giây)
+        autoClose: 2000,
       });
 
       // Trì hoãn chuyển trang sau khi thông báo được hiển thị
       setTimeout(() => {
-        router.push('/profile'); // Chuyển hướng đến trang profile sau khi submit thành công
-      }, 2000); // Đợi 2 giây trước khi chuyển trang
+        router.push(`/profile/${userData.id}`); // Chuyển hướng đến trang profile của user
+      }, 2000);
     } catch (error: any) {
       console.error('Error requesting artist role:', error);
       setError(

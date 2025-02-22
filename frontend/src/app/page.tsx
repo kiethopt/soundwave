@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -18,19 +18,19 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export default function Home() {
-  const { theme } = useTheme();
-  const router = useRouter();
-  const [artist, setArtist] = useState<ArtistProfile | null>(null);
-  const [albums, setAlbums] = useState<Album[]>([]);
-  const [tracks, setTracks] = useState<Track[]>([]);
-  // Track mapping for related artists - key is artist ID, value is array of tracks
-  const [artistTracksMap, setArtistTracksMap] = useState<Record<string, Track[]>>({});
-  const [relatedArtists, setRelatedArtists] = useState<ArtistProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [follow, setFollow] = useState(false);
-  const [isOwner, setIsOwner] = useState(false); 
-  const { dominantColor } = useDominantColor(artist?.avatar || '#A57865');
-  const [ showAllTracks, setShowAllTracks ] = useState(false);
+  // const { theme } = useTheme();
+  // const router = useRouter();
+  // const [artist, setArtist] = useState<ArtistProfile | null>(null);
+  // const [albums, setAlbums] = useState<Album[]>([]);
+  // const [tracks, setTracks] = useState<Track[]>([]);
+  // // Track mapping for related artists - key is artist ID, value is array of tracks
+  // const [artistTracksMap, setArtistTracksMap] = useState<Record<string, Track[]>>({});
+  // const [relatedArtists, setRelatedArtists] = useState<ArtistProfile[]>([]);
+  // const [loading, setLoading] = useState(true);
+  // const [follow, setFollow] = useState(false);
+  // const [isOwner, setIsOwner] = useState(false);
+  // const { dominantColor } = useDominantColor(artist?.avatar || '#A57865');
+  // const [ showAllTracks, setShowAllTracks ] = useState(false);
 
   return (
     <div>

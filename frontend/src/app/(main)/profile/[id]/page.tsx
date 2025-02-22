@@ -19,14 +19,14 @@ export default function UserProfilePage() {
   const params = useParams();
   // Lấy id từ params
   const idFromParams = Array.isArray(params.id) ? params.id[0] : params.id;
-  
+
   // Kiểm tra rỏ ràng id, nếu không tồn tại hoặc không phải string thì return.
   if (!idFromParams || typeof idFromParams !== 'string') {
     // Bạn có thể hiển thị thông báo lỗi hoặc chuyển hướng nếu cần.
     console.error('Invalid id parameter');
     return <div>Invalid user id</div>;
   }
-  
+
   // Bây giờ idFromParams chắc chắn là string.
   const validId = idFromParams;
 
@@ -65,7 +65,9 @@ export default function UserProfilePage() {
         const response = await api.user.getFollowing(token);
         if (response) {
           // Giả sử response là mảng các user mà user hiện tại đang theo dõi
-          const isFollowing = response.some((profile: UserProfile) => profile.id === validId);
+          const isFollowing = response.some(
+            (profile: UserProfile) => profile.id === validId
+          );
           const isOwner = userData && userData.id === validId;
           setFollow(isFollowing);
           setIsOwner(isOwner);
@@ -129,7 +131,7 @@ export default function UserProfilePage() {
               size="sm"
               onClick={handleFollow}
               className="flex-shrink-0 justify-center min-w-[80px] text-black hover:text-red-500"
-              >
+            >
               {follow ? 'Unfollow' : 'Follow'}
             </Button>
           )}

@@ -407,7 +407,7 @@ export const updateArtistProfile = async (
     const updatedArtistProfile = await prisma.artistProfile.update({
       where: { id },
       data: {
-        artistName, // Thêm artistName vào đây
+        artistName,
         bio,
         ...(avatarUrl && { avatar: avatarUrl }),
         ...(parsedSocialMediaLinks && {
@@ -547,4 +547,4 @@ export const getRelatedArtists = async (
     console.error('Get similar artists error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};

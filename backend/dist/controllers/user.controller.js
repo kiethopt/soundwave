@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestArtistRole = void 0;
+exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestArtistRole = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
@@ -376,8 +376,9 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             res.status(404).json({ message: 'Target not found' });
             return;
         }
-        if ((followingType === 'USER' || followingType === 'ARTIST') &&
-            (followingId === user.id || followingId === ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id))) {
+        if (((followingType === 'USER' || followingType === 'ARTIST') &&
+            followingId === user.id) ||
+            followingId === ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
             res.status(400).json({ message: 'Cannot follow yourself' });
             return;
         }
@@ -409,8 +410,6 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             const followerName = (currentUser === null || currentUser === void 0 ? void 0 : currentUser.username) || (currentUser === null || currentUser === void 0 ? void 0 : currentUser.email) || 'Unknown';
             if (followingType === 'ARTIST') {
                 console.log('=== DEBUG: followUser => about to create notification for ARTIST');
-                console.log('followingId =', followingId);
-                console.log('currentUser =', currentUser);
                 yield tx.notification.create({
                     data: {
                         type: 'NEW_FOLLOW',
@@ -420,7 +419,6 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                         senderId: user.id,
                     },
                 });
-                console.log('=== DEBUG: followUser => notification for ARTIST created successfully!');
                 yield tx.artistProfile.update({
                     where: { id: followingId },
                     data: { monthlyListeners: { increment: 1 } },
@@ -428,8 +426,6 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             }
             else {
                 console.log('=== DEBUG: followUser => about to create notification for USER->USER follow');
-                console.log('followingId =', followingId);
-                console.log('currentUser =', currentUser);
                 yield tx.notification.create({
                     data: {
                         type: 'NEW_FOLLOW',
@@ -439,7 +435,7 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                         senderId: user.id,
                     },
                 });
-                console.log('=== DEBUG: followUser => notification for followed USER created successfully!');
+                console.log('=== DEBUG: followUser => notification for followed USER created!');
             }
         }));
         res.json({ message: 'Followed successfully' });
@@ -705,4 +701,87 @@ const checkArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.checkArtistRequest = checkArtistRequest;
+const getUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        const user = yield db_1.default.user.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                username: true,
+                avatar: true,
+                role: true,
+                isActive: true,
+            },
+        });
+        if (!user) {
+            res.status(404).json({ message: "User not found" });
+            return;
+        }
+        res.json(user);
+    }
+    catch (error) {
+        console.error("Get user profile error:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+exports.getUserProfile = getUserProfile;
+const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = req.user;
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const listeningHistory = yield db_1.default.history.findMany({
+            where: { userId: user.id },
+            select: { track: { select: { artistId: true } } },
+        });
+        if (listeningHistory.length === 0) {
+            res.status(404).json({ message: 'No listening history found' });
+            return;
+        }
+        const artistIds = [
+            ...new Set(listeningHistory.filter((history) => history.track !== null).map((history) => history.track.artistId)),
+        ];
+        const recommendedArtists = yield db_1.default.artistProfile.findMany({
+            where: {
+                id: { in: artistIds },
+                isVerified: true,
+            },
+            select: {
+                id: true,
+                artistName: true,
+                bio: true,
+                avatar: true,
+                role: true,
+                socialMediaLinks: true,
+                monthlyListeners: true,
+                isVerified: true,
+                isActive: true,
+                verificationRequestedAt: true,
+                verifiedAt: true,
+                genres: {
+                    select: {
+                        genre: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+            take: 10,
+        });
+        res.json(recommendedArtists);
+    }
+    catch (error) {
+        console.error('Get recommended artists error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getRecommendedArtists = getRecommendedArtists;
 //# sourceMappingURL=user.controller.js.map

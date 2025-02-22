@@ -7,7 +7,6 @@ import {
   getArtistAlbums,
   updateArtistProfile,
   getRelatedArtists,
-  getRecommendedArtists
 } from '../controllers/artist.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -24,11 +23,7 @@ router.get(
   getAllArtistsProfile
 );
 
-router.get(
-  '/profile/:id',
-  authenticate,
-  getArtistProfile
-);
+router.get('/profile/:id', authenticate, getArtistProfile);
 
 router.put(
   '/profile/:id',
@@ -45,23 +40,11 @@ router.get(
   getArtistStats
 );
 
-router.get(
-  '/tracks/:id',
-  authenticate,
-  getArtistTracks
-);
+router.get('/tracks/:id', authenticate, getArtistTracks);
 
-router.get(
-  '/albums/:id',
-  authenticate,
-  getArtistAlbums
-);
+router.get('/albums/:id', authenticate, getArtistAlbums);
 
-router.get(
-  '/related/:id',
-  authenticate,
-  getRelatedArtists
-);
+router.get('/related/:id', authenticate, getRelatedArtists);
 
 // router.get(
 //   '/albums/:id',

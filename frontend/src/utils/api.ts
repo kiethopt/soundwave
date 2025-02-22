@@ -324,10 +324,7 @@ export const api = {
     getAllGenres: async () =>
       fetchWithAuth('/api/user/genres', { method: 'GET' }),
 
-    followUserOrArtist: async (
-      followingId: string,
-      token: string
-    ) =>
+    followUserOrArtist: async (followingId: string, token: string) =>
       fetchWithAuth(
         `/api/user/follow/${followingId}`,
         {
@@ -336,10 +333,7 @@ export const api = {
         token
       ),
 
-    unfollowUserOrArtist: async (
-      followingId: string,
-      token: string
-    ) =>
+    unfollowUserOrArtist: async (followingId: string, token: string) =>
       fetchWithAuth(
         `/api/user/unfollow/${followingId}`,
         {
@@ -435,7 +429,7 @@ export const api = {
     getAlbumByArtistId: async (id: string, token: string) =>
       fetchWithAuth(`/api/artist/albums/${id}`, { method: 'GET' }, token),
 
-    getRelatedArtists: async (id: string, token: string) => 
+    getRelatedArtists: async (id: string, token: string) =>
       fetchWithAuth(`/api/artist/related/${id}`, { method: 'GET' }, token),
 
     getAllTracks: async (
@@ -526,7 +520,6 @@ export const api = {
         { method: 'GET' },
         token
       ),
-
 
     create: async (data: FormData, token: string) =>
       fetchWithAuth('/api/tracks', { method: 'POST', body: data }, token),
@@ -672,7 +665,11 @@ export const api = {
 
     // Lấy số lượng thông báo chưa đọc
     getUnreadCount: async (token: string) =>
-      fetchWithAuth('/api/notifications/unread-count', { method: 'GET' }, token),
+      fetchWithAuth(
+        '/api/notifications/unread-count',
+        { method: 'GET' },
+        token
+      ),
 
     // Đánh dấu 1 thông báo đã đọc
     markAsRead: async (notificationId: string, token: string) =>
@@ -684,14 +681,6 @@ export const api = {
 
     // Đánh dấu tất cả thông báo đã đọc
     markAllAsRead: async (token: string) =>
-      fetchWithAuth(
-        '/api/notifications/read-all',
-        { method: 'PATCH' },
-        token
-      ),
+      fetchWithAuth('/api/notifications/read-all', { method: 'PATCH' }, token),
   },
-
-
-  // ...Các thuộc tính khác (auth, user, admin, etc.)...
 };
-  

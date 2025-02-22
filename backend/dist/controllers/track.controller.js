@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
+exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const cloudinary_service_1 = require("../services/cloudinary.service");
 const client_1 = require("@prisma/client");
@@ -567,6 +567,49 @@ const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.getAllTracks = getAllTracks;
+const getTrackById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { id } = req.params;
+        const user = req.user;
+        const track = yield db_1.default.track.findUnique({
+            where: { id },
+            select: prisma_selects_1.trackSelect,
+        });
+        if (!track) {
+            res.status(404).json({ message: 'Track not found' });
+            return;
+        }
+        if ((user === null || user === void 0 ? void 0 : user.role) === client_1.Role.ADMIN) {
+            res.json(track);
+            return;
+        }
+        if (!track.isActive) {
+            if (((_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.id) === track.artistId) {
+                if (!user.artistProfile.isVerified || !user.artistProfile.isActive) {
+                    res.status(403).json({
+                        message: 'Your artist profile is not verified or inactive',
+                        code: 'INVALID_ARTIST_PROFILE',
+                    });
+                    return;
+                }
+                res.json(track);
+                return;
+            }
+            res.status(403).json({
+                message: 'You do not have permission to view this track',
+                code: 'TRACK_NOT_ACCESSIBLE',
+            });
+            return;
+        }
+        res.json(track);
+    }
+    catch (error) {
+        console.error('Get track by id error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getTrackById = getTrackById;
 const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {

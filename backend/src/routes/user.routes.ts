@@ -10,12 +10,11 @@ import {
   editProfile,
   checkArtistRequest,
   getRecommendedArtists,
-  // getUserProfile,
+  getUserProfile,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload, { handleUploadError } from '../middleware/upload.middleware';
-
 
 const router = express.Router();
 
@@ -25,7 +24,7 @@ router.get('/followers', authenticate, getFollowers);
 router.get('/following', authenticate, getFollowing);
 router.get('/search-all', authenticate, searchAll);
 router.get('/genres', getAllGenres);
-// router.get('/profile/:id', getUserProfile);
+router.get('/profile/:id', getUserProfile);
 
 // Route yêu cầu trở thành Artist
 router.post(
@@ -54,11 +53,7 @@ router.get(
   checkArtistRequest
 );
 
-// 
-router.get(
-  '/recommended',
-  authenticate,
-  getRecommendedArtists
-);
+//
+router.get('/recommended', authenticate, getRecommendedArtists);
 
 export default router;
