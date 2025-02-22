@@ -9,7 +9,8 @@ import {
   requestArtistRole,
   editProfile,
   checkArtistRequest,
-  getUserProfile,
+  getRecommendedArtists,
+  // getUserProfile,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -24,7 +25,7 @@ router.get('/followers', authenticate, getFollowers);
 router.get('/following', authenticate, getFollowing);
 router.get('/search-all', authenticate, searchAll);
 router.get('/genres', getAllGenres);
-router.get('/profile/:id', getUserProfile);
+// router.get('/profile/:id', getUserProfile);
 
 // Route yêu cầu trở thành Artist
 router.post(
@@ -51,6 +52,13 @@ router.get(
   authenticate,
   authorize([Role.USER]),
   checkArtistRequest
+);
+
+// 
+router.get(
+  '/recommended',
+  authenticate,
+  getRecommendedArtists
 );
 
 export default router;

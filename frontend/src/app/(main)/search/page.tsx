@@ -419,8 +419,8 @@ function SearchContent() {
                           <button
                             onClick={() => handlePlay(track)}
                             className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                          >
-                            { currentTrack && track.id == currentTrack.id && isPlaying && queueType === 'track' ? (
+                          > 
+                            { currentTrack && track.id === currentTrack.id && isPlaying && queueType === 'track' ? (
                               <Pause className="w-5 h-5 text-white" />
                             ) : (
                               <Play className="w-5 h-5 text-white" />
@@ -497,7 +497,7 @@ function SearchContent() {
                           onClick={() => handlePlay(track)} 
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          {currentlyPlaying === track.id ? (
+                          { currentTrack && track.id === currentTrack.id && isPlaying && queueType === 'track' ? (
                             <Pause className="w-6 h-6 text-white" />
                           ) : (
                             <Play className="w-6 h-6 text-white" />

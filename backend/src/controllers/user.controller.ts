@@ -7,6 +7,7 @@ import {
   searchAlbumSelect,
   searchTrackSelect,
   userSelect,
+  artistRequestDetailsSelect,
 } from '../utils/prisma-selects';
 
 // Hàm validation cho dữ liệu nghệ sĩ
@@ -883,5 +884,70 @@ export const getUserProfile = async (req: Request, res: Response): Promise<void>
   } catch (error) {
     console.error("Get user profile error:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+// Lấy danh sách nghệ sĩ được đề xuất
+export const getRecommendedArtists = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const listeningHistory = await prisma.history.findMany({
+      where: { userId: user.id },
+      select: { track: { select: { artistId: true } } },
+    });
+
+    if (listeningHistory.length === 0) {
+      res.status(404).json({ message: 'No listening history found' });
+      return;
+    }
+
+    const artistIds = [
+      ...new Set(listeningHistory.filter((history) => history.track !== null).map((history) => history.track!.artistId)),
+    ];
+
+    const recommendedArtists = await prisma.artistProfile.findMany({
+      where: {
+        id: { in: artistIds },
+        isVerified: true,
+      },
+      select: {
+        id: true,
+        artistName: true,
+        bio: true,
+        avatar: true,
+        role: true,
+        socialMediaLinks: true,
+        monthlyListeners: true,
+        isVerified: true,
+        isActive: true,
+        verificationRequestedAt: true,
+        verifiedAt: true,
+        genres: {
+          select: {
+            genre: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      take: 10,
+    });
+
+    res.json(recommendedArtists);
+  } catch (error) {
+    console.error('Get recommended artists error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
