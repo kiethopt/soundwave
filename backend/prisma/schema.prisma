@@ -71,13 +71,13 @@ model ArtistProfile {
 
 model ArtistGenre {
   id              String        @id @default(cuid())
-  artistProfileId String
+  artistId        String
   genreId         String
   createdAt       DateTime      @default(now())
-  artistProfile   ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
+  artistProfile   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
   genre           Genre         @relation(fields: [genreId], references: [id], onDelete: Cascade)
 
-  @@unique([artistProfileId, genreId])
+  @@unique([artistId, genreId])
   @@map("artist_genre")
 }
 
