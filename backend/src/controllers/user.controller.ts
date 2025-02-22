@@ -855,6 +855,36 @@ export const checkArtistRequest = async (
     console.error('Check artist request error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
+
+};
+
+
+export const getUserProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        username: true,
+        avatar: true,
+        role: true,
+        isActive: true,
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    res.json(user);
+  } catch (error) {
+    console.error("Get user profile error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 
 
