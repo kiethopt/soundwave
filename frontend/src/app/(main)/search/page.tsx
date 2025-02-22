@@ -572,7 +572,7 @@ function SearchContent() {
                     <div
                       key={user.id}
                       className="group relative p-4 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                      onClick={() => router.push(`/user/${user.id}`)}
+                      onClick={() => router.push(`/profile/${user.id}`)}
                     >
                       <div className="relative">
                         <div className="aspect-square mb-4">
