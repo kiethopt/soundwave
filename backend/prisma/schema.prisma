@@ -179,8 +179,7 @@ model Playlist {
   tracks        PlaylistTrack[]
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, type])
-  @@unique([name, userId])
+
   @@index([userId])
   @@index([privacy])
   @@map("playlists")

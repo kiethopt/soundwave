@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from "next/link";
 import {
   AddSimple,
   Music,
@@ -13,11 +13,21 @@ import {
   LibraryOutline,
   LibraryFilled,
   HomeOutline,
-} from '@/components/ui/Icons';
-import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTheme } from '@/contexts/ThemeContext';
+} from "@/components/ui/Icons";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useTheme } from "@/contexts/ThemeContext";
+import { CreatePlaylistDialog } from "@/components/playlist/CreatePlaylistDialog";
+import { api } from "@/utils/api";
+import { toast } from "sonner";
+
+interface Playlist {
+  id: string;
+  name: string;
+  privacy: "PUBLIC" | "PRIVATE";
+  type: "FAVORITE" | "NORMAL";
+}
 
 export default function Sidebar({
   isOpen,
@@ -28,29 +38,31 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [userRole, setUserRole] = useState<'USER' | 'ADMIN'>('USER');
+  const [userRole, setUserRole] = useState<"USER" | "ADMIN">("USER");
   const [hasArtistProfile, setHasArtistProfile] = useState(false);
   const [isArtistVerified, setIsArtistVerified] = useState(false);
-  const [currentProfile, setCurrentProfile] = useState<'USER' | 'ARTIST'>(
-    'USER'
+  const [currentProfile, setCurrentProfile] = useState<"USER" | "ARTIST">(
+    "USER"
   );
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { theme } = useTheme();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
 
   useEffect(() => {
-    const savedCollapsedState = localStorage.getItem('sidebarCollapsed');
+    const savedCollapsedState = localStorage.getItem("sidebarCollapsed");
     if (savedCollapsedState) {
       setIsCollapsed(JSON.parse(savedCollapsedState));
     }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed));
+    localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
   }, [isCollapsed]);
 
   useEffect(() => {
-    const userData = localStorage.getItem('userData');
+    const userData = localStorage.getItem("userData");
     if (userData) {
       const user = JSON.parse(userData);
       setUserRole(user.role);
@@ -63,7 +75,32 @@ export default function Sidebar({
     }
   }, []);
 
+  // Fetch playlists
+  const fetchPlaylists = async () => {
+    try {
+      const token = localStorage.getItem("userToken");
+      if (!token) {
+        return;
+      }
+
+      const response = await api.playlists.getAll(token);
+      setPlaylists(response.data || []);
+    } catch (error) {
+      console.error("Error fetching playlists:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchPlaylists();
+    }
+  }, [isAuthenticated]);
+
   const isActive = (path: string) => pathname === path;
+
+  // Tách playlist yêu thích và playlist thường
+  const favoritePlaylist = playlists.find((p) => p.type === "FAVORITE");
+  const normalPlaylists = playlists.filter((p) => p.type === "NORMAL");
 
   return (
     <>
@@ -79,28 +116,28 @@ export default function Sidebar({
           fixed md:static inset-y-0 left-0 z-50
           transform transition-transform duration-300 ease-in-out
           md:transform-none md:transition-none
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0 md:flex-shrink-0
-          ${isCollapsed ? 'w-20' : 'w-64'}
+          ${isCollapsed ? "w-20" : "w-64"}
           ${
-            theme === 'light'
-              ? 'bg-white border-r border-gray-200'
-              : 'bg-[#121212] border-r border-white/10'
+            theme === "light"
+              ? "bg-white border-r border-gray-200"
+              : "bg-[#121212] border-r border-white/10"
           }
         `}
       >
         <div className="h-full flex flex-col">
           <div
             className={`md:hidden p-4 ${
-              isCollapsed ? 'flex justify-center' : 'flex justify-end'
+              isCollapsed ? "flex justify-center" : "flex justify-end"
             }`}
           >
             <button
               onClick={onClose}
               className={`p-1 flex items-center justify-center w-8 h-8 rounded-full ${
-                theme === 'light'
-                  ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  : 'bg-white/10 text-white/60 hover:text-white'
+                theme === "light"
+                  ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  : "bg-white/10 text-white/60 hover:text-white"
               }`}
             >
               <XIcon className="w-6 h-6" />
@@ -109,44 +146,115 @@ export default function Sidebar({
 
           <nav className="flex-1 px-4">
             {/* Library Section - Only for regular users */}
-            {currentProfile === 'USER' && userRole === 'USER' && (
-              <div className="h-[72px] -mx-4 border-b border-white/10">
-                <div className="h-full flex items-center gap-4 px-7">
-                  {isCollapsed ? (
-                    <div className="group">
-                      <LibraryOutline
-                        className={`w-7 h-7 ${
-                          theme === 'light'
-                            ? 'text-gray-600 group-hover:hidden'
-                            : 'text-white/70 group-hover:hidden'
-                        }`}
-                      />
-                      <LibraryFilled
-                        className={`w-7 h-7 hidden group-hover:block ${
-                          theme === 'light' ? 'text-gray-900' : 'text-white'
-                        }`}
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <div
-                        className={`flex items-center gap-3 group ${
-                          theme === 'light'
-                            ? 'text-gray-600 hover:text-gray-900'
-                            : 'text-white/70 hover:text-white'
-                        }`}
-                      >
-                        <div className="relative">
-                          <LibraryOutline className="w-7 h-7 group-hover:hidden" />
-                          <LibraryFilled className="w-7 h-7 hidden group-hover:block" />
-                        </div>
-                        <span className="text-base font-medium">
-                          Your Library
-                        </span>
+            {currentProfile === "USER" && userRole === "USER" && (
+              <div className="flex flex-col">
+                <div className="h-[72px] -mx-4 border-b border-white/10">
+                  <div className="h-full flex items-center gap-4 px-7">
+                    {isCollapsed ? (
+                      <div className="group">
+                        <LibraryOutline
+                          className={`w-7 h-7 ${
+                            theme === "light"
+                              ? "text-gray-600 group-hover:hidden"
+                              : "text-white/70 group-hover:hidden"
+                          }`}
+                        />
+                        <LibraryFilled
+                          className={`w-7 h-7 hidden group-hover:block ${
+                            theme === "light" ? "text-gray-900" : "text-white"
+                          }`}
+                        />
                       </div>
-                      <AddSimple className="w-6 h-6 ml-auto hover:text-white" />
-                    </>
+                    ) : (
+                      <>
+                        <div
+                          className={`flex items-center gap-3 group ${
+                            theme === "light"
+                              ? "text-gray-600 hover:text-gray-900"
+                              : "text-white/70 hover:text-white"
+                          }`}
+                        >
+                          <div className="relative">
+                            <LibraryOutline className="w-7 h-7 group-hover:hidden" />
+                            <LibraryFilled className="w-7 h-7 hidden group-hover:block" />
+                          </div>
+                          <span className="text-base font-medium">
+                            Your Library
+                          </span>
+                        </div>
+                        <AddSimple
+                          className="w-6 h-6 ml-auto hover:text-white cursor-pointer"
+                          onClick={() => setIsCreateDialogOpen(true)}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Playlists List */}
+                <div className="mt-2 px-2 space-y-1">
+                  {/* Favorite Playlist */}
+                  {favoritePlaylist && (
+                    <Link
+                      href={`/playlists/${favoritePlaylist.id}`}
+                      className={`flex items-center px-3 py-2 rounded-md truncate ${
+                        pathname === `/playlists/${favoritePlaylist.id}`
+                          ? theme === "light"
+                            ? "bg-gray-200 text-gray-900"
+                            : "bg-white/10 text-white"
+                          : theme === "light"
+                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {isCollapsed ? (
+                        <Music className="w-5 h-5" />
+                      ) : (
+                        <>
+                          <Music className="w-5 h-5 mr-3 text-primary" />
+                          <span className="truncate">
+                            {favoritePlaylist.name}
+                          </span>
+                        </>
+                      )}
+                    </Link>
                   )}
+
+                  {/* Divider */}
+                  {normalPlaylists.length > 0 && (
+                    <div className="h-px bg-white/10 my-2" />
+                  )}
+
+                  {/* Normal Playlists */}
+                  {normalPlaylists.map((playlist) => (
+                    <Link
+                      key={playlist.id}
+                      href={`/playlists/${playlist.id}`}
+                      className={`flex items-center px-3 py-2 rounded-md truncate ${
+                        pathname === `/playlists/${playlist.id}`
+                          ? theme === "light"
+                            ? "bg-gray-200 text-gray-900"
+                            : "bg-white/10 text-white"
+                          : theme === "light"
+                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {isCollapsed ? (
+                        <Music className="w-5 h-5" />
+                      ) : (
+                        <>
+                          <Music className="w-5 h-5 mr-3" />
+                          <span className="truncate">{playlist.name}</span>
+                          {playlist.privacy === "PRIVATE" && (
+                            <span className="ml-2 text-xs opacity-60">
+                              • Private
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </Link>
+                  ))}
                 </div>
               </div>
             )}
@@ -154,12 +262,12 @@ export default function Sidebar({
             {/* Artist Section */}
             {hasArtistProfile &&
               isArtistVerified &&
-              currentProfile === 'ARTIST' && (
+              currentProfile === "ARTIST" && (
                 <div className="mt-4 space-y-2">
                   {!isCollapsed && (
                     <div
                       className={`px-3 text-sm font-medium ${
-                        theme === 'light' ? 'text-gray-600' : 'text-white/70'
+                        theme === "light" ? "text-gray-600" : "text-white/70"
                       }`}
                     >
                       Artist Dashboard
@@ -168,13 +276,13 @@ export default function Sidebar({
                   <Link
                     href="/artist/dashboard"
                     className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                      pathname.startsWith('/artist/dashboard')
-                        ? theme === 'light'
-                          ? 'bg-gray-200 text-gray-900'
-                          : 'bg-white/10 text-white'
-                        : theme === 'light'
-                        ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                        : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      pathname.startsWith("/artist/dashboard")
+                        ? theme === "light"
+                          ? "bg-gray-200 text-gray-900"
+                          : "bg-white/10 text-white"
+                        : theme === "light"
+                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                        : "text-white/70 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     {isCollapsed ? (
@@ -189,13 +297,13 @@ export default function Sidebar({
                   <Link
                     href="/artist/albums"
                     className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                      pathname.startsWith('/artist/albums')
-                        ? theme === 'light'
-                          ? 'bg-gray-200 text-gray-900'
-                          : 'bg-white/10 text-white'
-                        : theme === 'light'
-                        ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                        : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      pathname.startsWith("/artist/albums")
+                        ? theme === "light"
+                          ? "bg-gray-200 text-gray-900"
+                          : "bg-white/10 text-white"
+                        : theme === "light"
+                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                        : "text-white/70 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     {isCollapsed ? (
@@ -210,13 +318,13 @@ export default function Sidebar({
                   <Link
                     href="/artist/tracks"
                     className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                      pathname.startsWith('/artist/tracks')
-                        ? theme === 'light'
-                          ? 'bg-gray-200 text-gray-900'
-                          : 'bg-white/10 text-white'
-                        : theme === 'light'
-                        ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                        : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      pathname.startsWith("/artist/tracks")
+                        ? theme === "light"
+                          ? "bg-gray-200 text-gray-900"
+                          : "bg-white/10 text-white"
+                        : theme === "light"
+                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                        : "text-white/70 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     {isCollapsed ? (
@@ -232,12 +340,12 @@ export default function Sidebar({
               )}
 
             {/* Admin Section */}
-            {userRole === 'ADMIN' && (
+            {userRole === "ADMIN" && (
               <div className="mt-4 space-y-2">
                 {!isCollapsed && (
                   <div
                     className={`px-3 text-sm font-medium ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/70'
+                      theme === "light" ? "text-gray-600" : "text-white/70"
                     }`}
                   >
                     Admin Dashboard
@@ -246,13 +354,13 @@ export default function Sidebar({
                 <Link
                   href="/admin/dashboard"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                    isActive('/admin/dashboard')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    isActive("/admin/dashboard")
+                      ? theme === "light"
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-white/10 text-white"
+                      : theme === "light"
+                      ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   {isCollapsed ? (
@@ -267,13 +375,13 @@ export default function Sidebar({
                 <Link
                   href="/admin/artist-requests"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                    pathname.startsWith('/admin/artist-requests')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    pathname.startsWith("/admin/artist-requests")
+                      ? theme === "light"
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-white/10 text-white"
+                      : theme === "light"
+                      ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   {isCollapsed ? (
@@ -288,13 +396,13 @@ export default function Sidebar({
                 <Link
                   href="/admin/users"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                    pathname.startsWith('/admin/users')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    pathname.startsWith("/admin/users")
+                      ? theme === "light"
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-white/10 text-white"
+                      : theme === "light"
+                      ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   {isCollapsed ? (
@@ -309,13 +417,13 @@ export default function Sidebar({
                 <Link
                   href="/admin/artists"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                    pathname.startsWith('/admin/artists')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    pathname.startsWith("/admin/artists")
+                      ? theme === "light"
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-white/10 text-white"
+                      : theme === "light"
+                      ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   {isCollapsed ? (
@@ -330,13 +438,13 @@ export default function Sidebar({
                 <Link
                   href="/admin/genres"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                    pathname.startsWith('/admin/genres')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    pathname.startsWith("/admin/genres")
+                      ? theme === "light"
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-white/10 text-white"
+                      : theme === "light"
+                      ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   {isCollapsed ? (
@@ -356,9 +464,9 @@ export default function Sidebar({
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className={`w-10 h-10 flex items-center justify-center rounded-full ${
-                theme === 'light'
-                  ? 'bg-gray-200 hover:bg-gray-200 text-gray-600'
-                  : 'bg-white/10 hover:bg-white/20 text-white'
+                theme === "light"
+                  ? "bg-gray-200 hover:bg-gray-200 text-gray-600"
+                  : "bg-white/10 hover:bg-white/20 text-white"
               }`}
             >
               {isCollapsed ? (
@@ -370,6 +478,15 @@ export default function Sidebar({
           </div>
         </div>
       </div>
+
+      <CreatePlaylistDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSuccess={() => {
+          fetchPlaylists();
+          setIsCreateDialogOpen(false);
+        }}
+      />
     </>
   );
 }

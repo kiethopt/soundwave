@@ -5,6 +5,8 @@ import { AlbumType, Role, Prisma } from '@prisma/client';
 import { client, setCache } from '../middleware/cache.middleware';
 import { sessionService } from '../services/session.service';
 import { trackSelect } from '../utils/prisma-selects';
+import { NotificationType, RecipientType } from '@prisma/client';
+import pusher from '../config/pusher';
 
 // Validation functions
 const validateTrackData = (
@@ -123,7 +125,6 @@ const validateFile = (
 
   return null; // File hợp lệ
 };
-
 // Tạo track mới (ADMIN & ARTIST only)
 export const createTrack = async (
   req: Request,
@@ -152,7 +153,6 @@ export const createTrack = async (
     const finalArtistId =
       user.role === 'ADMIN' ? artistId : user.artistProfile?.id;
 
-    // Kiểm tra quyền và xác thực
     if (!finalArtistId) {
       res.status(400).json({
         message:
@@ -163,7 +163,6 @@ export const createTrack = async (
       return;
     }
 
-    // Nếu là artist, kiểm tra verified
     if (user.role !== 'ADMIN' && !user.artistProfile?.isVerified) {
       res.status(403).json({
         message: 'Only verified artists can create tracks',
@@ -171,7 +170,6 @@ export const createTrack = async (
       return;
     }
 
-    // Kiểm tra files
     if (!req.files) {
       res.status(400).json({ message: 'No files uploaded' });
       return;
@@ -191,14 +189,11 @@ export const createTrack = async (
     }
 
     // Validate file types
-    if (audioFile) {
-      const audioValidationError = validateFile(audioFile, true);
-      if (audioValidationError) {
-        res.status(400).json({ message: audioValidationError });
-        return;
-      }
+    const audioValidationError = validateFile(audioFile, true);
+    if (audioValidationError) {
+      res.status(400).json({ message: audioValidationError });
+      return;
     }
-
     if (coverFile) {
       const coverValidationError = validateFile(coverFile, false);
       if (coverValidationError) {
@@ -222,12 +217,11 @@ export const createTrack = async (
     const featuredArtistsArray = featuredArtists
       ? featuredArtists.split(',').map((id: string) => id.trim())
       : [];
-
     const genreIdsArray = genreIds
       ? genreIds.split(',').map((id: string) => id.trim())
       : [];
 
-    // Tạo track
+    // Tạo track và lấy kết quả trả về
     const track = await prisma.track.create({
       data: {
         title,
@@ -242,22 +236,65 @@ export const createTrack = async (
         featuredArtists:
           featuredArtistsArray.length > 0
             ? {
-                create: featuredArtistsArray.map((artistId: string) => ({
-                  artistId,
-                })),
-              }
+              create: featuredArtistsArray.map((artistId: string) => ({
+                artistId,
+              })),
+            }
             : undefined,
         genres:
           genreIdsArray.length > 0
             ? {
-                create: genreIdsArray.map((genreId: string) => ({
-                  genreId,
-                })),
-              }
+              create: genreIdsArray.map((genreId: string) => ({
+                genreId,
+              })),
+            }
             : undefined,
       },
       select: trackSelect,
     });
+
+    // Lấy thông tin artist để lấy tên nghệ sĩ
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { id: finalArtistId },
+      select: { artistName: true },
+    });
+    // Sau khi tạo track, lấy danh sách các user đang follow nghệ sĩ
+    const followers = await prisma.userFollow.findMany({
+      where: {
+        followingArtistId: finalArtistId,
+        followingType: 'ARTIST', // Nếu bạn lưu loại follow
+      },
+      select: { followerId: true },
+    });
+
+
+    // Tạo thông báo cho mỗi follower, kèm theo tên nghệ sĩ và tên track
+    const notificationsData = followers.map((follower) => ({
+      type: NotificationType.NEW_TRACK, // sử dụng enum thay vì string
+      message: `${artistProfile?.artistName || 'Unknown'} vừa ra track mới: ${title}`,
+      recipientType: RecipientType.USER, // sử dụng enum thay vì string
+      userId: follower.followerId,
+      artistId: finalArtistId,
+      senderId: finalArtistId,
+    }));
+
+    // Sử dụng transaction để đảm bảo nhất quán (tùy chọn) lưu vào db
+    await prisma.$transaction(async (tx) => {
+      if (notificationsData.length > 0) {
+        await tx.notification.createMany({
+          data: notificationsData,
+        });
+      }
+    });
+
+
+    // Phát sự kiện realtime qua Pusher cho từng follower
+    for (const follower of followers) {
+      await pusher.trigger(`user-${follower.followerId}`, 'notification', {
+        type: NotificationType.NEW_TRACK,
+        message: `Artist của bạn vừa ra track mới: ${title}`,
+      });
+    }
 
     res.status(201).json({
       message: 'Track created successfully',
@@ -421,9 +458,8 @@ export const toggleTrackVisibility = async (
     });
 
     res.json({
-      message: `Track ${
-        updatedTrack.isActive ? 'activated' : 'hidden'
-      } successfully`,
+      message: `Track ${updatedTrack.isActive ? 'activated' : 'hidden'
+        } successfully`,
       track: updatedTrack,
     });
   } catch (error) {
