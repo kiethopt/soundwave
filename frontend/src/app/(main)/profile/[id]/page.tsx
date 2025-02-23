@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import HorizontalTrackListItem from '@/components/track/HorizontalTrackListItem';
 
 const DEFAULT_AVATAR = '/images/default-avatar.jpg';
 
@@ -35,6 +36,7 @@ export default function UserProfilePage({
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
   const { dominantColor } = useDominantColor(userData?.avatar || DEFAULT_AVATAR);
   const [ following, setFollowing ] = useState<ArtistProfile[]>([]);
+  const [ followingArtists, setFollowingArtists ] = useState<ArtistProfile[]>([]);
   const [ user, setUser ] = useState<User | null>(null);
   const [ topArtists, setTopArtists ] = useState<ArtistProfile[]>([]);
   const [ topTracks, setTopTracks ] = useState<Track[]>([]);
@@ -85,9 +87,12 @@ export default function UserProfilePage({
 
         if (isOwner) {
           setFollowing(followingResponse);
+          const followingArtists = followingResponse.filter((followingUser:any) => followingUser.type === 'ARTIST');
+          setFollowingArtists(followingArtists);
         } else {
           const isFollowing = followingResponse.some((user: User) => user.id === id);
           setFollow(isFollowing);
+          
         }
       } catch (error) {
         console.error('Failed to fetch user data:', error);
@@ -142,6 +147,53 @@ export default function UserProfilePage({
     }
   };
 
+  const handleTopTrackPlay = (track: Track) => {
+    if (currentTrack?.id === track.id && isPlaying && queueType === 'track') {
+      pauseTrack();
+    } else {
+      playTrack(track);
+      setQueueType('track');
+      trackQueue(topTracks);
+    }
+  };
+
+  const handleArtistPlay = async (artist: ArtistProfile, queueTypeValue: 'topArtist' | 'followingArtist', e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      let artistTracks = artistTracksMap[artist.id] || [];
+      
+      if (!artistTracks.length) {
+        artistTracks = await getArtistTracks(artist.id);
+        
+        setArtistTracksMap(prev => ({
+          ...prev,
+          [artist.id]: artistTracks
+        }));
+      }
+      
+      if (artistTracks.length > 0) {
+        const isCurrentArtistPlaying = 
+          isPlaying && 
+          currentTrack && 
+          artistTracks.some(track => track.id === currentTrack.id) &&
+          queueType === queueTypeValue;
+
+        if (isCurrentArtistPlaying) {
+          pauseTrack();
+        } else {
+          playTrack(artistTracks[0]);
+          setQueueType(queueTypeValue);
+          trackQueue(artistTracks);
+        }
+      } else {
+        toast.error("No tracks available for this artist");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load artist tracks");
+    }
+  };
+
   const getArtistTracks = async (artistId: string) => {
     try {
       if (!token) {
@@ -155,15 +207,14 @@ export default function UserProfilePage({
     }
   };
 
-  // Helper to check if an artist has the current playing track
-  const isArtistPlaying = (artistId: string) => {
+  const isArtistPlaying = (artistId: string, queueTypeValue: 'topArtist' | 'followingArtist') => {
     const artistTracks = artistTracksMap[artistId] || [];
     return currentTrack && 
            artistTracks.some(track => track.id === currentTrack.id) && 
            isPlaying && 
-           queueType === 'artist';
+           queueType === queueTypeValue;
   };
-
+  
   return (
     <div
       className="min-h-screen w-full rounded-lg"
@@ -292,41 +343,13 @@ export default function UserProfilePage({
                         className="w-full aspect-square object-cover rounded-full mb-4"
                       />
                       <button
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
-                          try {
-                            let artistTracks = artistTracksMap[topArtist.id] || [];
-                            
-                            if (!artistTracks.length) {
-                              artistTracks = await getArtistTracks(topArtist.id);
-                              
-                              setArtistTracksMap(prev => ({
-                                ...prev,
-                                [topArtist.id]: artistTracks
-                              }));
-                            }
-                            
-                            if (artistTracks.length > 0) {
-                                if (isArtistPlaying(topArtist.id)) {
-                                pauseTrack();
-                                } else if (currentTrack && queueType === 'artist') {
-                                playTrack(currentTrack);
-                                } else {
-                                playTrack(artistTracks[0]);
-                                setQueueType('artist');
-                                trackQueue(artistTracks);
-                                }
-                            } else {
-                              toast.error("No tracks available for this artist");
-                            }
-                          } catch (error) {
-                            console.error(error);
-                            toast.error("Failed to load artist tracks");
-                          }
+                          handleArtistPlay(topArtist, 'topArtist', e);
                         }}
                         className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        {isArtistPlaying(topArtist.id) ? (
+                        {isArtistPlaying(topArtist.id, 'topArtist') ? (
                           <Pause className="w-6 h-6 text-white" />
                         ) : (
                           <Play className="w-6 h-6 text-white" />
@@ -334,7 +357,7 @@ export default function UserProfilePage({
                       </button>
                     </div>
                     <h3 className={`font-medium truncate ${
-                      artistTracksMap[topArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'artist'
+                      artistTracksMap[topArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'topArtist'
                         ? 'text-[#A57865]'
                         : 'text-white'
                       }`}
@@ -352,148 +375,30 @@ export default function UserProfilePage({
 
           {/* Top Tracks Section */}
           { topTracks.length > 0 && (
-            <div className="px-2 md:px-8">
+            <div className="px-2 md:px-8 mt-8">
               <h2 className="text-2xl font-bold">Top tracks this month</h2>
               <div className="grid grid-cols-1 gap-4 mt-4">
                 {topTracks.map((track, index) => (
-                  <div
+                  <HorizontalTrackListItem
                     key={track.id}
-                    className={`grid grid-cols-[32px_48px_auto_auto] sm:grid-cols-[32px_48px_2fr_3fr_auto] gap-2 md:gap-4 py-2 md:px-2 group cursor-pointer rounded-lg ${
-                      theme === 'light'
-                        ? 'hover:bg-gray-50'
-                        : 'hover:bg-white/5'
-                    }`}
-                    onClick={() => {
+                    track={track}
+                    index={index}
+                    currentTrack={currentTrack}
+                    isPlaying={isPlaying}
+                    playCount={false}
+                    albumTitle={true}
+                    queueType={queueType}
+                    theme={theme}
+                    onTrackClick={() => {
                       if (currentTrack?.id === track.id && isPlaying && queueType === 'track') {
                         pauseTrack();
                       } else {
                         playTrack(track);
                         setQueueType('track');
-                        trackQueue(topTracks)
+                        trackQueue(topTracks);
                       }
                     }}
-                  >
-                    {/* Track Number or Play/Pause Button */}
-                    <div
-                      className={`flex items-center justify-center ${
-                        theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                      }`}
-                    >
-                      {/* Show play/pause button on hover */}
-                      <div className="hidden group-hover:block cursor-pointer">
-                        {currentTrack?.id === track.id && isPlaying && queueType === 'track'? (
-                          <Pause className="w-5 h-5" /> 
-                        ) : (
-                          <Play className="w-5 h-5" />
-                        )}
-                      </div>
-
-                      {/* Show track number or pause button when not hovering */}
-                      <div className="group-hover:hidden cursor-pointer">
-                        {currentTrack?.id === track.id && isPlaying && queueType === 'track'? (
-                          <Pause className="w-5 h-5" />
-                        ) : (
-                          index + 1
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Track Cover */}
-                    <div className="flex items-center justify-center">
-                      <img
-                        src={track.coverUrl}
-                        alt={track.title}
-                        className="w-12 h-12 rounded-md"
-                      />
-                    </div>
-
-                    {/* Track Title and Play Count */}
-                    <div className="flex flex-col md:flex-row md:justify-between items-center min-w-0 w-full">
-                      {/* Track Title */}
-                      <span
-                        className={`font-medium truncate w-full md:w-auto ${
-                          currentTrack?.id == track.id && queueType === 'track'
-                            ? 'text-[#A57865]'
-                            : 'text-white'
-                        }`}
-                      >
-                        {track.title}
-                      </span>
-
-                      {/* Play Count */}
-                      <div
-                        className={`truncate text-sm md:text-base w-full md:w-auto text-start md:text-right ${
-                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                        }`}
-                      >
-                        {new Intl.NumberFormat('en-US').format(track.playCount)}
-                      </div>
-                    </div>
-
-                    {/* Track Album */}
-                    <div
-                      className={`hidden md:flex items-center justify-center ${
-                        theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                      }`}
-                    >
-                      {track.album ? (
-                        <div className="flex items-center gap-1 truncate">
-                          <span className="truncate">{track.album.title}</span>
-                        </div>
-                        ) : (
-                        <span>-</span>
-                      )}
-                    </div>
-
-                    {/* Track Duration & option */}
-                    <div className="flex items-center justify-end gap-2 md:gap-8 ">
-                      {/* Track Duration */}
-                      <div
-                        className={`flex items-center justify-center font-medium text-sm ${
-                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                        }`}
-                      >
-                        {Math.floor(track.duration / 60)}:
-                        {(track.duration % 60).toString().padStart(2, '0')}
-                      </div>
-
-                      {/* Track Options */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button 
-                            className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreHorizontal className="w-5 h-5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                          <DropdownMenuItem 
-                            className='cursor-pointer'
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <AddSimple className="w-4 h-4 mr-2" />
-                              Add to playlist
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className='cursor-pointer'
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Heart className="w-4 h-4 mr-2" />
-                              Add to favorites
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            className='cursor-pointer'
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Share2 className="w-4 h-4 mr-2" />
-                              Share
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
+                />
                 ))}
               </div> 
             </div>
@@ -504,54 +409,26 @@ export default function UserProfilePage({
             <div className="px-2 md:px-8 mt-8">
               <h2 className="text-2xl font-bold">Following artists</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
-                {topArtists.map((topArtist) => (
+                {followingArtists.map((followArtist) => (
                   <div
-                    key={topArtist.id}
+                    key={followArtist.id}
                     className="hover:bg-white/5 p-2 rounded-lg group relative w-full"
-                    onClick={() => router.push(`/artist/profile/${topArtist.id}`)}
+                    onClick={() => router.push(`/artist/profile/${followArtist.id}`)}
                   >
                     <div className="relative">
                       <img
-                        src={topArtist.avatar || '/images/default-avatar.jpg'}
-                        alt={topArtist.artistName}
+                        src={followArtist.avatar || '/images/default-avatar.jpg'}
+                        alt={followArtist.artistName}
                         className="w-full aspect-square object-cover rounded-full mb-4"
                       />
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
-                          try {
-                            let artistTracks = artistTracksMap[topArtist.id] || [];
-                            
-                            if (!artistTracks.length) {
-                              artistTracks = await getArtistTracks(topArtist.id);
-                              
-                              setArtistTracksMap(prev => ({
-                                ...prev,
-                                [topArtist.id]: artistTracks
-                              }));
-                            }
-                            
-                            if (artistTracks.length > 0) {
-                                if (isArtistPlaying(topArtist.id)) {
-                                pauseTrack();
-                                } else if (currentTrack && queueType === 'artist') {
-                                playTrack(currentTrack);
-                                } else {
-                                playTrack(artistTracks[0]);
-                                setQueueType('artist');
-                                trackQueue(artistTracks);
-                                }
-                            } else {
-                              toast.error("No tracks available for this artist");
-                            }
-                          } catch (error) {
-                            console.error(error);
-                            toast.error("Failed to load artist tracks");
-                          }
+                          handleArtistPlay(followArtist, 'followingArtist', e)
                         }}
                         className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        {isArtistPlaying(topArtist.id) ? (
+                        {isArtistPlaying(followArtist.id, 'followingArtist') ? (
                           <Pause className="w-6 h-6 text-white" />
                         ) : (
                           <Play className="w-6 h-6 text-white" />
@@ -559,15 +436,15 @@ export default function UserProfilePage({
                       </button>
                     </div>
                     <h3 className={`font-medium truncate ${
-                      artistTracksMap[topArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'artist'
+                      artistTracksMap[followArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'followingArtist'
                         ? 'text-[#A57865]'
                         : 'text-white'
                       }`}
                     >
-                      {topArtist.artistName}
+                      {followArtist.artistName}
                     </h3>
                     <p className="text-white/60 text-sm truncate">
-                      {new Intl.NumberFormat('en-US').format(topArtist.monthlyListeners)} monthly listeners
+                      {new Intl.NumberFormat('en-US').format(followArtist.monthlyListeners)} monthly listeners
                     </p>
                   </div>
                 ))}

@@ -734,6 +734,17 @@ export const getFollowing = async (
             id: true,
             artistName: true,
             avatar: true,
+            monthlyListeners: true,
+            genres: {
+              select: {
+                genre: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
             user: {
               select: {
                 id: true,
