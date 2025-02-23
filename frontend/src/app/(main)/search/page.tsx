@@ -1,23 +1,27 @@
-'use client';
+"use client";
 
-import { Suspense, useRef, useState, useEffect, use } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Track, Album, Artist, User } from '@/types';
-import { api } from '@/utils/api';
-import { Pause, Play, AddSimple } from '@/components/ui/Icons';
+import { Suspense, useRef, useState, useEffect, use } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Track, Album, Artist, User, Playlist } from "@/types";
+import { api } from "@/utils/api";
+import { Pause, Play, AddSimple } from "@/components/ui/Icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
-import pusher from '@/utils/pusher';
-import { toast } from 'react-toastify';
-import { useTrack } from '@/contexts/TrackContext';
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
+} from "@/components/ui/dropdown-menu";
+import { Heart, MoreHorizontal, Share2 } from "lucide-react";
+import pusher from "@/utils/pusher";
+import { toast } from "react-toastify";
+import { useTrack } from "@/contexts/TrackContext";
 
-type FilterType = 'all' | 'albums' | 'tracks' | 'artists' | 'users';
+type FilterType = "all" | "albums" | "tracks" | "artists" | "users";
 
 // Loading UI component
 function LoadingUI() {
@@ -55,7 +59,7 @@ function LoadingUI() {
 function SearchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const query = searchParams.get('q');
+  const query = searchParams.get("q");
   const [results, setResults] = useState<{
     artists: Artist[];
     albums: Album[];
@@ -63,7 +67,7 @@ function SearchContent() {
     users: User[];
   }>({ artists: [], albums: [], tracks: [], users: [] });
   const [isLoading, setIsLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
   // Audio states
   const {
@@ -90,12 +94,15 @@ function SearchContent() {
 
   // Filter buttons
   const filterButtons: { label: string; value: FilterType }[] = [
-    { label: 'All', value: 'all' },
-    { label: 'Albums', value: 'albums' },
-    { label: 'Tracks', value: 'tracks' },
-    { label: 'Artists', value: 'artists' },
-    { label: 'Users', value: 'users' },
+    { label: "All", value: "all" },
+    { label: "Albums", value: "albums" },
+    { label: "Tracks", value: "tracks" },
+    { label: "Artists", value: "artists" },
+    { label: "Users", value: "users" },
   ];
+
+  // Playlists state
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
 
   // Fetch search results
   useEffect(() => {
@@ -107,21 +114,21 @@ function SearchContent() {
 
       setIsLoading(true);
       try {
-        const token = localStorage.getItem('userToken');
+        const token = localStorage.getItem("userToken");
         if (!token) {
-          router.push('/login');
+          router.push("/login");
           return;
         }
 
         const searchResult = await api.user.searchAll(query, token);
         setResults(searchResult);
       } catch (error: any) {
-        console.error('Search error:', error);
+        console.error("Search error:", error);
         if (
-          error.message === 'Unauthorized' ||
-          error.message === 'User not found'
+          error.message === "Unauthorized" ||
+          error.message === "User not found"
         ) {
-          router.push('/login');
+          router.push("/login");
         }
       } finally {
         setIsLoading(false);
@@ -132,7 +139,7 @@ function SearchContent() {
   }, [query, router]);
 
   useEffect(() => {
-    const userDataStr = localStorage.getItem('userData');
+    const userDataStr = localStorage.getItem("userData");
     if (userDataStr) {
       const user = JSON.parse(userDataStr);
 
@@ -140,8 +147,8 @@ function SearchContent() {
       const channel = pusher.subscribe(`user-${user.id}`);
 
       // Lắng nghe sự kiện audio-control
-      channel.bind('audio-control', (data: any) => {
-        if (data.type === 'STOP_OTHER_SESSIONS') {
+      channel.bind("audio-control", (data: any) => {
+        if (data.type === "STOP_OTHER_SESSIONS") {
           // Dừng phát nhạc nếu đang phát
           if (audioRef.current) {
             audioRef.current.pause();
@@ -152,27 +159,43 @@ function SearchContent() {
 
       // Cleanup function
       return () => {
-        channel.unbind('audio-control');
+        channel.unbind("audio-control");
         pusher.unsubscribe(`user-${user.id}`);
       };
     }
   }, []);
-  
+
   useEffect(() => {
-    if (currentTrack && queueType !== 'album' && queueType !== 'artist') {
+    if (currentTrack && queueType !== "album" && queueType !== "artist") {
       setCurrentlyPlaying(currentTrack.id);
     }
   }, [currentTrack, queueType]);
 
+  useEffect(() => {
+    const fetchPlaylists = async () => {
+      try {
+        const token = localStorage.getItem("userToken");
+        if (!token) return;
+
+        const response = await api.playlists.getAll(token);
+        setPlaylists(response.data);
+      } catch (error) {
+        console.error("Error fetching playlists:", error);
+      }
+    };
+
+    fetchPlaylists();
+  }, []);
+
   const handlePlay = async (item: Track | Album | Artist) => {
     try {
-      const token = localStorage.getItem('userToken');
+      const token = localStorage.getItem("userToken");
       if (!token) {
-        router.push('/login');
+        router.push("/login");
         return;
       }
-  
-      if ('audioUrl' in item) {
+
+      if ("audioUrl" in item) {
         // Single Track
         if (currentTrack?.id === item.id && currentlyPlaying === item.id) {
           if (isPlaying) {
@@ -183,13 +206,13 @@ function SearchContent() {
           }
         } else {
           trackQueue(results.tracks);
-          setQueueType('track');
+          setQueueType("track");
           playTrack(item);
           setCurrentlyPlaying(item.id);
         }
-      } else if ('tracks' in item) {
+      } else if ("tracks" in item) {
         // Album
-        if (queueType === 'album' && currentlyPlaying === item.id) {
+        if (queueType === "album" && currentlyPlaying === item.id) {
           // We're already playing from this album, just toggle play/pause
           if (isPlaying) {
             pauseTrack();
@@ -204,17 +227,20 @@ function SearchContent() {
           // Start fresh with this album
           if (item.tracks.length > 0) {
             trackQueue(item.tracks);
-            setQueueType('album');
+            setQueueType("album");
             playTrack(item.tracks[0]);
             setCurrentlyPlaying(item.id);
           } else {
-            toast.error('No tracks found in this album.');
+            toast.error("No tracks found in this album.");
             setCurrentlyPlaying(null);
           }
         }
-      } else if ('artistProfile' in item) {
+      } else if ("artistProfile" in item) {
         // Artist
-        if (queueType === 'artist' && currentlyPlaying === item.artistProfile.id) {
+        if (
+          queueType === "artist" &&
+          currentlyPlaying === item.artistProfile.id
+        ) {
           // We're already playing from this artist, just toggle play/pause
           if (isPlaying) {
             pauseTrack();
@@ -227,38 +253,55 @@ function SearchContent() {
           }
         } else {
           // Load artist tracks for a fresh start
-          const response = await api.artists.getTrackByArtistId(item.artistProfile.id, token);
+          const response = await api.artists.getTrackByArtistId(
+            item.artistProfile.id,
+            token
+          );
           const artistTracks = response?.tracks || [];
-  
+
           if (!Array.isArray(artistTracks)) {
-            console.error('artistTracks is not an array:', artistTracks);
-            toast.error('Error fetching artist tracks.');
+            console.error("artistTracks is not an array:", artistTracks);
+            toast.error("Error fetching artist tracks.");
             return;
           }
-  
-          const sortedTracks = artistTracks.sort((a, b) =>
-            (b.playCount - a.playCount) ||
-            (new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime())
+
+          const sortedTracks = artistTracks.sort(
+            (a, b) =>
+              b.playCount - a.playCount ||
+              new Date(b.releaseDate).getTime() -
+                new Date(a.releaseDate).getTime()
           );
-            
+
           if (sortedTracks.length > 0) {
             trackQueue(sortedTracks);
-            setQueueType('artist');
+            setQueueType("artist");
             playTrack(sortedTracks[0]);
             setCurrentlyPlaying(item.artistProfile.id);
           } else {
-            toast.error('No tracks found for this artist.');
+            toast.error("No tracks found for this artist.");
             setCurrentlyPlaying(null);
           }
         }
       }
     } catch (error) {
-      console.error('Error playing:', error);
-      toast.error('Error playing track. Please try again.');
+      console.error("Error playing:", error);
+      toast.error("Error playing track. Please try again.");
     }
   };
-  
-  
+
+  const handleAddToPlaylist = async (playlistId: string, trackId: string) => {
+    try {
+      console.log("Adding track to playlist:", { playlistId, trackId });
+      const token = localStorage.getItem("userToken");
+      console.log("Token:", token);
+
+      await api.playlists.addTrack(playlistId, trackId, token || "");
+      toast.success("Đã thêm bài hát vào playlist");
+    } catch (error: any) {
+      console.error("Error adding track:", error);
+      toast.error(error.message || "Không thể thêm bài hát vào playlist");
+    }
+  };
 
   return (
     <div suppressHydrationWarning>
@@ -271,8 +314,8 @@ function SearchContent() {
               onClick={() => setActiveFilter(button.value)}
               className={`py-2.5 text-sm font-medium transition-colors relative ${
                 activeFilter === button.value
-                  ? 'text-white'
-                  : 'text-white/70 hover:text-white'
+                  ? "text-white"
+                  : "text-white/70 hover:text-white"
               }`}
             >
               {button.label}
@@ -288,7 +331,7 @@ function SearchContent() {
       <div className="p-6">
         <div className="space-y-8">
           {/* Artists Section */}
-          {(activeFilter === 'all' || activeFilter === 'artists') &&
+          {(activeFilter === "all" || activeFilter === "artists") &&
             results.artists.length > 0 && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">Artists</h2>
@@ -297,16 +340,20 @@ function SearchContent() {
                     <div
                       key={artist.id}
                       className="group relative p-4 rounded-lg hover:bg-white/5 transition-colors"
-                      onClick={() => router.push(`/artist/profile/${artist.artistProfile.id}`)}
+                      onClick={() =>
+                        router.push(
+                          `/artist/profile/${artist.artistProfile.id}`
+                        )
+                      }
                     >
                       <div className="relative">
                         <div className="aspect-square mb-4">
                           <img
                             src={
                               artist.artistProfile?.avatar ||
-                              '/images/default-avatar.jpg'
+                              "/images/default-avatar.jpg"
                             }
-                            alt={artist.artistProfile?.artistName || 'Artist'}
+                            alt={artist.artistProfile?.artistName || "Artist"}
                             className="w-full h-full object-cover rounded-full"
                           />
                         </div>
@@ -317,7 +364,10 @@ function SearchContent() {
                           }}
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity shadow-lg transform translate-y-2 group-hover:translate-y-0"
                         >
-                          { currentTrack && queueType === 'artist' && currentTrack.artistId === artist.artistProfile?.id && isPlaying ? (
+                          {currentTrack &&
+                          queueType === "artist" &&
+                          currentTrack.artistId === artist.artistProfile?.id &&
+                          isPlaying ? (
                             <Pause className="w-6 h-6 text-white" />
                           ) : (
                             <Play className="w-6 h-6 text-white" />
@@ -325,16 +375,19 @@ function SearchContent() {
                         </button>
                       </div>
                       <div className="text-center">
-                        <h3 className={`font-medium truncate ${
-                          currentTrack && queueType === 'artist' && currentTrack.artistId === artist.artistProfile?.id
-                            ? 'text-[#A57865]'
-                            : 'text-white'
+                        <h3
+                          className={`font-medium truncate ${
+                            currentTrack &&
+                            queueType === "artist" &&
+                            currentTrack.artistId === artist.artistProfile?.id
+                              ? "text-[#A57865]"
+                              : "text-white"
                           }`}
                         >
                           {artist.artistProfile?.artistName}
                         </h3>
                         <p className="text-white/60 text-sm truncate">
-                          {artist.artistProfile?.monthlyListeners.toLocaleString()}{' '}
+                          {artist.artistProfile?.monthlyListeners.toLocaleString()}{" "}
                           monthly listeners
                         </p>
                       </div>
@@ -345,7 +398,7 @@ function SearchContent() {
             )}
 
           {/* Albums Section */}
-          {(activeFilter === 'all' || activeFilter === 'albums') &&
+          {(activeFilter === "all" || activeFilter === "albums") &&
             results.albums.length > 0 && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">Albums</h2>
@@ -357,7 +410,7 @@ function SearchContent() {
                     >
                       <div className="relative">
                         <img
-                          src={album.coverUrl || '/images/default-album.png'}
+                          src={album.coverUrl || "/images/default-album.png"}
                           alt={album.title}
                           className="w-full aspect-square object-cover rounded-md mb-4"
                         />
@@ -365,7 +418,12 @@ function SearchContent() {
                           onClick={() => handlePlay(album)}
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          {currentTrack && album.tracks.some(track => track.id === currentTrack.id) && isPlaying && queueType === 'album' ? (
+                          {currentTrack &&
+                          album.tracks.some(
+                            (track) => track.id === currentTrack.id
+                          ) &&
+                          isPlaying &&
+                          queueType === "album" ? (
                             <Pause className="w-6 h-6 text-white" />
                           ) : (
                             <Play className="w-6 h-6 text-white" />
@@ -375,16 +433,16 @@ function SearchContent() {
                       <h3
                         className={`font-medium truncate ${
                           currentlyPlaying === album.id
-                            ? 'text-[#A57865]'
-                            : 'text-white'
+                            ? "text-[#A57865]"
+                            : "text-white"
                         }`}
                       >
                         {album.title}
                       </h3>
                       <p className="text-white/60 text-sm truncate">
-                        {typeof album.artist === 'string'
+                        {typeof album.artist === "string"
                           ? album.artist
-                          : album.artist?.artistName || 'Unknown Artist'}
+                          : album.artist?.artistName || "Unknown Artist"}
                       </p>
                     </div>
                   ))}
@@ -393,7 +451,7 @@ function SearchContent() {
             )}
 
           {/* Tracks Section */}
-          {(activeFilter === 'all' || activeFilter === 'tracks') &&
+          {(activeFilter === "all" || activeFilter === "tracks") &&
             results.tracks.length > 0 && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">Tracks</h2>
@@ -406,21 +464,24 @@ function SearchContent() {
                         className={`flex items-center gap-3 p-2 rounded-lg group
                         ${
                           currentlyPlaying === track.id
-                            ? 'bg-white/5'
-                            : 'hover:bg-white/5'
+                            ? "bg-white/5"
+                            : "hover:bg-white/5"
                         }`}
                       >
                         <div className="relative flex-shrink-0">
                           <img
-                            src={track.coverUrl || '/images/default-avatar.jpg'}
+                            src={track.coverUrl || "/images/default-avatar.jpg"}
                             alt={track.title}
                             className="w-12 h-12 object-cover rounded"
                           />
                           <button
                             onClick={() => handlePlay(track)}
                             className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                          > 
-                            { currentTrack && track.id === currentTrack.id && isPlaying && queueType === 'track' ? (
+                          >
+                            {currentTrack &&
+                            track.id === currentTrack.id &&
+                            isPlaying &&
+                            queueType === "track" ? (
                               <Pause className="w-5 h-5 text-white" />
                             ) : (
                               <Play className="w-5 h-5 text-white" />
@@ -431,8 +492,8 @@ function SearchContent() {
                           <h3
                             className={`font-medium truncate ${
                               currentlyPlaying === track.id
-                                ? 'text-[#A57865]'
-                                : 'text-white'
+                                ? "text-[#A57865]"
+                                : "text-white"
                             }`}
                           >
                             {track.title}
@@ -440,14 +501,14 @@ function SearchContent() {
                           <p className="text-white/60 text-sm truncate">
                             {[
                               track.artist
-                                ? typeof track.artist === 'string'
+                                ? typeof track.artist === "string"
                                   ? track.artist
                                   : track.artist.artistName
-                                : 'Unknown Artist',
+                                : "Unknown Artist",
                               ...(track.featuredArtists?.map(
                                 (fa) => fa.artistProfile.artistName
                               ) || []),
-                            ].join(', ')}
+                            ].join(", ")}
                           </p>
                         </div>
                         <DropdownMenu>
@@ -457,10 +518,58 @@ function SearchContent() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuItem>
-                              <AddSimple className="w-4 h-4 mr-2" />
-                              Add to playlist
-                            </DropdownMenuItem>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <AddSimple className="w-4 h-4 mr-2" />
+                                Add to playlist
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuPortal>
+                                <DropdownMenuSubContent className="w-48">
+                                  {playlists.length === 0 ? (
+                                    <DropdownMenuItem disabled>
+                                      Bạn chưa có playlist nào
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    playlists.map((playlist) => (
+                                      <DropdownMenuItem
+                                        key={playlist.id}
+                                        onClick={() =>
+                                          handleAddToPlaylist(
+                                            playlist.id,
+                                            track.id
+                                          )
+                                        }
+                                      >
+                                        <div className="flex items-center gap-2 w-full">
+                                          <div className="w-6 h-6 relative flex-shrink-0">
+                                            {playlist.coverUrl ? (
+                                              <img
+                                                src={playlist.coverUrl}
+                                                alt={playlist.name}
+                                                className="w-full h-full object-cover rounded"
+                                              />
+                                            ) : (
+                                              <div className="w-full h-full bg-white/10 rounded flex items-center justify-center">
+                                                <svg
+                                                  className="w-4 h-4 text-white/70"
+                                                  fill="currentColor"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                                                </svg>
+                                              </div>
+                                            )}
+                                          </div>
+                                          <span className="truncate">
+                                            {playlist.name}
+                                          </span>
+                                        </div>
+                                      </DropdownMenuItem>
+                                    ))
+                                  )}
+                                </DropdownMenuSubContent>
+                              </DropdownMenuPortal>
+                            </DropdownMenuSub>
                             <DropdownMenuItem>
                               <Heart className="w-4 h-4 mr-2" />
                               Add to favorites
@@ -483,21 +592,24 @@ function SearchContent() {
                       className={`hidden md:block bg-white/5 p-4 rounded-lg group relative
                       ${
                         currentlyPlaying === track.id
-                          ? 'bg-white/5'
-                          : 'hover:bg-white/5'
+                          ? "bg-white/5"
+                          : "hover:bg-white/5"
                       }`}
                     >
                       <div className="relative">
                         <img
-                          src={track.coverUrl || '/images/default-avatar.jpg'}
+                          src={track.coverUrl || "/images/default-avatar.jpg"}
                           alt={track.title}
                           className="w-full aspect-square object-cover rounded-md mb-4"
                         />
                         <button
-                          onClick={() => handlePlay(track)} 
+                          onClick={() => handlePlay(track)}
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          { currentTrack && track.id === currentTrack.id && isPlaying && queueType === 'track' ? (
+                          {currentTrack &&
+                          track.id === currentTrack.id &&
+                          isPlaying &&
+                          queueType === "track" ? (
                             <Pause className="w-6 h-6 text-white" />
                           ) : (
                             <Play className="w-6 h-6 text-white" />
@@ -509,8 +621,8 @@ function SearchContent() {
                           <h3
                             className={`font-medium truncate ${
                               currentlyPlaying === track.id
-                                ? 'text-[#A57865]'
-                                : 'text-white'
+                                ? "text-[#A57865]"
+                                : "text-white"
                             }`}
                           >
                             {track.title}
@@ -518,14 +630,14 @@ function SearchContent() {
                           <p className="text-white/60 text-sm truncate">
                             {[
                               track.artist
-                                ? typeof track.artist === 'string'
+                                ? typeof track.artist === "string"
                                   ? track.artist
                                   : track.artist.artistName
-                                : 'Unknown Artist',
+                                : "Unknown Artist",
                               ...(track.featuredArtists?.map(
                                 (fa) => fa.artistProfile.artistName
                               ) || []),
-                            ].join(', ')}
+                            ].join(", ")}
                           </p>
                         </div>
                         <DropdownMenu>
@@ -535,10 +647,58 @@ function SearchContent() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuItem>
-                              <AddSimple className="w-4 h-4 mr-2" />
-                              Add to playlist
-                            </DropdownMenuItem>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <AddSimple className="w-4 h-4 mr-2" />
+                                Add to playlist
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuPortal>
+                                <DropdownMenuSubContent className="w-48">
+                                  {playlists.length === 0 ? (
+                                    <DropdownMenuItem disabled>
+                                      Bạn chưa có playlist nào
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    playlists.map((playlist) => (
+                                      <DropdownMenuItem
+                                        key={playlist.id}
+                                        onClick={() =>
+                                          handleAddToPlaylist(
+                                            playlist.id,
+                                            track.id
+                                          )
+                                        }
+                                      >
+                                        <div className="flex items-center gap-2 w-full">
+                                          <div className="w-6 h-6 relative flex-shrink-0">
+                                            {playlist.coverUrl ? (
+                                              <img
+                                                src={playlist.coverUrl}
+                                                alt={playlist.name}
+                                                className="w-full h-full object-cover rounded"
+                                              />
+                                            ) : (
+                                              <div className="w-full h-full bg-white/10 rounded flex items-center justify-center">
+                                                <svg
+                                                  className="w-4 h-4 text-white/70"
+                                                  fill="currentColor"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                                                </svg>
+                                              </div>
+                                            )}
+                                          </div>
+                                          <span className="truncate">
+                                            {playlist.name}
+                                          </span>
+                                        </div>
+                                      </DropdownMenuItem>
+                                    ))
+                                  )}
+                                </DropdownMenuSubContent>
+                              </DropdownMenuPortal>
+                            </DropdownMenuSub>
                             <DropdownMenuItem>
                               <Heart className="w-4 h-4 mr-2" />
                               Add to favorites
@@ -563,7 +723,7 @@ function SearchContent() {
           const router = useRouter(); */}
 
           {/* Users Section */}
-          {(activeFilter === 'all' || activeFilter === 'users') &&
+          {(activeFilter === "all" || activeFilter === "users") &&
             results.users.length > 0 && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">Users</h2>
@@ -577,8 +737,8 @@ function SearchContent() {
                       <div className="relative">
                         <div className="aspect-square mb-4">
                           <img
-                            src={user.avatar || '/images/default-avatar.jpg'}
-                            alt={user.name || 'User'}
+                            src={user.avatar || "/images/default-avatar.jpg"}
+                            alt={user.name || "User"}
                             className="w-full h-full object-cover rounded-full"
                           />
                         </div>
@@ -588,7 +748,7 @@ function SearchContent() {
                           {user.name}
                         </h3>
                         <p className="text-white/60 text-sm truncate">
-                          {user.username || 'No username'}
+                          {user.username || "No username"}
                         </p>
                       </div>
                     </div>
@@ -596,7 +756,6 @@ function SearchContent() {
                 </div>
               </div>
             )}
-
 
           {/* No Results Message */}
           {!isLoading &&

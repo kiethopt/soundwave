@@ -1,4 +1,4 @@
-import { ArtistRequestFilters } from '@/types';
+import { ArtistRequestFilters, CreatePlaylistData } from "@/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -8,15 +8,15 @@ const fetchWithAuth = async (
   options: RequestInit = {},
   token?: string
 ) => {
-  const sessionId = localStorage.getItem('sessionId');
+  const sessionId = localStorage.getItem("sessionId");
   const headers: Record<string, string> = {
     ...(token && { Authorization: `Bearer ${token}` }),
-    ...(sessionId && { 'Session-ID': sessionId }),
+    ...(sessionId && { "Session-ID": sessionId }),
     ...(options.headers as Record<string, string>),
   };
 
   if (!(options.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
+    headers["Content-Type"] = "application/json";
   }
 
   const response = await fetch(`${API_BASE}${url}`, {
@@ -26,17 +26,17 @@ const fetchWithAuth = async (
 
   if (!response.ok) {
     const errorText = await response.text();
-    let errorMessage = 'An unexpected error occurred';
-    let errorCode = '';
+    let errorMessage = "An unexpected error occurred";
+    let errorCode = "";
 
     try {
       const errorResponse = JSON.parse(errorText);
       errorMessage = errorResponse.message || errorMessage;
-      errorCode = errorResponse.code || '';
+      errorCode = errorResponse.code || "";
 
       // Thêm xử lý error code cho tài khoản bị khóa
-      if (errorCode === 'ARTIST_DEACTIVATED') {
-        errorMessage = 'Your artist account has been deactivated';
+      if (errorCode === "ARTIST_DEACTIVATED") {
+        errorMessage = "Your artist account has been deactivated";
       }
     } catch (e) {
       errorMessage = errorText;
@@ -69,42 +69,42 @@ interface ResetPasswordData {
 export const api = {
   auth: {
     register: async (data: RegisterData) =>
-      fetchWithAuth('/api/auth/register', {
-        method: 'POST',
+      fetchWithAuth("/api/auth/register", {
+        method: "POST",
         body: JSON.stringify(data),
       }),
 
     login: async (data: LoginData) =>
-      fetchWithAuth('/api/auth/login', {
-        method: 'POST',
+      fetchWithAuth("/api/auth/login", {
+        method: "POST",
         body: JSON.stringify(data),
       }),
 
     requestPasswordReset: async (email: string) =>
-      fetchWithAuth('/api/auth/request-password-reset', {
-        method: 'POST',
+      fetchWithAuth("/api/auth/request-password-reset", {
+        method: "POST",
         body: JSON.stringify({ email }),
       }),
 
     resetPassword: async (data: ResetPasswordData) =>
-      fetchWithAuth('/api/auth/reset-password', {
-        method: 'POST',
+      fetchWithAuth("/api/auth/reset-password", {
+        method: "POST",
         body: JSON.stringify(data),
       }),
 
     validateToken: async (token: string) =>
-      fetchWithAuth('/api/auth/validate-token', { method: 'GET' }, token),
+      fetchWithAuth("/api/auth/validate-token", { method: "GET" }, token),
 
     switchProfile: async (token: string) => {
       return fetchWithAuth(
-        '/api/auth/switch-profile',
-        { method: 'POST' },
+        "/api/auth/switch-profile",
+        { method: "POST" },
         token
       );
     },
 
     logout: async (token: string) =>
-      fetchWithAuth('/api/auth/logout', { method: 'POST' }, token),
+      fetchWithAuth("/api/auth/logout", { method: "POST" }, token),
   },
 
   session: {
@@ -112,7 +112,7 @@ export const api = {
       fetchWithAuth(
         `/api/session/handle-audio-play`,
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ userId, sessionId }),
         },
         token
@@ -133,22 +133,22 @@ export const api = {
 
       if (filters) {
         if (filters.startDate) {
-          params.append('startDate', filters.startDate.toISOString());
+          params.append("startDate", filters.startDate.toISOString());
         }
         if (filters.endDate) {
-          params.append('endDate', filters.endDate.toISOString());
+          params.append("endDate", filters.endDate.toISOString());
         }
         if (filters.status) {
-          params.append('status', filters.status);
+          params.append("status", filters.status);
         }
         if (filters.search) {
-          params.append('search', filters.search);
+          params.append("search", filters.search);
         }
       }
 
       return fetchWithAuth(
         `/api/admin/artist-requests?${params.toString()}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       );
     },
@@ -156,15 +156,15 @@ export const api = {
     getArtistRequestDetails: async (requestId: string, token: string) =>
       fetchWithAuth(
         `/api/admin/artist-requests/${requestId}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     approveArtistRequest: async (requestId: string, token: string) =>
       fetchWithAuth(
-        '/api/admin/artist-requests/approve',
+        "/api/admin/artist-requests/approve",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ requestId }),
         },
         token
@@ -172,9 +172,9 @@ export const api = {
 
     rejectArtistRequest: async (requestId: string, token: string) =>
       fetchWithAuth(
-        '/api/admin/artist-requests/reject',
+        "/api/admin/artist-requests/reject",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ requestId }),
         },
         token
@@ -183,18 +183,18 @@ export const api = {
     getAllArtists: async (token: string, page: number, limit: number) =>
       fetchWithAuth(
         `/api/admin/artists?page=${page}&limit=${limit}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getArtistById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/artists/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/admin/artists/${id}`, { method: "GET" }, token),
 
     verifyArtist: async (data: { userId: string }, token: string) =>
       fetchWithAuth(
-        '/api/admin/artists/verify',
+        "/api/admin/artists/verify",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify(data),
         },
         token
@@ -204,7 +204,7 @@ export const api = {
       fetchWithAuth(
         `/api/admin/artists/${id}/update-monthly-listeners`,
         {
-          method: 'POST',
+          method: "POST",
         },
         token
       ),
@@ -217,28 +217,28 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/admin/users?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getUserById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/users/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/admin/users/${id}`, { method: "GET" }, token),
 
     updateUser: async (id: string, data: any, token: string) =>
       fetchWithAuth(
         `/api/admin/users/${id}`,
         {
-          method: 'PUT',
+          method: "PUT",
           body: JSON.stringify(data),
         },
         token
       ),
 
     deleteUser: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/users/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/admin/users/${id}`, { method: "DELETE" }, token),
 
     deleteArtist: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/artists/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/admin/artists/${id}`, { method: "DELETE" }, token),
 
     deactivateUser: async (
       id: string,
@@ -248,7 +248,7 @@ export const api = {
       fetchWithAuth(
         `/api/admin/users/${id}/deactivate`,
         {
-          method: 'PATCH',
+          method: "PATCH",
           body: JSON.stringify(data),
         },
         token
@@ -261,7 +261,7 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/admin/artists/${id}/deactivate`,
-        { method: 'PATCH', body: JSON.stringify(data) },
+        { method: "PATCH", body: JSON.stringify(data) },
         token
       ),
 
@@ -273,15 +273,15 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/admin/genres?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     createGenre: async (data: any, token: string) =>
       fetchWithAuth(
-        '/api/admin/genres',
+        "/api/admin/genres",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify(data),
         },
         token
@@ -291,14 +291,14 @@ export const api = {
       fetchWithAuth(
         `/api/admin/genres/${id}`,
         {
-          method: 'PUT',
+          method: "PUT",
           body: JSON.stringify(data),
         },
         token
       ),
 
     deleteGenre: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/genres/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/admin/genres/${id}`, { method: "DELETE" }, token),
   },
 
   user: {
@@ -308,7 +308,7 @@ export const api = {
       // Ví dụ: /api/admin/users/:id hoặc /api/user/profile/:id
       const response = await fetchWithAuth(
         `/api/user/profile/${id}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       );
       return response; // hoặc response.data tuỳ fetchWithAuth
@@ -317,18 +317,18 @@ export const api = {
     searchAll: async (query: string, token: string) =>
       fetchWithAuth(
         `/api/user/search-all?q=${query}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getAllGenres: async () =>
-      fetchWithAuth('/api/user/genres', { method: 'GET' }),
+      fetchWithAuth("/api/user/genres", { method: "GET" }),
 
     followUserOrArtist: async (followingId: string, token: string) =>
       fetchWithAuth(
         `/api/user/follow/${followingId}`,
         {
-          method: 'POST',
+          method: "POST",
         },
         token
       ),
@@ -337,22 +337,22 @@ export const api = {
       fetchWithAuth(
         `/api/user/unfollow/${followingId}`,
         {
-          method: 'DELETE',
+          method: "DELETE",
         },
         token
       ),
 
     getFollowers: async (token: string) =>
-      fetchWithAuth('/api/user/followers', { method: 'GET' }, token),
+      fetchWithAuth("/api/user/followers", { method: "GET" }, token),
 
     getFollowing: async (token: string) =>
-      fetchWithAuth('/api/user/following', { method: 'GET' }, token),
+      fetchWithAuth("/api/user/following", { method: "GET" }, token),
 
     requestArtistRole: async (token: string, data: FormData) =>
       fetchWithAuth(
-        '/api/user/request-artist',
+        "/api/user/request-artist",
         {
-          method: 'POST',
+          method: "POST",
           body: data,
         },
         token
@@ -360,9 +360,9 @@ export const api = {
 
     editProfile: async (token: string, data: FormData) =>
       fetchWithAuth(
-        '/api/user/edit-profile',
+        "/api/user/edit-profile",
         {
-          method: 'PUT',
+          method: "PUT",
           body: data,
         },
         token
@@ -375,8 +375,8 @@ export const api = {
       isVerified: boolean;
     }> => {
       return fetchWithAuth(
-        '/api/user/check-artist-request',
-        { method: 'GET' },
+        "/api/user/check-artist-request",
+        { method: "GET" },
         token
       );
     },
@@ -386,51 +386,51 @@ export const api = {
     getAll: async (token: string, page: number, limit: number) =>
       fetchWithAuth(
         `/api/admin/artists?page=${page}&limit=${limit}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getRequests: async (token: string, page: number, limit: number) =>
       fetchWithAuth(
         `/api/admin/artist-requests?page=${page}&limit=${limit}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/artists/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/admin/artists/${id}`, { method: "GET" }, token),
 
     create: async (data: FormData, token: string) =>
       fetchWithAuth(
-        '/api/admin/artists',
-        { method: 'POST', body: data },
+        "/api/admin/artists",
+        { method: "POST", body: data },
         token
       ),
 
     getProfile: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/profile/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/artist/profile/${id}`, { method: "GET" }, token),
 
     updateProfile: async (id: string, data: any, token: string) =>
       fetchWithAuth(
         `/api/artist/profile/${id}`,
         {
-          method: 'PUT',
+          method: "PUT",
           body: JSON.stringify(data),
         },
         token
       ),
 
     getStats: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/stats/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/artist/stats/${id}`, { method: "GET" }, token),
 
     getTrackByArtistId: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/tracks/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/artist/tracks/${id}`, { method: "GET" }, token),
 
     getAlbumByArtistId: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/albums/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/artist/albums/${id}`, { method: "GET" }, token),
 
     getRelatedArtists: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/related/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/artist/related/${id}`, { method: "GET" }, token),
 
     getAllTracks: async (
       token: string,
@@ -440,7 +440,7 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/tracks?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
@@ -452,7 +452,7 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/albums?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
@@ -464,7 +464,7 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/artist/${artistId}/albums?page=${page}&limit=${limit}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
@@ -472,7 +472,7 @@ export const api = {
       fetchWithAuth(
         `/api/admin/artists/${id}/update-monthly-listeners`,
         {
-          method: 'POST',
+          method: "POST",
         },
         token
       ),
@@ -485,14 +485,14 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/artist/profiles?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
   },
 
   artist: {
     getStats: async (token: string) =>
-      fetchWithAuth('/api/artist/stats', { method: 'GET' }, token),
+      fetchWithAuth("/api/artist/stats", { method: "GET" }, token),
   },
 
   tracks: {
@@ -504,36 +504,36 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/tracks?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getByType: async (type: string, token: string) =>
-      fetchWithAuth(`/api/tracks/type/${type}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/tracks/type/${type}`, { method: "GET" }, token),
 
     getByGenre: async (genreId: string, token: string) =>
-      fetchWithAuth(`/api/tracks/genre/${genreId}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/tracks/genre/${genreId}`, { method: "GET" }, token),
 
     getByTypeAndGenre: async (type: string, genreId: string, token: string) =>
       fetchWithAuth(
         `/api/tracks/type/${type}/genre/${genreId}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     create: async (data: FormData, token: string) =>
-      fetchWithAuth('/api/tracks', { method: 'POST', body: data }, token),
+      fetchWithAuth("/api/tracks", { method: "POST", body: data }, token),
 
     update: async (id: string, data: FormData, token: string) =>
-      fetchWithAuth(`/api/tracks/${id}`, { method: 'PUT', body: data }, token),
+      fetchWithAuth(`/api/tracks/${id}`, { method: "PUT", body: data }, token),
 
     delete: async (id: string, token: string) =>
-      fetchWithAuth(`/api/tracks/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/tracks/${id}`, { method: "DELETE" }, token),
 
     toggleVisibility: async (trackId: string, token: string) =>
       fetchWithAuth(
         `/api/tracks/${trackId}/toggle-visibility`,
-        { method: 'PUT' },
+        { method: "PUT" },
         token
       ),
 
@@ -548,32 +548,32 @@ export const api = {
         `/api/tracks/search?${
           queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     play: async (trackId: string, token: string) =>
-      fetchWithAuth(`/api/tracks/${trackId}/play`, { method: 'POST' }, token),
+      fetchWithAuth(`/api/tracks/${trackId}/play`, { method: "POST" }, token),
   },
 
   history: {
     getPlayHistory: async (token: string) =>
-      fetchWithAuth('/api/history/play', { method: 'GET' }, token),
+      fetchWithAuth("/api/history/play", { method: "GET" }, token),
 
     getSearchHistory: async (token: string) =>
-      fetchWithAuth('/api/history/search', { method: 'GET' }, token),
+      fetchWithAuth("/api/history/search", { method: "GET" }, token),
 
     getAllHistory: async (token: string) =>
-      fetchWithAuth('/api/history', { method: 'GET' }, token),
+      fetchWithAuth("/api/history", { method: "GET" }, token),
 
     savePlayHistory: async (
       data: { trackId: string; duration: number; completed: boolean },
       token: string
     ) =>
       fetchWithAuth(
-        '/api/history/play',
+        "/api/history/play",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify(data),
         },
         token
@@ -581,9 +581,9 @@ export const api = {
 
     saveSearchHistory: async (query: string, token: string) =>
       fetchWithAuth(
-        '/api/history/search',
+        "/api/history/search",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ query }),
         },
         token
@@ -599,26 +599,26 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/albums?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/albums/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/albums/${id}`, { method: "GET" }, token),
 
     create: async (data: FormData, token: string) =>
-      fetchWithAuth('/api/albums', { method: 'POST', body: data }, token),
+      fetchWithAuth("/api/albums", { method: "POST", body: data }, token),
 
     update: async (id: string, data: FormData, token: string) =>
-      fetchWithAuth(`/api/albums/${id}`, { method: 'PUT', body: data }, token),
+      fetchWithAuth(`/api/albums/${id}`, { method: "PUT", body: data }, token),
 
     delete: async (id: string, token: string) =>
-      fetchWithAuth(`/api/albums/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/albums/${id}`, { method: "DELETE" }, token),
 
     toggleVisibility: async (albumId: string, token: string) =>
       fetchWithAuth(
         `/api/albums/${albumId}/toggle-visibility`,
-        { method: 'PUT' },
+        { method: "PUT" },
         token
       ),
 
@@ -626,7 +626,7 @@ export const api = {
       return fetchWithAuth(
         `/api/albums/${id}/tracks`,
         {
-          method: 'POST',
+          method: "POST",
           body: data,
           headers: {},
         },
@@ -645,29 +645,29 @@ export const api = {
         `/api/albums/search?${
           queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     playAlbum: async (albumId: string, token: string) =>
-      fetchWithAuth(`/api/albums/${albumId}/play`, { method: 'POST' }, token),
+      fetchWithAuth(`/api/albums/${albumId}/play`, { method: "POST" }, token),
   },
 
   dashboard: {
     getStats: async (token: string) =>
-      fetchWithAuth('/api/admin/stats', { method: 'GET' }, token),
+      fetchWithAuth("/api/admin/stats", { method: "GET" }, token),
   },
 
   notifications: {
     // Lấy danh sách notifications
     getList: async (token: string) =>
-      fetchWithAuth('/api/notifications', { method: 'GET' }, token),
+      fetchWithAuth("/api/notifications", { method: "GET" }, token),
 
     // Lấy số lượng thông báo chưa đọc
     getUnreadCount: async (token: string) =>
       fetchWithAuth(
-        '/api/notifications/unread-count',
-        { method: 'GET' },
+        "/api/notifications/unread-count",
+        { method: "GET" },
         token
       ),
 
@@ -675,12 +675,151 @@ export const api = {
     markAsRead: async (notificationId: string, token: string) =>
       fetchWithAuth(
         `/api/notifications/${notificationId}/read`,
-        { method: 'PATCH' },
+        { method: "PATCH" },
         token
       ),
 
     // Đánh dấu tất cả thông báo đã đọc
     markAllAsRead: async (token: string) =>
-      fetchWithAuth('/api/notifications/read-all', { method: 'PATCH' }, token),
+      fetchWithAuth("/api/notifications/read-all", { method: "PATCH" }, token),
+  },
+
+  playlists: {
+    create: async (data: CreatePlaylistData, token: string) =>
+      fetchWithAuth(
+        "/api/playlists",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        },
+        token
+      ),
+
+    getAll: async (token: string) =>
+      fetchWithAuth("/api/playlists", { method: "GET" }, token),
+
+    getById: async (playlistId: string) => {
+      try {
+        const token = localStorage.getItem("userToken");
+        if (!token) {
+          throw new Error("Vui lòng đăng nhập lại");
+        }
+
+        console.log(
+          "Making request to:",
+          `${API_BASE}/api/playlists/${playlistId}`
+        );
+        console.log("With token:", token);
+
+        const response = await fetch(
+          `${API_BASE}/api/playlists/${playlistId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const data = await response.json();
+        console.log("API response:", data);
+
+        if (!response.ok) {
+          throw new Error(data.message || "Không thể tải playlist");
+        }
+
+        return data;
+      } catch (error) {
+        console.error("API Error:", error);
+        throw error;
+      }
+    },
+
+    update: async (id: string, data: any, token: string) => {
+      const response = await fetch(`${API_BASE}/playlists/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error("Không thể cập nhật playlist");
+      }
+
+      return response.json();
+    },
+
+    removeTrack: async (playlistId: string, trackId: string) => {
+      const token = localStorage.getItem("userToken");
+      if (!token) throw new Error("Unauthorized");
+
+      console.log("Removing track:", { playlistId, trackId }); // Debug log
+
+      const response = await fetch(
+        `${API_BASE}/api/playlists/${playlistId}/tracks/${trackId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Không thể xóa bài hát khỏi playlist");
+      }
+
+      return response.json();
+    },
+
+    addTrack: async (playlistId: string, trackId: string, token: string) => {
+      console.log("Request:", {
+        url: `${API_BASE}/api/playlists/${playlistId}/tracks`,
+        playlistId,
+        trackId,
+      });
+
+      const response = await fetch(
+        `${API_BASE}/api/playlists/${playlistId}/tracks`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ trackId }),
+        }
+      );
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Error response:", text);
+        throw new Error("Không thể thêm bài hát vào playlist");
+      }
+
+      return response.json();
+    },
+  },
+
+  upload: {
+    image: async (formData: FormData, token: string) => {
+      const response = await fetch(`${API_BASE}/upload/image`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Không thể tải ảnh lên");
+      }
+
+      return response.json();
+    },
   },
 };
