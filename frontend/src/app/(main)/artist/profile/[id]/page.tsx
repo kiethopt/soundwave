@@ -298,7 +298,7 @@ export default function ArtistProfilePage({
                       <MoreHorizontal className="w-5 h-5" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="start" className="w-56">
                     <DropdownMenuItem 
                       className='cursor-pointer'
                       onClick={(e) => e.stopPropagation()}
@@ -319,7 +319,6 @@ export default function ArtistProfilePage({
             </div>
           </div>
 
-
           {/* Track Section */}
           { tracks.length > 0 && (
             <div className="px-2 md:px-8 max-w-5xl">
@@ -337,13 +336,7 @@ export default function ArtistProfilePage({
                     queueType={queueType}
                     theme={theme}
                     onTrackClick={() => {
-                      if (currentTrack?.id === track.id && isPlaying && queueType === 'track') {
-                        pauseTrack();
-                      } else {
-                        playTrack(track);
-                        setQueueType('track');
-                        trackQueue(tracks);
-                      }
+                      handleTopTrackPlay(track);
                     }}
                   />
                 ))}

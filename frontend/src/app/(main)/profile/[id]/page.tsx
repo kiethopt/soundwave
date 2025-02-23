@@ -327,13 +327,13 @@ export default function UserProfilePage({
 
           {/* Top Artists Section */}
           {topArtists.length > 0 && (
-            <div className="px-2 md:px-8 mt-8">
+            <div className="px-2 md:px-8">
               <h2 className="text-2xl font-bold">Top artists this month</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
                 {topArtists.map((topArtist) => (
                   <div
                     key={topArtist.id}
-                    className="hover:bg-white/5 p-2 rounded-lg group relative w-full"
+                    className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
                     onClick={() => router.push(`/artist/profile/${topArtist.id}`)}
                   >
                     <div className="relative">
@@ -390,13 +390,7 @@ export default function UserProfilePage({
                     queueType={queueType}
                     theme={theme}
                     onTrackClick={() => {
-                      if (currentTrack?.id === track.id && isPlaying && queueType === 'track') {
-                        pauseTrack();
-                      } else {
-                        playTrack(track);
-                        setQueueType('track');
-                        trackQueue(topTracks);
-                      }
+                      handleTopTrackPlay(track);
                     }}
                 />
                 ))}
@@ -412,7 +406,7 @@ export default function UserProfilePage({
                 {followingArtists.map((followArtist) => (
                   <div
                     key={followArtist.id}
-                    className="hover:bg-white/5 p-2 rounded-lg group relative w-full"
+                    className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
                     onClick={() => router.push(`/artist/profile/${followArtist.id}`)}
                   >
                     <div className="relative">
