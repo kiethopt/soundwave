@@ -8,6 +8,7 @@ import {
   searchTrackSelect,
   userSelect,
 } from '../utils/prisma-selects';
+import pusher from '../config/pusher';
 
 // Hàm validation cho dữ liệu nghệ sĩ
 const validateArtistData = (data: any): string | null => {
@@ -483,7 +484,7 @@ export const followUser = async (
       // 3) Tạo NOTIFICATION cho người được theo dõi
       if (followingType === 'ARTIST') {
         console.log('=== DEBUG: followUser => about to create notification for ARTIST');
-        await tx.notification.create({
+        const notification = await tx.notification.create({
           data: {
             type: 'NEW_FOLLOW',
             message: `New follower: ${followerName}`,
@@ -498,10 +499,17 @@ export const followUser = async (
           where: { id: followingId },
           data: { monthlyListeners: { increment: 1 } },
         });
+
+        // Phát sự kiện realtime qua Pusher cho artist
+        await pusher.trigger(`user-${followingId}`, 'notification', {
+          type: 'NEW_FOLLOW',
+          message: `New follower: ${followerName}`,
+          notificationId: notification.id, // Nếu cần gửi ID
+        });
       } else {
         // follow user => Tạo noti cho user bị follow
         console.log('=== DEBUG: followUser => about to create notification for USER->USER follow');
-        await tx.notification.create({
+        const notification = await tx.notification.create({
           data: {
             type: 'NEW_FOLLOW',
             message: `New follower: ${followerName}`,
@@ -511,24 +519,33 @@ export const followUser = async (
           },
         });
         console.log('=== DEBUG: followUser => notification for followed USER created!');
-      }
 
-      // 4) Tạo NOTIFICATION cho CHÍNH user (follower)
-      //    để user thấy mình vừa follow ai
-      // await tx.notification.create({
-      //   data: {
-      //     type: 'FOLLOW_CONFIRMATION',
-      //     message:
-      //       followingType === 'ARTIST'
-      //         ? `You are now following artist with id: ${followingId}`
-      //         : `You are now following user with id: ${followingId}`,
-      //     recipientType: 'USER',     // Vì follower luôn là 1 user
-      //     userId: user.id,           // Gửi cho chính user
-      //     senderId: user.id,
-      //   },
-      // });
-      // console.log('=== DEBUG: followUser => notification for the follower created!');
+        // Phát sự kiện realtime qua Pusher cho user được follow
+        await pusher.trigger(`user-${followingId}`, 'notification', {
+          type: 'NEW_FOLLOW',
+          message: `New follower: ${followerName}`,
+          notificationId: notification.id,
+        });
+      }
     });
+
+
+    // 4) Tạo NOTIFICATION cho CHÍNH user (follower)
+    //    để user thấy mình vừa follow ai
+    // await tx.notification.create({
+    //   data: {
+    //     type: 'FOLLOW_CONFIRMATION',
+    //     message:
+    //       followingType === 'ARTIST'
+    //         ? `You are now following artist with id: ${followingId}`
+    //         : `You are now following user with id: ${followingId}`,
+    //     recipientType: 'USER',     // Vì follower luôn là 1 user
+    //     userId: user.id,           // Gửi cho chính user
+    //     senderId: user.id,
+    //   },
+    // });
+    // console.log('=== DEBUG: followUser => notification for the follower created!');
+
 
     res.json({ message: 'Followed successfully' });
   } catch (error) {

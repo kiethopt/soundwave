@@ -7,6 +7,8 @@ import {
 import { Role, AlbumType, Prisma, HistoryType } from '@prisma/client';
 import { sessionService } from '../services/session.service';
 import { albumSelect, trackSelect } from '../utils/prisma-selects';
+import { NotificationType, RecipientType } from '@prisma/client';
+import pusher from '../config/pusher';
 
 // Function để kiểm tra quyền
 const canManageAlbum = (user: any, albumArtistId: string): boolean => {
@@ -61,7 +63,6 @@ const validateFile = (file: Express.Multer.File): string | null => {
 
   return null;
 };
-
 // Tạo album mới (ADMIN & ARTIST only)
 export const createAlbum = async (
   req: Request,
@@ -84,7 +85,6 @@ export const createAlbum = async (
     } = req.body;
     const coverFile = req.file;
 
-    // Validate input data
     const validationError = validateAlbumData({ title, releaseDate, type });
     if (validationError) {
       res.status(400).json({ message: validationError });
@@ -99,12 +99,10 @@ export const createAlbum = async (
       }
     }
 
-    // Xác định artist profile ID
     let targetArtistProfileId: string;
     let targetArtist: any;
 
     if (user.role === Role.ADMIN && artistId) {
-      // Nếu là admin và có artistId, tìm artist profile tương ứng
       targetArtist = await prisma.artistProfile.findFirst({
         where: {
           id: artistId,
@@ -122,13 +120,11 @@ export const createAlbum = async (
           .json({ message: 'Artist profile not found or not verified' });
         return;
       }
-
       targetArtistProfileId = targetArtist.id;
     } else if (
       user.artistProfile?.isVerified &&
       user.artistProfile.role === Role.ARTIST
     ) {
-      // Nếu là artist đã verify
       targetArtistProfileId = user.artistProfile.id;
       targetArtist = {
         user: user,
@@ -138,7 +134,6 @@ export const createAlbum = async (
       return;
     }
 
-    // Validate genres
     const genreIds = Array.isArray(genres)
       ? genres
       : genres.split(',').map((g: string) => g.trim());
@@ -152,7 +147,6 @@ export const createAlbum = async (
       return;
     }
 
-    // Upload cover image if provided
     let coverUrl: string | null = null;
     if (coverFile) {
       const coverUpload: CloudinaryUploadResult = await uploadFile(
@@ -163,7 +157,7 @@ export const createAlbum = async (
       coverUrl = coverUpload.secure_url;
     }
 
-    // Create album
+    // Tạo album
     const album = await prisma.album.create({
       data: {
         title,
@@ -182,6 +176,49 @@ export const createAlbum = async (
       select: albumSelect,
     });
 
+    // Lấy thông tin artist để lấy tên nghệ sĩ
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { id: targetArtistProfileId },
+      select: { artistName: true },
+    });
+
+    // Sau khi tạo album, lấy danh sách user follow nghệ sĩ
+    const followers = await prisma.userFollow.findMany({
+      where: {
+        followingArtistId: targetArtistProfileId,
+        followingType: 'ARTIST',
+      },
+      select: { followerId: true },
+    });
+
+    const notificationsData = followers.map((follower) => ({
+      type: NotificationType.NEW_ALBUM, // sử dụng enum thay vì string
+      // message: `Artist của bạn vừa ra album mới: ${title}`,
+      message: `${artistProfile?.artistName || 'Unknown'} vừa ra album mới: ${title}`,
+      recipientType: RecipientType.USER, // sử dụng enum thay vì string
+      userId: follower.followerId,
+      artistId: targetArtistProfileId,
+      senderId: targetArtistProfileId,
+    }));
+
+
+    await prisma.$transaction(async (tx) => {
+      if (notificationsData.length > 0) {
+        await tx.notification.createMany({
+          data: notificationsData,
+        });
+      }
+    });
+
+
+    // Phát sự kiện realtime cho từng follower qua Pusher
+    for (const follower of followers) {
+      await pusher.trigger(`user-${follower.followerId}`, 'notification', {
+        type: NotificationType.NEW_ALBUM,
+        message: `Artist của bạn vừa ra album mới: ${title}`,
+      });
+    }
+
     res.status(201).json({
       message: 'Album created successfully',
       album,
@@ -191,6 +228,7 @@ export const createAlbum = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
 
 // Thêm track vào album (ADMIN & ARTIST only)
 export const addTracksToAlbum = async (
@@ -269,8 +307,8 @@ export const addTracksToAlbum = async (
     const featuredArtists = Array.isArray(req.body.featuredArtists)
       ? req.body.featuredArtists.map((artists: string) => artists.split(','))
       : req.body.featuredArtists
-      ? [req.body.featuredArtists.split(',')]
-      : [];
+        ? [req.body.featuredArtists.split(',')]
+        : [];
 
     const mm = await import('music-metadata');
 
@@ -568,9 +606,8 @@ export const toggleAlbumVisibility = async (
     });
 
     res.json({
-      message: `Album ${
-        updatedAlbum.isActive ? 'activated' : 'hidden'
-      } successfully`,
+      message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'
+        } successfully`,
       album: updatedAlbum,
     });
   } catch (error) {

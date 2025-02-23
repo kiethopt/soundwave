@@ -41,7 +41,7 @@ export default function Header({
 
   // ======== Mới thêm cho notifications ========
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]); 
+  const [notifications, setNotifications] = useState<any[]>([]);
   // (Bạn có thể định nghĩa type Notification thay vì any[])
   const notificationRef = useRef<HTMLDivElement>(null);
   // ============================================
@@ -184,12 +184,12 @@ export default function Header({
     try {
       // 1. Toggle hiển thị dropdown
       setShowNotifications((prev) => !prev);
-  
+
       // 2. Nếu dropdown sắp được mở => load danh sách notifications
       if (!showNotifications) {
         const token = localStorage.getItem('userToken');
         if (!token) return;
-  
+
         // Gọi API lấy danh sách thông báo
         const notificationsData = await api.notifications.getList(token);
         console.log('Fetched notifications:', notificationsData);
@@ -197,7 +197,7 @@ export default function Header({
           setNotifications(notificationsData);
         }
       }
-  
+
       // 3. Đặt lại notificationCount = 0
       setNotificationCount(0);
       localStorage.setItem('notificationCount', '0');
@@ -205,7 +205,7 @@ export default function Header({
       console.error('Fetch notifications error:', err);
     }
   };
-  
+
 
   // ==============================
   // 7) Switch profile
@@ -246,23 +246,88 @@ export default function Header({
     setShowDropdown(false);
   };
 
+  // =============================
+  // 8) Thông báo thời gian thực
+  // =============================
+  useEffect(() => {
+    const userDataStr = localStorage.getItem('userData');
+    if (!userDataStr) return;
+
+    const userData = JSON.parse(userDataStr);
+    const userId = userData.id;
+
+    const channel = pusher.subscribe(`user-${userId}`);
+    console.log('Subscribed to Pusher channel:', `user-${userId}`);
+
+    // Hàm xử lý sự kiện realtime cho thông báo mới
+    const handleNewNotification = (data: { type: string; message: string;[key: string]: any }) => {
+      console.log('Received new notification event:', data);
+      // Tăng số lượng thông báo
+      setNotificationCount((prev) => {
+        const newCount = prev + 1;
+        localStorage.setItem('notificationCount', String(newCount));
+        return newCount;
+      });
+      // Cập nhật danh sách thông báo nếu bạn muốn hiển thị chi tiết luôn
+      setNotifications((prev) => [data, ...prev]);
+    };
+
+    // Bind event "notification" để nhận thông báo mới realtime
+    channel.bind('notification', handleNewNotification);
+
+    // Nếu vẫn muốn giữ sự kiện cũ, bạn có thể bind thêm
+    const handleArtistRequestStatus = (data: { type: string }) => {
+      console.log('Received artist request status event:', data);
+      // Logic cho REQUEST_APPROVED/REQUEST_REJECTED (nếu cần)
+    };
+    channel.bind('artist-request-status', handleArtistRequestStatus);
+
+    // Lấy số lượng lưu sẵn (nếu có)
+    const savedCount = Number(localStorage.getItem('notificationCount') || '0');
+    setNotificationCount(savedCount);
+
+    return () => {
+      channel.unbind('notification', handleNewNotification);
+      channel.unbind('artist-request-status', handleArtistRequestStatus);
+      pusher.unsubscribe(`user-${userId}`);
+    };
+  }, []);
+
+  // Hàm thay đổi trạng thái read thông báo
+  const handleNotificationClick = async (notification: any) => {
+    // Nếu thông báo chưa đọc, gọi API đánh dấu là đã đọc
+    if (!notification.isRead) {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) return;
+        // Giả sử api.notifications.markAsRead là hàm gọi API backend
+        await api.notifications.markAsRead(notification.id, token);
+        // Cập nhật lại state notifications: thay đổi isRead của thông báo đó thành true
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
+        );
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      }
+    }
+  };
+
+
   return (
     <header
-      className={`h-[72px] flex items-center justify-between px-2 md:px-4 lg:px-6 border-b ${
-        theme === 'light'
+      className={`h-[72px] flex items-center justify-between px-2 md:px-4 lg:px-6 border-b ${theme === 'light'
           ? 'bg-white border-gray-200'
           : 'bg-[#111111] border-white/10'
-      }`}
+        }`}
     >
       {/* Left Side */}
       <div className="flex items-center gap-2 md:gap-4 lg:gap-6">
         <button
           onClick={onMenuClick}
-          className={`md:hidden p-2 ${
-            theme === 'light'
+          className={`md:hidden p-2 ${theme === 'light'
               ? 'text-gray-600 hover:text-gray-900'
               : 'text-white/70 hover:text-white'
-          }`}
+            }`}
         >
           <Menu className="w-6 h-6" />
         </button>
@@ -272,15 +337,14 @@ export default function Header({
           <div className="hidden md:flex items-center gap-4 lg:gap-6">
             <Link
               href="/"
-              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${
-                isActive('/')
+              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${isActive('/')
                   ? theme === 'light'
                     ? 'text-gray-900 bg-gray-200'
                     : 'text-white bg-[#282828]'
                   : theme === 'light'
-                  ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                  : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
-              }`}
+                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                    : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
+                }`}
             >
               {isActive('/') ? (
                 <HomeFilled className="w-5 h-5" />
@@ -292,15 +356,14 @@ export default function Header({
 
             <Link
               href="/discover"
-              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${
-                isActive('/discover')
+              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${isActive('/discover')
                   ? theme === 'light'
                     ? 'text-gray-900 bg-gray-200'
                     : 'text-white bg-[#282828]'
                   : theme === 'light'
-                  ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                  : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
-              }`}
+                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                    : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
+                }`}
             >
               {isActive('/discover') ? (
                 <DiscoverFilled className="w-5 h-5" />
@@ -312,20 +375,18 @@ export default function Header({
 
             <form onSubmit={handleSearch} className="relative w-[400px]">
               <Search
-                className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                  theme === 'light' ? 'text-gray-400' : 'text-white/40'
-                }`}
+                className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${theme === 'light' ? 'text-gray-400' : 'text-white/40'
+                  }`}
               />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search"
-                className={`w-full rounded-md py-1.5 md:py-2 pl-10 pr-4 text-sm focus:outline-none ${
-                  theme === 'light'
+                className={`w-full rounded-md py-1.5 md:py-2 pl-10 pr-4 text-sm focus:outline-none ${theme === 'light'
                     ? 'bg-gray-100 text-gray-900 placeholder:text-gray-500 focus:bg-gray-200'
                     : 'bg-white/10 text-white placeholder:text-white/40 focus:bg-white/20'
-                }`}
+                  }`}
               />
             </form>
           </div>
@@ -339,21 +400,22 @@ export default function Header({
             {/* Nút chuông Notifications */}
             <div className="relative" ref={notificationRef}>
               <button
-                className={`p-2 rounded-full relative ${
-                  theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-                }`}
+                className={`p-2 rounded-full relative ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
+                  }`}
                 onClick={handleBellClick}
               >
                 <div className="relative">
                   <Notifications
-                    className={`w-5 h-5 ${
-                      theme === 'light' ? 'text-gray-700' : 'text-white'
-                    }`}
+                    className={`w-5 h-5 ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}
                   />
                   {/* Badge chấm đỏ */}
                   {notificationCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                      {notificationCount > 99 ? '99+' : notificationCount}
+                    <span
+                      style={{ height: '10px', width: '10px', right: '-10px' }}
+                      className="absolute -top-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center"
+                    >
+                      {/* Nếu cần hiển thị số thì mở comment */}
+                      {/* {notificationCount > 99 ? '99+' : notificationCount} */}
                     </span>
                   )}
                 </div>
@@ -361,74 +423,90 @@ export default function Header({
               {/* Dropdown Notifications */}
               {showNotifications && (
                 <div
-                  className={`absolute right-0 mt-2 w-72 max-h-[300px] overflow-auto rounded-md shadow-lg py-2 z-50 ${
-                    theme === 'light' ? 'bg-white' : 'bg-[#282828]'
-                  }`}
+                  className={`absolute right-0 mt-2 w-80 max-h-[300px] overflow-auto rounded-lg shadow-lg py-3 z-50 ${theme === 'light' ? 'bg-white' : 'bg-[#282828]'
+                    }`}
                 >
                   {notifications.length === 0 ? (
                     <p
-                      className={`px-4 py-2 text-sm ${
-                        theme === 'light'
-                          ? 'text-gray-700'
-                          : 'text-white/70'
-                      }`}
+                      className={`px-4 py-3 text-sm ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'
+                        }`}
                     >
                       No notifications
                     </p>
                   ) : (
-                    notifications.map((item) => (
+                    notifications.map((item, index) => (
                       <div
                         key={item.id}
-                        className={`px-4 py-2 text-sm border-b last:border-b-0 ${
-                          theme === 'light'
-                            ? 'border-gray-200 text-gray-700 hover:bg-gray-100'
-                            : 'border-white/10 text-white hover:bg-white/10'
-                        }`}
+                        className={`cursor-pointer px-4 py-3 transition-colors duration-200 
+                        ${item.isRead
+                            ? theme === 'light'
+                              ? 'bg-gray-50 text-gray-700'
+                              : 'bg-gray-700 text-gray-200'
+                            : theme === 'light'
+                              ? 'bg-blue-50 text-gray-900 font-medium'
+                              : 'bg-blue-900 text-white font-medium'
+                          }
+                        hover:opacity-90 ${index !== notifications.length - 1 ? 'border-b border-gray-200' : ''}`}
+                        onClick={() => handleNotificationClick(item)}
                       >
-                        {/* Tuỳ chỉnh hiển thị nội dung thông báo */}
-                        <p className="line-clamp-2">{item.message}</p>
-                        {/* item.createdAt, etc. */}
+                        <p className="line-clamp-2 text-sm">{item.message}</p>
+                        {/* Hiển thị thêm thời gian nếu cần, ví dụ: */}
+                        {/* <span className="block mt-1 text-xs text-gray-500">
+                        {formatDate(item.createdAt)}
+                      </span> */}
                       </div>
                     ))
                   )}
+
+                  {/* Nút "Xem tất cả" */}
+                  <div className="px-4 py-3">
+                    <Link href="/notifications">
+                      <button
+                        className={`w-full text-center text-sm py-2 rounded-lg transition-colors duration-200 ${theme === 'light'
+                            ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            : 'bg-gray-800 text-white hover:bg-gray-700'
+                          }`}
+                      >
+                        Xem tất cả
+                      </button>
+                    </Link>
+                  </div>
                 </div>
               )}
+
             </div>
 
+
             <button
-              className={`p-2 rounded-full ${
-                theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-              }`}
+              className={`p-2 rounded-full ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
+                }`}
             >
               <Settings
-                className={`w-5 h-5 ${
-                  theme === 'light' ? 'text-gray-700' : 'text-white'
-                }`}
+                className={`w-5 h-5 ${theme === 'light' ? 'text-gray-700' : 'text-white'
+                  }`}
               />
             </button>
             {/* Theme toggle - For Admin and Artist */}
             {(userData?.role === 'ADMIN' ||
               userData?.currentProfile === 'ARTIST') && (
-              <button
-                onClick={toggleTheme}
-                className={`p-2 rounded-full ${
-                  theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-                }`}
-              >
-                {theme === 'light' ? (
-                  <Moon className="w-5 h-5 text-gray-700" />
-                ) : (
-                  <Sun className="w-5 h-5 text-white" />
-                )}
-              </button>
-            )}
+                <button
+                  onClick={toggleTheme}
+                  className={`p-2 rounded-full ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
+                    }`}
+                >
+                  {theme === 'light' ? (
+                    <Moon className="w-5 h-5 text-gray-700" />
+                  ) : (
+                    <Sun className="w-5 h-5 text-white" />
+                  )}
+                </button>
+              )}
             <div className="relative" ref={dropdownRef}>
               <button
-                className={`flex items-center justify-center w-8 h-8 rounded-full overflow-hidden ${
-                  theme === 'light'
+                className={`flex items-center justify-center w-8 h-8 rounded-full overflow-hidden ${theme === 'light'
                     ? 'bg-gray-200 hover:bg-gray-200'
                     : 'bg-white/10 hover:bg-white/20'
-                }`}
+                  }`}
                 onClick={() => setShowDropdown(!showDropdown)}
               >
                 <Image
@@ -443,17 +521,15 @@ export default function Header({
 
               {showDropdown && (
                 <div
-                  className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-50 ${
-                    theme === 'light' ? 'bg-white' : 'bg-[#282828]'
-                  }`}
+                  className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-50 ${theme === 'light' ? 'bg-white' : 'bg-[#282828]'
+                    }`}
                 >
                   <Link
                     href="/account"
-                    className={`block px-4 py-2 text-sm ${
-                      theme === 'light'
+                    className={`block px-4 py-2 text-sm ${theme === 'light'
                         ? 'text-gray-700 hover:bg-gray-200'
                         : 'text-white hover:bg-white/10'
-                    }`}
+                      }`}
                     onClick={() => setShowDropdown(false)}
                   >
                     Account
@@ -462,11 +538,10 @@ export default function Header({
                   {userData?.artistProfile?.isVerified && (
                     <button
                       onClick={handleSwitchProfile}
-                      className={`block w-full text-left px-4 py-2 text-sm ${
-                        theme === 'light'
+                      className={`block w-full text-left px-4 py-2 text-sm ${theme === 'light'
                           ? 'text-gray-700 hover:bg-gray-200'
                           : 'text-white hover:bg-white/10'
-                      }`}
+                        }`}
                     >
                       Switch to{' '}
                       {userData.currentProfile === 'USER'
@@ -479,11 +554,10 @@ export default function Header({
                   {userData?.role === 'USER' && !userData?.artistProfile && (
                     <Link
                       href="/request-artist"
-                      className={`block px-4 py-2 text-sm ${
-                        theme === 'light'
+                      className={`block px-4 py-2 text-sm ${theme === 'light'
                           ? 'text-gray-700 hover:bg-gray-200'
                           : 'text-white hover:bg-white/10'
-                      }`}
+                        }`}
                       onClick={() => setShowDropdown(false)}
                     >
                       Become an Artist
@@ -491,20 +565,18 @@ export default function Header({
                   )}
 
                   <div
-                    className={`border-t my-1 ${
-                      theme === 'light' ? 'border-gray-200' : 'border-white/10'
-                    }`}
+                    className={`border-t my-1 ${theme === 'light' ? 'border-gray-200' : 'border-white/10'
+                      }`}
                   ></div>
                   <button
                     onClick={() => {
                       handleLogout();
                       setShowDropdown(false);
                     }}
-                    className={`block w-full text-left px-4 py-2 text-sm ${
-                      theme === 'light'
+                    className={`block w-full text-left px-4 py-2 text-sm ${theme === 'light'
                         ? 'text-gray-700 hover:bg-gray-200'
                         : 'text-white hover:bg-white/10'
-                    }`}
+                      }`}
                   >
                     Log out
                   </button>
@@ -516,11 +588,10 @@ export default function Header({
           <div className="flex items-center gap-2 md:gap-4">
             <Link
               href="/register"
-              className={`text-sm font-medium hidden md:block ${
-                theme === 'light'
+              className={`text-sm font-medium hidden md:block ${theme === 'light'
                   ? 'text-gray-600 hover:text-gray-900'
                   : 'text-white/70 hover:text-white'
-              }`}
+                }`}
             >
               Sign up
             </Link>
