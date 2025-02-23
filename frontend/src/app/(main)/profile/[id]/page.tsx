@@ -282,7 +282,7 @@ export default function UserProfilePage({
                 {topArtists.map((topArtist) => (
                   <div
                     key={topArtist.id}
-                    className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
+                    className="hover:bg-white/5 p-2 rounded-lg group relative w-full"
                     onClick={() => router.push(`/artist/profile/${topArtist.id}`)}
                   >
                     <div className="relative">
@@ -358,7 +358,7 @@ export default function UserProfilePage({
                 {topTracks.map((track, index) => (
                   <div
                     key={track.id}
-                    className={`grid grid-cols-[32px_48px_4fr_48px_32px] sm:grid-cols-[32px_48px_2fr_2fr_auto] gap-2 md:gap-4 py-2 md:px-2 group cursor-pointer rounded-lg lg:max-w-4xl ${
+                    className={`grid grid-cols-[32px_48px_auto_auto] sm:grid-cols-[32px_48px_2fr_3fr_auto] gap-2 md:gap-4 py-2 md:px-2 group cursor-pointer rounded-lg ${
                       theme === 'light'
                         ? 'hover:bg-gray-50'
                         : 'hover:bg-white/5'
@@ -422,7 +422,7 @@ export default function UserProfilePage({
 
                       {/* Play Count */}
                       <div
-                        className={`truncate text-sm md:text-base w-full md:w-auto text-start sm:text-right ${
+                        className={`truncate text-sm md:text-base w-full md:w-auto text-start md:text-right ${
                           theme === 'light' ? 'text-gray-500' : 'text-white/60'
                         }`}
                       >
@@ -430,54 +430,148 @@ export default function UserProfilePage({
                       </div>
                     </div>
 
-
                     {/* Track Album */}
                     <div
-                      className={`flex items-center justify-center ${
+                      className={`hidden md:flex items-center justify-center ${
                         theme === 'light' ? 'text-gray-500' : 'text-white/60'
                       }`}
                     >
-                      
+                      {track.album ? (
+                        <div className="flex items-center gap-1 truncate">
+                          <span className="truncate">{track.album.title}</span>
+                        </div>
+                        ) : (
+                        <span>-</span>
+                      )}
                     </div>
 
-                    {/* Track Options */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button 
-                          className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="w-5 h-5" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem 
-                          className='cursor-pointer'
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <AddSimple className="w-4 h-4 mr-2" />
-                            Add to playlist
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className='cursor-pointer'
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Heart className="w-4 h-4 mr-2" />
-                            Add to favorites
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          className='cursor-pointer'
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Share2 className="w-4 h-4 mr-2" />
-                            Share
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {/* Track Duration & option */}
+                    <div className="flex items-center justify-end gap-2 md:gap-8 ">
+                      {/* Track Duration */}
+                      <div
+                        className={`flex items-center justify-center font-medium text-sm ${
+                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                        }`}
+                      >
+                        {Math.floor(track.duration / 60)}:
+                        {(track.duration % 60).toString().padStart(2, '0')}
+                      </div>
+
+                      {/* Track Options */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button 
+                            className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="w-5 h-5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem 
+                            className='cursor-pointer'
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <AddSimple className="w-4 h-4 mr-2" />
+                              Add to playlist
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className='cursor-pointer'
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Heart className="w-4 h-4 mr-2" />
+                              Add to favorites
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            className='cursor-pointer'
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Share2 className="w-4 h-4 mr-2" />
+                              Share
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 ))}
               </div> 
+            </div>
+          )}
+
+          {/* Following Artists Section */}
+          {following.length > 0 && (
+            <div className="px-2 md:px-8 mt-8">
+              <h2 className="text-2xl font-bold">Following artists</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+                {topArtists.map((topArtist) => (
+                  <div
+                    key={topArtist.id}
+                    className="hover:bg-white/5 p-2 rounded-lg group relative w-full"
+                    onClick={() => router.push(`/artist/profile/${topArtist.id}`)}
+                  >
+                    <div className="relative">
+                      <img
+                        src={topArtist.avatar || '/images/default-avatar.jpg'}
+                        alt={topArtist.artistName}
+                        className="w-full aspect-square object-cover rounded-full mb-4"
+                      />
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            let artistTracks = artistTracksMap[topArtist.id] || [];
+                            
+                            if (!artistTracks.length) {
+                              artistTracks = await getArtistTracks(topArtist.id);
+                              
+                              setArtistTracksMap(prev => ({
+                                ...prev,
+                                [topArtist.id]: artistTracks
+                              }));
+                            }
+                            
+                            if (artistTracks.length > 0) {
+                                if (isArtistPlaying(topArtist.id)) {
+                                pauseTrack();
+                                } else if (currentTrack && queueType === 'artist') {
+                                playTrack(currentTrack);
+                                } else {
+                                playTrack(artistTracks[0]);
+                                setQueueType('artist');
+                                trackQueue(artistTracks);
+                                }
+                            } else {
+                              toast.error("No tracks available for this artist");
+                            }
+                          } catch (error) {
+                            console.error(error);
+                            toast.error("Failed to load artist tracks");
+                          }
+                        }}
+                        className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {isArtistPlaying(topArtist.id) ? (
+                          <Pause className="w-6 h-6 text-white" />
+                        ) : (
+                          <Play className="w-6 h-6 text-white" />
+                        )}
+                      </button>
+                    </div>
+                    <h3 className={`font-medium truncate ${
+                      artistTracksMap[topArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'artist'
+                        ? 'text-[#A57865]'
+                        : 'text-white'
+                      }`}
+                    >
+                      {topArtist.artistName}
+                    </h3>
+                    <p className="text-white/60 text-sm truncate">
+                      {new Intl.NumberFormat('en-US').format(topArtist.monthlyListeners)} monthly listeners
+                    </p>
+                  </div>
+                ))}
+              </div>   
             </div>
           )}
         </div>
