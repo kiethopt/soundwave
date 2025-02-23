@@ -1,4 +1,5 @@
 import { ArtistRequestFilters } from '@/types';
+import { getTopTracks } from '../../../backend/src/controllers/user.controller';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -380,6 +381,24 @@ export const api = {
         token
       );
     },
+
+    getRecommendedArtists: async (token: string) =>
+      fetchWithAuth('/api/user/recommendedArtists', { method: 'GET' }, token),
+
+    getNewestAlbums: async (token: string) =>
+      fetchWithAuth('/api/user/newestAlbums', { method: 'GET' }, token),
+
+    getNewestTracks: async (token: string) =>
+      fetchWithAuth('/api/user/newestTracks', { method: 'GET' }, token),
+
+    getTopTracks: async (token: string) =>
+      fetchWithAuth('/api/user/topTracks', { method: 'GET' }, token),
+
+    getTopArtists: async (token: string) =>
+      fetchWithAuth('/api/user/topArtists', { method: 'GET' }, token),
+
+    getTopAlbums: async (token: string) =>
+      fetchWithAuth('/api/user/topAlbums', { method: 'GET' }, token),
   },
 
   artists: {

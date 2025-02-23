@@ -31,46 +31,94 @@ export default function UserProfilePage({
   const { id } = use(params);
   const [ follow, setFollow ] = useState(false);
   const [ isOwner, setIsOwner ] = useState(false);
-  const token = localStorage.getItem('userToken') || '';
+  const [token, setToken] = useState<string | null>(null);
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
   const { dominantColor } = useDominantColor(userData?.avatar || DEFAULT_AVATAR);
   const [ following, setFollowing ] = useState<ArtistProfile[]>([]);
   const [ user, setUser ] = useState<User | null>(null);
+  const [ topArtists, setTopArtists ] = useState<ArtistProfile[]>([]);
+  const [ topTracks, setTopTracks ] = useState<Track[]>([]);
+  const [artistTracksMap, setArtistTracksMap] = useState<Record<string, Track[]>>({});
+
+  const {
+    currentTrack,
+    isPlaying,
+    volume,
+    progress,
+    loop,
+    shuffle,
+    playTrack,
+    pauseTrack,
+    setVolume,
+    seekTrack,
+    toggleLoop,
+    toggleShuffle,
+    skipNext,
+    skipPrevious,
+    queueType,
+    setQueueType,
+    trackQueue,
+  } = useTrack();
 
   useEffect(() => {
-    if (!token) {
+    const storedToken = localStorage.getItem('userToken');
+    if (!storedToken) {
       router.push('/login');
-    } else {
-      if (userData.id === id) {
-        setIsOwner(true);
-      }
+      return;
     }
-  }, [token]);
+    setToken(storedToken);
 
-  useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const isOwner = userData.id === id;
+    setIsOwner(isOwner);
+
     const fetchUserData = async () => {
       try {
-      const [userResponse, followingResponse] = await Promise.all([
-        api.user.getUserById(id, token),
-        api.user.getFollowing(token),
-      ]);
+        const [userResponse, followingResponse] = await Promise.all([
+          api.user.getUserById(id, storedToken),
+          api.user.getFollowing(storedToken),
+        ]);
 
-      if (userResponse) {
-        setUser(userResponse);
-      }
+        if (userResponse) {
+          setUser(userResponse);
+        }
 
-      if (followingResponse) {
-        setFollowing(followingResponse);
-        const isFollowing = followingResponse.some((user:User) => user.id === id);
-        setFollow(isFollowing);
-      }
+        if (isOwner) {
+          setFollowing(followingResponse);
+        } else {
+          const isFollowing = followingResponse.some((user: User) => user.id === id);
+          setFollow(isFollowing);
+        }
       } catch (error) {
-      console.error('Failed to fetch user data:', error);
+        console.error('Failed to fetch user data:', error);
+      }
+    };
+
+    const fetchTopArtists = async () => {
+      try {
+        const topArtistsResponse = await api.user.getTopArtists(storedToken);
+        setTopArtists(topArtistsResponse);
+      } catch (error) {
+        console.error('Failed to fetch top artists:', error);
+      }
+    };
+
+    const fetchTopTracks = async () => {
+      try {
+        const topTracksResponse = await api.user.getTopTracks(storedToken);
+        setTopTracks(topTracksResponse);
+      } catch (error) {
+        console.error('Failed to fetch top tracks:', error);
       }
     };
 
     fetchUserData();
-  }, [token, userData]);
+
+    if (isOwner) {
+      fetchTopArtists();
+      fetchTopTracks();
+    }
+  }, [id, router]);
 
   const handleFollow = async () => {
     if (!token) {
@@ -92,6 +140,28 @@ export default function UserProfilePage({
       console.error(error);
       toast.error('Failed to follow user!');
     }
+  };
+
+  const getArtistTracks = async (artistId: string) => {
+    try {
+      if (!token) {
+        throw new Error('Token is null');
+      }
+      const data = await api.artists.getTrackByArtistId(artistId, token);
+      return data.tracks.sort((a:any, b:any) => b.playCount - a.playCount);
+    } catch (error) {
+      console.error(error);
+      return [];
+    }
+  };
+
+  // Helper to check if an artist has the current playing track
+  const isArtistPlaying = (artistId: string) => {
+    const artistTracks = artistTracksMap[artistId] || [];
+    return currentTrack && 
+           artistTracks.some(track => track.id === currentTrack.id) && 
+           isPlaying && 
+           queueType === 'artist';
   };
 
   return (
@@ -203,6 +273,213 @@ export default function UserProfilePage({
               </DropdownMenu>
             </div>
           </div>
+
+          {/* Top Artists Section */}
+          {topArtists.length > 0 && (
+            <div className="px-2 md:px-8 mt-8">
+              <h2 className="text-2xl font-bold">Top artists this month</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+                {topArtists.map((topArtist) => (
+                  <div
+                    key={topArtist.id}
+                    className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
+                    onClick={() => router.push(`/artist/profile/${topArtist.id}`)}
+                  >
+                    <div className="relative">
+                      <img
+                        src={topArtist.avatar || '/images/default-avatar.jpg'}
+                        alt={topArtist.artistName}
+                        className="w-full aspect-square object-cover rounded-full mb-4"
+                      />
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            let artistTracks = artistTracksMap[topArtist.id] || [];
+                            
+                            if (!artistTracks.length) {
+                              artistTracks = await getArtistTracks(topArtist.id);
+                              
+                              setArtistTracksMap(prev => ({
+                                ...prev,
+                                [topArtist.id]: artistTracks
+                              }));
+                            }
+                            
+                            if (artistTracks.length > 0) {
+                                if (isArtistPlaying(topArtist.id)) {
+                                pauseTrack();
+                                } else if (currentTrack && queueType === 'artist') {
+                                playTrack(currentTrack);
+                                } else {
+                                playTrack(artistTracks[0]);
+                                setQueueType('artist');
+                                trackQueue(artistTracks);
+                                }
+                            } else {
+                              toast.error("No tracks available for this artist");
+                            }
+                          } catch (error) {
+                            console.error(error);
+                            toast.error("Failed to load artist tracks");
+                          }
+                        }}
+                        className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {isArtistPlaying(topArtist.id) ? (
+                          <Pause className="w-6 h-6 text-white" />
+                        ) : (
+                          <Play className="w-6 h-6 text-white" />
+                        )}
+                      </button>
+                    </div>
+                    <h3 className={`font-medium truncate ${
+                      artistTracksMap[topArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'artist'
+                        ? 'text-[#A57865]'
+                        : 'text-white'
+                      }`}
+                    >
+                      {topArtist.artistName}
+                    </h3>
+                    <p className="text-white/60 text-sm truncate">
+                      {new Intl.NumberFormat('en-US').format(topArtist.monthlyListeners)} monthly listeners
+                    </p>
+                  </div>
+                ))}
+              </div>   
+            </div>
+          )}
+
+          {/* Top Tracks Section */}
+          { topTracks.length > 0 && (
+            <div className="px-2 md:px-8">
+              <h2 className="text-2xl font-bold">Top tracks this month</h2>
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                {topTracks.map((track, index) => (
+                  <div
+                    key={track.id}
+                    className={`grid grid-cols-[32px_48px_4fr_48px_32px] sm:grid-cols-[32px_48px_2fr_2fr_auto] gap-2 md:gap-4 py-2 md:px-2 group cursor-pointer rounded-lg lg:max-w-4xl ${
+                      theme === 'light'
+                        ? 'hover:bg-gray-50'
+                        : 'hover:bg-white/5'
+                    }`}
+                    onClick={() => {
+                      if (currentTrack?.id === track.id && isPlaying && queueType === 'track') {
+                        pauseTrack();
+                      } else {
+                        playTrack(track);
+                        setQueueType('track');
+                        trackQueue(topTracks)
+                      }
+                    }}
+                  >
+                    {/* Track Number or Play/Pause Button */}
+                    <div
+                      className={`flex items-center justify-center ${
+                        theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                      }`}
+                    >
+                      {/* Show play/pause button on hover */}
+                      <div className="hidden group-hover:block cursor-pointer">
+                        {currentTrack?.id === track.id && isPlaying && queueType === 'track'? (
+                          <Pause className="w-5 h-5" /> 
+                        ) : (
+                          <Play className="w-5 h-5" />
+                        )}
+                      </div>
+
+                      {/* Show track number or pause button when not hovering */}
+                      <div className="group-hover:hidden cursor-pointer">
+                        {currentTrack?.id === track.id && isPlaying && queueType === 'track'? (
+                          <Pause className="w-5 h-5" />
+                        ) : (
+                          index + 1
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Track Cover */}
+                    <div className="flex items-center justify-center">
+                      <img
+                        src={track.coverUrl}
+                        alt={track.title}
+                        className="w-12 h-12 rounded-md"
+                      />
+                    </div>
+
+                    {/* Track Title and Play Count */}
+                    <div className="flex flex-col md:flex-row md:justify-between items-center min-w-0 w-full">
+                      {/* Track Title */}
+                      <span
+                        className={`font-medium truncate w-full md:w-auto ${
+                          currentTrack?.id == track.id && queueType === 'track'
+                            ? 'text-[#A57865]'
+                            : 'text-white'
+                        }`}
+                      >
+                        {track.title}
+                      </span>
+
+                      {/* Play Count */}
+                      <div
+                        className={`truncate text-sm md:text-base w-full md:w-auto text-start sm:text-right ${
+                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                        }`}
+                      >
+                        {new Intl.NumberFormat('en-US').format(track.playCount)}
+                      </div>
+                    </div>
+
+
+                    {/* Track Album */}
+                    <div
+                      className={`flex items-center justify-center ${
+                        theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                      }`}
+                    >
+                      
+                    </div>
+
+                    {/* Track Options */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button 
+                          className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="w-5 h-5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem 
+                          className='cursor-pointer'
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <AddSimple className="w-4 h-4 mr-2" />
+                            Add to playlist
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className='cursor-pointer'
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Heart className="w-4 h-4 mr-2" />
+                            Add to favorites
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className='cursor-pointer'
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Share2 className="w-4 h-4 mr-2" />
+                            Share
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))}
+              </div> 
+            </div>
+          )}
         </div>
       )}
     </div>
