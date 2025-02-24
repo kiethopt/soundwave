@@ -10,6 +10,11 @@ import {
 } from '../utils/prisma-selects';
 import pusher from '../config/pusher';
 
+const getMonthStartDate = (): Date => {
+  const date = new Date();
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+};
+
 // Hàm validation cho dữ liệu nghệ sĩ
 const validateArtistData = (data: any): string | null => {
   const { artistName, bio, socialMediaLinks, genres } = data;
@@ -729,6 +734,17 @@ export const getFollowing = async (
             id: true,
             artistName: true,
             avatar: true,
+            monthlyListeners: true,
+            genres: {
+              select: {
+                genre: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
             user: {
               select: {
                 id: true,
@@ -996,14 +1012,28 @@ export const getRecommendedArtists = async (
   }
 }
 
-// Lấy albums có nhiều lượt nghe nhất chứa track có nhiều người nghe nhất
 export const getTopAlbums = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
+    const monthStart = getMonthStartDate();
+    
     const albums = await prisma.album.findMany({
-      where: { isActive: true },
+      where: { 
+        isActive: true,
+        tracks: {
+          some: {
+            isActive: true,
+            history: {
+              some: {
+                type: 'PLAY',
+                createdAt: { gte: monthStart }
+              }
+            }
+          }
+        }
+      },
       select: {
         id: true,
         title: true,
@@ -1013,6 +1043,7 @@ export const getTopAlbums = async (
           select: {
             id: true,
             artistName: true,
+            avatar: true
           }
         },
         tracks: {
@@ -1024,28 +1055,79 @@ export const getTopAlbums = async (
             duration: true,
             audioUrl: true,
             playCount: true,
+            history: {
+              where: {
+                type: 'PLAY',
+                createdAt: { gte: monthStart }
+              },
+              select: {
+                playCount: true
+              }
+            }
           },
-          orderBy: { trackNumber: 'asc' },
+          orderBy: { trackNumber: 'asc' }
         },
+        _count: {
+          select: {
+            tracks: {
+              where: {
+                isActive: true,
+                history: {
+                  some: {
+                    type: 'PLAY',
+                    createdAt: { gte: monthStart }
+                  }
+                }
+              }
+            }
+          }
+        }
       },
-      take: 20,
+      orderBy: {
+        tracks: {
+          _count: 'desc'
+        }
+      },
+      take: 20
     });
 
-    res.json(albums);
+    // Calculate monthly plays for each album
+    const albumsWithMonthlyPlays = albums.map(album => ({
+      ...album,
+      monthlyPlays: album.tracks.reduce((sum, track) => 
+        sum + track.history.reduce((plays, h) => plays + (h.playCount || 0), 0), 0
+      )
+    }));
+
+    res.json(albumsWithMonthlyPlays);
   } catch (error) {
     console.error('Get top albums error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};
 
-// Lấy danh sách nghệ sĩ có nhiều lượt nghe nhất
 export const getTopArtists = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
+    const monthStart = getMonthStartDate();
+
     const artists = await prisma.artistProfile.findMany({
-      where: { isVerified: true },
+      where: { 
+        isVerified: true,
+        tracks: {
+          some: {
+            isActive: true,
+            history: {
+              some: {
+                type: 'PLAY',
+                createdAt: { gte: monthStart }
+              }
+            }
+          }
+        }
+      },
       select: {
         id: true,
         artistName: true,
@@ -1056,42 +1138,136 @@ export const getTopArtists = async (
             genre: {
               select: {
                 id: true,
-                name: true,
-              },
-            },
-          },
+                name: true
+              }
+            }
+          }
         },
-      },
-      orderBy: { monthlyListeners: 'desc' },
-      take: 20,
+        tracks: {
+          where: { isActive: true },
+          select: {
+            history: {
+              where: {
+                type: 'PLAY',
+                createdAt: { gte: monthStart }
+              },
+              select: {
+                userId: true,
+                playCount: true
+              }
+            }
+          }
+        }
+      }
     });
 
-    res.json(artists);
+    // Calculate actual monthly listeners (unique users) and plays
+    const artistsWithMonthlyMetrics = artists.map(artist => {
+      const uniqueListeners = new Set();
+      let monthlyPlays = 0;
+
+      artist.tracks.forEach(track => {
+        track.history.forEach(h => {
+          uniqueListeners.add(h.userId);
+          monthlyPlays += h.playCount || 0;
+        });
+      });
+
+      return {
+        ...artist,
+        monthlyListeners: uniqueListeners.size,
+        monthlyPlays
+      };
+    });
+
+    // Sort by monthly listeners and take top 20
+    const topArtists = artistsWithMonthlyMetrics
+      .sort((a, b) => b.monthlyListeners - a.monthlyListeners)
+      .slice(0, 20);
+
+    res.json(topArtists);
   } catch (error) {
     console.error('Get top artists error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};
 
-// Lấy danh sách track có nhiều lượt nghe nhất
 export const getTopTracks = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
+    const monthStart = getMonthStartDate();
+
     const tracks = await prisma.track.findMany({
-      where: { isActive: true },
-      select: searchTrackSelect,
-      orderBy: { playCount: 'desc' },
-      take: 20,
+      where: {
+        isActive: true,
+        history: {
+          some: {
+            type: 'PLAY',
+            createdAt: { gte: monthStart }
+          }
+        }
+      },
+      select: {
+        id: true,
+        title: true,
+        coverUrl: true,
+        duration: true,
+        audioUrl: true,
+        playCount: true,
+        artist: {
+          select: {
+            id: true,
+            artistName: true,
+            avatar: true
+          }
+        },
+        album: {
+          select: {
+            id: true,
+            title: true,
+            coverUrl: true
+          }
+        },
+        featuredArtists: {
+          select: {
+            artistProfile: {
+              select: {
+                id: true,
+                artistName: true
+              }
+            }
+          }
+        },
+        history: {
+          where: {
+            type: 'PLAY',
+            createdAt: { gte: monthStart }
+          },
+          select: {
+            playCount: true
+          }
+        }
+      },
+      orderBy: {
+        playCount: 'desc'
+      },
+      take: 20
     });
 
-    res.json(tracks);
+    // Calculate monthly plays for each track
+    const tracksWithMonthlyPlays = tracks.map(track => ({
+      ...track,
+      monthlyPlays: track.history.reduce((sum, h) => sum + (h.playCount || 0), 0)
+    }));
+
+    res.json(tracksWithMonthlyPlays);
   } catch (error) {
     console.error('Get top tracks error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};
 
 // Lấy danh sách track mới nhất
 export const getNewestTracks = async (

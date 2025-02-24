@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import HorizontalTrackListItem from '@/components/track/HorizontalTrackListItem';
 
 const DEFAULT_AVATAR = '/images/default-avatar.jpg';
 
@@ -31,46 +32,98 @@ export default function UserProfilePage({
   const { id } = use(params);
   const [ follow, setFollow ] = useState(false);
   const [ isOwner, setIsOwner ] = useState(false);
-  const token = localStorage.getItem('userToken') || '';
+  const [token, setToken] = useState<string | null>(null);
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
   const { dominantColor } = useDominantColor(userData?.avatar || DEFAULT_AVATAR);
   const [ following, setFollowing ] = useState<ArtistProfile[]>([]);
+  const [ followingArtists, setFollowingArtists ] = useState<ArtistProfile[]>([]);
   const [ user, setUser ] = useState<User | null>(null);
+  const [ topArtists, setTopArtists ] = useState<ArtistProfile[]>([]);
+  const [ topTracks, setTopTracks ] = useState<Track[]>([]);
+  const [artistTracksMap, setArtistTracksMap] = useState<Record<string, Track[]>>({});
+
+  const {
+    currentTrack,
+    isPlaying,
+    volume,
+    progress,
+    loop,
+    shuffle,
+    playTrack,
+    pauseTrack,
+    setVolume,
+    seekTrack,
+    toggleLoop,
+    toggleShuffle,
+    skipNext,
+    skipPrevious,
+    queueType,
+    setQueueType,
+    trackQueue,
+  } = useTrack();
 
   useEffect(() => {
-    if (!token) {
+    const storedToken = localStorage.getItem('userToken');
+    if (!storedToken) {
       router.push('/login');
-    } else {
-      if (userData.id === id) {
-        setIsOwner(true);
-      }
+      return;
     }
-  }, [token]);
+    setToken(storedToken);
 
-  useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const isOwner = userData.id === id;
+    setIsOwner(isOwner);
+
     const fetchUserData = async () => {
       try {
-      const [userResponse, followingResponse] = await Promise.all([
-        api.user.getUserById(id, token),
-        api.user.getFollowing(token),
-      ]);
+        const [userResponse, followingResponse] = await Promise.all([
+          api.user.getUserById(id, storedToken),
+          api.user.getFollowing(storedToken),
+        ]);
 
-      if (userResponse) {
-        setUser(userResponse);
-      }
+        if (userResponse) {
+          setUser(userResponse);
+        }
 
-      if (followingResponse) {
-        setFollowing(followingResponse);
-        const isFollowing = followingResponse.some((user:User) => user.id === id);
-        setFollow(isFollowing);
-      }
+        if (isOwner) {
+          setFollowing(followingResponse);
+          const followingArtists = followingResponse.filter((followingUser:any) => followingUser.type === 'ARTIST');
+          setFollowingArtists(followingArtists);
+        } else {
+          const isFollowing = followingResponse.some((user: User) => user.id === id);
+          setFollow(isFollowing);
+          
+        }
       } catch (error) {
-      console.error('Failed to fetch user data:', error);
+        console.error('Failed to fetch user data:', error);
+      }
+    };
+
+    const fetchTopArtists = async () => {
+      try {
+        const topArtistsResponse = await api.user.getTopArtists(storedToken);
+        setTopArtists(topArtistsResponse);
+      } catch (error) {
+        console.error('Failed to fetch top artists:', error);
+      }
+    };
+
+    const fetchTopTracks = async () => {
+      try {
+        const topTracksResponse = await api.user.getTopTracks(storedToken);
+        setTopTracks(topTracksResponse);
+      } catch (error) {
+        console.error('Failed to fetch top tracks:', error);
       }
     };
 
     fetchUserData();
-  }, [token, userData]);
+
+    if (isOwner) {
+      fetchTopArtists();
+      fetchTopTracks();
+    }
+  }, [id, router]);
 
   const handleFollow = async () => {
     if (!token) {
@@ -94,6 +147,74 @@ export default function UserProfilePage({
     }
   };
 
+  const handleTopTrackPlay = (track: Track) => {
+    if (currentTrack?.id === track.id && isPlaying && queueType === 'track') {
+      pauseTrack();
+    } else {
+      playTrack(track);
+      setQueueType('track');
+      trackQueue(topTracks);
+    }
+  };
+
+  const handleArtistPlay = async (artist: ArtistProfile, queueTypeValue: 'topArtist' | 'followingArtist', e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      let artistTracks = artistTracksMap[artist.id] || [];
+      
+      if (!artistTracks.length) {
+        artistTracks = await getArtistTracks(artist.id);
+        
+        setArtistTracksMap(prev => ({
+          ...prev,
+          [artist.id]: artistTracks
+        }));
+      }
+      
+      if (artistTracks.length > 0) {
+        const isCurrentArtistPlaying = 
+          isPlaying && 
+          currentTrack && 
+          artistTracks.some(track => track.id === currentTrack.id) &&
+          queueType === queueTypeValue;
+
+        if (isCurrentArtistPlaying) {
+          pauseTrack();
+        } else {
+          playTrack(artistTracks[0]);
+          setQueueType(queueTypeValue);
+          trackQueue(artistTracks);
+        }
+      } else {
+        toast.error("No tracks available for this artist");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load artist tracks");
+    }
+  };
+
+  const getArtistTracks = async (artistId: string) => {
+    try {
+      if (!token) {
+        throw new Error('Token is null');
+      }
+      const data = await api.artists.getTrackByArtistId(artistId, token);
+      return data.tracks.sort((a:any, b:any) => b.playCount - a.playCount);
+    } catch (error) {
+      console.error(error);
+      return [];
+    }
+  };
+
+  const isArtistPlaying = (artistId: string, queueTypeValue: 'topArtist' | 'followingArtist') => {
+    const artistTracks = artistTracksMap[artistId] || [];
+    return currentTrack && 
+           artistTracks.some(track => track.id === currentTrack.id) && 
+           isPlaying && 
+           queueType === queueTypeValue;
+  };
+  
   return (
     <div
       className="min-h-screen w-full rounded-lg"
@@ -203,6 +324,127 @@ export default function UserProfilePage({
               </DropdownMenu>
             </div>
           </div>
+
+          {/* Top Artists Section */}
+          {topArtists.length > 0 && (
+            <div className="px-2 md:px-8">
+              <h2 className="text-2xl font-bold">Top artists this month</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+                {topArtists.map((topArtist) => (
+                  <div
+                    key={topArtist.id}
+                    className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
+                    onClick={() => router.push(`/artist/profile/${topArtist.id}`)}
+                  >
+                    <div className="relative">
+                      <img
+                        src={topArtist.avatar || '/images/default-avatar.jpg'}
+                        alt={topArtist.artistName}
+                        className="w-full aspect-square object-cover rounded-full mb-4"
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleArtistPlay(topArtist, 'topArtist', e);
+                        }}
+                        className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {isArtistPlaying(topArtist.id, 'topArtist') ? (
+                          <Pause className="w-6 h-6 text-white" />
+                        ) : (
+                          <Play className="w-6 h-6 text-white" />
+                        )}
+                      </button>
+                    </div>
+                    <h3 className={`font-medium truncate ${
+                      artistTracksMap[topArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'topArtist'
+                        ? 'text-[#A57865]'
+                        : 'text-white'
+                      }`}
+                    >
+                      {topArtist.artistName}
+                    </h3>
+                    <p className="text-white/60 text-sm truncate">
+                      {new Intl.NumberFormat('en-US').format(topArtist.monthlyListeners)} monthly listeners
+                    </p>
+                  </div>
+                ))}
+              </div>   
+            </div>
+          )}
+
+          {/* Top Tracks Section */}
+          { topTracks.length > 0 && (
+            <div className="px-2 md:px-8 mt-8">
+              <h2 className="text-2xl font-bold">Top tracks this month</h2>
+              <div className="grid grid-cols-1 gap-4 mt-4">
+                {topTracks.map((track, index) => (
+                  <HorizontalTrackListItem
+                    key={track.id}
+                    track={track}
+                    index={index}
+                    currentTrack={currentTrack}
+                    isPlaying={isPlaying}
+                    playCount={false}
+                    albumTitle={true}
+                    queueType={queueType}
+                    theme={theme}
+                    onTrackClick={() => {
+                      handleTopTrackPlay(track);
+                    }}
+                />
+                ))}
+              </div> 
+            </div>
+          )}
+
+          {/* Following Artists Section */}
+          {following.length > 0 && (
+            <div className="px-2 md:px-8 mt-8">
+              <h2 className="text-2xl font-bold">Following artists</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+                {followingArtists.map((followArtist) => (
+                  <div
+                    key={followArtist.id}
+                    className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
+                    onClick={() => router.push(`/artist/profile/${followArtist.id}`)}
+                  >
+                    <div className="relative">
+                      <img
+                        src={followArtist.avatar || '/images/default-avatar.jpg'}
+                        alt={followArtist.artistName}
+                        className="w-full aspect-square object-cover rounded-full mb-4"
+                      />
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          handleArtistPlay(followArtist, 'followingArtist', e)
+                        }}
+                        className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {isArtistPlaying(followArtist.id, 'followingArtist') ? (
+                          <Pause className="w-6 h-6 text-white" />
+                        ) : (
+                          <Play className="w-6 h-6 text-white" />
+                        )}
+                      </button>
+                    </div>
+                    <h3 className={`font-medium truncate ${
+                      artistTracksMap[followArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'followingArtist'
+                        ? 'text-[#A57865]'
+                        : 'text-white'
+                      }`}
+                    >
+                      {followArtist.artistName}
+                    </h3>
+                    <p className="text-white/60 text-sm truncate">
+                      {new Intl.NumberFormat('en-US').format(followArtist.monthlyListeners)} monthly listeners
+                    </p>
+                  </div>
+                ))}
+              </div>   
+            </div>
+          )}
         </div>
       )}
     </div>

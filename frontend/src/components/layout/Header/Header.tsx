@@ -535,6 +535,18 @@ export default function Header({
                     Account
                   </Link>
 
+                  <Link
+                    href={`/profile/${userData?.id}`}
+                    className={`block px-4 py-2 text-sm ${
+                      theme === 'light'
+                        ? 'text-gray-700 hover:bg-gray-200'
+                        : 'text-white hover:bg-white/10'
+                    }`}
+                    onClick={() => setShowDropdown(false)}
+                  >
+                    Profile
+                  </Link>
+
                   {userData?.artistProfile?.isVerified && (
                     <button
                       onClick={handleSwitchProfile}

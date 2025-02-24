@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent } from 'react';
+import { ChangeEvent, FormEvent } from "react";
 
 // Form Data Types
 export interface FormData {
@@ -59,8 +59,8 @@ export interface User {
   password?: string;
   name?: string;
   avatar?: string;
-  role: 'USER' | 'ADMIN'; // Chỉ có USER và ADMIN
-  currentProfile: 'USER' | 'ARTIST';
+  role: "USER" | "ADMIN"; // Chỉ có USER và ADMIN
+  currentProfile: "USER" | "ARTIST";
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -81,7 +81,7 @@ export interface ArtistProfile {
   artistName: string;
   bio?: string;
   avatar?: string;
-  role: 'ARTIST';
+  role: "ARTIST";
   socialMediaLinks?: {
     facebook?: string;
     instagram?: string;
@@ -123,7 +123,7 @@ export interface UserFollow {
   followerId: string;
   followingUserId?: string; // ID của User được follow (nếu followingType là USER)
   followingArtistId?: string; // ID của ArtistProfile được follow (nếu followingType là ARTIST)
-  followingType: 'USER' | 'ARTIST';
+  followingType: "USER" | "ARTIST";
   createdAt: string;
   follower: User;
   followingUser?: User; // User được follow (nếu followingType là USER)
@@ -165,7 +165,7 @@ export interface Album {
   releaseDate: string;
   duration: number;
   totalTracks: number;
-  type: 'ALBUM' | 'EP' | 'SINGLE';
+  type: "ALBUM" | "EP" | "SINGLE";
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -193,7 +193,7 @@ export interface Track {
   coverUrl?: string;
   audioUrl: string;
   playCount: number;
-  type: 'ALBUM' | 'EP' | 'SINGLE';
+  type: "ALBUM" | "EP" | "SINGLE";
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -203,7 +203,7 @@ export interface Track {
     id: string;
     title: string;
     coverUrl?: string;
-    type: 'ALBUM' | 'EP' | 'SINGLE';
+    type: "ALBUM" | "EP" | "SINGLE";
   };
   artist: {
     id: string;
@@ -233,7 +233,7 @@ export interface Genre {
 
 export interface History {
   id: string;
-  type: 'SEARCH' | 'PLAY';
+  type: "SEARCH" | "PLAY";
   query?: string;
   duration?: number;
   completed?: boolean;
@@ -250,25 +250,24 @@ export interface Playlist {
   id: string;
   name: string;
   description?: string;
-  coverUrl?: string;
-  privacy: 'PUBLIC' | 'PRIVATE';
-  type: 'FAVORITE' | 'NORMAL';
+  privacy: "PUBLIC" | "PRIVATE";
+  type: string;
   isAIGenerated: boolean;
   totalTracks: number;
   totalDuration: number;
+  coverUrl?: string;
+  userId: string;
   createdAt: string;
   updatedAt: string;
-  user: User;
-  userId: string;
-  tracks?: Track[];
+  tracks: Track[];
 }
 
 export interface Notification {
   id: string;
-  type: 'NEW_TRACK' | 'NEW_ALBUM' | 'EVENT_REMINDER' | 'NEW_FOLLOW';
+  type: "NEW_TRACK" | "NEW_ALBUM" | "EVENT_REMINDER" | "NEW_FOLLOW";
   message: string;
   isRead: boolean;
-  recipientType: 'USER' | 'ARTIST'; // Loại người nhận (USER hoặc ARTIST)
+  recipientType: "USER" | "ARTIST"; // Loại người nhận (USER hoặc ARTIST)
   recipientId: string; // ID của người nhận (User hoặc ArtistProfile)
   senderId?: string; // ID của người gửi thông báo (nếu có)
   count?: number; // Số lượng hành động trong thông báo nhóm
@@ -316,4 +315,25 @@ export interface TrackEditForm {
   releaseDate: string;
   trackNumber: number;
   featuredArtists: string[];
+}
+
+export interface CreatePlaylistData {
+  name: string;
+  description?: string;
+  privacy?: "PUBLIC" | "PRIVATE";
+  type?: "FAVORITE" | "NORMAL";
+}
+
+// Thêm interface cho API responses
+export interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
+export interface PlaylistResponse {
+  id: string;
+  name: string;
+  description?: string;
+  tracks: Track[];
 }
