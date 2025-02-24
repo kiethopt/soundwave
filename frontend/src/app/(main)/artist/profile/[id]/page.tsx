@@ -19,6 +19,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import HorizontalTrackListItem from '@/components/track/HorizontalTrackListItem';
+import { EditArtistProfileModal } from '@/components/artist/EditArtistProfileModal';
+import { get } from 'lodash';
 
 export default function ArtistProfilePage({
   params,
@@ -39,6 +41,7 @@ export default function ArtistProfilePage({
   const [isOwner, setIsOwner] = useState(false); 
   const { dominantColor } = useDominantColor(artist?.avatar || '');
   const [showAllTracks, setShowAllTracks] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const {
     currentTrack,
@@ -67,10 +70,13 @@ export default function ArtistProfilePage({
   useEffect(() => {
     if (!token) {
       router.push('/login');
-    } else {
-      getArtistData(token);
     }
   }, [id, token]);
+
+  useEffect(() => {
+    getArtistData(token);
+  })
+
 
   useEffect(() => {
     const fetchFollowing = async () => {
@@ -301,9 +307,12 @@ export default function ArtistProfilePage({
                   <DropdownMenuContent align="start" className="w-56">
                     <DropdownMenuItem 
                       className='cursor-pointer'
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsEditOpen(true);
+                      }}
                     >
-                      <Edit className="w-4 h-4 mr-2" />
+                      <Edit className="w-4 h-4 mr-2"/>
                         Edit Profile
                     </DropdownMenuItem>
                     <DropdownMenuItem 
@@ -320,41 +329,63 @@ export default function ArtistProfilePage({
           </div>
 
           {/* Track Section */}
-          { tracks.length > 0 && (
-            <div className="px-2 md:px-8 max-w-5xl">
-              <h2 className="text-2xl font-bold">Popular Tracks</h2>
-              <div className="grid grid-cols-1 gap-4 mt-4">
-                {displayedTracks.map((track, index) => (
-                  <HorizontalTrackListItem
-                    key={track.id}
-                    track={track}
-                    index={index}
-                    currentTrack={currentTrack}
-                    isPlaying={isPlaying}
-                    playCount={true}
-                    albumTitle={false}
-                    queueType={queueType}
-                    theme={theme}
-                    onTrackClick={() => {
-                      handleTopTrackPlay(track);
+          <div  className="px-2 md:px-8 flex flex-col-reverse md:flex-row gap-4 lg:gap-12">
+            { tracks.length > 0 && (
+              <div className='flex-grow mt-8 md:mt-0'>
+                <h2 className="text-2xl font-bold">Popular Tracks</h2>
+                <div className="grid grid-cols-1 gap-4 mt-4">
+                  {displayedTracks.map((track, index) => (
+                    <HorizontalTrackListItem
+                      key={track.id}
+                      track={track}
+                      index={index}
+                      currentTrack={currentTrack}
+                      isPlaying={isPlaying}
+                      playCount={true}
+                      albumTitle={false}
+                      queueType={queueType}
+                      theme={theme}
+                      onTrackClick={() => {
+                        handleTopTrackPlay(track);
+                      }}
+                    />
+                  ))}
+                </div> 
+
+                {/* "See More" Button */}
+                {tracks.length > 5 && (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setShowAllTracks(!showAllTracks)}
+                      className="text-[#A57865] hover:underline"
+                    >
+                      {showAllTracks ? 'See Less' : 'See More'}
+                    </button>
+                  </div>
+                )} 
+              </div>
+            )}
+
+            {/* About Section */}
+            <div className='flex-grow mt-8 md:mt-0'>
+              <div className='flex items-center gap-4'>
+                <h2 className="text-2xl font-bold">About</h2>
+                {isOwner && (
+                  <Edit 
+                    className='w-5 h-5 text-white opacity-60 hover:opacity-100 cursor-pointer' 
+                    // show edit modal
+                    onClick={() => {
+                      setIsEditOpen(true);
                     }}
                   />
-                ))}
-              </div> 
-
-               {/* "See More" Button */}
-              {tracks.length > 5 && (
-                <div className="mt-4">
-                  <button
-                    onClick={() => setShowAllTracks(!showAllTracks)}
-                    className="text-[#A57865] hover:underline"
-                  >
-                    {showAllTracks ? 'See Less' : 'See More'}
-                  </button>
-                </div>
-              )} 
+                )}
+              </div>
+              <p className="text-white/60 mt-2">
+                {artist.bio || 'No biography available'}
+              </p>
             </div>
-          )}
+          </div>
+          
 
           {/* Album Section */}
           {albums.length > 0 && (
@@ -460,6 +491,12 @@ export default function ArtistProfilePage({
               </div>   
             </div>
           )}
+
+          <EditArtistProfileModal 
+            artistProfile={artist}
+            open={isEditOpen}
+            onOpenChange={setIsEditOpen}
+          />
         </div>
       )}
     </div>

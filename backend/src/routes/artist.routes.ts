@@ -28,7 +28,6 @@ router.get('/profile/:id', authenticate, getArtistProfile);
 router.put(
   '/profile/:id',
   authenticate,
-  authorize([Role.ADMIN, Role.ARTIST]),
   upload.single('avatar'),
   updateArtistProfile
 );

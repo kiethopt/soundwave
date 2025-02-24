@@ -86,7 +86,7 @@ export function EditPlaylistDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader>
+        <DialogHeader className="text-white">
           <DialogTitle>Chỉnh sửa playlist</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -96,6 +96,7 @@ export function EditPlaylistDialog({
               placeholder="Tên playlist"
               value={formData.name}
               onChange={handleInputChange}
+              className="text-white"
               required
             />
           </div>
@@ -105,6 +106,7 @@ export function EditPlaylistDialog({
               placeholder="Mô tả (tùy chọn)"
               value={formData.description}
               onChange={handleInputChange}
+              className="text-white"
               rows={3}
             />
           </div>
@@ -113,10 +115,10 @@ export function EditPlaylistDialog({
               value={formData.privacy}
               onValueChange={handlePrivacyChange}
             >
-              <SelectTrigger>
+              <SelectTrigger className="text-white">
                 <SelectValue placeholder="Chọn quyền riêng tư" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-white bg-[#121212]">
                 <SelectItem value="PRIVATE">Riêng tư</SelectItem>
                 <SelectItem value="PUBLIC">Công khai</SelectItem>
               </SelectContent>

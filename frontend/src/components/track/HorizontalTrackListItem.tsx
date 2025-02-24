@@ -79,7 +79,7 @@ const HorizontalTrackListItem: React.FC<TrackListItemProps> = ({
       </div>
 
       {/* Track Title and Play Count */}
-      <div className="flex flex-col md:flex-row md:justify-between items-center min-w-0 w-full">
+      <div className="flex flex-col md:flex-row justify-center md:justify-between items-center min-w-0 w-full">
         {/* Track Title */}
         <span
           className={`font-medium truncate w-full md:w-auto ${
@@ -94,7 +94,7 @@ const HorizontalTrackListItem: React.FC<TrackListItemProps> = ({
         {/* Play Count */}
         {playCount && (
           <div
-            className={`truncate text-sm md:text-base w-full md:w-auto text-center justify-center ${
+            className={`truncate text-sm md:text-base w-full md:w-auto text-start md:text-center justify-center ${
               theme === 'light' ? 'text-gray-500' : 'text-white/60'
             }`}
           >
