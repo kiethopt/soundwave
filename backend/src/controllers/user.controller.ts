@@ -484,11 +484,14 @@ export const followUser = async (
         where: { id: user.id },
         select: { username: true, email: true },
       });
-      const followerName = currentUser?.username || currentUser?.email || 'Unknown';
+      const followerName =
+        currentUser?.username || currentUser?.email || 'Unknown';
 
       // 3) Tạo NOTIFICATION cho người được theo dõi
       if (followingType === 'ARTIST') {
-        console.log('=== DEBUG: followUser => about to create notification for ARTIST');
+        console.log(
+          '=== DEBUG: followUser => about to create notification for ARTIST'
+        );
         const notification = await tx.notification.create({
           data: {
             type: 'NEW_FOLLOW',
@@ -513,7 +516,9 @@ export const followUser = async (
         });
       } else {
         // follow user => Tạo noti cho user bị follow
-        console.log('=== DEBUG: followUser => about to create notification for USER->USER follow');
+        console.log(
+          '=== DEBUG: followUser => about to create notification for USER->USER follow'
+        );
         const notification = await tx.notification.create({
           data: {
             type: 'NEW_FOLLOW',
@@ -523,7 +528,9 @@ export const followUser = async (
             senderId: user.id,
           },
         });
-        console.log('=== DEBUG: followUser => notification for followed USER created!');
+        console.log(
+          '=== DEBUG: followUser => notification for followed USER created!'
+        );
 
         // Phát sự kiện realtime qua Pusher cho user được follow
         await pusher.trigger(`user-${followingId}`, 'notification', {
@@ -533,7 +540,6 @@ export const followUser = async (
         });
       }
     });
-
 
     // 4) Tạo NOTIFICATION cho CHÍNH user (follower)
     //    để user thấy mình vừa follow ai
@@ -551,14 +557,12 @@ export const followUser = async (
     // });
     // console.log('=== DEBUG: followUser => notification for the follower created!');
 
-
     res.json({ message: 'Followed successfully' });
   } catch (error) {
     console.error('Follow error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
 
 // Hủy theo dõi người dùng
 export const unfollowUser = async (
@@ -638,15 +642,28 @@ export const getFollowers = async (
       return;
     }
 
+    const cacheKey = `/api/users/${user.id}/followers${
+      type ? `?type=${type}` : ''
+    }`;
+
+    // Kiểm tra cache
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+    }
+
     // Xây dựng điều kiện where
     const whereConditions: any = {
       OR: [
         {
-          followingUserId: user.id, // User
+          followingUserId: user.id,
           followingType: FollowingType.USER,
         },
         {
-          followingArtistId: user?.artistProfile?.id, // Artist
+          followingArtistId: user?.artistProfile?.id,
           followingType: FollowingType.ARTIST,
         },
       ],
@@ -681,11 +698,15 @@ export const getFollowers = async (
       },
     });
 
-    // Format kết quả
     const result = followers.map((f) => ({
       ...f.follower,
       followingType: f.followingType,
     }));
+
+    // Cache kết quả
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      await setCache(cacheKey, result, 300); // Cache trong 5 phút
+    }
 
     res.json(result);
   } catch (error) {
@@ -705,6 +726,17 @@ export const getFollowing = async (
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
+    }
+
+    const cacheKey = `/api/users/${user.id}/following`;
+
+    // Kiểm tra cache
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        res.json(JSON.parse(cachedData));
+        return;
+      }
     }
 
     const following = await prisma.userFollow.findMany({
@@ -770,6 +802,11 @@ export const getFollowing = async (
         user: follow.followingArtist?.user,
       };
     });
+
+    // Cache kết quả
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      await setCache(cacheKey, formattedResults, 300); // Cache trong 5 phút
+    }
 
     res.json(formattedResults);
   } catch (error) {
@@ -887,11 +924,12 @@ export const checkArtistRequest = async (
     console.error('Check artist request error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-
 };
 
-
-export const getUserProfile = async (req: Request, res: Response): Promise<void> => {
+export const getUserProfile = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { id } = req.params;
     const user = await prisma.user.findUnique({
@@ -908,17 +946,16 @@ export const getUserProfile = async (req: Request, res: Response): Promise<void>
     });
 
     if (!user) {
-      res.status(404).json({ message: "User not found" });
+      res.status(404).json({ message: 'User not found' });
       return;
     }
 
     res.json(user);
   } catch (error) {
-    console.error("Get user profile error:", error);
-    res.status(500).json({ message: "Internal server error" });
+    console.error('Get user profile error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
-
 
 // Lấy danh sách nghệ sĩ được đề xuất theo genre trong lịch sử nghe nhạc
 export const getRecommendedArtists = async (
@@ -1010,7 +1047,7 @@ export const getRecommendedArtists = async (
     console.error('Get recommended artists error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};
 
 export const getTopAlbums = async (
   req: Request,
@@ -1018,9 +1055,9 @@ export const getTopAlbums = async (
 ): Promise<void> => {
   try {
     const monthStart = getMonthStartDate();
-    
+
     const albums = await prisma.album.findMany({
-      where: { 
+      where: {
         isActive: true,
         tracks: {
           some: {
@@ -1028,11 +1065,11 @@ export const getTopAlbums = async (
             history: {
               some: {
                 type: 'PLAY',
-                createdAt: { gte: monthStart }
-              }
-            }
-          }
-        }
+                createdAt: { gte: monthStart },
+              },
+            },
+          },
+        },
       },
       select: {
         id: true,
@@ -1043,8 +1080,8 @@ export const getTopAlbums = async (
           select: {
             id: true,
             artistName: true,
-            avatar: true
-          }
+            avatar: true,
+          },
         },
         tracks: {
           where: { isActive: true },
@@ -1058,14 +1095,14 @@ export const getTopAlbums = async (
             history: {
               where: {
                 type: 'PLAY',
-                createdAt: { gte: monthStart }
+                createdAt: { gte: monthStart },
               },
               select: {
-                playCount: true
-              }
-            }
+                playCount: true,
+              },
+            },
           },
-          orderBy: { trackNumber: 'asc' }
+          orderBy: { trackNumber: 'asc' },
         },
         _count: {
           select: {
@@ -1075,28 +1112,31 @@ export const getTopAlbums = async (
                 history: {
                   some: {
                     type: 'PLAY',
-                    createdAt: { gte: monthStart }
-                  }
-                }
-              }
-            }
-          }
-        }
+                    createdAt: { gte: monthStart },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       orderBy: {
         tracks: {
-          _count: 'desc'
-        }
+          _count: 'desc',
+        },
       },
-      take: 20
+      take: 20,
     });
 
     // Calculate monthly plays for each album
-    const albumsWithMonthlyPlays = albums.map(album => ({
+    const albumsWithMonthlyPlays = albums.map((album) => ({
       ...album,
-      monthlyPlays: album.tracks.reduce((sum, track) => 
-        sum + track.history.reduce((plays, h) => plays + (h.playCount || 0), 0), 0
-      )
+      monthlyPlays: album.tracks.reduce(
+        (sum, track) =>
+          sum +
+          track.history.reduce((plays, h) => plays + (h.playCount || 0), 0),
+        0
+      ),
     }));
 
     res.json(albumsWithMonthlyPlays);
@@ -1114,7 +1154,7 @@ export const getTopArtists = async (
     const monthStart = getMonthStartDate();
 
     const artists = await prisma.artistProfile.findMany({
-      where: { 
+      where: {
         isVerified: true,
         tracks: {
           some: {
@@ -1122,11 +1162,11 @@ export const getTopArtists = async (
             history: {
               some: {
                 type: 'PLAY',
-                createdAt: { gte: monthStart }
-              }
-            }
-          }
-        }
+                createdAt: { gte: monthStart },
+              },
+            },
+          },
+        },
       },
       select: {
         id: true,
@@ -1138,10 +1178,10 @@ export const getTopArtists = async (
             genre: {
               select: {
                 id: true,
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
         tracks: {
           where: { isActive: true },
@@ -1149,25 +1189,25 @@ export const getTopArtists = async (
             history: {
               where: {
                 type: 'PLAY',
-                createdAt: { gte: monthStart }
+                createdAt: { gte: monthStart },
               },
               select: {
                 userId: true,
-                playCount: true
-              }
-            }
-          }
-        }
-      }
+                playCount: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     // Calculate actual monthly listeners (unique users) and plays
-    const artistsWithMonthlyMetrics = artists.map(artist => {
+    const artistsWithMonthlyMetrics = artists.map((artist) => {
       const uniqueListeners = new Set();
       let monthlyPlays = 0;
 
-      artist.tracks.forEach(track => {
-        track.history.forEach(h => {
+      artist.tracks.forEach((track) => {
+        track.history.forEach((h) => {
           uniqueListeners.add(h.userId);
           monthlyPlays += h.playCount || 0;
         });
@@ -1176,7 +1216,7 @@ export const getTopArtists = async (
       return {
         ...artist,
         monthlyListeners: uniqueListeners.size,
-        monthlyPlays
+        monthlyPlays,
       };
     });
 
@@ -1205,9 +1245,9 @@ export const getTopTracks = async (
         history: {
           some: {
             type: 'PLAY',
-            createdAt: { gte: monthStart }
-          }
-        }
+            createdAt: { gte: monthStart },
+          },
+        },
       },
       select: {
         id: true,
@@ -1220,46 +1260,49 @@ export const getTopTracks = async (
           select: {
             id: true,
             artistName: true,
-            avatar: true
-          }
+            avatar: true,
+          },
         },
         album: {
           select: {
             id: true,
             title: true,
-            coverUrl: true
-          }
+            coverUrl: true,
+          },
         },
         featuredArtists: {
           select: {
             artistProfile: {
               select: {
                 id: true,
-                artistName: true
-              }
-            }
-          }
+                artistName: true,
+              },
+            },
+          },
         },
         history: {
           where: {
             type: 'PLAY',
-            createdAt: { gte: monthStart }
+            createdAt: { gte: monthStart },
           },
           select: {
-            playCount: true
-          }
-        }
+            playCount: true,
+          },
+        },
       },
       orderBy: {
-        playCount: 'desc'
+        playCount: 'desc',
       },
-      take: 20
+      take: 20,
     });
 
     // Calculate monthly plays for each track
-    const tracksWithMonthlyPlays = tracks.map(track => ({
+    const tracksWithMonthlyPlays = tracks.map((track) => ({
       ...track,
-      monthlyPlays: track.history.reduce((sum, h) => sum + (h.playCount || 0), 0)
+      monthlyPlays: track.history.reduce(
+        (sum, h) => sum + (h.playCount || 0),
+        0
+      ),
     }));
 
     res.json(tracksWithMonthlyPlays);
@@ -1287,7 +1330,7 @@ export const getNewestTracks = async (
     console.error('Get newest tracks error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};
 
 // Lấy danh sách album mới nhất
 export const getNewestAlbums = async (
@@ -1307,4 +1350,4 @@ export const getNewestAlbums = async (
     console.error('Get newest albums error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
-}
+};
