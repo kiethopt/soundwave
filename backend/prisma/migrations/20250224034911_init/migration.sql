@@ -222,7 +222,7 @@ CREATE TABLE "track_genre" (
 CREATE TABLE "track_artist" (
     "id" TEXT NOT NULL,
     "trackId" TEXT NOT NULL,
-    "artistProfileId" TEXT NOT NULL,
+    "artistId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "track_artist_pkey" PRIMARY KEY ("id")
@@ -358,12 +358,6 @@ CREATE INDEX "playlists_userId_idx" ON "playlists"("userId");
 CREATE INDEX "playlists_privacy_idx" ON "playlists"("privacy");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "playlists_userId_type_key" ON "playlists"("userId", "type");
-
--- CreateIndex
-CREATE UNIQUE INDEX "playlists_name_userId_key" ON "playlists"("name", "userId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "genres_name_key" ON "genres"("name");
 
 -- CreateIndex
@@ -436,10 +430,10 @@ CREATE UNIQUE INDEX "track_genre_trackId_genreId_key" ON "track_genre"("trackId"
 CREATE INDEX "track_artist_trackId_idx" ON "track_artist"("trackId");
 
 -- CreateIndex
-CREATE INDEX "track_artist_artistProfileId_idx" ON "track_artist"("artistProfileId");
+CREATE INDEX "track_artist_artistId_idx" ON "track_artist"("artistId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "track_artist_trackId_artistProfileId_key" ON "track_artist"("trackId", "artistProfileId");
+CREATE UNIQUE INDEX "track_artist_trackId_artistId_key" ON "track_artist"("trackId", "artistId");
 
 -- CreateIndex
 CREATE INDEX "playlist_track_playlistId_idx" ON "playlist_track"("playlistId");
@@ -517,7 +511,7 @@ ALTER TABLE "track_genre" ADD CONSTRAINT "track_genre_genreId_fkey" FOREIGN KEY 
 ALTER TABLE "track_genre" ADD CONSTRAINT "track_genre_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_artistProfileId_fkey" FOREIGN KEY ("artistProfileId") REFERENCES "artist_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "artist_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "track_artist" ADD CONSTRAINT "track_artist_trackId_fkey" FOREIGN KEY ("trackId") REFERENCES "tracks"("id") ON DELETE CASCADE ON UPDATE CASCADE;
