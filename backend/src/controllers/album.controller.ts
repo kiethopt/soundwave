@@ -70,7 +70,6 @@ export const createAlbum = async (
 ): Promise<void> => {
   try {
     const user = req.user;
-
     if (!user) {
       res.status(403).json({ message: 'Forbidden' });
       return;
@@ -81,7 +80,7 @@ export const createAlbum = async (
       releaseDate,
       type = AlbumType.ALBUM,
       genres = [],
-      artistId, // ID của artist profile mà admin muốn tạo album cho
+      artistId,
     } = req.body;
     const coverFile = req.file;
 
@@ -89,14 +88,6 @@ export const createAlbum = async (
     if (validationError) {
       res.status(400).json({ message: validationError });
       return;
-    }
-
-    if (coverFile) {
-      const fileValidationError = validateFile(coverFile);
-      if (fileValidationError) {
-        res.status(400).json({ message: fileValidationError });
-        return;
-      }
     }
 
     let targetArtistProfileId: string;
@@ -109,9 +100,7 @@ export const createAlbum = async (
           isVerified: true,
           role: Role.ARTIST,
         },
-        include: {
-          user: true,
-        },
+        include: { user: true },
       });
 
       if (!targetArtist) {
@@ -126,49 +115,33 @@ export const createAlbum = async (
       user.artistProfile.role === Role.ARTIST
     ) {
       targetArtistProfileId = user.artistProfile.id;
-      targetArtist = {
-        user: user,
-      };
+      targetArtist = { user };
     } else {
       res.status(403).json({ message: 'Not authorized to create albums' });
       return;
     }
 
-    const genreIds = Array.isArray(genres)
-      ? genres
-      : genres.split(',').map((g: string) => g.trim());
-
-    const existingGenres = await prisma.genre.findMany({
-      where: { id: { in: genreIds } },
-    });
-
-    if (existingGenres.length !== genreIds.length) {
-      res.status(400).json({ message: 'One or more genres do not exist' });
-      return;
-    }
-
     let coverUrl: string | null = null;
     if (coverFile) {
-      const coverUpload: CloudinaryUploadResult = await uploadFile(
-        coverFile.buffer,
-        'covers',
-        'image'
-      );
+      const coverUpload = await uploadFile(coverFile.buffer, 'covers', 'image');
       coverUrl = coverUpload.secure_url;
     }
 
-    // Tạo album
+    const releaseDateObj = new Date(releaseDate);
+    const isActive = releaseDateObj <= new Date();
+
     const album = await prisma.album.create({
       data: {
         title,
         coverUrl,
-        releaseDate: new Date(releaseDate),
+        releaseDate: releaseDateObj,
         type,
         duration: 0,
         totalTracks: 0,
         artistId: targetArtistProfileId,
+        isActive,
         genres: {
-          create: genreIds.map((genreId: string) => ({
+          create: genres.map((genreId: string) => ({
             genre: { connect: { id: genreId } },
           })),
         },
@@ -176,13 +149,12 @@ export const createAlbum = async (
       select: albumSelect,
     });
 
-    // Lấy thông tin artist để lấy tên nghệ sĩ
+    // Thông báo cho followers
     const artistProfile = await prisma.artistProfile.findUnique({
       where: { id: targetArtistProfileId },
       select: { artistName: true },
     });
 
-    // Sau khi tạo album, lấy danh sách user follow nghệ sĩ
     const followers = await prisma.userFollow.findMany({
       where: {
         followingArtistId: targetArtistProfileId,
@@ -192,30 +164,26 @@ export const createAlbum = async (
     });
 
     const notificationsData = followers.map((follower) => ({
-      type: NotificationType.NEW_ALBUM, // sử dụng enum thay vì string
-      // message: `Artist của bạn vừa ra album mới: ${title}`,
-      message: `${artistProfile?.artistName || 'Unknown'} vừa ra album mới: ${title}`,
-      recipientType: RecipientType.USER, // sử dụng enum thay vì string
+      type: NotificationType.NEW_ALBUM,
+      message: `${
+        artistProfile?.artistName || 'Unknown'
+      } vừa ra album mới: ${title}`,
+      recipientType: RecipientType.USER,
       userId: follower.followerId,
       artistId: targetArtistProfileId,
       senderId: targetArtistProfileId,
     }));
 
-
     await prisma.$transaction(async (tx) => {
       if (notificationsData.length > 0) {
-        await tx.notification.createMany({
-          data: notificationsData,
-        });
+        await tx.notification.createMany({ data: notificationsData });
       }
     });
 
-
-    // Phát sự kiện realtime cho từng follower qua Pusher
     for (const follower of followers) {
       await pusher.trigger(`user-${follower.followerId}`, 'notification', {
         type: NotificationType.NEW_ALBUM,
-        message: `Artist của bạn vừa ra album mới: ${title}`,
+        message: `${artistProfile?.artistName} vừa ra album mới: ${title}`,
       });
     }
 
@@ -228,7 +196,6 @@ export const createAlbum = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
 
 // Thêm track vào album (ADMIN & ARTIST only)
 export const addTracksToAlbum = async (
@@ -307,8 +274,8 @@ export const addTracksToAlbum = async (
     const featuredArtists = Array.isArray(req.body.featuredArtists)
       ? req.body.featuredArtists.map((artists: string) => artists.split(','))
       : req.body.featuredArtists
-        ? [req.body.featuredArtists.split(',')]
-        : [];
+      ? [req.body.featuredArtists.split(',')]
+      : [];
 
     const mm = await import('music-metadata');
 
@@ -438,80 +405,29 @@ export const updateAlbum = async (
       return;
     }
 
-    // Chỉ validate các trường được gửi lên
-    if (title || releaseDate || type) {
-      const validationError = validateAlbumData({
-        title: title || '',
-        releaseDate: releaseDate || new Date(),
-        type: type || undefined,
-      });
-      if (validationError) {
-        res.status(400).json({ message: validationError });
-        return;
-      }
-    }
-
-    if (coverFile) {
-      const fileValidationError = validateFile(coverFile);
-      if (fileValidationError) {
-        res.status(400).json({ message: fileValidationError });
-        return;
-      }
-    }
-
     let coverUrl: string | undefined;
     if (coverFile) {
-      const coverUpload: CloudinaryUploadResult = await uploadFile(
-        coverFile.buffer,
-        'covers',
-        'image'
-      );
+      const coverUpload = await uploadFile(coverFile.buffer, 'covers', 'image');
       coverUrl = coverUpload.secure_url;
     }
 
-    // Xây dựng object data chỉ với các trường được cập nhật
     const updateData: any = {};
-
     if (title) updateData.title = title;
-    if (releaseDate) updateData.releaseDate = new Date(releaseDate);
-    if (type) {
-      updateData.type = type;
-      updateData.tracks = {
-        updateMany: {
-          where: { albumId: id },
-          data: { type },
-        },
-      };
+    if (releaseDate) {
+      const newReleaseDate = new Date(releaseDate);
+      updateData.releaseDate = newReleaseDate;
+      updateData.isActive = newReleaseDate <= new Date();
     }
+    if (type) updateData.type = type;
     if (coverUrl) updateData.coverUrl = coverUrl;
 
-    // Chỉ cập nhật genres nếu được gửi lên
     if (genres) {
-      const genreIds = Array.isArray(genres)
-        ? genres
-        : genres.split(',').map((g: string) => g.trim());
-
-      if (genreIds.length > 0) {
-        const existingGenres = await prisma.genre.findMany({
-          where: { id: { in: genreIds } },
-        });
-
-        if (existingGenres.length !== genreIds.length) {
-          res.status(400).json({ message: 'One or more genres do not exist' });
-          return;
-        }
-
-        // Xóa genres cũ và thêm genres mới
-        await prisma.albumGenre.deleteMany({
-          where: { albumId: id },
-        });
-
-        updateData.genres = {
-          create: genreIds.map((genreId: string) => ({
-            genre: { connect: { id: genreId } },
-          })),
-        };
-      }
+      await prisma.albumGenre.deleteMany({ where: { albumId: id } });
+      updateData.genres = {
+        create: genres.map((genreId: string) => ({
+          genre: { connect: { id: genreId } },
+        })),
+      };
     }
 
     const updatedAlbum = await prisma.album.update({
@@ -606,8 +522,9 @@ export const toggleAlbumVisibility = async (
     });
 
     res.json({
-      message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'
-        } successfully`,
+      message: `Album ${
+        updatedAlbum.isActive ? 'activated' : 'hidden'
+      } successfully`,
       album: updatedAlbum,
     });
   } catch (error) {

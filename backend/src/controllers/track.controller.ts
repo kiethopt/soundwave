@@ -7,6 +7,7 @@ import { sessionService } from '../services/session.service';
 import { trackSelect } from '../utils/prisma-selects';
 import { NotificationType, RecipientType } from '@prisma/client';
 import pusher from '../config/pusher';
+import cron from 'node-cron';
 
 // Validation functions
 const validateTrackData = (
@@ -125,6 +126,30 @@ const validateFile = (
 
   return null; // File hợp lệ
 };
+
+cron.schedule('* * * * *', async () => {
+  try {
+    const tracks = await prisma.track.findMany({
+      where: {
+        isActive: false,
+        releaseDate: {
+          lte: new Date(),
+        },
+      },
+    });
+
+    for (const track of tracks) {
+      await prisma.track.update({
+        where: { id: track.id },
+        data: { isActive: true },
+      });
+      console.log(`Auto published track: ${track.title}`);
+    }
+  } catch (error) {
+    console.error('Auto publish error:', error);
+  }
+});
+
 // Tạo track mới (ADMIN & ARTIST only)
 export const createTrack = async (
   req: Request,
@@ -132,8 +157,6 @@ export const createTrack = async (
 ): Promise<void> => {
   try {
     const user = req.user;
-
-    // Kiểm tra xác thực và quyền
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
@@ -146,26 +169,17 @@ export const createTrack = async (
       albumId,
       featuredArtists,
       genreIds,
-      artistId, // Cho ADMIN tạo track cho artist
+      artistId,
     } = req.body;
 
-    // Xác định artistId: nếu là ADMIN thì dùng artistId từ request, nếu là artist thì dùng từ profile
     const finalArtistId =
       user.role === 'ADMIN' ? artistId : user.artistProfile?.id;
-
     if (!finalArtistId) {
       res.status(400).json({
         message:
           user.role === 'ADMIN'
             ? 'Artist ID is required'
             : 'Only verified artists can create tracks',
-      });
-      return;
-    }
-
-    if (user.role !== 'ADMIN' && !user.artistProfile?.isVerified) {
-      res.status(403).json({
-        message: 'Only verified artists can create tracks',
       });
       return;
     }
@@ -179,7 +193,6 @@ export const createTrack = async (
       audioFile?: Express.Multer.File[];
       coverFile?: Express.Multer.File[];
     };
-
     const audioFile = files.audioFile?.[0];
     const coverFile = files.coverFile?.[0];
 
@@ -188,111 +201,100 @@ export const createTrack = async (
       return;
     }
 
-    // Validate file types
-    const audioValidationError = validateFile(audioFile, true);
-    if (audioValidationError) {
-      res.status(400).json({ message: audioValidationError });
-      return;
-    }
-    if (coverFile) {
-      const coverValidationError = validateFile(coverFile, false);
-      if (coverValidationError) {
-        res.status(400).json({ message: coverValidationError });
-        return;
-      }
-    }
-
-    // Upload files to cloudinary
     const audioUpload = await uploadFile(audioFile.buffer, 'tracks', 'auto');
     const coverUrl = coverFile
       ? (await uploadFile(coverFile.buffer, 'covers', 'image')).secure_url
       : null;
 
-    // Get audio duration using music-metadata
     const mm = await import('music-metadata');
     const metadata = await mm.parseBuffer(audioFile.buffer);
     const duration = Math.floor(metadata.format.duration || 0);
 
-    // Process arrays
-    const featuredArtistsArray = featuredArtists
-      ? featuredArtists.split(',').map((id: string) => id.trim())
-      : [];
-    const genreIdsArray = genreIds
-      ? genreIds.split(',').map((id: string) => id.trim())
-      : [];
+    let isActive = false;
+    let trackReleaseDate = new Date(releaseDate);
 
-    // Tạo track và lấy kết quả trả về
+    if (albumId) {
+      const album = await prisma.album.findUnique({
+        where: { id: albumId },
+        select: { isActive: true, releaseDate: true },
+      });
+      if (album) {
+        isActive = album.isActive;
+        trackReleaseDate = album.releaseDate;
+      }
+    } else {
+      // So sánh chính xác đến giờ phút giây
+      const now = new Date();
+      isActive = trackReleaseDate <= now;
+      console.log('Release date:', trackReleaseDate);
+      console.log('Current time:', now);
+      console.log('Is active:', isActive);
+    }
+
     const track = await prisma.track.create({
       data: {
         title,
         duration,
-        releaseDate: new Date(releaseDate),
+        releaseDate: trackReleaseDate,
         trackNumber: trackNumber ? Number(trackNumber) : null,
         coverUrl,
         audioUrl: audioUpload.secure_url,
         artistId: finalArtistId,
         albumId: albumId || null,
         type: albumId ? undefined : 'SINGLE',
-        featuredArtists:
-          featuredArtistsArray.length > 0
-            ? {
-              create: featuredArtistsArray.map((artistId: string) => ({
-                artistId,
+        isActive,
+        featuredArtists: featuredArtists
+          ? {
+              create: featuredArtists.split(',').map((artistId: string) => ({
+                artistId: artistId.trim(),
               })),
             }
-            : undefined,
-        genres:
-          genreIdsArray.length > 0
-            ? {
-              create: genreIdsArray.map((genreId: string) => ({
-                genreId,
+          : undefined,
+        genres: genreIds
+          ? {
+              create: genreIds.split(',').map((genreId: string) => ({
+                genreId: genreId.trim(),
               })),
             }
-            : undefined,
+          : undefined,
       },
       select: trackSelect,
     });
 
-    // Lấy thông tin artist để lấy tên nghệ sĩ
     const artistProfile = await prisma.artistProfile.findUnique({
       where: { id: finalArtistId },
       select: { artistName: true },
     });
-    // Sau khi tạo track, lấy danh sách các user đang follow nghệ sĩ
+
     const followers = await prisma.userFollow.findMany({
       where: {
         followingArtistId: finalArtistId,
-        followingType: 'ARTIST', // Nếu bạn lưu loại follow
+        followingType: 'ARTIST',
       },
       select: { followerId: true },
     });
 
-
-    // Tạo thông báo cho mỗi follower, kèm theo tên nghệ sĩ và tên track
     const notificationsData = followers.map((follower) => ({
-      type: NotificationType.NEW_TRACK, // sử dụng enum thay vì string
-      message: `${artistProfile?.artistName || 'Unknown'} vừa ra track mới: ${title}`,
-      recipientType: RecipientType.USER, // sử dụng enum thay vì string
+      type: NotificationType.NEW_TRACK,
+      message: `${
+        artistProfile?.artistName || 'Unknown'
+      } vừa ra track mới: ${title}`,
+      recipientType: RecipientType.USER,
       userId: follower.followerId,
       artistId: finalArtistId,
       senderId: finalArtistId,
     }));
 
-    // Sử dụng transaction để đảm bảo nhất quán (tùy chọn) lưu vào db
     await prisma.$transaction(async (tx) => {
       if (notificationsData.length > 0) {
-        await tx.notification.createMany({
-          data: notificationsData,
-        });
+        await tx.notification.createMany({ data: notificationsData });
       }
     });
 
-
-    // Phát sự kiện realtime qua Pusher cho từng follower
     for (const follower of followers) {
       await pusher.trigger(`user-${follower.followerId}`, 'notification', {
         type: NotificationType.NEW_TRACK,
-        message: `Artist của bạn vừa ra track mới: ${title}`,
+        message: `${artistProfile?.artistName} vừa ra track mới: ${title}`,
       });
     }
 
@@ -458,8 +460,9 @@ export const toggleTrackVisibility = async (
     });
 
     res.json({
-      message: `Track ${updatedTrack.isActive ? 'activated' : 'hidden'
-        } successfully`,
+      message: `Track ${
+        updatedTrack.isActive ? 'activated' : 'hidden'
+      } successfully`,
       track: updatedTrack,
     });
   } catch (error) {

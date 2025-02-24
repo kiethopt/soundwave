@@ -54,6 +54,7 @@ const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_2 = require("@prisma/client");
 const pusher_1 = __importDefault(require("../config/pusher"));
+const node_cron_1 = __importDefault(require("node-cron"));
 const validateTrackData = (data, isSingleTrack = true, validateRequired = true) => {
     const { title, duration, releaseDate, trackNumber, coverUrl, audioUrl, type, featuredArtists, } = data;
     if (validateRequired) {
@@ -131,8 +132,30 @@ const validateFile = (file, isAudio = false) => {
     }
     return null;
 };
+node_cron_1.default.schedule('* * * * *', () => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const tracks = yield db_1.default.track.findMany({
+            where: {
+                isActive: false,
+                releaseDate: {
+                    lte: new Date(),
+                },
+            },
+        });
+        for (const track of tracks) {
+            yield db_1.default.track.update({
+                where: { id: track.id },
+                data: { isActive: true },
+            });
+            console.log(`Auto published track: ${track.title}`);
+        }
+    }
+    catch (error) {
+        console.error('Auto publish error:', error);
+    }
+}));
 const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d;
+    var _a, _b, _c;
     try {
         const user = req.user;
         if (!user) {
@@ -149,34 +172,16 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             });
             return;
         }
-        if (user.role !== 'ADMIN' && !((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isVerified)) {
-            res.status(403).json({
-                message: 'Only verified artists can create tracks',
-            });
-            return;
-        }
         if (!req.files) {
             res.status(400).json({ message: 'No files uploaded' });
             return;
         }
         const files = req.files;
-        const audioFile = (_c = files.audioFile) === null || _c === void 0 ? void 0 : _c[0];
-        const coverFile = (_d = files.coverFile) === null || _d === void 0 ? void 0 : _d[0];
+        const audioFile = (_b = files.audioFile) === null || _b === void 0 ? void 0 : _b[0];
+        const coverFile = (_c = files.coverFile) === null || _c === void 0 ? void 0 : _c[0];
         if (!audioFile) {
             res.status(400).json({ message: 'Audio file is required' });
             return;
-        }
-        const audioValidationError = validateFile(audioFile, true);
-        if (audioValidationError) {
-            res.status(400).json({ message: audioValidationError });
-            return;
-        }
-        if (coverFile) {
-            const coverValidationError = validateFile(coverFile, false);
-            if (coverValidationError) {
-                res.status(400).json({ message: coverValidationError });
-                return;
-            }
         }
         const audioUpload = yield (0, cloudinary_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto');
         const coverUrl = coverFile
@@ -185,34 +190,48 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const mm = yield Promise.resolve().then(() => __importStar(require('music-metadata')));
         const metadata = yield mm.parseBuffer(audioFile.buffer);
         const duration = Math.floor(metadata.format.duration || 0);
-        const featuredArtistsArray = featuredArtists
-            ? featuredArtists.split(',').map((id) => id.trim())
-            : [];
-        const genreIdsArray = genreIds
-            ? genreIds.split(',').map((id) => id.trim())
-            : [];
+        let isActive = false;
+        let trackReleaseDate = new Date(releaseDate);
+        if (albumId) {
+            const album = yield db_1.default.album.findUnique({
+                where: { id: albumId },
+                select: { isActive: true, releaseDate: true },
+            });
+            if (album) {
+                isActive = album.isActive;
+                trackReleaseDate = album.releaseDate;
+            }
+        }
+        else {
+            const now = new Date();
+            isActive = trackReleaseDate <= now;
+            console.log('Release date:', trackReleaseDate);
+            console.log('Current time:', now);
+            console.log('Is active:', isActive);
+        }
         const track = yield db_1.default.track.create({
             data: {
                 title,
                 duration,
-                releaseDate: new Date(releaseDate),
+                releaseDate: trackReleaseDate,
                 trackNumber: trackNumber ? Number(trackNumber) : null,
                 coverUrl,
                 audioUrl: audioUpload.secure_url,
                 artistId: finalArtistId,
                 albumId: albumId || null,
                 type: albumId ? undefined : 'SINGLE',
-                featuredArtists: featuredArtistsArray.length > 0
+                isActive,
+                featuredArtists: featuredArtists
                     ? {
-                        create: featuredArtistsArray.map((artistId) => ({
-                            artistId,
+                        create: featuredArtists.split(',').map((artistId) => ({
+                            artistId: artistId.trim(),
                         })),
                     }
                     : undefined,
-                genres: genreIdsArray.length > 0
+                genres: genreIds
                     ? {
-                        create: genreIdsArray.map((genreId) => ({
-                            genreId,
+                        create: genreIds.split(',').map((genreId) => ({
+                            genreId: genreId.trim(),
                         })),
                     }
                     : undefined,
@@ -240,15 +259,13 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }));
         yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
             if (notificationsData.length > 0) {
-                yield tx.notification.createMany({
-                    data: notificationsData,
-                });
+                yield tx.notification.createMany({ data: notificationsData });
             }
         }));
         for (const follower of followers) {
             yield pusher_1.default.trigger(`user-${follower.followerId}`, 'notification', {
                 type: client_2.NotificationType.NEW_TRACK,
-                message: `Artist của bạn vừa ra track mới: ${title}`,
+                message: `${artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.artistName} vừa ra track mới: ${title}`,
             });
         }
         res.status(201).json({

@@ -89,7 +89,7 @@ model Album {
   duration    Int           @default(0)
   totalTracks Int           @default(0)
   type        AlbumType     @default(ALBUM)
-  isActive    Boolean       @default(true)
+  isActive    Boolean       @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   artistId    String
@@ -116,7 +116,7 @@ model Track {
   audioUrl        String
   playCount       Int             @default(0)
   type            AlbumType       @default(SINGLE)
-  isActive        Boolean         @default(true)
+  isActive        Boolean         @default(false)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   artistId        String

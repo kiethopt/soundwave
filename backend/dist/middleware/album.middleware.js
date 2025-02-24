@@ -12,11 +12,47 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.albumExtension = void 0;
 const client_1 = require("@prisma/client");
 exports.albumExtension = client_1.Prisma.defineExtension((client) => {
+    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
+        const now = new Date();
+        try {
+            yield client.$transaction([
+                client.album.updateMany({
+                    where: {
+                        releaseDate: { lte: now },
+                        isActive: false,
+                    },
+                    data: { isActive: true },
+                }),
+                client.track.updateMany({
+                    where: {
+                        releaseDate: { lte: now },
+                        isActive: false,
+                        albumId: null,
+                    },
+                    data: { isActive: true },
+                }),
+            ]);
+        }
+        catch (error) {
+            console.error('Release date check error:', error);
+        }
+    }), 1000 * 60 * 60);
     return client.$extends({
         query: {
             album: {
+                create(_a) {
+                    return __awaiter(this, arguments, void 0, function* ({ args, query }) {
+                        const releaseDate = new Date(args.data.releaseDate);
+                        args.data.isActive = releaseDate <= new Date();
+                        return query(args);
+                    });
+                },
                 update(_a) {
                     return __awaiter(this, arguments, void 0, function* ({ args, query }) {
+                        if (typeof args.data === 'object' && 'releaseDate' in args.data) {
+                            const releaseDate = new Date(args.data.releaseDate);
+                            args.data.isActive = releaseDate <= new Date();
+                        }
                         const result = yield query(args);
                         if (typeof args.data === 'object') {
                             if ('coverUrl' in args.data) {
@@ -25,10 +61,14 @@ exports.albumExtension = client_1.Prisma.defineExtension((client) => {
                                     data: { coverUrl: args.data.coverUrl },
                                 });
                             }
-                            if ('isActive' in args.data) {
+                            if ('isActive' in args.data || 'releaseDate' in args.data) {
                                 yield client.track.updateMany({
                                     where: { albumId: result.id },
-                                    data: { isActive: args.data.isActive },
+                                    data: Object.assign(Object.assign({}, (args.data.isActive !== undefined && {
+                                        isActive: args.data.isActive,
+                                    })), (args.data.releaseDate && {
+                                        releaseDate: args.data.releaseDate,
+                                    })),
                                 });
                             }
                         }
@@ -46,12 +86,16 @@ exports.albumExtension = client_1.Prisma.defineExtension((client) => {
                             if (albumId) {
                                 const album = yield client.album.findUnique({
                                     where: { id: albumId },
-                                    select: { isActive: true },
+                                    select: { isActive: true, releaseDate: true },
                                 });
-                                if (album && !album.isActive) {
-                                    args.data = Object.assign(Object.assign({}, data), { isActive: false });
+                                if (album) {
+                                    args.data = Object.assign(Object.assign({}, data), { isActive: album.isActive, releaseDate: album.releaseDate });
                                 }
                             }
+                        }
+                        else {
+                            const releaseDate = new Date(data.releaseDate);
+                            args.data = Object.assign(Object.assign({}, data), { isActive: releaseDate <= new Date() });
                         }
                         const result = yield query(args);
                         if (result.albumId) {
@@ -75,10 +119,10 @@ exports.albumExtension = client_1.Prisma.defineExtension((client) => {
                             if (newAlbumId && newAlbumId !== (oldTrack === null || oldTrack === void 0 ? void 0 : oldTrack.albumId)) {
                                 const newAlbum = yield client.album.findUnique({
                                     where: { id: newAlbumId },
-                                    select: { isActive: true },
+                                    select: { isActive: true, releaseDate: true },
                                 });
-                                if (newAlbum && !newAlbum.isActive) {
-                                    args.data = Object.assign(Object.assign({}, data), { isActive: false });
+                                if (newAlbum) {
+                                    args.data = Object.assign(Object.assign({}, data), { isActive: newAlbum.isActive, releaseDate: newAlbum.releaseDate });
                                 }
                             }
                         }
@@ -114,9 +158,7 @@ function updateAlbumTotalTracks(client, albumId) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const trackCount = yield client.track.count({
-                where: {
-                    albumId,
-                },
+                where: { albumId },
             });
             yield client.album.update({
                 where: { id: albumId },

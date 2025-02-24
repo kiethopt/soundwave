@@ -1,16 +1,52 @@
 import { Prisma } from '@prisma/client';
 
 export const albumExtension = Prisma.defineExtension((client) => {
+  // Kiểm tra và cập nhật isActive định kỳ
+  setInterval(async () => {
+    const now = new Date();
+    try {
+      await client.$transaction([
+        client.album.updateMany({
+          where: {
+            releaseDate: { lte: now },
+            isActive: false,
+          },
+          data: { isActive: true },
+        }),
+        client.track.updateMany({
+          where: {
+            releaseDate: { lte: now },
+            isActive: false,
+            albumId: null,
+          },
+          data: { isActive: true },
+        }),
+      ]);
+    } catch (error) {
+      console.error('Release date check error:', error);
+    }
+  }, 1000 * 60 * 60); // Chạy mỗi giờ
+
   return client.$extends({
     query: {
       album: {
+        async create({ args, query }) {
+          // Set isActive dựa trên releaseDate khi tạo album
+          const releaseDate = new Date(args.data.releaseDate);
+          args.data.isActive = releaseDate <= new Date();
+          return query(args);
+        },
         async update({ args, query }) {
-          // Thực hiện update album
+          // Kiểm tra và cập nhật isActive nếu có thay đổi releaseDate
+          if (typeof args.data === 'object' && 'releaseDate' in args.data) {
+            const releaseDate = new Date(args.data.releaseDate as string);
+            args.data.isActive = releaseDate <= new Date();
+          }
+
           const result = await query(args);
 
-          // Kiểm tra data có phải là object và có coverUrl không
           if (typeof args.data === 'object') {
-            // Nếu có thay đổi coverUrl
+            // Cập nhật coverUrl cho tracks nếu có thay đổi
             if ('coverUrl' in args.data) {
               await client.track.updateMany({
                 where: { albumId: result.id },
@@ -18,11 +54,18 @@ export const albumExtension = Prisma.defineExtension((client) => {
               });
             }
 
-            // Nếu có thay đổi isActive
-            if ('isActive' in args.data) {
+            // Cập nhật isActive và releaseDate cho tracks
+            if ('isActive' in args.data || 'releaseDate' in args.data) {
               await client.track.updateMany({
                 where: { albumId: result.id },
-                data: { isActive: args.data.isActive as boolean },
+                data: {
+                  ...(args.data.isActive !== undefined && {
+                    isActive: args.data.isActive as boolean,
+                  }),
+                  ...(args.data.releaseDate && {
+                    releaseDate: args.data.releaseDate as Date,
+                  }),
+                },
               });
             }
           }
@@ -34,29 +77,33 @@ export const albumExtension = Prisma.defineExtension((client) => {
         async create({ args, query }) {
           const data = args.data as Prisma.TrackCreateInput;
 
-          // Nếu track được thêm vào album, kiểm tra trạng thái của album
           if (data.album) {
             const albumId = (data.album as any).connect?.id;
             if (albumId) {
               const album = await client.album.findUnique({
                 where: { id: albumId },
-                select: { isActive: true },
+                select: { isActive: true, releaseDate: true },
               });
 
-              // Nếu album đang ẩn, track mới cũng sẽ ẩn
-              if (album && !album.isActive) {
+              if (album) {
                 args.data = {
                   ...data,
-                  isActive: false,
+                  isActive: album.isActive,
+                  releaseDate: album.releaseDate,
                 };
               }
             }
+          } else {
+            // Track độc lập, set isActive dựa trên releaseDate
+            const releaseDate = new Date(data.releaseDate);
+            args.data = {
+              ...data,
+              isActive: releaseDate <= new Date(),
+            };
           }
 
-          // Thực hiện tạo track
           const result = await query(args);
 
-          // Cập nhật totalTracks nếu track thuộc album
           if ((result as any).albumId) {
             await updateAlbumTotalTracks(client, (result as any).albumId);
           }
@@ -66,41 +113,35 @@ export const albumExtension = Prisma.defineExtension((client) => {
 
         async update({ args, query }) {
           const data = args.data as Prisma.TrackUpdateInput;
-
-          // Lấy thông tin track cũ trước khi update
           const oldTrack = await client.track.findUnique({
             where: args.where,
             select: { albumId: true },
           });
 
-          // Nếu track được chuyển sang album khác
           if (
             data.album &&
             typeof data.album === 'object' &&
             'connect' in data.album
           ) {
             const newAlbumId = (data.album.connect as any)?.id;
-
             if (newAlbumId && newAlbumId !== oldTrack?.albumId) {
               const newAlbum = await client.album.findUnique({
                 where: { id: newAlbumId },
-                select: { isActive: true },
+                select: { isActive: true, releaseDate: true },
               });
 
-              // Nếu album mới đang ẩn, track cũng sẽ ẩn
-              if (newAlbum && !newAlbum.isActive) {
+              if (newAlbum) {
                 args.data = {
                   ...data,
-                  isActive: false,
+                  isActive: newAlbum.isActive,
+                  releaseDate: newAlbum.releaseDate,
                 };
               }
             }
           }
 
-          // Thực hiện update track
           const result = await query(args);
 
-          // Cập nhật totalTracks cho album cũ và mới nếu có thay đổi
           if (oldTrack?.albumId) {
             await updateAlbumTotalTracks(client, oldTrack.albumId);
           }
@@ -115,16 +156,13 @@ export const albumExtension = Prisma.defineExtension((client) => {
         },
 
         async delete({ args, query }) {
-          // Lấy thông tin track trước khi xóa
           const track = await client.track.findUnique({
             where: args.where,
             select: { albumId: true },
           });
 
-          // Thực hiện xóa track
           const result = await query(args);
 
-          // Cập nhật totalTracks nếu track thuộc album
           if (track?.albumId) {
             await updateAlbumTotalTracks(client, track.albumId);
           }
@@ -136,13 +174,10 @@ export const albumExtension = Prisma.defineExtension((client) => {
   });
 });
 
-// Hàm helper để cập nhật totalTracks
 async function updateAlbumTotalTracks(client: any, albumId: string) {
   try {
     const trackCount = await client.track.count({
-      where: {
-        albumId,
-      },
+      where: { albumId },
     });
 
     await client.album.update({

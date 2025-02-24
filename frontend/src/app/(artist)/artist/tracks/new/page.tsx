@@ -180,10 +180,10 @@ export default function NewTrack() {
                     theme === 'light' ? 'text-gray-700' : 'text-white/80'
                   }`}
                 >
-                  Release Date
+                  Release Date & Time
                 </label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   id="releaseDate"
                   name="releaseDate"
                   value={trackData.releaseDate}

@@ -107,13 +107,6 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(400).json({ message: validationError });
             return;
         }
-        if (coverFile) {
-            const fileValidationError = validateFile(coverFile);
-            if (fileValidationError) {
-                res.status(400).json({ message: fileValidationError });
-                return;
-            }
-        }
         let targetArtistProfileId;
         let targetArtist;
         if (user.role === client_1.Role.ADMIN && artistId) {
@@ -123,9 +116,7 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                     isVerified: true,
                     role: client_1.Role.ARTIST,
                 },
-                include: {
-                    user: true,
-                },
+                include: { user: true },
             });
             if (!targetArtist) {
                 res
@@ -138,22 +129,10 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         else if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
             user.artistProfile.role === client_1.Role.ARTIST) {
             targetArtistProfileId = user.artistProfile.id;
-            targetArtist = {
-                user: user,
-            };
+            targetArtist = { user };
         }
         else {
             res.status(403).json({ message: 'Not authorized to create albums' });
-            return;
-        }
-        const genreIds = Array.isArray(genres)
-            ? genres
-            : genres.split(',').map((g) => g.trim());
-        const existingGenres = yield db_1.default.genre.findMany({
-            where: { id: { in: genreIds } },
-        });
-        if (existingGenres.length !== genreIds.length) {
-            res.status(400).json({ message: 'One or more genres do not exist' });
             return;
         }
         let coverUrl = null;
@@ -161,17 +140,20 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             const coverUpload = yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
             coverUrl = coverUpload.secure_url;
         }
+        const releaseDateObj = new Date(releaseDate);
+        const isActive = releaseDateObj <= new Date();
         const album = yield db_1.default.album.create({
             data: {
                 title,
                 coverUrl,
-                releaseDate: new Date(releaseDate),
+                releaseDate: releaseDateObj,
                 type,
                 duration: 0,
                 totalTracks: 0,
                 artistId: targetArtistProfileId,
+                isActive,
                 genres: {
-                    create: genreIds.map((genreId) => ({
+                    create: genres.map((genreId) => ({
                         genre: { connect: { id: genreId } },
                     })),
                 },
@@ -199,15 +181,13 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }));
         yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
             if (notificationsData.length > 0) {
-                yield tx.notification.createMany({
-                    data: notificationsData,
-                });
+                yield tx.notification.createMany({ data: notificationsData });
             }
         }));
         for (const follower of followers) {
             yield pusher_1.default.trigger(`user-${follower.followerId}`, 'notification', {
                 type: client_2.NotificationType.NEW_ALBUM,
-                message: `Artist của bạn vừa ra album mới: ${title}`,
+                message: `${artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.artistName} vừa ra album mới: ${title}`,
             });
         }
         res.status(201).json({
@@ -370,24 +350,6 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(403).json({ message: 'You can only update your own albums' });
             return;
         }
-        if (title || releaseDate || type) {
-            const validationError = validateAlbumData({
-                title: title || '',
-                releaseDate: releaseDate || new Date(),
-                type: type || undefined,
-            });
-            if (validationError) {
-                res.status(400).json({ message: validationError });
-                return;
-            }
-        }
-        if (coverFile) {
-            const fileValidationError = validateFile(coverFile);
-            if (fileValidationError) {
-                res.status(400).json({ message: fileValidationError });
-                return;
-            }
-        }
         let coverUrl;
         if (coverFile) {
             const coverUpload = yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
@@ -396,40 +358,22 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const updateData = {};
         if (title)
             updateData.title = title;
-        if (releaseDate)
-            updateData.releaseDate = new Date(releaseDate);
-        if (type) {
-            updateData.type = type;
-            updateData.tracks = {
-                updateMany: {
-                    where: { albumId: id },
-                    data: { type },
-                },
-            };
+        if (releaseDate) {
+            const newReleaseDate = new Date(releaseDate);
+            updateData.releaseDate = newReleaseDate;
+            updateData.isActive = newReleaseDate <= new Date();
         }
+        if (type)
+            updateData.type = type;
         if (coverUrl)
             updateData.coverUrl = coverUrl;
         if (genres) {
-            const genreIds = Array.isArray(genres)
-                ? genres
-                : genres.split(',').map((g) => g.trim());
-            if (genreIds.length > 0) {
-                const existingGenres = yield db_1.default.genre.findMany({
-                    where: { id: { in: genreIds } },
-                });
-                if (existingGenres.length !== genreIds.length) {
-                    res.status(400).json({ message: 'One or more genres do not exist' });
-                    return;
-                }
-                yield db_1.default.albumGenre.deleteMany({
-                    where: { albumId: id },
-                });
-                updateData.genres = {
-                    create: genreIds.map((genreId) => ({
-                        genre: { connect: { id: genreId } },
-                    })),
-                };
-            }
+            yield db_1.default.albumGenre.deleteMany({ where: { albumId: id } });
+            updateData.genres = {
+                create: genres.map((genreId) => ({
+                    genre: { connect: { id: genreId } },
+                })),
+            };
         }
         const updatedAlbum = yield db_1.default.album.update({
             where: { id },

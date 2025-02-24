@@ -4,17 +4,12 @@ import { withAccelerate } from '@prisma/extension-accelerate';
 import { authExtension } from '../middleware/auth.middleware';
 import { artistExtension } from '../middleware/artist.middleware';
 import { adminExtension } from '../middleware/admin.middleware';
-import { userExtension } from 'src/middleware/user.middleware';
+import { userExtension } from '../middleware/user.middleware';
 
 // Tạo Prisma Client và áp dụng extension
 const prisma = new PrismaClient({
   log: [{ emit: 'event', level: 'query' }],
 });
-
-// Kiểm tra environment variable trước khi khởi tạo
-// if (!process.env.OPTIMIZE_API_KEY) {
-//   throw new Error('OPTIMIZE_API_KEY is missing in environment variables');
-// }
 
 // Áp dụng extension
 const extendedPrisma = prisma
