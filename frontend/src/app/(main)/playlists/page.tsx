@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { PlaylistCard } from "@/components/playlist/PlaylistCard";
-import { CreatePlaylistDialog } from "@/components/playlist/CreatePlaylistDialog";
-import { Playlist } from "@/types";
-import { api } from "@/utils/api";
-import { toast } from "sonner";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { PlaylistCard } from '@/components/playlist/PlaylistCard';
+import { CreatePlaylistDialog } from '@/components/playlist/CreatePlaylistDialog';
+import { Playlist } from '@/types';
+import { api } from '@/utils/api';
+import { toast } from 'sonner';
 
 export default function PlaylistsPage() {
   const router = useRouter();
@@ -18,19 +18,19 @@ export default function PlaylistsPage() {
   const fetchPlaylists = async () => {
     try {
       setIsLoading(true);
-      const token = localStorage.getItem("userToken");
+      const token = localStorage.getItem('userToken');
       if (!token) {
-        toast.error("Vui lòng đăng nhập lại");
-        router.push("/login");
+        toast.error('Vui lòng đăng nhập lại');
+        router.push('/login');
         return;
       }
 
       const response = await api.playlists.getAll(token);
-      console.log("Playlists:", response);
+      console.log('Playlists:', response);
       setPlaylists(response.data || []);
     } catch (error) {
-      console.error("Error fetching playlists:", error);
-      toast.error("Không thể tải danh sách playlist");
+      console.error('Error fetching playlists:', error);
+      toast.error('Không thể tải danh sách playlist');
     } finally {
       setIsLoading(false);
     }

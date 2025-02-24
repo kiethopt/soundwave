@@ -9,17 +9,12 @@ export const userExtension = Prisma.defineExtension((client) => {
         async create({ args, query }) {
           const result = await query(args);
 
-          // Clear cache cho cả người follow và người được follow
           await Promise.all([
             // Clear cache cho người follow
-            redisClient.del(`/api/users/${args.data.followerId}/following`),
+            redisClient.del(`/api/user/following`),
 
-            // Clear cache cho người được follow (user hoặc artist)
-            redisClient.del(
-              `/api/users/${
-                args.data.followingUserId || args.data.followingArtistId
-              }/followers`
-            ),
+            // Clear cache cho người được follow
+            redisClient.del(`/api/user/followers`),
 
             // Clear cache tổng quát
             clearCacheForEntity('user', {
@@ -38,7 +33,6 @@ export const userExtension = Prisma.defineExtension((client) => {
         },
 
         async delete({ args, query }) {
-          // Lấy thông tin follow trước khi xóa
           const followInfo = await client.userFollow.findFirst({
             where: args.where as any,
             select: {
@@ -51,26 +45,36 @@ export const userExtension = Prisma.defineExtension((client) => {
           const result = await query(args);
 
           if (followInfo) {
-            await Promise.all([
-              // Clear cache cho người unfollow
-              redisClient.del(`/api/users/${followInfo.followerId}/following`),
+            const followerId = followInfo.followerId;
+            const followingId =
+              followInfo.followingUserId || followInfo.followingArtistId;
 
-              // Clear cache cho người bị unfollow
-              redisClient.del(
-                `/api/users/${
-                  followInfo.followingUserId || followInfo.followingArtistId
-                }/followers`
-              ),
+            // Sửa pattern matching cho Redis keys
+            const followingKeys = await redisClient.keys(
+              `/api/user/following*userId=${followerId}*` // Thay ? thành *
+            );
+            const followerKeys = await redisClient.keys(
+              `/api/user/followers*userId=${followingId}*` // Thay ? thành *
+            );
+
+            // Thêm xóa cache cho cả 2 phía
+            await Promise.all([
+              ...(followingKeys.length
+                ? followingKeys.map((k) => redisClient.del(k))
+                : []),
+              ...(followerKeys.length
+                ? followerKeys.map((k) => redisClient.del(k))
+                : []),
+              redisClient.del(`/api/user/following?userId=${followerId}`),
+              redisClient.del(`/api/user/followers?userId=${followingId}`),
 
               // Clear cache tổng quát
               clearCacheForEntity('user', {
-                entityId: followInfo.followerId,
+                entityId: followerId,
                 clearSearch: true,
               }),
               clearCacheForEntity('user', {
-                entityId: (followInfo.followingUserId ||
-                  followInfo.followingArtistId ||
-                  '') as string,
+                entityId: followingId as string,
                 clearSearch: true,
               }),
             ]);

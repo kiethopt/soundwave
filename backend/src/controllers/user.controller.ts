@@ -578,40 +578,47 @@ export const unfollowUser = async (
       return;
     }
 
-    // Tự động xác định followingType bằng cách kiểm tra followingId
+    // Kiểm tra xem đang follow User hay Artist
     const [userExists, artistExists] = await Promise.all([
       prisma.user.findUnique({ where: { id: followingId } }),
-      prisma.artistProfile.findUnique({ where: { id: followingId } }),
+      prisma.artistProfile.findUnique({
+        where: { id: followingId },
+        select: { id: true },
+      }),
     ]);
 
-    let followingType: FollowingType | null = null;
+    let followingType: FollowingType;
+    const whereConditions: any = {
+      followerId: user.id,
+      followingType: 'USER' as FollowingType, // mặc định
+    };
 
     if (userExists) {
       followingType = FollowingType.USER;
+      whereConditions.followingUserId = followingId;
     } else if (artistExists) {
       followingType = FollowingType.ARTIST;
+      whereConditions.followingArtistId = followingId;
+      whereConditions.followingType = FollowingType.ARTIST;
     } else {
       res.status(404).json({ message: 'Target not found' });
       return;
     }
 
-    // Xóa dựa trên followingType
-    const deleteConditions = {
-      followerId: user.id,
-      followingType: followingType,
-      ...(followingType === FollowingType.USER
-        ? { followingUserId: followingId }
-        : { followingArtistId: followingId }),
-    };
-
-    const result = await prisma.userFollow.deleteMany({
-      where: deleteConditions,
+    // Tìm follow record cụ thể
+    const followRecord = await prisma.userFollow.findFirst({
+      where: whereConditions,
     });
 
-    if (result.count === 0) {
+    if (!followRecord) {
       res.status(404).json({ message: 'Follow not found' });
       return;
     }
+
+    // delete thay vì deleteMany để trigger middleware
+    await prisma.userFollow.delete({
+      where: { id: followRecord.id },
+    });
 
     // Cập nhật monthlyListeners nếu unfollow artist
     if (followingType === FollowingType.ARTIST) {
@@ -642,8 +649,8 @@ export const getFollowers = async (
       return;
     }
 
-    const cacheKey = `/api/users/${user.id}/followers${
-      type ? `?type=${type}` : ''
+    const cacheKey = `/api/user/followers?userId=${user.id}${
+      type ? `&type=${type}` : ''
     }`;
 
     // Kiểm tra cache
@@ -728,7 +735,7 @@ export const getFollowing = async (
       return;
     }
 
-    const cacheKey = `/api/users/${user.id}/following`;
+    const cacheKey = `/api/user/following?userId=${user.id}`;
 
     // Kiểm tra cache
     if (process.env.USE_REDIS_CACHE === 'true') {

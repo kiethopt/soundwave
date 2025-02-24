@@ -1,20 +1,19 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { TrackList } from "@/components/track/TrackList";
-import { EditPlaylistDialog } from "@/components/playlist/EditPlaylistDialog";
-import { api } from "@/utils/api";
-import { toast } from "sonner";
-import { Playlist, Track, ApiResponse } from "@/types";
-import Image from "next/image";
-import { useAuth } from "@/hooks/useAuth";
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { TrackList } from '@/components/track/TrackList';
+import { EditPlaylistDialog } from '@/components/playlist/EditPlaylistDialog';
+import { api } from '@/utils/api';
+import { Playlist } from '@/types';
+import Image from 'next/image';
+import { useAuth } from '@/hooks/useAuth';
 
 interface UpdatePlaylistData {
   name: string;
   description: string;
-  privacy: "PUBLIC" | "PRIVATE";
+  privacy: 'PUBLIC' | 'PRIVATE';
 }
 
 export default function PlaylistPage() {
@@ -30,22 +29,22 @@ export default function PlaylistPage() {
     const fetchPlaylist = async () => {
       try {
         if (!token) {
-          router.push("/login");
+          router.push('/login');
           return;
         }
 
-        console.log("Fetching playlist with ID:", id);
+        console.log('Fetching playlist with ID:', id);
         const response = await api.playlists.getById(id as string);
-        console.log("Playlist response:", response);
+        console.log('Playlist response:', response);
 
         if (response.success) {
           setPlaylist(response.data);
         } else {
-          setError(response.message || "Không thể tải playlist");
+          setError(response.message || 'Không thể tải playlist');
         }
       } catch (error: any) {
-        console.error("Error fetching playlist:", error);
-        setError(error.message || "Không thể tải playlist");
+        console.error('Error fetching playlist:', error);
+        setError(error.message || 'Không thể tải playlist');
       } finally {
         setLoading(false);
       }
@@ -67,7 +66,7 @@ export default function PlaylistPage() {
         totalTracks: playlist.totalTracks - 1,
       });
     } catch (error) {
-      console.error("Error removing track:", error);
+      console.error('Error removing track:', error);
     }
   };
 
@@ -79,7 +78,7 @@ export default function PlaylistPage() {
       setPlaylist({ ...playlist, ...data });
       setIsEditOpen(false);
     } catch (error) {
-      console.error("Error updating playlist:", error);
+      console.error('Error updating playlist:', error);
     }
   };
 

@@ -3,12 +3,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useState, useEffect } from "react";
-import { api } from "@/utils/api";
-import { toast } from "sonner";
-import { Playlist } from "@/types";
-import Image from "next/image";
+} from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
+import { api } from '@/utils/api';
+import { Playlist } from '@/types';
+import Image from 'next/image';
+import { toast } from 'react-toastify';
 
 interface AddToPlaylistDialogProps {
   trackId: string;
@@ -33,17 +33,17 @@ export function AddToPlaylistDialog({
   const fetchPlaylists = async () => {
     try {
       setIsLoading(true);
-      const token = localStorage.getItem("userToken");
+      const token = localStorage.getItem('userToken');
       if (!token) {
-        toast.error("Vui lòng đăng nhập lại");
+        toast.error('Vui lòng đăng nhập lại');
         return;
       }
 
       const response = await api.playlists.getAll(token);
       setPlaylists(response.data);
     } catch (error) {
-      console.error("Error fetching playlists:", error);
-      toast.error("Không thể tải danh sách playlist");
+      console.error('Error fetching playlists:', error);
+      toast.error('Không thể tải danh sách playlist');
     } finally {
       setIsLoading(false);
     }
@@ -51,18 +51,18 @@ export function AddToPlaylistDialog({
 
   const handleAddToPlaylist = async (playlistId: string) => {
     try {
-      const token = localStorage.getItem("userToken");
+      const token = localStorage.getItem('userToken');
       if (!token) {
-        toast.error("Vui lòng đăng nhập lại");
+        toast.error('Vui lòng đăng nhập lại');
         return;
       }
 
       await api.playlists.addTrack(playlistId, trackId, token);
-      toast.success("Đã thêm bài hát vào playlist");
+      toast.success('Đã thêm bài hát vào playlist');
       onOpenChange(false);
     } catch (error: any) {
-      console.error("Error adding track to playlist:", error);
-      toast.error(error.message || "Không thể thêm bài hát vào playlist");
+      console.error('Error adding track to playlist:', error);
+      toast.error(error.message || 'Không thể thêm bài hát vào playlist');
     }
   };
 

@@ -12,7 +12,7 @@ const cache_middleware_1 = require("../middleware/cache.middleware");
 const router = express_1.default.Router();
 router.get('/profiles', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), artist_controller_1.getAllArtistsProfile);
 router.get('/profile/:id', auth_middleware_1.authenticate, artist_controller_1.getArtistProfile);
-router.put('/profile/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), upload_middleware_1.default.single('avatar'), artist_controller_1.updateArtistProfile);
+router.put('/profile/:id', auth_middleware_1.authenticate, upload_middleware_1.default.single('avatar'), artist_controller_1.updateArtistProfile);
 router.get('/stats/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), artist_controller_1.getArtistStats);
 router.get('/tracks/:id', auth_middleware_1.authenticate, artist_controller_1.getArtistTracks);
 router.get('/albums/:id', auth_middleware_1.authenticate, artist_controller_1.getArtistAlbums);

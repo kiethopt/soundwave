@@ -1,25 +1,25 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Playlist } from "@/types";
-import { api } from "@/utils/api";
-import { toast } from "sonner";
+} from '@/components/ui/select';
+import { Playlist } from '@/types';
+import { api } from '@/utils/api';
+import { toast } from 'react-toastify';
 
 interface EditPlaylistDialogProps {
   playlist: Playlist;
@@ -30,7 +30,7 @@ interface EditPlaylistDialogProps {
 interface FormData {
   name: string;
   description: string;
-  privacy: "PUBLIC" | "PRIVATE";
+  privacy: 'PUBLIC' | 'PRIVATE';
 }
 
 export function EditPlaylistDialog({
@@ -41,7 +41,7 @@ export function EditPlaylistDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     name: playlist.name,
-    description: playlist.description || "",
+    description: playlist.description || '',
     privacy: playlist.privacy,
   });
 
@@ -49,18 +49,18 @@ export function EditPlaylistDialog({
     e.preventDefault();
     setIsLoading(true);
     try {
-      const token = localStorage.getItem("userToken");
+      const token = localStorage.getItem('userToken');
       if (!token) {
-        toast.error("Vui lòng đăng nhập lại");
+        toast.error('Vui lòng đăng nhập lại');
         return;
       }
 
       await api.playlists.update(playlist.id, formData, token);
-      toast.success("Đã cập nhật playlist");
+      toast.success('Đã cập nhật playlist');
       onOpenChange(false);
     } catch (error) {
-      console.error("Error updating playlist:", error);
-      toast.error("Không thể cập nhật playlist");
+      console.error('Error updating playlist:', error);
+      toast.error('Không thể cập nhật playlist');
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +76,7 @@ export function EditPlaylistDialog({
     }));
   };
 
-  const handlePrivacyChange = (value: "PUBLIC" | "PRIVATE") => {
+  const handlePrivacyChange = (value: 'PUBLIC' | 'PRIVATE') => {
     setFormData((prev) => ({
       ...prev,
       privacy: value,
@@ -134,7 +134,7 @@ export function EditPlaylistDialog({
               Hủy
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Đang lưu..." : "Lưu thay đổi"}
+              {isLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
             </Button>
           </div>
         </form>

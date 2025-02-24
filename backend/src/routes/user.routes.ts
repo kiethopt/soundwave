@@ -20,13 +20,13 @@ import {
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload, { handleUploadError } from '../middleware/upload.middleware';
-
+import { cacheMiddleware } from '../middleware/cache.middleware';
 const router = express.Router();
 
-router.post('/follow/:id', authenticate, followUser);
-router.delete('/unfollow/:id', authenticate, unfollowUser);
-router.get('/followers', authenticate, getFollowers);
-router.get('/following', authenticate, getFollowing);
+router.post('/follow/:id', authenticate, cacheMiddleware, followUser);
+router.delete('/unfollow/:id', authenticate, cacheMiddleware, unfollowUser);
+router.get('/followers', authenticate, cacheMiddleware, getFollowers);
+router.get('/following', authenticate, cacheMiddleware, getFollowing);
 router.get('/search-all', authenticate, searchAll);
 router.get('/genres', getAllGenres);
 router.get('/profile/:id', getUserProfile);

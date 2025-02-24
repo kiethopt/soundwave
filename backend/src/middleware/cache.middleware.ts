@@ -3,10 +3,10 @@ import { createClient } from 'redis';
 
 export const client = createClient({
   username: 'default',
-  password: 'OIiJohR2wCpl3G6rxhfX81YneBXFASPn',
+  password: 'BAjFVLaluLLeQzEwR7IoOuKWUHSyJtas',
   socket: {
-    host: 'redis-14705.c292.ap-southeast-1-1.ec2.redns.redis-cloud.com',
-    port: 14705,
+    host: 'redis-12768.c1.ap-southeast-1-1.ec2.redns.redis-cloud.com',
+    port: 12768,
   },
 });
 
@@ -107,7 +107,9 @@ export const clearCacheForEntity = async (
       patterns.push(
         '/api/admin/users*',
         '/admin/api/users*',
-        '/api/users/search*'
+        '/api/users/search*',
+        '/api/user/following*',
+        '/api/user/followers*'
       );
     }
 

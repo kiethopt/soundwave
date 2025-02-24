@@ -52,6 +52,8 @@ const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
+const client_2 = require("@prisma/client");
+const pusher_1 = __importDefault(require("../config/pusher"));
 const validateTrackData = (data, isSingleTrack = true, validateRequired = true) => {
     const { title, duration, releaseDate, trackNumber, coverUrl, audioUrl, type, featuredArtists, } = data;
     if (validateRequired) {
@@ -164,12 +166,10 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(400).json({ message: 'Audio file is required' });
             return;
         }
-        if (audioFile) {
-            const audioValidationError = validateFile(audioFile, true);
-            if (audioValidationError) {
-                res.status(400).json({ message: audioValidationError });
-                return;
-            }
+        const audioValidationError = validateFile(audioFile, true);
+        if (audioValidationError) {
+            res.status(400).json({ message: audioValidationError });
+            return;
         }
         if (coverFile) {
             const coverValidationError = validateFile(coverFile, false);
@@ -219,6 +219,38 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: prisma_selects_1.trackSelect,
         });
+        const artistProfile = yield db_1.default.artistProfile.findUnique({
+            where: { id: finalArtistId },
+            select: { artistName: true },
+        });
+        const followers = yield db_1.default.userFollow.findMany({
+            where: {
+                followingArtistId: finalArtistId,
+                followingType: 'ARTIST',
+            },
+            select: { followerId: true },
+        });
+        const notificationsData = followers.map((follower) => ({
+            type: client_2.NotificationType.NEW_TRACK,
+            message: `${(artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.artistName) || 'Unknown'} vừa ra track mới: ${title}`,
+            recipientType: client_2.RecipientType.USER,
+            userId: follower.followerId,
+            artistId: finalArtistId,
+            senderId: finalArtistId,
+        }));
+        yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            if (notificationsData.length > 0) {
+                yield tx.notification.createMany({
+                    data: notificationsData,
+                });
+            }
+        }));
+        for (const follower of followers) {
+            yield pusher_1.default.trigger(`user-${follower.followerId}`, 'notification', {
+                type: client_2.NotificationType.NEW_TRACK,
+                message: `Artist của bạn vừa ra track mới: ${title}`,
+            });
+        }
         res.status(201).json({
             message: 'Track created successfully',
             track,

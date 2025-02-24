@@ -18,6 +18,11 @@ const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const cloudinary_service_1 = require("../services/cloudinary.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
+const pusher_1 = __importDefault(require("../config/pusher"));
+const getMonthStartDate = () => {
+    const date = new Date();
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+};
 const validateArtistData = (data) => {
     const { artistName, bio, socialMediaLinks, genres } = data;
     if (!(artistName === null || artistName === void 0 ? void 0 : artistName.trim()))
@@ -410,7 +415,7 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             const followerName = (currentUser === null || currentUser === void 0 ? void 0 : currentUser.username) || (currentUser === null || currentUser === void 0 ? void 0 : currentUser.email) || 'Unknown';
             if (followingType === 'ARTIST') {
                 console.log('=== DEBUG: followUser => about to create notification for ARTIST');
-                yield tx.notification.create({
+                const notification = yield tx.notification.create({
                     data: {
                         type: 'NEW_FOLLOW',
                         message: `New follower: ${followerName}`,
@@ -423,10 +428,15 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                     where: { id: followingId },
                     data: { monthlyListeners: { increment: 1 } },
                 });
+                yield pusher_1.default.trigger(`user-${followingId}`, 'notification', {
+                    type: 'NEW_FOLLOW',
+                    message: `New follower: ${followerName}`,
+                    notificationId: notification.id,
+                });
             }
             else {
                 console.log('=== DEBUG: followUser => about to create notification for USER->USER follow');
-                yield tx.notification.create({
+                const notification = yield tx.notification.create({
                     data: {
                         type: 'NEW_FOLLOW',
                         message: `New follower: ${followerName}`,
@@ -436,6 +446,11 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                     },
                 });
                 console.log('=== DEBUG: followUser => notification for followed USER created!');
+                yield pusher_1.default.trigger(`user-${followingId}`, 'notification', {
+                    type: 'NEW_FOLLOW',
+                    message: `New follower: ${followerName}`,
+                    notificationId: notification.id,
+                });
             }
         }));
         res.json({ message: 'Followed successfully' });
@@ -456,29 +471,39 @@ const unfollowUser = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         const [userExists, artistExists] = yield Promise.all([
             db_1.default.user.findUnique({ where: { id: followingId } }),
-            db_1.default.artistProfile.findUnique({ where: { id: followingId } }),
+            db_1.default.artistProfile.findUnique({
+                where: { id: followingId },
+                select: { id: true },
+            }),
         ]);
-        let followingType = null;
+        let followingType;
+        const whereConditions = {
+            followerId: user.id,
+            followingType: 'USER',
+        };
         if (userExists) {
             followingType = client_1.FollowingType.USER;
+            whereConditions.followingUserId = followingId;
         }
         else if (artistExists) {
             followingType = client_1.FollowingType.ARTIST;
+            whereConditions.followingArtistId = followingId;
+            whereConditions.followingType = client_1.FollowingType.ARTIST;
         }
         else {
             res.status(404).json({ message: 'Target not found' });
             return;
         }
-        const deleteConditions = Object.assign({ followerId: user.id, followingType: followingType }, (followingType === client_1.FollowingType.USER
-            ? { followingUserId: followingId }
-            : { followingArtistId: followingId }));
-        const result = yield db_1.default.userFollow.deleteMany({
-            where: deleteConditions,
+        const followRecord = yield db_1.default.userFollow.findFirst({
+            where: whereConditions,
         });
-        if (result.count === 0) {
+        if (!followRecord) {
             res.status(404).json({ message: 'Follow not found' });
             return;
         }
+        yield db_1.default.userFollow.delete({
+            where: { id: followRecord.id },
+        });
         if (followingType === client_1.FollowingType.ARTIST) {
             yield db_1.default.artistProfile.update({
                 where: { id: followingId },
@@ -501,6 +526,14 @@ const getFollowers = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
+        }
+        const cacheKey = `/api/user/followers?userId=${user.id}${type ? `&type=${type}` : ''}`;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                res.json(JSON.parse(cachedData));
+                return;
+            }
         }
         const whereConditions = {
             OR: [
@@ -542,6 +575,9 @@ const getFollowers = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             },
         });
         const result = followers.map((f) => (Object.assign(Object.assign({}, f.follower), { followingType: f.followingType })));
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.setCache)(cacheKey, result, 300);
+        }
         res.json(result);
     }
     catch (error) {
@@ -556,6 +592,14 @@ const getFollowing = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
+        }
+        const cacheKey = `/api/user/following?userId=${user.id}`;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                res.json(JSON.parse(cachedData));
+                return;
+            }
         }
         const following = yield db_1.default.userFollow.findMany({
             where: {
@@ -584,6 +628,17 @@ const getFollowing = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                         id: true,
                         artistName: true,
                         avatar: true,
+                        monthlyListeners: true,
+                        genres: {
+                            select: {
+                                genre: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                    },
+                                },
+                            },
+                        },
                         user: {
                             select: {
                                 id: true,
@@ -602,6 +657,9 @@ const getFollowing = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             }
             return Object.assign(Object.assign({ type: 'ARTIST' }, follow.followingArtist), { user: (_a = follow.followingArtist) === null || _a === void 0 ? void 0 : _a.user });
         });
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.setCache)(cacheKey, formattedResults, 300);
+        }
         res.json(formattedResults);
     }
     catch (error) {
@@ -717,14 +775,14 @@ const getUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, function*
             },
         });
         if (!user) {
-            res.status(404).json({ message: "User not found" });
+            res.status(404).json({ message: 'User not found' });
             return;
         }
         res.json(user);
     }
     catch (error) {
-        console.error("Get user profile error:", error);
-        res.status(500).json({ message: "Internal server error" });
+        console.error('Get user profile error:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 });
 exports.getUserProfile = getUserProfile;
@@ -814,8 +872,22 @@ const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, fu
 exports.getRecommendedArtists = getRecommendedArtists;
 const getTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const monthStart = getMonthStartDate();
         const albums = yield db_1.default.album.findMany({
-            where: { isActive: true },
+            where: {
+                isActive: true,
+                tracks: {
+                    some: {
+                        isActive: true,
+                        history: {
+                            some: {
+                                type: 'PLAY',
+                                createdAt: { gte: monthStart },
+                            },
+                        },
+                    },
+                },
+            },
             select: {
                 id: true,
                 title: true,
@@ -825,7 +897,8 @@ const getTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                     select: {
                         id: true,
                         artistName: true,
-                    }
+                        avatar: true,
+                    },
                 },
                 tracks: {
                     where: { isActive: true },
@@ -836,13 +909,44 @@ const getTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                         duration: true,
                         audioUrl: true,
                         playCount: true,
+                        history: {
+                            where: {
+                                type: 'PLAY',
+                                createdAt: { gte: monthStart },
+                            },
+                            select: {
+                                playCount: true,
+                            },
+                        },
                     },
                     orderBy: { trackNumber: 'asc' },
+                },
+                _count: {
+                    select: {
+                        tracks: {
+                            where: {
+                                isActive: true,
+                                history: {
+                                    some: {
+                                        type: 'PLAY',
+                                        createdAt: { gte: monthStart },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: {
+                tracks: {
+                    _count: 'desc',
                 },
             },
             take: 20,
         });
-        res.json(albums);
+        const albumsWithMonthlyPlays = albums.map((album) => (Object.assign(Object.assign({}, album), { monthlyPlays: album.tracks.reduce((sum, track) => sum +
+                track.history.reduce((plays, h) => plays + (h.playCount || 0), 0), 0) })));
+        res.json(albumsWithMonthlyPlays);
     }
     catch (error) {
         console.error('Get top albums error:', error);
@@ -852,8 +956,22 @@ const getTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 exports.getTopAlbums = getTopAlbums;
 const getTopArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const monthStart = getMonthStartDate();
         const artists = yield db_1.default.artistProfile.findMany({
-            where: { isVerified: true },
+            where: {
+                isVerified: true,
+                tracks: {
+                    some: {
+                        isActive: true,
+                        history: {
+                            some: {
+                                type: 'PLAY',
+                                createdAt: { gte: monthStart },
+                            },
+                        },
+                    },
+                },
+            },
             select: {
                 id: true,
                 artistName: true,
@@ -869,11 +987,38 @@ const getTopArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                         },
                     },
                 },
+                tracks: {
+                    where: { isActive: true },
+                    select: {
+                        history: {
+                            where: {
+                                type: 'PLAY',
+                                createdAt: { gte: monthStart },
+                            },
+                            select: {
+                                userId: true,
+                                playCount: true,
+                            },
+                        },
+                    },
+                },
             },
-            orderBy: { monthlyListeners: 'desc' },
-            take: 20,
         });
-        res.json(artists);
+        const artistsWithMonthlyMetrics = artists.map((artist) => {
+            const uniqueListeners = new Set();
+            let monthlyPlays = 0;
+            artist.tracks.forEach((track) => {
+                track.history.forEach((h) => {
+                    uniqueListeners.add(h.userId);
+                    monthlyPlays += h.playCount || 0;
+                });
+            });
+            return Object.assign(Object.assign({}, artist), { monthlyListeners: uniqueListeners.size, monthlyPlays });
+        });
+        const topArtists = artistsWithMonthlyMetrics
+            .sort((a, b) => b.monthlyListeners - a.monthlyListeners)
+            .slice(0, 20);
+        res.json(topArtists);
     }
     catch (error) {
         console.error('Get top artists error:', error);
@@ -883,13 +1028,65 @@ const getTopArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* 
 exports.getTopArtists = getTopArtists;
 const getTopTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const monthStart = getMonthStartDate();
         const tracks = yield db_1.default.track.findMany({
-            where: { isActive: true },
-            select: prisma_selects_1.searchTrackSelect,
-            orderBy: { playCount: 'desc' },
+            where: {
+                isActive: true,
+                history: {
+                    some: {
+                        type: 'PLAY',
+                        createdAt: { gte: monthStart },
+                    },
+                },
+            },
+            select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+                duration: true,
+                audioUrl: true,
+                playCount: true,
+                artist: {
+                    select: {
+                        id: true,
+                        artistName: true,
+                        avatar: true,
+                    },
+                },
+                album: {
+                    select: {
+                        id: true,
+                        title: true,
+                        coverUrl: true,
+                    },
+                },
+                featuredArtists: {
+                    select: {
+                        artistProfile: {
+                            select: {
+                                id: true,
+                                artistName: true,
+                            },
+                        },
+                    },
+                },
+                history: {
+                    where: {
+                        type: 'PLAY',
+                        createdAt: { gte: monthStart },
+                    },
+                    select: {
+                        playCount: true,
+                    },
+                },
+            },
+            orderBy: {
+                playCount: 'desc',
+            },
             take: 20,
         });
-        res.json(tracks);
+        const tracksWithMonthlyPlays = tracks.map((track) => (Object.assign(Object.assign({}, track), { monthlyPlays: track.history.reduce((sum, h) => sum + (h.playCount || 0), 0) })));
+        res.json(tracksWithMonthlyPlays);
     }
     catch (error) {
         console.error('Get top tracks error:', error);

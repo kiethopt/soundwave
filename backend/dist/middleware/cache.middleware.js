@@ -13,10 +13,10 @@ exports.clearCacheForEntity = exports.setCache = exports.cacheMiddleware = expor
 const redis_1 = require("redis");
 exports.client = (0, redis_1.createClient)({
     username: 'default',
-    password: 'OIiJohR2wCpl3G6rxhfX81YneBXFASPn',
+    password: 'BAjFVLaluLLeQzEwR7IoOuKWUHSyJtas',
     socket: {
-        host: 'redis-14705.c292.ap-southeast-1-1.ec2.redns.redis-cloud.com',
-        port: 14705,
+        host: 'redis-12768.c1.ap-southeast-1-1.ec2.redns.redis-cloud.com',
+        port: 12768,
     },
 });
 exports.client.on('error', (err) => console.log('Redis Client Error', err));
@@ -91,7 +91,7 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
             ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
         ];
         if (entity === 'user') {
-            patterns.push('/api/admin/users*', '/admin/api/users*', '/api/users/search*');
+            patterns.push('/api/admin/users*', '/admin/api/users*', '/api/users/search*', '/api/user/following*', '/api/user/followers*');
         }
         if (entity === 'artist') {
             patterns.push('/api/admin/artists*', '/api/artists*', '/api/artist/*');

@@ -1,19 +1,19 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { ArtistProfile } from "@/types";
-import { api } from "@/utils/api";
-import { toast } from "sonner";
-import Image from "next/image";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { ArtistProfile } from '@/types';
+import { api } from '@/utils/api';
+import Image from 'next/image';
+import { toast } from 'react-toastify';
 
 interface EditArtistProfileModalProps {
   artistProfile: ArtistProfile;
@@ -35,10 +35,12 @@ export function EditArtistProfileModal({
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     artistName: artistProfile.artistName,
-    bio: artistProfile.bio || "",
-    avatar: artistProfile.avatar || "",
+    bio: artistProfile.bio || '',
+    avatar: artistProfile.avatar || '',
   });
-  const [avatarPreview, setAvatarPreview] = useState<string>(artistProfile.avatar || '/images/default-avatar.jpg');
+  const [avatarPreview, setAvatarPreview] = useState<string>(
+    artistProfile.avatar || '/images/default-avatar.jpg'
+  );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,18 +57,18 @@ export function EditArtistProfileModal({
     e.preventDefault();
     setIsLoading(true);
     try {
-      const token = localStorage.getItem("userToken");
+      const token = localStorage.getItem('userToken');
       if (!token) {
-        toast.error("Vui lòng đăng nhập lại");
+        toast.error('Vui lòng đăng nhập lại');
         return;
       }
-      console.log("formData", formData);
+      console.log('formData', formData);
       await api.artists.updateProfile(artistProfile.id, formData, token);
-      toast.success("Đã cập nhật Artist Profile");
+      toast.success('Đã cập nhật Artist Profile');
       onOpenChange(false);
     } catch (error) {
-      console.error("Error updating playlist:", error);
-      toast.error("Không thể cập nhật Artist Profile");
+      console.error('Error updating playlist:', error);
+      toast.error('Không thể cập nhật Artist Profile');
     } finally {
       setIsLoading(false);
     }
@@ -112,7 +114,10 @@ export function EditArtistProfileModal({
             />
           </div>
           <div className="space-y-4">
-            <label htmlFor="artistName" className="block text-sm font-medium text-white/70 mb-2">
+            <label
+              htmlFor="artistName"
+              className="block text-sm font-medium text-white/70 mb-2"
+            >
               Artist Name
             </label>
 
@@ -126,7 +131,10 @@ export function EditArtistProfileModal({
               required
             />
 
-            <label htmlFor="bio" className="block text-sm font-medium text-white/70 mb-2">
+            <label
+              htmlFor="bio"
+              className="block text-sm font-medium text-white/70 mb-2"
+            >
               Bio
             </label>
 
@@ -151,8 +159,13 @@ export function EditArtistProfileModal({
             >
               Cancel
             </Button>
-            <Button type="submit" variant="outline" disabled={isLoading} className="">
-              {isLoading ? "Saving..." : "Save"}
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={isLoading}
+              className=""
+            >
+              {isLoading ? 'Saving...' : 'Save'}
             </Button>
           </div>
         </form>

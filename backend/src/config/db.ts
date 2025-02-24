@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client';
 import { albumExtension } from '../middleware/album.middleware';
-// import { withOptimize } from '@prisma/extension-optimize';
 import { withAccelerate } from '@prisma/extension-accelerate';
 import { authExtension } from '../middleware/auth.middleware';
 import { artistExtension } from '../middleware/artist.middleware';
@@ -13,9 +12,9 @@ const prisma = new PrismaClient({
 });
 
 // Kiểm tra environment variable trước khi khởi tạo
-if (!process.env.OPTIMIZE_API_KEY) {
-  throw new Error('OPTIMIZE_API_KEY is missing in environment variables');
-}
+// if (!process.env.OPTIMIZE_API_KEY) {
+//   throw new Error('OPTIMIZE_API_KEY is missing in environment variables');
+// }
 
 // Áp dụng extension
 const extendedPrisma = prisma
@@ -24,7 +23,6 @@ const extendedPrisma = prisma
   .$extends(albumExtension)
   .$extends(artistExtension)
   .$extends(userExtension)
-  // .$extends(withOptimize({ apiKey: process.env.OPTIMIZE_API_KEY }))
   .$extends(withAccelerate());
 
 export default extendedPrisma;

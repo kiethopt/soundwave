@@ -51,6 +51,8 @@ const cloudinary_service_1 = require("../services/cloudinary.service");
 const client_1 = require("@prisma/client");
 const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
+const client_2 = require("@prisma/client");
+const pusher_1 = __importDefault(require("../config/pusher"));
 const canManageAlbum = (user, albumArtistId) => {
     var _a, _b, _c;
     if (!user)
@@ -176,6 +178,38 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: prisma_selects_1.albumSelect,
         });
+        const artistProfile = yield db_1.default.artistProfile.findUnique({
+            where: { id: targetArtistProfileId },
+            select: { artistName: true },
+        });
+        const followers = yield db_1.default.userFollow.findMany({
+            where: {
+                followingArtistId: targetArtistProfileId,
+                followingType: 'ARTIST',
+            },
+            select: { followerId: true },
+        });
+        const notificationsData = followers.map((follower) => ({
+            type: client_2.NotificationType.NEW_ALBUM,
+            message: `${(artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.artistName) || 'Unknown'} vừa ra album mới: ${title}`,
+            recipientType: client_2.RecipientType.USER,
+            userId: follower.followerId,
+            artistId: targetArtistProfileId,
+            senderId: targetArtistProfileId,
+        }));
+        yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            if (notificationsData.length > 0) {
+                yield tx.notification.createMany({
+                    data: notificationsData,
+                });
+            }
+        }));
+        for (const follower of followers) {
+            yield pusher_1.default.trigger(`user-${follower.followerId}`, 'notification', {
+                type: client_2.NotificationType.NEW_ALBUM,
+                message: `Artist của bạn vừa ra album mới: ${title}`,
+            });
+        }
         res.status(201).json({
             message: 'Album created successfully',
             album,

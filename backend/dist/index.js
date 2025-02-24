@@ -17,6 +17,7 @@ const history_routes_1 = __importDefault(require("./routes/history.routes"));
 const artist_routes_1 = __importDefault(require("./routes/artist.routes"));
 const user_routes_1 = __importDefault(require("./routes/user.routes"));
 const notification_routes_1 = __importDefault(require("./routes/notification.routes"));
+const playlist_routes_1 = __importDefault(require("./routes/playlist.routes"));
 const error_1 = require("./middleware/error");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -33,6 +34,7 @@ app.use('/api/history', history_routes_1.default);
 app.use('/api/artist', artist_routes_1.default);
 app.use('/api/user', user_routes_1.default);
 app.use('/api/notifications', notification_routes_1.default);
+app.use('/api/playlists', playlist_routes_1.default);
 app.use(error_1.errorHandler);
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
