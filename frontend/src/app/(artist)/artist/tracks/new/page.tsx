@@ -20,29 +20,54 @@ export default function NewTrack() {
   });
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [availableArtists, setAvailableArtists] = useState<
+    Array<{
+      id: string;
+      name: string;
+    }>
+  >([]);
   const [featuredArtists, setFeaturedArtists] = useState<string[]>([]);
+  const [availableGenres, setAvailableGenres] = useState<
+    Array<{
+      id: string;
+      name: string;
+    }>
+  >([]);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [artistOptions, setArtistOptions] = useState<ArtistProfile[]>([]);
   const { theme } = useTheme();
 
   useEffect(() => {
-    const fetchArtists = async () => {
+    const fetchData = async () => {
       try {
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        const response = await api.artists.getAllArtistsProfile(token, 1, 100);
-        const verifiedArtists = response.artists.filter(
-          (artist: ArtistProfile) =>
-            artist.isVerified && artist.role === 'ARTIST'
+        const [artistsResponse, genresResponse] = await Promise.all([
+          api.artists.getAllArtistsProfile(token, 1, 100),
+          api.artists.getAllGenres(token, 1, 100),
+        ]);
+
+        setAvailableArtists(
+          artistsResponse.artists.map((artist: ArtistProfile) => ({
+            id: artist.id,
+            name: artist.artistName,
+          }))
         );
-        setArtistOptions(verifiedArtists);
-      } catch (err) {
-        console.error('Error fetching artists:', err);
-        toast.error('Failed to load featured artists');
+
+        setAvailableGenres(
+          genresResponse.data.map((genre: { id: string; name: string }) => ({
+            id: genre.id,
+            name: genre.name,
+          }))
+        );
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+        toast.error('Failed to load required data');
       }
     };
 
-    fetchArtists();
+    fetchData();
   }, []);
 
   const handleInputChange = (
@@ -76,9 +101,14 @@ export default function NewTrack() {
       formData.append('releaseDate', trackData.releaseDate);
       if (audioFile) formData.append('audioFile', audioFile);
       if (coverFile) formData.append('coverFile', coverFile);
-      if (featuredArtists.length > 0) {
-        formData.append('featuredArtists', featuredArtists.join(','));
-      }
+
+      featuredArtists.forEach((artistId) => {
+        formData.append('featuredArtists[]', artistId);
+      });
+
+      selectedGenres.forEach((genreId) => {
+        formData.append('genreIds[]', genreId);
+      });
 
       await api.tracks.create(formData, token);
       toast.success('Track created successfully');
@@ -125,6 +155,7 @@ export default function NewTrack() {
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
+              {/* Title */}
               <div className="space-y-2">
                 <label
                   htmlFor="title"
@@ -149,6 +180,7 @@ export default function NewTrack() {
                 />
               </div>
 
+              {/* Type */}
               <div className="space-y-2">
                 <label
                   htmlFor="type"
@@ -173,6 +205,7 @@ export default function NewTrack() {
                 </select>
               </div>
 
+              {/* Release Date & Time */}
               <div className="space-y-2">
                 <label
                   htmlFor="releaseDate"
@@ -197,27 +230,45 @@ export default function NewTrack() {
                 />
               </div>
 
+              {/* Featured Artists */}
               <div className="space-y-2">
                 <label
                   htmlFor="featuredArtists"
                   className={`block text-sm font-medium ${
-                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                    theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
                   }`}
                 >
                   Featured Artists
                 </label>
                 <SearchableSelect
-                  options={artistOptions.map((artist) => ({
-                    id: artist.id,
-                    name: artist.artistName,
-                  }))}
+                  options={availableArtists}
                   value={featuredArtists}
-                  onChange={(value) => setFeaturedArtists(value as string[])}
-                  placeholder="Select featured artists"
-                  multiple
+                  onChange={setFeaturedArtists}
+                  placeholder="Select featured artists..."
+                  multiple={true}
                 />
               </div>
 
+              {/* Genres */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="genres"
+                  className={`block text-sm font-medium ${
+                    theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                  }`}
+                >
+                  Genres
+                </label>
+                <SearchableSelect
+                  options={availableGenres}
+                  value={selectedGenres}
+                  onChange={setSelectedGenres}
+                  placeholder="Select genres..."
+                  multiple={true}
+                />
+              </div>
+
+              {/* Audio File */}
               <div className="space-y-2">
                 <label
                   htmlFor="audio"
@@ -242,6 +293,7 @@ export default function NewTrack() {
                 />
               </div>
 
+              {/* Cover Image */}
               <div className="space-y-2">
                 <label
                   htmlFor="cover"
@@ -265,6 +317,7 @@ export default function NewTrack() {
                 />
               </div>
 
+              {/* Submit Button */}
               <div className="flex justify-end">
                 <button
                   type="submit"

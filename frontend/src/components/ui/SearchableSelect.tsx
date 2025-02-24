@@ -9,8 +9,8 @@ interface Option {
 
 interface SearchableSelectProps {
   options: Option[];
-  value: string | string[];
-  onChange: (value: string | string[]) => void;
+  value: string[];
+  onChange: (value: string[]) => void;
   placeholder?: string;
   multiple?: boolean;
   label?: string;
@@ -19,7 +19,7 @@ interface SearchableSelectProps {
 
 export function SearchableSelect({
   options,
-  value,
+  value = [],
   onChange,
   placeholder = 'Select an option',
   multiple = false,
@@ -32,18 +32,23 @@ export function SearchableSelect({
   const { theme } = useTheme();
 
   const filteredOptions = options.filter((option) =>
-    option.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (option.name || '').toLowerCase().includes((searchTerm || '').toLowerCase())
   );
 
   const handleSelect = (optionId: string) => {
+    let newValue: string[];
     if (multiple) {
-      const currentValue = Array.isArray(value) ? value : [];
-      const newValue = currentValue.includes(optionId)
-        ? currentValue.filter((id) => id !== optionId)
-        : [...currentValue, optionId];
-      onChange(newValue);
+      newValue = value.includes(optionId)
+        ? value.filter((id) => id !== optionId)
+        : [...value, optionId];
     } else {
-      onChange(optionId);
+      newValue = value[0] === optionId ? [] : [optionId];
+    }
+
+    // Cho phép gửi mảng rỗng khi đã xóa hết lựa chọn
+    onChange(newValue.length === 0 ? [] : newValue);
+
+    if (!multiple) {
       setIsOpen(false);
     }
   };
@@ -64,26 +69,7 @@ export function SearchableSelect({
   }, []);
 
   const displayValue = () => {
-    if (multiple) {
-      if (Array.isArray(value) && value.length > 0) {
-        const selectedOptions = options.filter((opt) => value.includes(opt.id));
-        return (
-          <div className="flex flex-wrap gap-2">
-            {selectedOptions.map((opt) => (
-              <span
-                key={opt.id}
-                className={`px-2 py-1 rounded-md text-sm ${
-                  theme === 'light'
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'bg-white/10 text-white'
-                }`}
-              >
-                {opt.name}
-              </span>
-            ))}
-          </div>
-        );
-      }
+    if (value.length === 0) {
       return (
         <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>
           {placeholder}
@@ -91,15 +77,32 @@ export function SearchableSelect({
       );
     }
 
-    const selectedOption = options.find((opt) => opt.id === value);
-    return selectedOption ? (
-      <span className={theme === 'light' ? 'text-gray-900' : 'text-white'}>
-        {selectedOption.name}
-      </span>
-    ) : (
-      <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>
-        {placeholder}
-      </span>
+    const selectedOptions = options.filter((opt) => value.includes(opt.id));
+    return (
+      <div className="flex flex-wrap gap-2">
+        {selectedOptions.map((opt) => (
+          <span
+            key={opt.id}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-sm ${
+              theme === 'light'
+                ? 'bg-gray-100 text-gray-900'
+                : 'bg-white/10 text-white'
+            }`}
+          >
+            {opt.name}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSelect(opt.id);
+              }}
+              className={`hover:text-red-500 transition-colors`}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
     );
   };
 
@@ -117,7 +120,7 @@ export function SearchableSelect({
       <div className="relative" ref={wrapperRef}>
         <div
           className={`w-full px-3 py-2 rounded-md border cursor-pointer ${
-            required && !value
+            required && value.length === 0
               ? 'border-red-500'
               : theme === 'light'
               ? 'border-gray-300 bg-white'
@@ -165,18 +168,10 @@ export function SearchableSelect({
                   key={option.id}
                   className={`px-3 py-2 cursor-pointer ${
                     theme === 'light'
-                      ? multiple
-                        ? Array.isArray(value) && value.includes(option.id)
-                          ? 'bg-gray-100'
-                          : 'hover:bg-gray-50'
-                        : option.id === value
+                      ? value.includes(option.id)
                         ? 'bg-gray-100'
                         : 'hover:bg-gray-50'
-                      : multiple
-                      ? Array.isArray(value) && value.includes(option.id)
-                        ? 'bg-white/10'
-                        : 'hover:bg-white/5'
-                      : option.id === value
+                      : value.includes(option.id)
                       ? 'bg-white/10'
                       : 'hover:bg-white/5'
                   }`}
@@ -204,7 +199,7 @@ export function SearchableSelect({
           </div>
         )}
       </div>
-      {required && !value && (
+      {required && value.length === 0 && (
         <p className="text-red-500 text-sm mt-1">This field is required</p>
       )}
     </div>

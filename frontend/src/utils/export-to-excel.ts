@@ -15,15 +15,18 @@ export function exportToExcel<T>(
           return obj[key];
         }, item);
 
+        // Xử lý đặc biệt cho trường title để tránh Excel hiểu nhầm là ngày tháng
+        if (col.key === 'title') {
+          return { v: value, t: 's' }; // Chỉ định kiểu dữ liệu là string
+        }
+
         // Xử lý đặc biệt cho trường artistProfile
         if (col.key.startsWith('artistProfile.')) {
-          // Kiểm tra xem user có artistProfile và đã được verify chưa
           const artistProfile = item.artistProfile;
           if (!artistProfile || !artistProfile.isVerified) {
             return 'N/A';
           }
 
-          // Nếu là các trường liên quan đến social media
           if (col.key.includes('socialMediaLinks')) {
             const links = artistProfile.socialMediaLinks || {};
             if (col.key.includes('facebook'))
@@ -33,8 +36,33 @@ export function exportToExcel<T>(
             return 'Not provided';
           }
 
-          // Trả về giá trị thực của trường artistProfile nếu có
           return value || 'N/A';
+        }
+
+        if (col.key === 'duration') {
+          const duration = value as number;
+          return `${Math.floor(duration / 60)}:${(duration % 60)
+            .toString()
+            .padStart(2, '0')}`;
+        }
+
+        if (col.key === 'featuredArtists') {
+          const artists = (value as any[])?.map(
+            (fa) => fa.artistProfile.artistName
+          );
+          return artists?.join(', ') || '';
+        }
+
+        if (col.key === 'playCount') {
+          return (value as number).toLocaleString('vi-VN');
+        }
+
+        if (col.key === 'isActive') {
+          return value ? 'Active' : 'Hidden';
+        }
+
+        if (col.key === 'album.title') {
+          return item.album?.title || '';
         }
 
         // Format dates
@@ -79,6 +107,17 @@ export function exportToExcel<T>(
   ];
 
   const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+
+  // Đặt kiểu dữ liệu cho cột title
+  const titleCol = columns.findIndex((col) => col.key === 'title');
+  if (titleCol !== -1) {
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    for (let row = range.s.r + 1; row <= range.e.r; row++) {
+      const cell = XLSX.utils.encode_cell({ r: row, c: titleCol });
+      if (!worksheet[cell]) continue;
+      worksheet[cell].t = 's'; // Đặt kiểu dữ liệu là string
+    }
+  }
 
   // Auto-size columns
   const maxWidths = worksheetData[0].map((_, i) =>

@@ -52,6 +52,11 @@ export function DataTable<TData, TValue>({
   theme = 'light',
   onSortingChange,
 }: DataTableProps<TData, TValue>) {
+  // Reset  row khi data thay đổi
+  React.useEffect(() => {
+    table.resetRowSelection();
+  }, [data, table]);
+
   React.useEffect(() => {
     if (onRowSelection) {
       const selectedRows = table
@@ -90,7 +95,7 @@ export function DataTable<TData, TValue>({
                   return (
                     <TableHead
                       key={header.id}
-                      className={`h-10 px-2 text-left align-middle font-medium whitespace-nowrap ${
+                      className={`h-10 px-4 text-left align-middle font-medium whitespace-nowrap ${
                         header.id === 'actions'
                           ? `sticky right-0 ${
                               theme === 'dark' ? 'bg-[#121212]' : 'bg-white'
@@ -101,7 +106,7 @@ export function DataTable<TData, TValue>({
                       {header.isPlaceholder ? null : canSort ? (
                         <Button
                           variant="ghost"
-                          className={`-ml-3 h-8 data-[state=open]:bg-accent ${
+                          className={`-ml-4 h-8 data-[state=open]:bg-accent ${
                             theme === 'dark'
                               ? 'hover:bg-white/10 hover:text-white'
                               : ''
@@ -145,7 +150,7 @@ export function DataTable<TData, TValue>({
                   {row.getVisibleCells().map((cell: any) => (
                     <TableCell
                       key={cell.id}
-                      className={`p-2 align-middle whitespace-nowrap ${
+                      className={`px-4 py-2 align-middle whitespace-nowrap ${
                         cell.column.id === 'actions'
                           ? `sticky right-0 ${
                               theme === 'dark' ? 'bg-[#121212]' : 'bg-white'

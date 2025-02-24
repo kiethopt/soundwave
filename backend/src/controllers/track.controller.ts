@@ -168,8 +168,8 @@ export const createTrack = async (
       trackNumber,
       albumId,
       featuredArtists,
-      genreIds,
       artistId,
+      genreIds,
     } = req.body;
 
     const finalArtistId =
@@ -223,13 +223,25 @@ export const createTrack = async (
         trackReleaseDate = album.releaseDate;
       }
     } else {
-      // So sánh chính xác đến giờ phút giây
       const now = new Date();
       isActive = trackReleaseDate <= now;
       console.log('Release date:', trackReleaseDate);
       console.log('Current time:', now);
       console.log('Is active:', isActive);
     }
+
+    const featuredArtistsArray = Array.isArray(featuredArtists)
+      ? featuredArtists
+      : featuredArtists
+      ? [featuredArtists]
+      : [];
+
+    // Xử lý genres
+    const genreIdsArray = Array.isArray(genreIds)
+      ? genreIds
+      : genreIds
+      ? [genreIds]
+      : [];
 
     const track = await prisma.track.create({
       data: {
@@ -243,20 +255,24 @@ export const createTrack = async (
         albumId: albumId || null,
         type: albumId ? undefined : 'SINGLE',
         isActive,
-        featuredArtists: featuredArtists
-          ? {
-              create: featuredArtists.split(',').map((artistId: string) => ({
-                artistId: artistId.trim(),
-              })),
-            }
-          : undefined,
-        genres: genreIds
-          ? {
-              create: genreIds.split(',').map((genreId: string) => ({
-                genreId: genreId.trim(),
-              })),
-            }
-          : undefined,
+        featuredArtists:
+          featuredArtistsArray.length > 0
+            ? {
+                create: featuredArtistsArray.map((artistId: string) => ({
+                  artistId: artistId.trim(),
+                })),
+              }
+            : undefined,
+        genres:
+          genreIdsArray.length > 0
+            ? {
+                create: genreIdsArray.map((genreId: string) => ({
+                  genre: {
+                    connect: { id: genreId.trim() },
+                  },
+                })),
+              }
+            : undefined,
       },
       select: trackSelect,
     });
@@ -325,40 +341,83 @@ export const updateTrack = async (
       genreIds,
     } = req.body;
 
-    const updateData: any = {};
-    if (title !== undefined) updateData.title = title;
-    if (releaseDate !== undefined)
-      updateData.releaseDate = new Date(releaseDate);
-    if (type !== undefined) updateData.type = type;
-    if (trackNumber !== undefined) updateData.trackNumber = Number(trackNumber);
-    if (albumId !== undefined) updateData.albumId = albumId || null;
+    // Kiểm tra track hiện tại
+    const currentTrack = await prisma.track.findUnique({
+      where: { id },
+      select: {
+        releaseDate: true,
+        isActive: true,
+        artistId: true,
+        featuredArtists: true,
+        genres: true,
+      },
+    });
 
-    // Xử lý featuredArtists nếu được cung cấp
-    if (featuredArtists) {
-      const featuredArtistsArray = Array.isArray(featuredArtists)
-        ? featuredArtists
-        : featuredArtists.split(',').map((id: string) => id.trim());
-
-      updateData.featuredArtists = {
-        deleteMany: {},
-        create: featuredArtistsArray.map((artistId: string) => ({
-          artistId,
-        })),
-      };
+    if (!currentTrack) {
+      res.status(404).json({ message: 'Track not found' });
+      return;
     }
 
-    // Xử lý genres nếu được cung cấp
-    if (genreIds) {
-      const genreIdsArray = Array.isArray(genreIds)
-        ? genreIds
-        : genreIds.split(',').map((id: string) => id.trim());
+    // Kiểm tra quyền chỉnh sửa
+    if (!canManageTrack(req.user, currentTrack.artistId)) {
+      res.status(403).json({
+        message: 'You can only update your own tracks',
+        code: 'NOT_TRACK_OWNER',
+      });
+      return;
+    }
 
-      updateData.genres = {
-        deleteMany: {},
-        create: genreIdsArray.map((genreId: string) => ({
-          genreId,
-        })),
+    const updateData: any = {};
+
+    // Cập nhật các trường cơ bản
+    if (title) updateData.title = title;
+    if (type) updateData.type = type;
+    if (trackNumber) updateData.trackNumber = Number(trackNumber);
+    if (albumId !== undefined) updateData.albumId = albumId || null;
+
+    // Xử lý release date và trạng thái active
+    if (releaseDate) {
+      const newReleaseDate = new Date(releaseDate);
+      const now = new Date();
+
+      // Chỉ set isActive = false nếu releaseDate mới lớn hơn thời điểm hiện tại
+      if (newReleaseDate > now) {
+        updateData.isActive = false;
+      } else {
+        updateData.isActive = true;
+      }
+
+      updateData.releaseDate = newReleaseDate;
+    }
+
+    // Cập nhật featured artists
+    if (featuredArtists !== undefined) {
+      updateData.featuredArtists = {
+        deleteMany: { trackId: id }, // Xóa tất cả featured artists hiện có
       };
+      if (Array.isArray(featuredArtists) && featuredArtists.length > 0) {
+        updateData.featuredArtists.create = featuredArtists.map(
+          (artistId: string) => ({
+            artistId: artistId.trim(),
+          })
+        );
+      } else {
+        updateData.featuredArtists.create = []; // Không tạo mới nếu không phải mảng hoặc mảng rỗng
+      }
+    }
+
+    // Cập nhật genres
+    if (genreIds !== undefined) {
+      updateData.genres = {
+        deleteMany: { trackId: id }, // Xóa tất cả genres hiện có
+      };
+      if (Array.isArray(genreIds) && genreIds.length > 0) {
+        updateData.genres.create = genreIds.map((genreId: string) => ({
+          genreId: genreId.trim(),
+        }));
+      } else {
+        updateData.genres.create = []; // Không tạo mới nếu không phải mảng hoặc mảng rỗng
+      }
     }
 
     // Cập nhật track

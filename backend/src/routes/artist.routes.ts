@@ -7,6 +7,7 @@ import {
   getArtistAlbums,
   updateArtistProfile,
   getRelatedArtists,
+  getAllGenres,
 } from '../controllers/artist.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -39,19 +40,19 @@ router.get(
   getArtistStats
 );
 
+router.get(
+  '/genres',
+  authenticate,
+  authorize([Role.ARTIST]),
+  cacheMiddleware,
+  getAllGenres
+);
+
 router.get('/tracks/:id', authenticate, getArtistTracks);
 
 router.get('/albums/:id', authenticate, getArtistAlbums);
 
 router.get('/related/:id', authenticate, getRelatedArtists);
-
-// router.get(
-//   '/albums/:id',
-//   authenticate,
-//   // authorize([Role.ADMIN, Role.ARTIST]),
-//   cacheMiddleware,
-//   getArtistAlbums
-// );
 
 router.get('/:id/albums', authenticate, cacheMiddleware, getArtistAlbums);
 

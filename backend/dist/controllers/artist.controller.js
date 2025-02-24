@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRelatedArtists = exports.getArtistStats = exports.updateArtistProfile = exports.getArtistTracks = exports.getArtistAlbums = exports.getArtistProfile = exports.getAllArtistsProfile = void 0;
+exports.getRelatedArtists = exports.getArtistStats = exports.updateArtistProfile = exports.getArtistTracks = exports.getArtistAlbums = exports.getAllGenres = exports.getArtistProfile = exports.getAllArtistsProfile = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cloudinary_service_1 = require("../services/cloudinary.service");
@@ -80,7 +80,7 @@ const validateUpdateArtistProfile = (data) => {
     return null;
 };
 const getAllArtistsProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b;
     try {
         const { page = 1, limit = 10 } = req.query;
         const pageNumber = parseInt(page, 10);
@@ -99,9 +99,11 @@ const getAllArtistsProfile = (req, res) => __awaiter(void 0, void 0, void 0, fun
             });
             return;
         }
+        const currentArtistId = (_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.id;
         const whereCondition = {
             isVerified: true,
             role: client_1.Role.ARTIST,
+            id: { not: currentArtistId },
         };
         const [artists, total] = yield Promise.all([
             db_1.default.artistProfile.findMany({
@@ -149,6 +151,28 @@ const getArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.getArtistProfile = getArtistProfile;
+const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { page = 1, limit = 100 } = req.query;
+        const genres = yield db_1.default.genre.findMany({
+            select: { id: true, name: true },
+            orderBy: { name: 'asc' },
+            skip: (Number(page) - 1) * Number(limit),
+            take: Number(limit),
+        });
+        res.json({
+            data: genres,
+            total: yield db_1.default.genre.count(),
+            page: Number(page),
+            limit: Number(limit),
+        });
+    }
+    catch (error) {
+        console.error('Get all genres error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getAllGenres = getAllGenres;
 const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const { page = 1, limit = 10 } = req.query;

@@ -109,7 +109,7 @@ export const getAllArtistsProfile = async (
       return;
     }
 
-    // Kiểm tra quyền truy cập
+    // Kiểm tra quyền truy cập, cần là ADMIN hoặc artist đã được verify hoặc đã switch sang profile Artist
     if (
       user.role !== Role.ADMIN &&
       (!user.artistProfile?.isVerified || user.currentProfile !== 'ARTIST')
@@ -121,10 +121,14 @@ export const getAllArtistsProfile = async (
       return;
     }
 
+    // Tạo biến lấy ID của artist hiện tại để loại bỏ khỏi danh sách
+    const currentArtistId = user.artistProfile?.id;
+
     // Chỉ lấy các artist đã được verify
     const whereCondition = {
       isVerified: true,
       role: Role.ARTIST,
+      id: { not: currentArtistId }, // Không lấy artist hiện tại
     };
 
     const [artists, total] = await Promise.all([
@@ -174,6 +178,34 @@ export const getArtistProfile = async (
 
     res.json(artist);
   } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Lấy danh sách tất cả thể loại nhạc (chỉ đọc)
+export const getAllGenres = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { page = 1, limit = 100 } = req.query;
+
+    const genres = await prisma.genre.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+      skip: (Number(page) - 1) * Number(limit),
+      take: Number(limit),
+    });
+
+    // Thêm cấu trúc response có pagination
+    res.json({
+      data: genres,
+      total: await prisma.genre.count(),
+      page: Number(page),
+      limit: Number(limit),
+    });
+  } catch (error) {
+    console.error('Get all genres error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

@@ -28,6 +28,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 import Link from 'next/link';
+import { getAlbumColumns } from '@/components/data-table/data-table-columns';
 
 export default function ArtistAlbums() {
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -162,26 +163,50 @@ export default function ArtistAlbums() {
     }
   };
 
-  const handleDeleteAlbum = async (albumId: string) => {
-    if (!confirm('Are you sure you want to delete this album?')) return;
+  const handleDeleteAlbum = async (albumId: string | string[]) => {
+    const ids = Array.isArray(albumId) ? albumId : [albumId];
+    const confirmMessage =
+      ids.length === 1
+        ? 'Are you sure you want to delete this album?'
+        : `Delete ${ids.length} selected albums?`;
+
+    if (!confirm(confirmMessage)) return;
 
     try {
-      setActionLoading(albumId);
       const token = localStorage.getItem('userToken');
       if (!token) {
         toast.error('No authentication token found');
         return;
       }
 
-      await api.albums.delete(albumId, token);
-      setAlbums((prev) => prev.filter((album) => album.id !== albumId));
-      toast.success('Album deleted successfully');
+      // Nếu xóa một album, set loading state cho album đó
+      if (!Array.isArray(albumId)) {
+        setActionLoading(albumId);
+      }
+
+      await Promise.all(ids.map((id) => api.albums.delete(id, token)));
+
+      // Nếu xóa một album, cập nhật state albums ngay lập tức
+      if (!Array.isArray(albumId)) {
+        setAlbums((prev) => prev.filter((album) => album.id !== albumId));
+      } else {
+        // Nếu xóa nhiều albums, fetch lại data
+        await fetchAlbums(currentPage);
+      }
+
+      toast.success(
+        ids.length === 1
+          ? 'Album deleted successfully'
+          : `Deleted ${ids.length} albums successfully`
+      );
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : 'Failed to delete album'
+        error instanceof Error ? error.message : 'Failed to delete album(s)'
       );
     } finally {
-      setActionLoading(null);
+      if (!Array.isArray(albumId)) {
+        setActionLoading(null);
+      }
     }
   };
 
@@ -209,152 +234,11 @@ export default function ArtistAlbums() {
   };
 
   // Table columns definition
-  const columns: ColumnDef<Album>[] = [
-    {
-      id: 'select',
-      header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-          className={theme === 'dark' ? 'border-white/50' : ''}
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-          className={theme === 'dark' ? 'border-white/50' : ''}
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
-      accessorKey: 'title',
-      header: 'Album',
-      cell: ({ row }) => {
-        const album = row.original;
-        return (
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-12 h-12 rounded-md overflow-hidden ${
-                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
-              }`}
-            >
-              {album.coverUrl ? (
-                <Image
-                  src={album.coverUrl}
-                  alt={album.title}
-                  width={48}
-                  height={48}
-                  className="object-cover w-full h-full"
-                />
-              ) : (
-                <Music
-                  className={`w-12 h-12 p-2.5 ${
-                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                  }`}
-                />
-              )}
-            </div>
-            <div>
-              <Link
-                href={`/artist/albums/${album.id}`}
-                className={`font-medium hover:underline ${
-                  theme === 'dark' ? 'text-white' : ''
-                }`}
-              >
-                {album.title}
-              </Link>
-              <div
-                className={theme === 'dark' ? 'text-white/60' : 'text-gray-500'}
-              >
-                {album.type}
-              </div>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: 'totalTracks',
-      header: 'Tracks',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {row.original.totalTracks}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'duration',
-      header: 'Duration',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {Math.floor(row.original.duration / 60)}:
-          {(row.original.duration % 60).toString().padStart(2, '0')}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'isActive',
-      header: 'Status',
-      cell: ({ row }) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            row.original.isActive
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-red-500/20 text-red-400'
-          }`}
-        >
-          {row.original.isActive ? 'Active' : 'Hidden'}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'releaseDate',
-      header: 'Release Date',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {new Date(row.original.releaseDate).toLocaleDateString()}
-        </span>
-      ),
-    },
-    {
-      id: 'actions',
-      cell: ({ row }) => {
-        const album = row.original;
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger>
-              <MoreVertical className="h-4 w-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => handleAlbumVisibility(album.id, album.isActive)}
-              >
-                {album.isActive ? (
-                  <EyeOff className="w-4 h-4 mr-2" />
-                ) : (
-                  <Eye className="w-4 h-4 mr-2" />
-                )}
-                {album.isActive ? 'Hide Album' : 'Show Album'}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => handleDeleteAlbum(album.id)}
-                className="text-red-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Album
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
-  ];
+  const columns = getAlbumColumns({
+    theme,
+    onVisibilityChange: handleAlbumVisibility,
+    onDelete: handleDeleteAlbum,
+  });
 
   const table = useReactTable({
     data: albums,
@@ -430,7 +314,7 @@ export default function ArtistAlbums() {
           searchValue: searchInput,
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
-          onDelete: handleDeleteSelected,
+          onDelete: () => handleDeleteAlbum(selectedRows.map((row) => row.id)),
           showExport: true,
           exportData: {
             data: albums,

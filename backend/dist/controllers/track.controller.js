@@ -162,7 +162,7 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const { title, releaseDate, trackNumber, albumId, featuredArtists, genreIds, artistId, } = req.body;
+        const { title, releaseDate, trackNumber, albumId, featuredArtists, artistId, genreIds, } = req.body;
         const finalArtistId = user.role === 'ADMIN' ? artistId : (_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id;
         if (!finalArtistId) {
             res.status(400).json({
@@ -209,6 +209,16 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             console.log('Current time:', now);
             console.log('Is active:', isActive);
         }
+        const featuredArtistsArray = Array.isArray(featuredArtists)
+            ? featuredArtists
+            : featuredArtists
+                ? [featuredArtists]
+                : [];
+        const genreIdsArray = Array.isArray(genreIds)
+            ? genreIds
+            : genreIds
+                ? [genreIds]
+                : [];
         const track = yield db_1.default.track.create({
             data: {
                 title,
@@ -221,17 +231,19 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 albumId: albumId || null,
                 type: albumId ? undefined : 'SINGLE',
                 isActive,
-                featuredArtists: featuredArtists
+                featuredArtists: featuredArtistsArray.length > 0
                     ? {
-                        create: featuredArtists.split(',').map((artistId) => ({
+                        create: featuredArtistsArray.map((artistId) => ({
                             artistId: artistId.trim(),
                         })),
                     }
                     : undefined,
-                genres: genreIds
+                genres: genreIdsArray.length > 0
                     ? {
-                        create: genreIds.split(',').map((genreId) => ({
-                            genreId: genreId.trim(),
+                        create: genreIdsArray.map((genreId) => ({
+                            genre: {
+                                connect: { id: genreId.trim() },
+                            },
                         })),
                     }
                     : undefined,
@@ -283,38 +295,72 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     try {
         const { id } = req.params;
         const { title, releaseDate, type, trackNumber, albumId, featuredArtists, genreIds, } = req.body;
+        const currentTrack = yield db_1.default.track.findUnique({
+            where: { id },
+            select: {
+                releaseDate: true,
+                isActive: true,
+                artistId: true,
+                featuredArtists: true,
+                genres: true,
+            },
+        });
+        if (!currentTrack) {
+            res.status(404).json({ message: 'Track not found' });
+            return;
+        }
+        if (!canManageTrack(req.user, currentTrack.artistId)) {
+            res.status(403).json({
+                message: 'You can only update your own tracks',
+                code: 'NOT_TRACK_OWNER',
+            });
+            return;
+        }
         const updateData = {};
-        if (title !== undefined)
+        if (title)
             updateData.title = title;
-        if (releaseDate !== undefined)
-            updateData.releaseDate = new Date(releaseDate);
-        if (type !== undefined)
+        if (type)
             updateData.type = type;
-        if (trackNumber !== undefined)
+        if (trackNumber)
             updateData.trackNumber = Number(trackNumber);
         if (albumId !== undefined)
             updateData.albumId = albumId || null;
-        if (featuredArtists) {
-            const featuredArtistsArray = Array.isArray(featuredArtists)
-                ? featuredArtists
-                : featuredArtists.split(',').map((id) => id.trim());
-            updateData.featuredArtists = {
-                deleteMany: {},
-                create: featuredArtistsArray.map((artistId) => ({
-                    artistId,
-                })),
-            };
+        if (releaseDate) {
+            const newReleaseDate = new Date(releaseDate);
+            const now = new Date();
+            if (newReleaseDate > now) {
+                updateData.isActive = false;
+            }
+            else {
+                updateData.isActive = true;
+            }
+            updateData.releaseDate = newReleaseDate;
         }
-        if (genreIds) {
-            const genreIdsArray = Array.isArray(genreIds)
-                ? genreIds
-                : genreIds.split(',').map((id) => id.trim());
-            updateData.genres = {
-                deleteMany: {},
-                create: genreIdsArray.map((genreId) => ({
-                    genreId,
-                })),
+        if (featuredArtists !== undefined) {
+            updateData.featuredArtists = {
+                deleteMany: { trackId: id },
             };
+            if (Array.isArray(featuredArtists) && featuredArtists.length > 0) {
+                updateData.featuredArtists.create = featuredArtists.map((artistId) => ({
+                    artistId: artistId.trim(),
+                }));
+            }
+            else {
+                updateData.featuredArtists.create = [];
+            }
+        }
+        if (genreIds !== undefined) {
+            updateData.genres = {
+                deleteMany: { trackId: id },
+            };
+            if (Array.isArray(genreIds) && genreIds.length > 0) {
+                updateData.genres.create = genreIds.map((genreId) => ({
+                    genreId: genreId.trim(),
+                }));
+            }
+            else {
+                updateData.genres.create = [];
+            }
         }
         const updatedTrack = yield db_1.default.track.update({
             where: { id },

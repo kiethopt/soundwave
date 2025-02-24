@@ -2,21 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import type { Track } from '@/types';
+import type { ArtistProfile, Track } from '@/types';
 import { api } from '@/utils/api';
-import { MoreVertical, Eye, EyeOff, Trash2, Music } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import Image from 'next/image';
 import { toast } from 'react-toastify';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
-  ColumnDef,
   ColumnFiltersState,
   getCoreRowModel,
   getPaginationRowModel,
@@ -25,9 +15,10 @@ import {
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table';
-import { Checkbox } from '@/components/ui/checkbox';
 import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 import Link from 'next/link';
+import { EditTrackModal } from '@/components/data-table/data-table-modals';
+import { getTrackColumns } from '@/components/data-table/data-table-columns';
 
 export default function ArtistTracks() {
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -35,6 +26,23 @@ export default function ArtistTracks() {
   const [searchInput, setSearchInput] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
+  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
+  const [availableArtists, setAvailableArtists] = useState<
+    Array<{
+      id: string;
+      name: string;
+    }>
+  >([]);
+  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<
+    string[]
+  >([]);
+  const [availableGenres, setAvailableGenres] = useState<
+    Array<{
+      id: string;
+      name: string;
+    }>
+  >([]);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const limit = 10;
   const { theme } = useTheme();
 
@@ -64,6 +72,45 @@ export default function ArtistTracks() {
   const pageFromURL = Number(searchParams.get('page'));
   const currentPage = isNaN(pageFromURL) || pageFromURL < 1 ? 1 : pageFromURL;
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) return;
+
+        const [artistsResponse, genresResponse] = await Promise.all([
+          api.artists.getAllArtistsProfile(token, 1, 100),
+          api.artists.getAllGenres(token),
+        ]);
+
+        setAvailableArtists(
+          artistsResponse.artists.map((artist: ArtistProfile) => ({
+            id: artist.id,
+            name: artist.artistName,
+          }))
+        );
+        setAvailableGenres(
+          genresResponse.data.map((genre: { id: string; name: string }) => ({
+            id: genre.id,
+            name: genre.name,
+          }))
+        );
+
+        if (editingTrack) {
+          setSelectedFeaturedArtists(
+            editingTrack.featuredArtists.map((fa) => fa.artistProfile.id)
+          );
+          setSelectedGenres(editingTrack.genres.map((g) => g.genre.id));
+        }
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+        toast.error('Failed to load required data');
+      }
+    };
+
+    fetchData(); // Luôn fetch data, không cần điều kiện editingTrack
+  }, [editingTrack]);
+
   const updateQueryParam = (param: string, value: number) => {
     if (totalPages === 1 && value !== 1) return;
     if (value < 1) value = 1;
@@ -76,6 +123,31 @@ export default function ArtistTracks() {
     }
     const queryStr = current.toString() ? `?${current.toString()}` : '';
     router.push(`/artist/tracks${queryStr}`);
+  };
+
+  // Format release time
+  const formatReleaseTime = (releaseDate: string) => {
+    const release = new Date(releaseDate);
+    const now = new Date();
+
+    if (release <= now) {
+      return release.toLocaleString(); // Hiển thị ngày giờ cố định nếu đã release
+    }
+
+    // Tính thời gian còn lại
+    const diff = release.getTime() - now.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+    }
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`;
+    }
+    return `${minutes}m ${seconds}s`;
   };
 
   // API calls
@@ -162,9 +234,54 @@ export default function ArtistTracks() {
     }
   };
 
-  const handleDeleteTrack = async (trackId: string) => {
-    if (!confirm('Are you sure you want to delete this track?')) return;
+  const handleDeleteTracks = async (trackIds: string | string[]) => {
+    const ids = Array.isArray(trackIds) ? trackIds : [trackIds];
+    const confirmMessage =
+      ids.length === 1
+        ? 'Are you sure you want to delete this track?'
+        : `Delete ${ids.length} selected tracks?`;
 
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
+
+      // Nếu xóa một track, set loading state cho track đó
+      if (!Array.isArray(trackIds)) {
+        setActionLoading(trackIds);
+      }
+
+      await Promise.all(ids.map((id) => api.tracks.delete(id, token)));
+
+      // Nếu xóa một track, cập nhật state tracks ngay lập tức
+      if (!Array.isArray(trackIds)) {
+        setTracks((prev) => prev.filter((track) => track.id !== trackIds));
+      } else {
+        // Nếu xóa nhiều tracks, fetch lại data
+        await fetchTracks(currentPage);
+      }
+
+      toast.success(
+        ids.length === 1
+          ? 'Track deleted successfully'
+          : `Deleted ${ids.length} tracks successfully`
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to delete track(s)'
+      );
+    } finally {
+      if (!Array.isArray(trackIds)) {
+        setActionLoading(null);
+      }
+    }
+  };
+
+  const handleUpdateTrack = async (trackId: string, formData: FormData) => {
     try {
       setActionLoading(trackId);
       const token = localStorage.getItem('userToken');
@@ -173,201 +290,43 @@ export default function ArtistTracks() {
         return;
       }
 
-      await api.tracks.delete(trackId, token);
-      setTracks((prev) => prev.filter((track) => track.id !== trackId));
-      toast.success('Track deleted successfully');
+      // Xóa các trường cũ từ formData
+      formData.delete('featuredArtists');
+      formData.delete('genres');
+
+      // Tạo object data để gửi lên server
+      const data = {
+        title: formData.get('title'),
+        releaseDate: formData.get('releaseDate'),
+        featuredArtists: selectedFeaturedArtists,
+        genreIds: selectedGenres, // Đổi tên từ genres thành genreIds để match với backend
+      };
+
+      // Gửi request với JSON thay vì FormData
+      await api.tracks.update(trackId, data, token);
+      await fetchTracks(currentPage);
+      setEditingTrack(null);
+      toast.success('Track updated successfully');
     } catch (error) {
+      console.error('Update track error:', error);
       toast.error(
-        error instanceof Error ? error.message : 'Failed to delete track'
+        error instanceof Error ? error.message : 'Failed to update track'
       );
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleDeleteSelected = async () => {
-    if (
-      !selectedRows.length ||
-      !confirm(`Delete ${selectedRows.length} selected tracks?`)
-    )
-      return;
-
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-
-      await Promise.all(
-        selectedRows.map((row) => api.tracks.delete(row.id, token))
-      );
-
-      setSelectedRows([]);
-      fetchTracks(currentPage);
-      toast.success(`Deleted ${selectedRows.length} tracks successfully`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Deletion failed');
-    }
-  };
-
   // Table columns definition
-  const columns: ColumnDef<Track>[] = [
-    {
-      id: 'select',
-      header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-          className={theme === 'dark' ? 'border-white/50' : ''}
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-          className={theme === 'dark' ? 'border-white/50' : ''}
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
-      accessorKey: 'title',
-      header: 'Track',
-      cell: ({ row }) => {
-        const track = row.original;
-        return (
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-8 h-8 rounded overflow-hidden ${
-                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
-              }`}
-            >
-              {track.coverUrl ? (
-                <Image
-                  src={track.coverUrl}
-                  alt={track.title}
-                  width={32}
-                  height={32}
-                  className="object-cover w-full h-full"
-                />
-              ) : (
-                <Music
-                  className={`w-8 h-8 p-1.5 ${
-                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                  }`}
-                />
-              )}
-            </div>
-            <div>
-              <Link
-                href={`/artist/tracks/${track.id}`}
-                className={`font-medium hover:underline ${
-                  theme === 'dark' ? 'text-white' : ''
-                }`}
-              >
-                {track.title}
-              </Link>
-              {track.album && (
-                <div
-                  className={
-                    theme === 'dark' ? 'text-white/60' : 'text-gray-500'
-                  }
-                >
-                  {track.album.title}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: 'duration',
-      header: 'Duration',
-      cell: ({ row }) => {
-        const minutes = Math.floor(row.original.duration / 60);
-        const seconds = row.original.duration % 60;
-        return (
-          <span className={theme === 'dark' ? 'text-white' : ''}>
-            {`${minutes}:${seconds.toString().padStart(2, '0')}`}
-          </span>
-        );
-      },
-    },
-    {
-      accessorKey: 'playCount',
-      header: 'Plays',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {row.original.playCount.toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'isActive',
-      header: 'Status',
-      cell: ({ row }) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            row.original.isActive
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-red-500/20 text-red-400'
-          }`}
-        >
-          {row.original.isActive ? 'Active' : 'Hidden'}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'releaseDate',
-      header: 'Release Date',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {new Date(row.original.releaseDate).toLocaleDateString()}
-        </span>
-      ),
-    },
-    {
-      id: 'actions',
-      cell: ({ row }) => {
-        const track = row.original;
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger>
-              <MoreVertical className="h-4 w-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => handleTrackVisibility(track.id, track.isActive)}
-              >
-                {track.isActive ? (
-                  <>
-                    <EyeOff className="w-4 h-4 mr-2" />
-                    Hide Track
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-4 h-4 mr-2" />
-                    Show Track
-                  </>
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => handleDeleteTrack(track.id)}
-                className="text-red-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Track
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
-  ];
+  const columns = getTrackColumns({
+    theme,
+    onVisibilityChange: handleTrackVisibility,
+    onDelete: handleDeleteTracks,
+    onEdit: setEditingTrack,
+    formatReleaseTime,
+  });
 
+  // Table configuration
   const table = useReactTable({
     data: tracks,
     columns,
@@ -377,7 +336,15 @@ export default function ArtistTracks() {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: (updatedSelection) => {
+      setRowSelection(updatedSelection);
+      const selectedRowData = tracks.filter(
+        (track, index) =>
+          typeof updatedSelection === 'object' &&
+          updatedSelection[index.toString()]
+      );
+      setSelectedRows(selectedRowData);
+    },
     state: {
       sorting,
       columnFilters,
@@ -442,28 +409,38 @@ export default function ArtistTracks() {
           searchValue: searchInput,
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
-          onDelete: handleDeleteSelected,
+          onDelete: () => handleDeleteTracks(selectedRows.map((row) => row.id)),
           showExport: true,
           exportData: {
             data: tracks,
             columns: [
-              { key: 'id', header: 'ID' },
-              { key: 'title', header: 'Title' },
+              { key: 'title', header: 'Track Title' },
+              { key: 'album.title', header: 'Album' },
+              { key: 'featuredArtists', header: 'Featured Artists' },
               { key: 'duration', header: 'Duration' },
-              { key: 'playCount', header: 'Play Count' },
+              { key: 'playCount', header: 'Plays' },
               { key: 'isActive', header: 'Status' },
               { key: 'releaseDate', header: 'Release Date' },
               { key: 'createdAt', header: 'Created At' },
               { key: 'updatedAt', header: 'Updated At' },
             ],
-            filename: 'tracks',
-          },
-          searchPlaceholder: 'Search tracks...',
-          statusFilter: {
-            value: statusFilter,
-            onChange: setStatusFilter,
+            filename: 'tracks-export',
           },
         }}
+      />
+
+      {/* Edit Track Modal */}
+      <EditTrackModal
+        track={editingTrack}
+        onClose={() => setEditingTrack(null)}
+        onSubmit={handleUpdateTrack}
+        availableArtists={availableArtists}
+        selectedFeaturedArtists={selectedFeaturedArtists}
+        setSelectedFeaturedArtists={setSelectedFeaturedArtists}
+        availableGenres={availableGenres}
+        selectedGenres={selectedGenres}
+        setSelectedGenres={setSelectedGenres}
+        theme={theme}
       />
     </div>
   );
