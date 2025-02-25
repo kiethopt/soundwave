@@ -157,7 +157,6 @@ function SearchContent() {
         }
       });
 
-      // Cleanup function
       return () => {
         channel.unbind("audio-control");
         pusher.unsubscribe(`user-${user.id}`);
@@ -196,96 +195,70 @@ function SearchContent() {
       }
 
       if ("audioUrl" in item) {
-        // Single Track
-        if (currentTrack?.id === item.id && currentlyPlaying === item.id) {
+        // Xử lý phát Track
+        if (currentTrack?.id === item.id && queueType === 'track') {
           if (isPlaying) {
             pauseTrack();
           } else {
             playTrack(item);
-            setCurrentlyPlaying(item.id);
           }
         } else {
-          trackQueue(results.tracks);
-          setQueueType("track");
           playTrack(item);
-          setCurrentlyPlaying(item.id);
+          setQueueType('track');
+          trackQueue(results.tracks);
         }
       } else if ("tracks" in item) {
-        // Album
-        if (queueType === "album" && currentlyPlaying === item.id) {
-          // We're already playing from this album, just toggle play/pause
-          if (isPlaying) {
+        // Xử lý phát Album
+        if (item.tracks.length > 0) {
+          const isCurrentAlbumPlaying = 
+            currentTrack && 
+            item.tracks.some(track => track.id === currentTrack.id) &&
+            queueType === 'album' &&
+            isPlaying;
+
+          if (isCurrentAlbumPlaying) {
             pauseTrack();
           } else {
-            // Just resume the current track
-            if (currentTrack) {
-              playTrack(currentTrack);
-              setCurrentlyPlaying(item.id);
-            }
+            playTrack(item.tracks[0]);
+            setQueueType('album');
+            trackQueue(item.tracks);
           }
         } else {
-          // Start fresh with this album
-          if (item.tracks.length > 0) {
-            trackQueue(item.tracks);
-            setQueueType("album");
-            playTrack(item.tracks[0]);
-            setCurrentlyPlaying(item.id);
-          } else {
-            toast.error("No tracks found in this album.");
-            setCurrentlyPlaying(null);
-          }
+          toast.error("No tracks available for this album");
         }
       } else if ("artistProfile" in item) {
-        // Artist
-        if (
-          queueType === "artist" &&
-          currentlyPlaying === item.artistProfile.id
-        ) {
-          // We're already playing from this artist, just toggle play/pause
-          if (isPlaying) {
-            pauseTrack();
-          } else {
-            // Just resume the current track
-            if (currentTrack) {
-              playTrack(currentTrack);
-              setCurrentlyPlaying(item.artistProfile.id);
-            }
-          }
+        // Xử lý phát Artist
+        const isCurrentArtistPlaying = 
+          currentTrack && 
+          currentTrack.artistId === item.artistProfile.id &&
+          queueType === 'artist' &&
+          isPlaying;
+
+        if (isCurrentArtistPlaying) {
+          pauseTrack();
         } else {
-          // Load artist tracks for a fresh start
+          // Lấy tracks của artist
           const response = await api.artists.getTrackByArtistId(
             item.artistProfile.id,
             token
           );
           const artistTracks = response?.tracks || [];
 
-          if (!Array.isArray(artistTracks)) {
-            console.error("artistTracks is not an array:", artistTracks);
-            toast.error("Error fetching artist tracks.");
-            return;
-          }
-
-          const sortedTracks = artistTracks.sort(
-            (a, b) =>
-              b.playCount - a.playCount ||
-              new Date(b.releaseDate).getTime() -
-                new Date(a.releaseDate).getTime()
-          );
-
-          if (sortedTracks.length > 0) {
-            trackQueue(sortedTracks);
-            setQueueType("artist");
+          if (artistTracks.length > 0) {
+            const sortedTracks = artistTracks.sort(
+              (a:any, b:any) => b.playCount - a.playCount
+            );
             playTrack(sortedTracks[0]);
-            setCurrentlyPlaying(item.artistProfile.id);
+            setQueueType('artist');
+            trackQueue(sortedTracks);
           } else {
-            toast.error("No tracks found for this artist.");
-            setCurrentlyPlaying(null);
+            toast.error("No tracks available for this artist");
           }
         }
       }
     } catch (error) {
       console.error("Error playing:", error);
-      toast.error("Error playing track. Please try again.");
+      toast.error("An error occurred while playing");
     }
   };
 
@@ -296,10 +269,10 @@ function SearchContent() {
       console.log("Token:", token);
 
       await api.playlists.addTrack(playlistId, trackId, token || "");
-      toast.success("Đã thêm bài hát vào playlist");
+      toast.success("Track added to playlist");
     } catch (error: any) {
       console.error("Error adding track:", error);
-      toast.error(error.message || "Không thể thêm bài hát vào playlist");
+      toast.error(error.message || "Cannot add track to playlist");
     }
   };
 

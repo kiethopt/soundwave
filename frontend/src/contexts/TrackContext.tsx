@@ -81,6 +81,9 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const tabId = useRef(Math.random().toString(36).substring(2, 15)).current;
   const broadcastChannel = useRef<BroadcastChannel | null>(null);
 
+  // Thêm một ref để theo dõi request hiện tại
+  const currentPlayRequestRef = useRef<AbortController | null>(null);
+
   // Initialize audio and broadcast channel
   useEffect(() => {
     audioRef.current = new Audio();
@@ -130,45 +133,84 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
       if (!audioRef.current) return;
 
-      if (broadcastChannel.current) {
-        broadcastChannel.current.postMessage({ type: "play", tabId });
-      }
+      try {
+        // Hủy request cũ nếu có
+        if (currentPlayRequestRef.current) {
+          currentPlayRequestRef.current.abort();
+        }
 
-      setShowPlayer(true);
+        // Tạo AbortController mới cho request hiện tại
+        currentPlayRequestRef.current = new AbortController();
 
-      if (currentTrack?.id === track.id) {
-        audioRef.current.play().catch((error) => {
+        if (broadcastChannel.current) {
+          broadcastChannel.current.postMessage({ type: "play", tabId });
+        }
+
+        setShowPlayer(true);
+
+        // Nếu đang phát cùng một track
+        if (currentTrack?.id === track.id) {
+          try {
+            await audioRef.current.play();
+            setIsPlaying(true);
+          } catch (error) {
+            if (error instanceof Error && error.name !== 'AbortError') {
+              console.error("Playback error:", error);
+              setIsPlaying(false);
+            }
+          }
+          return;
+        }
+
+        // Reset các state khi chuyển bài
+        setPlayStartTime(Date.now());
+        setLastSavedTime(0);
+        setProgress(0);
+        
+        // Tạm dừng audio hiện tại trước khi load bài mới
+        audioRef.current.pause();
+        
+        // Load source mới
+        audioRef.current.src = track.audioUrl;
+        audioRef.current.currentTime = 0;
+
+        const newIndex = trackQueueRef.current.findIndex(
+          (t) => t.id === track.id
+        );
+        if (newIndex !== -1) {
+          setCurrentIndex(newIndex);
+        }
+
+        setCurrentTrack(track);
+        setIsPlaying(true);
+
+        // Đợi audio load xong và phát
+        await new Promise((resolve, reject) => {
+          const handleCanPlay = () => {
+            audioRef.current?.removeEventListener('canplay', handleCanPlay);
+            resolve(null);
+          };
+
+          const handleError = (error: Event) => {
+            audioRef.current?.removeEventListener('error', handleError);
+            reject(error);
+          };
+
+          audioRef.current?.addEventListener('canplay', handleCanPlay);
+          audioRef.current?.addEventListener('error', handleError);
+        });
+
+        // Kiểm tra xem có bị abort không trước khi play
+        if (!currentPlayRequestRef.current?.signal.aborted) {
+          await audioRef.current.play();
+          saveHistory(track.id, 0, false);
+        }
+
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
           console.error("Playback error:", error);
           setIsPlaying(false);
-        });
-        setIsPlaying(true);
-        return;
-      }
-
-      setPlayStartTime(Date.now());
-      setLastSavedTime(0);
-      audioRef.current.src = track.audioUrl;
-      audioRef.current.currentTime = 0;
-      setProgress(0);
-
-      const newIndex = trackQueueRef.current.findIndex(
-        (t) => t.id === track.id
-      );
-      if (newIndex !== -1) {
-        setCurrentIndex(newIndex);
-      }
-
-      setCurrentTrack(track);
-      setIsPlaying(true);
-
-      try {
-        await audioRef.current.play();
-        saveHistory(track.id, 0, false).catch((error) => {
-          console.error("Failed to save initial play history:", error);
-        });
-      } catch (error) {
-        console.error("Playback error:", error);
-        setIsPlaying(false);
+        }
       }
     },
     [currentTrack, saveHistory, tabId]
@@ -217,37 +259,49 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentIndex, playTrack]);
 
-  const skipNext = useCallback(() => {
+  const skipNext = useCallback(async () => {
     if (!trackQueueRef.current.length) return;
 
-    let nextIndex = currentIndex + 1;
-    if (nextIndex >= trackQueueRef.current.length) {
-      nextIndex = 0;
-    }
+    try {
+      let nextIndex = currentIndex + 1;
+      if (nextIndex >= trackQueueRef.current.length) {
+        nextIndex = 0;
+      }
 
-    const nextTrack = trackQueueRef.current[nextIndex];
-    if (nextTrack) {
-      setCurrentIndex(nextIndex);
-      playTrack(nextTrack);
+      const nextTrack = trackQueueRef.current[nextIndex];
+      if (nextTrack) {
+        setCurrentIndex(nextIndex);
+        await playTrack(nextTrack);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error("Error skipping to next track:", error);
+      }
     }
   }, [currentIndex, playTrack]);
 
-  const skipPrevious = useCallback(() => {
+  const skipPrevious = useCallback(async () => {
     if (!trackQueueRef.current.length) return;
 
-    let prevIndex = currentIndex - 1;
-    if (prevIndex < 0) {
-      prevIndex = trackQueueRef.current.length - 1;
-    }
+    try {
+      let prevIndex = currentIndex - 1;
+      if (prevIndex < 0) {
+        prevIndex = trackQueueRef.current.length - 1;
+      }
 
-    const prevTrack = trackQueueRef.current[prevIndex];
-    if (prevTrack) {
-      setCurrentIndex(prevIndex);
-      playTrack(prevTrack);
+      const prevTrack = trackQueueRef.current[prevIndex];
+      if (prevTrack) {
+        setCurrentIndex(prevIndex);
+        await playTrack(prevTrack);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error("Error skipping to previous track:", error);
+      }
     }
   }, [currentIndex, playTrack]);
 
-  // Main audio event listeners and tab synchronization
+  // Quản lý audio và tab synchronization
   useEffect(() => {
     if (!audioRef.current || !broadcastChannel.current) return;
 
@@ -306,12 +360,11 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
     const handleBroadcastMessage = (event: MessageEvent) => {
       if (event.data.type === "play" && event.data.tabId !== tabId) {
-        // If another tab has started playback, pause the current tab
+        // Nếu tab khác đã bắt đầu phát, tạm dừng tab hiện tại
         pauseTrack();
       }
     };
 
-    // Add event listeners
     audio.addEventListener("loadedmetadata", handleMetadataLoaded);
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("ended", handleEnded);
@@ -328,7 +381,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // Cleanup event listeners
     return () => {
       audio.removeEventListener("loadedmetadata", handleMetadataLoaded);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
@@ -353,6 +405,14 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     pauseTrack,
     tabId,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (currentPlayRequestRef.current) {
+        currentPlayRequestRef.current.abort();
+      }
+    };
+  }, []);
 
   return (
     <TrackContext.Provider

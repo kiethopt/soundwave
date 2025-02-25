@@ -20,7 +20,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import HorizontalTrackListItem from '@/components/track/HorizontalTrackListItem';
 import { EditArtistProfileModal } from '@/components/artist/EditArtistProfileModal';
-import { get } from 'lodash';
 
 export default function ArtistProfilePage({
   params,
@@ -67,78 +66,71 @@ export default function ArtistProfilePage({
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
   const displayedTracks = showAllTracks ? tracks : tracks.slice(0, 5);
 
+  const fetchRelatedArtistTracks = async (artists: ArtistProfile[]) => {
+    const tracksMap: Record<string, Track[]> = {};
+    
+    await Promise.all(
+      artists.map(async (artist) => {
+        try {
+          const data = await api.artists.getTrackByArtistId(artist.id, token);
+          tracksMap[artist.id] = data.tracks.sort((a:any, b:any) => b.playCount - a.playCount);
+        } catch (error) {
+          console.error(`Error fetching tracks for artist ${artist.id}:`, error);
+          tracksMap[artist.id] = [];
+        }
+      })
+    );
+    
+    return tracksMap;
+  };
+
   useEffect(() => {
     if (!token) {
       router.push('/login');
+      return;
     }
-  }, [id, token]);
 
-  useEffect(() => {
-    getArtistData(token);
-  })
+    const fetchData = async () => {
+      try {
+        const [artistData, followingResponse, albumsResponse, tracksResponse, relatedArtistsResponse] = 
+          await Promise.all([
+            api.artists.getProfile(id, token),
+            api.user.getFollowing(token),
+            api.artists.getAlbumByArtistId(id, token),
+            api.artists.getTrackByArtistId(id, token),
+            api.artists.getRelatedArtists(id, token)
+          ]);
 
-
-  useEffect(() => {
-    const fetchFollowing = async () => {
-      const response = await api.user.getFollowing(token);
-      if (response) {
-        const isFollowing = response.some((artistProfile: ArtistProfile) => artistProfile.id === id);
-        const isOwner = userData.artistProfile?.id === id;
-
-        setFollow(isFollowing);
-        setIsOwner(isOwner);
-      }
-    };
-
-    const fetchAlbums = async () => {
-      const response = await api.artists.getAlbumByArtistId(id, token);
-      setAlbums(response.albums);
-    };
-
-    const fetchTracks = async () => {
-      const response = await api.artists.getTrackByArtistId(id, token);
-      // Sort track by playCount and releaseDate
-      const sortedTracks = response.tracks
-        .sort((a:any, b:any) => b.playCount - a.playCount);
-      setTracks(sortedTracks);
-    };
-
-    const fetchRelatedArtists = async () => {
-      const response = await api.artists.getRelatedArtists(id, token);
-      setRelatedArtists(response);
-      
-      // Pre-fetch tracks for all related artists
-      if (response && response.length > 0) {
-        const tracksPromises = response.map((artist: { id: string; }) => getArtistTracks(artist.id));
+        setArtist(artistData);
         
-        Promise.all(tracksPromises).then(results => {
-          const tracksMap: Record<string, Track[]> = {};
-          
-            response.forEach((artist: ArtistProfile, index: number) => {
-            tracksMap[artist.id] = results[index];
-            });
-          
+        if (followingResponse) {
+          const isFollowing = followingResponse.some(
+            (artistProfile: ArtistProfile) => artistProfile.id === id
+          );
+          const isOwner = userData.artistProfile?.id === id;
+          setFollow(isFollowing);
+          setIsOwner(isOwner);
+        }
+
+        setAlbums(albumsResponse.albums);
+        setTracks(tracksResponse.tracks.sort((a:any, b:any) => b.playCount - a.playCount));
+        setRelatedArtists(relatedArtistsResponse);
+
+        // Fetch tracks cho related artists chỉ khi có related artists
+        if (relatedArtistsResponse?.length > 0) {
+          const tracksMap = await fetchRelatedArtistTracks(relatedArtistsResponse);
           setArtistTracksMap(tracksMap);
-        });
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching artist data:', error);
+        setLoading(false);
       }
     };
 
-    fetchFollowing();
-    fetchAlbums();
-    fetchTracks();
-    fetchRelatedArtists();
-  }, [id, token]);
-
-  const getArtistData = async (token: string) => {
-    try {
-      const data = await api.artists.getProfile(id, token);
-      setArtist(data);
-      setLoading(false);
-    } catch (error) {
-      console.error(error);
-      setLoading(false);
-    }
-  };
+    fetchData();
+  }, [id, token, router, userData.artistProfile?.id]);
 
   const handleFollow = async () => {
     if (!token) {
@@ -202,10 +194,54 @@ export default function ArtistProfilePage({
     }
   };
 
+  const handleAlbumPlay = async (album: Album, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      // Kiểm tra nếu album có tracks
+      if (album.tracks?.length > 0) {
+        // Nếu đang phát album này thì pause
+        const isCurrentAlbumPlaying = 
+          isPlaying && 
+          currentTrack && 
+          album.tracks.some(track => track.id === currentTrack.id) &&
+          queueType === 'album';
+
+        if (isCurrentAlbumPlaying) {
+          pauseTrack();
+        } else {
+          // Nếu không thì phát track đầu tiên và set queue là toàn bộ tracks của album
+          playTrack(album.tracks[0]);
+          setQueueType('album');
+          trackQueue(album.tracks);
+        }
+      } else {
+        toast.error("No tracks available for this album");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load album tracks");
+    }
+  }
+
+  // Sửa lại hàm getArtistTracks để sử dụng cache từ state
   const getArtistTracks = async (artistId: string) => {
+    // Nếu đã có trong cache, trả về luôn
+    if (artistTracksMap[artistId]?.length > 0) {
+      return artistTracksMap[artistId];
+    }
+
+    // Nếu chưa có, fetch mới
     try {
       const data = await api.artists.getTrackByArtistId(artistId, token);
-      return data.tracks.sort((a:any, b:any) => b.playCount - a.playCount);
+      const sortedTracks = data.tracks.sort((a:any, b:any) => b.playCount - a.playCount);
+      
+      // Cập nhật cache
+      setArtistTracksMap(prev => ({
+        ...prev,
+        [artistId]: sortedTracks
+      }));
+      
+      return sortedTracks;
     } catch (error) {
       console.error(error);
       return [];
@@ -406,16 +442,8 @@ export default function ArtistProfilePage({
                         className="w-full aspect-square object-cover rounded-md mb-4"
                       />
                       <button
-                        onClick={() => {
-                          if (album.tracks.some(track => track.id === currentTrack?.id) && isPlaying && queueType === 'album') {
-                            pauseTrack();
-                          } else if (currentTrack && queueType === 'album') {
-                            playTrack(currentTrack);
-                          } else {
-                            playTrack(album.tracks[0]);
-                            setQueueType('album');
-                            trackQueue(album.tracks);
-                          }
+                        onClick={(e) => {
+                          handleAlbumPlay(album, e);
                         }}
                         className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                       > 
