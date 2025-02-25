@@ -977,6 +977,16 @@ export const getRecommendedArtists = async (
       return;
     }
 
+    const cacheKey = `/api/user/${user.id}/recommended-artists`;
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+    }
+
     const history = await prisma.history.findMany({
       where: {
         userId: user.id,
@@ -1049,6 +1059,10 @@ export const getRecommendedArtists = async (
       },
     });
 
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      await setCache(cacheKey, recommendedArtists, 1800); // Cache for 30 mins
+    }
+
     res.json(recommendedArtists);
   } catch (error) {
     console.error('Get recommended artists error:', error);
@@ -1061,7 +1075,16 @@ export const getTopAlbums = async (
   res: Response
 ): Promise<void> => {
   try {
+    const cacheKey = '/api/top-albums';
     const monthStart = getMonthStartDate();
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+    }
 
     const albums = await prisma.album.findMany({
       where: {
@@ -1146,6 +1169,10 @@ export const getTopAlbums = async (
       ),
     }));
 
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      await setCache(cacheKey, albumsWithMonthlyPlays, 1800); // Cache for 30 mins
+    }
+
     res.json(albumsWithMonthlyPlays);
   } catch (error) {
     console.error('Get top albums error:', error);
@@ -1158,7 +1185,16 @@ export const getTopArtists = async (
   res: Response
 ): Promise<void> => {
   try {
+    const cacheKey = '/api/top-artists';
     const monthStart = getMonthStartDate();
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+    }
 
     const artists = await prisma.artistProfile.findMany({
       where: {
@@ -1232,6 +1268,11 @@ export const getTopArtists = async (
       .sort((a, b) => b.monthlyListeners - a.monthlyListeners)
       .slice(0, 20);
 
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      await setCache(cacheKey, topArtists, 1800); // Cache for 30 mins
+    }
+
     res.json(topArtists);
   } catch (error) {
     console.error('Get top artists error:', error);
@@ -1244,7 +1285,16 @@ export const getTopTracks = async (
   res: Response
 ): Promise<void> => {
   try {
+    const cacheKey = '/api/top-tracks';
     const monthStart = getMonthStartDate();
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+    }
 
     const tracks = await prisma.track.findMany({
       where: {
@@ -1311,6 +1361,10 @@ export const getTopTracks = async (
         0
       ),
     }));
+
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      await setCache(cacheKey, tracksWithMonthlyPlays, 1800); // Cache for 30 mins  
+    }
 
     res.json(tracksWithMonthlyPlays);
   } catch (error) {

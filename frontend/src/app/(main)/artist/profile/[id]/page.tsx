@@ -307,12 +307,14 @@ export default function ArtistProfilePage({
                   <DropdownMenuContent align="start" className="w-56">
                     <DropdownMenuItem 
                       className='cursor-pointer'
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsEditOpen(true);
-                      }}
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <Edit className="w-4 h-4 mr-2"/>
+                      <Edit 
+                        className="w-4 h-4 mr-2"
+                        onClick={() => {
+                          setIsEditOpen(true);
+                        }}  
+                      />
                         Edit Profile
                     </DropdownMenuItem>
                     <DropdownMenuItem 

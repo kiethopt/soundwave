@@ -98,10 +98,23 @@ export const clearCacheForEntity = async (
 
     // Tạo danh sách các pattern cần xóa
     const patterns = [
-      `/api/${entity}s*`, // Xóa cache của entity (số nhiều)
-      `/api/${entity}/*`, // Xóa cache của entity (số ít)
+      `/api/${entity}s*`,
+      `/api/${entity}/*`,
       ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
     ];
+
+    if (entity === 'artist') {
+      patterns.push(
+        '/api/admin/artists*',
+        '/api/artists*',
+        '/api/artist/*',
+        '/api/top-artists',
+        ...(options.entityId ? [
+          `/api/artists/${options.entityId}/tracks*`,
+          `/api/artists/${options.entityId}/albums*`
+        ] : [])
+      );
+    }
 
     if (entity === 'user') {
       patterns.push(
@@ -109,28 +122,27 @@ export const clearCacheForEntity = async (
         '/admin/api/users*',
         '/api/users/search*',
         '/api/user/following*',
-        '/api/user/followers*'
-      );
-    }
-
-    if (entity === 'artist') {
-      patterns.push('/api/admin/artists*', '/api/artists*', '/api/artist/*');
-    }
-
-    if (entity === 'artist-requests') {
-      patterns.push(
-        '/api/admin/artist-requests*',
-        '/api/artist-requests*',
-        '/api/users/check-artist-request*'
+        '/api/user/followers*',
+        ...(options.userId ? [`/api/user/${options.userId}/recommended-artists`] : [])
       );
     }
 
     if (entity === 'album') {
-      patterns.push('/api/admin/albums*', '/api/albums*', '/api/album/*');
+      patterns.push('/api/admin/albums*', '/api/albums*', '/api/album/*', '/api/top-albums');
     }
 
     if (entity === 'track') {
-      patterns.push('/api/admin/tracks*', '/api/tracks*', '/api/track/*');
+      patterns.push('/api/admin/tracks*', '/api/tracks*', '/api/track/*', '/api/top-tracks');
+    }
+
+    // Add handling for history changes
+    if (entity === 'history') {
+      patterns.push(
+        '/api/top-albums',
+        '/api/top-artists',
+        '/api/top-tracks',
+        ...(options.userId ? [`/api/user/${options.userId}/recommended-artists`] : [])
+      );
     }
 
     if (options.clearSearch) {
@@ -143,19 +155,15 @@ export const clearCacheForEntity = async (
       );
     }
 
-    // Xóa cache cho từng pattern
     for (const pattern of patterns) {
       const keys = await client.keys(pattern);
       if (keys.length) {
-        console.log(
-          `[Redis] Clearing ${keys.length} keys for pattern: ${pattern}`
-        );
+        console.log(`[Redis] Clearing ${keys.length} keys for pattern: ${pattern}`);
         await Promise.all(keys.map((key) => client.del(key)));
       }
     }
 
-    // Xóa thêm cache stats
-    if (entity === 'user' || entity === 'stats') {
+    if (entity === 'user' || entity === 'stats' || entity === 'history') {
       const statsKeys = await client.keys('/api/admin/stats*');
       if (statsKeys.length) {
         console.log(`[Redis] Clearing stats cache`);

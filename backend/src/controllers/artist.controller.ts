@@ -2,13 +2,12 @@ import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { Role } from '@prisma/client';
 import { uploadFile } from '../services/cloudinary.service';
-import { client } from '../middleware/cache.middleware';
+import { client, setCache } from '../middleware/cache.middleware';
 import {
   albumSelect,
   artistProfileSelect,
   trackSelect,
 } from '../utils/prisma-selects';
-import exp from 'constants';
 
 // Cho phép tất cả các Artist xem thông tin của nhau
 const canViewArtistData = async (
@@ -225,6 +224,19 @@ export const getArtistAlbums = async (
   }
 
   try {
+    // Tạo cache key dựa trên params
+    const cacheKey = `/api/artists/${id}/albums?page=${page}&limit=${limit}`;
+
+    // Kiểm tra cache
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log('Serving artist albums from cache:', cacheKey);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+    }
+
     const artistProfile = await prisma.artistProfile.findUnique({
       where: { id },
       select: { id: true, isVerified: true, userId: true },
@@ -266,7 +278,7 @@ export const getArtistAlbums = async (
       }),
     ]);
 
-    res.json({
+    const response = {
       albums,
       pagination: {
         total,
@@ -274,7 +286,14 @@ export const getArtistAlbums = async (
         limit: Number(limit),
         totalPages: Math.ceil(total / Number(limit)),
       },
-    });
+    };
+
+    // Cache kết quả
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      await setCache(cacheKey, response, 1800); // Cache trong 30 phút
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Error fetching artist albums:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -296,6 +315,19 @@ export const getArtistTracks = async (
   }
 
   try {
+    // Tạo cache key dựa trên params
+    const cacheKey = `/api/artists/${id}/tracks?page=${page}&limit=${limit}`;
+
+    // Kiểm tra cache
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      const cachedData = await client.get(cacheKey);
+      if (cachedData) {
+        console.log('Serving artist tracks from cache:', cacheKey);
+        res.json(JSON.parse(cachedData));
+        return;
+      }
+    }
+
     const artistProfile = await prisma.artistProfile.findUnique({
       where: { id },
       select: { id: true, isVerified: true, userId: true },
@@ -329,7 +361,7 @@ export const getArtistTracks = async (
       }),
     ]);
 
-    res.json({
+    const response = {
       tracks,
       pagination: {
         total,
@@ -337,7 +369,14 @@ export const getArtistTracks = async (
         limit: Number(limit),
         totalPages: Math.ceil(total / Number(limit)),
       },
-    });
+    };
+
+    // Cache kết quả
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      await setCache(cacheKey, response, 1800); // Cache trong 30 phút
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Error fetching artist tracks:', error);
     res.status(500).json({ message: 'Internal server error' });
