@@ -265,14 +265,16 @@ export default function AlbumDetailPage() {
                 }`}
               >
                 <div
-                  className={`grid grid-cols-[48px_4fr_2fr_100px] gap-4 text-sm ${
+                  className={`grid grid-cols-[48px_1.5fr_1fr_1fr_100px_50px] gap-4 text-sm ${
                     theme === 'light' ? 'text-gray-500' : 'text-white/60'
                   }`}
                 >
                   <div className="text-center">#</div>
                   <div>Title</div>
                   <div>Artists</div>
+                  <div className="text-center">Play Count</div>
                   <div className="text-right">Duration</div>
+                  <div></div>
                 </div>
               </div>
 
@@ -285,7 +287,7 @@ export default function AlbumDetailPage() {
                   <div key={track.id}>
                     {/* Desktop Layout */}
                     <div
-                      className={`hidden md:grid grid-cols-[48px_4fr_2fr_100px] gap-4 px-6 py-4 group ${
+                      className={`hidden md:grid grid-cols-[48px_1.5fr_1fr_1fr_100px_50px] gap-4 px-6 py-4 group ${
                         theme === 'light'
                           ? 'hover:bg-gray-50'
                           : 'hover:bg-white/5'
@@ -297,12 +299,25 @@ export default function AlbumDetailPage() {
                           theme === 'light' ? 'text-gray-500' : 'text-white/60'
                         }`}
                       >
-                        {currentTrack?.id === track.id && isPlaying ? (
-                          <Pause className="w-4 h-4" />
-                        ) : (
-                          track.trackNumber
-                        )}
+                        {/* Show play/pause button on hover */}
+                        <div className="hidden group-hover:block cursor-pointer">
+                          {currentTrack?.id === track.id && isPlaying ? (
+                            <Pause className="w-4 h-4" />
+                          ) : (
+                            <Play className="w-4 h-4" />
+                          )}
+                        </div>
+
+                        {/* Show track number when not hovering */}
+                        <div className="group-hover:hidden cursor-pointer">
+                          {currentTrack?.id === track.id && isPlaying ? (
+                            <Pause className="w-4 h-4" />
+                          ) : (
+                            track.trackNumber
+                          )}
+                        </div>
                       </div>
+
                       <div className="flex items-center min-w-0">
                         <span
                           className={`font-medium truncate ${
@@ -316,6 +331,7 @@ export default function AlbumDetailPage() {
                           {track.title}
                         </span>
                       </div>
+
                       <div className="flex flex-col justify-center min-w-0">
                         <div
                           className={`truncate ${
@@ -345,6 +361,16 @@ export default function AlbumDetailPage() {
                           </div>
                         )}
                       </div>
+
+                      <div className='flex items-center justify-center'>
+                        <span className={`text-sm ${
+                            theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                          }`}
+                        >
+                          {track.playCount}
+                        </span>
+                      </div>
+
                       <div
                         className={`flex items-center justify-end ${
                           theme === 'light' ? 'text-gray-500' : 'text-white/60'
@@ -352,6 +378,43 @@ export default function AlbumDetailPage() {
                       >
                         {Math.floor(track.duration / 60)}:
                         {(track.duration % 60).toString().padStart(2, '0')}
+                      </div>
+
+                      <div className='flex items-center justify-center'>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="w-5 h-5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <AddSimple className="w-4 h-4 mr-2" />
+                              Add to Playlist
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Heart className="w-4 h-4 mr-2" />
+                              Add to Favorites
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Share2 className="w-4 h-4 mr-2" />
+                              Share
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
 
@@ -372,11 +435,23 @@ export default function AlbumDetailPage() {
                               : 'text-white/60'
                           }
                         >
-                          {currentTrack?.id === track.id && isPlaying ? (
-                            <Pause className="w-4 h-4" />
-                          ) : (
-                            track.trackNumber
-                          )}
+                          {/* Show play/pause button on hover */}
+                          <div className="hidden group-hover:block cursor-pointer">
+                            {currentTrack?.id === track.id && isPlaying ? (
+                              <Pause className="w-4 h-4" />
+                            ) : (
+                              <Play className="w-4 h-4" />
+                            )}
+                          </div>
+
+                          {/* Show track number when not hovering */}
+                          <div className="group-hover:hidden cursor-pointer">
+                            {currentTrack?.id === track.id && isPlaying ? (
+                              <Pause className="w-4 h-4" />
+                            ) : (
+                              track.trackNumber
+                            )}
+                          </div>
                         </span>
                         <div className="flex-1 min-w-0">
                           <div
