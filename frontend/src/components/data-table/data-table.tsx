@@ -3,12 +3,6 @@
 import {
   type ColumnDef,
   flexRender,
-  getCoreRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-  RowSelectionState,
-  VisibilityState,
   SortingState,
 } from '@tanstack/react-table';
 import {
@@ -52,7 +46,7 @@ export function DataTable<TData, TValue>({
   theme = 'light',
   onSortingChange,
 }: DataTableProps<TData, TValue>) {
-  // Reset  row khi data thay đổi
+  // Reset row khi data thay đổi
   React.useEffect(() => {
     table.resetRowSelection();
   }, [data, table]);

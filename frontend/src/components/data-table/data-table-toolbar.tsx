@@ -29,6 +29,11 @@ interface DataTableToolbarProps {
     value: string[];
     onChange: (value: string[]) => void;
   };
+  genreFilter?: {
+    value: string[];
+    onChange: (value: string[]) => void;
+    options: { value: string; label: string }[];
+  };
   table: any;
   theme?: 'light' | 'dark';
   searchPlaceholder?: string;
@@ -87,10 +92,11 @@ export function DataTableToolbar({
   onDelete,
   showExport = false,
   exportData,
+  statusFilter,
+  genreFilter,
   table,
   theme = 'light',
-  searchPlaceholder = 'Search request...',
-  statusFilter,
+  searchPlaceholder = 'Search...',
 }: DataTableToolbarProps) {
   const debouncedSearch = React.useCallback(
     debounce((value: string) => {
@@ -119,11 +125,14 @@ export function DataTableToolbar({
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Update local state immediately for UI feedback
     e.target.value = value;
-    // Debounce the actual search
     debouncedSearch(value);
   };
+
+  // Kiểm tra xem có bất kỳ bộ lọc nào đang được áp dụng không
+  const hasActiveFilters =
+    (statusFilter && statusFilter.value.length > 0) ||
+    (genreFilter && genreFilter.value.length > 0);
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto">
@@ -148,32 +157,48 @@ export function DataTableToolbar({
 
       <div className="flex items-center gap-2">
         {statusFilter && (
-          <>
-            <DataTableFilter
-              title="Status"
-              options={[
-                { label: 'Active', value: 'true' },
-                { label: 'Inactive', value: 'false' },
-              ]}
-              value={statusFilter.value}
-              onChange={statusFilter.onChange}
-              theme={theme}
-            />
-            {statusFilter.value.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => statusFilter.onChange([])}
-                className={`h-9 px-2 ${
-                  theme === 'dark'
-                    ? 'bg-white/[0.07] border-white/[0.1] text-white hover:bg-white/[0.1]'
-                    : ''
-                }`}
-              >
-                Reset
-              </Button>
-            )}
-          </>
+          <DataTableFilter
+            title="Status"
+            options={[
+              { label: 'Active', value: 'true' },
+              { label: 'Inactive', value: 'false' },
+            ]}
+            value={statusFilter.value}
+            onChange={statusFilter.onChange}
+            theme={theme}
+          />
+        )}
+
+        {genreFilter && (
+          <DataTableFilter
+            title="Genres"
+            options={genreFilter.options}
+            value={genreFilter.value}
+            onChange={genreFilter.onChange}
+            theme={theme}
+          />
+        )}
+
+        {hasActiveFilters && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (statusFilter && statusFilter.value.length > 0) {
+                statusFilter.onChange([]);
+              }
+              if (genreFilter && genreFilter.value.length > 0) {
+                genreFilter.onChange([]);
+              }
+            }}
+            className={`h-9 px-2 ${
+              theme === 'dark'
+                ? 'bg-white/[0.07] border-white/[0.1] text-white hover:bg-white/[0.1]'
+                : ''
+            }`}
+          >
+            Reset
+          </Button>
         )}
       </div>
 

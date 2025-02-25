@@ -418,6 +418,9 @@ export const api = {
     getById: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/artists/${id}`, { method: 'GET' }, token),
 
+    getArtistById: async (id: string, token: string) =>
+      fetchWithAuth(`/api/artist/profile/${id}`, { method: 'GET' }, token),
+
     create: async (data: FormData, token: string) =>
       fetchWithAuth(
         '/api/admin/artists',
@@ -556,12 +559,12 @@ export const api = {
     create: async (formData: FormData, token: string) =>
       fetchWithAuth('/api/tracks', { method: 'POST', body: formData }, token),
 
-    update: async (trackId: string, data: any, token: string) =>
+    update: async (trackId: string, data: FormData, token: string) =>
       fetchWithAuth(
         `/api/tracks/${trackId}`,
         {
           method: 'PUT',
-          body: JSON.stringify(data), // Gửi dữ liệu dưới dạng JSON
+          body: data,
         },
         token
       ),

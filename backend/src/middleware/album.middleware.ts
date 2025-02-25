@@ -1,31 +1,54 @@
 import { Prisma } from '@prisma/client';
+import cron from 'node-cron';
+
+async function checkAndUpdateAlbumStatus(client: any) {
+  try {
+    const now = new Date();
+
+    // Tìm các album chưa active nhưng đã đến ngày phát hành
+    const albums = await client.album.findMany({
+      where: {
+        isActive: false,
+        releaseDate: { lte: now },
+      },
+      select: {
+        id: true,
+        title: true,
+      },
+    });
+
+    if (albums.length > 0) {
+      // Cập nhật trạng thái các album
+      await client.album.updateMany({
+        where: {
+          id: { in: albums.map((album: any) => album.id) },
+        },
+        data: { isActive: true },
+      });
+
+      // Cập nhật trạng thái các track thuộc album
+      await client.track.updateMany({
+        where: {
+          albumId: { in: albums.map((album: any) => album.id) },
+          isActive: false,
+        },
+        data: { isActive: true },
+      });
+
+      console.log(
+        `Auto published ${albums.length} albums: ${albums
+          .map((a: any) => a.title)
+          .join(', ')}`
+      );
+    }
+  } catch (error) {
+    console.error('Album auto publish error:', error);
+  }
+}
 
 export const albumExtension = Prisma.defineExtension((client) => {
-  // Kiểm tra và cập nhật isActive định kỳ
-  setInterval(async () => {
-    const now = new Date();
-    try {
-      await client.$transaction([
-        client.album.updateMany({
-          where: {
-            releaseDate: { lte: now },
-            isActive: false,
-          },
-          data: { isActive: true },
-        }),
-        client.track.updateMany({
-          where: {
-            releaseDate: { lte: now },
-            isActive: false,
-            albumId: null,
-          },
-          data: { isActive: true },
-        }),
-      ]);
-    } catch (error) {
-      console.error('Release date check error:', error);
-    }
-  }, 1000 * 60 * 60); // Chạy mỗi giờ
+  // Thiết lập cron job để kiểm tra và cập nhật trạng thái album mỗi phút
+  cron.schedule('* * * * *', () => checkAndUpdateAlbumStatus(client));
 
   return client.$extends({
     query: {

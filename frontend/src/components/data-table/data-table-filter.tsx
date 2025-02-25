@@ -49,25 +49,43 @@ export function DataTableFilter({
           role="combobox"
           aria-expanded={open}
           className={`h-9 border-dashed ${
-            theme === 'dark'
+            value.length > 0
+              ? theme === 'dark'
+                ? 'bg-white/20 border-white/30 text-white'
+                : 'bg-primary/20 border-primary/30'
+              : theme === 'dark'
               ? 'bg-white/[0.07] border-white/[0.1] text-white hover:bg-white/[0.1] hover:text-white'
               : ''
           }`}
         >
           <span>{title}</span>
           {selectedValues.size > 0 && (
-            <div className="ml-2 rounded-sm bg-primary/10 px-1 font-mono text-xs">
+            <div
+              className={`ml-2 rounded-sm ${
+                theme === 'dark' ? 'bg-white/20' : 'bg-primary/10'
+              } px-1 font-mono text-xs`}
+            >
               {selectedValues.size}
             </div>
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder={`Search ${title.toLowerCase()}...`} />
+      <PopoverContent
+        className={`w-[200px] p-0 ${
+          theme === 'dark' ? 'bg-[#1e1e1e] border-white/10' : ''
+        }`}
+        align="start"
+      >
+        <Command className={theme === 'dark' ? 'bg-[#1e1e1e]' : ''}>
+          <CommandInput
+            placeholder={`Search ${title.toLowerCase()}...`}
+            className={theme === 'dark' ? 'text-white border-white/10' : ''}
+          />
           <CommandList>
-            <CommandEmpty>No {title.toLowerCase()} found.</CommandEmpty>
+            <CommandEmpty className={theme === 'dark' ? 'text-white/70' : ''}>
+              No {title.toLowerCase()} found.
+            </CommandEmpty>
             <CommandGroup>
               {options.map((option) => {
                 const isSelected = selectedValues.has(option.value);
@@ -83,22 +101,30 @@ export function DataTableFilter({
                       }
                       onChange(Array.from(newValues));
                     }}
+                    className={
+                      theme === 'dark' ? 'text-white hover:bg-white/10' : ''
+                    }
                   >
                     <div
                       className={cn(
-                        'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-black',
+                        'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border',
                         isSelected
-                          ? 'bg-black text-white'
-                          : 'bg-transparent hover:border-black',
-                        theme === 'dark' &&
-                          !isSelected &&
-                          'border-black hover:border-black'
+                          ? theme === 'dark'
+                            ? 'bg-white border-white'
+                            : 'bg-black border-black'
+                          : theme === 'dark'
+                          ? 'border-white/30'
+                          : 'border-gray-300'
                       )}
                     >
                       <Check
                         className={cn(
-                          'h-4 w-4',
-                          isSelected ? 'text-white' : 'invisible'
+                          'h-3 w-3',
+                          isSelected
+                            ? theme === 'dark'
+                              ? 'text-black'
+                              : 'text-white'
+                            : 'invisible'
                         )}
                       />
                     </div>

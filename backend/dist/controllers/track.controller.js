@@ -54,46 +54,6 @@ const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_2 = require("@prisma/client");
 const pusher_1 = __importDefault(require("../config/pusher"));
-const node_cron_1 = __importDefault(require("node-cron"));
-const validateTrackData = (data, isSingleTrack = true, validateRequired = true) => {
-    const { title, duration, releaseDate, trackNumber, coverUrl, audioUrl, type, featuredArtists, } = data;
-    if (validateRequired) {
-        if (!(title === null || title === void 0 ? void 0 : title.trim()))
-            return 'Title is required';
-        if (duration === undefined || duration < 0)
-            return 'Duration must be a non-negative number';
-        if (!releaseDate || isNaN(Date.parse(releaseDate)))
-            return 'Valid release date is required';
-        if (!(coverUrl === null || coverUrl === void 0 ? void 0 : coverUrl.trim()))
-            return 'Cover URL is required';
-        if (!(audioUrl === null || audioUrl === void 0 ? void 0 : audioUrl.trim()))
-            return 'Audio URL is required';
-    }
-    else {
-        if (title !== undefined && !title.trim())
-            return 'Title cannot be empty';
-        if (duration !== undefined && duration < 0)
-            return 'Duration must be a non-negative number';
-        if (releaseDate !== undefined && isNaN(Date.parse(releaseDate)))
-            return 'Invalid release date format';
-    }
-    if (type && !Object.values(client_1.AlbumType).includes(type))
-        return 'Invalid track type';
-    if (!isSingleTrack && trackNumber !== undefined && trackNumber <= 0) {
-        return 'Track number must be a positive integer';
-    }
-    if (featuredArtists) {
-        if (!Array.isArray(featuredArtists)) {
-            return 'Featured artists must be an array';
-        }
-        for (const artistProfileId of featuredArtists) {
-            if (typeof artistProfileId !== 'string' || !artistProfileId.trim()) {
-                return 'Each featured artist ID must be a non-empty string';
-            }
-        }
-    }
-    return null;
-};
 const canManageTrack = (user, trackArtistId) => {
     var _a, _b, _c, _d;
     if (!user)
@@ -105,55 +65,6 @@ const canManageTrack = (user, trackArtistId) => {
         ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.role) === client_1.Role.ARTIST &&
         ((_d = user.artistProfile) === null || _d === void 0 ? void 0 : _d.id) === trackArtistId);
 };
-const validateFile = (file, isAudio = false) => {
-    const maxSize = 5 * 1024 * 1024;
-    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    const allowedAudioTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3'];
-    const maxFileNameLength = 100;
-    if (file.size > maxSize) {
-        return 'File size too large. Maximum allowed size is 5MB.';
-    }
-    if (isAudio) {
-        if (!allowedAudioTypes.includes(file.mimetype)) {
-            return `Invalid audio file type. Only ${allowedAudioTypes.join(', ')} are allowed.`;
-        }
-    }
-    else {
-        if (!allowedImageTypes.includes(file.mimetype)) {
-            return `Invalid image file type. Only ${allowedImageTypes.join(', ')} are allowed.`;
-        }
-    }
-    if (file.originalname.length > maxFileNameLength) {
-        return `File name too long. Maximum allowed length is ${maxFileNameLength} characters.`;
-    }
-    const invalidChars = /[<>:"/\\|?*]/g;
-    if (invalidChars.test(file.originalname)) {
-        return 'File name contains invalid characters.';
-    }
-    return null;
-};
-node_cron_1.default.schedule('* * * * *', () => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const tracks = yield db_1.default.track.findMany({
-            where: {
-                isActive: false,
-                releaseDate: {
-                    lte: new Date(),
-                },
-            },
-        });
-        for (const track of tracks) {
-            yield db_1.default.track.update({
-                where: { id: track.id },
-                data: { isActive: true },
-            });
-            console.log(`Auto published track: ${track.title}`);
-        }
-    }
-    catch (error) {
-        console.error('Auto publish error:', error);
-    }
-}));
 const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;
     try {
@@ -294,7 +205,7 @@ exports.createTrack = createTrack;
 const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { title, releaseDate, type, trackNumber, albumId, featuredArtists, genreIds, } = req.body;
+        const { title, releaseDate, type, trackNumber, albumId, featuredArtists, genreIds, updateFeaturedArtists, updateGenres, } = req.body;
         const currentTrack = yield db_1.default.track.findUnique({
             where: { id },
             select: {
@@ -303,6 +214,7 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 artistId: true,
                 featuredArtists: true,
                 genres: true,
+                coverUrl: true,
             },
         });
         if (!currentTrack) {
@@ -325,6 +237,11 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             updateData.trackNumber = Number(trackNumber);
         if (albumId !== undefined)
             updateData.albumId = albumId || null;
+        if (req.files && req.files.coverFile) {
+            const coverFile = req.files.coverFile[0];
+            const coverUpload = yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
+            updateData.coverUrl = coverUpload.secure_url;
+        }
         if (releaseDate) {
             const newReleaseDate = new Date(releaseDate);
             const now = new Date();
@@ -336,37 +253,52 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             }
             updateData.releaseDate = newReleaseDate;
         }
-        if (featuredArtists !== undefined) {
-            updateData.featuredArtists = {
-                deleteMany: { trackId: id },
-            };
-            if (Array.isArray(featuredArtists) && featuredArtists.length > 0) {
-                updateData.featuredArtists.create = featuredArtists.map((artistId) => ({
-                    artistId: artistId.trim(),
-                }));
+        const updatedTrack = yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
+            const updated = yield tx.track.update({
+                where: { id },
+                data: updateData,
+                select: prisma_selects_1.trackSelect,
+            });
+            if (updateFeaturedArtists === 'true') {
+                yield tx.trackArtist.deleteMany({
+                    where: { trackId: id },
+                });
+                const artistsArray = !featuredArtists
+                    ? []
+                    : Array.isArray(featuredArtists)
+                        ? featuredArtists
+                        : [featuredArtists];
+                if (artistsArray.length > 0) {
+                    yield tx.trackArtist.createMany({
+                        data: artistsArray.map((artistId) => ({
+                            trackId: id,
+                            artistId: artistId.trim(),
+                        })),
+                        skipDuplicates: true,
+                    });
+                }
             }
-            else {
-                updateData.featuredArtists.create = [];
+            if (updateGenres === 'true') {
+                yield tx.trackGenre.deleteMany({
+                    where: { trackId: id },
+                });
+                const genresArray = !genreIds
+                    ? []
+                    : Array.isArray(genreIds)
+                        ? genreIds
+                        : [genreIds];
+                if (genresArray.length > 0) {
+                    yield tx.trackGenre.createMany({
+                        data: genresArray.map((genreId) => ({
+                            trackId: id,
+                            genreId: genreId.trim(),
+                        })),
+                        skipDuplicates: true,
+                    });
+                }
             }
-        }
-        if (genreIds !== undefined) {
-            updateData.genres = {
-                deleteMany: { trackId: id },
-            };
-            if (Array.isArray(genreIds) && genreIds.length > 0) {
-                updateData.genres.create = genreIds.map((genreId) => ({
-                    genreId: genreId.trim(),
-                }));
-            }
-            else {
-                updateData.genres.create = [];
-            }
-        }
-        const updatedTrack = yield db_1.default.track.update({
-            where: { id },
-            data: updateData,
-            select: prisma_selects_1.trackSelect,
-        });
+            return updated;
+        }));
         res.json({
             message: 'Track updated successfully',
             track: updatedTrack,
@@ -617,7 +549,7 @@ const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const { page = 1, limit = 10, q: search, status } = req.query;
+        const { page = 1, limit = 10, q: search, status, genres } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
         const whereClause = {};
         if (search) {
@@ -632,6 +564,18 @@ const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         if (status) {
             whereClause.isActive = status === 'true';
+        }
+        if (genres) {
+            const genreIds = Array.isArray(genres)
+                ? genres.map((g) => String(g))
+                : [String(genres)];
+            whereClause.genres = {
+                some: {
+                    genreId: {
+                        in: genreIds,
+                    },
+                },
+            };
         }
         if (user.role !== client_1.Role.ADMIN && ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
             whereClause.artistId = user.artistProfile.id;

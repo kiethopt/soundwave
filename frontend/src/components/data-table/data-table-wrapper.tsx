@@ -34,6 +34,11 @@ interface DataTableWrapperProps<TData> {
       value: string[];
       onChange: (value: string[]) => void;
     };
+    genreFilter?: {
+      value: string[];
+      onChange: (value: string[]) => void;
+      options: { value: string; label: string }[];
+    };
   };
 }
 
@@ -71,6 +76,7 @@ export function DataTableWrapper<TData>({
           theme={theme}
           searchPlaceholder={toolbar.searchPlaceholder}
           statusFilter={toolbar.statusFilter}
+          genreFilter={toolbar.genreFilter}
         />
       )}
 

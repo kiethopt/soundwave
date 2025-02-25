@@ -24,7 +24,7 @@ router.get(
   getAllArtistsProfile
 );
 
-router.get('/profile/:id', authenticate, getArtistProfile);
+router.get('/profile/:id', authenticate, cacheMiddleware, getArtistProfile);
 
 router.put(
   '/profile/:id',

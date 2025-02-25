@@ -135,7 +135,14 @@ const getAllArtistsProfile = (req, res) => __awaiter(void 0, void 0, void 0, fun
 exports.getAllArtistsProfile = getAllArtistsProfile;
 const getArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
+    const cacheKey = `/api/artist/profile/${id}`;
     try {
+        const cachedData = yield cache_middleware_1.client.get(cacheKey);
+        if (cachedData) {
+            console.log(`[Redis] Serving artist profile from cache: ${id}`);
+            res.json(JSON.parse(cachedData));
+            return;
+        }
         const artist = yield db_1.default.artistProfile.findUnique({
             where: { id },
             select: prisma_selects_1.artistProfileSelect,
@@ -144,9 +151,12 @@ const getArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, functio
             res.status(404).json({ message: 'Artist not found' });
             return;
         }
+        yield cache_middleware_1.client.set(cacheKey, JSON.stringify(artist), { EX: 600 });
+        console.log(`[Redis] Cached artist profile: ${id}`);
         res.json(artist);
     }
     catch (error) {
+        console.error('Error fetching artist profile:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
