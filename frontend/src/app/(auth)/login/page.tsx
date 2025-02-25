@@ -5,10 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/utils/api';
 import { Music } from '@/components/ui/Icons';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface LoginFormData {
   email: string;
   password: string;
+  rememberMe: boolean;
 }
 
 function LoginForm() {
@@ -16,6 +18,7 @@ function LoginForm() {
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: '',
+    rememberMe: false,
   });
   const [error, setError] = useState<string>('');
   const [mounted, setMounted] = useState(false);
@@ -119,6 +122,23 @@ function LoginForm() {
             }
             className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
           />
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="rememberMe"
+            checked={formData.rememberMe}
+            onCheckedChange={(checked) =>
+              setFormData({ ...formData, rememberMe: checked === true })
+            }
+            className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black"
+          />
+          <label
+            htmlFor="rememberMe"
+            className="text-sm font-medium text-white/70 cursor-pointer"
+          >
+            Remember me
+          </label>
         </div>
 
         <button
