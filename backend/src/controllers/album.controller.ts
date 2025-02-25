@@ -747,7 +747,9 @@ export const getAlbumById = async (
     }
 
     const album = await prisma.album.findUnique({
-      where: { id },
+      where: { 
+        id 
+      },
       select: albumSelect,
     });
 
@@ -756,40 +758,8 @@ export const getAlbumById = async (
       return;
     }
 
-    // ADMIN luôn có quyền truy cập
-    if (user.role === Role.ADMIN) {
-      res.json(album);
-      return;
-    }
+    res.json(album);
 
-    // Kiểm tra quyền ARTIST
-    if (user.artistProfile?.isVerified && user.artistProfile?.isActive) {
-      // Nếu chưa switch sang profile ARTIST
-      if (user.currentProfile !== 'ARTIST') {
-        res.status(403).json({
-          message: 'Please switch to Artist profile to access this page',
-          code: 'SWITCH_TO_ARTIST_PROFILE',
-        });
-        return;
-      }
-
-      // Kiểm tra xem có phải artist sở hữu album hoặc featured artist không
-      const isOwner = user.artistProfile.id === album.artist.id;
-      const isFeaturedArtist = album.tracks.some((track) =>
-        track.featuredArtists.some(
-          (fa) => fa.artistProfile.id === user.artistProfile?.id
-        )
-      );
-
-      if (isOwner || isFeaturedArtist) {
-        res.json(album);
-        return;
-      }
-    }
-
-    res.status(403).json({
-      message: 'You do not have permission to access this album',
-    });
   } catch (error) {
     console.error('Get album error:', error);
     res.status(500).json({ message: 'Internal server error' });

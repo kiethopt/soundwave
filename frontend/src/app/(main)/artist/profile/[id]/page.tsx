@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'react-toastify';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { Verified, Play, Pause, AddSimple, Edit, Music } from '@/components/ui/Icons';
-import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
+import { ArrowLeft, Heart, MoreHorizontal, Share2 } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
 import {
   DropdownMenu,
@@ -275,10 +275,24 @@ export default function ArtistProfilePage({
         <div>
           {/* Artist Banner */}
           <div
-            className="relative w-full h-[370px] flex flex-col items-start justify-end rounded-t-lg"
+            className="relative w-full h-[370px] flex flex-col items-start rounded-t-lg px-4 md:px-6 py-6 justify-between"
             style={{ backgroundColor: dominantColor || undefined }}
           >
-            <div className='p-8'>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => router.back()}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  theme === 'light'
+                    ? 'bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow'
+                    : 'bg-black/20 hover:bg-black/30 text-white/80 hover:text-white'
+                }`}
+              >
+                <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+                <span>Back</span>
+              </button>
+            </div>
+
+            <div>
               <div className="flex items-center space-x-2">
                 <Verified className='w-6 h-6' />
                 <span className='text-sm font-medium'>Verified Artist</span>
@@ -293,7 +307,7 @@ export default function ArtistProfilePage({
           </div>
   
           {/* Artist Controls */}
-          <div className="px-2 md:px-8 py-6">
+          <div className="px-4 md:px-6 py-6">
             <div className="flex items-center gap-5">
               {/* Play/Pause Button */}
                 <button
@@ -308,7 +322,7 @@ export default function ArtistProfilePage({
                       }
                     }
                   }}
-                  className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200 ml-2"
+                  className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200"
                 >
                   { isPlaying && queueType === 'track' && currentTrack?.artistId === artist?.id ? (
                     <Pause className="w-6 h-6 text-white" />
@@ -367,9 +381,9 @@ export default function ArtistProfilePage({
           </div>
 
           {/* Track Section */}
-          <div  className="px-2 md:px-8 flex flex-col-reverse md:flex-row gap-4 lg:gap-12">
+          <div className="px-4 md:px-6 py-6 flex flex-col-reverse md:flex-row gap-4 lg:gap-12">
             { tracks.length > 0 && (
-              <div className='flex-grow mt-8 md:mt-0'>
+              <div className='flex-grow mt-4 md:mt-0'>
                 <h2 className="text-2xl font-bold">Popular Tracks</h2>
                 <div className="grid grid-cols-1 gap-4 mt-4">
                   {displayedTracks.map((track, index) => (
@@ -405,7 +419,7 @@ export default function ArtistProfilePage({
             )}
 
             {/* About Section */}
-            <div className='flex-grow mt-8 md:mt-0'>
+            <div className='flex-grow'>
               <div className='flex items-center gap-4'>
                 <h2 className="text-2xl font-bold">About</h2>
                 {isOwner && (
@@ -427,13 +441,14 @@ export default function ArtistProfilePage({
 
           {/* Album Section */}
           {albums.length > 0 && (
-            <div className="px-2 md:px-8 mt-8">
+            <div className="px-4 md:px-6 py-6">
               <h2 className="text-2xl font-bold">Albums</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
                 {albums.map((album) => (
                   <div
                     key={album.id}
                     className="bg-white/5 p-4 rounded-lg group relative w-full"
+                    onClick={() => router.push(`/album/${album.id}`)}
                   >
                     <div className="relative">
                       <img
@@ -476,7 +491,7 @@ export default function ArtistProfilePage({
 
           {/* Related Artists Section */}
           {relatedArtists.length > 0 && (
-            <div className="px-2 md:px-8 mt-8">
+            <div className="px-4 md:px-6 py-6">
               <h2 className="text-2xl font-bold">Related Artists</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
                 {relatedArtists.map((relatedArtist) => (

@@ -380,6 +380,7 @@ function SearchContent() {
                     <div
                       key={album.id}
                       className="bg-white/5 p-4 rounded-lg group relative"
+                      onClick={() => router.push(`/album/${album.id}`)}
                     >
                       <div className="relative">
                         <img
@@ -388,7 +389,10 @@ function SearchContent() {
                           className="w-full aspect-square object-cover rounded-md mb-4"
                         />
                         <button
-                          onClick={() => handlePlay(album)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handlePlay(album);
+                          }}
                           className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           {currentTrack &&
@@ -494,7 +498,7 @@ function SearchContent() {
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger>
                                 <AddSimple className="w-4 h-4 mr-2" />
-                                Add to playlist
+                                Add to Playlist
                               </DropdownMenuSubTrigger>
                               <DropdownMenuPortal>
                                 <DropdownMenuSubContent className="w-48">
@@ -545,7 +549,7 @@ function SearchContent() {
                             </DropdownMenuSub>
                             <DropdownMenuItem>
                               <Heart className="w-4 h-4 mr-2" />
-                              Add to favorites
+                              Add to Favorites
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem>
@@ -623,7 +627,7 @@ function SearchContent() {
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger>
                                 <AddSimple className="w-4 h-4 mr-2" />
-                                Add to playlist
+                                Add to Playlist
                               </DropdownMenuSubTrigger>
                               <DropdownMenuPortal>
                                 <DropdownMenuSubContent className="w-48">
@@ -674,7 +678,7 @@ function SearchContent() {
                             </DropdownMenuSub>
                             <DropdownMenuItem>
                               <Heart className="w-4 h-4 mr-2" />
-                              Add to favorites
+                              Add to Favorites
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem>

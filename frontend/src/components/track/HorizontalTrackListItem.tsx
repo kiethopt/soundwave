@@ -148,14 +148,14 @@ const HorizontalTrackListItem: React.FC<TrackListItemProps> = ({
               onClick={(e) => e.stopPropagation()}
             >
               <AddSimple className="w-4 h-4 mr-2" />
-              Add to playlist
+              Add to Playlist
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={(e) => e.stopPropagation()}
             >
               <Heart className="w-4 h-4 mr-2" />
-              Add to favorites
+              Add to Favorites
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

@@ -77,7 +77,6 @@ router.post(
 router.get(
   '/:id',
   authenticate,
-  authorize([Role.ADMIN, Role.ARTIST]), // Chỉ cho phép ADMIN và ARTIST
   cacheMiddleware,
   getAlbumById
 );

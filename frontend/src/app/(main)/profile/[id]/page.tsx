@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'react-toastify';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { Verified, Play, Pause, AddSimple, Edit, Music } from '@/components/ui/Icons';
-import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
+import { ArrowLeft, Heart, MoreHorizontal, Share2 } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
 import {
   DropdownMenu,
@@ -234,9 +234,24 @@ export default function UserProfilePage({
         <div>
           {/* User Banner */}
           <div
-            className="relative w-full h-[300px] flex flex-row items-end justify-start rounded-t-lg p-2 md:p-6"
+            className="relative w-full h-[330px] flex flex-col justify-between rounded-t-lg px-4 md:px-6 py-6"
             style={{ backgroundColor: dominantColor || undefined }}
           >
+            {/* Header with Back button */}
+            <div className="flex items-center justify-between mb-6">
+              <button
+                onClick={() => router.back()}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  theme === 'light'
+                    ? 'bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow'
+                    : 'bg-black/20 hover:bg-black/30 text-white/80 hover:text-white'
+                }`}
+              >
+                <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+                <span>Back</span>
+              </button>
+            </div>
+
             <div className="flex flex-row items-center justify-start w-full">
               {/* Avatar */}
               <img
@@ -269,7 +284,7 @@ export default function UserProfilePage({
           </div>
   
           {/* Artist Controls */}
-          <div className="px-2 md:px-8 py-6">
+          <div className="px-4 md:px-6 py-6">
             <div className="flex items-center gap-5">
               {/* Follow Button (Can't self follow) */}
               {!isOwner && (
@@ -327,7 +342,7 @@ export default function UserProfilePage({
 
           {/* Top Artists Section */}
           {topArtists.length > 0 && (
-            <div className="px-2 md:px-8">
+            <div className="px-4 md:px-6 py-6">
               <h2 className="text-2xl font-bold">Top artists this month</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
                 {topArtists.map((topArtist) => (
@@ -375,7 +390,7 @@ export default function UserProfilePage({
 
           {/* Top Tracks Section */}
           { topTracks.length > 0 && (
-            <div className="px-2 md:px-8 mt-8">
+            <div className="px-4 md:px-6 py-6">
               <h2 className="text-2xl font-bold">Top tracks this month</h2>
               <div className="grid grid-cols-1 gap-4 mt-4">
                 {(showAllTracks ? topTracks : topTracks.slice(0, 5)).map((track, index) => (
@@ -412,7 +427,7 @@ export default function UserProfilePage({
 
           {/* Following Artists Section */}
           {followingArtists.length > 0 && (
-            <div className="px-2 md:px-8 mt-8">
+            <div className="px-4 md:px-6 py-6">
               <h2 className="text-2xl font-bold">Following artists</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
                 {followingArtists.map((followArtist) => (
