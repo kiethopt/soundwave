@@ -41,6 +41,7 @@ export default function UserProfilePage({
   const [ topArtists, setTopArtists ] = useState<ArtistProfile[]>([]);
   const [ topTracks, setTopTracks ] = useState<Track[]>([]);
   const [artistTracksMap, setArtistTracksMap] = useState<Record<string, Track[]>>({});
+  const [showAllTracks, setShowAllTracks] = useState(false);
 
   const {
     currentTrack,
@@ -92,7 +93,6 @@ export default function UserProfilePage({
         } else {
           const isFollowing = followingResponse.some((user: User) => user.id === id);
           setFollow(isFollowing);
-          
         }
       } catch (error) {
         console.error('Failed to fetch user data:', error);
@@ -214,7 +214,7 @@ export default function UserProfilePage({
            isPlaying && 
            queueType === queueTypeValue;
   };
-  
+
   return (
     <div
       className="min-h-screen w-full rounded-lg"
@@ -303,7 +303,7 @@ export default function UserProfilePage({
                       }}
                     >
                       <Edit className="w-4 h-4 mr-2" />
-                        Edit Profile
+                      Edit Profile
                     </DropdownMenuItem>
                   )}
                   {!isOwner && (
@@ -378,7 +378,7 @@ export default function UserProfilePage({
             <div className="px-2 md:px-8 mt-8">
               <h2 className="text-2xl font-bold">Top tracks this month</h2>
               <div className="grid grid-cols-1 gap-4 mt-4">
-                {topTracks.map((track, index) => (
+                {(showAllTracks ? topTracks : topTracks.slice(0, 5)).map((track, index) => (
                   <HorizontalTrackListItem
                     key={track.id}
                     track={track}
@@ -392,14 +392,26 @@ export default function UserProfilePage({
                     onTrackClick={() => {
                       handleTopTrackPlay(track);
                     }}
-                />
+                  />
                 ))}
               </div> 
+
+              {/* "See More" Button */}
+              {topTracks.length > 5 && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => setShowAllTracks(!showAllTracks)}
+                    className="text-[#A57865] hover:underline"
+                  >
+                    {showAllTracks ? 'See Less' : 'See More'}
+                  </button>
+                </div>
+              )} 
             </div>
           )}
 
           {/* Following Artists Section */}
-          {following.length > 0 && (
+          {followingArtists.length > 0 && (
             <div className="px-2 md:px-8 mt-8">
               <h2 className="text-2xl font-bold">Following artists</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">

@@ -561,7 +561,9 @@ export default function Header({
                   </Link>
 
                   <Link
-                    href={`/profile/${userData?.id}`}
+                    href={userData?.currentProfile === 'USER' 
+                      ? `/profile/${userData?.id}`
+                      : `/artist/profile/${userData?.artistProfile?.id}`}
                     className={`block px-4 py-2 text-sm ${
                       theme === 'light'
                         ? 'text-gray-700 hover:bg-gray-200'
@@ -572,20 +574,6 @@ export default function Header({
                     Profile
                   </Link>
 
-                  {userData?.artistProfile?.isVerified &&
-                    userData?.artistProfile?.id && (
-                      <Link
-                        href={`/artist/profile/${userData.artistProfile.id}`}
-                        className={`block px-4 py-2 text-sm ${
-                          theme === 'light'
-                            ? 'text-gray-700 hover:bg-gray-200'
-                            : 'text-white hover:bg-white/10'
-                        }`}
-                        onClick={() => setShowDropdown(false)}
-                      >
-                        Artist Profile
-                      </Link>
-                    )}
 
                   {userData?.artistProfile?.isVerified && (
                     <button

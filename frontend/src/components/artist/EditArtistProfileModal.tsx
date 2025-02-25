@@ -59,12 +59,13 @@ export function EditArtistProfileModal({
     try {
       const token = localStorage.getItem('userToken');
       if (!token) {
-        toast.error('Vui lòng đăng nhập lại');
+        toast.error('Please login again');
         return;
       }
       console.log('formData', formData);
       await api.artists.updateProfile(artistProfile.id, formData, token);
-      toast.success('Đã cập nhật Artist Profile');
+
+      toast.success('Updated Artist Profile');
       onOpenChange(false);
     } catch (error) {
       console.error('Error updating playlist:', error);
