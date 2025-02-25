@@ -1,22 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
 import type { Album } from '@/types';
 import { api } from '@/utils/api';
-import { MoreVertical, Eye, EyeOff, Trash2, Music } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import Image from 'next/image';
 import { toast } from 'react-toastify';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
-  ColumnDef,
   ColumnFiltersState,
   getCoreRowModel,
   getPaginationRowModel,
@@ -25,85 +14,37 @@ import {
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table';
-import { Checkbox } from '@/components/ui/checkbox';
 import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 import Link from 'next/link';
 import { getAlbumColumns } from '@/components/data-table/data-table-columns';
+import { useDataTable } from '@/hooks/useDataTable';
+import { EditAlbumModal } from '@/components/data-table/data-table-modals';
 
 export default function ArtistAlbums() {
-  const [albums, setAlbums] = useState<Album[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState('');
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 10;
   const { theme } = useTheme();
+  const limit = 10;
 
-  // State for sorting, column filters, visibility, row selection, selected rows, status filter
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = useState({});
-  const [selectedRows, setSelectedRows] = useState<Album[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  // URL handling logic
-  useEffect(() => {
-    const pageStr = searchParams.get('page');
-    const pageNumber = Number(pageStr);
-    if (pageStr === '1' || pageNumber < 1) {
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.delete('page');
-      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
-      router.replace(`/artist/albums${queryStr}`);
-    }
-  }, [searchParams, router]);
-
-  const pageFromURL = Number(searchParams.get('page'));
-  const currentPage = isNaN(pageFromURL) || pageFromURL < 1 ? 1 : pageFromURL;
-
-  const updateQueryParam = (param: string, value: number) => {
-    if (totalPages === 1 && value !== 1) return;
-    if (value < 1) value = 1;
-    if (value > totalPages) value = totalPages;
-    const current = new URLSearchParams(searchParams.toString());
-    if (value === 1) {
-      current.delete(param);
-    } else {
-      current.set(param, value.toString());
-    }
-    const queryStr = current.toString() ? `?${current.toString()}` : '';
-    router.push(`/artist/albums${queryStr}`);
-  };
-
-  // API calls
-  const fetchAlbums = async (page: number) => {
-    try {
-      setLoading(true);
+  // Dùng custom hook để xử lý logic của data table
+  const {
+    data: albums,
+    setData: setAlbums,
+    loading,
+    totalPages,
+    currentPage,
+    setActionLoading,
+    searchInput,
+    setSearchInput,
+    statusFilter,
+    setStatusFilter,
+    genreFilter,
+    setGenreFilter,
+    selectedRows,
+    setSelectedRows,
+    updateQueryParam,
+  } = useDataTable<Album>({
+    fetchData: async (page, params) => {
       const token = localStorage.getItem('userToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        return;
-      }
-
-      // Tạo query params
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-      });
-
-      // Thêm search param nếu có
-      if (searchInput) {
-        params.append('q', searchInput);
-      }
-
-      // Thêm status filter nếu có
-      if (statusFilter.length === 1) {
-        params.append('status', statusFilter[0]);
-      }
+      if (!token) throw new Error('No authentication token found');
 
       const response = await api.albums.getAll(
         token,
@@ -111,29 +52,57 @@ export default function ArtistAlbums() {
         limit,
         params.toString()
       );
-      setAlbums(response.albums);
-      setTotalPages(response.pagination.totalPages);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to fetch albums'
+
+      return {
+        data: response.albums,
+        pagination: response.pagination,
+      };
+    },
+    limit,
+  });
+
+  // Table state
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
+
+  // Edit modal state
+  const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
+  const [availableGenres, setAvailableGenres] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+
+  // Fetch metadata for edit modal
+  const fetchMetadata = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) return;
+
+      const genresResponse = await api.artists.getAllGenres(token);
+
+      setAvailableGenres(
+        genresResponse.data.map((genre: { id: string; name: string }) => ({
+          id: genre.id,
+          name: genre.name,
+        }))
       );
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    // Reset về trang 1 khi filter hoặc search thay đổi
-    if (currentPage !== 1) {
-      updateQueryParam('page', 1);
-    } else {
-      fetchAlbums(1);
+      // Set selected values if editing an album
+      if (editingAlbum) {
+        setSelectedGenres(editingAlbum.genres.map((g) => g.genre.id));
+      }
+    } catch (error) {
+      console.error('Failed to fetch metadata:', error);
+      toast.error('Failed to load required data');
     }
-  }, [searchInput, statusFilter]);
+  }, [editingAlbum]);
 
+  // Fetch metadata when needed
   useEffect(() => {
-    fetchAlbums(currentPage);
-  }, [currentPage]);
+    fetchMetadata();
+  }, [fetchMetadata]);
 
   // Action handlers
   const handleAlbumVisibility = async (albumId: string, isActive: boolean) => {
@@ -163,8 +132,8 @@ export default function ArtistAlbums() {
     }
   };
 
-  const handleDeleteAlbum = async (albumId: string | string[]) => {
-    const ids = Array.isArray(albumId) ? albumId : [albumId];
+  const handleDeleteAlbums = async (albumIds: string | string[]) => {
+    const ids = Array.isArray(albumIds) ? albumIds : [albumIds];
     const confirmMessage =
       ids.length === 1
         ? 'Are you sure you want to delete this album?'
@@ -179,19 +148,35 @@ export default function ArtistAlbums() {
         return;
       }
 
-      // Nếu xóa một album, set loading state cho album đó
-      if (!Array.isArray(albumId)) {
-        setActionLoading(albumId);
+      // Set loading state for single album delete
+      if (!Array.isArray(albumIds)) {
+        setActionLoading(albumIds);
       }
 
       await Promise.all(ids.map((id) => api.albums.delete(id, token)));
 
-      // Nếu xóa một album, cập nhật state albums ngay lập tức
-      if (!Array.isArray(albumId)) {
-        setAlbums((prev) => prev.filter((album) => album.id !== albumId));
+      // Update UI based on delete type
+      if (!Array.isArray(albumIds)) {
+        setAlbums((prev) => prev.filter((album) => album.id !== albumIds));
       } else {
-        // Nếu xóa nhiều albums, fetch lại data
-        await fetchAlbums(currentPage);
+        // Refresh the current page
+        const params = new URLSearchParams();
+        params.set('page', currentPage.toString());
+        params.set('limit', limit.toString());
+
+        if (searchInput) params.append('q', searchInput);
+        if (statusFilter.length === 1) params.append('status', statusFilter[0]);
+
+        const token = localStorage.getItem('userToken');
+        if (token) {
+          const response = await api.albums.getAll(
+            token,
+            currentPage,
+            limit,
+            params.toString()
+          );
+          setAlbums(response.albums);
+        }
       }
 
       toast.success(
@@ -204,40 +189,57 @@ export default function ArtistAlbums() {
         error instanceof Error ? error.message : 'Failed to delete album(s)'
       );
     } finally {
-      if (!Array.isArray(albumId)) {
+      if (!Array.isArray(albumIds)) {
         setActionLoading(null);
       }
     }
   };
 
-  const handleDeleteSelected = async () => {
-    if (
-      !selectedRows.length ||
-      !confirm(`Delete ${selectedRows.length} selected albums?`)
-    )
-      return;
-
+  const handleUpdateAlbum = async (albumId: string, formData: FormData) => {
     try {
+      setActionLoading(albumId);
       const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
 
-      await Promise.all(
-        selectedRows.map((row) => api.albums.delete(row.id, token))
+      await api.albums.update(albumId, formData, token);
+
+      // Refresh the current page
+      const params = new URLSearchParams();
+      params.set('page', currentPage.toString());
+      params.set('limit', limit.toString());
+
+      if (searchInput) params.append('q', searchInput);
+      if (statusFilter.length === 1) params.append('status', statusFilter[0]);
+
+      const response = await api.albums.getAll(
+        token,
+        currentPage,
+        limit,
+        params.toString()
       );
+      setAlbums(response.albums);
 
-      setSelectedRows([]);
-      fetchAlbums(currentPage);
-      toast.success(`Deleted ${selectedRows.length} albums successfully`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Deletion failed');
+      setEditingAlbum(null);
+      toast.success('Album updated successfully');
+    } catch (error) {
+      console.error('Update album error:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update album'
+      );
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  // Table columns definition
+  // Table configuration
   const columns = getAlbumColumns({
     theme,
     onVisibilityChange: handleAlbumVisibility,
-    onDelete: handleDeleteAlbum,
+    onDelete: handleDeleteAlbums,
+    onEdit: (album: Album) => setEditingAlbum(album),
   });
 
   const table = useReactTable({
@@ -249,7 +251,15 @@ export default function ArtistAlbums() {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: (updatedSelection) => {
+      setRowSelection(updatedSelection);
+      const selectedRowData = albums.filter(
+        (album, index) =>
+          typeof updatedSelection === 'object' &&
+          updatedSelection[index.toString()]
+      );
+      setSelectedRows(selectedRowData);
+    },
     state: {
       sorting,
       columnFilters,
@@ -284,7 +294,7 @@ export default function ArtistAlbums() {
               theme === 'dark' ? 'text-white/60' : ''
             }`}
           >
-            Manage your albums and tracks
+            Manage and monitor your albums
           </p>
         </div>
 
@@ -314,29 +324,48 @@ export default function ArtistAlbums() {
           searchValue: searchInput,
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
-          onDelete: () => handleDeleteAlbum(selectedRows.map((row) => row.id)),
+          onDelete: () => handleDeleteAlbums(selectedRows.map((row) => row.id)),
           showExport: true,
           exportData: {
             data: albums,
             columns: [
-              { key: 'id', header: 'ID' },
-              { key: 'title', header: 'Title' },
+              { key: 'title', header: 'Album Title' },
               { key: 'type', header: 'Type' },
               { key: 'totalTracks', header: 'Total Tracks' },
+              { key: 'genres', header: 'Genres' },
               { key: 'duration', header: 'Duration' },
               { key: 'isActive', header: 'Status' },
               { key: 'releaseDate', header: 'Release Date' },
               { key: 'createdAt', header: 'Created At' },
               { key: 'updatedAt', header: 'Updated At' },
             ],
-            filename: 'albums',
+            filename: 'albums-export',
           },
           searchPlaceholder: 'Search albums...',
           statusFilter: {
             value: statusFilter,
             onChange: setStatusFilter,
           },
+          genreFilter: {
+            value: genreFilter,
+            onChange: setGenreFilter,
+            options: availableGenres.map((genre) => ({
+              value: genre.id,
+              label: genre.name,
+            })),
+          },
         }}
+      />
+
+      {/* Edit Album Modal */}
+      <EditAlbumModal
+        album={editingAlbum}
+        onClose={() => setEditingAlbum(null)}
+        onSubmit={handleUpdateAlbum}
+        availableGenres={availableGenres}
+        selectedGenres={selectedGenres}
+        setSelectedGenres={setSelectedGenres}
+        theme={theme}
       />
     </div>
   );

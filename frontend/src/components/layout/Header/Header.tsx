@@ -17,7 +17,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { User } from '@/types';
 import pusher from '@/utils/pusher';
-import { api } from '@/utils/api'; // Giả sử bạn có file api
+import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -92,7 +92,7 @@ export default function Header({
   }, []);
 
   // ==============================
-  // 2) Click outside để đóng dropdown 
+  // 2) Click outside để đóng dropdown
   //    a) Menu user dropdown
   //    b) Notification dropdown
   // ==============================
@@ -146,7 +146,7 @@ export default function Header({
       if (!isAuthenticated) {
         router.push('/login');
       } else {
-        router.push(`/search?q=${encodeURIComponent(searchQuery)}`)
+        router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
         setSearchQuery('');
       }
     }
@@ -206,7 +206,6 @@ export default function Header({
     }
   };
 
-
   // ==============================
   // 7) Switch profile
   // ==============================
@@ -260,7 +259,11 @@ export default function Header({
     console.log('Subscribed to Pusher channel:', `user-${userId}`);
 
     // Hàm xử lý sự kiện realtime cho thông báo mới
-    const handleNewNotification = (data: { type: string; message: string;[key: string]: any }) => {
+    const handleNewNotification = (data: {
+      type: string;
+      message: string;
+      [key: string]: any;
+    }) => {
       console.log('Received new notification event:', data);
       // Tăng số lượng thông báo
       setNotificationCount((prev) => {
@@ -304,7 +307,9 @@ export default function Header({
         await api.notifications.markAsRead(notification.id, token);
         // Cập nhật lại state notifications: thay đổi isRead của thông báo đó thành true
         setNotifications((prev) =>
-          prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
+          prev.map((n) =>
+            n.id === notification.id ? { ...n, isRead: true } : n
+          )
         );
       } catch (error) {
         console.error('Error marking notification as read:', error);
@@ -312,22 +317,23 @@ export default function Header({
     }
   };
 
-
   return (
     <header
-      className={`h-[72px] flex items-center justify-between px-2 md:px-4 lg:px-6 border-b ${theme === 'light'
+      className={`h-[72px] flex items-center justify-between px-2 md:px-4 lg:px-6 border-b ${
+        theme === 'light'
           ? 'bg-white border-gray-200'
           : 'bg-[#111111] border-white/10'
-        }`}
+      }`}
     >
       {/* Left Side */}
       <div className="flex items-center gap-2 md:gap-4 lg:gap-6">
         <button
           onClick={onMenuClick}
-          className={`md:hidden p-2 ${theme === 'light'
+          className={`md:hidden p-2 ${
+            theme === 'light'
               ? 'text-gray-600 hover:text-gray-900'
               : 'text-white/70 hover:text-white'
-            }`}
+          }`}
         >
           <Menu className="w-6 h-6" />
         </button>
@@ -337,14 +343,15 @@ export default function Header({
           <div className="hidden md:flex items-center gap-4 lg:gap-6">
             <Link
               href="/"
-              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${isActive('/')
+              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${
+                isActive('/')
                   ? theme === 'light'
                     ? 'text-gray-900 bg-gray-200'
                     : 'text-white bg-[#282828]'
                   : theme === 'light'
-                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                    : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
-                }`}
+                  ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                  : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
+              }`}
             >
               {isActive('/') ? (
                 <HomeFilled className="w-5 h-5" />
@@ -356,14 +363,15 @@ export default function Header({
 
             <Link
               href="/discover"
-              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${isActive('/discover')
+              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${
+                isActive('/discover')
                   ? theme === 'light'
                     ? 'text-gray-900 bg-gray-200'
                     : 'text-white bg-[#282828]'
                   : theme === 'light'
-                    ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                    : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
-                }`}
+                  ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                  : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
+              }`}
             >
               {isActive('/discover') ? (
                 <DiscoverFilled className="w-5 h-5" />
@@ -375,18 +383,20 @@ export default function Header({
 
             <form onSubmit={handleSearch} className="relative w-[400px]">
               <Search
-                className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${theme === 'light' ? 'text-gray-400' : 'text-white/40'
-                  }`}
+                className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
+                  theme === 'light' ? 'text-gray-400' : 'text-white/40'
+                }`}
               />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search"
-                className={`w-full rounded-md py-1.5 md:py-2 pl-10 pr-4 text-sm focus:outline-none ${theme === 'light'
+                className={`w-full rounded-md py-1.5 md:py-2 pl-10 pr-4 text-sm focus:outline-none ${
+                  theme === 'light'
                     ? 'bg-gray-100 text-gray-900 placeholder:text-gray-500 focus:bg-gray-200'
                     : 'bg-white/10 text-white placeholder:text-white/40 focus:bg-white/20'
-                  }`}
+                }`}
               />
             </form>
           </div>
@@ -400,13 +410,16 @@ export default function Header({
             {/* Nút chuông Notifications */}
             <div className="relative" ref={notificationRef}>
               <button
-                className={`p-2 rounded-full relative ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-                  }`}
+                className={`p-2 rounded-full relative ${
+                  theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
+                }`}
                 onClick={handleBellClick}
               >
                 <div className="relative">
                   <Notifications
-                    className={`w-5 h-5 ${theme === 'light' ? 'text-gray-700' : 'text-white'}`}
+                    className={`w-5 h-5 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white'
+                    }`}
                   />
                   {/* Badge chấm đỏ */}
                   {notificationCount > 0 && (
@@ -423,13 +436,15 @@ export default function Header({
               {/* Dropdown Notifications */}
               {showNotifications && (
                 <div
-                  className={`absolute right-0 mt-2 w-80 max-h-[300px] overflow-auto rounded-lg shadow-lg py-3 z-50 ${theme === 'light' ? 'bg-white' : 'bg-[#282828]'
-                    }`}
+                  className={`absolute right-0 mt-2 w-80 max-h-[300px] overflow-auto rounded-lg shadow-lg py-3 z-50 ${
+                    theme === 'light' ? 'bg-white' : 'bg-[#282828]'
+                  }`}
                 >
                   {notifications.length === 0 ? (
                     <p
-                      className={`px-4 py-3 text-sm ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'
-                        }`}
+                      className={`px-4 py-3 text-sm ${
+                        theme === 'light' ? 'text-gray-700' : 'text-gray-300'
+                      }`}
                     >
                       No notifications
                     </p>
@@ -438,15 +453,20 @@ export default function Header({
                       <div
                         key={item.id}
                         className={`cursor-pointer px-4 py-3 transition-colors duration-200 
-                        ${item.isRead
+                        ${
+                          item.isRead
                             ? theme === 'light'
                               ? 'bg-gray-50 text-gray-700'
                               : 'bg-gray-700 text-gray-200'
                             : theme === 'light'
-                              ? 'bg-blue-50 text-gray-900 font-medium'
-                              : 'bg-blue-900 text-white font-medium'
-                          }
-                        hover:opacity-90 ${index !== notifications.length - 1 ? 'border-b border-gray-200' : ''}`}
+                            ? 'bg-blue-50 text-gray-900 font-medium'
+                            : 'bg-blue-900 text-white font-medium'
+                        }
+                        hover:opacity-90 ${
+                          index !== notifications.length - 1
+                            ? 'border-b border-gray-200'
+                            : ''
+                        }`}
                         onClick={() => handleNotificationClick(item)}
                       >
                         <p className="line-clamp-2 text-sm">{item.message}</p>
@@ -462,10 +482,11 @@ export default function Header({
                   <div className="px-4 py-3">
                     <Link href="/notifications">
                       <button
-                        className={`w-full text-center text-sm py-2 rounded-lg transition-colors duration-200 ${theme === 'light'
+                        className={`w-full text-center text-sm py-2 rounded-lg transition-colors duration-200 ${
+                          theme === 'light'
                             ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             : 'bg-gray-800 text-white hover:bg-gray-700'
-                          }`}
+                        }`}
                       >
                         Xem tất cả
                       </button>
@@ -473,40 +494,42 @@ export default function Header({
                   </div>
                 </div>
               )}
-
             </div>
 
-
             <button
-              className={`p-2 rounded-full ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-                }`}
+              className={`p-2 rounded-full ${
+                theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
+              }`}
             >
               <Settings
-                className={`w-5 h-5 ${theme === 'light' ? 'text-gray-700' : 'text-white'
-                  }`}
+                className={`w-5 h-5 ${
+                  theme === 'light' ? 'text-gray-700' : 'text-white'
+                }`}
               />
             </button>
             {/* Theme toggle - For Admin and Artist */}
             {(userData?.role === 'ADMIN' ||
               userData?.currentProfile === 'ARTIST') && (
-                <button
-                  onClick={toggleTheme}
-                  className={`p-2 rounded-full ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-                    }`}
-                >
-                  {theme === 'light' ? (
-                    <Moon className="w-5 h-5 text-gray-700" />
-                  ) : (
-                    <Sun className="w-5 h-5 text-white" />
-                  )}
-                </button>
-              )}
+              <button
+                onClick={toggleTheme}
+                className={`p-2 rounded-full ${
+                  theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
+                }`}
+              >
+                {theme === 'light' ? (
+                  <Moon className="w-5 h-5 text-gray-700" />
+                ) : (
+                  <Sun className="w-5 h-5 text-white" />
+                )}
+              </button>
+            )}
             <div className="relative" ref={dropdownRef}>
               <button
-                className={`flex items-center justify-center w-8 h-8 rounded-full overflow-hidden ${theme === 'light'
+                className={`flex items-center justify-center w-8 h-8 rounded-full overflow-hidden ${
+                  theme === 'light'
                     ? 'bg-gray-200 hover:bg-gray-200'
                     : 'bg-white/10 hover:bg-white/20'
-                  }`}
+                }`}
                 onClick={() => setShowDropdown(!showDropdown)}
               >
                 <Image
@@ -521,15 +544,17 @@ export default function Header({
 
               {showDropdown && (
                 <div
-                  className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-50 ${theme === 'light' ? 'bg-white' : 'bg-[#282828]'
-                    }`}
+                  className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-50 ${
+                    theme === 'light' ? 'bg-white' : 'bg-[#282828]'
+                  }`}
                 >
                   <Link
                     href="/account"
-                    className={`block px-4 py-2 text-sm ${theme === 'light'
+                    className={`block px-4 py-2 text-sm ${
+                      theme === 'light'
                         ? 'text-gray-700 hover:bg-gray-200'
                         : 'text-white hover:bg-white/10'
-                      }`}
+                    }`}
                     onClick={() => setShowDropdown(false)}
                   >
                     Account
@@ -547,32 +572,32 @@ export default function Header({
                     Profile
                   </Link>
 
-                  {userData?.artistProfile?.isVerified &&  userData?.artistProfile?.id && (
-                    <Link
-                      href={`/artist/profile/${userData.artistProfile.id}`}
-                      className={`block px-4 py-2 text-sm ${
-                        theme === 'light'
-                          ? 'text-gray-700 hover:bg-gray-200'
-                          : 'text-white hover:bg-white/10'
-                      }`}
-                      onClick={() => setShowDropdown(false)}
-                    >
-                      Artist Profile
-                    </Link>
-                  )}
+                  {userData?.artistProfile?.isVerified &&
+                    userData?.artistProfile?.id && (
+                      <Link
+                        href={`/artist/profile/${userData.artistProfile.id}`}
+                        className={`block px-4 py-2 text-sm ${
+                          theme === 'light'
+                            ? 'text-gray-700 hover:bg-gray-200'
+                            : 'text-white hover:bg-white/10'
+                        }`}
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        Artist Profile
+                      </Link>
+                    )}
 
                   {userData?.artistProfile?.isVerified && (
                     <button
                       onClick={handleSwitchProfile}
-                      className={`block w-full text-left px-4 py-2 text-sm ${theme === 'light'
+                      className={`block w-full text-left px-4 py-2 text-sm ${
+                        theme === 'light'
                           ? 'text-gray-700 hover:bg-gray-200'
                           : 'text-white hover:bg-white/10'
-                        }`}
+                      }`}
                     >
                       Switch to{' '}
-                      {userData.currentProfile === 'USER'
-                        ? 'Artist'
-                        : 'User'}{' '}
+                      {userData.currentProfile === 'USER' ? 'Artist' : 'User'}{' '}
                       Profile
                     </button>
                   )}
@@ -580,10 +605,11 @@ export default function Header({
                   {userData?.role === 'USER' && !userData?.artistProfile && (
                     <Link
                       href="/request-artist"
-                      className={`block px-4 py-2 text-sm ${theme === 'light'
+                      className={`block px-4 py-2 text-sm ${
+                        theme === 'light'
                           ? 'text-gray-700 hover:bg-gray-200'
                           : 'text-white hover:bg-white/10'
-                        }`}
+                      }`}
                       onClick={() => setShowDropdown(false)}
                     >
                       Become an Artist
@@ -591,18 +617,20 @@ export default function Header({
                   )}
 
                   <div
-                    className={`border-t my-1 ${theme === 'light' ? 'border-gray-200' : 'border-white/10'
-                      }`}
+                    className={`border-t my-1 ${
+                      theme === 'light' ? 'border-gray-200' : 'border-white/10'
+                    }`}
                   ></div>
                   <button
                     onClick={() => {
                       handleLogout();
                       setShowDropdown(false);
                     }}
-                    className={`block w-full text-left px-4 py-2 text-sm ${theme === 'light'
+                    className={`block w-full text-left px-4 py-2 text-sm ${
+                      theme === 'light'
                         ? 'text-gray-700 hover:bg-gray-200'
                         : 'text-white hover:bg-white/10'
-                      }`}
+                    }`}
                   >
                     Log out
                   </button>
@@ -614,10 +642,11 @@ export default function Header({
           <div className="flex items-center gap-2 md:gap-4">
             <Link
               href="/register"
-              className={`text-sm font-medium hidden md:block ${theme === 'light'
+              className={`text-sm font-medium hidden md:block ${
+                theme === 'light'
                   ? 'text-gray-600 hover:text-gray-900'
                   : 'text-white/70 hover:text-white'
-                }`}
+              }`}
             >
               Sign up
             </Link>

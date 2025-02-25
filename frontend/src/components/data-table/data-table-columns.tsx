@@ -11,13 +11,23 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import React from 'react';
+import { api } from '@/utils/api';
+import { ArtistInfoModal } from './data-table-modals';
 
-interface GetColumnsOptions {
+interface GetTrackColumnsOptions {
   theme?: 'light' | 'dark';
   onVisibilityChange?: (id: string, isActive: boolean) => Promise<void>;
   onDelete?: (id: string | string[]) => Promise<void>;
-  onEdit?: (item: Track) => void;
+  onEdit?: (track: Track) => void;
+  formatReleaseTime?: (date: string) => string;
+}
+
+interface GetAlbumColumnsOptions {
+  theme?: 'light' | 'dark';
+  onVisibilityChange?: (id: string, isActive: boolean) => Promise<void>;
+  onDelete?: (id: string | string[]) => Promise<void>;
+  onEdit?: (album: Album) => void;
   formatReleaseTime?: (date: string) => string;
 }
 
@@ -27,16 +37,14 @@ export function getTrackColumns({
   onDelete,
   onEdit,
   formatReleaseTime,
-}: GetColumnsOptions): ColumnDef<Track>[] {
+}: GetTrackColumnsOptions): ColumnDef<Track>[] {
   return [
     {
       id: 'select',
       header: ({ table }) => (
         <Checkbox
           checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => {
-            table.toggleAllPageRowsSelected(!!value);
-          }}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
           aria-label="Select all"
           className={theme === 'dark' ? 'border-white/50' : ''}
         />
@@ -56,7 +64,7 @@ export function getTrackColumns({
     },
     {
       accessorKey: 'title',
-      header: 'Track',
+      header: 'Title',
       cell: ({ row }) => {
         const track = row.original;
         return (
@@ -91,17 +99,29 @@ export function getTrackColumns({
               >
                 {track.title}
               </Link>
-              {track.album && (
-                <div
-                  className={
-                    theme === 'dark' ? 'text-white/60' : 'text-gray-500'
-                  }
-                >
-                  {track.album.title}
-                </div>
-              )}
             </div>
           </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'album',
+      header: 'Album',
+      cell: ({ row }) => {
+        const album = row.original.album;
+        return album ? (
+          <Link
+            href={`/artist/albums/${album.id}`}
+            className={`font-semibold text-[#A57865] hover:underline`}
+          >
+            {album.title}
+          </Link>
+        ) : (
+          <span
+            className={theme === 'dark' ? 'text-white/50' : 'text-gray-500'}
+          >
+            -
+          </span>
         );
       },
     },
@@ -109,26 +129,112 @@ export function getTrackColumns({
       accessorKey: 'featuredArtists',
       header: 'Featured Artists',
       cell: ({ row }) => {
-        const track = row.original;
-        if (!track.featuredArtists?.length) {
-          return (
-            <span
-              className={theme === 'dark' ? 'text-white/60' : 'text-gray-500'}
-            ></span>
-          );
-        }
+        const [selectedArtist, setSelectedArtist] = React.useState<any>(null);
+        const [isModalOpen, setIsModalOpen] = React.useState(false);
+        const [isLoading, setIsLoading] = React.useState(false);
+        const [loadingArtistId, setLoadingArtistId] = React.useState<
+          string | null
+        >(null);
+
+        const featuredArtists = row.original.featuredArtists;
+
+        const handleArtistClick = async (artistId: string) => {
+          try {
+            setLoadingArtistId(artistId);
+            setIsLoading(true);
+            const token = localStorage.getItem('userToken');
+            if (!token) return;
+
+            const artistData = await api.artists.getArtistById(artistId, token);
+            setSelectedArtist(artistData);
+            setIsModalOpen(true);
+          } catch (error) {
+            console.error('Failed to fetch artist details:', error);
+          } finally {
+            setIsLoading(false);
+            setLoadingArtistId(null);
+          }
+        };
 
         return (
-          <div className="flex flex-wrap gap-1">
-            {track.featuredArtists.map((fa, index) => (
-              <span key={fa.artistProfile.id}>
-                <span className={`${theme === 'dark' ? 'text-white' : ''}`}>
-                  {fa.artistProfile.artistName}
-                </span>
-                {index < track.featuredArtists.length - 1 && ', '}
+          <div className="relative">
+            {featuredArtists && featuredArtists.length > 0 ? (
+              <div className="space-y-1">
+                {featuredArtists.map((fa, index) => (
+                  <div key={fa.artistProfile.id} className="flex items-center">
+                    <button
+                      onClick={() => handleArtistClick(fa.artistProfile.id)}
+                      className="text-[#A57865] font-medium hover:underline focus:outline-none relative"
+                      disabled={isLoading}
+                    >
+                      {fa.artistProfile.artistName}
+                      {isLoading && loadingArtistId === fa.artistProfile.id && (
+                        <span className="ml-2 inline-block w-3 h-3 border-t-2 border-r-2 border-[#A57865] rounded-full animate-spin"></span>
+                      )}
+                    </button>
+                    {index < featuredArtists.length - 1 && (
+                      <span
+                        className={
+                          theme === 'dark' ? 'text-white/50' : 'text-gray-500'
+                        }
+                      >
+                        ,&nbsp;
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span
+                className={theme === 'dark' ? 'text-white/50' : 'text-gray-500'}
+              >
+                -
               </span>
+            )}
+
+            {selectedArtist && (
+              <ArtistInfoModal
+                artist={selectedArtist}
+                isOpen={isModalOpen}
+                onClose={() => {
+                  setIsModalOpen(false);
+                  setTimeout(() => setSelectedArtist(null), 300);
+                }}
+                theme={theme}
+              />
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'genres',
+      header: 'Genres',
+      cell: ({ row }) => {
+        const genres = row.original.genres;
+        return genres && genres.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {genres.map((g, index) => (
+              <React.Fragment key={g.genre.id}>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs ${
+                    theme === 'dark'
+                      ? 'bg-white/10 text-white/80'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {g.genre.name}
+                </span>
+                {index < genres.length - 1 && ' '}
+              </React.Fragment>
             ))}
           </div>
+        ) : (
+          <span
+            className={theme === 'dark' ? 'text-white/50' : 'text-gray-500'}
+          >
+            -
+          </span>
         );
       },
     },
@@ -136,23 +242,15 @@ export function getTrackColumns({
       accessorKey: 'duration',
       header: 'Duration',
       cell: ({ row }) => {
-        const minutes = Math.floor(row.original.duration / 60);
-        const seconds = row.original.duration % 60;
+        const duration = row.original.duration;
+        const minutes = Math.floor(duration / 60);
+        const seconds = Math.floor(duration % 60);
         return (
           <span className={theme === 'dark' ? 'text-white' : ''}>
-            {`${minutes}:${seconds.toString().padStart(2, '0')}`}
+            {minutes}:{seconds.toString().padStart(2, '0')}
           </span>
         );
       },
-    },
-    {
-      accessorKey: 'playCount',
-      header: 'Plays',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {row.original.playCount.toLocaleString()}
-        </span>
-      ),
     },
     {
       accessorKey: 'isActive',
@@ -173,37 +271,63 @@ export function getTrackColumns({
       accessorKey: 'releaseDate',
       header: 'Release Date',
       cell: ({ row }) => {
-        const [countdown, setCountdown] = useState(
-          formatReleaseTime ? formatReleaseTime(row.original.releaseDate) : ''
-        );
+        const releaseDate = row.original.releaseDate;
+        const [timeDisplay, setTimeDisplay] = React.useState<string>('');
+        const track = row.original;
 
-        useEffect(() => {
-          const release = new Date(row.original.releaseDate);
-          const now = new Date();
+        React.useEffect(() => {
+          // Tính toán và hiển thị thời gian đếm ngược
+          const calculateTimeRemaining = () => {
+            const now = new Date();
+            const release = new Date(releaseDate);
 
-          if (release <= now) {
-            return;
-          }
-
-          const timer = setInterval(() => {
-            const currentTime = new Date();
-            if (release <= currentTime) {
-              clearInterval(timer);
-            } else {
-              setCountdown(
-                formatReleaseTime
-                  ? formatReleaseTime(row.original.releaseDate)
-                  : ''
-              );
+            // Nếu đã phát hành, hiển thị ngày phát hành
+            if (release <= now) {
+              return new Date(releaseDate).toLocaleString();
             }
+
+            // Tính toán thời gian còn lại
+            const diff = release.getTime() - now.getTime();
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor(
+              (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+            );
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+            if (days > 0) {
+              return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+            } else if (hours > 0) {
+              return `${hours}h ${minutes}m ${seconds}s`;
+            } else {
+              return `${minutes}m ${seconds}s`;
+            }
+          };
+
+          // Cập nhật ban đầu
+          setTimeDisplay(calculateTimeRemaining());
+
+          // Cập nhật mỗi giây
+          const timer = setInterval(() => {
+            const now = new Date();
+            const release = new Date(releaseDate);
+
+            // Kiểm tra nếu vừa đến thời điểm phát hành và track chưa active
+            if (release <= now && !track.isActive) {
+              // Đơn giản nhất: reload trang
+              window.location.reload();
+            }
+
+            setTimeDisplay(calculateTimeRemaining());
           }, 1000);
 
+          // Dọn dẹp khi component unmount
           return () => clearInterval(timer);
-        }, [row.original.releaseDate]);
+        }, [releaseDate, track.isActive]);
 
         return (
           <span className={theme === 'dark' ? 'text-white' : ''}>
-            {countdown}
+            {timeDisplay}
           </span>
         );
       },
@@ -229,16 +353,11 @@ export function getTrackColumns({
                 }
               >
                 {track.isActive ? (
-                  <>
-                    <EyeOff className="w-4 h-4 mr-2" />
-                    Hide Track
-                  </>
+                  <EyeOff className="w-4 h-4 mr-2" />
                 ) : (
-                  <>
-                    <Eye className="w-4 h-4 mr-2" />
-                    Show Track
-                  </>
+                  <Eye className="w-4 h-4 mr-2" />
                 )}
+                {track.isActive ? 'Hide Track' : 'Show Track'}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -260,7 +379,8 @@ export function getAlbumColumns({
   theme = 'light',
   onVisibilityChange,
   onDelete,
-}: GetColumnsOptions): ColumnDef<Album>[] {
+  onEdit,
+}: GetAlbumColumnsOptions): ColumnDef<Album>[] {
   return [
     {
       id: 'select',
@@ -275,7 +395,9 @@ export function getAlbumColumns({
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          onCheckedChange={(value) => {
+            row.toggleSelected(!!value);
+          }}
           aria-label="Select row"
           className={theme === 'dark' ? 'border-white/50' : ''}
         />
@@ -291,7 +413,7 @@ export function getAlbumColumns({
         return (
           <div className="flex items-center gap-3">
             <div
-              className={`w-12 h-12 rounded-md overflow-hidden ${
+              className={`w-8 h-8 rounded overflow-hidden ${
                 theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
               }`}
             >
@@ -299,13 +421,13 @@ export function getAlbumColumns({
                 <Image
                   src={album.coverUrl}
                   alt={album.title}
-                  width={48}
-                  height={48}
+                  width={32}
+                  height={32}
                   className="object-cover w-full h-full"
                 />
               ) : (
                 <Music
-                  className={`w-12 h-12 p-2.5 ${
+                  className={`w-8 h-8 p-1.5 ${
                     theme === 'dark' ? 'text-white/40' : 'text-gray-400'
                   }`}
                 />
@@ -320,15 +442,27 @@ export function getAlbumColumns({
               >
                 {album.title}
               </Link>
-              <div
-                className={theme === 'dark' ? 'text-white/60' : 'text-gray-500'}
-              >
-                {album.type}
-              </div>
             </div>
           </div>
         );
       },
+    },
+    {
+      accessorKey: 'type',
+      header: 'Type',
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.original.type === 'ALBUM'
+              ? 'bg-blue-500/20 text-blue-400'
+              : row.original.type === 'EP'
+              ? 'bg-purple-500/20 text-purple-400'
+              : 'bg-green-500/20 text-green-400'
+          }`}
+        >
+          {row.original.type}
+        </span>
+      ),
     },
     {
       accessorKey: 'totalTracks',
@@ -338,6 +472,35 @@ export function getAlbumColumns({
           {row.original.totalTracks}
         </span>
       ),
+    },
+    {
+      accessorKey: 'genres',
+      header: 'Genres',
+      cell: ({ row }) => {
+        const genres = row.original.genres;
+        return genres && genres.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {genres.map((genreObj) => (
+              <span
+                key={genreObj.genre.id}
+                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                  theme === 'dark'
+                    ? 'bg-white/10 text-white'
+                    : 'bg-gray-100 text-gray-800'
+                }`}
+              >
+                {genreObj.genre.name}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span
+            className={theme === 'dark' ? 'text-white/50' : 'text-gray-500'}
+          >
+            -
+          </span>
+        );
+      },
     },
     {
       accessorKey: 'duration',
@@ -367,12 +530,69 @@ export function getAlbumColumns({
     {
       accessorKey: 'releaseDate',
       header: 'Release Date',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {new Date(row.original.releaseDate).toLocaleDateString()}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const releaseDate = row.original.releaseDate;
+        const [timeDisplay, setTimeDisplay] = React.useState<string>('');
+        const album = row.original;
+
+        React.useEffect(() => {
+          // Tính toán và hiển thị thời gian đếm ngược
+          const calculateTimeRemaining = () => {
+            const now = new Date();
+            const release = new Date(releaseDate);
+
+            // Nếu đã phát hành, hiển thị ngày phát hành
+            if (release <= now) {
+              return new Date(releaseDate).toLocaleString();
+            }
+
+            // Tính toán thời gian còn lại
+            const diff = release.getTime() - now.getTime();
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor(
+              (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+            );
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+            if (days > 0) {
+              return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+            } else if (hours > 0) {
+              return `${hours}h ${minutes}m ${seconds}s`;
+            } else {
+              return `${minutes}m ${seconds}s`;
+            }
+          };
+
+          // Cập nhật ban đầu
+          setTimeDisplay(calculateTimeRemaining());
+
+          // Cập nhật mỗi giây
+          const timer = setInterval(() => {
+            const now = new Date();
+            const release = new Date(releaseDate);
+
+            // Kiểm tra nếu vừa đến thời điểm phát hành và album chưa active
+            if (release <= now && !album.isActive) {
+              // Đơn giản nhất: reload trang
+              window.location.reload();
+            }
+
+            setTimeDisplay(calculateTimeRemaining());
+          }, 1000);
+
+          // Dọn dẹp khi component unmount
+          return () => clearInterval(timer);
+        }, [releaseDate, album.isActive]);
+
+        return (
+          <span className={theme === 'dark' ? 'text-white' : ''}>
+            {timeDisplay}
+          </span>
+        );
+      },
     },
+
     {
       id: 'actions',
       cell: ({ row }) => {
@@ -383,6 +603,10 @@ export function getAlbumColumns({
               <MoreVertical className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit && onEdit(album)}>
+                <Pencil className="w-4 h-4 mr-2" />
+                Edit Album
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>
                   onVisibilityChange &&

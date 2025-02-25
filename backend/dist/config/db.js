@@ -7,6 +7,7 @@ const auth_middleware_1 = require("../middleware/auth.middleware");
 const artist_middleware_1 = require("../middleware/artist.middleware");
 const admin_middleware_1 = require("../middleware/admin.middleware");
 const user_middleware_1 = require("../middleware/user.middleware");
+const track_middleware_1 = require("../middleware/track.middleware");
 const prisma = new client_1.PrismaClient({
     log: [{ emit: 'event', level: 'query' }],
 });
@@ -16,6 +17,7 @@ const extendedPrisma = prisma
     .$extends(album_middleware_1.albumExtension)
     .$extends(artist_middleware_1.artistExtension)
     .$extends(user_middleware_1.userExtension)
+    .$extends(track_middleware_1.trackExtension)
     .$extends((0, extension_accelerate_1.withAccelerate)());
 exports.default = extendedPrisma;
 //# sourceMappingURL=db.js.map

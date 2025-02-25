@@ -73,25 +73,6 @@ const validateAlbumData = (data) => {
         return 'Invalid album type';
     return null;
 };
-const validateFile = (file) => {
-    const maxSize = 5 * 1024 * 1024;
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    const maxFileNameLength = 100;
-    if (file.size > maxSize) {
-        return 'File size too large. Maximum allowed size is 5MB.';
-    }
-    if (!allowedTypes.includes(file.mimetype)) {
-        return `Invalid file type. Only ${allowedTypes.join(', ')} are allowed.`;
-    }
-    if (file.originalname.length > maxFileNameLength) {
-        return `File name too long. Maximum allowed length is ${maxFileNameLength} characters.`;
-    }
-    const invalidChars = /[<>:"/\\|?*]/g;
-    if (invalidChars.test(file.originalname)) {
-        return 'File name contains invalid characters.';
-    }
-    return null;
-};
 const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -331,7 +312,7 @@ exports.addTracksToAlbum = addTracksToAlbum;
 const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { title, releaseDate, type, genres } = req.body;
+        const { title, releaseDate, type, genres, updateGenres } = req.body;
         const coverFile = req.file;
         const user = req.user;
         if (!user) {
@@ -367,13 +348,20 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             updateData.type = type;
         if (coverUrl)
             updateData.coverUrl = coverUrl;
-        if (genres) {
+        if (updateGenres === 'true') {
             yield db_1.default.albumGenre.deleteMany({ where: { albumId: id } });
-            updateData.genres = {
-                create: genres.map((genreId) => ({
-                    genre: { connect: { id: genreId } },
-                })),
-            };
+            const genresArray = !genres
+                ? []
+                : Array.isArray(genres)
+                    ? genres
+                    : [genres];
+            if (genresArray.length > 0) {
+                updateData.genres = {
+                    create: genresArray.map((genreId) => ({
+                        genre: { connect: { id: genreId.trim() } },
+                    })),
+                };
+            }
         }
         const updatedAlbum = yield db_1.default.album.update({
             where: { id },
@@ -561,7 +549,7 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             });
             return;
         }
-        const { page = 1, limit = 10, q: search, status } = req.query;
+        const { page = 1, limit = 10, q: search, status, genres } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
         const whereClause = {};
         const conditions = [];
@@ -579,6 +567,18 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         if (status) {
             whereClause.isActive = status === 'true';
+        }
+        if (genres) {
+            const genreIds = Array.isArray(genres) ? genres : [genres];
+            if (genreIds.length > 0) {
+                conditions.push({
+                    genres: {
+                        some: {
+                            genreId: { in: genreIds },
+                        },
+                    },
+                });
+            }
         }
         if (user.role !== client_1.Role.ADMIN && ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id)) {
             conditions.push({

@@ -20,6 +20,14 @@ export function exportToExcel<T>(
           return { v: value, t: 's' }; // Chỉ định kiểu dữ liệu là string
         }
 
+        // Xử lý đặc biệt cho trường genres
+        if (col.key === 'genres') {
+          if (Array.isArray(value)) {
+            return value.map((g) => g.genre?.name || '').join(', ');
+          }
+          return '';
+        }
+
         // Xử lý đặc biệt cho trường artistProfile
         if (col.key.startsWith('artistProfile.')) {
           const artistProfile = item.artistProfile;

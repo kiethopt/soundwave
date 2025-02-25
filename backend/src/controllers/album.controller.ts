@@ -1,9 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
-import {
-  uploadFile,
-  CloudinaryUploadResult,
-} from '../services/cloudinary.service';
+import { uploadFile } from '../services/cloudinary.service';
 import { Role, AlbumType, Prisma, HistoryType } from '@prisma/client';
 import { sessionService } from '../services/session.service';
 import { albumSelect, trackSelect } from '../utils/prisma-selects';
@@ -38,31 +35,6 @@ const validateAlbumData = (data: any): string | null => {
   return null;
 };
 
-// Validation functions cho
-const validateFile = (file: Express.Multer.File): string | null => {
-  const maxSize = 5 * 1024 * 1024; // 5MB
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-  const maxFileNameLength = 100;
-
-  if (file.size > maxSize) {
-    return 'File size too large. Maximum allowed size is 5MB.';
-  }
-
-  if (!allowedTypes.includes(file.mimetype)) {
-    return `Invalid file type. Only ${allowedTypes.join(', ')} are allowed.`;
-  }
-
-  if (file.originalname.length > maxFileNameLength) {
-    return `File name too long. Maximum allowed length is ${maxFileNameLength} characters.`;
-  }
-
-  const invalidChars = /[<>:"/\\|?*]/g;
-  if (invalidChars.test(file.originalname)) {
-    return 'File name contains invalid characters.';
-  }
-
-  return null;
-};
 // Tạo album mới (ADMIN & ARTIST only)
 export const createAlbum = async (
   req: Request,
@@ -381,7 +353,7 @@ export const updateAlbum = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, releaseDate, type, genres } = req.body;
+    const { title, releaseDate, type, genres, updateGenres } = req.body;
     const coverFile = req.file;
     const user = req.user;
 
@@ -421,13 +393,25 @@ export const updateAlbum = async (
     if (type) updateData.type = type;
     if (coverUrl) updateData.coverUrl = coverUrl;
 
-    if (genres) {
+    // Xử lý genres
+    if (updateGenres === 'true') {
+      // Xóa tất cả genres hiện tại
       await prisma.albumGenre.deleteMany({ where: { albumId: id } });
-      updateData.genres = {
-        create: genres.map((genreId: string) => ({
-          genre: { connect: { id: genreId } },
-        })),
-      };
+
+      // Thêm genres mới nếu có
+      const genresArray = !genres
+        ? []
+        : Array.isArray(genres)
+        ? genres
+        : [genres];
+
+      if (genresArray.length > 0) {
+        updateData.genres = {
+          create: genresArray.map((genreId: string) => ({
+            genre: { connect: { id: genreId.trim() } },
+          })),
+        };
+      }
     }
 
     const updatedAlbum = await prisma.album.update({
@@ -659,7 +643,7 @@ export const getAllAlbums = async (
       return;
     }
 
-    const { page = 1, limit = 10, q: search, status } = req.query;
+    const { page = 1, limit = 10, q: search, status, genres } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
     // Xây dựng điều kiện where
@@ -683,6 +667,20 @@ export const getAllAlbums = async (
     // Thêm điều kiện status nếu có
     if (status) {
       whereClause.isActive = status === 'true';
+    }
+
+    // Thêm điều kiện lọc theo genre nếu có
+    if (genres) {
+      const genreIds = Array.isArray(genres) ? genres : [genres];
+      if (genreIds.length > 0) {
+        conditions.push({
+          genres: {
+            some: {
+              genreId: { in: genreIds },
+            },
+          },
+        });
+      }
     }
 
     // Thêm điều kiện artist nếu user là artist

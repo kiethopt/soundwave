@@ -8,35 +8,53 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.albumExtension = void 0;
 const client_1 = require("@prisma/client");
-exports.albumExtension = client_1.Prisma.defineExtension((client) => {
-    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
-        const now = new Date();
+const node_cron_1 = __importDefault(require("node-cron"));
+function checkAndUpdateAlbumStatus(client) {
+    return __awaiter(this, void 0, void 0, function* () {
         try {
-            yield client.$transaction([
-                client.album.updateMany({
+            const now = new Date();
+            const albums = yield client.album.findMany({
+                where: {
+                    isActive: false,
+                    releaseDate: { lte: now },
+                },
+                select: {
+                    id: true,
+                    title: true,
+                },
+            });
+            if (albums.length > 0) {
+                yield client.album.updateMany({
                     where: {
-                        releaseDate: { lte: now },
+                        id: { in: albums.map((album) => album.id) },
+                    },
+                    data: { isActive: true },
+                });
+                yield client.track.updateMany({
+                    where: {
+                        albumId: { in: albums.map((album) => album.id) },
                         isActive: false,
                     },
                     data: { isActive: true },
-                }),
-                client.track.updateMany({
-                    where: {
-                        releaseDate: { lte: now },
-                        isActive: false,
-                        albumId: null,
-                    },
-                    data: { isActive: true },
-                }),
-            ]);
+                });
+                console.log(`Auto published ${albums.length} albums: ${albums
+                    .map((a) => a.title)
+                    .join(', ')}`);
+            }
         }
         catch (error) {
-            console.error('Release date check error:', error);
+            console.error('Album auto publish error:', error);
         }
-    }), 1000 * 60 * 60);
+    });
+}
+exports.albumExtension = client_1.Prisma.defineExtension((client) => {
+    node_cron_1.default.schedule('* * * * *', () => checkAndUpdateAlbumStatus(client));
     return client.$extends({
         query: {
             album: {

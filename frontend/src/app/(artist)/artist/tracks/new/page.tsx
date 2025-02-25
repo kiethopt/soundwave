@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import Link from 'next/link';
@@ -20,6 +20,8 @@ export default function NewTrack() {
   });
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
   const [availableArtists, setAvailableArtists] = useState<
     Array<{
       id: string;
@@ -34,7 +36,6 @@ export default function NewTrack() {
     }>
   >([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [artistOptions, setArtistOptions] = useState<ArtistProfile[]>([]);
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -81,14 +82,32 @@ export default function NewTrack() {
     if (e.target.files) {
       if (e.target.name === 'audio') {
         setAudioFile(e.target.files[0]);
-      } else if (e.target.name === 'cover') {
-        setCoverFile(e.target.files[0]);
+      } else if (e.target.name === 'cover' && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        setCoverFile(file);
+        const imageUrl = URL.createObjectURL(file);
+        setPreviewImage(imageUrl);
       }
     }
   };
 
+  const handleCoverClick = () => {
+    coverFileInputRef.current?.click();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!audioFile) {
+      toast.error('Please select an audio file');
+      return;
+    }
+
+    if (selectedGenres.length === 0) {
+      toast.error('Please select at least one genre');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -99,8 +118,13 @@ export default function NewTrack() {
       formData.append('title', trackData.title);
       formData.append('type', 'SINGLE');
       formData.append('releaseDate', trackData.releaseDate);
-      if (audioFile) formData.append('audioFile', audioFile);
-      if (coverFile) formData.append('coverFile', coverFile);
+      formData.append('audioFile', audioFile);
+
+      if (coverFile) {
+        formData.append('coverFile', coverFile);
+      } else {
+        toast.warning('No cover image selected. You can update it later.');
+      }
 
       featuredArtists.forEach((artistId) => {
         formData.append('featuredArtists[]', artistId);
@@ -197,11 +221,18 @@ export default function NewTrack() {
                   disabled
                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${
                     theme === 'light'
-                      ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+                      ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
+                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
                   }`}
                 >
-                  <option value="SINGLE">Single</option>
+                  <option
+                    value="SINGLE"
+                    className={
+                      theme === 'dark' ? 'bg-[#121212] text-white' : ''
+                    }
+                  >
+                    Single
+                  </option>
                 </select>
               </div>
 
@@ -265,6 +296,7 @@ export default function NewTrack() {
                   onChange={setSelectedGenres}
                   placeholder="Select genres..."
                   multiple={true}
+                  required={true}
                 />
               </div>
 
@@ -303,18 +335,46 @@ export default function NewTrack() {
                 >
                   Cover Image
                 </label>
-                <input
-                  type="file"
-                  id="cover"
-                  name="cover"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${
-                    theme === 'light'
-                      ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-                  }`}
-                />
+                <div
+                  className="w-full flex flex-col items-center mb-4"
+                  onClick={handleCoverClick}
+                >
+                  <div
+                    className={`w-40 h-40 rounded-md overflow-hidden cursor-pointer border-2 ${
+                      theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
+                    } hover:opacity-90 transition-opacity relative`}
+                  >
+                    <img
+                      src={
+                        previewImage ||
+                        'https://placehold.co/150x150?text=No+Cover'
+                      }
+                      alt="Track cover"
+                      className="w-full h-full object-cover"
+                    />
+                    <div
+                      className={`absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 hover:opacity-100 transition-opacity text-white`}
+                    >
+                      <span>Choose Cover</span>
+                    </div>
+                  </div>
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    id="cover"
+                    name="cover"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <span
+                    className={`mt-2 text-sm ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                    }`}
+                  >
+                    Click to upload cover image
+                  </span>
+                </div>
               </div>
 
               {/* Submit Button */}

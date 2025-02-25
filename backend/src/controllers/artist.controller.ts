@@ -163,8 +163,17 @@ export const getArtistProfile = async (
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
+  const cacheKey = `/api/artist/profile/${id}`;
 
   try {
+    // Kiểm tra cache trước
+    const cachedData = await client.get(cacheKey);
+    if (cachedData) {
+      console.log(`[Redis] Serving artist profile from cache: ${id}`);
+      res.json(JSON.parse(cachedData));
+      return;
+    }
+
     const artist = await prisma.artistProfile.findUnique({
       where: { id },
       select: artistProfileSelect,
@@ -175,8 +184,13 @@ export const getArtistProfile = async (
       return;
     }
 
+    // Lưu vào cache với thời gian sống 10 phút (600 giây)
+    await client.set(cacheKey, JSON.stringify(artist), { EX: 600 });
+    console.log(`[Redis] Cached artist profile: ${id}`);
+
     res.json(artist);
   } catch (error) {
+    console.error('Error fetching artist profile:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import type { ArtistProfile, Track } from '@/types';
+import { useState, useEffect, useCallback } from 'react';
+import type { Track } from '@/types';
 import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -19,162 +18,33 @@ import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 import Link from 'next/link';
 import { EditTrackModal } from '@/components/data-table/data-table-modals';
 import { getTrackColumns } from '@/components/data-table/data-table-columns';
+import { useDataTable } from '@/hooks/useDataTable';
 
 export default function ArtistTracks() {
-  const [tracks, setTracks] = useState<Track[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState('');
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [totalPages, setTotalPages] = useState(1);
-  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
-  const [availableArtists, setAvailableArtists] = useState<
-    Array<{
-      id: string;
-      name: string;
-    }>
-  >([]);
-  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<
-    string[]
-  >([]);
-  const [availableGenres, setAvailableGenres] = useState<
-    Array<{
-      id: string;
-      name: string;
-    }>
-  >([]);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const limit = 10;
   const { theme } = useTheme();
+  const limit = 10;
 
-  // State cho sorting, column filters, visibility, row selection, selected rows, status filter
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = useState({});
-  const [selectedRows, setSelectedRows] = useState<Track[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
-
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  // URL handling logic
-  useEffect(() => {
-    const pageStr = searchParams.get('page');
-    const pageNumber = Number(pageStr);
-    if (pageStr === '1' || pageNumber < 1) {
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.delete('page');
-      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
-      router.replace(`/artist/tracks${queryStr}`);
-    }
-  }, [searchParams, router]);
-
-  const pageFromURL = Number(searchParams.get('page'));
-  const currentPage = isNaN(pageFromURL) || pageFromURL < 1 ? 1 : pageFromURL;
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = localStorage.getItem('userToken');
-        if (!token) return;
-
-        const [artistsResponse, genresResponse] = await Promise.all([
-          api.artists.getAllArtistsProfile(token, 1, 100),
-          api.artists.getAllGenres(token),
-        ]);
-
-        setAvailableArtists(
-          artistsResponse.artists.map((artist: ArtistProfile) => ({
-            id: artist.id,
-            name: artist.artistName,
-          }))
-        );
-        setAvailableGenres(
-          genresResponse.data.map((genre: { id: string; name: string }) => ({
-            id: genre.id,
-            name: genre.name,
-          }))
-        );
-
-        if (editingTrack) {
-          setSelectedFeaturedArtists(
-            editingTrack.featuredArtists.map((fa) => fa.artistProfile.id)
-          );
-          setSelectedGenres(editingTrack.genres.map((g) => g.genre.id));
-        }
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-        toast.error('Failed to load required data');
-      }
-    };
-
-    fetchData(); // Luôn fetch data, không cần điều kiện editingTrack
-  }, [editingTrack]);
-
-  const updateQueryParam = (param: string, value: number) => {
-    if (totalPages === 1 && value !== 1) return;
-    if (value < 1) value = 1;
-    if (value > totalPages) value = totalPages;
-    const current = new URLSearchParams(searchParams.toString());
-    if (value === 1) {
-      current.delete(param);
-    } else {
-      current.set(param, value.toString());
-    }
-    const queryStr = current.toString() ? `?${current.toString()}` : '';
-    router.push(`/artist/tracks${queryStr}`);
-  };
-
-  // Format release time
-  const formatReleaseTime = (releaseDate: string) => {
-    const release = new Date(releaseDate);
-    const now = new Date();
-
-    if (release <= now) {
-      return release.toLocaleString(); // Hiển thị ngày giờ cố định nếu đã release
-    }
-
-    // Tính thời gian còn lại
-    const diff = release.getTime() - now.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-    if (days > 0) {
-      return `${days}d ${hours}h ${minutes}m ${seconds}s`;
-    }
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${seconds}s`;
-    }
-    return `${minutes}m ${seconds}s`;
-  };
-
-  // API calls
-  const fetchTracks = async (page: number) => {
-    try {
-      setLoading(true);
+  // Dùng custom hook để xử lý logic của data table
+  const {
+    data: tracks,
+    setData: setTracks,
+    loading,
+    totalPages,
+    currentPage,
+    setActionLoading,
+    searchInput,
+    setSearchInput,
+    statusFilter,
+    setStatusFilter,
+    genreFilter,
+    setGenreFilter,
+    selectedRows,
+    setSelectedRows,
+    updateQueryParam,
+  } = useDataTable<Track>({
+    fetchData: async (page, params) => {
       const token = localStorage.getItem('userToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        return;
-      }
-
-      // Tạo query params
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-      });
-
-      // Thêm search param nếu có
-      if (searchInput) {
-        params.append('q', searchInput);
-      }
-
-      // Thêm status filter nếu có
-      if (statusFilter.length === 1) {
-        params.append('status', statusFilter[0]);
-      }
+      if (!token) throw new Error('No authentication token found');
 
       const response = await api.tracks.getAll(
         token,
@@ -182,29 +52,76 @@ export default function ArtistTracks() {
         limit,
         params.toString()
       );
-      setTracks(response.tracks);
-      setTotalPages(response.pagination.totalPages);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to fetch tracks'
+
+      return {
+        data: response.tracks,
+        pagination: response.pagination,
+      };
+    },
+    limit,
+  });
+
+  // Table state
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
+
+  // Edit modal state
+  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
+  const [availableArtists, setAvailableArtists] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [availableGenres, setAvailableGenres] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<
+    string[]
+  >([]);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+
+  // Fetch metadata for edit modal
+  const fetchMetadata = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) return;
+
+      const [artistsResponse, genresResponse] = await Promise.all([
+        api.artists.getAllArtistsProfile(token, 1, 100),
+        api.artists.getAllGenres(token),
+      ]);
+
+      setAvailableArtists(
+        artistsResponse.artists.map((artist: any) => ({
+          id: artist.id,
+          name: artist.artistName,
+        }))
       );
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
-    // Reset về trang 1 khi filter hoặc search thay đổi
-    if (currentPage !== 1) {
-      updateQueryParam('page', 1);
-    } else {
-      fetchTracks(1);
-    }
-  }, [searchInput, statusFilter]);
+      setAvailableGenres(
+        genresResponse.data.map((genre: { id: string; name: string }) => ({
+          id: genre.id,
+          name: genre.name,
+        }))
+      );
 
+      // Set selected values if editing a track
+      if (editingTrack) {
+        setSelectedFeaturedArtists(
+          editingTrack.featuredArtists.map((fa) => fa.artistProfile.id)
+        );
+        setSelectedGenres(editingTrack.genres.map((g) => g.genre.id));
+      }
+    } catch (error) {
+      console.error('Failed to fetch metadata:', error);
+      toast.error('Failed to load required data');
+    }
+  }, [editingTrack]);
+
+  // Fetch metadata when needed
   useEffect(() => {
-    fetchTracks(currentPage);
-  }, [currentPage]);
+    fetchMetadata();
+  }, [fetchMetadata]);
 
   // Action handlers
   const handleTrackVisibility = async (trackId: string, isActive: boolean) => {
@@ -250,19 +167,38 @@ export default function ArtistTracks() {
         return;
       }
 
-      // Nếu xóa một track, set loading state cho track đó
+      // Set loading state for single track delete
       if (!Array.isArray(trackIds)) {
         setActionLoading(trackIds);
       }
 
       await Promise.all(ids.map((id) => api.tracks.delete(id, token)));
 
-      // Nếu xóa một track, cập nhật state tracks ngay lập tức
+      // Update UI based on delete type
       if (!Array.isArray(trackIds)) {
         setTracks((prev) => prev.filter((track) => track.id !== trackIds));
       } else {
-        // Nếu xóa nhiều tracks, fetch lại data
-        await fetchTracks(currentPage);
+        // Refresh the current page
+        const params = new URLSearchParams();
+        params.set('page', currentPage.toString());
+        params.set('limit', limit.toString());
+
+        if (searchInput) params.append('q', searchInput);
+        if (statusFilter.length === 1) params.append('status', statusFilter[0]);
+        if (genreFilter.length > 0) {
+          genreFilter.forEach((genre) => params.append('genres', genre));
+        }
+
+        const token = localStorage.getItem('userToken');
+        if (token) {
+          const response = await api.tracks.getAll(
+            token,
+            currentPage,
+            limit,
+            params.toString()
+          );
+          setTracks(response.tracks);
+        }
       }
 
       toast.success(
@@ -290,21 +226,27 @@ export default function ArtistTracks() {
         return;
       }
 
-      // Xóa các trường cũ từ formData
-      formData.delete('featuredArtists');
-      formData.delete('genres');
+      await api.tracks.update(trackId, formData, token);
 
-      // Tạo object data để gửi lên server
-      const data = {
-        title: formData.get('title'),
-        releaseDate: formData.get('releaseDate'),
-        featuredArtists: selectedFeaturedArtists,
-        genreIds: selectedGenres, // Đổi tên từ genres thành genreIds để match với backend
-      };
+      // Refresh the current page
+      const params = new URLSearchParams();
+      params.set('page', currentPage.toString());
+      params.set('limit', limit.toString());
 
-      // Gửi request với JSON thay vì FormData
-      await api.tracks.update(trackId, data, token);
-      await fetchTracks(currentPage);
+      if (searchInput) params.append('q', searchInput);
+      if (statusFilter.length === 1) params.append('status', statusFilter[0]);
+      if (genreFilter.length > 0) {
+        genreFilter.forEach((genre) => params.append('genres', genre));
+      }
+
+      const response = await api.tracks.getAll(
+        token,
+        currentPage,
+        limit,
+        params.toString()
+      );
+      setTracks(response.tracks);
+
       setEditingTrack(null);
       toast.success('Track updated successfully');
     } catch (error) {
@@ -317,16 +259,14 @@ export default function ArtistTracks() {
     }
   };
 
-  // Table columns definition
+  // Table configuration
   const columns = getTrackColumns({
     theme,
     onVisibilityChange: handleTrackVisibility,
     onDelete: handleDeleteTracks,
-    onEdit: setEditingTrack,
-    formatReleaseTime,
+    onEdit: (track: Track) => setEditingTrack(track),
   });
 
-  // Table configuration
   const table = useReactTable({
     data: tracks,
     columns,
@@ -352,7 +292,7 @@ export default function ArtistTracks() {
       rowSelection,
       pagination: {
         pageIndex: currentPage - 1,
-        pageSize: 10,
+        pageSize: limit,
       },
     },
     pageCount: totalPages,
@@ -417,6 +357,7 @@ export default function ArtistTracks() {
               { key: 'title', header: 'Track Title' },
               { key: 'album.title', header: 'Album' },
               { key: 'featuredArtists', header: 'Featured Artists' },
+              { key: 'genres', header: 'Genres' },
               { key: 'duration', header: 'Duration' },
               { key: 'playCount', header: 'Plays' },
               { key: 'isActive', header: 'Status' },
@@ -425,6 +366,19 @@ export default function ArtistTracks() {
               { key: 'updatedAt', header: 'Updated At' },
             ],
             filename: 'tracks-export',
+          },
+          searchPlaceholder: 'Search tracks...',
+          statusFilter: {
+            value: statusFilter,
+            onChange: setStatusFilter,
+          },
+          genreFilter: {
+            value: genreFilter,
+            onChange: setGenreFilter,
+            options: availableGenres.map((genre) => ({
+              value: genre.id,
+              label: genre.name,
+            })),
           },
         }}
       />
