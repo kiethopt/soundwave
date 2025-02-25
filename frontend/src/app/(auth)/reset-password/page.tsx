@@ -2,9 +2,11 @@
 
 import { Suspense, useCallback, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { api } from '@/utils/api';
+import { Music } from '@/components/ui/Icons';
 
-function ResetPasswordContent() {
+function ResetPasswordForm() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -50,75 +52,116 @@ function ResetPasswordContent() {
   );
 
   return (
-    <div
-      className="w-full max-w-[450px] p-10 bg-[#121212] rounded-lg mx-4"
-      suppressHydrationWarning
-    >
-      <h1 className="text-2xl font-bold text-white mb-8">Reset Password</h1>
+    <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
+      <div className="flex flex-col items-center gap-2 text-center">
+        <h1 className="text-2xl font-bold text-white">Reset Password</h1>
+        <p className="text-balance text-sm text-white/60">
+          Enter your new password below
+        </p>
+      </div>
+
       {message && (
-        <div className="bg-green-500/10 text-green-500 p-3 rounded-md mb-4">
+        <div className="bg-green-500/10 text-green-500 p-3 rounded-md">
           {message}
         </div>
       )}
+
       {error && (
-        <div className="bg-red-500/10 text-red-500 p-3 rounded-md mb-4">
-          {error}
-        </div>
+        <div className="bg-red-500/10 text-red-500 p-3 rounded-md">{error}</div>
       )}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
+
+      <div className="grid gap-6">
+        <div className="grid gap-2">
           <label
             htmlFor="newPassword"
-            className="block text-sm font-medium text-white/70 mb-1"
+            className="text-sm font-medium text-white/70"
           >
             New Password
           </label>
           <input
-            type="password"
             id="newPassword"
+            type="password"
+            required
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
-            required
           />
         </div>
-        <div>
+
+        <div className="grid gap-2">
           <label
             htmlFor="confirmPassword"
-            className="block text-sm font-medium text-white/70 mb-1"
+            className="text-sm font-medium text-white/70"
           >
             Confirm Password
           </label>
           <input
-            type="password"
             id="confirmPassword"
+            type="password"
+            required
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
-            required
           />
         </div>
+
         <button
           type="submit"
-          className="w-full bg-white text-black py-2 rounded-full font-medium hover:bg-white/90"
+          className="w-full bg-white text-black py-2 rounded-md font-medium hover:bg-white/90"
         >
           Reset Password
         </button>
-      </form>
-      <p className="mt-6 text-center text-[#A7A7A7]">
+      </div>
+
+      <div className="text-center text-sm text-white/70">
         Remember your password?{' '}
-        <a href="/login" className="text-white hover:underline">
+        <Link
+          href="/login"
+          className="text-white hover:underline underline-offset-4"
+        >
           Log in
-        </a>
-      </p>
-    </div>
+        </Link>
+      </div>
+    </form>
   );
 }
 
 export default function ResetPassword() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <ResetPasswordContent />
-    </Suspense>
+    <div className="grid min-h-svh lg:grid-cols-2">
+      <div className="flex flex-col gap-4 p-6 md:p-10 bg-[#121212]">
+        <div className="flex justify-center gap-2 md:justify-start">
+          <a
+            href="/"
+            className="flex items-center gap-2 font-medium text-white"
+          >
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-white text-black">
+              <Music className="size-4" />
+            </div>
+            Soundwave
+          </a>
+        </div>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full max-w-xs">
+            <Suspense fallback={<div>Loading...</div>}>
+              <ResetPasswordForm />
+            </Suspense>
+          </div>
+        </div>
+      </div>
+      <div className="relative hidden bg-[#0a0a0a] lg:block">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#A57865]/30 via-black-500/20 to-pink-500/20"></div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-white mb-4">
+              Create a New Password
+            </h2>
+            <p className="text-white/70 max-w-md mx-auto">
+              Choose a strong password to keep your account secure.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
