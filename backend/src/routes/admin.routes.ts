@@ -26,7 +26,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import { queryRateLimiter } from '../middleware/rateLimit.middleware';
 import { cacheMiddleware } from '../middleware/cache.middleware';
-import upload from 'src/middleware/upload.middleware';
+import upload from '../middleware/upload.middleware';
 
 const router = express.Router();
 

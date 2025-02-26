@@ -10,7 +10,7 @@ import {
   genreSelect,
   userSelect,
 } from '../utils/prisma-selects';
-import { uploadFile } from 'src/services/cloudinary.service';
+import { uploadFile } from '../services/cloudinary.service';
 
 // Lấy danh sách tất cả người dùng
 export const getAllUsers = async (
