@@ -191,38 +191,6 @@ export default function ArtistDetail({
     }
   };
 
-  const handleUpdateMonthlyListeners = async () => {
-    try {
-      setIsUpdating(true);
-      setError(null);
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-
-      const response = await api.artists.updateMonthlyListeners(id, token);
-
-      if (response && response.artistProfile) {
-        setArtist((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            monthlyListeners: response.artistProfile.monthlyListeners,
-          };
-        });
-      } else {
-        throw new Error('Invalid response format');
-      }
-    } catch (err) {
-      console.error('Error updating monthly listeners:', err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to update monthly listeners'
-      );
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
   const handleArtistUpdate = (updatedArtist: Partial<ArtistProfile>) => {
     setArtist((prev) => {
       if (!prev) return null;
@@ -407,21 +375,6 @@ export default function ArtistDetail({
                     </span>
                   </>
                 )}
-              </button>
-
-              <button
-                onClick={handleUpdateMonthlyListeners}
-                disabled={isUpdating}
-                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg hover:bg-opacity-90 border text-sm ${
-                  theme === 'light'
-                    ? 'bg-gray-100 text-gray-900 border-gray-200 hover:bg-gray-200'
-                    : 'bg-white/5 text-white/90 border-white/10 hover:bg-white/10'
-                }`}
-              >
-                <RefreshCw
-                  className={`w-4 h-4 ${isUpdating ? 'animate-spin' : ''}`}
-                />
-                <span>Update Listeners</span>
               </button>
             </div>
 

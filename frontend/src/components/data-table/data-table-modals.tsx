@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import type { Track, Album, ArtistProfile } from '@/types';
+import type { Track, Album, ArtistProfile, User, Genre } from '@/types';
 import Image from 'next/image';
 import { Facebook, Instagram, Verified } from '../ui/Icons';
 import { api } from '@/utils/api';
@@ -903,6 +903,261 @@ export function EditArtistModal({
               className={theme === 'dark' ? 'bg-white text-black' : ''}
             >
               {isUploading ? 'Updating...' : 'Save Changes'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface EditUserModalProps {
+  user: User | null;
+  onClose: () => void;
+  onSubmit: (userId: string, formData: FormData) => Promise<void>;
+  theme?: 'light' | 'dark';
+}
+
+export function EditUserModal({
+  user,
+  onClose,
+  onSubmit,
+  theme = 'light',
+}: EditUserModalProps) {
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (!user) return null;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setPreviewImage(imageUrl);
+    }
+  };
+
+  const handleCoverClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  return (
+    <Dialog open={!!user} onOpenChange={onClose}>
+      <DialogContent
+        className={`${
+          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+        } p-6 rounded-lg shadow-lg max-w-2xl w-full`}
+      >
+        <DialogHeader>
+          <DialogTitle
+            className={`text-xl font-semibold ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}
+          >
+            Edit User
+          </DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+            onSubmit(user.id, formData);
+          }}
+          className="space-y-6 mt-4"
+        >
+          {/* Avatar */}
+          <div className="space-y-2">
+            <span
+              className={`block text-sm font-medium ${
+                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+              }`}
+            >
+              Avatar
+            </span>
+            <div
+              className="w-full flex flex-col items-center mb-4"
+              onClick={handleCoverClick}
+            >
+              <div
+                className={`w-32 h-32 rounded-full overflow-hidden cursor-pointer border-2 ${
+                  theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
+                } hover:opacity-90 transition-opacity relative`}
+              >
+                <img
+                  src={
+                    previewImage ||
+                    user.avatar ||
+                    'https://placehold.co/150x150?text=No+Avatar'
+                  }
+                  alt="User avatar"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                id="avatar"
+                name="avatar"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          {/* Name */}
+          <div className="space-y-2">
+            <span
+              className={`block text-sm font-medium ${
+                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+              }`}
+            >
+              Name
+            </span>
+            <Input
+              id="name"
+              name="name"
+              defaultValue={user.name || ''}
+              className={`w-full px-3 py-2 rounded-md border ${
+                theme === 'dark'
+                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                  : 'bg-white border-gray-300'
+              }`}
+            />
+          </div>
+
+          {/* Username */}
+          <div className="space-y-2">
+            <span
+              className={`block text-sm font-medium ${
+                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+              }`}
+            >
+              Username
+            </span>
+            <Input
+              id="username"
+              name="username"
+              defaultValue={user.username || ''}
+              className={`w-full px-3 py-2 rounded-md border ${
+                theme === 'dark'
+                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                  : 'bg-white border-gray-300'
+              }`}
+            />
+          </div>
+
+          {/* Email */}
+          <div className="space-y-2">
+            <span
+              className={`block text-sm font-medium ${
+                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+              }`}
+            >
+              Email
+            </span>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              defaultValue={user.email}
+              className={`w-full px-3 py-2 rounded-md border ${
+                theme === 'dark'
+                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                  : 'bg-white border-gray-300'
+              }`}
+            />
+          </div>
+
+          {/* Buttons */}
+          <div className="flex justify-end gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit">Save Changes</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface EditGenreModalProps {
+  genre: Genre | null;
+  onClose: () => void;
+  onSubmit: (genreId: string, formData: FormData) => Promise<void>;
+  theme?: 'light' | 'dark';
+}
+
+export function EditGenreModal({
+  genre,
+  onClose,
+  onSubmit,
+  theme = 'light',
+}: EditGenreModalProps) {
+  if (!genre) return null;
+
+  return (
+    <Dialog open={!!genre} onOpenChange={onClose}>
+      <DialogContent
+        className={`${
+          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+        } p-6 rounded-lg shadow-lg max-w-md w-full`}
+      >
+        <DialogHeader>
+          <DialogTitle
+            className={`text-xl font-semibold ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}
+          >
+            Edit Genre
+          </DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+            onSubmit(genre.id, formData);
+          }}
+          className="space-y-4 mt-4"
+        >
+          <div className="space-y-2">
+            <label
+              htmlFor="name"
+              className={`block text-sm font-medium ${
+                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+              }`}
+            >
+              Name
+            </label>
+            <Input
+              id="name"
+              name="name"
+              defaultValue={genre.name}
+              required
+              maxLength={50}
+              className={`w-full px-3 py-2 rounded-md border ${
+                theme === 'dark'
+                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                  : 'bg-white border-gray-300'
+              }`}
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className={theme === 'dark' ? 'text-white border-white/50' : ''}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className={theme === 'dark' ? 'bg-white text-black' : ''}
+            >
+              Save Changes
             </Button>
           </div>
         </form>

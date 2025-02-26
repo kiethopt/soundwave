@@ -15,12 +15,12 @@ import {
   getAllArtistRequests,
   rejectArtistRequest,
   verifyArtist,
-  updateMonthlyListeners,
   getArtistRequestDetails,
   deactivateUser,
   deactivateArtist,
   deleteArtist,
   updateArtist,
+  updateAllMonthlyListeners,
 } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -51,7 +51,13 @@ router.get(
   getAllUsers
 );
 router.get('/users/:id', authenticate, authorize([Role.ADMIN]), getUserById);
-router.put('/users/:id', authenticate, authorize([Role.ADMIN]), updateUser);
+router.put(
+  '/users/:id',
+  authenticate,
+  authorize([Role.ADMIN]),
+  upload.single('avatar'),
+  updateUser
+);
 router.put(
   '/artists/:id',
   authenticate,
@@ -95,18 +101,29 @@ router.get(
   authorize([Role.ADMIN]),
   getArtistRequestDetails
 );
-router.post('/artists/verify', verifyArtist);
 router.post(
-  '/artists/:id/update-monthly-listeners',
+  '/artists/verify',
   authenticate,
-  authorize([Role.ADMIN, Role.ARTIST]),
-  updateMonthlyListeners
+  authorize([Role.ADMIN]),
+  verifyArtist
+);
+router.post(
+  '/artists/update-all-monthly-listeners',
+  authenticate,
+  authorize([Role.ADMIN]),
+  updateAllMonthlyListeners
 );
 
 // Quản lý thể loại nhạc
 router.get('/genres', queryRateLimiter, cacheMiddleware, getAllGenres);
 router.post('/genres', createGenre);
-router.put('/genres/:id', updateGenre);
+router.put(
+  '/genres/:id',
+  authenticate,
+  authorize([Role.ADMIN]),
+  upload.none(),
+  updateGenre
+);
 router.delete('/genres/:id', deleteGenre);
 
 // Duyệt yêu cầu trở thành Artist

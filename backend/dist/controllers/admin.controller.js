@@ -23,13 +23,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStats = exports.updateMonthlyListeners = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateArtist = exports.deactivateUser = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetails = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.getStats = exports.updateAllMonthlyListeners = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateArtist = exports.deactivateUser = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetails = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
-const cloudinary_service_1 = require("src/services/cloudinary.service");
+const cloudinary_service_1 = require("../services/cloudinary.service");
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { page = 1, limit = 10, search = '', status } = req.query;
@@ -210,16 +210,23 @@ const getArtistRequestDetails = (req, res) => __awaiter(void 0, void 0, void 0, 
 });
 exports.getArtistRequestDetails = getArtistRequestDetails;
 const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d;
     try {
         const { id } = req.params;
-        const { role, isVerified, name, email, username } = req.body;
-        if (!id) {
-            res.status(400).json({ message: 'User ID is required' });
-            return;
+        const { name, email, username } = req.body;
+        const avatarFile = req.file;
+        const validationErrors = [];
+        if (!id)
+            validationErrors.push('User ID is required');
+        if (email && !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+            validationErrors.push('Invalid email format');
         }
-        if (role && !Object.values(client_1.Role).includes(role)) {
-            res.status(400).json({ message: 'Invalid role' });
+        if (username && username.length < 3) {
+            validationErrors.push('Username must be at least 3 characters long');
+        }
+        if (validationErrors.length > 0) {
+            res
+                .status(400)
+                .json({ message: 'Validation failed', errors: validationErrors });
             return;
         }
         const currentUser = yield db_1.default.user.findUnique({
@@ -231,83 +238,37 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             return;
         }
         if (email && email !== currentUser.email) {
-            const existingUserWithEmail = yield db_1.default.user.findUnique({
-                where: { email },
+            const existingEmail = yield db_1.default.user.findFirst({
+                where: { email, NOT: { id } },
             });
-            if (existingUserWithEmail) {
+            if (existingEmail) {
                 res.status(400).json({ message: 'Email already exists' });
                 return;
             }
         }
         if (username && username !== currentUser.username) {
-            const existingUserWithUsername = yield db_1.default.user.findUnique({
-                where: { username },
+            const existingUsername = yield db_1.default.user.findFirst({
+                where: { username, NOT: { id } },
             });
-            if (existingUserWithUsername) {
+            if (existingUsername) {
                 res.status(400).json({ message: 'Username already exists' });
                 return;
             }
         }
-        if (currentUser.role === client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Cannot modify ADMIN role' });
-            return;
+        let avatarUrl = currentUser.avatar;
+        if (avatarFile) {
+            const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'users/avatars');
+            avatarUrl = uploadResult.secure_url;
         }
-        if (role === client_1.Role.ARTIST && currentUser.role === client_1.Role.USER) {
-            if (!((_a = currentUser.artistProfile) === null || _a === void 0 ? void 0 : _a.verificationRequestedAt)) {
-                res.status(400).json({
-                    message: 'User has not requested to become an artist',
-                });
-                return;
-            }
+        const updatedUser = yield db_1.default.user.update({
+            where: { id },
+            data: Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (email && { email })), (username && { username })), (avatarUrl &&
+                avatarUrl !== currentUser.avatar && { avatar: avatarUrl })),
+            select: prisma_selects_1.userSelect,
+        });
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.clearCacheForEntity)('user', { entityId: id, clearSearch: true });
         }
-        if (currentUser.role === client_1.Role.ARTIST &&
-            ((_b = currentUser.artistProfile) === null || _b === void 0 ? void 0 : _b.isVerified)) {
-            if (role === client_1.Role.USER) {
-                res.status(400).json({
-                    message: 'Cannot change role from ARTIST to USER once verified',
-                });
-                return;
-            }
-            if (isVerified === false) {
-                res.status(400).json({
-                    message: 'Cannot unverify a verified artist',
-                });
-                return;
-            }
-        }
-        if (isVerified === true) {
-            if (!((_c = currentUser.artistProfile) === null || _c === void 0 ? void 0 : _c.verificationRequestedAt)) {
-                res.status(400).json({
-                    message: 'User has not requested to become an artist',
-                });
-                return;
-            }
-        }
-        const isVerifyingArtistRequest = isVerified === true &&
-            ((_d = currentUser.artistProfile) === null || _d === void 0 ? void 0 : _d.verificationRequestedAt) &&
-            !currentUser.artistProfile.isVerified;
-        const updateData = Object.assign(Object.assign(Object.assign({}, (name && { name })), (email && { email })), (username && { username }));
-        const updatedUser = yield db_1.default.$transaction((prisma) => __awaiter(void 0, void 0, void 0, function* () {
-            yield prisma.user.update({
-                where: { id },
-                data: updateData,
-            });
-            if (isVerifyingArtistRequest) {
-                yield prisma.artistProfile.update({
-                    where: { userId: id },
-                    data: {
-                        isVerified: true,
-                        verifiedAt: new Date(),
-                        verificationRequestedAt: null,
-                        role: client_1.Role.ARTIST,
-                    },
-                });
-            }
-            return yield prisma.user.findUnique({
-                where: { id },
-                select: prisma_selects_1.userSelect,
-            });
-        }));
         res.json({
             message: 'User updated successfully',
             user: updatedUser,
@@ -320,15 +281,23 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
 });
 exports.updateUser = updateUser;
 const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
         const { id } = req.params;
         const { artistName, bio, socialMediaLinks } = req.body;
         const avatarFile = req.file;
-        const admin = req.user;
-        if (!admin ||
-            (admin.role !== client_1.Role.ADMIN && ((_a = admin.artistProfile) === null || _a === void 0 ? void 0 : _a.id) !== id)) {
-            res.status(403).json({ message: 'Forbidden' });
+        const validationErrors = [];
+        if (!id)
+            validationErrors.push('Artist ID is required');
+        if (artistName && artistName.length < 2) {
+            validationErrors.push('Artist name must be at least 2 characters long');
+        }
+        if (bio && bio.length > 1000) {
+            validationErrors.push('Bio must not exceed 1000 characters');
+        }
+        if (validationErrors.length > 0) {
+            res
+                .status(400)
+                .json({ message: 'Validation failed', errors: validationErrors });
             return;
         }
         const existingArtist = yield db_1.default.artistProfile.findUnique({
@@ -665,20 +634,20 @@ const updateGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     try {
         const { id } = req.params;
         const { name } = req.body;
-        if (!name) {
-            res.status(400).json({ message: 'Name is required' });
-            return;
+        const validationErrors = [];
+        if (!id)
+            validationErrors.push('Genre ID is required');
+        if (!name)
+            validationErrors.push('Name is required');
+        if (name && name.trim() === '')
+            validationErrors.push('Name cannot be empty');
+        if (name && name.length > 50) {
+            validationErrors.push('Name exceeds maximum length (50 characters)');
         }
-        if (name.trim() === '') {
-            res.status(400).json({ message: 'Name cannot be empty' });
-            return;
-        }
-        if (name.length > 50) {
-            res.status(400).json({
-                message: 'Name exceeds maximum length (50 characters)',
-                maxLength: 50,
-                currentLength: name.length,
-            });
+        if (validationErrors.length > 0) {
+            res
+                .status(400)
+                .json({ message: 'Validation failed', errors: validationErrors });
             return;
         }
         const existingGenre = yield db_1.default.genre.findUnique({
@@ -688,24 +657,23 @@ const updateGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(404).json({ message: 'Genre not found' });
             return;
         }
-        const existingGenreWithName = yield db_1.default.genre.findFirst({
-            where: {
-                name,
-                NOT: {
-                    id,
-                },
-            },
-        });
-        if (existingGenreWithName) {
-            res.status(400).json({ message: 'Genre name already exists' });
-            return;
+        if (name !== existingGenre.name) {
+            const existingGenreWithName = yield db_1.default.genre.findFirst({
+                where: { name, NOT: { id } },
+            });
+            if (existingGenreWithName) {
+                res.status(400).json({ message: 'Genre name already exists' });
+                return;
+            }
         }
         const updatedGenre = yield db_1.default.genre.update({
             where: { id },
             data: { name },
         });
-        yield (0, cache_middleware_1.clearCacheForEntity)('genre', { entityId: id, clearSearch: true });
-        yield (0, cache_middleware_1.clearCacheForEntity)('track', { clearSearch: true });
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.clearCacheForEntity)('genre', { entityId: id, clearSearch: true });
+            yield (0, cache_middleware_1.clearCacheForEntity)('track', { clearSearch: true });
+        }
         res.json({
             message: 'Genre updated successfully',
             genre: updatedGenre,
@@ -713,20 +681,6 @@ const updateGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
     catch (error) {
         console.error('Update genre error:', error);
-        if (error instanceof Error && 'code' in error) {
-            switch (error.code) {
-                case 'P2002':
-                    res.status(400).json({ message: 'Genre name already exists' });
-                    return;
-                case 'P2025':
-                    res.status(404).json({ message: 'Genre not found' });
-                    return;
-                default:
-                    console.error('Prisma error:', error);
-                    res.status(500).json({ message: 'Internal server error' });
-                    return;
-            }
-        }
         res.status(500).json({ message: 'Internal server error' });
     }
 });
@@ -892,61 +846,44 @@ const verifyArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.verifyArtist = verifyArtist;
-const updateMonthlyListeners = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const updateAllMonthlyListeners = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { id } = req.params;
-        const user = req.user;
-        if (!user || (user.role !== client_1.Role.ADMIN && ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id) !== id)) {
-            res.status(403).json({ message: 'Forbidden' });
-            return;
-        }
-        const artistProfile = yield db_1.default.artistProfile.findUnique({
-            where: { id },
-            include: {
-                tracks: {
-                    select: {
-                        id: true,
-                    },
-                },
-            },
+        const artists = yield db_1.default.artistProfile.findMany({
+            where: { role: 'ARTIST', isVerified: true },
+            select: { id: true },
         });
-        if (!artistProfile) {
-            res.status(404).json({ message: 'Artist not found' });
-            return;
-        }
-        const trackIds = artistProfile.tracks.map((track) => track.id);
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const uniqueListeners = yield db_1.default.history.findMany({
-            where: {
-                trackId: {
-                    in: trackIds,
+        for (const artist of artists) {
+            const trackIds = yield db_1.default.track
+                .findMany({
+                where: { artistId: artist.id },
+                select: { id: true },
+            })
+                .then((tracks) => tracks.map((track) => track.id));
+            const uniqueListeners = yield db_1.default.history.findMany({
+                where: {
+                    trackId: { in: trackIds },
+                    type: 'PLAY',
+                    createdAt: { gte: thirtyDaysAgo },
                 },
-                type: 'PLAY',
-                createdAt: {
-                    gte: thirtyDaysAgo,
-                },
-            },
-            distinct: ['userId'],
-        });
-        const updatedArtistProfile = yield db_1.default.artistProfile.update({
-            where: { id },
-            data: {
-                monthlyListeners: uniqueListeners.length,
-            },
-        });
+                distinct: ['userId'],
+            });
+            yield db_1.default.artistProfile.update({
+                where: { id: artist.id },
+                data: { monthlyListeners: uniqueListeners.length },
+            });
+        }
         res.json({
-            message: 'Monthly listeners updated successfully',
-            artistProfile: updatedArtistProfile,
+            message: "All artists' monthly listeners updated successfully",
         });
     }
     catch (error) {
-        console.error('Update monthly listeners error:', error);
+        console.error('Update all monthly listeners error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
-exports.updateMonthlyListeners = updateMonthlyListeners;
+exports.updateAllMonthlyListeners = updateAllMonthlyListeners;
 const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const cacheKey = '/api/admin/stats';

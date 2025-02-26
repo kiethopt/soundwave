@@ -1,274 +1,141 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useState } from 'react';
+import type { Genre } from '@/types';
 import { api } from '@/utils/api';
-import type { ColumnDef } from '@tanstack/react-table';
+import { toast } from 'react-toastify';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   ColumnFiltersState,
-  SortingState,
-  VisibilityState,
   getCoreRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  SortingState,
   useReactTable,
+  VisibilityState,
 } from '@tanstack/react-table';
-import { Edit, MoreHorizontal, Trash2 } from 'lucide-react';
-import type { Genre } from '@/types';
-import { toast } from 'react-toastify';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useTheme } from '@/contexts/ThemeContext';
 import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
-import { Checkbox } from '@/components/ui/checkbox';
+import { getGenreColumns } from '@/components/data-table/data-table-columns';
+import { useDataTable } from '@/hooks/useDataTable';
+import { EditGenreModal } from '@/components/data-table/data-table-modals';
 
 export default function GenreManagement() {
-  const [genres, setGenres] = useState<Genre[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState('');
-  const [totalPages, setTotalPages] = useState(1);
-  const [editingGenre, setEditingGenre] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [selectedRows, setSelectedRows] = useState<Genre[]>([]);
+  const { theme } = useTheme();
+  const limit = 10;
 
+  // Sử dụng custom hook useDataTable
+  const {
+    data: genres,
+    setData: setGenres,
+    loading,
+    totalPages,
+    currentPage,
+    setActionLoading,
+    searchInput,
+    setSearchInput,
+    selectedRows,
+    setSelectedRows,
+    updateQueryParam,
+  } = useDataTable<Genre>({
+    fetchData: async (page, params) => {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      const response = await api.admin.getAllGenres(
+        token,
+        page,
+        limit,
+        params.toString()
+      );
+      return {
+        data: response.genres,
+        pagination: response.pagination,
+      };
+    },
+    limit,
+  });
+
+  // Table state
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
+  const [editingGenre, setEditingGenre] = useState<Genre | null>(null);
 
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const { theme } = useTheme();
-  const limit = 10;
+  // Action handlers
+  const handleDeleteGenres = async (genreIds: string | string[]) => {
+    const ids = Array.isArray(genreIds) ? genreIds : [genreIds];
+    if (!confirm(`Delete ${ids.length} selected genres?`)) return;
 
-  const pageFromURL = Number(searchParams.get('page'));
-  const currentPage = isNaN(pageFromURL) || pageFromURL < 1 ? 1 : pageFromURL;
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
 
-  useEffect(() => {
-    const pageStr = searchParams.get('page');
-    const pageNumber = Number(pageStr);
-    if (pageStr === '1' || pageNumber < 1) {
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.delete('page');
-      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
-      router.replace(`/admin/genres${queryStr}`);
-    }
-  }, [searchParams, router]);
+      if (!Array.isArray(genreIds)) setActionLoading(genreIds);
 
-  const updateQueryParam = (param: string, value: number) => {
-    if (totalPages === 1 && value !== 1) return;
-    if (value < 1) value = 1;
-    if (value > totalPages) value = totalPages;
+      await Promise.all(ids.map((id) => api.admin.deleteGenre(id, token)));
 
-    if (value === currentPage) return;
-
-    const current = new URLSearchParams(searchParams.toString());
-    if (value === 1) {
-      current.delete(param);
-    } else {
-      current.set(param, value.toString());
-    }
-    const queryStr = current.toString() ? `?${current.toString()}` : '';
-    router.push(`/admin/genres${queryStr}`);
-  };
-
-  const fetchGenres = React.useCallback(
-    async (page: number, query: string = '') => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('userToken');
-        if (!token) throw new Error('No authentication token found');
-
-        const params = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString(),
-        });
-
-        if (query) {
-          params.append('search', query);
-        }
+      // Update UI
+      if (!Array.isArray(genreIds)) {
+        setGenres((prev) => prev.filter((genre) => genre.id !== genreIds));
+      } else {
+        // Refresh current page
+        const params = new URLSearchParams();
+        if (searchInput) params.append('q', searchInput);
 
         const response = await api.admin.getAllGenres(
           token,
-          page,
+          currentPage,
           limit,
           params.toString()
         );
         setGenres(response.genres);
-        setTotalPages(response.pagination.totalPages);
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : 'Failed to fetch genres'
-        );
-      } finally {
-        setLoading(false);
       }
-    },
-    []
-  );
 
-  useEffect(() => {
-    if (currentPage === 1) {
-      fetchGenres(1, searchInput);
-    }
-  }, [searchInput]);
-
-  useEffect(() => {
-    fetchGenres(currentPage, searchInput);
-  }, [currentPage, fetchGenres]);
-
-  const handleDeleteGenre = async (genreId: string) => {
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-
-      await api.admin.deleteGenre(genreId, token);
-      toast.success('Genre deleted successfully');
-      fetchGenres(currentPage, searchInput);
-    } catch (err) {
+      toast.success(`${ids.length} genre(s) deleted successfully`);
+    } catch (error) {
       toast.error(
-        err instanceof Error ? err.message : 'Failed to delete genre'
+        error instanceof Error ? error.message : 'Failed to delete genre(s)'
       );
+    } finally {
+      if (!Array.isArray(genreIds)) setActionLoading(null);
     }
   };
 
-  const handleDeleteSelected = async () => {
-    if (
-      !selectedRows.length ||
-      !confirm(`Delete ${selectedRows.length} selected genres?`)
-    )
-      return;
-
+  const handleUpdateGenre = async (genreId: string, formData: FormData) => {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      await Promise.all(
-        selectedRows.map((row) => api.admin.deleteGenre(row.id, token))
+      await api.admin.updateGenre(genreId, formData, token);
+
+      // Refresh current page
+      const params = new URLSearchParams();
+      if (searchInput) params.append('q', searchInput);
+
+      const response = await api.admin.getAllGenres(
+        token,
+        currentPage,
+        limit,
+        params.toString()
       );
-      setSelectedRows([]);
-      fetchGenres(currentPage, searchInput);
-      toast.success(`Deleted ${selectedRows.length} genres successfully`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Deletion failed');
-    }
-  };
+      setGenres(response.genres);
 
-  const handleEditGenre = (genre: { id: string; name: string }) => {
-    setEditingGenre(genre);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editingGenre) return;
-
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-
-      await api.admin.updateGenre(
-        editingGenre.id,
-        { name: editingGenre.name },
-        token
-      );
-      toast.success('Genre updated successfully');
       setEditingGenre(null);
-      fetchGenres(currentPage, searchInput);
-    } catch (err) {
+      toast.success('Genre updated successfully');
+    } catch (error) {
       toast.error(
-        err instanceof Error ? err.message : 'Failed to update genre'
+        error instanceof Error ? error.message : 'Failed to update genre'
       );
     }
   };
 
-  const columns: ColumnDef<Genre>[] = [
-    {
-      id: 'select',
-      header: ({ table }) => (
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && 'indeterminate')
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-          className={`translate-y-[2px] ${
-            theme === 'dark' ? 'border-white/50' : ''
-          }`}
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-          className={`translate-y-[2px] ${
-            theme === 'dark' ? 'border-white/50' : ''
-          }`}
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
-      accessorKey: 'name',
-      header: 'Name',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {row.original.name}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'createdAt',
-      header: 'Created At',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {new Date(row.original.createdAt).toLocaleDateString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-          })}
-        </span>
-      ),
-    },
-    {
-      id: 'actions',
-      cell: ({ row }) => {
-        const genre = row.original;
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleEditGenre(genre)}>
-                <Edit className="w-4 h-4 mr-2" />
-                Edit Genre
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => handleDeleteGenre(genre.id)}
-                className="text-red-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Genre
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
-  ];
+  // Table configuration
+  const columns = getGenreColumns({
+    theme,
+    onDelete: handleDeleteGenres,
+    onEdit: setEditingGenre,
+  });
 
   const table = useReactTable({
     data: genres,
@@ -279,7 +146,15 @@ export default function GenreManagement() {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: (updatedSelection) => {
+      setRowSelection(updatedSelection);
+      const selectedRowData = genres.filter(
+        (genre, index) =>
+          typeof updatedSelection === 'object' &&
+          updatedSelection[index.toString()]
+      );
+      setSelectedRows(selectedRowData);
+    },
     state: {
       sorting,
       columnFilters,
@@ -287,7 +162,7 @@ export default function GenreManagement() {
       rowSelection,
       pagination: {
         pageIndex: currentPage - 1,
-        pageSize: 10,
+        pageSize: limit,
       },
     },
     pageCount: totalPages,
@@ -331,7 +206,7 @@ export default function GenreManagement() {
           searchValue: searchInput,
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
-          onDelete: handleDeleteSelected,
+          onDelete: () => handleDeleteGenres(selectedRows.map((row) => row.id)),
           showExport: true,
           exportData: {
             data: genres,
@@ -353,42 +228,12 @@ export default function GenreManagement() {
         }}
       />
 
-      {/* Edit Genre Modal */}
-      {editingGenre && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div
-            className={`p-6 rounded-lg w-full max-w-md ${
-              theme === 'light' ? 'bg-white' : 'bg-[#121212]'
-            }`}
-          >
-            <h2
-              className={`text-xl font-bold mb-4 ${
-                theme === 'light' ? 'text-gray-900' : 'text-white'
-              }`}
-            >
-              Edit Genre
-            </h2>
-            <input
-              type="text"
-              value={editingGenre.name}
-              onChange={(e) =>
-                setEditingGenre({ ...editingGenre, name: e.target.value })
-              }
-              className={`w-full p-2 rounded-md focus:outline-none focus:ring-2 ${
-                theme === 'light'
-                  ? 'bg-gray-100 focus:ring-gray-300 text-gray-900'
-                  : 'bg-white/10 focus:ring-white/20 text-white'
-              }`}
-            />
-            <div className="flex justify-end space-x-2 mt-4">
-              <Button variant="ghost" onClick={() => setEditingGenre(null)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveEdit}>Save</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EditGenreModal
+        genre={editingGenre}
+        onClose={() => setEditingGenre(null)}
+        onSubmit={handleUpdateGenre}
+        theme={theme}
+      />
     </div>
   );
 }

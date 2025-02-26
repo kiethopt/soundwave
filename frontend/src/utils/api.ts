@@ -180,9 +180,14 @@ export const api = {
         token
       ),
 
-    getAllArtists: async (token: string, page: number, limit: number) =>
+    getAllArtists: async (
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
       fetchWithAuth(
-        `/api/admin/artists?page=${page}&limit=${limit}`,
+        `/api/admin/artists?${queryParams || `page=${page}&limit=${limit}`}`,
         { method: 'GET' },
         token
       ),
@@ -224,23 +229,27 @@ export const api = {
     getUserById: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/users/${id}`, { method: 'GET' }, token),
 
-    updateUser: async (id: string, data: any, token: string) =>
+    updateUser: async (userId: string, data: FormData, token: string) =>
       fetchWithAuth(
-        `/api/admin/users/${id}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(data),
-        },
+        `/api/admin/users/${userId}`,
+        { method: 'PUT', body: data },
         token
       ),
 
-    updateArtist: async (id: string, data: FormData, token: string) =>
+    updateArtist: async (artistId: string, data: FormData, token: string) =>
       fetchWithAuth(
-        `/api/admin/artists/${id}`,
+        `/api/admin/artists/${artistId}`,
         {
           method: 'PUT',
           body: data,
         },
+        token
+      ),
+
+    updateAllMonthlyListeners: async (token: string) =>
+      fetchWithAuth(
+        '/api/admin/artists/update-all-monthly-listeners',
+        { method: 'POST' },
         token
       ),
 
@@ -297,12 +306,12 @@ export const api = {
         token
       ),
 
-    updateGenre: async (id: string, data: any, token: string) =>
+    updateGenre: async (genreId: string, data: FormData, token: string) =>
       fetchWithAuth(
-        `/api/admin/genres/${id}`,
+        `/api/admin/genres/${genreId}`,
         {
           method: 'PUT',
-          body: JSON.stringify(data),
+          body: data,
         },
         token
       ),

@@ -8,11 +8,49 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.artistExtension = void 0;
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("./cache.middleware");
+const node_cron_1 = __importDefault(require("node-cron"));
 exports.artistExtension = client_1.Prisma.defineExtension((client) => {
+    node_cron_1.default.schedule('0 0 * * *', () => __awaiter(void 0, void 0, void 0, function* () {
+        try {
+            const artists = yield client.artistProfile.findMany({
+                where: { role: 'ARTIST', isVerified: true },
+                select: { id: true },
+            });
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            for (const artist of artists) {
+                const trackIds = yield client.track
+                    .findMany({
+                    where: { artistId: artist.id },
+                    select: { id: true },
+                })
+                    .then((tracks) => tracks.map((track) => track.id));
+                const uniqueListeners = yield client.history.findMany({
+                    where: {
+                        trackId: { in: trackIds },
+                        type: 'PLAY',
+                        createdAt: { gte: thirtyDaysAgo },
+                    },
+                    distinct: ['userId'],
+                });
+                yield client.artistProfile.update({
+                    where: { id: artist.id },
+                    data: { monthlyListeners: uniqueListeners.length },
+                });
+            }
+            console.log('Updated monthly listeners for all artists');
+        }
+        catch (error) {
+            console.error('Auto update monthly listeners error:', error);
+        }
+    }));
     return client.$extends({
         query: {
             artistProfile: {

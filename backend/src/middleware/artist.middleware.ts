@@ -1,7 +1,47 @@
 import { Prisma } from '@prisma/client';
 import { clearCacheForEntity } from './cache.middleware';
+import cron from 'node-cron';
 
 export const artistExtension = Prisma.defineExtension((client) => {
+  // Cron job chạy mỗi ngày lúc 0:00 để cập nhật số lượng người nghe hàng tháng cho tất cả artists đã được xác thực
+  cron.schedule('0 0 * * *', async () => {
+    try {
+      const artists = await client.artistProfile.findMany({
+        where: { role: 'ARTIST', isVerified: true },
+        select: { id: true },
+      });
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      for (const artist of artists) {
+        const trackIds = await client.track
+          .findMany({
+            where: { artistId: artist.id },
+            select: { id: true },
+          })
+          .then((tracks) => tracks.map((track) => track.id));
+
+        const uniqueListeners = await client.history.findMany({
+          where: {
+            trackId: { in: trackIds },
+            type: 'PLAY',
+            createdAt: { gte: thirtyDaysAgo },
+          },
+          distinct: ['userId'],
+        });
+
+        await client.artistProfile.update({
+          where: { id: artist.id },
+          data: { monthlyListeners: uniqueListeners.length },
+        });
+      }
+      console.log('Updated monthly listeners for all artists');
+    } catch (error) {
+      console.error('Auto update monthly listeners error:', error);
+    }
+  });
+
   return client.$extends({
     query: {
       artistProfile: {

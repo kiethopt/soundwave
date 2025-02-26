@@ -252,21 +252,26 @@ export const updateUser = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { role, isVerified, name, email, username } = req.body;
+    const { name, email, username } = req.body;
+    const avatarFile = req.file;
 
-    // Validation cơ bản
-    if (!id) {
-      res.status(400).json({ message: 'User ID is required' });
+    // Validation
+    const validationErrors = [];
+    if (!id) validationErrors.push('User ID is required');
+    if (email && !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      validationErrors.push('Invalid email format');
+    }
+    if (username && username.length < 3) {
+      validationErrors.push('Username must be at least 3 characters long');
+    }
+    if (validationErrors.length > 0) {
+      res
+        .status(400)
+        .json({ message: 'Validation failed', errors: validationErrors });
       return;
     }
 
-    // Kiểm tra role hợp lệ
-    if (role && !Object.values(Role).includes(role)) {
-      res.status(400).json({ message: 'Invalid role' });
-      return;
-    }
-
-    // Lấy thông tin người dùng hiện tại
+    // Kiểm tra user tồn tại
     const currentUser = await prisma.user.findUnique({
       where: { id },
       select: userSelect,
@@ -277,116 +282,51 @@ export const updateUser = async (
       return;
     }
 
-    // Kiểm tra xem email mới có trùng với user khác không
+    // Kiểm tra trùng lặp email/username
     if (email && email !== currentUser.email) {
-      const existingUserWithEmail = await prisma.user.findUnique({
-        where: { email },
+      const existingEmail = await prisma.user.findFirst({
+        where: { email, NOT: { id } },
       });
-
-      if (existingUserWithEmail) {
+      if (existingEmail) {
         res.status(400).json({ message: 'Email already exists' });
         return;
       }
     }
 
-    // Kiểm tra xem username mới có trùng với user khác không
     if (username && username !== currentUser.username) {
-      const existingUserWithUsername = await prisma.user.findUnique({
-        where: { username },
+      const existingUsername = await prisma.user.findFirst({
+        where: { username, NOT: { id } },
       });
-
-      if (existingUserWithUsername) {
+      if (existingUsername) {
         res.status(400).json({ message: 'Username already exists' });
         return;
       }
     }
 
-    // Case 1: Không thể thay đổi role của ADMIN
-    if (currentUser.role === Role.ADMIN) {
-      res.status(403).json({ message: 'Cannot modify ADMIN role' });
-      return;
+    // Xử lý avatar
+    let avatarUrl = currentUser.avatar;
+    if (avatarFile) {
+      const uploadResult = await uploadFile(avatarFile.buffer, 'users/avatars');
+      avatarUrl = uploadResult.secure_url;
     }
 
-    // Case 2: Kiểm tra khi chuyển từ USER sang ARTIST
-    if (role === Role.ARTIST && currentUser.role === Role.USER) {
-      if (!currentUser.artistProfile?.verificationRequestedAt) {
-        res.status(400).json({
-          message: 'User has not requested to become an artist',
-        });
-        return;
-      }
-    }
-
-    // Case 3: Kiểm tra khi đã là ARTIST và verified
-    if (
-      currentUser.role === Role.ARTIST &&
-      currentUser.artistProfile?.isVerified
-    ) {
-      if (role === Role.USER) {
-        res.status(400).json({
-          message: 'Cannot change role from ARTIST to USER once verified',
-        });
-        return;
-      }
-      if (isVerified === false) {
-        res.status(400).json({
-          message: 'Cannot unverify a verified artist',
-        });
-        return;
-      }
-    }
-
-    // Case 4: Kiểm tra khi đặt isVerified thành true
-    if (isVerified === true) {
-      // Nếu user chưa gửi request, không cho phép đặt isVerified thành true
-      if (!currentUser.artistProfile?.verificationRequestedAt) {
-        res.status(400).json({
-          message: 'User has not requested to become an artist',
-        });
-        return;
-      }
-    }
-
-    // Xác định xem có phải đang verify một user request artist không
-    const isVerifyingArtistRequest =
-      isVerified === true &&
-      currentUser.artistProfile?.verificationRequestedAt &&
-      !currentUser.artistProfile.isVerified;
-
-    // Cập nhật dữ liệu user
-    const updateData: any = {
-      ...(name && { name }),
-      ...(email && { email }),
-      ...(username && { username }),
-    };
-
-    // Thực hiện cập nhật trong transaction
-    const updatedUser = await prisma.$transaction(async (prisma) => {
-      // Cập nhật user
-      await prisma.user.update({
-        where: { id },
-        data: updateData,
-      });
-
-      // Cập nhật ArtistProfile nếu đang verify artist request
-      if (isVerifyingArtistRequest) {
-        await prisma.artistProfile.update({
-          where: { userId: id },
-          data: {
-            isVerified: true,
-            verifiedAt: new Date(),
-            verificationRequestedAt: null,
-            role: Role.ARTIST,
-          },
-        });
-      }
-
-      // Lấy lại thông tin user đã cập nhật với đầy đủ relations
-      return await prisma.user.findUnique({
-        where: { id },
-        select: userSelect,
-      });
+    // Cập nhật user
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(name && { name }),
+        ...(email && { email }),
+        ...(username && { username }),
+        ...(avatarUrl &&
+          avatarUrl !== currentUser.avatar && { avatar: avatarUrl }),
+      },
+      select: userSelect,
     });
+
+    // Clear cache
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      await clearCacheForEntity('user', { entityId: id, clearSearch: true });
+    }
 
     res.json({
       message: 'User updated successfully',
@@ -407,18 +347,24 @@ export const updateArtist = async (
     const { id } = req.params;
     const { artistName, bio, socialMediaLinks } = req.body;
     const avatarFile = req.file;
-    const admin = req.user;
 
-    // Kiểm tra quyền truy cập
-    if (
-      !admin ||
-      (admin.role !== Role.ADMIN && admin.artistProfile?.id !== id)
-    ) {
-      res.status(403).json({ message: 'Forbidden' });
+    // Validation
+    const validationErrors = [];
+    if (!id) validationErrors.push('Artist ID is required');
+    if (artistName && artistName.length < 2) {
+      validationErrors.push('Artist name must be at least 2 characters long');
+    }
+    if (bio && bio.length > 1000) {
+      validationErrors.push('Bio must not exceed 1000 characters');
+    }
+    if (validationErrors.length > 0) {
+      res
+        .status(400)
+        .json({ message: 'Validation failed', errors: validationErrors });
       return;
     }
 
-    // Tìm artist profile
+    // Kiểm tra artist tồn tại
     const existingArtist = await prisma.artistProfile.findUnique({
       where: { id },
       include: { user: true },
@@ -429,7 +375,7 @@ export const updateArtist = async (
       return;
     }
 
-    // Kiểm tra tên nghệ sĩ đã tồn tại chưa (nếu có thay đổi)
+    // Kiểm tra trùng lặp artist name
     if (artistName && artistName !== existingArtist.artistName) {
       const existingArtistName = await prisma.artistProfile.findFirst({
         where: { artistName, NOT: { id } },
@@ -440,7 +386,7 @@ export const updateArtist = async (
       }
     }
 
-    // Xử lý avatar nếu có file mới
+    // Xử lý avatar
     let avatarUrl = existingArtist.avatar;
     if (avatarFile) {
       const uploadResult = await uploadFile(
@@ -450,7 +396,7 @@ export const updateArtist = async (
       avatarUrl = uploadResult.secure_url;
     }
 
-    // Cập nhật thông tin artist
+    // Cập nhật artist
     const updatedArtist = await prisma.artistProfile.update({
       where: { id },
       data: {
@@ -463,7 +409,7 @@ export const updateArtist = async (
       select: artistProfileSelect,
     });
 
-    // Clear cache nếu cần
+    // Clear cache
     if (process.env.USE_REDIS_CACHE === 'true') {
       await clearCacheForEntity('artist', { entityId: id, clearSearch: true });
     }
@@ -875,29 +821,23 @@ export const updateGenre = async (
     const { id } = req.params;
     const { name } = req.body;
 
-    // Validation: Kiểm tra body có trống không
-    if (!name) {
-      res.status(400).json({ message: 'Name is required' });
+    // Validation tập trung
+    const validationErrors = [];
+    if (!id) validationErrors.push('Genre ID is required');
+    if (!name) validationErrors.push('Name is required');
+    if (name && name.trim() === '')
+      validationErrors.push('Name cannot be empty');
+    if (name && name.length > 50) {
+      validationErrors.push('Name exceeds maximum length (50 characters)');
+    }
+    if (validationErrors.length > 0) {
+      res
+        .status(400)
+        .json({ message: 'Validation failed', errors: validationErrors });
       return;
     }
 
-    // Validation: Kiểm tra tên không được trống
-    if (name.trim() === '') {
-      res.status(400).json({ message: 'Name cannot be empty' });
-      return;
-    }
-
-    // Validation: Kiểm tra độ dài tên (tối đa 50 ký tự)
-    if (name.length > 50) {
-      res.status(400).json({
-        message: 'Name exceeds maximum length (50 characters)',
-        maxLength: 50,
-        currentLength: name.length,
-      });
-      return;
-    }
-
-    // Kiểm tra xem genre có tồn tại không
+    // Kiểm tra genre tồn tại
     const existingGenre = await prisma.genre.findUnique({
       where: { id },
     });
@@ -907,19 +847,15 @@ export const updateGenre = async (
       return;
     }
 
-    // Kiểm tra xem tên thể loại đã tồn tại chưa (trừ genre hiện tại)
-    const existingGenreWithName = await prisma.genre.findFirst({
-      where: {
-        name,
-        NOT: {
-          id,
-        },
-      },
-    });
-
-    if (existingGenreWithName) {
-      res.status(400).json({ message: 'Genre name already exists' });
-      return;
+    // Kiểm tra trùng lặp tên
+    if (name !== existingGenre.name) {
+      const existingGenreWithName = await prisma.genre.findFirst({
+        where: { name, NOT: { id } },
+      });
+      if (existingGenreWithName) {
+        res.status(400).json({ message: 'Genre name already exists' });
+        return;
+      }
     }
 
     // Cập nhật genre
@@ -929,8 +865,10 @@ export const updateGenre = async (
     });
 
     // Clear cache
-    await clearCacheForEntity('genre', { entityId: id, clearSearch: true });
-    await clearCacheForEntity('track', { clearSearch: true });
+    if (process.env.USE_REDIS_CACHE === 'true') {
+      await clearCacheForEntity('genre', { entityId: id, clearSearch: true });
+      await clearCacheForEntity('track', { clearSearch: true });
+    }
 
     res.json({
       message: 'Genre updated successfully',
@@ -938,23 +876,6 @@ export const updateGenre = async (
     });
   } catch (error) {
     console.error('Update genre error:', error);
-
-    // Xử lý lỗi từ Prisma
-    if (error instanceof Error && 'code' in error) {
-      switch ((error as any).code) {
-        case 'P2002': // Lỗi unique constraint
-          res.status(400).json({ message: 'Genre name already exists' });
-          return;
-        case 'P2025': // Lỗi không tìm thấy bản ghi
-          res.status(404).json({ message: 'Genre not found' });
-          return;
-        default:
-          console.error('Prisma error:', error);
-          res.status(500).json({ message: 'Internal server error' });
-          return;
-      }
-    }
-
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -1163,70 +1084,50 @@ export const verifyArtist = async (
   }
 };
 
-// Update số lượng người nghe hàng tháng của các Artists - ADMIN only
-export const updateMonthlyListeners = async (
+// Cập nhật số lượng người nghe hàng tháng cho tất cả artists đã được xác thực
+export const updateAllMonthlyListeners = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params; // id này là artistProfileId
-    const user = req.user;
-
-    // Kiểm tra quyền truy cập
-    if (!user || (user.role !== Role.ADMIN && user.artistProfile?.id !== id)) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
-    }
-
-    // Tìm ArtistProfile
-    const artistProfile = await prisma.artistProfile.findUnique({
-      where: { id },
-      include: {
-        tracks: {
-          select: {
-            id: true,
-          },
-        },
-      },
+    // Lấy danh sách tất cả artist đã được xác thực
+    const artists = await prisma.artistProfile.findMany({
+      where: { role: 'ARTIST', isVerified: true },
+      select: { id: true },
     });
 
-    if (!artistProfile) {
-      res.status(404).json({ message: 'Artist not found' });
-      return;
-    }
-
-    const trackIds = artistProfile.tracks.map((track) => track.id);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Đếm số lượng người nghe duy nhất trong 30 ngày gần nhất
-    const uniqueListeners = await prisma.history.findMany({
-      where: {
-        trackId: {
-          in: trackIds,
-        },
-        type: 'PLAY',
-        createdAt: {
-          gte: thirtyDaysAgo,
-        },
-      },
-      distinct: ['userId'], // Đảm bảo mỗi user chỉ được tính một lần
-    });
+    // Cập nhật số liệu cho từng artist
+    for (const artist of artists) {
+      const trackIds = await prisma.track
+        .findMany({
+          where: { artistId: artist.id },
+          select: { id: true },
+        })
+        .then((tracks) => tracks.map((track) => track.id));
 
-    // Cập nhật monthlyListeners với số lượng người nghe duy nhất
-    const updatedArtistProfile = await prisma.artistProfile.update({
-      where: { id },
-      data: {
-        monthlyListeners: uniqueListeners.length,
-      },
-    });
+      const uniqueListeners = await prisma.history.findMany({
+        where: {
+          trackId: { in: trackIds },
+          type: 'PLAY',
+          createdAt: { gte: thirtyDaysAgo },
+        },
+        distinct: ['userId'],
+      });
+
+      await prisma.artistProfile.update({
+        where: { id: artist.id },
+        data: { monthlyListeners: uniqueListeners.length },
+      });
+    }
 
     res.json({
-      message: 'Monthly listeners updated successfully',
-      artistProfile: updatedArtistProfile,
+      message: "All artists' monthly listeners updated successfully",
     });
   } catch (error) {
-    console.error('Update monthly listeners error:', error);
+    console.error('Update all monthly listeners error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

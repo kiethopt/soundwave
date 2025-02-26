@@ -1,7 +1,16 @@
 import { ColumnDef } from '@tanstack/react-table';
-import { Track, Album } from '@/types';
+import { Track, Album, Genre, ArtistProfile, User } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
-import { MoreVertical, Eye, EyeOff, Trash2, Music, Pencil } from 'lucide-react';
+import {
+  MoreVertical,
+  Eye,
+  EyeOff,
+  Trash2,
+  Music,
+  Pencil,
+  MoreHorizontal,
+  RefreshCw,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +23,8 @@ import Link from 'next/link';
 import React from 'react';
 import { api } from '@/utils/api';
 import { ArtistInfoModal } from './data-table-modals';
+import { Edit, Key, Power, User as UserIcon } from '../ui/Icons';
+import { Button } from '../ui/button';
 
 interface GetTrackColumnsOptions {
   theme?: 'light' | 'dark';
@@ -29,6 +40,29 @@ interface GetAlbumColumnsOptions {
   onDelete?: (id: string | string[]) => Promise<void>;
   onEdit?: (album: Album) => void;
   formatReleaseTime?: (date: string) => string;
+}
+
+interface GetUserColumnsOptions {
+  theme?: 'light' | 'dark';
+  onStatusChange?: (id: string, isActive: boolean) => Promise<void>;
+  onDelete?: (id: string | string[]) => Promise<void>;
+  onResetPassword?: (id: string) => Promise<void>;
+  onEdit?: (user: User) => void;
+}
+
+interface GetGenreColumnsOptions {
+  theme?: 'light' | 'dark';
+  onDelete?: (id: string | string[]) => Promise<void>;
+  onEdit?: (genre: Genre) => void;
+}
+
+interface GetArtistColumnsOptions {
+  theme?: 'light' | 'dark';
+  onStatusChange?: (id: string, isActive: boolean) => Promise<void>;
+  onDelete?: (id: string | string[]) => Promise<void>;
+  handleUpdateAllListeners?: () => void;
+  loading?: boolean;
+  actionLoading?: string | null;
 }
 
 export function getTrackColumns({
@@ -630,6 +664,411 @@ export function getAlbumColumns({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        );
+      },
+    },
+  ];
+}
+
+export function getUserColumns({
+  theme = 'light',
+  onStatusChange,
+  onDelete,
+  onResetPassword,
+  onEdit,
+}: GetUserColumnsOptions): ColumnDef<User>[] {
+  return [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'name',
+      header: 'User',
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-8 h-8 rounded-full overflow-hidden ${
+                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+              }`}
+            >
+              {user.avatar ? (
+                <Image
+                  src={user.avatar}
+                  alt={user.name || 'User avatar'}
+                  width={32}
+                  height={32}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <UserIcon
+                  className={`w-8 h-8 p-1.5 ${
+                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                  }`}
+                />
+              )}
+            </div>
+            <div>
+              <div
+                className={`font-medium ${
+                  theme === 'dark' ? 'text-white' : ''
+                }`}
+              >
+                {user.name || 'Anonymous'}
+              </div>
+              <div
+                className={theme === 'dark' ? 'text-white/60' : 'text-gray-500'}
+              >
+                @{user.username}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'email',
+      header: 'Email',
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'Status',
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.original.isActive
+              ? 'bg-green-500/20 text-green-400'
+              : 'bg-red-500/20 text-red-400'
+          }`}
+        >
+          {row.original.isActive ? 'Active' : 'Inactive'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Joined',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {new Date(row.original.createdAt).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit && onEdit(user)}>
+                <Pencil className="w-4 h-4 mr-2" />
+                Edit User
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  onStatusChange && onStatusChange(user.id, user.isActive)
+                }
+              >
+                <Power className="w-4 h-4 mr-2" />
+                {user.isActive ? 'Deactivate' : 'Activate'}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onResetPassword && onResetPassword(user.id)}
+              >
+                <Key className="w-4 h-4 mr-2" />
+                Reset Password
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onDelete && onDelete(user.id)}
+                className="text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete User
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+}
+
+export function getGenreColumns({
+  theme = 'light',
+  onDelete,
+  onEdit,
+}: GetGenreColumnsOptions): ColumnDef<Genre>[] {
+  return [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {row.original.name}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Created At',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {new Date(row.original.createdAt).toLocaleDateString('vi-VN')}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const genre = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit?.(genre)}>
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Genre
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onDelete?.(genre.id)}
+                className="text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Genre
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
+}
+
+export function getArtistColumns({
+  theme,
+  onStatusChange,
+  onDelete,
+  handleUpdateAllListeners,
+  loading,
+  actionLoading,
+}: GetArtistColumnsOptions): ColumnDef<ArtistProfile>[] {
+  return [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'artistName',
+      header: 'Artist',
+      cell: ({ row }) => {
+        const artist = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-8 h-8 rounded-full overflow-hidden ${
+                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+              }`}
+            >
+              {artist.avatar ? (
+                <Image
+                  src={artist.avatar}
+                  alt={artist.artistName}
+                  width={32}
+                  height={32}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <UserIcon
+                  className={`w-8 h-8 p-1.5 ${
+                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                  }`}
+                />
+              )}
+            </div>
+            <div>
+              <Link
+                href={`/admin/artists/${artist.id}`}
+                className={`font-medium hover:underline ${
+                  theme === 'dark' ? 'text-white' : ''
+                }`}
+              >
+                {artist.artistName}
+              </Link>
+              <div
+                className={theme === 'dark' ? 'text-white/60' : 'text-gray-500'}
+              >
+                {artist.user.email}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'monthlyListeners',
+      header: 'Monthly Listeners',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {row.original.monthlyListeners.toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'isVerified',
+      header: 'Verification',
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.original.isVerified
+              ? 'bg-blue-500/20 text-blue-400'
+              : 'bg-yellow-500/20 text-yellow-400'
+          }`}
+        >
+          {row.original.isVerified ? 'Verified' : 'Unverified'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'Status',
+      cell: ({ row }) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.original.isActive
+              ? 'bg-green-500/20 text-green-400'
+              : 'bg-red-500/20 text-red-400'
+          }`}
+        >
+          {row.original.isActive ? 'Active' : 'Inactive'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Joined',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {new Date(row.original.createdAt).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => (
+        <div className="flex items-center justify-center">
+          <button
+            onClick={handleUpdateAllListeners}
+            disabled={loading || actionLoading === 'updateAll'}
+            className={`p-1 rounded-full ${
+              theme === 'dark'
+                ? 'text-white hover:bg-white/10'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Update All Listeners"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${
+                actionLoading === 'updateAll' ? 'animate-spin' : ''
+              }`}
+            />
+          </button>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const artist = row.original;
+        return (
+          <div className="flex justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <MoreVertical className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() =>
+                    onStatusChange && onStatusChange(artist.id, artist.isActive)
+                  }
+                >
+                  <Power className="w-4 h-4 mr-2" />
+                  {artist.isActive ? 'Deactivate' : 'Activate'}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onDelete && onDelete(artist.id)}
+                  className="text-red-600"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Artist
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },
