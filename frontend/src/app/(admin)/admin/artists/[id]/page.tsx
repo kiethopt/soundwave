@@ -13,15 +13,17 @@ import {
   Play,
   Pause,
 } from 'lucide-react';
-import { Verified } from '@/components/ui/Icons';
+import { MoreVertical, Verified } from '@/components/ui/Icons';
 import { ArtistProfile, Album, Track } from '@/types';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/contexts/ThemeContext';
+import { EditArtistModal } from '@/components/data-table/data-table-modals';
 
 export default function ArtistDetail({
   params,
@@ -69,6 +71,7 @@ export default function ArtistDetail({
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'albums' | 'tracks'>('albums');
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const albumPageRef = useRef<HTMLInputElement>(null);
   const trackPageRef = useRef<HTMLInputElement>(null);
 
@@ -220,6 +223,18 @@ export default function ArtistDetail({
     }
   };
 
+  const handleArtistUpdate = (updatedArtist: Partial<ArtistProfile>) => {
+    setArtist((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        artistName: updatedArtist.artistName ?? prev.artistName,
+        bio: updatedArtist.bio ?? prev.bio,
+        avatar: updatedArtist.avatar ?? prev.avatar,
+      };
+    });
+  };
+
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -341,6 +356,16 @@ export default function ArtistDetail({
                     <Verified className="w-5 h-5 md:w-6 md:h-6" />
                   </span>
                 )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger>
+                    <MoreVertical className="w-5 h-5" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => setIsEditModalOpen(true)}>
+                      Edit Artist
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               {artist?.bio && (
                 <p
@@ -437,6 +462,7 @@ export default function ArtistDetail({
                 </button>
               </div>
             </div>
+
             {/* Content Area */}
             <div className="flex-1 min-h-0">
               {/* Albums Tab */}
@@ -971,6 +997,14 @@ export default function ArtistDetail({
           </div>
         </div>
       </div>
+
+      {/* Edit Artist Modal */}
+      <EditArtistModal
+        artist={isEditModalOpen ? artist : null}
+        onClose={() => setIsEditModalOpen(false)}
+        onUpdate={handleArtistUpdate}
+        theme={theme}
+      />
     </div>
   );
 }

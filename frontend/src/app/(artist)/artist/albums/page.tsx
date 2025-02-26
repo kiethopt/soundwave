@@ -20,7 +20,7 @@ import { getAlbumColumns } from '@/components/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
 import { EditAlbumModal } from '@/components/data-table/data-table-modals';
 
-export default function ArtistAlbums() {
+export default function AlbumManagement() {
   const { theme } = useTheme();
   const limit = 10;
 

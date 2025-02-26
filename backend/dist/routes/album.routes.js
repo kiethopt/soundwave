@@ -51,7 +51,7 @@ router.put('/:id/toggle-visibility', auth_middleware_1.authenticate, (0, auth_mi
 router.post('/:albumId/tracks', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), upload_middleware_1.default.array('tracks'), upload_middleware_1.handleUploadError, album_controller_1.addTracksToAlbum);
 router.get('/search', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, album_controller_1.searchAlbum);
 router.post('/:albumId/play', auth_middleware_1.authenticate, session_middleware_1.sessionMiddleware, cache_middleware_1.cacheMiddleware, album_controller_1.playAlbum);
-router.get('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), cache_middleware_1.cacheMiddleware, album_controller_1.getAlbumById);
+router.get('/:id', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, album_controller_1.getAlbumById);
 router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), album_controller_1.getAllAlbums);
 exports.default = router;
 //# sourceMappingURL=album.routes.js.map

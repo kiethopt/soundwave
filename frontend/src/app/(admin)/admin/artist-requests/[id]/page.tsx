@@ -10,7 +10,7 @@ import { toast } from 'react-toastify';
 import { Facebook, Instagram } from '@/components/ui/Icons';
 import { useTheme } from '@/contexts/ThemeContext';
 
-export default function ArtistRequestDetails({
+export default function ArtistRequestDetail({
   params,
 }: {
   params: Promise<{ id: string }>;

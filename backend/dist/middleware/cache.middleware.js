@@ -90,20 +90,23 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
             `/api/${entity}/*`,
             ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
         ];
-        if (entity === 'user') {
-            patterns.push('/api/admin/users*', '/admin/api/users*', '/api/users/search*', '/api/user/following*', '/api/user/followers*');
-        }
         if (entity === 'artist') {
-            patterns.push('/api/admin/artists*', '/api/artists*', '/api/artist/*');
+            patterns.push('/api/admin/artists*', '/api/artists*', '/api/artist/*', '/api/top-artists', ...(options.entityId ? [
+                `/api/artists/${options.entityId}/tracks*`,
+                `/api/artists/${options.entityId}/albums*`
+            ] : []));
         }
-        if (entity === 'artist-requests') {
-            patterns.push('/api/admin/artist-requests*', '/api/artist-requests*', '/api/users/check-artist-request*');
+        if (entity === 'user') {
+            patterns.push('/api/admin/users*', '/admin/api/users*', '/api/users/search*', '/api/user/following*', '/api/user/followers*', ...(options.userId ? [`/api/user/${options.userId}/recommended-artists`] : []));
         }
         if (entity === 'album') {
-            patterns.push('/api/admin/albums*', '/api/albums*', '/api/album/*');
+            patterns.push('/api/admin/albums*', '/api/albums*', '/api/album/*', '/api/top-albums');
         }
         if (entity === 'track') {
-            patterns.push('/api/admin/tracks*', '/api/tracks*', '/api/track/*');
+            patterns.push('/api/admin/tracks*', '/api/tracks*', '/api/track/*', '/api/top-tracks');
+        }
+        if (entity === 'history') {
+            patterns.push('/api/top-albums', '/api/top-artists', '/api/top-tracks', ...(options.userId ? [`/api/user/${options.userId}/recommended-artists`] : []));
         }
         if (options.clearSearch) {
             patterns.push('/api/search*', '/api/*/search*', '/search-all*', `/api/${entity}s/search*`, `/api/${entity}/search*`);
@@ -115,7 +118,7 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
                 yield Promise.all(keys.map((key) => exports.client.del(key)));
             }
         }
-        if (entity === 'user' || entity === 'stats') {
+        if (entity === 'user' || entity === 'stats' || entity === 'history') {
             const statsKeys = yield exports.client.keys('/api/admin/stats*');
             if (statsKeys.length) {
                 console.log(`[Redis] Clearing stats cache`);

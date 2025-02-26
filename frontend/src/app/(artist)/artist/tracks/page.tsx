@@ -20,7 +20,7 @@ import { EditTrackModal } from '@/components/data-table/data-table-modals';
 import { getTrackColumns } from '@/components/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
 
-export default function ArtistTracks() {
+export default function TrackManagement() {
   const { theme } = useTheme();
   const limit = 10;
 

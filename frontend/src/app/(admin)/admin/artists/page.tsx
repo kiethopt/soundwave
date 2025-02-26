@@ -29,7 +29,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 import Link from 'next/link';
 
-export default function AdminArtists() {
+export default function ArtistManagement() {
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState('');

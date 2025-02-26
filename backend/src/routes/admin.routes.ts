@@ -12,8 +12,7 @@ import {
   approveArtistRequest,
   getStats,
   getArtistById,
-  createArtist,
-  getArtistRequests,
+  getAllArtistRequests,
   rejectArtistRequest,
   verifyArtist,
   updateMonthlyListeners,
@@ -21,12 +20,13 @@ import {
   deactivateUser,
   deactivateArtist,
   deleteArtist,
+  updateArtist,
 } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import { queryRateLimiter } from '../middleware/rateLimit.middleware';
-import upload from '../middleware/upload.middleware';
 import { cacheMiddleware } from '../middleware/cache.middleware';
+import upload from 'src/middleware/upload.middleware';
 
 const router = express.Router();
 
@@ -43,9 +43,22 @@ router.get(
 );
 
 // Quản lý người dùng
-router.get('/users', queryRateLimiter, authorize([Role.ADMIN]), getAllUsers);
-router.get('/users/:id', authorize([Role.ADMIN]), getUserById);
-router.put('/users/:id', authorize([Role.ADMIN]), updateUser);
+router.get(
+  '/users',
+  queryRateLimiter,
+  authenticate,
+  authorize([Role.ADMIN]),
+  getAllUsers
+);
+router.get('/users/:id', authenticate, authorize([Role.ADMIN]), getUserById);
+router.put('/users/:id', authenticate, authorize([Role.ADMIN]), updateUser);
+router.put(
+  '/artists/:id',
+  authenticate,
+  authorize([Role.ADMIN]),
+  upload.single('avatar'),
+  updateArtist
+);
 router.delete('/users/:id', authorize([Role.ADMIN]), deleteUser);
 router.delete(
   '/artists/:id',
@@ -69,17 +82,12 @@ router.get(
   getAllArtists
 );
 router.get('/artists/:id', authorize([Role.ADMIN, Role.ARTIST]), getArtistById);
-router.post(
-  '/artists',
-  authorize([Role.ADMIN]),
-  upload.single('avatar'),
-  createArtist
-);
+
 router.get(
   '/artist-requests',
   queryRateLimiter,
   authorize([Role.ADMIN]),
-  getArtistRequests
+  getAllArtistRequests
 );
 router.get(
   '/artist-requests/:id',

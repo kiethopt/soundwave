@@ -234,6 +234,16 @@ export const api = {
         token
       ),
 
+    updateArtist: async (id: string, data: FormData, token: string) =>
+      fetchWithAuth(
+        `/api/admin/artists/${id}`,
+        {
+          method: 'PUT',
+          body: data,
+        },
+        token
+      ),
+
     deleteUser: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/users/${id}`, { method: 'DELETE' }, token),
 

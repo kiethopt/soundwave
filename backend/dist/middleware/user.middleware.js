@@ -84,9 +84,50 @@ exports.userExtension = client_1.Prisma.defineExtension((client) => {
                             yield Promise.all([
                                 cache_middleware_2.client.del(`/api/users/${args.where.id}/followers`),
                                 cache_middleware_2.client.del(`/api/users/${args.where.id}/following`),
+                                cache_middleware_2.client.del(`/api/user/${args.where.id}/recommended-artists`),
                                 (0, cache_middleware_1.clearCacheForEntity)('user', {
                                     entityId: args.where.id,
                                     clearSearch: true,
+                                }),
+                            ]);
+                        }
+                        return result;
+                    });
+                },
+            },
+            history: {
+                create(_a) {
+                    return __awaiter(this, arguments, void 0, function* ({ args, query }) {
+                        const result = yield query(args);
+                        if (args.data.userId && args.data.type === 'PLAY') {
+                            yield Promise.all([
+                                cache_middleware_2.client.del(`/api/user/${args.data.userId}/recommended-artists`),
+                                cache_middleware_2.client.del('/api/top-tracks'),
+                                cache_middleware_2.client.del('/api/top-albums'),
+                                cache_middleware_2.client.del('/api/top-artists'),
+                                (0, cache_middleware_1.clearCacheForEntity)('history', {
+                                    userId: args.data.userId,
+                                }),
+                            ]);
+                        }
+                        return result;
+                    });
+                },
+                update(_a) {
+                    return __awaiter(this, arguments, void 0, function* ({ args, query }) {
+                        const history = yield client.history.findFirst({
+                            where: args.where,
+                            select: { userId: true, type: true },
+                        });
+                        const result = yield query(args);
+                        if ((history === null || history === void 0 ? void 0 : history.userId) && history.type === 'PLAY') {
+                            yield Promise.all([
+                                cache_middleware_2.client.del(`/api/user/${history.userId}/recommended-artists`),
+                                cache_middleware_2.client.del('/api/top-tracks'),
+                                cache_middleware_2.client.del('/api/top-albums'),
+                                cache_middleware_2.client.del('/api/top-artists'),
+                                (0, cache_middleware_1.clearCacheForEntity)('history', {
+                                    userId: history.userId,
                                 }),
                             ]);
                         }

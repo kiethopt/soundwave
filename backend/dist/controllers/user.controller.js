@@ -793,6 +793,14 @@ const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, fu
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
+        const cacheKey = `/api/user/${user.id}/recommended-artists`;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+        }
         const history = yield db_1.default.history.findMany({
             where: {
                 userId: user.id,
@@ -862,6 +870,9 @@ const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, fu
                 },
             },
         });
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.setCache)(cacheKey, recommendedArtists, 1800);
+        }
         res.json(recommendedArtists);
     }
     catch (error) {
@@ -872,7 +883,15 @@ const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, fu
 exports.getRecommendedArtists = getRecommendedArtists;
 const getTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const cacheKey = '/api/top-albums';
         const monthStart = getMonthStartDate();
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+        }
         const albums = yield db_1.default.album.findMany({
             where: {
                 isActive: true,
@@ -946,6 +965,9 @@ const getTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         });
         const albumsWithMonthlyPlays = albums.map((album) => (Object.assign(Object.assign({}, album), { monthlyPlays: album.tracks.reduce((sum, track) => sum +
                 track.history.reduce((plays, h) => plays + (h.playCount || 0), 0), 0) })));
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.setCache)(cacheKey, albumsWithMonthlyPlays, 1800);
+        }
         res.json(albumsWithMonthlyPlays);
     }
     catch (error) {
@@ -956,7 +978,15 @@ const getTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 exports.getTopAlbums = getTopAlbums;
 const getTopArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const cacheKey = '/api/top-artists';
         const monthStart = getMonthStartDate();
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+        }
         const artists = yield db_1.default.artistProfile.findMany({
             where: {
                 isVerified: true,
@@ -1018,6 +1048,9 @@ const getTopArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         const topArtists = artistsWithMonthlyMetrics
             .sort((a, b) => b.monthlyListeners - a.monthlyListeners)
             .slice(0, 20);
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.setCache)(cacheKey, topArtists, 1800);
+        }
         res.json(topArtists);
     }
     catch (error) {
@@ -1028,7 +1061,15 @@ const getTopArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* 
 exports.getTopArtists = getTopArtists;
 const getTopTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const cacheKey = '/api/top-tracks';
         const monthStart = getMonthStartDate();
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+        }
         const tracks = yield db_1.default.track.findMany({
             where: {
                 isActive: true,
@@ -1086,6 +1127,9 @@ const getTopTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             take: 20,
         });
         const tracksWithMonthlyPlays = tracks.map((track) => (Object.assign(Object.assign({}, track), { monthlyPlays: track.history.reduce((sum, h) => sum + (h.playCount || 0), 0) })));
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.setCache)(cacheKey, tracksWithMonthlyPlays, 1800);
+        }
         res.json(tracksWithMonthlyPlays);
     }
     catch (error) {

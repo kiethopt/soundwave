@@ -29,7 +29,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-export default function ArtistRequests() {
+
+export default function ArtistRequestManagement() {
   const [requests, setRequests] = useState<ArtistRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -626,7 +626,6 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.getAllAlbums = getAllAlbums;
 const getAlbumById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
     try {
         const { id } = req.params;
         const user = req.user;
@@ -635,35 +634,16 @@ const getAlbumById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             return;
         }
         const album = yield db_1.default.album.findUnique({
-            where: { id },
+            where: {
+                id
+            },
             select: prisma_selects_1.albumSelect,
         });
         if (!album) {
             res.status(404).json({ message: 'Album not found' });
             return;
         }
-        if (user.role === client_1.Role.ADMIN) {
-            res.json(album);
-            return;
-        }
-        if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) && ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isActive)) {
-            if (user.currentProfile !== 'ARTIST') {
-                res.status(403).json({
-                    message: 'Please switch to Artist profile to access this page',
-                    code: 'SWITCH_TO_ARTIST_PROFILE',
-                });
-                return;
-            }
-            const isOwner = user.artistProfile.id === album.artist.id;
-            const isFeaturedArtist = album.tracks.some((track) => track.featuredArtists.some((fa) => { var _a; return fa.artistProfile.id === ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id); }));
-            if (isOwner || isFeaturedArtist) {
-                res.json(album);
-                return;
-            }
-        }
-        res.status(403).json({
-            message: 'You do not have permission to access this album',
-        });
+        res.json(album);
     }
     catch (error) {
         console.error('Get album error:', error);

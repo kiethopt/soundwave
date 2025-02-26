@@ -28,7 +28,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 import { Checkbox } from '@/components/ui/checkbox';
 
-export default function AdminGenres() {
+export default function GenreManagement() {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState('');

@@ -193,6 +193,15 @@ const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function
         return;
     }
     try {
+        const cacheKey = `/api/artists/${id}/albums?page=${page}&limit=${limit}`;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log('Serving artist albums from cache:', cacheKey);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+        }
         const artistProfile = yield db_1.default.artistProfile.findUnique({
             where: { id },
             select: { id: true, isVerified: true, userId: true },
@@ -224,7 +233,7 @@ const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function
                 where: whereCondition,
             }),
         ]);
-        res.json({
+        const response = {
             albums,
             pagination: {
                 total,
@@ -232,7 +241,11 @@ const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function
                 limit: Number(limit),
                 totalPages: Math.ceil(total / Number(limit)),
             },
-        });
+        };
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.setCache)(cacheKey, response, 1800);
+        }
+        res.json(response);
     }
     catch (error) {
         console.error('Error fetching artist albums:', error);
@@ -250,6 +263,15 @@ const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function
         return;
     }
     try {
+        const cacheKey = `/api/artists/${id}/tracks?page=${page}&limit=${limit}`;
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log('Serving artist tracks from cache:', cacheKey);
+                res.json(JSON.parse(cachedData));
+                return;
+            }
+        }
         const artistProfile = yield db_1.default.artistProfile.findUnique({
             where: { id },
             select: { id: true, isVerified: true, userId: true },
@@ -278,7 +300,7 @@ const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function
                 where: whereCondition,
             }),
         ]);
-        res.json({
+        const response = {
             tracks,
             pagination: {
                 total,
@@ -286,7 +308,11 @@ const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function
                 limit: Number(limit),
                 totalPages: Math.ceil(total / Number(limit)),
             },
-        });
+        };
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.setCache)(cacheKey, response, 1800);
+        }
+        res.json(response);
     }
     catch (error) {
         console.error('Error fetching artist tracks:', error);

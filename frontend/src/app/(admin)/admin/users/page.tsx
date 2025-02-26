@@ -4,15 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { User } from '@/types';
 import { api } from '@/utils/api';
-import {
-  Search,
-  MoreVertical,
-  Key,
-  Trash2,
-  Power,
-  User as UserIcon,
-  Spinner,
-} from '@/components/ui/Icons';
+import { Key, Trash2, Power, User as UserIcon } from '@/components/ui/Icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +29,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 
-export default function AdminUsers() {
+export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState('');

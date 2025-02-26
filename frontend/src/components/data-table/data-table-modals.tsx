@@ -13,9 +13,11 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import type { Track, Album } from '@/types';
+import type { Track, Album, ArtistProfile } from '@/types';
 import Image from 'next/image';
 import { Facebook, Instagram, Verified } from '../ui/Icons';
+import { api } from '@/utils/api';
+import { toast } from 'react-toastify';
 
 interface EditTrackModalProps {
   track: Track | null;
@@ -742,6 +744,169 @@ export function ArtistInfoModal({
           </div>
         </DialogPrimitive.Content>
       </DialogPortal>
+    </Dialog>
+  );
+}
+
+interface EditArtistModalProps {
+  artist: ArtistProfile | null;
+  onClose: () => void;
+  onUpdate: (updatedArtist: Partial<ArtistProfile>) => void;
+  theme?: 'light' | 'dark';
+}
+
+export function EditArtistModal({
+  artist,
+  onClose,
+  onUpdate,
+  theme = 'light',
+}: EditArtistModalProps) {
+  const [previewImage, setPreviewImage] = useState<string | null>(
+    artist?.avatar || null
+  );
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (!artist) return null;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setPreviewImage(imageUrl);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsUploading(true);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      const response = await api.admin.updateArtist(artist.id, formData, token);
+      onUpdate(response.artist);
+      onClose();
+      toast.success('Artist updated successfully');
+    } catch (error) {
+      console.error('Error updating artist:', error);
+      toast.error('Failed to update artist');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <Dialog open={!!artist} onOpenChange={onClose}>
+      <DialogContent
+        className={`${
+          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+        } p-6 rounded-lg shadow-lg max-w-lg w-full`}
+      >
+        <DialogHeader>
+          <DialogTitle
+            className={theme === 'dark' ? 'text-white' : 'text-gray-900'}
+          >
+            Edit Artist
+          </DialogTitle>
+          <DialogDescription
+            className={theme === 'dark' ? 'text-white/70' : 'text-gray-500'}
+          >
+            Update artist details below.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          {/* Avatar */}
+          <div className="space-y-2">
+            <label
+              htmlFor="avatar"
+              className={theme === 'dark' ? 'text-white' : 'text-gray-700'}
+            >
+              Avatar
+            </label>
+            <div className="flex items-center gap-4">
+              <img
+                src={
+                  previewImage || 'https://placehold.co/150x150?text=No+Cover'
+                }
+                alt="Avatar preview"
+                className="w-20 h-20 rounded-full object-cover cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              />
+              <input
+                type="file"
+                id="avatar"
+                name="avatar"
+                accept="image/*"
+                onChange={handleFileChange}
+                ref={fileInputRef}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className={theme === 'dark' ? 'text-white border-white/50' : ''}
+              >
+                Change Avatar
+              </Button>
+            </div>
+          </div>
+
+          {/* Artist Name */}
+          <div className="space-y-2">
+            <label
+              htmlFor="artistName"
+              className={theme === 'dark' ? 'text-white' : 'text-gray-700'}
+            >
+              Artist Name
+            </label>
+            <Input
+              id="artistName"
+              name="artistName"
+              defaultValue={artist.artistName}
+              required
+              className={theme === 'dark' ? 'bg-[#3a3a3a] text-white' : ''}
+            />
+          </div>
+
+          {/* Bio */}
+          <div className="space-y-2">
+            <label
+              htmlFor="bio"
+              className={theme === 'dark' ? 'text-white' : 'text-gray-700'}
+            >
+              Bio
+            </label>
+            <Input
+              id="bio"
+              name="bio"
+              defaultValue={artist.bio || ''}
+              className={theme === 'dark' ? 'bg-[#3a3a3a] text-white' : ''}
+            />
+          </div>
+
+          {/* Buttons */}
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className={theme === 'dark' ? 'text-white border-white/50' : ''}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isUploading}
+              className={theme === 'dark' ? 'bg-white text-black' : ''}
+            >
+              {isUploading ? 'Updating...' : 'Save Changes'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
     </Dialog>
   );
 }

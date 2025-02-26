@@ -161,7 +161,7 @@ const TrackList = ({
   );
 };
 
-export default function AlbumDetailPage() {
+export default function AlbumDetail() {
   const { id, albumId } = useParams();
   const [album, setAlbum] = useState<Album | null>(null);
   const { dominantColor } = useDominantColor(album?.coverUrl);

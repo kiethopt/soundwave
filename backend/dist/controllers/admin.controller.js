@@ -23,113 +23,28 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStats = exports.updateMonthlyListeners = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateArtist = exports.deactivateUser = exports.deleteArtist = exports.deleteUser = exports.updateUser = exports.getArtistRequestDetails = exports.getArtistRequests = exports.getUserById = exports.getAllUsers = exports.createArtist = void 0;
+exports.getStats = exports.updateMonthlyListeners = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateArtist = exports.deactivateUser = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetails = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
-const cloudinary_service_1 = require("../services/cloudinary.service");
-const bcrypt_1 = __importDefault(require("bcrypt"));
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
-const cacheConfig = {
-    short: { ttl: 300, swr: 60 },
-    medium: { ttl: 1800, swr: 300 },
-    long: { ttl: 3600, swr: 600 },
-};
-const createArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { name, email, artistName, bio, genres, socialMediaLinks } = req.body;
-        const avatarFile = req.file;
-        const user = req.user;
-        if (!user || user.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden' });
-            return;
-        }
-        let username = (name === null || name === void 0 ? void 0 : name.toLowerCase().replace(/\s+/g, '')) || email.split('@')[0];
-        let existingUser = yield db_1.default.user.findUnique({
-            where: { username },
-        });
-        if (existingUser) {
-            let isUnique = false;
-            let counter = 1;
-            while (!isUnique) {
-                const newUsername = `${username}${counter}`;
-                existingUser = yield db_1.default.user.findUnique({
-                    where: { username: newUsername },
-                });
-                if (!existingUser) {
-                    username = newUsername;
-                    isUnique = true;
-                }
-                counter++;
-            }
-        }
-        let avatarUrl = null;
-        if (avatarFile) {
-            const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'avatars', 'image');
-            avatarUrl = uploadResult.secure_url;
-        }
-        let parsedSocialMediaLinks = {};
-        try {
-            parsedSocialMediaLinks = JSON.parse(socialMediaLinks);
-        }
-        catch (e) {
-            console.error('Error parsing socialMediaLinks:', e);
-        }
-        const saltRounds = 10;
-        const hashedPassword = yield bcrypt_1.default.hash('artist123', saltRounds);
-        const artist = yield db_1.default.user.create({
-            data: {
-                email,
-                username,
-                password: hashedPassword,
-                name,
-                avatar: avatarUrl,
-                role: client_1.Role.USER,
-                artistProfile: {
-                    create: {
-                        artistName: artistName || name,
-                        bio: bio || null,
-                        avatar: avatarUrl,
-                        role: client_1.Role.ARTIST,
-                        socialMediaLinks: parsedSocialMediaLinks,
-                        monthlyListeners: 0,
-                        isVerified: true,
-                        verifiedAt: new Date(),
-                    },
-                },
-            },
-            include: {
-                artistProfile: true,
-            },
-        });
-        res.status(201).json({ message: 'Artist created successfully', artist });
-    }
-    catch (error) {
-        console.error('Create artist error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.createArtist = createArtist;
+const cloudinary_service_1 = require("src/services/cloudinary.service");
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { page = 1, limit = 10, search = '', status } = req.query;
         const pageNumber = Number(page);
         const limitNumber = Number(limit);
         const offset = (pageNumber - 1) * limitNumber;
-        const where = {
-            role: 'USER',
-        };
-        if (search) {
-            where.OR = [
-                { email: { contains: String(search), mode: 'insensitive' } },
-                { username: { contains: String(search), mode: 'insensitive' } },
-                { name: { contains: String(search), mode: 'insensitive' } },
-            ];
-        }
-        if (status !== undefined) {
-            where.isActive = status === 'true';
-        }
+        const where = Object.assign(Object.assign({ role: 'USER' }, (search
+            ? {
+                OR: [
+                    { email: { contains: String(search), mode: 'insensitive' } },
+                    { username: { contains: String(search), mode: 'insensitive' } },
+                    { name: { contains: String(search), mode: 'insensitive' } },
+                ],
+            }
+            : {})), (status !== undefined ? { isActive: status === 'true' } : {}));
         const [users, totalUsers] = yield Promise.all([
             db_1.default.user.findMany({
                 where,
@@ -152,7 +67,7 @@ const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             }),
             db_1.default.user.count({ where }),
         ]);
-        const response = {
+        res.json({
             users: users.map((user) => (Object.assign(Object.assign({}, user), { artistProfile: user.artistProfile
                     ? Object.assign(Object.assign({}, user.artistProfile), { socialMediaLinks: user.artistProfile.socialMediaLinks || {}, verifiedAt: user.artistProfile.verifiedAt }) : null }))),
             pagination: {
@@ -161,8 +76,7 @@ const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 limit: limitNumber,
                 totalPages: Math.ceil(totalUsers / limitNumber),
             },
-        };
-        res.json(response);
+        });
     }
     catch (error) {
         console.error('Get all users error:', error);
@@ -203,61 +117,59 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.getUserById = getUserById;
-const getArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { page = 1, limit = 10, startDate, endDate, status, search, } = req.query;
-        const offset = (Number(page) - 1) * Number(limit);
-        const cacheKey = req.originalUrl;
-        const where = {
-            verificationRequestedAt: { not: null },
-        };
-        if (status === 'pending') {
-            where.isVerified = false;
-        }
-        if (startDate && endDate) {
-            where.verificationRequestedAt = {
-                gte: new Date(startDate),
-                lte: new Date(endDate),
-            };
-        }
-        if (search) {
-            where.OR = [
-                { artistName: { contains: search, mode: 'insensitive' } },
-                {
-                    user: { email: { contains: search, mode: 'insensitive' } },
+        const pageNumber = Number(page);
+        const limitNumber = Number(limit);
+        const offset = (pageNumber - 1) * limitNumber;
+        const where = Object.assign(Object.assign(Object.assign({ verificationRequestedAt: { not: null } }, (status === 'pending' ? { isVerified: false } : {})), (startDate && endDate
+            ? {
+                verificationRequestedAt: {
+                    gte: new Date(startDate),
+                    lte: new Date(endDate),
                 },
-            ];
-        }
-        const requests = yield db_1.default.artistProfile.findMany({
-            where,
-            skip: offset,
-            take: Number(limit),
-            select: prisma_selects_1.artistRequestSelect,
-            orderBy: {
-                verificationRequestedAt: 'desc',
-            },
-        });
-        const totalRequests = yield db_1.default.artistProfile.count({ where });
-        const response = {
+            }
+            : {})), (search
+            ? {
+                OR: [
+                    { artistName: { contains: String(search), mode: 'insensitive' } },
+                    {
+                        user: {
+                            email: { contains: String(search), mode: 'insensitive' },
+                        },
+                    },
+                ],
+            }
+            : {}));
+        const [requests, totalRequests] = yield Promise.all([
+            db_1.default.artistProfile.findMany({
+                where,
+                skip: offset,
+                take: limitNumber,
+                select: prisma_selects_1.artistRequestSelect,
+                orderBy: {
+                    verificationRequestedAt: 'desc',
+                },
+            }),
+            db_1.default.artistProfile.count({ where }),
+        ]);
+        res.json({
             requests,
             pagination: {
                 total: totalRequests,
-                page: Number(page),
-                limit: Number(limit),
-                totalPages: Math.ceil(totalRequests / Number(limit)),
+                page: pageNumber,
+                limit: limitNumber,
+                totalPages: Math.ceil(totalRequests / limitNumber),
             },
-        };
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
-        }
-        res.json(response);
+        });
     }
     catch (error) {
         console.error('Get artist requests error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
-exports.getArtistRequests = getArtistRequests;
+exports.getAllArtistRequests = getAllArtistRequests;
 const getArtistRequestDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -407,6 +319,60 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.updateUser = updateUser;
+const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { id } = req.params;
+        const { artistName, bio, socialMediaLinks } = req.body;
+        const avatarFile = req.file;
+        const admin = req.user;
+        if (!admin ||
+            (admin.role !== client_1.Role.ADMIN && ((_a = admin.artistProfile) === null || _a === void 0 ? void 0 : _a.id) !== id)) {
+            res.status(403).json({ message: 'Forbidden' });
+            return;
+        }
+        const existingArtist = yield db_1.default.artistProfile.findUnique({
+            where: { id },
+            include: { user: true },
+        });
+        if (!existingArtist) {
+            res.status(404).json({ message: 'Artist not found' });
+            return;
+        }
+        if (artistName && artistName !== existingArtist.artistName) {
+            const existingArtistName = yield db_1.default.artistProfile.findFirst({
+                where: { artistName, NOT: { id } },
+            });
+            if (existingArtistName) {
+                res.status(400).json({ message: 'Artist name already exists' });
+                return;
+            }
+        }
+        let avatarUrl = existingArtist.avatar;
+        if (avatarFile) {
+            const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'artists/avatars');
+            avatarUrl = uploadResult.secure_url;
+        }
+        const updatedArtist = yield db_1.default.artistProfile.update({
+            where: { id },
+            data: Object.assign(Object.assign(Object.assign(Object.assign({}, (artistName && { artistName })), (bio && { bio })), (socialMediaLinks && { socialMediaLinks })), (avatarUrl &&
+                avatarUrl !== existingArtist.avatar && { avatar: avatarUrl })),
+            select: prisma_selects_1.artistProfileSelect,
+        });
+        if (process.env.USE_REDIS_CACHE === 'true') {
+            yield (0, cache_middleware_1.clearCacheForEntity)('artist', { entityId: id, clearSearch: true });
+        }
+        res.json({
+            message: 'Artist updated successfully',
+            artist: updatedArtist,
+        });
+    }
+    catch (error) {
+        console.error('Update artist error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.updateArtist = updateArtist;
 const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
@@ -530,25 +496,26 @@ exports.deactivateArtist = deactivateArtist;
 const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { page = 1, limit = 10, search = '', status } = req.query;
-        const offset = (Number(page) - 1) * Number(limit);
-        const where = {
-            role: client_1.Role.ARTIST,
-            isVerified: true,
-        };
-        if (search) {
-            where.OR = [
-                { artistName: { contains: String(search), mode: 'insensitive' } },
-                { user: { email: { contains: String(search), mode: 'insensitive' } } },
-            ];
-        }
-        if (status !== undefined) {
-            where.isActive = status === 'true';
-        }
+        const pageNumber = Number(page);
+        const limitNumber = Number(limit);
+        const offset = (pageNumber - 1) * limitNumber;
+        const where = Object.assign(Object.assign({ role: client_1.Role.ARTIST, isVerified: true }, (search
+            ? {
+                OR: [
+                    { artistName: { contains: String(search), mode: 'insensitive' } },
+                    {
+                        user: {
+                            email: { contains: String(search), mode: 'insensitive' },
+                        },
+                    },
+                ],
+            }
+            : {})), (status !== undefined ? { isActive: status === 'true' } : {}));
         const [artists, totalArtists] = yield Promise.all([
             db_1.default.artistProfile.findMany({
                 where,
                 skip: offset,
-                take: Number(limit),
+                take: limitNumber,
                 select: prisma_selects_1.artistProfileSelect,
                 orderBy: { createdAt: 'desc' },
             }),
@@ -558,9 +525,9 @@ const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             artists,
             pagination: {
                 total: totalArtists,
-                page: Number(page),
-                limit: Number(limit),
-                totalPages: Math.ceil(totalArtists / Number(limit)),
+                page: pageNumber,
+                limit: limitNumber,
+                totalPages: Math.ceil(totalArtists / limitNumber),
             },
         });
     }
@@ -639,13 +606,14 @@ const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         const pageNumber = Number(page);
         const limitNumber = Number(limit);
         const offset = (pageNumber - 1) * limitNumber;
-        const where = {};
-        if (search) {
-            where.name = {
-                contains: String(search),
-                mode: 'insensitive',
-            };
-        }
+        const where = Object.assign({}, (search
+            ? {
+                name: {
+                    contains: String(search),
+                    mode: 'insensitive',
+                },
+            }
+            : {}));
         const [genres, totalGenres] = yield Promise.all([
             db_1.default.genre.findMany({
                 where,
@@ -658,7 +626,7 @@ const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             }),
             db_1.default.genre.count({ where }),
         ]);
-        const response = {
+        res.json({
             genres,
             pagination: {
                 total: totalGenres,
@@ -666,8 +634,7 @@ const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 limit: limitNumber,
                 totalPages: Math.ceil(totalGenres / limitNumber),
             },
-        };
-        res.json(response);
+        });
     }
     catch (error) {
         console.error('Get all genres error:', error);
