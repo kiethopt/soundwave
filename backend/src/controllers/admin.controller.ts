@@ -798,13 +798,6 @@ export const createGenre = async (
       data: { name },
     });
 
-    // Clear cache
-    await Promise.all([
-      clearCacheForEntity('genre', { clearSearch: true }),
-      clearCacheForEntity('track', { clearSearch: true }),
-      clearCacheForEntity('stats', {}),
-    ]);
-
     res.status(201).json({ message: 'Genre created successfully', genre });
   } catch (error) {
     console.error('Create genre error:', error);

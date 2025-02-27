@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Genre } from '@/types';
 import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
@@ -17,7 +17,10 @@ import {
 import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 import { getGenreColumns } from '@/components/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
-import { EditGenreModal } from '@/components/data-table/data-table-modals';
+import {
+  AddGenreModal,
+  EditGenreModal,
+} from '@/components/data-table/data-table-modals';
 
 export default function GenreManagement() {
   const { theme } = useTheme();
@@ -56,6 +59,7 @@ export default function GenreManagement() {
   });
 
   // Table state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -63,6 +67,40 @@ export default function GenreManagement() {
   const [editingGenre, setEditingGenre] = useState<Genre | null>(null);
 
   // Action handlers
+  const handleAddGenre = async (name: string) => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      await api.admin.createGenre({ name }, token);
+
+      // Refresh trang hiện tại
+      const params = new URLSearchParams();
+      if (searchInput) params.append('q', searchInput);
+      const response = await api.admin.getAllGenres(
+        token,
+        currentPage,
+        limit,
+        params.toString()
+      );
+      setGenres(response.genres);
+
+      toast.success('Genre created successfully');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to create genre'
+      );
+    }
+  };
+
+  // Xử lý sự kiện mở modal từ button trong column
+  useEffect(() => {
+    const handleOpenModal = () => setIsAddModalOpen(true);
+    window.addEventListener('openAddGenreModal', handleOpenModal);
+    return () =>
+      window.removeEventListener('openAddGenreModal', handleOpenModal);
+  }, []);
+
   const handleDeleteGenres = async (genreIds: string | string[]) => {
     const ids = Array.isArray(genreIds) ? genreIds : [genreIds];
     if (!confirm(`Delete ${ids.length} selected genres?`)) return;
@@ -79,7 +117,7 @@ export default function GenreManagement() {
       if (!Array.isArray(genreIds)) {
         setGenres((prev) => prev.filter((genre) => genre.id !== genreIds));
       } else {
-        // Refresh current page
+        // // Refresh trang hiện tại
         const params = new URLSearchParams();
         if (searchInput) params.append('q', searchInput);
 
@@ -109,7 +147,7 @@ export default function GenreManagement() {
 
       await api.admin.updateGenre(genreId, formData, token);
 
-      // Refresh current page
+      // Refresh trang hiện tại
       const params = new URLSearchParams();
       if (searchInput) params.append('q', searchInput);
 
@@ -232,6 +270,12 @@ export default function GenreManagement() {
         genre={editingGenre}
         onClose={() => setEditingGenre(null)}
         onSubmit={handleUpdateGenre}
+        theme={theme}
+      />
+      <AddGenreModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSubmit={handleAddGenre}
         theme={theme}
       />
     </div>

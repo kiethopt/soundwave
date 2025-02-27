@@ -1165,3 +1165,90 @@ export function EditGenreModal({
     </Dialog>
   );
 }
+
+interface AddGenreModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (name: string) => Promise<void>;
+  theme?: 'light' | 'dark';
+}
+
+export function AddGenreModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = 'light',
+}: AddGenreModalProps) {
+  const [name, setName] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await onSubmit(name);
+      setName('');
+      onClose();
+    } catch (error) {
+      toast.error('Failed to create genre');
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`${
+          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+        } p-6 rounded-lg shadow-lg max-w-md w-full`}
+      >
+        <DialogHeader>
+          <DialogTitle
+            className={`text-xl font-semibold ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}
+          >
+            Add New Genre
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          <div className="space-y-2">
+            <label
+              htmlFor="name"
+              className={`block text-sm font-medium ${
+                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+              }`}
+            >
+              Genre Name
+            </label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              maxLength={50}
+              className={`w-full px-3 py-2 rounded-md border ${
+                theme === 'dark'
+                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                  : 'bg-white border-gray-300'
+              }`}
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className={theme === 'dark' ? 'text-white border-white/50' : ''}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className={theme === 'dark' ? 'bg-white text-black' : ''}
+            >
+              Add Genre
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

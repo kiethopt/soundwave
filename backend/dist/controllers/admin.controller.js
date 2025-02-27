@@ -617,11 +617,6 @@ const createGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const genre = yield db_1.default.genre.create({
             data: { name },
         });
-        yield Promise.all([
-            (0, cache_middleware_1.clearCacheForEntity)('genre', { clearSearch: true }),
-            (0, cache_middleware_1.clearCacheForEntity)('track', { clearSearch: true }),
-            (0, cache_middleware_1.clearCacheForEntity)('stats', {}),
-        ]);
         res.status(201).json({ message: 'Genre created successfully', genre });
     }
     catch (error) {

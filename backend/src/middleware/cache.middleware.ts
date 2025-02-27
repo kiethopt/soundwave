@@ -103,16 +103,25 @@ export const clearCacheForEntity = async (
       ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
     ];
 
+    // Thêm xử lý cho các entity có endpoint admin
+    const adminEntities = ['user', 'artist', 'genre', 'album', 'track'];
+    if (adminEntities.includes(entity)) {
+      patterns.push(`/api/admin/${entity}s*`);
+    }
+
+    // Xử lý cụ thể cho từng entity nếu cần
     if (entity === 'artist') {
       patterns.push(
         '/api/admin/artists*',
         '/api/artists*',
         '/api/artist/*',
         '/api/top-artists',
-        ...(options.entityId ? [
-          `/api/artists/${options.entityId}/tracks*`,
-          `/api/artists/${options.entityId}/albums*`
-        ] : [])
+        ...(options.entityId
+          ? [
+              `/api/artists/${options.entityId}/tracks*`,
+              `/api/artists/${options.entityId}/albums*`,
+            ]
+          : [])
       );
     }
 
@@ -123,25 +132,38 @@ export const clearCacheForEntity = async (
         '/api/users/search*',
         '/api/user/following*',
         '/api/user/followers*',
-        ...(options.userId ? [`/api/user/${options.userId}/recommended-artists`] : [])
+        ...(options.userId
+          ? [`/api/user/${options.userId}/recommended-artists`]
+          : [])
       );
     }
 
     if (entity === 'album') {
-      patterns.push('/api/admin/albums*', '/api/albums*', '/api/album/*', '/api/top-albums');
+      patterns.push(
+        '/api/admin/albums*',
+        '/api/albums*',
+        '/api/album/*',
+        '/api/top-albums'
+      );
     }
 
     if (entity === 'track') {
-      patterns.push('/api/admin/tracks*', '/api/tracks*', '/api/track/*', '/api/top-tracks');
+      patterns.push(
+        '/api/admin/tracks*',
+        '/api/tracks*',
+        '/api/track/*',
+        '/api/top-tracks'
+      );
     }
 
-    // Add handling for history changes
     if (entity === 'history') {
       patterns.push(
         '/api/top-albums',
         '/api/top-artists',
         '/api/top-tracks',
-        ...(options.userId ? [`/api/user/${options.userId}/recommended-artists`] : [])
+        ...(options.userId
+          ? [`/api/user/${options.userId}/recommended-artists`]
+          : [])
       );
     }
 
@@ -158,7 +180,9 @@ export const clearCacheForEntity = async (
     for (const pattern of patterns) {
       const keys = await client.keys(pattern);
       if (keys.length) {
-        console.log(`[Redis] Clearing ${keys.length} keys for pattern: ${pattern}`);
+        console.log(
+          `[Redis] Clearing ${keys.length} keys for pattern: ${pattern}`
+        );
         await Promise.all(keys.map((key) => client.del(key)));
       }
     }

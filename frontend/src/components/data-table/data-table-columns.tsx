@@ -23,7 +23,7 @@ import Link from 'next/link';
 import React from 'react';
 import { api } from '@/utils/api';
 import { ArtistInfoModal } from './data-table-modals';
-import { Edit, Key, Power, User as UserIcon } from '../ui/Icons';
+import { AddSimple, Edit, Key, Power, User as UserIcon } from '../ui/Icons';
 import { Button } from '../ui/button';
 
 interface GetTrackColumnsOptions {
@@ -863,30 +863,49 @@ export function getGenreColumns({
     },
     {
       id: 'actions',
+      header: () => (
+        <div className="flex items-center justify-center">
+          <button
+            onClick={() => {
+              window.dispatchEvent(new Event('openAddGenreModal'));
+            }}
+            className={`h-8 w-8 p-0 rounded-full flex items-center justify-center ${
+              theme === 'dark'
+                ? 'text-white hover:bg-white/10'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Add New Genre"
+          >
+            <AddSimple className="w-4 h-4" />
+          </button>
+        </div>
+      ),
       cell: ({ row }) => {
         const genre = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit?.(genre)}>
-                <Edit className="w-4 h-4 mr-2" />
-                Edit Genre
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onDelete?.(genre.id)}
-                className="text-red-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Genre
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEdit?.(genre)}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Genre
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onDelete?.(genre.id)}
+                  className="text-red-600"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Genre
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },

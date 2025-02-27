@@ -90,14 +90,22 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
             `/api/${entity}/*`,
             ...(options.entityId ? [`/api/${entity}s/${options.entityId}*`] : []),
         ];
+        const adminEntities = ['user', 'artist', 'genre', 'album', 'track'];
+        if (adminEntities.includes(entity)) {
+            patterns.push(`/api/admin/${entity}s*`);
+        }
         if (entity === 'artist') {
-            patterns.push('/api/admin/artists*', '/api/artists*', '/api/artist/*', '/api/top-artists', ...(options.entityId ? [
-                `/api/artists/${options.entityId}/tracks*`,
-                `/api/artists/${options.entityId}/albums*`
-            ] : []));
+            patterns.push('/api/admin/artists*', '/api/artists*', '/api/artist/*', '/api/top-artists', ...(options.entityId
+                ? [
+                    `/api/artists/${options.entityId}/tracks*`,
+                    `/api/artists/${options.entityId}/albums*`,
+                ]
+                : []));
         }
         if (entity === 'user') {
-            patterns.push('/api/admin/users*', '/admin/api/users*', '/api/users/search*', '/api/user/following*', '/api/user/followers*', ...(options.userId ? [`/api/user/${options.userId}/recommended-artists`] : []));
+            patterns.push('/api/admin/users*', '/admin/api/users*', '/api/users/search*', '/api/user/following*', '/api/user/followers*', ...(options.userId
+                ? [`/api/user/${options.userId}/recommended-artists`]
+                : []));
         }
         if (entity === 'album') {
             patterns.push('/api/admin/albums*', '/api/albums*', '/api/album/*', '/api/top-albums');
@@ -106,7 +114,9 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
             patterns.push('/api/admin/tracks*', '/api/tracks*', '/api/track/*', '/api/top-tracks');
         }
         if (entity === 'history') {
-            patterns.push('/api/top-albums', '/api/top-artists', '/api/top-tracks', ...(options.userId ? [`/api/user/${options.userId}/recommended-artists`] : []));
+            patterns.push('/api/top-albums', '/api/top-artists', '/api/top-tracks', ...(options.userId
+                ? [`/api/user/${options.userId}/recommended-artists`]
+                : []));
         }
         if (options.clearSearch) {
             patterns.push('/api/search*', '/api/*/search*', '/search-all*', `/api/${entity}s/search*`, `/api/${entity}/search*`);
