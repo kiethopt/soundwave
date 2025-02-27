@@ -96,23 +96,9 @@ export interface ArtistProfile {
   updatedAt: string;
   user: User;
   userId: string;
-  genres?: Genre[];
-  albums?: {
-    data: Album[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-  tracks?: {
-    some(arg0: (track: any) => boolean): unknown;
-    length: number;
-    data: Track[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
+  genres?: { genre: Genre }[];
+  albums?: Album[];
+  tracks?: Track[];
   events?: Event[];
   followers?: UserFollow[];
   notifications?: Notification[];

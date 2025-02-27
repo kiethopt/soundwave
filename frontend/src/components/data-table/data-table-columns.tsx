@@ -1219,3 +1219,58 @@ export function getArtistRequestColumns({
     },
   ];
 }
+
+export function getDiscographyColumns({
+  theme = 'light',
+  onEdit,
+}: {
+  theme?: 'light' | 'dark';
+  onEdit?: (item: any) => void;
+}): ColumnDef<any>[] {
+  return [
+    {
+      accessorKey: 'title',
+      header: 'Title',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          {row.original.coverUrl && (
+            <Image
+              src={row.original.coverUrl}
+              alt={row.original.title}
+              width={32}
+              height={32}
+              className="rounded"
+            />
+          )}
+          <span>{row.original.title}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'releaseDate',
+      header: 'Release Date',
+      cell: ({ row }) =>
+        new Date(row.original.releaseDate).toLocaleDateString(),
+    },
+    {
+      accessorKey: 'itemType',
+      header: 'Type',
+      cell: ({ row }) => row.original.itemType.toUpperCase(),
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger>
+            <MoreVertical className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => onEdit?.(row.original)}>
+              Edit Artist
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
+}

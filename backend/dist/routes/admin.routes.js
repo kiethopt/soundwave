@@ -22,12 +22,12 @@ router.delete('/artists/:id', auth_middleware_1.authenticate, (0, auth_middlewar
 router.patch('/users/:id/deactivate', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.deactivateUser);
 router.patch('/artists/:id/deactivate', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.deactivateArtist);
 router.get('/artists', rateLimit_middleware_1.queryRateLimiter, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllArtists);
-router.get('/artists/:id', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), admin_controller_1.getArtistById);
+router.get('/artists/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getArtistById);
 router.get('/artist-requests', rateLimit_middleware_1.queryRateLimiter, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllArtistRequests);
-router.get('/artist-requests/:id', rateLimit_middleware_1.queryRateLimiter, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getArtistRequestDetails);
+router.get('/artist-requests/:id', rateLimit_middleware_1.queryRateLimiter, auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getArtistRequestDetail);
 router.post('/artists/verify', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.verifyArtist);
-router.get('/genres', rateLimit_middleware_1.queryRateLimiter, cache_middleware_1.cacheMiddleware, admin_controller_1.getAllGenres);
-router.post('/genres', admin_controller_1.createGenre);
+router.get('/genres', rateLimit_middleware_1.queryRateLimiter, auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), cache_middleware_1.cacheMiddleware, admin_controller_1.getAllGenres);
+router.post('/genres', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.createGenre);
 router.put('/genres/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), upload_middleware_1.default.none(), admin_controller_1.updateGenre);
 router.delete('/genres/:id', admin_controller_1.deleteGenre);
 router.post('/artist-requests/approve', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.approveArtistRequest);

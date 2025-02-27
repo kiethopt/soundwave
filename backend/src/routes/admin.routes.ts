@@ -86,7 +86,12 @@ router.get(
   authorize([Role.ADMIN]),
   getAllArtists
 );
-router.get('/artists/:id', authorize([Role.ADMIN, Role.ARTIST]), getArtistById);
+router.get(
+  '/artists/:id',
+  authenticate,
+  authorize([Role.ADMIN]),
+  getArtistById
+);
 
 router.get(
   '/artist-requests',
@@ -97,6 +102,7 @@ router.get(
 router.get(
   '/artist-requests/:id',
   queryRateLimiter,
+  authenticate,
   authorize([Role.ADMIN]),
   getArtistRequestDetail
 );
@@ -108,7 +114,14 @@ router.post(
 );
 
 // Quản lý thể loại nhạc
-router.get('/genres', queryRateLimiter, cacheMiddleware, getAllGenres);
+router.get(
+  '/genres',
+  queryRateLimiter,
+  authenticate,
+  authorize([Role.ADMIN]),
+  cacheMiddleware,
+  getAllGenres
+);
 router.post('/genres', authenticate, authorize([Role.ADMIN]), createGenre);
 router.put(
   '/genres/:id',

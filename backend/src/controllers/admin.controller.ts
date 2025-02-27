@@ -650,12 +650,6 @@ export const getArtistById = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const {
-      albumPage = 1,
-      albumLimit = 6,
-      trackPage = 1,
-      trackLimit = 10,
-    } = req.query;
     const cacheKey = req.originalUrl;
 
     if (process.env.USE_REDIS_CACHE === 'true') {
@@ -673,22 +667,16 @@ export const getArtistById = async (
       select: {
         ...artistProfileSelect,
         albums: {
-          skip: (Number(albumPage) - 1) * Number(albumLimit),
-          take: Number(albumLimit),
           orderBy: { releaseDate: 'desc' },
           select: artistProfileSelect.albums.select,
         },
         tracks: {
-          skip: (Number(trackPage) - 1) * Number(trackLimit),
-          take: Number(trackLimit),
+          where: {
+            type: 'SINGLE',
+            albumId: null, // Chỉ lấy track không thuộc album nào
+          },
           orderBy: { releaseDate: 'desc' },
           select: artistProfileSelect.tracks.select,
-        },
-        _count: {
-          select: {
-            albums: true,
-            tracks: true,
-          },
         },
       },
     });
@@ -698,31 +686,12 @@ export const getArtistById = async (
       return;
     }
 
-    const { _count, ...artistData } = artist;
-    const response = {
-      ...artistData,
-      albums: {
-        data: artist.albums,
-        total: _count.albums,
-        page: Number(albumPage),
-        limit: Number(albumLimit),
-        totalPages: Math.ceil(_count.albums / Number(albumLimit)),
-      },
-      tracks: {
-        data: artist.tracks,
-        total: _count.tracks,
-        page: Number(trackPage),
-        limit: Number(trackLimit),
-        totalPages: Math.ceil(_count.tracks / Number(trackLimit)),
-      },
-    };
-
     if (process.env.USE_REDIS_CACHE === 'true') {
       console.log(`[Redis] Caching data for key: ${cacheKey}`);
-      await client.setEx(cacheKey, 300, JSON.stringify(response));
+      await client.setEx(cacheKey, 300, JSON.stringify(artist));
     }
 
-    res.json(response);
+    res.json(artist);
   } catch (error) {
     console.error('Get artist by id error:', error);
     res.status(500).json({ message: 'Internal server error' });

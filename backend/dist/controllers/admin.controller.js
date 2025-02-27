@@ -8,22 +8,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
-                t[p[i]] = s[p[i]];
-        }
-    return t;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStats = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateArtist = exports.deactivateUser = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetails = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.getStats = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateArtist = exports.deactivateUser = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
@@ -170,15 +159,9 @@ const getAllArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.getAllArtistRequests = getAllArtistRequests;
-const getArtistRequestDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const getArtistRequestDetail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const token = (_a = req.headers.authorization) === null || _a === void 0 ? void 0 : _a.split(' ')[1];
-        if (!token) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
         const cacheKey = req.originalUrl;
         if (process.env.USE_REDIS_CACHE === 'true') {
             const cachedData = yield cache_middleware_1.client.get(cacheKey);
@@ -208,7 +191,7 @@ const getArtistRequestDetails = (req, res) => __awaiter(void 0, void 0, void 0, 
         res.status(500).json({ message: 'Internal server error' });
     }
 });
-exports.getArtistRequestDetails = getArtistRequestDetails;
+exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
@@ -509,7 +492,6 @@ exports.getAllArtists = getAllArtists;
 const getArtistById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { albumPage = 1, albumLimit = 6, trackPage = 1, trackLimit = 10, } = req.query;
         const cacheKey = req.originalUrl;
         if (process.env.USE_REDIS_CACHE === 'true') {
             const cachedData = yield cache_middleware_1.client.get(cacheKey);
@@ -523,45 +505,26 @@ const getArtistById = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         const artist = yield db_1.default.artistProfile.findUnique({
             where: { id },
             select: Object.assign(Object.assign({}, prisma_selects_1.artistProfileSelect), { albums: {
-                    skip: (Number(albumPage) - 1) * Number(albumLimit),
-                    take: Number(albumLimit),
                     orderBy: { releaseDate: 'desc' },
                     select: prisma_selects_1.artistProfileSelect.albums.select,
                 }, tracks: {
-                    skip: (Number(trackPage) - 1) * Number(trackLimit),
-                    take: Number(trackLimit),
+                    where: {
+                        type: 'SINGLE',
+                        albumId: null,
+                    },
                     orderBy: { releaseDate: 'desc' },
                     select: prisma_selects_1.artistProfileSelect.tracks.select,
-                }, _count: {
-                    select: {
-                        albums: true,
-                        tracks: true,
-                    },
                 } }),
         });
         if (!artist) {
             res.status(404).json({ message: 'Artist not found' });
             return;
         }
-        const { _count } = artist, artistData = __rest(artist, ["_count"]);
-        const response = Object.assign(Object.assign({}, artistData), { albums: {
-                data: artist.albums,
-                total: _count.albums,
-                page: Number(albumPage),
-                limit: Number(albumLimit),
-                totalPages: Math.ceil(_count.albums / Number(albumLimit)),
-            }, tracks: {
-                data: artist.tracks,
-                total: _count.tracks,
-                page: Number(trackPage),
-                limit: Number(trackLimit),
-                totalPages: Math.ceil(_count.tracks / Number(trackLimit)),
-            } });
         if (process.env.USE_REDIS_CACHE === 'true') {
             console.log(`[Redis] Caching data for key: ${cacheKey}`);
-            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(response));
+            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(artist));
         }
-        res.json(response);
+        res.json(artist);
     }
     catch (error) {
         console.error('Get artist by id error:', error);
@@ -614,6 +577,27 @@ exports.getAllGenres = getAllGenres;
 const createGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { name } = req.body;
+        const validationErrors = [];
+        if (!name)
+            validationErrors.push('Name is required');
+        if (name && name.trim() === '')
+            validationErrors.push('Name cannot be empty');
+        if (name && name.length > 50) {
+            validationErrors.push('Name exceeds maximum length (50 characters)');
+        }
+        if (validationErrors.length > 0) {
+            res
+                .status(400)
+                .json({ message: 'Validation failed', errors: validationErrors });
+            return;
+        }
+        const existingGenre = yield db_1.default.genre.findFirst({
+            where: { name },
+        });
+        if (existingGenre) {
+            res.status(400).json({ message: 'Genre name already exists' });
+            return;
+        }
         const genre = yield db_1.default.genre.create({
             data: { name },
         });

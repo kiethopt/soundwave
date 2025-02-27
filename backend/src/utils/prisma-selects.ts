@@ -187,6 +187,7 @@ export const artistProfileSelect = {
       id: true,
       title: true,
       duration: true,
+      releaseDate: true,
       coverUrl: true,
       audioUrl: true,
       playCount: true,
