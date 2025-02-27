@@ -1,5 +1,12 @@
 import { ColumnDef } from '@tanstack/react-table';
-import { Track, Album, Genre, ArtistProfile, User } from '@/types';
+import {
+  Track,
+  Album,
+  Genre,
+  ArtistProfile,
+  User,
+  ArtistRequest,
+} from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   MoreVertical,
@@ -10,6 +17,8 @@ import {
   Pencil,
   MoreHorizontal,
   RefreshCw,
+  Check,
+  X,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -1085,6 +1094,126 @@ export function getArtistColumns({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        );
+      },
+    },
+  ];
+}
+
+export function getArtistRequestColumns({
+  theme,
+  onApprove,
+  onReject,
+  onViewDetails,
+}: {
+  theme?: 'light' | 'dark';
+  onApprove?: (id: string) => void;
+  onReject?: (id: string) => void;
+  onViewDetails?: (id: string) => void;
+}): ColumnDef<ArtistRequest>[] {
+  return [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'artistName',
+      header: 'Artist Name',
+      cell: ({ row }) => {
+        const request = row.original;
+        return (
+          <Link
+            href={`/admin/artist-requests/${request.id}`}
+            className={`font-medium text-sm hover:underline ${
+              theme === 'dark' ? 'text-white' : ''
+            }`}
+          >
+            {request.artistName}
+          </Link>
+        );
+      },
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'user.email',
+      header: 'Email',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {row.original.user.email}
+        </span>
+      ),
+      enableSorting: true,
+    },
+    {
+      accessorKey: 'verificationRequestedAt',
+      header: 'Requested At',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {new Date(row.original.verificationRequestedAt).toLocaleDateString(
+            'vi-VN',
+            {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            }
+          )}
+        </span>
+      ),
+      enableSorting: true,
+    },
+    {
+      id: 'actions',
+      enableHiding: false,
+      cell: ({ row }) => {
+        const request = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onViewDetails?.(request.id)}>
+                <Eye className="w-4 h-4 mr-2" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onApprove?.(request.id)}
+                className="text-green-600"
+              >
+                <Check className="w-4 h-4 mr-2" />
+                Approve Request
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onReject?.(request.id)}
+                className="text-red-600"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Reject Request
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         );
       },
     },

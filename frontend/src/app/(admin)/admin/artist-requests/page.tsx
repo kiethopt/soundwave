@@ -1,150 +1,93 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
-import type { ColumnDef } from '@tanstack/react-table';
+import { toast } from 'react-toastify';
+import { useTheme } from '@/contexts/ThemeContext';
+import { useDataTable } from '@/hooks/useDataTable';
+import { getArtistRequestColumns } from '@/components/data-table/data-table-columns';
+import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { ArtistRequest } from '@/types';
 import {
   ColumnFiltersState,
-  SortingState,
-  VisibilityState,
   getCoreRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  RowSelectionState,
+  SortingState,
   useReactTable,
+  VisibilityState,
 } from '@tanstack/react-table';
-import { Eye, Check, X, MoreHorizontal } from 'lucide-react';
-import type { ArtistRequest, ArtistRequestFilters } from '@/types';
-import { toast } from 'react-toastify';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
-import Link from 'next/link';
-import { useTheme } from '@/contexts/ThemeContext';
-import { Checkbox } from '@/components/ui/checkbox';
-import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
-import { DateRangePicker } from '@/components/ui/date-range-picker';
 
 export default function ArtistRequestManagement() {
-  const [requests, setRequests] = useState<ArtistRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchInput, setSearchInput] = useState('');
-  const [totalPages, setTotalPages] = useState(1);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [selectedRows, setSelectedRows] = useState<ArtistRequest[]>([]);
+  const { theme } = useTheme();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const limit = 10;
 
+  // Sử dụng useDataTable hook
+  const {
+    data: requests,
+    setData: setRequests,
+    loading,
+    totalPages,
+    currentPage,
+    searchInput,
+    setSearchInput,
+    selectedRows,
+    setSelectedRows,
+    updateQueryParam,
+  } = useDataTable<ArtistRequest>({
+    fetchData: async (page, params) => {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      const filters = {
+        search: params.get('q') || '',
+        startDate: params.get('startDate')
+          ? new Date(params.get('startDate')!)
+          : undefined,
+        endDate: params.get('endDate')
+          ? new Date(params.get('endDate')!)
+          : undefined,
+      };
+
+      const response = await api.admin.getArtistRequests(
+        token,
+        page,
+        limit,
+        filters
+      );
+      return {
+        data: response.requests,
+        pagination: response.pagination,
+      };
+    },
+    limit,
+  });
+
+  // Table state
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
+  const [startDate, setStartDate] = useState<string>(
+    searchParams.get('startDate') || ''
+  );
+  const [endDate, setEndDate] = useState<string>(
+    searchParams.get('endDate') || ''
+  );
 
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const { theme } = useTheme();
-
-  const pageFromURL = Number(searchParams.get('page'));
-  const currentPage = isNaN(pageFromURL) || pageFromURL < 1 ? 1 : pageFromURL;
-
-  useEffect(() => {
-    const pageStr = searchParams.get('page');
-    const pageNumber = Number(pageStr);
-    if (pageStr === '1' || pageNumber < 1) {
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.delete('page');
-      const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
-      router.replace(`/admin/artist-requests${queryStr}`);
-    }
-  }, [searchParams, router]);
-
-  const updateQueryParam = (param: string, value: number) => {
-    if (totalPages === 1 && value !== 1) return;
-    if (value < 1) value = 1;
-    if (value > totalPages) value = totalPages;
-    const current = new URLSearchParams(searchParams.toString());
-    if (value === 1) {
-      current.delete(param);
-    } else {
-      current.set(param, value.toString());
-    }
-    const queryStr = current.toString() ? `?${current.toString()}` : '';
-    router.push(`/admin/artist-requests${queryStr}`);
-  };
-
-  const fetchRequests = async (page: number, query = '') => {
-    try {
-      setLoading(true);
-      // Kiểm tra xem có đang ở client-side không
-      if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('userToken');
-        if (!token) throw new Error('No authentication token found');
-
-        // Tạo đối tượng filters
-        const filters: ArtistRequestFilters = {};
-
-        // Thêm search nếu có
-        if (query) {
-          filters.search = query;
-        }
-
-        // Thêm date filters nếu có
-        if (startDate && endDate) {
-          filters.startDate = new Date(startDate);
-          filters.endDate = new Date(endDate);
-        }
-
-        const response = await api.admin.getArtistRequests(
-          token,
-          page,
-          10,
-          filters
-        );
-
-        setRequests(response.requests);
-        setTotalPages(response.pagination.totalPages);
-      }
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to fetch requests'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    // Reset về trang 1 khi search hoặc date filters thay đổi
-    if (currentPage !== 1) {
-      updateQueryParam('page', 1);
-    } else {
-      // Chỉ fetch khi không có date filter hoặc có đủ cả start và end date
-      if (!startDate || (startDate && endDate)) {
-        fetchRequests(1, searchInput);
-      }
-    }
-  }, [searchInput, startDate, endDate]);
-
-  useEffect(() => {
-    // Chỉ fetch khi không có date filter hoặc có đủ cả start và end date
-    if (!startDate || (startDate && endDate)) {
-      fetchRequests(currentPage, searchInput);
-    }
-  }, [currentPage]);
-
+  // Action handlers
   const handleApprove = async (requestId: string) => {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
-
       await api.admin.approveArtistRequest(requestId, token);
       toast.success('Artist request approved successfully!');
-      fetchRequests(currentPage, searchInput);
+      setRequests((prev) => prev.filter((req) => req.id !== requestId));
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to approve request'
@@ -155,18 +98,12 @@ export default function ArtistRequestManagement() {
   const handleReject = async (requestId: string) => {
     if (!confirm('Are you sure you want to reject this artist request?'))
       return;
-
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
-
-      const response = await api.admin.rejectArtistRequest(requestId, token);
-      if (response.hasPendingRequest === false) {
-        toast.success('Artist request rejected successfully!');
-      } else {
-        toast.error('Failed to update request status');
-      }
-      fetchRequests(currentPage, searchInput);
+      await api.admin.rejectArtistRequest(requestId, token);
+      toast.success('Artist request rejected successfully!');
+      setRequests((prev) => prev.filter((req) => req.id !== requestId));
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to reject request'
@@ -184,139 +121,42 @@ export default function ArtistRequestManagement() {
       !confirm(`Delete ${selectedRows.length} selected requests?`)
     )
       return;
-
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
-
       await Promise.all(
         selectedRows.map((row) => api.admin.rejectArtistRequest(row.id, token))
       );
-
+      setRequests((prev) =>
+        prev.filter((req) => !selectedRows.some((row) => row.id === req.id))
+      );
       setSelectedRows([]);
-      fetchRequests(currentPage, searchInput);
       toast.success(`Deleted ${selectedRows.length} requests successfully`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Deletion failed');
     }
   };
 
-  const columns: ColumnDef<ArtistRequest>[] = [
-    {
-      id: 'select',
-      header: ({ table }) => (
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && 'indeterminate')
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-          className={`translate-y-[2px] ${
-            theme === 'dark' ? 'border-white/50' : ''
-          }`}
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-          className={`translate-y-[2px] ${
-            theme === 'dark' ? 'border-white/50' : ''
-          }`}
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
-      accessorKey: 'artistName',
-      header: 'Artist Name',
-      cell: ({ row }) => {
-        const request = row.original;
-        return (
-          <Link
-            href={`/admin/artist-requests/${request.id}`}
-            className={`font-medium text-sm hover:underline ${
-              theme === 'dark' ? 'text-white' : ''
-            }`}
-          >
-            {request.artistName}
-          </Link>
-        );
-      },
-      enableSorting: true,
-    },
-    {
-      accessorKey: 'user.email',
-      header: 'Email',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {row.original.user.email}
-        </span>
-      ),
-      enableSorting: true,
-    },
-    {
-      accessorKey: 'verificationRequestedAt',
-      header: 'Requested At',
-      cell: ({ row }) => (
-        <span className={theme === 'dark' ? 'text-white' : ''}>
-          {new Date(row.original.verificationRequestedAt).toLocaleDateString(
-            'vi-VN',
-            {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            }
-          )}
-        </span>
-      ),
-      enableSorting: true,
-    },
-    {
-      id: 'actions',
-      enableHiding: false,
-      cell: ({ row }) => {
-        const request = row.original;
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleViewDetails(request.id)}>
-                <Eye className="w-4 h-4 mr-2" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleApprove(request.id)}
-                className="text-green-600"
-              >
-                <Check className="w-4 h-4 mr-2" />
-                Approve Request
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => handleReject(request.id)}
-                className="text-red-600"
-              >
-                <X className="w-4 h-4 mr-2" />
-                Reject Request
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
-  ];
+  // Cập nhật URL khi thay đổi filters
+  const updateFilters = (newStartDate?: string, newEndDate?: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newStartDate) params.set('startDate', newStartDate);
+    else params.delete('startDate');
+    if (newEndDate) params.set('endDate', newEndDate);
+    else params.delete('endDate');
+    if (currentPage !== 1) params.set('page', '1');
+    const queryStr = params.toString() ? `?${params.toString()}` : '';
+    router.push(`/admin/artist-requests${queryStr}`);
+  };
 
-  // Initialize table
+  // Define columns
+  const columns = getArtistRequestColumns({
+    theme,
+    onApprove: handleApprove,
+    onReject: handleReject,
+    onViewDetails: handleViewDetails,
+  });
+
   const table = useReactTable({
     data: requests,
     columns,
@@ -324,32 +164,31 @@ export default function ArtistRequestManagement() {
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: (updatedSelection) => {
+      let newSelection: RowSelectionState;
+      if (typeof updatedSelection === 'function') {
+        newSelection = updatedSelection(rowSelection);
+      } else {
+        newSelection = updatedSelection;
+      }
+      setRowSelection(newSelection);
+      const selectedRowData = requests.filter(
+        (request, index) => newSelection[index]
+      );
+      setSelectedRows(selectedRowData);
+    },
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
-      pagination: {
-        pageIndex: currentPage - 1,
-        pageSize: 10,
-      },
+      pagination: { pageIndex: currentPage - 1, pageSize: limit },
     },
     pageCount: totalPages,
     manualPagination: true,
   });
-
-  const exportColumns = [
-    { key: 'artistName', header: 'Artist Name' },
-    { key: 'user.name', header: 'User Name' },
-    { key: 'user.email', header: 'Email' },
-    { key: 'verificationRequestedAt', header: 'Requested At' },
-    { key: 'bio', header: 'Biography' },
-    { key: 'socialMediaLinks.facebook', header: 'Facebook' },
-    { key: 'socialMediaLinks.instagram', header: 'Instagram' },
-    { key: 'isVerified', header: 'Status' },
-  ];
 
   return (
     <div
@@ -378,8 +217,14 @@ export default function ArtistRequestManagement() {
         <DateRangePicker
           startDate={startDate}
           endDate={endDate}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
+          onStartDateChange={(date) => {
+            setStartDate(date);
+            updateFilters(date, endDate);
+          }}
+          onEndDateChange={(date) => {
+            setEndDate(date);
+            updateFilters(startDate, date);
+          }}
           theme={theme}
         />
       </div>
@@ -402,7 +247,16 @@ export default function ArtistRequestManagement() {
           showExport: true,
           exportData: {
             data: requests,
-            columns: exportColumns,
+            columns: [
+              { key: 'artistName', header: 'Artist Name' },
+              { key: 'user.name', header: 'User Name' },
+              { key: 'user.email', header: 'Email' },
+              { key: 'verificationRequestedAt', header: 'Requested At' },
+              { key: 'bio', header: 'Biography' },
+              { key: 'socialMediaLinks.facebook', header: 'Facebook' },
+              { key: 'socialMediaLinks.instagram', header: 'Instagram' },
+              { key: 'isVerified', header: 'Status' },
+            ],
             filename: 'artist-requests',
           },
           searchPlaceholder: 'Search requests...',

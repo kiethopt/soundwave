@@ -15,7 +15,7 @@ import {
   getAllArtistRequests,
   rejectArtistRequest,
   verifyArtist,
-  getArtistRequestDetails,
+  getArtistRequestDetail,
   deactivateUser,
   deactivateArtist,
   deleteArtist,
@@ -98,7 +98,7 @@ router.get(
   '/artist-requests/:id',
   queryRateLimiter,
   authorize([Role.ADMIN]),
-  getArtistRequestDetails
+  getArtistRequestDetail
 );
 router.post(
   '/artists/verify',
@@ -109,7 +109,7 @@ router.post(
 
 // Quản lý thể loại nhạc
 router.get('/genres', queryRateLimiter, cacheMiddleware, getAllGenres);
-router.post('/genres', createGenre);
+router.post('/genres', authenticate, authorize([Role.ADMIN]), createGenre);
 router.put(
   '/genres/:id',
   authenticate,

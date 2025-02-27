@@ -199,20 +199,14 @@ export const getAllArtistRequests = async (
 };
 
 // Xem chi tiết request yêu cầu trở thành Artist từ User
-export const getArtistRequestDetails = async (
+export const getArtistRequestDetail = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const token = req.headers.authorization?.split(' ')[1];
-
-    if (!token) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
     const cacheKey = req.originalUrl;
+
     if (process.env.USE_REDIS_CACHE === 'true') {
       const cachedData = await client.get(cacheKey);
       if (cachedData) {
@@ -794,6 +788,31 @@ export const createGenre = async (
   try {
     const { name } = req.body;
 
+    // Validation tập trung
+    const validationErrors = [];
+    if (!name) validationErrors.push('Name is required');
+    if (name && name.trim() === '')
+      validationErrors.push('Name cannot be empty');
+    if (name && name.length > 50) {
+      validationErrors.push('Name exceeds maximum length (50 characters)');
+    }
+    if (validationErrors.length > 0) {
+      res
+        .status(400)
+        .json({ message: 'Validation failed', errors: validationErrors });
+      return;
+    }
+
+    // Kiểm tra trùng lặp tên thể loại
+    const existingGenre = await prisma.genre.findFirst({
+      where: { name },
+    });
+    if (existingGenre) {
+      res.status(400).json({ message: 'Genre name already exists' });
+      return;
+    }
+
+    // Tạo thể loại mới
     const genre = await prisma.genre.create({
       data: { name },
     });

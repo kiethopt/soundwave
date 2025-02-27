@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
+import { debounce } from 'lodash';
 
 interface UseDataTableOptions<T> {
   fetchData: (
@@ -27,20 +28,25 @@ export function useDataTable<T>({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Filter states
-  const [searchInput, setSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState(searchParams.get('q') || '');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [genreFilter, setGenreFilter] = useState<string[]>([]);
   const [selectedRows, setSelectedRows] = useState<T[]>([]);
 
-  // Get current page from URL
+  // Get current page and filters from URL
   const pageFromURL = Number(searchParams.get('page'));
   const currentPage = isNaN(pageFromURL) || pageFromURL < 1 ? 1 : pageFromURL;
+  const startDate = searchParams.get('startDate') || '';
+  const endDate = searchParams.get('endDate') || '';
+
+  // Ref to track initial load
+  const initialLoad = useRef(true);
 
   // Update URL helper
   const updateQueryParam = useCallback(
-    (param: string, value: number) => {
+    (param: string, value: number | string) => {
       const current = new URLSearchParams(searchParams.toString());
-      if (value === 1) {
+      if (value === 1 || value === '') {
         current.delete(param);
       } else {
         current.set(param, value.toString());
@@ -51,21 +57,11 @@ export function useDataTable<T>({
     [router, searchParams]
   );
 
-  // Fetch data function
-  const fetchDataWithFilters = useCallback(
-    async (page: number) => {
+  // Debounce fetch data function
+  const debouncedFetchData = useRef(
+    debounce(async (page: number, params: URLSearchParams) => {
       try {
         setLoading(true);
-        const params = new URLSearchParams();
-        params.set('page', page.toString());
-        params.set('limit', limit.toString());
-
-        if (searchInput) params.append('q', searchInput);
-        if (statusFilter.length === 1) params.append('status', statusFilter[0]);
-        if (genreFilter.length > 0) {
-          genreFilter.forEach((genre) => params.append('genres', genre));
-        }
-
         const response = await fetchData(page, params);
         setData(response.data);
         setTotalPages(response.pagination.totalPages);
@@ -76,23 +72,53 @@ export function useDataTable<T>({
       } finally {
         setLoading(false);
       }
+    }, 500) // Delay 500ms
+  ).current;
+
+  // Fetch data function
+  const fetchDataWithFilters = useCallback(
+    (page: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('page', page.toString());
+      params.set('limit', limit.toString());
+      if (searchInput) params.set('q', searchInput);
+      if (statusFilter.length === 1) params.set('status', statusFilter[0]);
+      if (genreFilter.length > 0) {
+        genreFilter.forEach((genre) => params.append('genres', genre));
+      }
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+      debouncedFetchData(page, params);
     },
-    [fetchData, searchInput, statusFilter, genreFilter, limit]
+    [
+      searchInput,
+      statusFilter,
+      genreFilter,
+      startDate,
+      endDate,
+      limit,
+      searchParams,
+      debouncedFetchData,
+    ]
   );
 
-  // Handle filter changes
+  // Handle filter and page changes
   useEffect(() => {
-    if (currentPage === 1) {
-      fetchDataWithFilters(1);
-    } else {
-      updateQueryParam('page', 1);
+    if (initialLoad.current) {
+      initialLoad.current = false;
+      fetchDataWithFilters(currentPage);
+      return;
     }
-  }, [searchInput, statusFilter, genreFilter]);
-
-  // Handle page changes
-  useEffect(() => {
     fetchDataWithFilters(currentPage);
-  }, [currentPage]);
+  }, [
+    currentPage,
+    searchInput,
+    statusFilter,
+    genreFilter,
+    startDate,
+    endDate,
+    fetchDataWithFilters,
+  ]);
 
   return {
     data,
