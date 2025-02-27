@@ -60,7 +60,6 @@ interface GetArtistColumnsOptions {
   theme?: 'light' | 'dark';
   onStatusChange?: (id: string, isActive: boolean) => Promise<void>;
   onDelete?: (id: string | string[]) => Promise<void>;
-  handleUpdateAllListeners?: () => void;
   loading?: boolean;
   actionLoading?: string | null;
 }
@@ -898,7 +897,6 @@ export function getArtistColumns({
   theme,
   onStatusChange,
   onDelete,
-  handleUpdateAllListeners,
   loading,
   actionLoading,
 }: GetArtistColumnsOptions): ColumnDef<ArtistProfile>[] {
@@ -1024,7 +1022,6 @@ export function getArtistColumns({
       header: () => (
         <div className="flex items-center justify-center">
           <button
-            onClick={handleUpdateAllListeners}
             disabled={loading || actionLoading === 'updateAll'}
             className={`p-1 rounded-full ${
               theme === 'dark'

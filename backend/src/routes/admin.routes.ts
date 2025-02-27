@@ -20,7 +20,6 @@ import {
   deactivateArtist,
   deleteArtist,
   updateArtist,
-  updateAllMonthlyListeners,
 } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -106,12 +105,6 @@ router.post(
   authenticate,
   authorize([Role.ADMIN]),
   verifyArtist
-);
-router.post(
-  '/artists/update-all-monthly-listeners',
-  authenticate,
-  authorize([Role.ADMIN]),
-  updateAllMonthlyListeners
 );
 
 // Quản lý thể loại nhạc

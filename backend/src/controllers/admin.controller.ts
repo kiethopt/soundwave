@@ -1084,54 +1084,6 @@ export const verifyArtist = async (
   }
 };
 
-// Cập nhật số lượng người nghe hàng tháng cho tất cả artists đã được xác thực
-export const updateAllMonthlyListeners = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    // Lấy danh sách tất cả artist đã được xác thực
-    const artists = await prisma.artistProfile.findMany({
-      where: { role: 'ARTIST', isVerified: true },
-      select: { id: true },
-    });
-
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    // Cập nhật số liệu cho từng artist
-    for (const artist of artists) {
-      const trackIds = await prisma.track
-        .findMany({
-          where: { artistId: artist.id },
-          select: { id: true },
-        })
-        .then((tracks) => tracks.map((track) => track.id));
-
-      const uniqueListeners = await prisma.history.findMany({
-        where: {
-          trackId: { in: trackIds },
-          type: 'PLAY',
-          createdAt: { gte: thirtyDaysAgo },
-        },
-        distinct: ['userId'],
-      });
-
-      await prisma.artistProfile.update({
-        where: { id: artist.id },
-        data: { monthlyListeners: uniqueListeners.length },
-      });
-    }
-
-    res.json({
-      message: "All artists' monthly listeners updated successfully",
-    });
-  } catch (error) {
-    console.error('Update all monthly listeners error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
 // Lấy thông số tổng quan để thống kê
 export const getStats = async (req: Request, res: Response): Promise<void> => {
   try {

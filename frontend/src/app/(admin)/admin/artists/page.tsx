@@ -120,41 +120,40 @@ export default function ArtistManagement() {
     }
   };
 
-  const handleUpdateAllListeners = async () => {
-    try {
-      setActionLoading('updateAll');
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-      await api.admin.updateAllMonthlyListeners(token);
-      toast.success("All artists' monthly listeners updated successfully");
-      // Refresh data
-      const params = new URLSearchParams();
-      params.set('page', currentPage.toString());
-      params.set('limit', limit.toString());
-      if (searchInput) params.append('q', searchInput);
-      if (statusFilter.length === 1) params.append('status', statusFilter[0]);
-      const response = await api.admin.getAllArtists(
-        token,
-        currentPage,
-        limit,
-        params.toString()
-      );
-      setArtists(response.artists);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to update listeners'
-      );
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  // const handleUpdateAllListeners = async () => {
+  //   try {
+  //     setActionLoading('updateAll');
+  //     const token = localStorage.getItem('userToken');
+  //     if (!token) throw new Error('No authentication token found');
+  //     await api.admin.updateAllMonthlyListeners(token);
+  //     toast.success("All artists' monthly listeners updated successfully");
+  //     // Refresh data
+  //     const params = new URLSearchParams();
+  //     params.set('page', currentPage.toString());
+  //     params.set('limit', limit.toString());
+  //     if (searchInput) params.append('q', searchInput);
+  //     if (statusFilter.length === 1) params.append('status', statusFilter[0]);
+  //     const response = await api.admin.getAllArtists(
+  //       token,
+  //       currentPage,
+  //       limit,
+  //       params.toString()
+  //     );
+  //     setArtists(response.artists);
+  //   } catch (error) {
+  //     toast.error(
+  //       error instanceof Error ? error.message : 'Failed to update listeners'
+  //     );
+  //   } finally {
+  //     setActionLoading(null);
+  //   }
+  // };
 
   // Define columns
   const columns = getArtistColumns({
     theme,
     onStatusChange: handleArtistStatus,
     onDelete: handleDeleteArtist,
-    handleUpdateAllListeners,
     loading,
     actionLoading,
   });

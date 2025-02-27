@@ -23,7 +23,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStats = exports.updateAllMonthlyListeners = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateArtist = exports.deactivateUser = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetails = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.getStats = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateArtist = exports.deactivateUser = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetails = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
@@ -846,44 +846,6 @@ const verifyArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.verifyArtist = verifyArtist;
-const updateAllMonthlyListeners = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const artists = yield db_1.default.artistProfile.findMany({
-            where: { role: 'ARTIST', isVerified: true },
-            select: { id: true },
-        });
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        for (const artist of artists) {
-            const trackIds = yield db_1.default.track
-                .findMany({
-                where: { artistId: artist.id },
-                select: { id: true },
-            })
-                .then((tracks) => tracks.map((track) => track.id));
-            const uniqueListeners = yield db_1.default.history.findMany({
-                where: {
-                    trackId: { in: trackIds },
-                    type: 'PLAY',
-                    createdAt: { gte: thirtyDaysAgo },
-                },
-                distinct: ['userId'],
-            });
-            yield db_1.default.artistProfile.update({
-                where: { id: artist.id },
-                data: { monthlyListeners: uniqueListeners.length },
-            });
-        }
-        res.json({
-            message: "All artists' monthly listeners updated successfully",
-        });
-    }
-    catch (error) {
-        console.error('Update all monthly listeners error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.updateAllMonthlyListeners = updateAllMonthlyListeners;
 const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const cacheKey = '/api/admin/stats';

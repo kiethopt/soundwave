@@ -246,13 +246,6 @@ export const api = {
         token
       ),
 
-    updateAllMonthlyListeners: async (token: string) =>
-      fetchWithAuth(
-        '/api/admin/artists/update-all-monthly-listeners',
-        { method: 'POST' },
-        token
-      ),
-
     deleteUser: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/users/${id}`, { method: 'DELETE' }, token),
 
