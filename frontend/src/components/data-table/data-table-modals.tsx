@@ -786,7 +786,10 @@ export function EditArtistModal({
       if (!token) throw new Error('No authentication token found');
 
       const response = await api.admin.updateArtist(artist.id, formData, token);
-      onUpdate(response.artist);
+
+      // Fetch lại dữ liệu artist mới nhất
+      const updatedData = await api.admin.getArtistById(artist.id, token);
+      onUpdate(updatedData); // Cập nhật toàn bộ dữ liệu artist
       onClose();
       toast.success('Artist updated successfully');
     } catch (error) {
@@ -847,7 +850,11 @@ export function EditArtistModal({
                 type="button"
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
-                className={theme === 'dark' ? 'text-white border-white/50' : ''}
+                className={
+                  theme === 'dark'
+                    ? 'text-black border-white/50 hover:bg-gray-200'
+                    : ''
+                }
               >
                 Change Avatar
               </Button>
@@ -893,14 +900,20 @@ export function EditArtistModal({
               type="button"
               variant="outline"
               onClick={onClose}
-              className={theme === 'dark' ? 'text-white border-white/50' : ''}
+              className={
+                theme === 'dark'
+                  ? 'bg-white text-black hover:bg-gray-200 border-gray-300'
+                  : ''
+              }
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isUploading}
-              className={theme === 'dark' ? 'bg-white text-black' : ''}
+              className={
+                theme === 'dark' ? 'bg-white text-black hover:bg-gray-200' : ''
+              }
             >
               {isUploading ? 'Updating...' : 'Save Changes'}
             </Button>
@@ -1248,6 +1261,295 @@ export function AddGenreModal({
             </Button>
           </div>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface UserInfoModalProps {
+  user: User | null;
+  onClose: () => void;
+  theme?: 'light' | 'dark';
+}
+
+export function UserInfoModal({
+  user,
+  onClose,
+  theme = 'light',
+}: UserInfoModalProps) {
+  if (!user) return null;
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <Dialog open={!!user} onOpenChange={onClose}>
+      <DialogContent
+        className={`${
+          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+        } p-6 rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto`}
+      >
+        <DialogHeader>
+          <DialogTitle
+            className={`text-xl font-semibold ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}
+          >
+            User Information
+          </DialogTitle>
+          <DialogDescription
+            className={theme === 'dark' ? 'text-white/70' : 'text-gray-500'}
+          >
+            Detailed information about the user
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-6 space-y-6">
+          {/* Basic Information */}
+          <div className="flex items-center space-x-4">
+            <div className="flex-shrink-0">
+              {user.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user.name || 'User avatar'}
+                  className="w-20 h-20 rounded-full object-cover"
+                />
+              ) : (
+                <div
+                  className={`w-20 h-20 rounded-full flex items-center justify-center ${
+                    theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`text-2xl font-bold ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-600'
+                    }`}
+                  >
+                    {(user.name || user.email)?.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div>
+              <h3
+                className={`text-lg font-semibold ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}
+              >
+                {user.name || 'No name provided'}
+              </h3>
+              <p
+                className={`text-sm ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                }`}
+              >
+                {user.email}
+              </p>
+              <div className="flex items-center mt-1 space-x-2">
+                <span
+                  className={`px-2 py-1 text-xs rounded-full ${
+                    user.role === 'ADMIN'
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}
+                >
+                  {user.role}
+                </span>
+                <span
+                  className={`px-2 py-1 text-xs rounded-full ${
+                    user.isActive
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {user.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Information */}
+          <div
+            className={`grid grid-cols-2 gap-4 p-4 rounded-lg ${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+            }`}
+          >
+            <div>
+              <p
+                className={`text-sm font-medium ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                }`}
+              >
+                Username
+              </p>
+              <p
+                className={`mt-1 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}
+              >
+                {user.username || 'Not set'}
+              </p>
+            </div>
+            <div>
+              <p
+                className={`text-sm font-medium ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                }`}
+              >
+                Current Profile
+              </p>
+              <p
+                className={`mt-1 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}
+              >
+                {user.currentProfile}
+              </p>
+            </div>
+            <div>
+              <p
+                className={`text-sm font-medium ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                }`}
+              >
+                Created At
+              </p>
+              <p
+                className={`mt-1 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}
+              >
+                {formatDate(user.createdAt)}
+              </p>
+            </div>
+            <div>
+              <p
+                className={`text-sm font-medium ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                }`}
+              >
+                Last Login
+              </p>
+              <p
+                className={`mt-1 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}
+              >
+                {user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never'}
+              </p>
+            </div>
+          </div>
+
+          {/* Artist Profile Information (if exists) */}
+          {user.artistProfile && (
+            <div
+              className={`mt-6 p-4 rounded-lg ${
+                theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+              }`}
+            >
+              <h4
+                className={`text-lg font-semibold mb-4 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}
+              >
+                Artist Profile
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p
+                    className={`text-sm font-medium ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                    }`}
+                  >
+                    Artist Name
+                  </p>
+                  <p
+                    className={`mt-1 ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-900'
+                    }`}
+                  >
+                    {user.artistProfile.artistName}
+                  </p>
+                </div>
+                <div>
+                  <p
+                    className={`text-sm font-medium ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                    }`}
+                  >
+                    Verification Status
+                  </p>
+                  <p
+                    className={`mt-1 ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-900'
+                    }`}
+                  >
+                    {user.artistProfile.isVerified
+                      ? 'Verified'
+                      : 'Not Verified'}
+                  </p>
+                </div>
+                {user.artistProfile.verificationRequestedAt && (
+                  <div>
+                    <p
+                      className={`text-sm font-medium ${
+                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                      }`}
+                    >
+                      Verification Requested
+                    </p>
+                    <p
+                      className={`mt-1 ${
+                        theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}
+                    >
+                      {formatDate(user.artistProfile.verificationRequestedAt)}
+                    </p>
+                  </div>
+                )}
+                {user.artistProfile.verifiedAt && (
+                  <div>
+                    <p
+                      className={`text-sm font-medium ${
+                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                      }`}
+                    >
+                      Verified At
+                    </p>
+                    <p
+                      className={`mt-1 ${
+                        theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}
+                    >
+                      {formatDate(user.artistProfile.verifiedAt)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Close Button */}
+          <div className="flex justify-end mt-6">
+            <Button
+              onClick={onClose}
+              className={`${
+                theme === 'dark'
+                  ? 'bg-white text-black hover:bg-gray-200'
+                  : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+              }`}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -17,13 +17,15 @@ import {
 import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
 import { getUserColumns } from '@/components/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
-import { EditUserModal } from '@/components/data-table/data-table-modals';
+import {
+  EditUserModal,
+  UserInfoModal,
+} from '@/components/data-table/data-table-modals';
 
 export default function UserManagement() {
   const { theme } = useTheme();
   const limit = 10;
 
-  // Sử dụng custom hook useDataTable
   const {
     data: users,
     setData: setUsers,
@@ -64,8 +66,9 @@ export default function UserManagement() {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
 
-  // Edit modal state
+  // Modal states
   const [editingUser, setUpdatingUser] = useState<User | null>(null);
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
 
   // Action handlers
   const handleUserStatus = async (userId: string, isActive: boolean) => {
@@ -133,18 +136,15 @@ export default function UserManagement() {
         return;
       }
 
-      // Set loading state for single user delete
       if (!Array.isArray(userIds)) {
         setActionLoading(userIds);
       }
 
       await Promise.all(ids.map((id) => api.admin.deleteUser(id, token)));
 
-      // Update UI
       if (!Array.isArray(userIds)) {
         setUsers((prev) => prev.filter((user) => user.id !== userIds));
       } else {
-        // Refresh the current page
         const params = new URLSearchParams();
         params.set('page', currentPage.toString());
         params.set('limit', limit.toString());
@@ -187,7 +187,6 @@ export default function UserManagement() {
 
       await api.admin.updateUser(userId, formData, token);
 
-      // Refresh the current page
       const params = new URLSearchParams();
       params.set('page', currentPage.toString());
       params.set('limit', limit.toString());
@@ -218,6 +217,7 @@ export default function UserManagement() {
     onDelete: handleDeleteUsers,
     onResetPassword: handleResetPassword,
     onEdit: setUpdatingUser,
+    onView: setViewingUser,
   });
 
   const table = useReactTable({
@@ -338,6 +338,12 @@ export default function UserManagement() {
         user={editingUser}
         onClose={() => setUpdatingUser(null)}
         onSubmit={handleUpdateUser}
+        theme={theme}
+      />
+
+      <UserInfoModal
+        user={viewingUser}
+        onClose={() => setViewingUser(null)}
         theme={theme}
       />
     </div>

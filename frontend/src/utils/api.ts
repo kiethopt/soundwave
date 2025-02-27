@@ -153,7 +153,7 @@ export const api = {
       );
     },
 
-    getArtistRequestDetails: async (requestId: string, token: string) =>
+    getArtistRequestDetail: async (requestId: string, token: string) =>
       fetchWithAuth(
         `/api/admin/artist-requests/${requestId}`,
         { method: 'GET' },

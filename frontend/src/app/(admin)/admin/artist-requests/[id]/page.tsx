@@ -29,7 +29,7 @@ export default function ArtistRequestDetail({
         if (!token) {
           throw new Error('No authentication token found');
         }
-        const response = await api.admin.getArtistRequestDetails(id, token);
+        const response = await api.admin.getArtistRequestDetail(id, token);
         setRequest(response);
       } catch (err) {
         console.error('Error fetching request details:', err);
