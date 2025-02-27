@@ -1068,15 +1068,9 @@ export const verifyArtist = async (
 // Lấy thông số tổng quan để thống kê
 export const getStats = async (req: Request, res: Response): Promise<void> => {
   try {
-    const cacheKey = '/api/admin/stats';
-    const user = req.user;
+    const cacheKey = req.originalUrl;
 
-    if (!user || user.role !== Role.ADMIN) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
-    }
-
-    // Nếu caching được bật, thử lấy dữ liệu từ cache
+    // Kiểm tra cache Redis nếu được bật
     if (process.env.USE_REDIS_CACHE === 'true') {
       const cachedStats = await client.get(cacheKey);
       if (cachedStats) {
@@ -1087,45 +1081,43 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
       console.log(`[Redis] Cache miss for key: ${cacheKey}`);
     }
 
+    // Sử dụng Promise.all để thực hiện đồng thời các truy vấn
+    const stats = await Promise.all([
+      prisma.user.count(), // Tổng số user
+      prisma.artistProfile.count({
+        where: {
+          role: Role.ARTIST,
+          isVerified: true,
+        },
+      }), // Tổng số nghệ sĩ đã xác minh
+      prisma.artistProfile.count({
+        where: {
+          verificationRequestedAt: { not: null },
+          isVerified: false,
+        },
+      }), // Tổng số yêu cầu nghệ sĩ đang chờ
+      prisma.artistProfile.findFirst({
+        where: {
+          role: Role.ARTIST,
+          isVerified: true,
+        },
+        orderBy: [{ monthlyListeners: 'desc' }],
+        select: {
+          id: true,
+          artistName: true,
+          monthlyListeners: true,
+        },
+      }), // Nghệ sĩ nổi bật nhất
+      prisma.genre.count(), // Tổng số thể loại nhạc
+    ]);
+
     const [
       totalUsers,
       totalArtists,
       totalArtistRequests,
       mostActiveArtist,
       totalGenres,
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.artistProfile.count({
-        where: {
-          role: Role.ARTIST,
-          isVerified: true,
-        },
-      }),
-      prisma.artistProfile.count({
-        where: {
-          verificationRequestedAt: { not: null },
-          isVerified: false,
-        },
-      }),
-      prisma.artistProfile.findFirst({
-        where: {
-          role: Role.ARTIST,
-          isVerified: true,
-        },
-        orderBy: [{ monthlyListeners: 'desc' }, { tracks: { _count: 'desc' } }],
-        select: {
-          id: true,
-          artistName: true,
-          monthlyListeners: true,
-          _count: {
-            select: {
-              tracks: true,
-            },
-          },
-        },
-      }),
-      prisma.genre.count(),
-    ]);
+    ] = stats;
 
     const statsData = {
       totalUsers,
@@ -1136,23 +1128,18 @@ export const getStats = async (req: Request, res: Response): Promise<void> => {
         id: mostActiveArtist?.id || '',
         artistName: mostActiveArtist?.artistName || '',
         monthlyListeners: mostActiveArtist?.monthlyListeners || 0,
-        trackCount: mostActiveArtist?._count.tracks || 0,
       },
       updatedAt: new Date().toISOString(),
     };
 
-    // Lưu vào Redis nếu caching được bật
     if (process.env.USE_REDIS_CACHE === 'true') {
       console.log(`[Redis] Caching data for key: ${cacheKey}`);
-      await client.setEx(cacheKey, 300, JSON.stringify(statsData));
+      await client.setEx(cacheKey, 3600, JSON.stringify(statsData)); // Tăng TTL lên 1 giờ
     }
 
     res.json(statsData);
   } catch (error) {
     console.error('Get stats error:', error);
-    res.status(500).json({
-      message: 'Internal server error',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };

@@ -12,7 +12,7 @@ const cache_middleware_1 = require("../middleware/cache.middleware");
 const upload_middleware_1 = __importDefault(require("../middleware/upload.middleware"));
 const router = express_1.default.Router();
 router.use(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]));
-router.get('/stats', (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), cache_middleware_1.cacheMiddleware, rateLimit_middleware_1.queryRateLimiter, admin_controller_1.getStats);
+router.get('/stats', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), cache_middleware_1.cacheMiddleware, rateLimit_middleware_1.queryRateLimiter, admin_controller_1.getStats);
 router.get('/users', rateLimit_middleware_1.queryRateLimiter, auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllUsers);
 router.get('/users/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getUserById);
 router.put('/users/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), upload_middleware_1.default.single('avatar'), admin_controller_1.updateUser);

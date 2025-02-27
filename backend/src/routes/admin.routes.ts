@@ -35,6 +35,7 @@ router.use(authenticate, authorize([Role.ADMIN, Role.ARTIST]));
 // Thống kê
 router.get(
   '/stats',
+  authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
   queryRateLimiter,

@@ -827,12 +827,7 @@ const verifyArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 exports.verifyArtist = verifyArtist;
 const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const cacheKey = '/api/admin/stats';
-        const user = req.user;
-        if (!user || user.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden' });
-            return;
-        }
+        const cacheKey = req.originalUrl;
         if (process.env.USE_REDIS_CACHE === 'true') {
             const cachedStats = yield cache_middleware_1.client.get(cacheKey);
             if (cachedStats) {
@@ -842,7 +837,7 @@ const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             }
             console.log(`[Redis] Cache miss for key: ${cacheKey}`);
         }
-        const [totalUsers, totalArtists, totalArtistRequests, mostActiveArtist, totalGenres,] = yield Promise.all([
+        const stats = yield Promise.all([
             db_1.default.user.count(),
             db_1.default.artistProfile.count({
                 where: {
@@ -861,20 +856,16 @@ const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                     role: client_1.Role.ARTIST,
                     isVerified: true,
                 },
-                orderBy: [{ monthlyListeners: 'desc' }, { tracks: { _count: 'desc' } }],
+                orderBy: [{ monthlyListeners: 'desc' }],
                 select: {
                     id: true,
                     artistName: true,
                     monthlyListeners: true,
-                    _count: {
-                        select: {
-                            tracks: true,
-                        },
-                    },
                 },
             }),
             db_1.default.genre.count(),
         ]);
+        const [totalUsers, totalArtists, totalArtistRequests, mostActiveArtist, totalGenres,] = stats;
         const statsData = {
             totalUsers,
             totalArtists,
@@ -884,22 +875,18 @@ const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 id: (mostActiveArtist === null || mostActiveArtist === void 0 ? void 0 : mostActiveArtist.id) || '',
                 artistName: (mostActiveArtist === null || mostActiveArtist === void 0 ? void 0 : mostActiveArtist.artistName) || '',
                 monthlyListeners: (mostActiveArtist === null || mostActiveArtist === void 0 ? void 0 : mostActiveArtist.monthlyListeners) || 0,
-                trackCount: (mostActiveArtist === null || mostActiveArtist === void 0 ? void 0 : mostActiveArtist._count.tracks) || 0,
             },
             updatedAt: new Date().toISOString(),
         };
         if (process.env.USE_REDIS_CACHE === 'true') {
             console.log(`[Redis] Caching data for key: ${cacheKey}`);
-            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(statsData));
+            yield cache_middleware_1.client.setEx(cacheKey, 3600, JSON.stringify(statsData));
         }
         res.json(statsData);
     }
     catch (error) {
         console.error('Get stats error:', error);
-        res.status(500).json({
-            message: 'Internal server error',
-            error: error instanceof Error ? error.message : 'Unknown error',
-        });
+        res.status(500).json({ message: 'Internal server error' });
     }
 });
 exports.getStats = getStats;
