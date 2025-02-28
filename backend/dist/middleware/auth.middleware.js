@@ -97,38 +97,39 @@ const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
 exports.authenticate = authenticate;
 const authorize = (roles) => {
     return (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-        var _a, _b, _c, _d;
+        var _a, _b;
         try {
             const user = req.user;
             if (!user) {
                 res.status(401).json({ message: 'Unauthorized' });
                 return;
             }
-            if (!user.isActive) {
-                res.status(403).json({
-                    message: 'Your account has been deactivated',
-                    code: 'ACCOUNT_DEACTIVATED',
-                });
-                return;
-            }
             if (user.role === client_1.Role.ADMIN) {
                 return next();
             }
             if (roles.includes(client_1.Role.ARTIST)) {
-                if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
-                    ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isActive) &&
-                    user.currentProfile !== 'ARTIST') {
+                if (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified)) {
+                    res.status(403).json({
+                        message: 'Your artist profile is not verified yet',
+                        code: 'ARTIST_NOT_VERIFIED',
+                    });
+                    return;
+                }
+                if (!((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isActive)) {
+                    res.status(403).json({
+                        message: 'Your artist profile has been deactivated. Please contact admin',
+                        code: 'ARTIST_DEACTIVATED',
+                    });
+                    return;
+                }
+                if (user.currentProfile !== 'ARTIST') {
                     res.status(403).json({
                         message: 'Please switch to Artist profile to access this page',
                         code: 'SWITCH_TO_ARTIST_PROFILE',
                     });
                     return;
                 }
-                if (user.currentProfile === 'ARTIST' &&
-                    ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.isVerified) &&
-                    ((_d = user.artistProfile) === null || _d === void 0 ? void 0 : _d.isActive)) {
-                    return next();
-                }
+                return next();
             }
             if (roles.includes(client_1.Role.USER) && user.role === client_1.Role.USER) {
                 return next();

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStats = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deactivateArtist = exports.deactivateUser = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.getStats = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
@@ -195,7 +195,7 @@ exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { name, email, username } = req.body;
+        const { name, email, username, isActive } = req.body;
         const avatarFile = req.file;
         const validationErrors = [];
         if (!id)
@@ -243,17 +243,19 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'users/avatars');
             avatarUrl = uploadResult.secure_url;
         }
+        const isActiveBool = isActive !== undefined
+            ? isActive === 'true' || isActive === true
+            : undefined;
         const updatedUser = yield db_1.default.user.update({
             where: { id },
-            data: Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (email && { email })), (username && { username })), (avatarUrl &&
-                avatarUrl !== currentUser.avatar && { avatar: avatarUrl })),
+            data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (email && { email })), (username && { username })), (avatarUrl &&
+                avatarUrl !== currentUser.avatar && { avatar: avatarUrl })), (isActiveBool !== undefined && { isActive: isActiveBool })),
             select: prisma_selects_1.userSelect,
         });
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            yield (0, cache_middleware_1.clearCacheForEntity)('user', { entityId: id, clearSearch: true });
-        }
         res.json({
-            message: 'User updated successfully',
+            message: isActiveBool !== undefined
+                ? `User ${isActiveBool ? 'activated' : 'deactivated'} successfully`
+                : 'User updated successfully',
             user: updatedUser,
         });
     }
@@ -266,7 +268,7 @@ exports.updateUser = updateUser;
 const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { artistName, bio, socialMediaLinks } = req.body;
+        const { artistName, bio, socialMediaLinks, isActive } = req.body;
         const avatarFile = req.file;
         const validationErrors = [];
         if (!id)
@@ -305,17 +307,19 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'artists/avatars');
             avatarUrl = uploadResult.secure_url;
         }
+        const isActiveBool = isActive !== undefined
+            ? isActive === 'true' || isActive === true
+            : undefined;
         const updatedArtist = yield db_1.default.artistProfile.update({
             where: { id },
-            data: Object.assign(Object.assign(Object.assign(Object.assign({}, (artistName && { artistName })), (bio && { bio })), (socialMediaLinks && { socialMediaLinks })), (avatarUrl &&
-                avatarUrl !== existingArtist.avatar && { avatar: avatarUrl })),
+            data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (artistName && { artistName })), (bio && { bio })), (socialMediaLinks && { socialMediaLinks })), (avatarUrl &&
+                avatarUrl !== existingArtist.avatar && { avatar: avatarUrl })), (isActiveBool !== undefined && { isActive: isActiveBool })),
             select: prisma_selects_1.artistProfileSelect,
         });
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            yield (0, cache_middleware_1.clearCacheForEntity)('artist', { entityId: id, clearSearch: true });
-        }
         res.json({
-            message: 'Artist updated successfully',
+            message: isActiveBool !== undefined
+                ? `Artist ${isActiveBool ? 'activated' : 'deactivated'} successfully`
+                : 'Artist updated successfully',
             artist: updatedArtist,
         });
     }
@@ -358,93 +362,6 @@ const deleteArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.deleteArtist = deleteArtist;
-const deactivateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const { isActive } = req.body;
-        const admin = req.user;
-        if (!admin || admin.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden' });
-            return;
-        }
-        const user = yield db_1.default.user.findUnique({
-            where: { id },
-            select: {
-                id: true,
-                role: true,
-                isActive: true,
-                email: true,
-            },
-        });
-        if (!user) {
-            res.status(404).json({ message: 'User not found' });
-            return;
-        }
-        if (user.role === client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Cannot deactivate admin users' });
-            return;
-        }
-        const updatedUser = yield db_1.default.user.update({
-            where: { id },
-            data: {
-                isActive: isActive,
-            },
-            select: prisma_selects_1.userSelect,
-        });
-        const keys = yield cache_middleware_1.client.keys('users:list:*');
-        if (keys.length) {
-            yield Promise.all(keys.map((key) => cache_middleware_1.client.del(key)));
-        }
-        if (!isActive) {
-            yield session_service_1.sessionService.handleUserDeactivation(user.id);
-        }
-        res.json({
-            message: isActive
-                ? 'User activated successfully'
-                : 'User deactivated successfully',
-            user: updatedUser,
-        });
-    }
-    catch (error) {
-        console.error('Deactivate user error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.deactivateUser = deactivateUser;
-const deactivateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const { isActive } = req.body;
-        const artist = yield db_1.default.artistProfile.findUnique({
-            where: { id },
-            include: { user: true },
-        });
-        if (!artist) {
-            res.status(404).json({ message: 'Artist not found' });
-            return;
-        }
-        const [updatedUser] = yield db_1.default.$transaction([
-            db_1.default.user.update({
-                where: { id: artist.userId },
-                data: Object.assign({ isActive }, (!isActive ? { currentProfile: 'USER' } : {})),
-                select: prisma_selects_1.userSelect,
-            }),
-            db_1.default.artistProfile.update({
-                where: { id },
-                data: { isActive },
-            }),
-        ]);
-        res.json({
-            message: `Artist ${isActive ? 'activated' : 'deactivated'} successfully`,
-            user: updatedUser,
-        });
-    }
-    catch (error) {
-        console.error('Deactivate artist error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.deactivateArtist = deactivateArtist;
 const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { page = 1, limit = 10, search = '', status } = req.query;

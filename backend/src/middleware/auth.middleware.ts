@@ -98,15 +98,6 @@ export const authorize = (roles: Role[]) => {
         return;
       }
 
-      // Kiểm tra nếu user không active
-      if (!user.isActive) {
-        res.status(403).json({
-          message: 'Your account has been deactivated',
-          code: 'ACCOUNT_DEACTIVATED',
-        });
-        return;
-      }
-
       // ADMIN luôn có quyền truy cập
       if (user.role === Role.ADMIN) {
         return next();
@@ -114,12 +105,27 @@ export const authorize = (roles: Role[]) => {
 
       // Kiểm tra quyền ARTIST
       if (roles.includes(Role.ARTIST)) {
-        // Kiểm tra nếu user có artistProfile nhưng chưa switch sang profile ARTIST
-        if (
-          user.artistProfile?.isVerified &&
-          user.artistProfile?.isActive &&
-          user.currentProfile !== 'ARTIST'
-        ) {
+        // Kiểm tra nếu artist profile không tồn tại hoặc chưa được verify
+        if (!user.artistProfile?.isVerified) {
+          res.status(403).json({
+            message: 'Your artist profile is not verified yet',
+            code: 'ARTIST_NOT_VERIFIED',
+          });
+          return;
+        }
+
+        // Kiểm tra nếu artist profile bị deactivate
+        if (!user.artistProfile?.isActive) {
+          res.status(403).json({
+            message:
+              'Your artist profile has been deactivated. Please contact admin',
+            code: 'ARTIST_DEACTIVATED',
+          });
+          return;
+        }
+
+        // Kiểm tra nếu chưa switch sang profile ARTIST
+        if (user.currentProfile !== 'ARTIST') {
           res.status(403).json({
             message: 'Please switch to Artist profile to access this page',
             code: 'SWITCH_TO_ARTIST_PROFILE',
@@ -127,14 +133,7 @@ export const authorize = (roles: Role[]) => {
           return;
         }
 
-        // Kiểm tra quyền ARTIST thông qua currentProfile và artistProfile
-        if (
-          user.currentProfile === 'ARTIST' &&
-          user.artistProfile?.isVerified &&
-          user.artistProfile?.isActive
-        ) {
-          return next();
-        }
+        return next();
       }
 
       // Kiểm tra quyền USER

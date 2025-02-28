@@ -82,21 +82,6 @@ class SessionService {
     await redis.expire(`user_sessions:${userId}`, this.SESSION_TTL);
   }
 
-  // Xử lý khi admin deactivate user
-  async handleUserDeactivation(userId: string): Promise<void> {
-    // Lấy tất cả session của user
-    const sessions = await this.getUserSessions(userId);
-
-    // Gửi thông báo tới tất cả session của user
-    await pusher.trigger(`user-${userId}`, 'account-status', {
-      type: 'ACCOUNT_DEACTIVATED',
-      message: 'Your account has been deactivated by admin',
-    });
-
-    // Xóa tất cả session
-    await redis.del(`user_sessions:${userId}`);
-  }
-
   // Xử lý khi user bắt đầu phát nhạc
   async handleAudioPlay(
     userId: string,

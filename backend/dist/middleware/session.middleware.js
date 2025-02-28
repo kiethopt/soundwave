@@ -13,12 +13,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sessionMiddleware = void 0;
-const session_service_1 = require("../services/session.service");
+const cache_middleware_1 = require("./cache.middleware");
 const db_1 = __importDefault(require("../config/db"));
 const SESSION_REQUIRED_PATHS = [
     '/api/tracks/:trackId/play',
     '/api/albums/:albumId/play',
     '/api/admin/users/:id/deactivate',
+    '/api/user/profile',
+    '/api/user/playlists',
+    '/api/user/favorites',
+    '/api/user/history',
 ];
 const sessionMiddleware = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -38,8 +42,8 @@ const sessionMiddleware = (req, res, next) => __awaiter(void 0, void 0, void 0, 
         return next(error);
     }
     try {
-        const isValidSession = yield session_service_1.sessionService.validateSession(userId, sessionId);
-        if (!isValidSession) {
+        const sessionData = yield cache_middleware_1.client.hGet(`user_sessions:${userId}`, sessionId);
+        if (!sessionData) {
             const error = new Error('Session expired or invalid');
             error.code = 'INVALID_SESSION';
             error.status = 401;
@@ -50,12 +54,13 @@ const sessionMiddleware = (req, res, next) => __awaiter(void 0, void 0, void 0, 
             select: { isActive: true },
         });
         if (!(user === null || user === void 0 ? void 0 : user.isActive)) {
-            yield session_service_1.sessionService.handleUserDeactivation(userId);
-            const error = new Error('Your account has been deactivated');
+            yield cache_middleware_1.client.del(`user_sessions:${userId}`);
+            const error = new Error('Your account has been deactivated. Please contact admin');
             error.code = 'ACCOUNT_DEACTIVATED';
             error.status = 403;
             return next(error);
         }
+        yield cache_middleware_1.client.expire(`user_sessions:${userId}`, 24 * 60 * 60);
         next();
     }
     catch (error) {

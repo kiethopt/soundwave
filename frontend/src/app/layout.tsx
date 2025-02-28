@@ -10,7 +10,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import type React from 'react';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
-import { TrackProvider, useTrack } from '@/contexts/TrackContext'; 
+import { TrackProvider, useTrack } from '@/contexts/TrackContext';
 import PlayerBar from '@/components/layout/PlayerBar/PlayerBar';
 
 // Tạo component con để xử lý theme
@@ -21,7 +21,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const { currentTrack  } = useTrack();
+  const { currentTrack } = useTrack();
 
   const isAuthPage = useMemo(
     () =>
@@ -38,21 +38,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     if (userDataStr) {
       const user = JSON.parse(userDataStr);
       setIsAdmin(user.role === 'ADMIN');
-      const channel = pusher.subscribe(`user-${user.id}`);
-
-      channel.bind('account-status', (data: any) => {
-        if (data.type === 'ACCOUNT_DEACTIVATED') {
-          localStorage.removeItem('userToken');
-          localStorage.removeItem('userData');
-          localStorage.removeItem('sessionId');
-          router.push('/login?message=account_deactivated');
-        }
-      });
-
-      return () => {
-        channel.unbind('account-status');
-        pusher.unsubscribe(`user-${user.id}`);
-      };
     }
   }, [router]);
 
@@ -112,7 +97,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
           {/* Player Bar */}
           {currentTrack && (
-            <div className={currentTrack ? "mt-[108px]" : ""}>
+            <div className={currentTrack ? 'mt-[108px]' : ''}>
               <PlayerBar />
             </div>
           )}

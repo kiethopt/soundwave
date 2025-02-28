@@ -216,11 +216,14 @@ export default function Header({
 
       const response = await api.auth.switchProfile(token);
 
+      // Kiểm tra nếu artist profile bị deactivate
       if (
         response.user.artistProfile &&
         !response.user.artistProfile.isActive
       ) {
-        toast.error('Your artist account has been deactivated');
+        toast.error(
+          'Artist profile has been deactivated. Please contact admin'
+        );
         return;
       }
 
@@ -236,11 +239,7 @@ export default function Header({
       console.error('Error switching profile:', error);
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to switch profile';
-      toast.error(
-        errorMessage.includes('deactivated')
-          ? 'Your account has been deactivated'
-          : errorMessage
-      );
+      toast.error(errorMessage);
     }
     setShowDropdown(false);
   };
@@ -561,9 +560,11 @@ export default function Header({
                   </Link>
 
                   <Link
-                    href={userData?.currentProfile === 'USER' 
-                      ? `/profile/${userData?.id}`
-                      : `/artist/profile/${userData?.artistProfile?.id}`}
+                    href={
+                      userData?.currentProfile === 'USER'
+                        ? `/profile/${userData?.id}`
+                        : `/artist/profile/${userData?.artistProfile?.id}`
+                    }
                     className={`block px-4 py-2 text-sm ${
                       theme === 'light'
                         ? 'text-gray-700 hover:bg-gray-200'
@@ -573,7 +574,6 @@ export default function Header({
                   >
                     Profile
                   </Link>
-
 
                   {userData?.artistProfile?.isVerified && (
                     <button

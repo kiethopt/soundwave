@@ -1,5 +1,3 @@
-import { ChangeEvent, FormEvent } from 'react';
-
 // Form Data Types
 export interface FormData {
   title: string;

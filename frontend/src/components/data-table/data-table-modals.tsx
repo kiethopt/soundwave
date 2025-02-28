@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import Image from 'next/image';
 import { Facebook, Instagram, Verified } from '../ui/Icons';
 import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
+import { Switch } from '../ui/switch';
 
 interface EditTrackModalProps {
   track: Track | null;
@@ -766,6 +767,13 @@ export function EditArtistModal({
   );
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isActive, setIsActive] = useState(artist?.isActive ?? false);
+
+  useEffect(() => {
+    if (artist) {
+      setIsActive(artist.isActive);
+    }
+  }, [artist]);
 
   if (!artist) return null;
 
@@ -779,24 +787,24 @@ export function EditArtistModal({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsUploading(true);
+    const formData = new FormData(e.currentTarget);
+    formData.append('isActive', isActive.toString());
+
     try {
-      const formData = new FormData(e.currentTarget);
       const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
+      if (!token) {
+        toast.error('No authentication token found');
+        return;
+      }
 
       const response = await api.admin.updateArtist(artist.id, formData, token);
-
-      // Fetch lại dữ liệu artist mới nhất
-      const updatedData = await api.admin.getArtistById(artist.id, token);
-      onUpdate(updatedData); // Cập nhật toàn bộ dữ liệu artist
+      onUpdate(response.artist);
       onClose();
       toast.success('Artist updated successfully');
     } catch (error) {
-      console.error('Error updating artist:', error);
-      toast.error('Failed to update artist');
-    } finally {
-      setIsUploading(false);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update artist'
+      );
     }
   };
 
@@ -808,15 +816,10 @@ export function EditArtistModal({
         } p-6 rounded-lg shadow-lg max-w-lg w-full`}
       >
         <DialogHeader>
-          <DialogTitle
-            className={theme === 'dark' ? 'text-white' : 'text-gray-900'}
-          >
-            Edit Artist
-          </DialogTitle>
-          <DialogDescription
-            className={theme === 'dark' ? 'text-white/70' : 'text-gray-500'}
-          >
-            Update artist details below.
+          <DialogTitle>Edit Artist</DialogTitle>
+          <DialogDescription>
+            Make changes to artist information here. Click save when you're
+            done.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
@@ -894,6 +897,29 @@ export function EditArtistModal({
             />
           </div>
 
+          {/* Account Status */}
+          <div className="space-y-2">
+            <span
+              className={`block text-sm font-medium ${
+                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+              }`}
+            >
+              Account Status
+            </span>
+            <div className="flex items-center justify-between">
+              <span
+                className={theme === 'dark' ? 'text-white' : 'text-gray-700'}
+              >
+                {isActive ? 'Active' : 'Inactive'}
+              </span>
+              <Switch
+                checked={isActive}
+                onCheckedChange={setIsActive}
+                className={theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'}
+              />
+            </div>
+          </div>
+
           {/* Buttons */}
           <div className="flex justify-end gap-3">
             <Button
@@ -939,8 +965,22 @@ export function EditUserModal({
 }: EditUserModalProps) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isActive, setIsActive] = useState(user?.isActive ?? false);
+
+  useEffect(() => {
+    if (user) {
+      setIsActive(user.isActive);
+    }
+  }, [user]);
 
   if (!user) return null;
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    formData.append('isActive', isActive.toString());
+    onSubmit(user.id, formData);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -969,15 +1009,13 @@ export function EditUserModal({
           >
             Edit User
           </DialogTitle>
+          <DialogDescription
+            className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}
+          >
+            Make changes to user information here. Click save when you're done.
+          </DialogDescription>
         </DialogHeader>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const formData = new FormData(e.currentTarget);
-            onSubmit(user.id, formData);
-          }}
-          className="space-y-6 mt-4"
-        >
+        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
           {/* Avatar */}
           <div className="space-y-2">
             <span
@@ -1080,6 +1118,29 @@ export function EditUserModal({
                   : 'bg-white border-gray-300'
               }`}
             />
+          </div>
+
+          {/* Account Status */}
+          <div className="space-y-2">
+            <span
+              className={`block text-sm font-medium ${
+                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+              }`}
+            >
+              Account Status
+            </span>
+            <div className="flex items-center justify-between">
+              <span
+                className={theme === 'dark' ? 'text-white' : 'text-gray-700'}
+              >
+                {isActive ? 'Active' : 'Inactive'}
+              </span>
+              <Switch
+                checked={isActive}
+                onCheckedChange={setIsActive}
+                className={theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'}
+              />
+            </div>
           </div>
 
           {/* Buttons */}

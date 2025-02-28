@@ -229,10 +229,13 @@ export const api = {
     getUserById: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/users/${id}`, { method: 'GET' }, token),
 
-    updateUser: async (userId: string, data: FormData, token: string) =>
+    updateUser: async (userId: string, data: FormData | any, token: string) =>
       fetchWithAuth(
         `/api/admin/users/${userId}`,
-        { method: 'PUT', body: data },
+        {
+          method: 'PUT',
+          body: data,
+        },
         token
       ),
 

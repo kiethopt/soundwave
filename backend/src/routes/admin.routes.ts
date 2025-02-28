@@ -16,8 +16,6 @@ import {
   rejectArtistRequest,
   verifyArtist,
   getArtistRequestDetail,
-  deactivateUser,
-  deactivateArtist,
   deleteArtist,
   updateArtist,
 } from '../controllers/admin.controller';
@@ -71,13 +69,6 @@ router.delete(
   authenticate,
   authorize([Role.ADMIN]),
   deleteArtist
-);
-router.patch('/users/:id/deactivate', authorize([Role.ADMIN]), deactivateUser);
-router.patch(
-  '/artists/:id/deactivate',
-  authenticate,
-  authorize([Role.ADMIN]),
-  deactivateArtist
 );
 
 // Quản lý nghệ sĩ

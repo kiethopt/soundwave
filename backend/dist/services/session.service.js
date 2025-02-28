@@ -75,16 +75,6 @@ class SessionService {
             yield cache_middleware_1.client.expire(`user_sessions:${userId}`, this.SESSION_TTL);
         });
     }
-    handleUserDeactivation(userId) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const sessions = yield this.getUserSessions(userId);
-            yield pusher_1.default.trigger(`user-${userId}`, 'account-status', {
-                type: 'ACCOUNT_DEACTIVATED',
-                message: 'Your account has been deactivated by admin',
-            });
-            yield cache_middleware_1.client.del(`user_sessions:${userId}`);
-        });
-    }
     handleAudioPlay(userId, currentSessionId) {
         return __awaiter(this, void 0, void 0, function* () {
             const sessions = yield this.getUserSessions(userId);

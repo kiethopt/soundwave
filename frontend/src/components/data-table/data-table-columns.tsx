@@ -32,7 +32,7 @@ import Link from 'next/link';
 import React from 'react';
 import { api } from '@/utils/api';
 import { ArtistInfoModal } from './data-table-modals';
-import { AddSimple, Edit, Key, Power, User as UserIcon } from '../ui/Icons';
+import { AddSimple, Edit, Power, User as UserIcon } from '../ui/Icons';
 import { Button } from '../ui/button';
 
 interface GetTrackColumnsOptions {
@@ -55,7 +55,6 @@ interface GetUserColumnsOptions {
   theme?: 'light' | 'dark';
   onStatusChange?: (id: string, isActive: boolean) => Promise<void>;
   onDelete?: (id: string | string[]) => Promise<void>;
-  onResetPassword?: (id: string) => Promise<void>;
   onEdit?: (user: User) => void;
   onView?: (user: User) => void;
 }
@@ -681,10 +680,8 @@ export function getAlbumColumns({
 
 export function getUserColumns({
   theme = 'light',
-  onStatusChange,
-  onDelete,
-  onResetPassword,
   onEdit,
+  onDelete,
   onView,
 }: GetUserColumnsOptions): ColumnDef<User>[] {
   return [
@@ -813,11 +810,20 @@ export function getUserColumns({
               <MoreHorizontal className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onView && onView(user)}>
-                <Eye className="w-4 h-4 mr-2" />
-                View Details
+              <DropdownMenuItem onClick={() => onEdit && onEdit(user)}>
+                Edit User
               </DropdownMenuItem>
-              {/* ... các menu item khác ... */}
+              {/* <DropdownMenuItem
+                onClick={() => onResetPassword && onResetPassword(user.id)}
+              >
+                Reset Password
+              </DropdownMenuItem> */}
+              <DropdownMenuItem
+                onClick={() => onDelete && onDelete(user.id)}
+                className="text-red-600 focus:text-red-600"
+              >
+                Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -1217,61 +1223,6 @@ export function getArtistRequestColumns({
           </DropdownMenu>
         );
       },
-    },
-  ];
-}
-
-export function getDiscographyColumns({
-  theme = 'light',
-  onEdit,
-}: {
-  theme?: 'light' | 'dark';
-  onEdit?: (item: any) => void;
-}): ColumnDef<any>[] {
-  return [
-    {
-      accessorKey: 'title',
-      header: 'Title',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          {row.original.coverUrl && (
-            <Image
-              src={row.original.coverUrl}
-              alt={row.original.title}
-              width={32}
-              height={32}
-              className="rounded"
-            />
-          )}
-          <span>{row.original.title}</span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'releaseDate',
-      header: 'Release Date',
-      cell: ({ row }) =>
-        new Date(row.original.releaseDate).toLocaleDateString(),
-    },
-    {
-      accessorKey: 'itemType',
-      header: 'Type',
-      cell: ({ row }) => row.original.itemType.toUpperCase(),
-    },
-    {
-      id: 'actions',
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger>
-            <MoreVertical className="h-4 w-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => onEdit?.(row.original)}>
-              Edit Artist
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
     },
   ];
 }

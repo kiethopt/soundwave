@@ -1,18 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
-import { sessionService } from '../services/session.service';
+import { client as redis } from './cache.middleware';
 import prisma from '../config/db';
 
-// Thêm interface cho Error mở rộng
 interface ErrorWithCode extends Error {
   code?: string;
   status?: number;
 }
 
-// Danh sách các route yêu cầu session validation
 const SESSION_REQUIRED_PATHS = [
   '/api/tracks/:trackId/play',
   '/api/albums/:albumId/play',
   '/api/admin/users/:id/deactivate',
+  '/api/user/profile',
+  '/api/user/playlists',
+  '/api/user/favorites',
+  '/api/user/history',
 ];
 
 export const sessionMiddleware = async (
@@ -20,13 +22,11 @@ export const sessionMiddleware = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  // Kiểm tra xem route hiện tại có yêu cầu session không
   const requiresSession = SESSION_REQUIRED_PATHS.some((path) => {
     const regex = new RegExp(`^${path.replace(/:\w+/g, '\\w+')}$`);
     return regex.test(req.path);
   });
 
-  // Nếu route không yêu cầu session, bỏ qua middleware
   if (!requiresSession) {
     return next();
   }
@@ -44,33 +44,36 @@ export const sessionMiddleware = async (
   }
 
   try {
-    const isValidSession = await sessionService.validateSession(
-      userId,
-      sessionId
-    );
+    // Kiểm tra session trong Redis
+    const sessionData = await redis.hGet(`user_sessions:${userId}`, sessionId);
 
-    if (!isValidSession) {
+    if (!sessionData) {
       const error = new Error('Session expired or invalid') as ErrorWithCode;
       error.code = 'INVALID_SESSION';
       error.status = 401;
       return next(error);
     }
 
+    // Kiểm tra trạng thái active của user
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { isActive: true },
     });
 
     if (!user?.isActive) {
-      await sessionService.handleUserDeactivation(userId);
+      // Xóa session nếu tài khoản bị khóa
+      await redis.del(`user_sessions:${userId}`);
+
       const error = new Error(
-        'Your account has been deactivated'
+        'Your account has been deactivated. Please contact admin'
       ) as ErrorWithCode;
       error.code = 'ACCOUNT_DEACTIVATED';
       error.status = 403;
       return next(error);
     }
 
+    // Refresh session TTL
+    await redis.expire(`user_sessions:${userId}`, 24 * 60 * 60); // 24 hours
     next();
   } catch (error) {
     next(error);

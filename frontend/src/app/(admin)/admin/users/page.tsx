@@ -67,53 +67,49 @@ export default function UserManagement() {
   const [rowSelection, setRowSelection] = useState({});
 
   // Modal states
-  const [editingUser, setUpdatingUser] = useState<User | null>(null);
+  const [updatingUser, setUpdatingUser] = useState<User | null>(null);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
 
   // Action handlers
-  const handleUserStatus = async (userId: string, isActive: boolean) => {
+  const handleUpdateUser = async (
+    userId: string,
+    data: FormData | { isActive: boolean }
+  ) => {
     try {
-      setActionLoading(userId);
       const token = localStorage.getItem('userToken');
       if (!token) {
         toast.error('No authentication token found');
         return;
       }
 
-      await api.admin.deactivateUser(userId, { isActive: !isActive }, token);
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.id === userId ? { ...user, isActive: !isActive } : user
-        )
+      setActionLoading(userId);
+
+      const isFormData = data instanceof FormData;
+      const requestData = isFormData ? data : JSON.stringify(data);
+
+      // Gửi yêu cầu cập nhật
+      await api.admin.updateUser(userId, requestData, token);
+
+      // Cập nhật UI
+      const params = new URLSearchParams();
+      params.set('page', currentPage.toString());
+      params.set('limit', limit.toString());
+      if (searchInput) params.append('q', searchInput);
+      if (statusFilter.length === 1) params.append('status', statusFilter[0]);
+
+      const response = await api.admin.getAllUsers(
+        token,
+        currentPage,
+        limit,
+        params.toString()
       );
-      toast.success(
-        `User ${isActive ? 'deactivated' : 'activated'} successfully`
-      );
+
+      setUsers(response.users);
+      setUpdatingUser(null);
+      toast.success('User updated successfully');
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to update user'
-      );
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleResetPassword = async (userId: string) => {
-    try {
-      setActionLoading(userId);
-      const token = localStorage.getItem('userToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        return;
-      }
-
-      await api.auth.requestPasswordReset(
-        users.find((u) => u.id === userId)?.email || ''
-      );
-      toast.success('Password reset email sent successfully');
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to reset password'
       );
     } finally {
       setActionLoading(null);
@@ -177,45 +173,10 @@ export default function UserManagement() {
     }
   };
 
-  const handleUpdateUser = async (userId: string, formData: FormData) => {
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        return;
-      }
-
-      await api.admin.updateUser(userId, formData, token);
-
-      const params = new URLSearchParams();
-      params.set('page', currentPage.toString());
-      params.set('limit', limit.toString());
-      if (searchInput) params.append('q', searchInput);
-      if (statusFilter.length === 1) params.append('status', statusFilter[0]);
-
-      const response = await api.admin.getAllUsers(
-        token,
-        currentPage,
-        limit,
-        params.toString()
-      );
-      setUsers(response.users);
-
-      setUpdatingUser(null);
-      toast.success('User updated successfully');
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to update user'
-      );
-    }
-  };
-
   // Table configuration
   const columns = getUserColumns({
     theme,
-    onStatusChange: handleUserStatus,
     onDelete: handleDeleteUsers,
-    onResetPassword: handleResetPassword,
     onEdit: setUpdatingUser,
     onView: setViewingUser,
   });
@@ -335,7 +296,7 @@ export default function UserManagement() {
       />
 
       <EditUserModal
-        user={editingUser}
+        user={updatingUser}
         onClose={() => setUpdatingUser(null)}
         onSubmit={handleUpdateUser}
         theme={theme}

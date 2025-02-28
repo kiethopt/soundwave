@@ -246,7 +246,7 @@ export const updateUser = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, email, username } = req.body;
+    const { name, email, username, isActive } = req.body;
     const avatarFile = req.file;
 
     // Validation
@@ -304,6 +304,12 @@ export const updateUser = async (
       avatarUrl = uploadResult.secure_url;
     }
 
+    // Chuyển đổi isActive thành boolean
+    const isActiveBool =
+      isActive !== undefined
+        ? isActive === 'true' || isActive === true
+        : undefined;
+
     // Cập nhật user
     const updatedUser = await prisma.user.update({
       where: { id },
@@ -313,17 +319,16 @@ export const updateUser = async (
         ...(username && { username }),
         ...(avatarUrl &&
           avatarUrl !== currentUser.avatar && { avatar: avatarUrl }),
+        ...(isActiveBool !== undefined && { isActive: isActiveBool }),
       },
       select: userSelect,
     });
 
-    // Clear cache
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await clearCacheForEntity('user', { entityId: id, clearSearch: true });
-    }
-
     res.json({
-      message: 'User updated successfully',
+      message:
+        isActiveBool !== undefined
+          ? `User ${isActiveBool ? 'activated' : 'deactivated'} successfully`
+          : 'User updated successfully',
       user: updatedUser,
     });
   } catch (error) {
@@ -339,7 +344,7 @@ export const updateArtist = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { artistName, bio, socialMediaLinks } = req.body;
+    const { artistName, bio, socialMediaLinks, isActive } = req.body;
     const avatarFile = req.file;
 
     // Validation
@@ -390,6 +395,12 @@ export const updateArtist = async (
       avatarUrl = uploadResult.secure_url;
     }
 
+    // Chuyển đổi isActive thành boolean
+    const isActiveBool =
+      isActive !== undefined
+        ? isActive === 'true' || isActive === true
+        : undefined;
+
     // Cập nhật artist
     const updatedArtist = await prisma.artistProfile.update({
       where: { id },
@@ -399,17 +410,16 @@ export const updateArtist = async (
         ...(socialMediaLinks && { socialMediaLinks }),
         ...(avatarUrl &&
           avatarUrl !== existingArtist.avatar && { avatar: avatarUrl }),
+        ...(isActiveBool !== undefined && { isActive: isActiveBool }),
       },
       select: artistProfileSelect,
     });
 
-    // Clear cache
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await clearCacheForEntity('artist', { entityId: id, clearSearch: true });
-    }
-
     res.json({
-      message: 'Artist updated successfully',
+      message:
+        isActiveBool !== undefined
+          ? `Artist ${isActiveBool ? 'activated' : 'deactivated'} successfully`
+          : 'Artist updated successfully',
       artist: updatedArtist,
     });
   } catch (error) {
@@ -468,121 +478,6 @@ export const deleteArtist = async (
     res.json({ message: 'Artist deleted permanently' });
   } catch (error) {
     console.error('Delete artist error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
-// Deactivate user (Khóa tài khoản người dùng)
-export const deactivateUser = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { isActive } = req.body;
-    const admin = req.user;
-
-    // Kiểm tra quyền admin
-    if (!admin || admin.role !== Role.ADMIN) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
-    }
-
-    // Kiểm tra user tồn tại
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        role: true,
-        isActive: true,
-        email: true,
-      },
-    });
-
-    if (!user) {
-      res.status(404).json({ message: 'User not found' });
-      return;
-    }
-
-    // Không cho phép deactivate ADMIN
-    if (user.role === Role.ADMIN) {
-      res.status(403).json({ message: 'Cannot deactivate admin users' });
-      return;
-    }
-
-    // Cập nhật trạng thái user
-    const updatedUser = await prisma.user.update({
-      where: { id },
-      data: {
-        isActive: isActive,
-      },
-      select: userSelect,
-    });
-
-    // Clear tất cả cache liên quan đến users list
-    const keys = await client.keys('users:list:*');
-    if (keys.length) {
-      await Promise.all(keys.map((key) => client.del(key)));
-    }
-
-    // Chỉ gửi thông báo Pusher khi deactivate tài khoản
-    if (!isActive) {
-      await sessionService.handleUserDeactivation(user.id);
-    }
-
-    res.json({
-      message: isActive
-        ? 'User activated successfully'
-        : 'User deactivated successfully',
-      user: updatedUser,
-    });
-  } catch (error) {
-    console.error('Deactivate user error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
-// Deactivate artist (Khóa tài khoản nghệ sĩ)
-export const deactivateArtist = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { isActive } = req.body;
-
-    const artist = await prisma.artistProfile.findUnique({
-      where: { id },
-      include: { user: true },
-    });
-
-    if (!artist) {
-      res.status(404).json({ message: 'Artist not found' });
-      return;
-    }
-
-    // Cập nhật trạng thái user và artist profile
-    const [updatedUser] = await prisma.$transaction([
-      prisma.user.update({
-        where: { id: artist.userId },
-        data: {
-          isActive,
-          ...(!isActive ? { currentProfile: 'USER' } : {}), // Reset profile nếu deactivate
-        },
-        select: userSelect,
-      }),
-      prisma.artistProfile.update({
-        where: { id },
-        data: { isActive },
-      }),
-    ]);
-
-    res.json({
-      message: `Artist ${isActive ? 'activated' : 'deactivated'} successfully`,
-      user: updatedUser,
-    });
-  } catch (error) {
-    console.error('Deactivate artist error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
