@@ -95,36 +95,6 @@ class SessionService {
       currentSessionId,
     });
   }
-
-  // Xử lý khi user được chấp nhận yêu cầu trở thành nghệ sĩ
-  async handleArtistRequestApproval(userId: string): Promise<void> {
-    try {
-      await pusher.trigger(`user-${userId}`, 'artist-request-status', {
-        type: 'REQUEST_APPROVED',
-        message: 'Your artist request has been approved',
-        hasPendingRequest: false,
-      });
-    } catch (error) {
-      console.error('[Pusher] Error sending approval event:', error);
-      throw error;
-    }
-  }
-
-  // Xử lý khi user bị từ chối yêu cầu trở thành nghệ sĩ
-  async handleArtistRequestRejection(userId: string): Promise<void> {
-    try {
-      console.log(`[Pusher] Sending rejection event to user ${userId}`);
-      await pusher.trigger(`user-${userId}`, 'artist-request-status', {
-        type: 'REQUEST_REJECTED',
-        message: 'Your artist request has been rejected',
-        hasPendingRequest: false,
-      });
-      console.log(`[Pusher] Event sent successfully to user ${userId}`);
-    } catch (error) {
-      console.error('[Pusher] Error sending rejection event:', error);
-      throw error;
-    }
-  }
 }
 
 export const sessionService = new SessionService();

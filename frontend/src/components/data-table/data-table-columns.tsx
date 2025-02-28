@@ -1083,21 +1083,20 @@ export function getArtistColumns({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  onClick={() =>
-                    onStatusChange && onStatusChange(artist.id, artist.isActive)
-                  }
-                >
-                  <Power className="w-4 h-4 mr-2" />
-                  {artist.isActive ? 'Deactivate' : 'Activate'}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
                   onClick={() => onDelete && onDelete(artist.id)}
                   className="text-red-600"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete Artist
                 </DropdownMenuItem>
+                {/* <DropdownMenuSeparator /> */}
+                {/* <DropdownMenuItem
+                  onClick={() => onDelete && onDelete(artist.id)}
+                  className="text-red-600"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Artist
+                </DropdownMenuItem> */}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

@@ -16,7 +16,6 @@ exports.getStats = exports.verifyArtist = exports.rejectArtistRequest = exports.
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
-const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const cloudinary_service_1 = require("../services/cloudinary.service");
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -600,11 +599,6 @@ exports.deleteGenre = deleteGenre;
 const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { requestId } = req.body;
-        const admin = req.user;
-        if (!admin || admin.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden' });
-            return;
-        }
         const artistProfile = yield db_1.default.artistProfile.findUnique({
             where: { id: requestId },
             include: {
@@ -619,33 +613,25 @@ const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, fun
                 },
             },
         });
-        if (!artistProfile ||
-            !artistProfile.verificationRequestedAt ||
-            artistProfile.isVerified) {
+        if (!(artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.verificationRequestedAt) || artistProfile.isVerified) {
             res
                 .status(404)
                 .json({ message: 'Artist request not found or already verified' });
             return;
         }
-        yield db_1.default.$transaction([
-            db_1.default.artistProfile.update({
-                where: { id: requestId },
-                data: {
-                    role: client_1.Role.ARTIST,
-                    isVerified: true,
-                    verifiedAt: new Date(),
-                    verificationRequestedAt: null,
-                },
-            }),
-        ]);
-        const updatedUser = yield db_1.default.user.findUnique({
-            where: { id: artistProfile.userId },
-            select: prisma_selects_1.userSelect,
+        const updatedProfile = yield db_1.default.artistProfile.update({
+            where: { id: requestId },
+            data: {
+                role: client_1.Role.ARTIST,
+                isVerified: true,
+                verifiedAt: new Date(),
+                verificationRequestedAt: null,
+            },
+            include: { user: { select: prisma_selects_1.userSelect } },
         });
-        yield session_service_1.sessionService.handleArtistRequestApproval(artistProfile.user.id);
         res.json({
             message: 'Artist role approved successfully',
-            user: updatedUser,
+            user: updatedProfile.user,
         });
     }
     catch (error) {
@@ -656,24 +642,11 @@ const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, fun
 exports.approveArtistRequest = approveArtistRequest;
 const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log('[Admin] Starting reject artist request process');
         const { requestId } = req.body;
-        const admin = req.user;
-        if (!admin || admin.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden' });
-            return;
-        }
         const artistProfile = yield db_1.default.artistProfile.findUnique({
             where: { id: requestId },
             include: {
-                user: {
-                    select: {
-                        id: true,
-                        email: true,
-                        name: true,
-                        role: true,
-                    },
-                },
+                user: { select: { id: true, email: true, name: true, role: true } },
             },
         });
         if (!artistProfile ||
@@ -687,7 +660,6 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
         yield db_1.default.artistProfile.delete({
             where: { id: requestId },
         });
-        yield session_service_1.sessionService.handleArtistRequestRejection(artistProfile.user.id);
         res.json({
             message: 'Artist role request rejected successfully',
             user: artistProfile.user,

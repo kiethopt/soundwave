@@ -84,38 +84,6 @@ class SessionService {
             });
         });
     }
-    handleArtistRequestApproval(userId) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                yield pusher_1.default.trigger(`user-${userId}`, 'artist-request-status', {
-                    type: 'REQUEST_APPROVED',
-                    message: 'Your artist request has been approved',
-                    hasPendingRequest: false,
-                });
-            }
-            catch (error) {
-                console.error('[Pusher] Error sending approval event:', error);
-                throw error;
-            }
-        });
-    }
-    handleArtistRequestRejection(userId) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                console.log(`[Pusher] Sending rejection event to user ${userId}`);
-                yield pusher_1.default.trigger(`user-${userId}`, 'artist-request-status', {
-                    type: 'REQUEST_REJECTED',
-                    message: 'Your artist request has been rejected',
-                    hasPendingRequest: false,
-                });
-                console.log(`[Pusher] Event sent successfully to user ${userId}`);
-            }
-            catch (error) {
-                console.error('[Pusher] Error sending rejection event:', error);
-                throw error;
-            }
-        });
-    }
 }
 exports.sessionService = new SessionService();
 //# sourceMappingURL=session.service.js.map

@@ -12,7 +12,7 @@ import {
 } from '../utils/prisma-selects';
 import { uploadFile } from '../services/cloudinary.service';
 
-// Lấy danh sách tất cả người dùng
+// Lấy danh sách tất cả người dùng - ADMIN only
 export const getAllUsers = async (
   req: Request,
   res: Response
@@ -85,7 +85,7 @@ export const getAllUsers = async (
   }
 };
 
-// Lấy thông tin chi tiết của một người dùng
+// Lấy thông tin chi tiết của một người dùng - ADMIN only
 export const getUserById = async (
   req: Request,
   res: Response
@@ -126,7 +126,7 @@ export const getUserById = async (
   }
 };
 
-// Lấy tất cả request yêu cầu trở thành Artist từ User
+// Lấy tất cả request yêu cầu trở thành Artist từ User - ADMIN only
 export const getAllArtistRequests = async (
   req: Request,
   res: Response
@@ -198,7 +198,7 @@ export const getAllArtistRequests = async (
   }
 };
 
-// Xem chi tiết request yêu cầu trở thành Artist từ User
+// Xem chi tiết request yêu cầu trở thành Artist từ User - ADMIN only
 export const getArtistRequestDetail = async (
   req: Request,
   res: Response
@@ -239,7 +239,7 @@ export const getArtistRequestDetail = async (
   }
 };
 
-// Cập nhật thông tin người dùng
+// Cập nhật thông tin người dùng - ADMIN only
 export const updateUser = async (
   req: Request,
   res: Response
@@ -337,7 +337,7 @@ export const updateUser = async (
   }
 };
 
-// Cập nhật thông tin nghệ sĩ
+// Cập nhật thông tin nghệ sĩ - ADMIN only
 export const updateArtist = async (
   req: Request,
   res: Response
@@ -428,7 +428,7 @@ export const updateArtist = async (
   }
 };
 
-// Xóa người dùng
+// Xóa người dùng - ADMIN only
 export const deleteUser = async (
   req: Request,
   res: Response
@@ -453,7 +453,7 @@ export const deleteUser = async (
   }
 };
 
-// Xóa nghệ sĩ
+// Xóa nghệ sĩ - ADMIN only
 export const deleteArtist = async (
   req: Request,
   res: Response
@@ -482,7 +482,7 @@ export const deleteArtist = async (
   }
 };
 
-// Lấy danh sách tất cả nghệ sĩ
+// Lấy danh sách tất cả nghệ sĩ - ADMIN only
 export const getAllArtists = async (
   req: Request,
   res: Response
@@ -538,7 +538,7 @@ export const getAllArtists = async (
   }
 };
 
-// Lấy thông tin chi tiết của một nghệ sĩ
+// Lấy thông tin chi tiết của một nghệ sĩ - ADMIN only
 export const getArtistById = async (
   req: Request,
   res: Response
@@ -593,7 +593,7 @@ export const getArtistById = async (
   }
 };
 
-// Lấy danh sách tất cả thể loại nhạc
+// Lấy danh sách tất cả thể loại nhạc - ADMIN only
 export const getAllGenres = async (
   req: Request,
   res: Response
@@ -644,7 +644,7 @@ export const getAllGenres = async (
   }
 };
 
-// Tạo thể loại nhạc mới
+// Tạo thể loại nhạc mới - ADMIN only
 export const createGenre = async (
   req: Request,
   res: Response
@@ -688,7 +688,7 @@ export const createGenre = async (
   }
 };
 
-// Cập nhật thể loại nhạc
+// Cập nhật thể loại nhạc - ADMIN only
 export const updateGenre = async (
   req: Request,
   res: Response
@@ -756,7 +756,7 @@ export const updateGenre = async (
   }
 };
 
-// Xóa thể loại nhạc
+// Xóa thể loại nhạc - ADMIN only
 export const deleteGenre = async (
   req: Request,
   res: Response
@@ -786,13 +786,8 @@ export const approveArtistRequest = async (
 ): Promise<void> => {
   try {
     const { requestId } = req.body;
-    const admin = req.user;
 
-    if (!admin || admin.role !== Role.ADMIN) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
-    }
-
+    // Lấy và kiểm tra ArtistProfile
     const artistProfile = await prisma.artistProfile.findUnique({
       where: { id: requestId },
       include: {
@@ -808,40 +803,28 @@ export const approveArtistRequest = async (
       },
     });
 
-    if (
-      !artistProfile ||
-      !artistProfile.verificationRequestedAt ||
-      artistProfile.isVerified
-    ) {
+    if (!artistProfile?.verificationRequestedAt || artistProfile.isVerified) {
       res
         .status(404)
         .json({ message: 'Artist request not found or already verified' });
       return;
     }
 
-    // Cập nhật ArtistProfile: chuyển thành ARTIST, xác thực và xóa trường verificationRequestedAt
-    await prisma.$transaction([
-      prisma.artistProfile.update({
-        where: { id: requestId },
-        data: {
-          role: Role.ARTIST,
-          isVerified: true,
-          verifiedAt: new Date(),
-          verificationRequestedAt: null,
-        },
-      }),
-    ]);
-
-    const updatedUser = await prisma.user.findUnique({
-      where: { id: artistProfile.userId },
-      select: userSelect,
+    // Cập nhật ArtistProfile và lấy thông tin user ngay trong một truy vấn
+    const updatedProfile = await prisma.artistProfile.update({
+      where: { id: requestId },
+      data: {
+        role: Role.ARTIST,
+        isVerified: true,
+        verifiedAt: new Date(),
+        verificationRequestedAt: null,
+      },
+      include: { user: { select: userSelect } },
     });
-
-    await sessionService.handleArtistRequestApproval(artistProfile.user.id);
 
     res.json({
       message: 'Artist role approved successfully',
-      user: updatedUser,
+      user: updatedProfile.user,
     });
   } catch (error) {
     console.error('Approve artist request error:', error);
@@ -855,26 +838,12 @@ export const rejectArtistRequest = async (
   res: Response
 ): Promise<void> => {
   try {
-    console.log('[Admin] Starting reject artist request process');
     const { requestId } = req.body;
-    const admin = req.user;
-
-    if (!admin || admin.role !== Role.ADMIN) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
-    }
 
     const artistProfile = await prisma.artistProfile.findUnique({
       where: { id: requestId },
       include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-          },
-        },
+        user: { select: { id: true, email: true, name: true, role: true } },
       },
     });
 
@@ -889,12 +858,9 @@ export const rejectArtistRequest = async (
       return;
     }
 
-    // Xóa artist profile - sẽ tự động clear cache thông qua extension
     await prisma.artistProfile.delete({
       where: { id: requestId },
     });
-
-    await sessionService.handleArtistRequestRejection(artistProfile.user.id);
 
     res.json({
       message: 'Artist role request rejected successfully',
@@ -960,7 +926,7 @@ export const verifyArtist = async (
   }
 };
 
-// Lấy thông số tổng quan để thống kê
+// Lấy thông số tổng quan để thống kê - ADMIN only
 export const getStats = async (req: Request, res: Response): Promise<void> => {
   try {
     const cacheKey = req.originalUrl;

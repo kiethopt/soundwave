@@ -5,7 +5,6 @@ import {
   Notifications,
   DiscoverFilled,
   DiscoverOutline,
-  Home,
   Menu,
   Search,
   Settings,
@@ -21,10 +20,8 @@ import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { set } from 'lodash';
 
 export default function Header({
-  isSidebarOpen,
   onMenuClick,
 }: {
   isSidebarOpen?: boolean;
@@ -216,14 +213,11 @@ export default function Header({
 
       const response = await api.auth.switchProfile(token);
 
-      // Kiểm tra nếu artist profile bị deactivate
       if (
         response.user.artistProfile &&
         !response.user.artistProfile.isActive
       ) {
-        toast.error(
-          'Artist profile has been deactivated. Please contact admin'
-        );
+        toast.error('Your artist account has been deactivated');
         return;
       }
 
@@ -239,7 +233,11 @@ export default function Header({
       console.error('Error switching profile:', error);
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to switch profile';
-      toast.error(errorMessage);
+      toast.error(
+        errorMessage.includes('deactivated')
+          ? 'Your account has been deactivated'
+          : errorMessage
+      );
     }
     setShowDropdown(false);
   };
