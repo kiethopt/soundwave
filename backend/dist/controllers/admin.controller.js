@@ -194,7 +194,7 @@ exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { name, email, username, isActive } = req.body;
+        const { name, email, username, isActive, role } = req.body;
         const avatarFile = req.file;
         const validationErrors = [];
         if (!id)
@@ -210,6 +210,9 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 .status(400)
                 .json({ message: 'Validation failed', errors: validationErrors });
             return;
+        }
+        if (role && !['USER', 'ARTIST', 'ADMIN'].includes(role)) {
+            validationErrors.push('Invalid role value');
         }
         const currentUser = yield db_1.default.user.findUnique({
             where: { id },
@@ -247,8 +250,8 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             : undefined;
         const updatedUser = yield db_1.default.user.update({
             where: { id },
-            data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (email && { email })), (username && { username })), (avatarUrl &&
-                avatarUrl !== currentUser.avatar && { avatar: avatarUrl })), (isActiveBool !== undefined && { isActive: isActiveBool })),
+            data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (email && { email })), (username && { username })), (avatarUrl &&
+                avatarUrl !== currentUser.avatar && { avatar: avatarUrl })), (isActiveBool !== undefined && { isActive: isActiveBool })), (role && { role })),
             select: prisma_selects_1.userSelect,
         });
         res.json({

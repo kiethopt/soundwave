@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { clearCacheForEntity } from './cache.middleware';
 import { client as redis } from './cache.middleware';
 
@@ -7,6 +7,21 @@ export const adminExtension = Prisma.defineExtension((client) => {
     query: {
       user: {
         async update({ args, query }) {
+          // Kiểm tra nếu role được cập nhật thành ADMIN
+          if (args.data.role === Role.ADMIN) {
+            // Tìm và xóa ArtistProfile nếu tồn tại
+            const existingArtistProfile = await client.artistProfile.findUnique(
+              {
+                where: { userId: args.where.id },
+              }
+            );
+            if (existingArtistProfile) {
+              await client.artistProfile.delete({
+                where: { userId: args.where.id },
+              });
+            }
+          }
+
           const result = await query(args);
 
           // Nếu user bị deactivate, xóa tất cả session của họ

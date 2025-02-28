@@ -245,7 +245,7 @@ export const updateUser = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, email, username, isActive } = req.body;
+    const { name, email, username, isActive, role } = req.body;
     const avatarFile = req.file;
 
     // Validation
@@ -262,6 +262,9 @@ export const updateUser = async (
         .status(400)
         .json({ message: 'Validation failed', errors: validationErrors });
       return;
+    }
+    if (role && !['USER', 'ARTIST', 'ADMIN'].includes(role)) {
+      validationErrors.push('Invalid role value');
     }
 
     // Kiểm tra user tồn tại
@@ -319,6 +322,7 @@ export const updateUser = async (
         ...(avatarUrl &&
           avatarUrl !== currentUser.avatar && { avatar: avatarUrl }),
         ...(isActiveBool !== undefined && { isActive: isActiveBool }),
+        ...(role && { role }),
       },
       select: userSelect,
     });

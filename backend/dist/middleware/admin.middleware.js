@@ -19,6 +19,16 @@ exports.adminExtension = client_1.Prisma.defineExtension((client) => {
             user: {
                 update(_a) {
                     return __awaiter(this, arguments, void 0, function* ({ args, query }) {
+                        if (args.data.role === client_1.Role.ADMIN) {
+                            const existingArtistProfile = yield client.artistProfile.findUnique({
+                                where: { userId: args.where.id },
+                            });
+                            if (existingArtistProfile) {
+                                yield client.artistProfile.delete({
+                                    where: { userId: args.where.id },
+                                });
+                            }
+                        }
                         const result = yield query(args);
                         if (args.data.isActive === false) {
                             yield cache_middleware_2.client.del(`user_sessions:${args.where.id}`);
