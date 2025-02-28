@@ -23,6 +23,17 @@ export const adminExtension = Prisma.defineExtension((client) => {
           ]);
           return result;
         },
+        async delete({ args, query }) {
+          const result = await query(args);
+          await Promise.all([
+            clearCacheForEntity('user', {
+              entityId: args.where.id,
+              clearSearch: true,
+            }),
+            clearCacheForEntity('stats', {}),
+          ]);
+          return result;
+        },
       },
       artistProfile: {
         async update({ args, query }) {

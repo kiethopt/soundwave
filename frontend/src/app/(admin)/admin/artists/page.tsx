@@ -68,16 +68,15 @@ export default function ArtistManagement() {
       setActionLoading(artistId);
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
-      await api.admin.deactivateArtist(
-        artistId,
-        { isActive: !isActive },
-        token
-      );
+
+      await api.admin.updateArtist(artistId, { isActive: !isActive }, token);
+
       setArtists((prev) =>
         prev.map((artist) =>
           artist.id === artistId ? { ...artist, isActive: !isActive } : artist
         )
       );
+
       toast.success(
         `Artist ${isActive ? 'deactivated' : 'activated'} successfully`
       );

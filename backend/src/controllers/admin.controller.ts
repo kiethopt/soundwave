@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { Role } from '@prisma/client';
-import { clearCacheForEntity, client } from '../middleware/cache.middleware';
-import { sessionService } from '../services/session.service';
+import { client } from '../middleware/cache.middleware';
 import {
   artistProfileSelect,
   artistRequestDetailsSelect,
@@ -25,7 +24,7 @@ export const getAllUsers = async (
 
     // Xây dựng điều kiện where gộp tất cả điều kiện
     const where: any = {
-      role: 'USER', // Chỉ lấy user thường, không lấy admin
+      role: 'USER',
       ...(search
         ? {
             OR: [
@@ -435,17 +434,7 @@ export const deleteUser = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-
-    // Xóa ArtistProfile nếu có
-    await prisma.artistProfile.deleteMany({
-      where: { userId: id },
-    });
-
-    // Xóa User
-    await prisma.user.delete({
-      where: { id },
-    });
-
+    await prisma.user.delete({ where: { id } });
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Delete user error:', error);
@@ -460,21 +449,7 @@ export const deleteArtist = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-
-    // Xóa toàn bộ dữ liệu liên quan
-    await prisma.$transaction([
-      prisma.track.deleteMany({ where: { artistId: id } }),
-      prisma.album.deleteMany({ where: { artistId: id } }),
-      prisma.artistProfile.delete({ where: { id } }),
-    ]);
-
-    // Clear cache
-    // await Promise.all([
-    //   clearCacheForEntity('artist', { entityId: id, clearSearch: true }),
-    //   clearCacheForEntity('album', { clearSearch: true }),
-    //   clearCacheForEntity('track', { clearSearch: true }),
-    // ]);
-
+    await prisma.artistProfile.delete({ where: { id } });
     res.json({ message: 'Artist deleted permanently' });
   } catch (error) {
     console.error('Delete artist error:', error);
@@ -740,12 +715,6 @@ export const updateGenre = async (
       data: { name },
     });
 
-    // Clear cache
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await clearCacheForEntity('genre', { entityId: id, clearSearch: true });
-      await clearCacheForEntity('track', { clearSearch: true });
-    }
-
     res.json({
       message: 'Genre updated successfully',
       genre: updatedGenre,
@@ -763,15 +732,7 @@ export const deleteGenre = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-
-    await prisma.genre.delete({
-      where: { id },
-    });
-
-    // Clear cache
-    await clearCacheForEntity('genre', { entityId: id, clearSearch: true });
-    await clearCacheForEntity('track', { clearSearch: true });
-
+    await prisma.genre.delete({ where: { id } });
     res.json({ message: 'Genre deleted successfully' });
   } catch (error) {
     console.error('Delete genre error:', error);
@@ -869,59 +830,6 @@ export const rejectArtistRequest = async (
     });
   } catch (error) {
     console.error('Reject artist request error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
-// Xác thực artist (Verify Artist) - ADMIN only
-export const verifyArtist = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { userId } = req.body;
-    const admin = req.user;
-
-    if (!admin || admin.role !== Role.ADMIN) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
-    }
-
-    // Tìm ArtistProfile trực tiếp bằng id
-    const artistProfile = await prisma.artistProfile.findUnique({
-      where: { id: userId },
-      include: {
-        user: true,
-      },
-    });
-
-    if (!artistProfile || artistProfile.isVerified) {
-      res.status(404).json({ message: 'Artist not found or already verified' });
-      return;
-    }
-
-    // Cập nhật ArtistProfile
-    await prisma.artistProfile.update({
-      where: { id: userId },
-      data: {
-        isVerified: true,
-        verifiedAt: new Date(),
-      },
-    });
-
-    const updatedUser = await prisma.user.findUnique({
-      where: { id: artistProfile.userId },
-      include: {
-        artistProfile: true,
-      },
-    });
-
-    res.json({
-      message: 'Artist verified successfully',
-      user: updatedUser,
-    });
-  } catch (error) {
-    console.error('Verify artist error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

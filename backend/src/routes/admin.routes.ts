@@ -14,21 +14,16 @@ import {
   getArtistById,
   getAllArtistRequests,
   rejectArtistRequest,
-  verifyArtist,
   getArtistRequestDetail,
   deleteArtist,
   updateArtist,
 } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
-import { queryRateLimiter } from '../middleware/rateLimit.middleware';
 import { cacheMiddleware } from '../middleware/cache.middleware';
 import upload from '../middleware/upload.middleware';
 
 const router = express.Router();
-
-// Chỉ ADMIN và ARTIST có thể truy cập các route này
-router.use(authenticate, authorize([Role.ADMIN, Role.ARTIST]));
 
 // Thống kê
 router.get(
@@ -36,18 +31,11 @@ router.get(
   authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
-  queryRateLimiter,
   getStats
 );
 
 // Quản lý người dùng
-router.get(
-  '/users',
-  queryRateLimiter,
-  authenticate,
-  authorize([Role.ADMIN]),
-  getAllUsers
-);
+router.get('/users', authenticate, authorize([Role.ADMIN]), getAllUsers);
 router.get('/users/:id', authenticate, authorize([Role.ADMIN]), getUserById);
 router.put(
   '/users/:id',
@@ -63,7 +51,7 @@ router.put(
   upload.single('avatar'),
   updateArtist
 );
-router.delete('/users/:id', authorize([Role.ADMIN]), deleteUser);
+router.delete('/users/:id', authenticate, authorize([Role.ADMIN]), deleteUser);
 router.delete(
   '/artists/:id',
   authenticate,
@@ -72,12 +60,7 @@ router.delete(
 );
 
 // Quản lý nghệ sĩ
-router.get(
-  '/artists',
-  queryRateLimiter,
-  authorize([Role.ADMIN]),
-  getAllArtists
-);
+router.get('/artists', authenticate, authorize([Role.ADMIN]), getAllArtists);
 router.get(
   '/artists/:id',
   authenticate,
@@ -87,28 +70,20 @@ router.get(
 
 router.get(
   '/artist-requests',
-  queryRateLimiter,
+  authenticate,
   authorize([Role.ADMIN]),
   getAllArtistRequests
 );
 router.get(
   '/artist-requests/:id',
-  queryRateLimiter,
   authenticate,
   authorize([Role.ADMIN]),
   getArtistRequestDetail
-);
-router.post(
-  '/artists/verify',
-  authenticate,
-  authorize([Role.ADMIN]),
-  verifyArtist
 );
 
 // Quản lý thể loại nhạc
 router.get(
   '/genres',
-  queryRateLimiter,
   authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
@@ -122,16 +97,23 @@ router.put(
   upload.none(),
   updateGenre
 );
-router.delete('/genres/:id', deleteGenre);
+router.delete(
+  '/genres/:id',
+  authenticate,
+  authorize([Role.ADMIN]),
+  deleteGenre
+);
 
 // Duyệt yêu cầu trở thành Artist
 router.post(
   '/artist-requests/approve',
+  authenticate,
   authorize([Role.ADMIN]),
   approveArtistRequest
 );
 router.post(
   '/artist-requests/reject',
+  authenticate,
   authorize([Role.ADMIN]),
   rejectArtistRequest
 );

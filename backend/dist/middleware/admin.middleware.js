@@ -33,6 +33,19 @@ exports.adminExtension = client_1.Prisma.defineExtension((client) => {
                         return result;
                     });
                 },
+                delete(_a) {
+                    return __awaiter(this, arguments, void 0, function* ({ args, query }) {
+                        const result = yield query(args);
+                        yield Promise.all([
+                            (0, cache_middleware_1.clearCacheForEntity)('user', {
+                                entityId: args.where.id,
+                                clearSearch: true,
+                            }),
+                            (0, cache_middleware_1.clearCacheForEntity)('stats', {}),
+                        ]);
+                        return result;
+                    });
+                },
             },
             artistProfile: {
                 update(_a) {

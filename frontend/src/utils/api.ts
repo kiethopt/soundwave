@@ -195,25 +195,6 @@ export const api = {
     getArtistById: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/artists/${id}`, { method: 'GET' }, token),
 
-    verifyArtist: async (data: { userId: string }, token: string) =>
-      fetchWithAuth(
-        '/api/admin/artists/verify',
-        {
-          method: 'POST',
-          body: JSON.stringify(data),
-        },
-        token
-      ),
-
-    updateMonthlyListeners: async (id: string, token: string) =>
-      fetchWithAuth(
-        `/api/admin/artists/${id}/update-monthly-listeners`,
-        {
-          method: 'POST',
-        },
-        token
-      ),
-
     getAllUsers: async (
       token: string,
       page: number,
@@ -239,7 +220,11 @@ export const api = {
         token
       ),
 
-    updateArtist: async (artistId: string, data: FormData, token: string) =>
+    updateArtist: async (
+      artistId: string,
+      data: FormData | any,
+      token: string
+    ) =>
       fetchWithAuth(
         `/api/admin/artists/${artistId}`,
         {
@@ -254,31 +239,6 @@ export const api = {
 
     deleteArtist: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/artists/${id}`, { method: 'DELETE' }, token),
-
-    deactivateUser: async (
-      id: string,
-      data: { isActive: boolean },
-      token: string
-    ) =>
-      fetchWithAuth(
-        `/api/admin/users/${id}/deactivate`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify(data),
-        },
-        token
-      ),
-
-    deactivateArtist: async (
-      id: string,
-      data: { isActive: boolean },
-      token: string
-    ) =>
-      fetchWithAuth(
-        `/api/admin/artists/${id}/deactivate`,
-        { method: 'PATCH', body: JSON.stringify(data) },
-        token
-      ),
 
     getAllGenres: async (
       token: string,

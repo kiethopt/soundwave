@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStats = exports.verifyArtist = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
@@ -331,12 +331,7 @@ exports.updateArtist = updateArtist;
 const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        yield db_1.default.artistProfile.deleteMany({
-            where: { userId: id },
-        });
-        yield db_1.default.user.delete({
-            where: { id },
-        });
+        yield db_1.default.user.delete({ where: { id } });
         res.json({ message: 'User deleted successfully' });
     }
     catch (error) {
@@ -348,11 +343,7 @@ exports.deleteUser = deleteUser;
 const deleteArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        yield db_1.default.$transaction([
-            db_1.default.track.deleteMany({ where: { artistId: id } }),
-            db_1.default.album.deleteMany({ where: { artistId: id } }),
-            db_1.default.artistProfile.delete({ where: { id } }),
-        ]);
+        yield db_1.default.artistProfile.delete({ where: { id } });
         res.json({ message: 'Artist deleted permanently' });
     }
     catch (error) {
@@ -565,10 +556,6 @@ const updateGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             where: { id },
             data: { name },
         });
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            yield (0, cache_middleware_1.clearCacheForEntity)('genre', { entityId: id, clearSearch: true });
-            yield (0, cache_middleware_1.clearCacheForEntity)('track', { clearSearch: true });
-        }
         res.json({
             message: 'Genre updated successfully',
             genre: updatedGenre,
@@ -583,11 +570,7 @@ exports.updateGenre = updateGenre;
 const deleteGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        yield db_1.default.genre.delete({
-            where: { id },
-        });
-        yield (0, cache_middleware_1.clearCacheForEntity)('genre', { entityId: id, clearSearch: true });
-        yield (0, cache_middleware_1.clearCacheForEntity)('track', { clearSearch: true });
+        yield db_1.default.genre.delete({ where: { id } });
         res.json({ message: 'Genre deleted successfully' });
     }
     catch (error) {
@@ -672,48 +655,6 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
     }
 });
 exports.rejectArtistRequest = rejectArtistRequest;
-const verifyArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { userId } = req.body;
-        const admin = req.user;
-        if (!admin || admin.role !== client_1.Role.ADMIN) {
-            res.status(403).json({ message: 'Forbidden' });
-            return;
-        }
-        const artistProfile = yield db_1.default.artistProfile.findUnique({
-            where: { id: userId },
-            include: {
-                user: true,
-            },
-        });
-        if (!artistProfile || artistProfile.isVerified) {
-            res.status(404).json({ message: 'Artist not found or already verified' });
-            return;
-        }
-        yield db_1.default.artistProfile.update({
-            where: { id: userId },
-            data: {
-                isVerified: true,
-                verifiedAt: new Date(),
-            },
-        });
-        const updatedUser = yield db_1.default.user.findUnique({
-            where: { id: artistProfile.userId },
-            include: {
-                artistProfile: true,
-            },
-        });
-        res.json({
-            message: 'Artist verified successfully',
-            user: updatedUser,
-        });
-    }
-    catch (error) {
-        console.error('Verify artist error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.verifyArtist = verifyArtist;
 const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const cacheKey = req.originalUrl;
