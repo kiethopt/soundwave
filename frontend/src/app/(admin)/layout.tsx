@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import AdminRoute from '@/components/admin/AdminRoute';
 
 export default function AdminLayout({
   children,
@@ -45,8 +46,10 @@ export default function AdminLayout({
   }
 
   return (
-    <div className={theme === 'light' ? 'bg-white' : 'bg-[#111111]'}>
-      {children}
-    </div>
+    <AdminRoute>
+      <div className={theme === 'light' ? 'bg-white' : 'bg-[#111111]'}>
+        {children}
+      </div>
+    </AdminRoute>
   );
 }
