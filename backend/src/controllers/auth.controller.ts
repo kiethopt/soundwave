@@ -167,7 +167,13 @@ export const registerAdmin = async (
 // Đăng ký (Register)
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, name, username } = req.body;
+    const { email, password, confirmPassword, name, username } = req.body;
+
+    // Kiểm tra password và confirmPassword có khớp không
+    if (password !== confirmPassword) {
+      res.status(400).json({ message: 'Passwords do not match' });
+      return;
+    }
 
     // Validate dữ liệu đăng ký
     const validationError = validateRegisterData({ email, password, username });
@@ -216,14 +222,15 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+
 // Đăng nhập (Login)
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    const { emailOrUsername, password } = req.body;
 
-    const validationError = validateLoginData({ email, password });
-    if (validationError) {
-      res.status(400).json({ message: validationError });
+    // Kiểm tra xem emailOrUsername và password có được cung cấp không
+    if (!emailOrUsername || !password) {
+      res.status(400).json({ message: 'Email/username and password are required' });
       return;
     }
 
@@ -231,13 +238,18 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // 1. Security-critical operation
     // 2. Cần real-time accuracy cho password và isActive status
     // 3. Không phải high-frequency operation
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: emailOrUsername },
+          { username: emailOrUsername }
+        ]
+      },
       select: { ...userSelect, password: true, isActive: true },
     });
 
     if (!user) {
-      res.status(400).json({ message: 'Invalid email or password' });
+      res.status(400).json({ message: 'Invalid email/username or password' });
       return;
     }
 
@@ -251,7 +263,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      res.status(401).json({ message: 'Invalid email or password' });
+      res.status(401).json({ message: 'Invalid email/user or password' });
       return;
     }
 

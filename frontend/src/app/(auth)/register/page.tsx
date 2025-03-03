@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/utils/api';
 import { Music } from '@/components/ui/Icons';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface RegisterFormData {
   email: string;
   username: string;
   password: string;
+  confirmPassword: string;
   name: string;
 }
 
@@ -19,13 +21,46 @@ function RegisterForm() {
     email: '',
     username: '',
     password: '',
+    confirmPassword: '',
     name: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
   const [error, setError] = useState<string>('');
+  const [passwordMatch, setPasswordMatch] = useState<boolean | null>(null);
+
+  const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const confirmPasswordValue = e.target.value;
+  setFormData({ ...formData, confirmPassword: confirmPasswordValue });
+
+  if (confirmPasswordValue && formData.password) {
+    setPasswordMatch(confirmPasswordValue === formData.password);
+  } else {
+    setPasswordMatch(null);
+  }
+};
+const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const passwordValue = e.target.value;
+  setFormData({ ...formData, password: passwordValue });
+
+  if (formData.confirmPassword && passwordValue) {
+    setPasswordMatch(passwordValue === formData.confirmPassword);
+  } else {
+    setPasswordMatch(null);
+  }
+};
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+
+      if (formData.password !== formData.confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+
       try {
         const response = await api.auth.register(formData);
 
@@ -35,7 +70,6 @@ function RegisterForm() {
           setError(response.message || 'An error occurred');
         }
       } catch (err: any) {
-        // Hiển thị thông báo lỗi từ backend
         setError(err.message || 'An unexpected error occurred');
       }
     },
@@ -73,11 +107,8 @@ function RegisterForm() {
           />
         </div>
 
-        <div className="grid gap-2">
-          <label
-            htmlFor="username"
-            className="text-sm font-medium text-white/70"
-          >
+        <div className="grid gap-2 ">
+          <label htmlFor="username" className="text-sm font-medium text-white/70">
             Username
           </label>
           <input
@@ -96,36 +127,55 @@ function RegisterForm() {
         </div>
 
         <div className="grid gap-2">
-          <label htmlFor="name" className="text-sm font-medium text-white/70">
-            Full Name
+          <label htmlFor="password" className="text-sm font-medium text-white/70">
+            Password
           </label>
-          <input
-            id="name"
-            type="text"
-            required
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              required
+              value={formData.password}
+              onChange={handlePasswordChange}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white pr-10"
+            />
+            <button
+              type="button"
+              onClick={togglePasswordVisibility}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-2">
-          <label
-            htmlFor="password"
-            className="text-sm font-medium text-white/70"
-          >
-            Password
+          <label htmlFor="confirmPassword" className="text-sm font-medium text-white/70">
+            Confirm Password
           </label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={formData.password}
-            onChange={(e) =>
-              setFormData({ ...formData, password: e.target.value })
-            }
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
-          />
+          <div className="relative">
+            <input
+              id="confirmPassword"
+              type={showPassword ? "text" : "password"}
+              required
+              value={formData.confirmPassword}
+              onChange={handleConfirmPasswordChange}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white pr-10"
+            />
+            <button
+              type="button"
+              onClick={togglePasswordVisibility}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+          
+          {formData.password && formData.confirmPassword && (
+            <p className={`text-sm ${passwordMatch ? 'text-green-400' : 'text-red-400'}`}>
+              {passwordMatch ? '✅ Passwords match' : '❌ Passwords do not match'}
+            </p>
+          )}
         </div>
 
         <button
@@ -138,14 +188,12 @@ function RegisterForm() {
 
       <div className="text-center text-sm text-white/70">
         Already have an account?{' '}
-        <Link
-          href="/login"
-          className="text-white hover:underline underline-offset-4"
-        >
+        <Link href="/login" className="text-white hover:underline underline-offset-4">
           Log in
         </Link>
       </div>
     </form>
+    
   );
 }
 

@@ -57,7 +57,7 @@ interface RegisterData {
 }
 
 interface LoginData {
-  email: string;
+  emailOrUsername: string;
   password: string;
 }
 

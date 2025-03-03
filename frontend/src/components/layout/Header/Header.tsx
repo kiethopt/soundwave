@@ -156,23 +156,32 @@ export default function Header({
     try {
       const token = localStorage.getItem('userToken');
       const sessionId = localStorage.getItem('sessionId');
-
+  
       if (token && sessionId) {
         await api.auth.logout(token);
         pusher.disconnect();
       }
 
-      localStorage.clear();
+      localStorage.removeItem('userToken');
+      localStorage.removeItem('sessionId');
+      localStorage.removeItem('userData');
+  
       setIsAuthenticated(false);
       setUserData(null);
+  
       window.location.href = '/login';
     } catch (error) {
       console.error('Logout error:', error);
       pusher.disconnect();
-      localStorage.clear();
+  
+      localStorage.removeItem('userToken');
+      localStorage.removeItem('sessionId');
+      localStorage.removeItem('userData');
+  
       window.location.href = '/login';
     }
   };
+  
 
   // ==============================
   // 6) Sự kiện click chuông

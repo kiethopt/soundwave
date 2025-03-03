@@ -142,7 +142,11 @@ const registerAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* 
 exports.registerAdmin = registerAdmin;
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { email, password, name, username } = req.body;
+        const { email, password, confirmPassword, name, username } = req.body;
+        if (password !== confirmPassword) {
+            res.status(400).json({ message: 'Passwords do not match' });
+            return;
+        }
         const validationError = validateRegisterData({ email, password, username });
         if (validationError) {
             res.status(400).json({ message: validationError });
@@ -183,18 +187,22 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 exports.register = register;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { email, password } = req.body;
-        const validationError = validateLoginData({ email, password });
-        if (validationError) {
-            res.status(400).json({ message: validationError });
+        const { emailOrUsername, password } = req.body;
+        if (!emailOrUsername || !password) {
+            res.status(400).json({ message: 'Email/username and password are required' });
             return;
         }
-        const user = yield db_1.default.user.findUnique({
-            where: { email },
+        const user = yield db_1.default.user.findFirst({
+            where: {
+                OR: [
+                    { email: emailOrUsername },
+                    { username: emailOrUsername }
+                ]
+            },
             select: Object.assign(Object.assign({}, prisma_selects_1.userSelect), { password: true, isActive: true }),
         });
         if (!user) {
-            res.status(400).json({ message: 'Invalid email or password' });
+            res.status(400).json({ message: 'Invalid email/username or password' });
             return;
         }
         if (!user.isActive) {
@@ -205,7 +213,7 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         const isValidPassword = yield bcrypt_1.default.compare(password, user.password);
         if (!isValidPassword) {
-            res.status(401).json({ message: 'Invalid email or password' });
+            res.status(401).json({ message: 'Invalid email/user or password' });
             return;
         }
         const updatedUser = yield db_1.default.user.update({
