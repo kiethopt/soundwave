@@ -16,6 +16,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'i.scdn.co',
+        port: '',
+      },
+      {
+        protocol: 'https',
         hostname: 'example.com',
         port: '',
       },

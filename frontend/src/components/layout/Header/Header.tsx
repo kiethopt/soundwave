@@ -568,7 +568,9 @@ export default function Header({
 
                   <Link
                     href={
-                      userData?.currentProfile === 'USER'
+                      userData?.role === 'ADMIN'
+                        ? '/admin/profile'
+                        : userData?.currentProfile === 'USER'
                         ? `/profile/${userData?.id}`
                         : `/artist/profile/${userData?.artistProfile?.id}`
                     }

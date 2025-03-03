@@ -19,6 +19,13 @@ import { Facebook, Instagram, Verified } from '../ui/Icons';
 import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
 import { Switch } from '../ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
 
 interface EditTrackModalProps {
   track: Track | null;
@@ -966,10 +973,12 @@ export function EditUserModal({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isActive, setIsActive] = useState(user?.isActive ?? false);
+  const [role, setRole] = useState<string>(user?.role ?? 'USER');
 
   useEffect(() => {
     if (user) {
       setIsActive(user.isActive);
+      setRole(user.role);
     }
   }, [user]);
 
@@ -979,6 +988,7 @@ export function EditUserModal({
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     formData.append('isActive', isActive.toString());
+    formData.append('role', role);
     onSubmit(user.id, formData);
   };
 
@@ -1141,6 +1151,34 @@ export function EditUserModal({
                 className={theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'}
               />
             </div>
+          </div>
+
+          {/* Role */}
+          <div className="space-y-2">
+            <span
+              className={`block text-sm font-medium ${
+                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+              }`}
+            >
+              Role
+            </span>
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger
+                className={`w-full ${
+                  theme === 'dark'
+                    ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                    : 'bg-white border-gray-300'
+                }`}
+              >
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent
+                className={theme === 'dark' ? 'bg-[#3a3a3a] text-white' : ''}
+              >
+                <SelectItem value="USER">User</SelectItem>
+                <SelectItem value="ADMIN">Admin</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Buttons */}
@@ -1385,7 +1423,7 @@ export function UserInfoModal({
               ) : (
                 <div
                   className={`w-20 h-20 rounded-full flex items-center justify-center ${
-                    theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                    theme === 'dark' ? 'bg-gray-500' : 'bg-gray-200'
                   }`}
                 >
                   <span
@@ -1439,13 +1477,13 @@ export function UserInfoModal({
           {/* Additional Information */}
           <div
             className={`grid grid-cols-2 gap-4 p-4 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+              theme === 'dark' ? 'bg-gray-500' : 'bg-gray-50'
             }`}
           >
             <div>
               <p
                 className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
                 }`}
               >
                 Username
@@ -1461,7 +1499,7 @@ export function UserInfoModal({
             <div>
               <p
                 className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
                 }`}
               >
                 Current Profile
@@ -1477,7 +1515,7 @@ export function UserInfoModal({
             <div>
               <p
                 className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
                 }`}
               >
                 Created At
@@ -1493,7 +1531,7 @@ export function UserInfoModal({
             <div>
               <p
                 className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
                 }`}
               >
                 Last Login
@@ -1504,6 +1542,22 @@ export function UserInfoModal({
                 }`}
               >
                 {user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never'}
+              </p>
+            </div>
+            <div>
+              <p
+                className={`text-sm font-medium ${
+                  theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
+                }`}
+              >
+                Role
+              </p>
+              <p
+                className={`mt-1 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}
+              >
+                {user.role}
               </p>
             </div>
           </div>

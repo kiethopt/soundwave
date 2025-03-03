@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Image from 'next/image';
 import Link from 'next/link';
-import React from 'react';
+import React, { Fragment, useEffect, useState } from 'react';
 import { api } from '@/utils/api';
 import { ArtistInfoModal } from './data-table-modals';
 import { AddSimple, Edit, Power, User as UserIcon } from '../ui/Icons';
@@ -171,12 +171,12 @@ export function getTrackColumns({
       accessorKey: 'featuredArtists',
       header: 'Featured Artists',
       cell: ({ row }) => {
-        const [selectedArtist, setSelectedArtist] = React.useState<any>(null);
-        const [isModalOpen, setIsModalOpen] = React.useState(false);
-        const [isLoading, setIsLoading] = React.useState(false);
-        const [loadingArtistId, setLoadingArtistId] = React.useState<
-          string | null
-        >(null);
+        const [selectedArtist, setSelectedArtist] = useState<any>(null);
+        const [isModalOpen, setIsModalOpen] = useState(false);
+        const [isLoading, setIsLoading] = useState(false);
+        const [loadingArtistId, setLoadingArtistId] = useState<string | null>(
+          null
+        );
 
         const featuredArtists = row.original.featuredArtists;
 
@@ -257,7 +257,7 @@ export function getTrackColumns({
         return genres && genres.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {genres.map((g, index) => (
-              <React.Fragment key={g.genre.id}>
+              <Fragment key={g.genre.id}>
                 <span
                   className={`px-2 py-0.5 rounded-full text-xs ${
                     theme === 'dark'
@@ -268,7 +268,7 @@ export function getTrackColumns({
                   {g.genre.name}
                 </span>
                 {index < genres.length - 1 && ' '}
-              </React.Fragment>
+              </Fragment>
             ))}
           </div>
         ) : (
@@ -314,10 +314,10 @@ export function getTrackColumns({
       header: 'Release Date',
       cell: ({ row }) => {
         const releaseDate = row.original.releaseDate;
-        const [timeDisplay, setTimeDisplay] = React.useState<string>('');
+        const [timeDisplay, setTimeDisplay] = useState<string>('');
         const track = row.original;
 
-        React.useEffect(() => {
+        useEffect(() => {
           // Tính toán và hiển thị thời gian đếm ngược
           const calculateTimeRemaining = () => {
             const now = new Date();
@@ -574,10 +574,10 @@ export function getAlbumColumns({
       header: 'Release Date',
       cell: ({ row }) => {
         const releaseDate = row.original.releaseDate;
-        const [timeDisplay, setTimeDisplay] = React.useState<string>('');
+        const [timeDisplay, setTimeDisplay] = useState<string>('');
         const album = row.original;
 
-        React.useEffect(() => {
+        useEffect(() => {
           // Tính toán và hiển thị thời gian đếm ngược
           const calculateTimeRemaining = () => {
             const now = new Date();
