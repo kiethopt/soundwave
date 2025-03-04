@@ -32,7 +32,7 @@ import Link from 'next/link';
 import React, { Fragment, useEffect, useState } from 'react';
 import { api } from '@/utils/api';
 import { ArtistInfoModal } from './data-table-modals';
-import { AddSimple, Edit, Power, User as UserIcon } from '../ui/Icons';
+import { AddSimple, Edit, UserIcon } from '../ui/Icons';
 import { Button } from '../ui/button';
 
 interface GetTrackColumnsOptions {

@@ -10,6 +10,9 @@ import {
   Settings,
   HomeOutline,
   HomeFilled,
+  UserIcon,
+  ProfileIcon,
+  ArrowRight,
 } from '@/components/ui/Icons';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -18,8 +21,8 @@ import type { User } from '@/types';
 import pusher from '@/utils/pusher';
 import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
-import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { ArrowLeft, LogOut } from 'lucide-react';
 
 export default function Header({
   onMenuClick,
@@ -36,23 +39,17 @@ export default function Header({
   const isActive = (path: string) => pathname === path;
   const [notificationCount, setNotificationCount] = useState(0);
 
-  // ======== Mới thêm cho notifications ========
+  // New notifications handling
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
-  // (Bạn có thể định nghĩa type Notification thay vì any[])
   const notificationRef = useRef<HTMLDivElement>(null);
-  // ============================================
 
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const router = useRouter();
 
-  // Check if user is admin or artist
   const isAdminOrArtist =
     userData?.role === 'ADMIN' || userData?.currentProfile === 'ARTIST';
 
-  // ==============================
-  // 1) Đoạn code pusher subscribe
-  // ==============================
   useEffect(() => {
     const userDataStr = localStorage.getItem('userData');
     if (!userDataStr) return;
@@ -88,21 +85,14 @@ export default function Header({
     };
   }, []);
 
-  // ==============================
-  // 2) Click outside để đóng dropdown
-  //    a) Menu user dropdown
-  //    b) Notification dropdown
-  // ==============================
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Click ngoài user dropdown
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setShowDropdown(false);
       }
-      // Click ngoài notification dropdown
       if (
         notificationRef.current &&
         !notificationRef.current.contains(event.target as Node)
@@ -115,9 +105,6 @@ export default function Header({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ============================
-  // 3) Check auth
-  // ============================
   useEffect(() => {
     const checkAuth = () => {
       const token = localStorage.getItem('userToken');
@@ -134,9 +121,6 @@ export default function Header({
     checkAuth();
   }, []);
 
-  // ============================
-  // 4) Handle search
-  // ============================
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -149,14 +133,11 @@ export default function Header({
     }
   };
 
-  // ============================
-  // 5) Logout
-  // ============================
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem('userToken');
       const sessionId = localStorage.getItem('sessionId');
-  
+
       if (token && sessionId) {
         await api.auth.logout(token);
         pusher.disconnect();
@@ -165,38 +146,31 @@ export default function Header({
       localStorage.removeItem('userToken');
       localStorage.removeItem('sessionId');
       localStorage.removeItem('userData');
-  
+
       setIsAuthenticated(false);
       setUserData(null);
-  
+
       window.location.href = '/login';
     } catch (error) {
       console.error('Logout error:', error);
       pusher.disconnect();
-  
+
       localStorage.removeItem('userToken');
       localStorage.removeItem('sessionId');
       localStorage.removeItem('userData');
-  
+
       window.location.href = '/login';
     }
   };
-  
 
-  // ==============================
-  // 6) Sự kiện click chuông
-  // ==============================
   const handleBellClick = async () => {
     try {
-      // 1. Toggle hiển thị dropdown
       setShowNotifications((prev) => !prev);
 
-      // 2. Nếu dropdown sắp được mở => load danh sách notifications
       if (!showNotifications) {
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        // Gọi API lấy danh sách thông báo
         const notificationsData = await api.notifications.getList(token);
         console.log('Fetched notifications:', notificationsData);
         if (notificationsData) {
@@ -204,7 +178,6 @@ export default function Header({
         }
       }
 
-      // 3. Đặt lại notificationCount = 0
       setNotificationCount(0);
       localStorage.setItem('notificationCount', '0');
     } catch (err) {
@@ -212,9 +185,6 @@ export default function Header({
     }
   };
 
-  // ==============================
-  // 7) Switch profile
-  // ==============================
   const handleSwitchProfile = async () => {
     try {
       const token = localStorage.getItem('userToken');
@@ -251,9 +221,6 @@ export default function Header({
     setShowDropdown(false);
   };
 
-  // =============================
-  // 8) Thông báo thời gian thực
-  // =============================
   useEffect(() => {
     const userDataStr = localStorage.getItem('userData');
     if (!userDataStr) return;
@@ -264,34 +231,27 @@ export default function Header({
     const channel = pusher.subscribe(`user-${userId}`);
     console.log('Subscribed to Pusher channel:', `user-${userId}`);
 
-    // Hàm xử lý sự kiện realtime cho thông báo mới
     const handleNewNotification = (data: {
       type: string;
       message: string;
       [key: string]: any;
     }) => {
       console.log('Received new notification event:', data);
-      // Tăng số lượng thông báo
       setNotificationCount((prev) => {
         const newCount = prev + 1;
         localStorage.setItem('notificationCount', String(newCount));
         return newCount;
       });
-      // Cập nhật danh sách thông báo nếu bạn muốn hiển thị chi tiết luôn
       setNotifications((prev) => [data, ...prev]);
     };
 
-    // Bind event "notification" để nhận thông báo mới realtime
     channel.bind('notification', handleNewNotification);
 
-    // Nếu vẫn muốn giữ sự kiện cũ, bạn có thể bind thêm
     const handleArtistRequestStatus = (data: { type: string }) => {
       console.log('Received artist request status event:', data);
-      // Logic cho REQUEST_APPROVED/REQUEST_REJECTED (nếu cần)
     };
     channel.bind('artist-request-status', handleArtistRequestStatus);
 
-    // Lấy số lượng lưu sẵn (nếu có)
     const savedCount = Number(localStorage.getItem('notificationCount') || '0');
     setNotificationCount(savedCount);
 
@@ -302,16 +262,12 @@ export default function Header({
     };
   }, []);
 
-  // Hàm thay đổi trạng thái read thông báo
   const handleNotificationClick = async (notification: any) => {
-    // Nếu thông báo chưa đọc, gọi API đánh dấu là đã đọc
     if (!notification.isRead) {
       try {
         const token = localStorage.getItem('userToken');
         if (!token) return;
-        // Giả sử api.notifications.markAsRead là hàm gọi API backend
         await api.notifications.markAsRead(notification.id, token);
-        // Cập nhật lại state notifications: thay đổi isRead của thông báo đó thành true
         setNotifications((prev) =>
           prev.map((n) =>
             n.id === notification.id ? { ...n, isRead: true } : n
@@ -344,7 +300,6 @@ export default function Header({
           <Menu className="w-6 h-6" />
         </button>
 
-        {/* Navigation Links - Only show for regular users */}
         {!isAdminOrArtist && (
           <div className="hidden md:flex items-center gap-4 lg:gap-6">
             <Link
@@ -413,10 +368,10 @@ export default function Header({
       <div className="flex items-center gap-2 md:gap-4">
         {isAuthenticated ? (
           <>
-            {/* Nút chuông Notifications */}
             <div className="relative" ref={notificationRef}>
+              {/* Notification Button */}
               <button
-                className={`p-2 rounded-full relative ${
+                className={`p-2 rounded-full relative cursor-pointer ${
                   theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
                 }`}
                 onClick={handleBellClick}
@@ -427,19 +382,14 @@ export default function Header({
                       theme === 'light' ? 'text-gray-700' : 'text-white'
                     }`}
                   />
-                  {/* Badge chấm đỏ */}
                   {notificationCount > 0 && (
                     <span
                       style={{ height: '10px', width: '10px', right: '-10px' }}
                       className="absolute -top-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center"
-                    >
-                      {/* Nếu cần hiển thị số thì mở comment */}
-                      {/* {notificationCount > 99 ? '99+' : notificationCount} */}
-                    </span>
+                    ></span>
                   )}
                 </div>
               </button>
-              {/* Dropdown Notifications */}
               {showNotifications && (
                 <div
                   className={`absolute right-0 mt-2 w-80 max-h-[300px] overflow-auto rounded-lg shadow-lg py-3 z-50 ${
@@ -476,15 +426,10 @@ export default function Header({
                         onClick={() => handleNotificationClick(item)}
                       >
                         <p className="line-clamp-2 text-sm">{item.message}</p>
-                        {/* Hiển thị thêm thời gian nếu cần, ví dụ: */}
-                        {/* <span className="block mt-1 text-xs text-gray-500">
-                        {formatDate(item.createdAt)}
-                      </span> */}
                       </div>
                     ))
                   )}
 
-                  {/* Nút "Xem tất cả" */}
                   <div className="px-4 py-3">
                     <Link href="/notifications">
                       <button
@@ -502,135 +447,189 @@ export default function Header({
               )}
             </div>
 
-            <button
-              className={`p-2 rounded-full ${
-                theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-              }`}
-            >
-              <Settings
-                className={`w-5 h-5 ${
-                  theme === 'light' ? 'text-gray-700' : 'text-white'
-                }`}
-              />
-            </button>
-            {/* Theme toggle - For Admin and Artist */}
-            {(userData?.role === 'ADMIN' ||
-              userData?.currentProfile === 'ARTIST') && (
-              <button
-                onClick={toggleTheme}
-                className={`p-2 rounded-full ${
-                  theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-                }`}
-              >
-                {theme === 'light' ? (
-                  <Moon className="w-5 h-5 text-gray-700" />
-                ) : (
-                  <Sun className="w-5 h-5 text-white" />
-                )}
-              </button>
-            )}
+            {/* User Avatar Button */}
             <div className="relative" ref={dropdownRef}>
               <button
-                className={`flex items-center justify-center w-8 h-8 rounded-full overflow-hidden ${
-                  theme === 'light'
-                    ? 'bg-gray-200 hover:bg-gray-200'
-                    : 'bg-white/10 hover:bg-white/20'
-                }`}
+                className="flex items-center justify-center w-8 h-8 rounded-full overflow-hidden cursor-pointer border-2 border-transparent hover:border-gray-300 transition-all duration-200"
                 onClick={() => setShowDropdown(!showDropdown)}
               >
-                <Image
-                  src={userData?.avatar || '/images/default-avatar.jpg'}
-                  alt="User avatar"
-                  width={32}
-                  height={32}
-                  className="object-cover w-full h-full"
-                  priority
-                />
+                <div className="relative w-8 h-8 rounded-full overflow-hidden">
+                  <Image
+                    src={userData?.avatar || '/images/default-avatar.jpg'}
+                    alt="User avatar"
+                    width={32}
+                    height={32}
+                    className="object-cover w-full h-full"
+                    style={{ objectFit: 'cover' }}
+                    priority
+                  />
+                </div>
               </button>
 
               {showDropdown && (
                 <div
-                  className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-50 ${
-                    theme === 'light' ? 'bg-white' : 'bg-[#282828]'
+                  className={`absolute right-0 mt-2 w-64 rounded-2xl shadow-lg overflow-hidden z-50 border ${
+                    theme === 'light'
+                      ? 'bg-white border-zinc-200'
+                      : 'bg-[#111111] border-zinc-800'
                   }`}
                 >
-                  <Link
-                    href="/account"
-                    className={`block px-4 py-2 text-sm ${
-                      theme === 'light'
-                        ? 'text-gray-700 hover:bg-gray-200'
-                        : 'text-white hover:bg-white/10'
+                  <div className="px-6 pt-6 pb-4">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="relative shrink-0">
+                        <div className="w-12 h-12 rounded-full overflow-hidden">
+                          <Image
+                            src={
+                              userData?.avatar || '/images/default-avatar.jpg'
+                            }
+                            alt={userData?.name || 'User'}
+                            width={48}
+                            height={48}
+                            className="object-cover w-full h-full"
+                            style={{ objectFit: 'cover' }}
+                          />
+                        </div>
+                        <div
+                          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ${
+                            theme === 'light' ? 'ring-white' : 'ring-zinc-900'
+                          }`}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <h2
+                          className={`text-base font-semibold ${
+                            theme === 'light'
+                              ? 'text-zinc-900'
+                              : 'text-zinc-100'
+                          }`}
+                        >
+                          {userData?.name || userData?.username || 'User'}
+                        </h2>
+                        <p
+                          className={`text-sm ${
+                            theme === 'light'
+                              ? 'text-zinc-600'
+                              : 'text-zinc-400'
+                          }`}
+                        >
+                          {userData?.role === 'ADMIN'
+                            ? 'Administrator'
+                            : userData?.currentProfile === 'ARTIST'
+                            ? 'Artist'
+                            : 'User'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`h-px ${
+                      theme === 'light' ? 'bg-zinc-200' : 'bg-zinc-800'
                     }`}
-                    onClick={() => setShowDropdown(false)}
-                  >
-                    Account
-                  </Link>
+                  />
 
-                  <Link
-                    href={
-                      userData?.role === 'ADMIN'
-                        ? '/admin/profile'
-                        : userData?.currentProfile === 'USER'
-                        ? `/profile/${userData?.id}`
-                        : `/artist/profile/${userData?.artistProfile?.id}`
-                    }
-                    className={`block px-4 py-2 text-sm ${
-                      theme === 'light'
-                        ? 'text-gray-700 hover:bg-gray-200'
-                        : 'text-white hover:bg-white/10'
-                    }`}
-                    onClick={() => setShowDropdown(false)}
-                  >
-                    Profile
-                  </Link>
-
-                  {userData?.artistProfile?.isVerified && (
-                    <button
-                      onClick={handleSwitchProfile}
-                      className={`block w-full text-left px-4 py-2 text-sm ${
-                        theme === 'light'
-                          ? 'text-gray-700 hover:bg-gray-200'
-                          : 'text-white hover:bg-white/10'
-                      }`}
-                    >
-                      Switch to{' '}
-                      {userData.currentProfile === 'USER' ? 'Artist' : 'User'}{' '}
-                      Profile
-                    </button>
-                  )}
-
-                  {userData?.role === 'USER' && !userData?.artistProfile && (
+                  <div className="p-2">
                     <Link
-                      href="/request-artist"
-                      className={`block px-4 py-2 text-sm ${
+                      href={
+                        userData?.role === 'ADMIN'
+                          ? `/admin/profile/${userData.id}`
+                          : userData?.currentProfile === 'USER'
+                          ? `/profile/${userData?.id}`
+                          : `/artist/profile/${userData?.artistProfile?.id}`
+                      }
+                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${
                         theme === 'light'
-                          ? 'text-gray-700 hover:bg-gray-200'
-                          : 'text-white hover:bg-white/10'
+                          ? 'hover:bg-zinc-50 text-zinc-900'
+                          : 'hover:bg-zinc-800/50 text-zinc-100'
                       }`}
                       onClick={() => setShowDropdown(false)}
                     >
-                      Become an Artist
+                      <ProfileIcon className="w-4 h-4" />
+                      <span className="text-sm font-medium">Profile</span>
                     </Link>
-                  )}
 
-                  <div
-                    className={`border-t my-1 ${
-                      theme === 'light' ? 'border-gray-200' : 'border-white/10'
-                    }`}
-                  ></div>
-                  <button
-                    onClick={() => {
-                      handleLogout();
-                      setShowDropdown(false);
-                    }}
-                    className={`block w-full text-left px-4 py-2 text-sm ${
-                      theme === 'light'
-                        ? 'text-gray-700 hover:bg-gray-200'
-                        : 'text-white hover:bg-white/10'
-                    }`}
-                  >
-                    Log out
-                  </button>
+                    <Link
+                      href="/settings"
+                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${
+                        theme === 'light'
+                          ? 'hover:bg-zinc-50 text-zinc-900'
+                          : 'hover:bg-zinc-800/50 text-zinc-100'
+                      }`}
+                      onClick={() => setShowDropdown(false)}
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span className="text-sm font-medium">Settings</span>
+                    </Link>
+
+                    {userData?.artistProfile?.isVerified && (
+                      <button
+                        onClick={handleSwitchProfile}
+                        className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 text-left ${
+                          theme === 'light'
+                            ? 'hover:bg-zinc-50 text-zinc-900'
+                            : 'hover:bg-zinc-800/50 text-zinc-100'
+                        }`}
+                      >
+                        {userData.currentProfile === 'USER' ? (
+                          <ArrowRight className="w-4 h-4" />
+                        ) : (
+                          <ArrowLeft className="w-4 h-4" />
+                        )}
+                        <span className="text-sm font-medium">
+                          Switch to{' '}
+                          {userData.currentProfile === 'USER'
+                            ? 'Artist'
+                            : 'User'}{' '}
+                          Profile
+                        </span>
+                      </button>
+                    )}
+
+                    {userData?.role === 'USER' && !userData?.artistProfile && (
+                      <Link
+                        href="/request-artist"
+                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${
+                          theme === 'light'
+                            ? 'hover:bg-zinc-50 text-zinc-900'
+                            : 'hover:bg-zinc-800/50 text-zinc-100'
+                        }`}
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M12 5V19M5 12H19"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        <span className="text-sm font-medium">
+                          Become an Artist
+                        </span>
+                      </Link>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setShowDropdown(false);
+                      }}
+                      className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 text-left ${
+                        theme === 'light'
+                          ? 'hover:bg-zinc-50 text-zinc-900'
+                          : 'hover:bg-zinc-800/50 text-zinc-100'
+                      }`}
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span className="text-sm font-medium">Logout</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

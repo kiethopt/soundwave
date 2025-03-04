@@ -12,6 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface DateRangePickerProps {
   startDate: string;
@@ -19,7 +20,6 @@ interface DateRangePickerProps {
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
   className?: string;
-  theme?: 'light' | 'dark';
 }
 
 export function DateRangePicker({
@@ -28,8 +28,8 @@ export function DateRangePicker({
   onStartDateChange,
   onEndDateChange,
   className,
-  theme = 'light',
 }: DateRangePickerProps) {
+  const { theme } = useTheme();
   const [date, setDate] = React.useState<DateRange | undefined>({
     from: startDate ? new Date(startDate) : undefined,
     to: endDate ? new Date(endDate) : undefined,
@@ -63,13 +63,13 @@ export function DateRangePicker({
       <Popover>
         <PopoverTrigger asChild>
           <Button
-            variant={theme === 'dark' ? 'secondary' : 'outline'}
+            variant={theme === 'light' ? 'outline' : 'secondary'}
             className={cn(
               'w-[250px] sm:w-[300px] justify-start text-left font-normal',
               !date && 'text-muted-foreground',
-              theme === 'dark'
-                ? 'bg-white/[0.07] border border-white/[0.1] hover:bg-white/[0.1] text-white focus:outline-none focus:ring-2 focus:ring-white/20'
-                : 'border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300'
+              theme === 'light'
+                ? 'border border-neutral-200 text-neutral-950 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-gray-300'
+                : 'bg-white/[0.07] border border-white/[0.1] text-neutral-50 hover:bg-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20'
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -88,9 +88,12 @@ export function DateRangePicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className={`w-auto p-0 ${
-            theme === 'dark' ? 'bg-[#282828] border-white/10' : ''
-          }`}
+          className={cn(
+            'w-auto p-0',
+            theme === 'light'
+              ? 'bg-white border-neutral-200 text-neutral-950'
+              : '  border-white/[0.1] text-neutral-50'
+          )}
           align="start"
         >
           <Calendar
@@ -100,9 +103,12 @@ export function DateRangePicker({
             selected={date}
             onSelect={handleSelect}
             numberOfMonths={2}
-            className={`max-h-[350px] overflow-y-auto ${
-              theme === 'dark' ? 'bg-[#282828] text-white' : ''
-            }`}
+            className={cn(
+              'max-h-[350px] overflow-y-auto',
+              theme === 'light'
+                ? 'bg-white text-neutral-950'
+                : 'bg-[#282828] text-neutral-50'
+            )}
           />
         </PopoverContent>
       </Popover>

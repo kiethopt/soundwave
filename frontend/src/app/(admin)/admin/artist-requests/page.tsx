@@ -225,7 +225,6 @@ export default function ArtistRequestManagement() {
             setEndDate(date);
             updateFilters(startDate, date);
           }}
-          theme={theme}
         />
       </div>
 
