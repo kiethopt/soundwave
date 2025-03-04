@@ -85,7 +85,11 @@ function LoginForm() {
   }
 
   return (
-    <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
+    <form
+      className="flex flex-col gap-6"
+      onSubmit={handleSubmit}
+      suppressHydrationWarning
+    >
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold text-white">Login to your account</h1>
         <p className="text-balance text-sm text-white/60">
@@ -99,7 +103,10 @@ function LoginForm() {
 
       <div className="grid gap-6">
         <div className="grid gap-2">
-          <label htmlFor="emailOrUsername" className="text-sm font-medium text-white/70">
+          <label
+            htmlFor="emailOrUsername"
+            className="text-sm font-medium text-white/70"
+          >
             Email or Username
           </label>
           <input
@@ -133,7 +140,7 @@ function LoginForm() {
           <div className="relative">
             <input
               id="password"
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? 'text' : 'password'}
               required
               value={formData.password}
               onChange={(e) =>
@@ -141,12 +148,16 @@ function LoginForm() {
               }
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white pr-10"
             />
-            <button 
+            <button
               type="button"
               onClick={togglePasswordVisibility}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/70 hover:text-white"
             >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
             </button>
           </div>
         </div>

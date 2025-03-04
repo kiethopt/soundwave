@@ -3,9 +3,8 @@
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar/Sidebar';
 import Header from '@/components/layout/Header/Header';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import pusher from '@/utils/pusher';
+import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import type React from 'react';
@@ -13,12 +12,9 @@ import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { TrackProvider, useTrack } from '@/contexts/TrackContext';
 import PlayerBar from '@/components/layout/PlayerBar/PlayerBar';
 
-// Tạo component con để xử lý theme
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { currentTrack } = useTrack();
@@ -34,12 +30,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-    const userDataStr = localStorage.getItem('userData');
-    if (userDataStr) {
-      const user = JSON.parse(userDataStr);
-      setIsAdmin(user.role === 'ADMIN');
-    }
-  }, [router]);
+  }, []);
 
   if (!mounted) {
     return null;
@@ -68,7 +59,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
               isOpen={isSidebarOpen}
               onClose={() => setIsSidebarOpen(false)}
             />
-
             <div
               className="flex-1 flex flex-col min-h-0"
               suppressHydrationWarning
@@ -95,7 +85,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {/* Player Bar */}
           {currentTrack && (
             <div className={currentTrack ? 'mt-[108px]' : ''}>
               <PlayerBar />
@@ -107,7 +96,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Component chính
 export default function RootLayout({
   children,
 }: {

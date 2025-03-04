@@ -1,4 +1,5 @@
 import { ArtistRequestFilters, CreatePlaylistData } from '@/types';
+import useSWR from 'swr';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -673,6 +674,17 @@ export const api = {
   dashboard: {
     getStats: async (token: string) =>
       fetchWithAuth('/api/admin/stats', { method: 'GET' }, token),
+
+    useStats: () => {
+      const token =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('userToken')
+          : null;
+      return useSWR('/api/admin/stats', () => {
+        if (!token) throw new Error('No authentication token found');
+        return api.dashboard.getStats(token);
+      });
+    },
   },
 
   notifications: {
