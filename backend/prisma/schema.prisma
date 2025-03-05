@@ -44,6 +44,7 @@ model ArtistProfile {
   artistName              String         @unique
   bio                     String?
   avatar                  String?
+  artistBanner            String?
   role                    Role           @default(ARTIST)
   socialMediaLinks        Json?
   monthlyListeners        Int            @default(0)
