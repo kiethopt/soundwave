@@ -11,7 +11,6 @@
     "seed": "tsx prisma/seed.ts",
     "backup": "tsx scripts/backup-auto.ts",
     "restore": "tsx scripts/restore-auto.ts",
-    "backup:manual": "SET PGSSLMODE=disable && pg_dump -h 127.0.0.1 -p 5433 -d postgres -Fc -v -n public -f \"backups/db-backup-manual.bak\"",
     "backup:manage": "tsx scripts/manage-backups.ts"
   },
   "prisma": {

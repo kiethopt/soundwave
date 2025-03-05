@@ -142,6 +142,7 @@ exports.artistProfileSelect = {
     artistName: true,
     bio: true,
     avatar: true,
+    artistBanner: true,
     role: true,
     socialMediaLinks: true,
     monthlyListeners: true,

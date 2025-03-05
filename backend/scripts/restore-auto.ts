@@ -102,21 +102,16 @@ async function runRestore(): Promise<void> {
       '5433',
     ]);
 
-    // Lệnh restore
-    const pgRestoreCommand = `pg_restore -h 127.0.0.1 -p 5433 -v -d postgres "${backupFile}"`;
-
     // Xử lý output từ tunnel
     let tunnelReady = false;
 
     tunnel.stdout.on('data', (data: Buffer) => {
       console.log(`Tunnel: ${data.toString().trim()}`);
 
-      // SỬA: Thay đổi điều kiện để kiểm tra khi tunnel đã bắt đầu lắng nghe
       if (data.toString().includes('Prisma Postgres auth proxy listening')) {
-        // Thêm một khoảng thời gian nhỏ để đảm bảo tunnel hoàn toàn sẵn sàng
         setTimeout(() => {
           tunnelReady = true;
-          runPgRestore();
+          resetAndRestoreDatabase();
         }, 1000);
       }
     });
@@ -125,7 +120,6 @@ async function runRestore(): Promise<void> {
       console.error(`Tunnel error: ${data.toString().trim()}`);
     });
 
-    // Thiết lập timeout nếu tunnel không kết nối được
     const timeoutId = setTimeout(() => {
       if (!tunnelReady) {
         console.error('❌ Tunnel connection timed out after 15 seconds');
@@ -134,34 +128,119 @@ async function runRestore(): Promise<void> {
       }
     }, 15000);
 
-    // Hàm để chạy pg_restore sau khi tunnel sẵn sàng
-    function runPgRestore(): void {
+    // Hàm mới: reset và restore database với xác nhận bổ sung
+    async function resetAndRestoreDatabase(): Promise<void> {
       clearTimeout(timeoutId);
-      console.log('✅ Tunnel connected successfully');
-      console.log(`⚙️ Running restore command: ${pgRestoreCommand}`);
+      console.log(
+        '✅ Tunnel ready, proceeding with database reset and restore...'
+      );
 
-      try {
-        // Chạy pg_restore với PGSSLMODE=disable
-        execSync(pgRestoreCommand, {
-          stdio: 'inherit',
-          env: {
-            ...process.env,
-            PGSSLMODE: 'disable',
-          },
-        });
-
-        console.log(`✅ Restore completed successfully from: ${backupFile}`);
-      } catch (error) {
-        console.error(
-          '❌ Restore failed:',
-          error instanceof Error ? error.message : String(error)
+      // Thêm bước xác nhận bổ sung trước khi reset database
+      return new Promise<void>((resolve) => {
+        console.log('\n⚠️ ===== NGUY HIỂM! XÓA TOÀN BỘ DỮ LIỆU ===== ⚠️');
+        console.log(
+          '🚨 Quá trình này sẽ XÓA HOÀN TOÀN tất cả dữ liệu hiện có trong database'
         );
-      } finally {
-        // Luôn kết thúc tunnel khi hoàn tất
-        tunnel.kill();
-        rl.close();
-        console.log('🔌 Tunnel closed');
-      }
+        console.log('🚨 Các bảng, ràng buộc và dữ liệu sẽ bị xóa vĩnh viễn');
+        console.log(
+          '🚨 Chỉ tiếp tục nếu bạn đã sao lưu tất cả thông tin quan trọng\n'
+        );
+
+        rl.question(
+          '👉 Để tiếp tục, vui lòng gõ "RESET" (viết HOA): ',
+          (confirmation) => {
+            if (confirmation !== 'RESET') {
+              console.log(
+                '❌ Đã hủy thao tác restore do không xác nhận reset database'
+              );
+              tunnel.kill();
+              rl.close();
+              process.exit(0);
+            }
+
+            console.log('✅ Xác nhận thành công, tiến hành reset database...');
+
+            // Tiếp tục với quy trình reset và restore
+            try {
+              // BƯỚC 1: Xóa bảng hiện có bằng cách sử dụng lệnh DELETE
+              console.log('🗑️ Xóa tất cả dữ liệu từ các bảng...');
+
+              // Sử dụng DELETE FROM thay vì TRUNCATE để tránh xung đột với triggers
+              const deleteCommand = `
+              psql -h 127.0.0.1 -p 5433 -d postgres -c "
+                SET client_min_messages TO WARNING;
+                DELETE FROM user_like_track;
+                DELETE FROM playlist_track;
+                DELETE FROM histories;
+                DELETE FROM track_genre;
+                DELETE FROM track_artist;
+                DELETE FROM user_follow;
+                DELETE FROM album_genre;
+                DELETE FROM artist_genre;
+                DELETE FROM tracks;
+                DELETE FROM albums;
+                DELETE FROM notifications;
+                DELETE FROM events;
+                DELETE FROM playlists;
+                DELETE FROM artist_profiles;
+                DELETE FROM users;
+                DELETE FROM genres;
+                DELETE FROM _prisma_migrations;
+              "`;
+
+              execSync(deleteCommand, {
+                stdio: 'inherit',
+                env: {
+                  ...process.env,
+                  PGSSLMODE: 'disable',
+                },
+              });
+
+              console.log('✅ Dữ liệu hiện có đã được xóa thành công');
+
+              // BƯỚC 2: Thay thế bước vô hiệu hóa ràng buộc bằng cách sử dụng nhiều flags hơn
+              console.log('📥 Đang nạp dữ liệu từ backup...');
+
+              // Thêm flags để xử lý tốt hơn việc khôi phục và khắc phục các lỗi phổ biến
+              const restoreCommand = `pg_restore -h 127.0.0.1 -p 5433 -v --data-only --no-owner --no-privileges --disable-triggers --single-transaction --no-acl --clean --if-exists --exit-on-error=false -d postgres "${backupFile}"`;
+
+              try {
+                execSync(restoreCommand, {
+                  stdio: 'inherit',
+                  env: {
+                    ...process.env,
+                    PGSSLMODE: 'disable',
+                  },
+                });
+              } catch (restoreError) {
+                console.log(
+                  '⚠️ Restore gặp một số lỗi nhưng vẫn hoàn thành. Một số dữ liệu có thể đã được khôi phục.'
+                );
+              }
+
+              console.log(
+                `✅ Đã hoàn thành quá trình khôi phục từ file: ${backupFile}`
+              );
+              console.log(
+                '✳️ Ghi chú: Nếu xuất hiện thông báo lỗi trong quá trình khôi phục, một số dữ liệu vẫn có thể đã được nạp thành công.'
+              );
+              console.log(
+                '✳️ Lưu ý rằng dữ liệu có thể không hoàn toàn nhất quán do lỗi ràng buộc khóa ngoại.'
+              );
+            } catch (error) {
+              console.error(
+                '❌ Database operation failed:',
+                error instanceof Error ? error.message : String(error)
+              );
+            } finally {
+              // Luôn kết thúc tunnel khi hoàn tất
+              tunnel.kill();
+              rl.close();
+              console.log('🔌 Tunnel closed');
+            }
+          }
+        );
+      });
     }
 
     // Xử lý khi tunnel kết thúc

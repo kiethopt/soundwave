@@ -375,10 +375,16 @@ const updateArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, func
             });
             return;
         }
+        const files = req.files;
         let avatarUrl = undefined;
-        if (req.file) {
-            const result = yield (0, cloudinary_service_1.uploadFile)(req.file.buffer, 'artist-avatars', 'image');
+        if (files && files.avatar && files.avatar[0]) {
+            const result = yield (0, cloudinary_service_1.uploadFile)(files.avatar[0].buffer, 'avatar', 'image');
             avatarUrl = result.secure_url;
+        }
+        let bannerUrl = undefined;
+        if (files && files.artistBanner && files.artistBanner[0]) {
+            const result = yield (0, cloudinary_service_1.uploadFile)(files.artistBanner[0].buffer, 'artistBanner', 'image');
+            bannerUrl = result.secure_url;
         }
         if ((parsedGenreIds === null || parsedGenreIds === void 0 ? void 0 : parsedGenreIds.length) > 0) {
             const existingGenres = yield db_1.default.genre.findMany({
@@ -394,8 +400,8 @@ const updateArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, func
         }
         const updatedArtistProfile = yield db_1.default.artistProfile.update({
             where: { id },
-            data: Object.assign(Object.assign(Object.assign(Object.assign({ artistName,
-                bio }, (avatarUrl && { avatar: avatarUrl })), (parsedSocialMediaLinks && {
+            data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({ artistName,
+                bio }, (avatarUrl && { avatar: avatarUrl })), (bannerUrl && { artistBanner: bannerUrl })), (parsedSocialMediaLinks && {
                 socialMediaLinks: parsedSocialMediaLinks,
             })), (isVerified !== undefined && {
                 isVerified,
