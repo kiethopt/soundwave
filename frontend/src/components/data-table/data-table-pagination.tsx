@@ -33,6 +33,8 @@ export function DataTablePagination({
 
   const handleGoToPage = () => {
     const page = Number.parseInt(pageInput, 10);
+
+    // Validations
     if (
       !isNaN(page) &&
       page >= 1 &&
@@ -41,6 +43,7 @@ export function DataTablePagination({
     ) {
       onPageChange(page - 1);
     } else {
+      // Reset input khi số không hợp lệ
       setPageInput((pageIndex + 1).toString());
     }
   };

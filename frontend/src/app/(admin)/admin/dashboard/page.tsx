@@ -1,8 +1,8 @@
 'use client';
 
+import { useEffect, useState, useMemo } from 'react';
+import { Users, User, TrendingUp, ListMusic, Calendar } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { Users, User, TrendingUp, ListMusic } from 'lucide-react';
 import { api } from '@/utils/api';
 import { Stats } from '@/types';
 import { Music } from '@/components/ui/Icons';
@@ -18,6 +18,7 @@ import {
   Legend,
 } from 'chart.js';
 import { useTheme } from '@/contexts/ThemeContext';
+import { StatsCard } from '@/components/admin/StatsCard';
 
 ChartJS.register(
   CategoryScale,
@@ -36,28 +37,107 @@ export default function AdminDashboard() {
     totalArtists: 0,
     totalArtistRequests: 0,
     totalGenres: 0,
-    trendingArtist: {
-      id: '',
-      artistName: '',
-      monthlyListeners: 0,
-      trackCount: 0,
-    },
+    topArtists: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [timeframe, setTimeframe] = useState<'6m' | '1y'>('6m');
 
-  const [chartData, setChartData] = useState({
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    datasets: [
-      {
-        label: 'Monthly Active Users',
-        data: [0, 0, 0, 0, 0, 0],
-        borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1,
+  // Memoized chart data
+  const chartData = useMemo(() => {
+    const labels =
+      timeframe === '6m'
+        ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+        : [
+            'Jan',
+            'Feb',
+            'Mar',
+            'Apr',
+            'May',
+            'Jun',
+            'Jul',
+            'Aug',
+            'Sep',
+            'Oct',
+            'Nov',
+            'Dec',
+          ];
+
+    const generateData = () => {
+      if (!stats.totalUsers) return Array(labels.length).fill(0);
+
+      if (timeframe === '6m') {
+        return [
+          stats.totalUsers * 0.8,
+          stats.totalUsers * 0.85,
+          stats.totalUsers * 0.9,
+          stats.totalUsers * 0.95,
+          stats.totalUsers * 0.97,
+          stats.totalUsers,
+        ];
+      } else {
+        // Generate yearly data with more variation
+        const baseValue = stats.totalUsers * 0.5;
+        return Array(12)
+          .fill(0)
+          .map((_, i) => baseValue + (stats.totalUsers - baseValue) * (i / 11));
+      }
+    };
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Monthly Active Users',
+          data: generateData(),
+          borderColor: 'rgb(75, 192, 192)',
+          tension: 0.1,
+        },
+      ],
+    };
+  }, [stats.totalUsers, timeframe]);
+
+  // Memoized chart options
+  const chartOptions = useMemo(() => {
+    const isSmallScreen =
+      typeof window !== 'undefined' && window.innerWidth < 768;
+    const gridColor =
+      theme === 'light' ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)';
+    const tickColor =
+      theme === 'light' ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)';
+
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: gridColor },
+          ticks: {
+            color: tickColor,
+            font: { size: isSmallScreen ? 10 : 12 },
+          },
+        },
+        x: {
+          grid: { color: gridColor },
+          ticks: {
+            color: tickColor,
+            font: { size: isSmallScreen ? 10 : 12 },
+          },
+        },
       },
-    ],
-  });
+      plugins: {
+        legend: {
+          labels: {
+            color: tickColor,
+            font: { size: isSmallScreen ? 11 : 13 },
+          },
+        },
+      },
+    };
+  }, [theme]);
 
+  // Fetch dashboard data
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -68,22 +148,6 @@ export default function AdminDashboard() {
         }
         const data = await api.dashboard.getStats(token);
         setStats(data);
-        setChartData((prev) => ({
-          ...prev,
-          datasets: [
-            {
-              ...prev.datasets[0],
-              data: [
-                data.totalUsers * 0.8,
-                data.totalUsers * 0.85,
-                data.totalUsers * 0.9,
-                data.totalUsers * 0.95,
-                data.totalUsers * 0.97,
-                data.totalUsers,
-              ],
-            },
-          ],
-        }));
       } catch (err) {
         console.error('Error fetching stats:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch stats');
@@ -94,76 +158,19 @@ export default function AdminDashboard() {
     fetchStats();
   }, []);
 
-  // Định nghĩa các lớp CSS theo theme
-  const cardBg = theme === 'light' ? 'bg-gray-100' : 'bg-white/5';
-  const cardHoverBg =
-    theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10';
-  const textSecondary = theme === 'light' ? 'text-gray-600' : 'text-white/60';
-  const headingPrimary = theme === 'light' ? 'text-gray-900' : 'text-white';
-  const chartGridColor =
-    theme === 'light' ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)';
-  const chartTickColor =
-    theme === 'light' ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)';
-  const chartLegendColor =
-    theme === 'light' ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)';
-
-  // Định nghĩa style cho button Export Data theo theme
-  const exportBtnBg = theme === 'light' ? 'bg-gray-200' : 'bg-white/10';
-  const exportBtnHover =
-    theme === 'light' ? 'hover:bg-gray-300' : 'hover:bg-white/20';
-  const exportBtnText = theme === 'light' ? 'text-gray-900' : 'text-white';
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      y: {
-        beginAtZero: true,
-        grid: { color: chartGridColor },
-        ticks: {
-          color: chartTickColor,
-          font: { size: window.innerWidth < 768 ? 10 : 12 },
-        },
-      },
-      x: {
-        grid: { color: chartGridColor },
-        ticks: {
-          color: chartTickColor,
-          font: { size: window.innerWidth < 768 ? 10 : 12 },
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        labels: {
-          color: chartLegendColor,
-          font: { size: window.innerWidth < 768 ? 11 : 13 },
-        },
-      },
-    },
-  };
-
   return (
-    <div className="container mx-auto space-y-6 p-4 mb-16 md:mb-0">
+    <div
+      className={`container mx-auto space-y-6 p-4 mb-16 md:mb-0 theme-${theme}`}
+    >
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
         <div>
-          <h1 className={`text-2xl sm:text-3xl font-bold ${headingPrimary}`}>
+          <h1 className="text-2xl sm:text-3xl font-bold text-primary">
             Admin Dashboard
           </h1>
-          <h2 className={`text-sm sm:text-base ${textSecondary}`}>
+          <h2 className="text-sm sm:text-base text-secondary">
             System Overview
           </h2>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            className={`flex-1 sm:flex-none px-3 py-1.5 sm:px-4 sm:py-2 ${exportBtnBg} ${exportBtnText} ${exportBtnHover} rounded-lg text-xs sm:text-sm font-medium`}
-          >
-            Export Data
-          </button>
-          <button className="flex-1 sm:flex-none px-3 py-1.5 sm:px-4 sm:py-2 bg-[#A57865] text-white rounded-lg hover:bg-[#A57865]/90 text-xs sm:text-sm font-medium">
-            Generate Report
-          </button>
         </div>
       </div>
 
@@ -174,7 +181,8 @@ export default function AdminDashboard() {
               key={i}
               className="h-24 md:h-32 rounded-lg animate-pulse"
               style={{
-                backgroundColor: theme === 'light' ? '#f9fafb' : undefined,
+                backgroundColor:
+                  theme === 'light' ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
               }}
             />
           ))}
@@ -187,149 +195,134 @@ export default function AdminDashboard() {
         <div className="flex flex-col gap-4 sm:gap-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-            <Link
+            <StatsCard
+              icon={Users}
+              iconColor="text-blue-500"
+              count={stats.totalUsers}
+              title="Total Users"
+              description="Active accounts"
               href="/admin/users"
-              className={`p-3 sm:p-4 md:p-6 rounded-lg ${cardBg} ${cardHoverBg}`}
-            >
-              <div className="flex items-center justify-between mb-2 md:mb-4">
-                <Users className="w-5 h-5 md:w-8 md:h-8 text-blue-500" />
-                <span className="text-lg sm:text-xl md:text-2xl font-bold">
-                  {stats.totalUsers}
-                </span>
-              </div>
-              <h3
-                className={`text-sm sm:text-base md:text-lg font-bold ${headingPrimary}`}
-              >
-                Total Users
-              </h3>
-              <p className={`text-xs md:text-sm ${textSecondary}`}>
-                Active accounts
-              </p>
-            </Link>
+            />
 
-            <Link
+            <StatsCard
+              icon={User}
+              iconColor="text-green-500"
+              count={stats.totalArtists}
+              title="Verified Artists"
+              description="Professional creators"
               href="/admin/artists"
-              className={`p-3 sm:p-4 md:p-6 rounded-lg ${cardBg} ${cardHoverBg}`}
-            >
-              <div className="flex items-center justify-between mb-2 md:mb-4">
-                <User className="w-5 h-5 md:w-8 md:h-8 text-green-500" />
-                <span className="text-lg sm:text-xl md:text-2xl font-bold">
-                  {stats.totalArtists}
-                </span>
-              </div>
-              <h3
-                className={`text-sm sm:text-base md:text-lg font-bold ${headingPrimary}`}
-              >
-                Verified Artists
-              </h3>
-              <p className={`text-xs md:text-sm ${textSecondary}`}>
-                Professional creators
-              </p>
-            </Link>
+            />
 
-            <Link
+            <StatsCard
+              icon={TrendingUp}
+              iconColor="text-yellow-500"
+              count={stats.totalArtistRequests}
+              title="Pending Requests"
+              description="Awaiting verification"
               href="/admin/artist-requests"
-              className={`p-3 sm:p-4 md:p-6 rounded-lg ${cardBg} ${cardHoverBg}`}
-            >
-              <div className="flex items-center justify-between mb-2 md:mb-4">
-                <TrendingUp className="w-5 h-5 md:w-8 md:h-8 text-yellow-500" />
-                <span className="text-lg sm:text-xl md:text-2xl font-bold">
-                  {stats.totalArtistRequests}
-                </span>
-              </div>
-              <h3
-                className={`text-sm sm:text-base md:text-lg font-bold ${headingPrimary}`}
-              >
-                Pending Requests
-              </h3>
-              <p className={`text-xs md:text-sm ${textSecondary}`}>
-                Awaiting verification
-              </p>
-            </Link>
+            />
 
-            <Link
+            <StatsCard
+              icon={ListMusic}
+              iconColor="text-purple-500"
+              count={stats.totalGenres}
+              title="Music Genres"
+              description="Available categories"
               href="/admin/genres"
-              className={`p-3 sm:p-4 md:p-6 rounded-lg ${cardBg} ${cardHoverBg}`}
-            >
-              <div className="flex items-center justify-between mb-2 md:mb-4">
-                <ListMusic className="w-5 h-5 md:w-8 md:h-8 text-purple-500" />
-                <span className="text-lg sm:text-xl md:text-2xl font-bold">
-                  {stats.totalGenres}
-                </span>
-              </div>
-              <h3
-                className={`text-sm sm:text-base md:text-lg font-bold ${headingPrimary}`}
-              >
-                Music Genres
-              </h3>
-              <p className={`text-xs md:text-sm ${textSecondary}`}>
-                Available categories
-              </p>
-            </Link>
+            />
           </div>
 
           {/* Charts Section */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
             {/* User Growth Chart */}
-            <div
-              className={`md:col-span-2 p-3 sm:p-4 md:p-6 rounded-lg ${cardBg} ${cardHoverBg}`}
-            >
-              <h3
-                className={`text-sm sm:text-base md:text-xl font-bold mb-3 md:mb-4 ${headingPrimary}`}
-              >
-                User Growth
-              </h3>
+            <div className="md:col-span-2 dashboard-card">
+              <div className="flex justify-between items-center mb-3 md:mb-4">
+                <h3 className="text-sm sm:text-base md:text-xl font-bold text-primary">
+                  User Growth
+                </h3>
+                <div className="flex space-x-2 text-xs">
+                  <button
+                    className={`px-2 py-1 rounded ${
+                      timeframe === '6m'
+                        ? 'bg-[#A57865] text-white'
+                        : 'text-secondary'
+                    }`}
+                    onClick={() => setTimeframe('6m')}
+                  >
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      6M
+                    </span>
+                  </button>
+                  <button
+                    className={`px-2 py-1 rounded ${
+                      timeframe === '1y'
+                        ? 'bg-[#A57865] text-white'
+                        : 'text-secondary'
+                    }`}
+                    onClick={() => setTimeframe('1y')}
+                  >
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      1Y
+                    </span>
+                  </button>
+                </div>
+              </div>
               <div className="h-[200px] sm:h-[250px] md:h-[300px]">
                 <Line data={chartData} options={chartOptions} />
               </div>
             </div>
 
-            {/* Trending Artist Card */}
-            <div
-              className={`p-3 sm:p-4 md:p-6 rounded-lg ${cardBg} ${cardHoverBg}`}
-            >
-              <h3
-                className={`text-sm sm:text-base md:text-xl font-bold mb-3 md:mb-4 ${headingPrimary}`}
-              >
-                Trending Artist
+            {/* Top Artists Card */}
+            <div className="dashboard-card">
+              <h3 className="text-sm sm:text-base md:text-xl font-bold mb-3 md:mb-4 text-primary">
+                Top Artists
               </h3>
               <div className="space-y-3 md:space-y-4">
-                <div className="flex items-center gap-3 md:gap-4">
-                  <div
-                    className={`w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center ${
-                      theme === 'light' ? 'bg-gray-100' : 'bg-white/10'
-                    }`}
-                  >
-                    <Music
-                      className={`w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 ${textSecondary}`}
-                    />
-                  </div>
-                  <div>
-                    <h4
-                      className={`font-bold text-sm sm:text-base md:text-xl ${headingPrimary}`}
+                {stats.topArtists && stats.topArtists.length > 0 ? (
+                  stats.topArtists.map((artist) => (
+                    <div
+                      key={artist.id}
+                      className="flex items-center gap-3 md:gap-4"
                     >
-                      {stats.trendingArtist.artistName || 'No artist found'}
-                    </h4>
-                    <p className={`text-xs md:text-sm ${textSecondary}`}>
-                      {stats.trendingArtist.monthlyListeners.toLocaleString()}{' '}
-                      listeners
-                    </p>
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full overflow-hidden flex-shrink-0">
+                        {artist.avatar ? (
+                          <img
+                            src={artist.avatar}
+                            alt={artist.artistName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className={`w-full h-full flex items-center justify-center ${
+                              theme === 'light' ? 'bg-gray-100' : 'bg-white/10'
+                            }`}
+                          >
+                            <Music
+                              className={`w-5 h-5 sm:w-6 sm:h-6 text-secondary`}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <Link
+                          href={`/admin/artists/${artist.id}`}
+                          className="font-bold text-sm sm:text-base hover:underline text-primary"
+                        >
+                          {artist.artistName}
+                        </Link>
+                        <p className="text-xs md:text-sm text-secondary">
+                          {artist.monthlyListeners.toLocaleString()} listeners
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-secondary">No artist data available</p>
                   </div>
-                </div>
-                <div
-                  className={`pt-3 md:pt-4 ${
-                    theme === 'light'
-                      ? 'border-t border-gray-200'
-                      : 'border-t border-white/10'
-                  }`}
-                >
-                  <div className="flex justify-between text-xs md:text-sm">
-                    <span className={textSecondary}>Total Tracks</span>
-                    <span className="font-bold">
-                      {stats.trendingArtist.trackCount}
-                    </span>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>

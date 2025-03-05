@@ -292,12 +292,12 @@ export interface Stats {
   totalArtists: number;
   totalArtistRequests: number;
   totalGenres: number;
-  trendingArtist: {
+  topArtists: Array<{
     id: string;
     artistName: string;
+    avatar?: string;
     monthlyListeners: number;
-    trackCount: number;
-  };
+  }>;
 }
 
 export interface TrackEditForm {

@@ -51,7 +51,6 @@ export default function UserManagement() {
         limit,
         params.toString()
       );
-
       return {
         data: response.users,
         pagination: response.pagination,

@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { Role } from '@prisma/client';
-import { client } from '../middleware/cache.middleware';
 import {
   artistProfileSelect,
   artistRequestDetailsSelect,
@@ -10,6 +9,14 @@ import {
   userSelect,
 } from '../utils/prisma-selects';
 import { uploadFile } from '../services/cloudinary.service';
+import {
+  handleCache,
+  handleError,
+  paginate,
+  runValidations,
+  toBooleanValue,
+  validateField,
+} from 'src/utils/handle-utils';
 
 // Lấy danh sách tất cả người dùng - ADMIN only
 export const getAllUsers = async (
@@ -17,13 +24,10 @@ export const getAllUsers = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10, search = '', status } = req.query;
-    const pageNumber = Number(page);
-    const limitNumber = Number(limit);
-    const offset = (pageNumber - 1) * limitNumber;
+    const { search = '', status } = req.query;
 
-    // Xây dựng điều kiện where gộp tất cả điều kiện
-    const where: any = {
+    // Build where conditions
+    const where = {
       role: 'USER',
       ...(search
         ? {
@@ -37,31 +41,20 @@ export const getAllUsers = async (
       ...(status !== undefined ? { isActive: status === 'true' } : {}),
     };
 
-    const [users, totalUsers] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        skip: offset,
-        take: limitNumber,
-        include: {
-          artistProfile: {
-            include: {
-              genres: {
-                include: {
-                  genre: true,
-                },
-              },
-            },
-          },
+    // Use the paginate helper
+    const result = await paginate(prisma.user, req, {
+      where,
+      include: {
+        artistProfile: {
+          include: { genres: { include: { genre: true } } },
         },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      }),
-      prisma.user.count({ where }),
-    ]);
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
+    // Format the response
     res.json({
-      users: users.map((user) => ({
+      users: result.data.map((user: any) => ({
         ...user,
         artistProfile: user.artistProfile
           ? {
@@ -71,16 +64,10 @@ export const getAllUsers = async (
             }
           : null,
       })),
-      pagination: {
-        total: totalUsers,
-        page: pageNumber,
-        limit: limitNumber,
-        totalPages: Math.ceil(totalUsers / limitNumber),
-      },
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('Get all users error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get all users');
   }
 };
 
@@ -91,21 +78,12 @@ export const getUserById = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const cacheKey = req.originalUrl;
 
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: userSelect,
+    const user = await handleCache(req, async () => {
+      return prisma.user.findUnique({
+        where: { id },
+        select: userSelect,
+      });
     });
 
     if (!user) {
@@ -113,15 +91,9 @@ export const getUserById = async (
       return;
     }
 
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      console.log(`[Redis] Caching data for key: ${cacheKey}`);
-      await client.setEx(cacheKey, 300, JSON.stringify(user));
-    }
-
     res.json(user);
   } catch (error) {
-    console.error('Get user by id error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get user by id');
   }
 };
 
@@ -131,19 +103,9 @@ export const getAllArtistRequests = async (
   res: Response
 ): Promise<void> => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      startDate,
-      endDate,
-      status,
-      search,
-    } = req.query;
-    const pageNumber = Number(page);
-    const limitNumber = Number(limit);
-    const offset = (pageNumber - 1) * limitNumber;
+    const { startDate, endDate, status, search } = req.query;
 
-    // Xây dựng điều kiện where gộp tất cả điều kiện
+    // Xây dựng điều kiện where
     const where: any = {
       verificationRequestedAt: { not: null }, // Chỉ lấy các request đã được gửi
       ...(status === 'pending' ? { isVerified: false } : {}),
@@ -169,31 +131,18 @@ export const getAllArtistRequests = async (
         : {}),
     };
 
-    const [requests, totalRequests] = await Promise.all([
-      prisma.artistProfile.findMany({
-        where,
-        skip: offset,
-        take: limitNumber,
-        select: artistRequestSelect,
-        orderBy: {
-          verificationRequestedAt: 'desc',
-        },
-      }),
-      prisma.artistProfile.count({ where }),
-    ]);
+    const result = await paginate(prisma.artistProfile, req, {
+      where,
+      select: artistRequestSelect,
+      orderBy: { verificationRequestedAt: 'desc' },
+    });
 
     res.json({
-      requests,
-      pagination: {
-        total: totalRequests,
-        page: pageNumber,
-        limit: limitNumber,
-        totalPages: Math.ceil(totalRequests / limitNumber),
-      },
+      requests: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('Get artist requests error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get artist requests');
   }
 };
 
@@ -204,21 +153,12 @@ export const getArtistRequestDetail = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const cacheKey = req.originalUrl;
 
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-    }
-
-    const request = await prisma.artistProfile.findUnique({
-      where: { id },
-      select: artistRequestDetailsSelect,
+    const request = await handleCache(req, async () => {
+      return prisma.artistProfile.findUnique({
+        where: { id },
+        select: artistRequestDetailsSelect,
+      });
     });
 
     if (!request) {
@@ -226,15 +166,9 @@ export const getArtistRequestDetail = async (
       return;
     }
 
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      console.log(`[Redis] Caching data for key: ${cacheKey}`);
-      await client.setEx(cacheKey, 300, JSON.stringify(request));
-    }
-
     res.json(request);
   } catch (error) {
-    console.error('Get artist request details error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get artist request details');
   }
 };
 
@@ -249,22 +183,23 @@ export const updateUser = async (
     const avatarFile = req.file;
 
     // Validation
-    const validationErrors = [];
-    if (!id) validationErrors.push('User ID is required');
-    if (email && !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      validationErrors.push('Invalid email format');
-    }
-    if (username && username.length < 3) {
-      validationErrors.push('Username must be at least 3 characters long');
-    }
+    const validationErrors = runValidations([
+      validateField(id, 'User ID', { required: true }),
+      email &&
+        validateField(email, 'Email', {
+          pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+          message: 'Invalid email format',
+        }),
+      username && validateField(username, 'Username', { minLength: 3 }),
+      role &&
+        validateField(role, 'Role', { enum: ['USER', 'ARTIST', 'ADMIN'] }),
+    ]);
+
     if (validationErrors.length > 0) {
       res
         .status(400)
         .json({ message: 'Validation failed', errors: validationErrors });
       return;
-    }
-    if (role && !['USER', 'ARTIST', 'ADMIN'].includes(role)) {
-      validationErrors.push('Invalid role value');
     }
 
     // Kiểm tra user tồn tại
@@ -307,10 +242,7 @@ export const updateUser = async (
     }
 
     // Chuyển đổi isActive thành boolean
-    const isActiveBool =
-      isActive !== undefined
-        ? isActive === 'true' || isActive === true
-        : undefined;
+    const isActiveBool = toBooleanValue(isActive);
 
     // Cập nhật user
     const updatedUser = await prisma.user.update({
@@ -335,8 +267,7 @@ export const updateUser = async (
       user: updatedUser,
     });
   } catch (error) {
-    console.error('Update user error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Update user');
   }
 };
 
@@ -351,14 +282,12 @@ export const updateArtist = async (
     const avatarFile = req.file;
 
     // Validation
-    const validationErrors = [];
-    if (!id) validationErrors.push('Artist ID is required');
-    if (artistName && artistName.length < 2) {
-      validationErrors.push('Artist name must be at least 2 characters long');
-    }
-    if (bio && bio.length > 1000) {
-      validationErrors.push('Bio must not exceed 1000 characters');
-    }
+    const validationErrors = runValidations([
+      validateField(id, 'Artist ID', { required: true }),
+      artistName && validateField(artistName, 'Artist name', { minLength: 2 }),
+      bio && validateField(bio, 'Bio', { maxLength: 1000 }),
+    ]);
+
     if (validationErrors.length > 0) {
       res
         .status(400)
@@ -399,10 +328,7 @@ export const updateArtist = async (
     }
 
     // Chuyển đổi isActive thành boolean
-    const isActiveBool =
-      isActive !== undefined
-        ? isActive === 'true' || isActive === true
-        : undefined;
+    const isActiveBool = toBooleanValue(isActive);
 
     // Cập nhật artist
     const updatedArtist = await prisma.artistProfile.update({
@@ -426,8 +352,7 @@ export const updateArtist = async (
       artist: updatedArtist,
     });
   } catch (error) {
-    console.error('Update artist error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Update artist');
   }
 };
 
@@ -441,8 +366,7 @@ export const deleteUser = async (
     await prisma.user.delete({ where: { id } });
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
-    console.error('Delete user error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Delete user');
   }
 };
 
@@ -456,8 +380,7 @@ export const deleteArtist = async (
     await prisma.artistProfile.delete({ where: { id } });
     res.json({ message: 'Artist deleted permanently' });
   } catch (error) {
-    console.error('Delete artist error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Delete artist');
   }
 };
 
@@ -467,12 +390,9 @@ export const getAllArtists = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10, search = '', status } = req.query;
-    const pageNumber = Number(page);
-    const limitNumber = Number(limit);
-    const offset = (pageNumber - 1) * limitNumber;
+    const { search = '', status } = req.query;
 
-    // Xây dựng điều kiện where gộp tất cả điều kiện
+    // Xây dựng điều kiện where
     const where: any = {
       role: Role.ARTIST,
       isVerified: true,
@@ -491,29 +411,18 @@ export const getAllArtists = async (
       ...(status !== undefined ? { isActive: status === 'true' } : {}),
     };
 
-    const [artists, totalArtists] = await Promise.all([
-      prisma.artistProfile.findMany({
-        where,
-        skip: offset,
-        take: limitNumber,
-        select: artistProfileSelect,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.artistProfile.count({ where }),
-    ]);
+    const result = await paginate(prisma.artistProfile, req, {
+      where,
+      select: artistProfileSelect,
+      orderBy: { createdAt: 'desc' },
+    });
 
     res.json({
-      artists,
-      pagination: {
-        total: totalArtists,
-        page: pageNumber,
-        limit: limitNumber,
-        totalPages: Math.ceil(totalArtists / limitNumber),
-      },
+      artists: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('Get all artists error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get all artists');
   }
 };
 
@@ -524,35 +433,26 @@ export const getArtistById = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const cacheKey = req.originalUrl;
 
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-    }
-
-    const artist = await prisma.artistProfile.findUnique({
-      where: { id },
-      select: {
-        ...artistProfileSelect,
-        albums: {
-          orderBy: { releaseDate: 'desc' },
-          select: artistProfileSelect.albums.select,
-        },
-        tracks: {
-          where: {
-            type: 'SINGLE',
-            albumId: null, // Chỉ lấy track không thuộc album nào
+    const artist = await handleCache(req, async () => {
+      return prisma.artistProfile.findUnique({
+        where: { id },
+        select: {
+          ...artistProfileSelect,
+          albums: {
+            orderBy: { releaseDate: 'desc' },
+            select: artistProfileSelect.albums.select,
           },
-          orderBy: { releaseDate: 'desc' },
-          select: artistProfileSelect.tracks.select,
+          tracks: {
+            where: {
+              type: 'SINGLE',
+              albumId: null, // Chỉ lấy track không thuộc album nào
+            },
+            orderBy: { releaseDate: 'desc' },
+            select: artistProfileSelect.tracks.select,
+          },
         },
-      },
+      });
     });
 
     if (!artist) {
@@ -560,15 +460,9 @@ export const getArtistById = async (
       return;
     }
 
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      console.log(`[Redis] Caching data for key: ${cacheKey}`);
-      await client.setEx(cacheKey, 300, JSON.stringify(artist));
-    }
-
     res.json(artist);
   } catch (error) {
-    console.error('Get artist by id error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get artist by id');
   }
 };
 
@@ -578,12 +472,9 @@ export const getAllGenres = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
-    const pageNumber = Number(page);
-    const limitNumber = Number(limit);
-    const offset = (pageNumber - 1) * limitNumber;
+    const { search = '' } = req.query;
 
-    // Xây dựng điều kiện where gộp tất cả điều kiện
+    // Xây dựng điều kiện where
     const where: any = {
       ...(search
         ? {
@@ -595,31 +486,18 @@ export const getAllGenres = async (
         : {}),
     };
 
-    const [genres, totalGenres] = await Promise.all([
-      prisma.genre.findMany({
-        where,
-        skip: offset,
-        take: limitNumber,
-        select: genreSelect,
-        orderBy: {
-          createdAt: 'desc',
-        },
-      }),
-      prisma.genre.count({ where }),
-    ]);
+    const result = await paginate(prisma.genre, req, {
+      where,
+      select: genreSelect,
+      orderBy: { createdAt: 'desc' },
+    });
 
     res.json({
-      genres,
-      pagination: {
-        total: totalGenres,
-        page: pageNumber,
-        limit: limitNumber,
-        totalPages: Math.ceil(totalGenres / limitNumber),
-      },
+      genres: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('Get all genres error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get all genres');
   }
 };
 
@@ -631,14 +509,13 @@ export const createGenre = async (
   try {
     const { name } = req.body;
 
-    // Validation tập trung
-    const validationErrors = [];
-    if (!name) validationErrors.push('Name is required');
-    if (name && name.trim() === '')
-      validationErrors.push('Name cannot be empty');
-    if (name && name.length > 50) {
-      validationErrors.push('Name exceeds maximum length (50 characters)');
-    }
+    // Validation
+    const validationErrors = runValidations([
+      validateField(name, 'Name', { required: true }),
+      name && validateField(name.trim(), 'Name', { minLength: 1 }),
+      name && validateField(name, 'Name', { maxLength: 50 }),
+    ]);
+
     if (validationErrors.length > 0) {
       res
         .status(400)
@@ -662,8 +539,7 @@ export const createGenre = async (
 
     res.status(201).json({ message: 'Genre created successfully', genre });
   } catch (error) {
-    console.error('Create genre error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Create genre');
   }
 };
 
@@ -676,15 +552,14 @@ export const updateGenre = async (
     const { id } = req.params;
     const { name } = req.body;
 
-    // Validation tập trung
-    const validationErrors = [];
-    if (!id) validationErrors.push('Genre ID is required');
-    if (!name) validationErrors.push('Name is required');
-    if (name && name.trim() === '')
-      validationErrors.push('Name cannot be empty');
-    if (name && name.length > 50) {
-      validationErrors.push('Name exceeds maximum length (50 characters)');
-    }
+    // Validation
+    const validationErrors = runValidations([
+      validateField(id, 'Genre ID', { required: true }),
+      validateField(name, 'Name', { required: true }),
+      name && validateField(name.trim(), 'Name', { minLength: 1 }),
+      name && validateField(name, 'Name', { maxLength: 50 }),
+    ]);
+
     if (validationErrors.length > 0) {
       res
         .status(400)
@@ -724,8 +599,7 @@ export const updateGenre = async (
       genre: updatedGenre,
     });
   } catch (error) {
-    console.error('Update genre error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Update genre');
   }
 };
 
@@ -739,8 +613,7 @@ export const deleteGenre = async (
     await prisma.genre.delete({ where: { id } });
     res.json({ message: 'Genre deleted successfully' });
   } catch (error) {
-    console.error('Delete genre error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Delete genre');
   }
 };
 
@@ -792,8 +665,7 @@ export const approveArtistRequest = async (
       user: updatedProfile.user,
     });
   } catch (error) {
-    console.error('Approve artist request error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Approve artist request');
   }
 };
 
@@ -833,86 +705,75 @@ export const rejectArtistRequest = async (
       hasPendingRequest: false,
     });
   } catch (error) {
-    console.error('Reject artist request error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Reject artist request');
   }
 };
 
 // Lấy thông số tổng quan để thống kê - ADMIN only
 export const getStats = async (req: Request, res: Response): Promise<void> => {
   try {
-    const cacheKey = req.originalUrl;
+    const statsData = await handleCache(
+      req,
+      async () => {
+        // Sử dụng Promise.all để thực hiện đồng thời các truy vấn
+        const stats = await Promise.all([
+          prisma.user.count({ where: { role: Role.USER } }),
+          prisma.artistProfile.count({
+            where: {
+              role: Role.ARTIST,
+              isVerified: true,
+            },
+          }), // Tổng số nghệ sĩ đã xác minh
+          prisma.artistProfile.count({
+            where: {
+              verificationRequestedAt: { not: null },
+              isVerified: false,
+            },
+          }), // Tổng số yêu cầu nghệ sĩ đang chờ
+          prisma.artistProfile.findMany({
+            where: {
+              role: Role.ARTIST,
+              isVerified: true,
+            },
+            orderBy: [{ monthlyListeners: 'desc' }],
+            take: 4,
+            select: {
+              id: true,
+              artistName: true,
+              avatar: true,
+              monthlyListeners: true,
+            },
+          }), // Nghệ sĩ nổi bật nhất
+          prisma.genre.count(), // Tổng số thể loại nhạc
+        ]);
 
-    // Kiểm tra cache Redis nếu được bật
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedStats = await client.get(cacheKey);
-      if (cachedStats) {
-        console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-        res.json(JSON.parse(cachedStats));
-        return;
-      }
-      console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-    }
+        const [
+          totalUsers,
+          totalArtists,
+          totalArtistRequests,
+          topArtists,
+          totalGenres,
+        ] = stats;
 
-    // Sử dụng Promise.all để thực hiện đồng thời các truy vấn
-    const stats = await Promise.all([
-      prisma.user.count(), // Tổng số user
-      prisma.artistProfile.count({
-        where: {
-          role: Role.ARTIST,
-          isVerified: true,
-        },
-      }), // Tổng số nghệ sĩ đã xác minh
-      prisma.artistProfile.count({
-        where: {
-          verificationRequestedAt: { not: null },
-          isVerified: false,
-        },
-      }), // Tổng số yêu cầu nghệ sĩ đang chờ
-      prisma.artistProfile.findFirst({
-        where: {
-          role: Role.ARTIST,
-          isVerified: true,
-        },
-        orderBy: [{ monthlyListeners: 'desc' }],
-        select: {
-          id: true,
-          artistName: true,
-          monthlyListeners: true,
-        },
-      }), // Nghệ sĩ nổi bật nhất
-      prisma.genre.count(), // Tổng số thể loại nhạc
-    ]);
-
-    const [
-      totalUsers,
-      totalArtists,
-      totalArtistRequests,
-      mostActiveArtist,
-      totalGenres,
-    ] = stats;
-
-    const statsData = {
-      totalUsers,
-      totalArtists,
-      totalArtistRequests,
-      totalGenres,
-      trendingArtist: {
-        id: mostActiveArtist?.id || '',
-        artistName: mostActiveArtist?.artistName || '',
-        monthlyListeners: mostActiveArtist?.monthlyListeners || 0,
+        return {
+          totalUsers,
+          totalArtists,
+          totalArtistRequests,
+          totalGenres,
+          topArtists: topArtists.map((artist) => ({
+            id: artist.id,
+            artistName: artist.artistName,
+            avatar: artist.avatar,
+            monthlyListeners: artist.monthlyListeners,
+          })),
+          updatedAt: new Date().toISOString(),
+        };
       },
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      console.log(`[Redis] Caching data for key: ${cacheKey}`);
-      await client.setEx(cacheKey, 3600, JSON.stringify(statsData)); // Tăng TTL lên 1 giờ
-    }
+      3600 // TTL 1 giờ
+    );
 
     res.json(statsData);
   } catch (error) {
-    console.error('Get stats error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get stats');
   }
 };

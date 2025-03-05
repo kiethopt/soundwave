@@ -15,3 +15,58 @@
     --radius: 0.5rem;
   }
 }
+
+/* Add to global.css */
+@layer components {
+  .dashboard-card {
+    @apply p-3 sm:p-4 md:p-6 rounded-lg transition-colors;
+  }
+
+  .theme-light .dashboard-card {
+    @apply bg-gray-100 hover:bg-gray-200;
+  }
+
+  .theme-dark .dashboard-card {
+    @apply bg-white/5 hover:bg-white/10;
+  }
+
+  .text-primary {
+    @apply transition-colors;
+  }
+
+  .theme-light .text-primary {
+    @apply text-gray-900;
+  }
+
+  .theme-dark .text-primary {
+    @apply text-white;
+  }
+
+  .text-secondary {
+    @apply transition-colors;
+  }
+
+  .theme-light .text-secondary {
+    @apply text-gray-600;
+  }
+
+  .theme-dark .text-secondary {
+    @apply text-white/60;
+  }
+
+  .btn-primary {
+    @apply px-3 py-1.5 sm:px-4 sm:py-2 bg-[#A57865] text-white rounded-lg hover:bg-[#A57865]/90 text-xs sm:text-sm font-medium;
+  }
+
+  .btn-secondary {
+    @apply px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors;
+  }
+
+  .theme-light .btn-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300;
+  }
+
+  .theme-dark .btn-secondary {
+    @apply bg-white/10 text-white hover:bg-white/20;
+  }
+}
