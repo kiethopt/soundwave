@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import HorizontalTrackListItem from '@/components/track/HorizontalTrackListItem';
 import { EditArtistProfileModal } from '@/components/artist/EditArtistProfileModal';
+import Image from 'next/image';
+import { EditArtistBannerModal } from '@/components/artist/EditArtistBannerModal';
 
 export default function ArtistProfilePage({
   params,
@@ -38,9 +40,10 @@ export default function ArtistProfilePage({
   const [loading, setLoading] = useState(true);
   const [follow, setFollow] = useState(false);
   const [isOwner, setIsOwner] = useState(false); 
-  const { dominantColor } = useDominantColor(artist?.avatar || '');
+  const { dominantColor } = useDominantColor(artist?.artistBanner || artist?.avatar || '');
   const [showAllTracks, setShowAllTracks] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isBannerOpen, setIsBannerOpen] = useState(false);
 
   const {
     currentTrack,
@@ -256,6 +259,49 @@ export default function ArtistProfilePage({
            queueType === 'artist';
   };
 
+  const fetchArtistData = async () => {
+    const token = localStorage.getItem('userToken');
+    if (!token) return;
+
+    try {
+      const artistResponse = await api.artists.getArtistById(id, token);
+      setArtist(artistResponse.data);
+
+      // Check if current user is the owner
+      const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+      setIsOwner(userData?.id === artistResponse.data.userId);
+
+      // Fetch albums
+      const albumsResponse = await api.artists.getAlbumByArtistId(id, token);
+      setAlbums(albumsResponse.data);
+
+      // Fetch tracks
+      const tracksResponse = await api.artists.getTrackByArtistId(id, token);
+      setTracks(tracksResponse.data);
+
+      // Fetch related artists
+      const relatedResponse = await api.artists.getRelatedArtists(id, token);
+      setRelatedArtists(relatedResponse.data);
+
+      // Check if user follows this artist
+      if (userData?.id) {
+        try {
+          const followResponse = await api.follows.checkFollow(
+            userData.id,
+            id,
+            'ARTIST',
+            token
+          );
+          setFollow(followResponse.data.isFollowing);
+        } catch (error) {
+          console.error('Error checking follow status:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching artist data:', error);
+    }
+  };
+
   return (
     <div
       className="min-h-screen w-full rounded-lg"
@@ -274,35 +320,56 @@ export default function ArtistProfilePage({
       {artist && (
         <div>
           {/* Artist Banner */}
-          <div
-            className="relative w-full h-[370px] flex flex-col items-start rounded-t-lg px-4 md:px-6 py-6 justify-between"
-            style={{ backgroundColor: dominantColor || undefined }}
-          >
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => router.back()}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  theme === 'light'
-                    ? 'bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow'
-                    : 'bg-black/20 hover:bg-black/30 text-white/80 hover:text-white'
-                }`}
-              >
-                <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
-                <span>Back</span>
-              </button>
-            </div>
+          <div className="relative w-full h-[370px] rounded-t-lg overflow-hidden">
+            {artist.artistBanner ? (
+              <Image
+                src={artist.artistBanner}
+                alt={`${artist.artistName} banner`}
+                fill
+                className="object-cover"
+                priority
+              />
+            ) : (
+              <div 
+                className="absolute inset-0" 
+                style={{ backgroundColor: dominantColor || '#121212' }}
+              />
+            )}
+            
+            {/* Content overlay */}
+            <div className="absolute inset-0 flex flex-col justify-between px-4 md:px-6 py-6 z-10">
+              <div className="flex items-center justify-between w-full">
+                <button
+                  onClick={() => router.back()}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    theme === 'light'
+                      ? 'bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow'
+                      : 'bg-black/20 hover:bg-black/30 text-white/80 hover:text-white'
+                  }`}
+                >
+                  <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+                  <span>Back</span>
+                </button>
 
-            <div>
-              <div className="flex items-center space-x-2">
-                <Verified className='w-6 h-6' />
-                <span className='text-sm font-medium'>Verified Artist</span>
+                {isOwner && (
+                  <button onClick={() => setIsBannerOpen(true)}>
+                    <Edit className='w-5 h-5 mr-2 text-white hover:text-gray-300' />
+                  </button>
+                )}
               </div>
-              <h1 className='text-6xl font-bold uppercase py-4' style={{ lineHeight: '1.1' }}>
-                {artist.artistName}
-              </h1>
-              <span className='text-base font-semibold py-6'>
-                {new Intl.NumberFormat('en-US').format(artist.monthlyListeners)} monthly listeners
-              </span>
+
+              <div>
+                <div className="flex items-center space-x-2">
+                  <Verified className='w-6 h-6' />
+                  <span className='text-sm font-medium'>Verified Artist</span>
+                </div>
+                <h1 className='text-6xl font-bold uppercase py-4' style={{ lineHeight: '1.1' }}>
+                  {artist.artistName}
+                </h1>
+                <span className='text-base font-semibold py-6'>
+                  {new Intl.NumberFormat('en-US').format(artist.monthlyListeners)} monthly listeners
+                </span>
+              </div>
             </div>
           </div>
   
@@ -357,14 +424,12 @@ export default function ArtistProfilePage({
                   <DropdownMenuContent align="start" className="w-56">
                     <DropdownMenuItem 
                       className='cursor-pointer'
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsEditOpen(true);
+                      }}
                     >
-                      <Edit 
-                        className="w-4 h-4 mr-2"
-                        onClick={() => {
-                          setIsEditOpen(true);
-                        }}  
-                      />
+                      <Edit className="w-4 h-4 mr-2" />
                         Edit Profile
                     </DropdownMenuItem>
                     <DropdownMenuItem 
@@ -422,17 +487,8 @@ export default function ArtistProfilePage({
             <div className='flex-grow'>
               <div className='flex items-center gap-4'>
                 <h2 className="text-2xl font-bold">About</h2>
-                {isOwner && (
-                  <Edit 
-                    className='w-5 h-5 text-white opacity-60 hover:opacity-100 cursor-pointer' 
-                    // show edit modal
-                    onClick={() => {
-                      setIsEditOpen(true);
-                    }}
-                  />
-                )}
               </div>
-              <p className="text-white/60 mt-2">
+              <p className="text-white/60 mt-2 dark:text-black/60">
                 {artist.bio || 'No biography available'}
               </p>
             </div>
@@ -470,7 +526,7 @@ export default function ArtistProfilePage({
                       </button>
                     </div>
                     <h3
-                      className={`font-medium truncate ${
+                      className={`font-medium truncate dark:text-black/60 ${
                         currentTrack && album.tracks.some(track => track.id === currentTrack.id && queueType === 'album')
                           ? 'text-[#A57865]'
                           : 'text-white'
@@ -478,7 +534,7 @@ export default function ArtistProfilePage({
                     >
                       {album.title}
                     </h3>
-                    <p className="text-white/60 text-sm truncate">
+                    <p className="text-white/60 text-sm truncate dark:text-black/60">
                       {typeof album.artist === 'string'
                         ? album.artist
                         : album.artist?.artistName || 'Unknown Artist'}
@@ -520,7 +576,7 @@ export default function ArtistProfilePage({
                         )}
                       </button>
                     </div>
-                    <h3 className={`font-medium truncate ${
+                    <h3 className={`font-medium truncate dark:text-black/60 ${
                       artistTracksMap[relatedArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'artist'
                         ? 'text-[#A57865]'
                         : 'text-white'
@@ -528,7 +584,7 @@ export default function ArtistProfilePage({
                     >
                       {relatedArtist.artistName}
                     </h3>
-                    <p className="text-white/60 text-sm truncate">
+                    <p className="text-white/60 text-sm truncate dark:text-black/60">
                       {new Intl.NumberFormat('en-US').format(relatedArtist.monthlyListeners)} monthly listeners
                     </p>
                   </div>
@@ -542,6 +598,16 @@ export default function ArtistProfilePage({
             open={isEditOpen}
             onOpenChange={setIsEditOpen}
           />
+
+          {/* Add Banner Modal */}
+          {artist && (
+            <EditArtistBannerModal
+              artistProfile={artist}
+              open={isBannerOpen}
+              onOpenChange={setIsBannerOpen}
+              onBannerUpdate={fetchArtistData}
+            />
+          )}
         </div>
       )}
     </div>

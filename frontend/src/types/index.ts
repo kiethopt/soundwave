@@ -79,6 +79,7 @@ export interface ArtistProfile {
   artistName: string;
   bio?: string;
   avatar?: string;
+  artistBanner?: string;
   role: 'ARTIST';
   socialMediaLinks?: {
     facebook?: string;

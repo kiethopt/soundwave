@@ -462,15 +462,29 @@ export const updateArtistProfile = async (
       return;
     }
 
+    // Trong controller
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+
     // Upload avatar nếu có
     let avatarUrl = undefined;
-    if (req.file) {
+    if (files && files.avatar && files.avatar[0]) {
       const result = await uploadFile(
-        req.file.buffer,
-        'artist-avatars',
+        files.avatar[0].buffer,
+        'avatar',
         'image'
       );
       avatarUrl = result.secure_url;
+    }
+
+    // Upload banner nếu có
+    let bannerUrl = undefined;
+    if (files && files.artistBanner && files.artistBanner[0]) {
+      const result = await uploadFile(
+        files.artistBanner[0].buffer,
+        'artistBanner',
+        'image'
+      );
+      bannerUrl = result.secure_url;
     }
 
     // Kiểm tra genres nếu có
@@ -495,6 +509,7 @@ export const updateArtistProfile = async (
         artistName,
         bio,
         ...(avatarUrl && { avatar: avatarUrl }),
+        ...(bannerUrl && { artistBanner: bannerUrl }),
         ...(parsedSocialMediaLinks && {
           socialMediaLinks: parsedSocialMediaLinks,
         }),

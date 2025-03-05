@@ -29,7 +29,10 @@ router.get('/profile/:id', authenticate, cacheMiddleware, getArtistProfile);
 router.put(
   '/profile/:id',
   authenticate,
-  upload.single('avatar'),
+  upload.fields([
+    { name: 'avatar', maxCount: 1 },
+    { name: 'artistBanner', maxCount: 1 },
+  ]),
   updateArtistProfile
 );
 
