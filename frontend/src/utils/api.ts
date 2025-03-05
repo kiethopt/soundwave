@@ -407,12 +407,12 @@ export const api = {
     getProfile: async (id: string, token: string) =>
       fetchWithAuth(`/api/artist/profile/${id}`, { method: 'GET' }, token),
 
-    updateProfile: async (id: string, data: any, token: string) =>
+    updateProfile: async (id: string, data: FormData, token: string) =>
       fetchWithAuth(
         `/api/artist/profile/${id}`,
         {
           method: 'PUT',
-          body: JSON.stringify(data),
+          body: data,
         },
         token
       ),
@@ -850,5 +850,28 @@ export const api = {
 
       return response.json();
     },
+  },
+
+  follows: {
+    checkFollow: async (userId: string, targetId: string, type: string, token: string) =>
+      fetchWithAuth(
+        `/api/user/check-follow/${targetId}?type=${type}`,
+        { method: 'GET' },
+        token
+      ),
+    
+    follow: async (targetId: string, token: string) =>
+      fetchWithAuth(
+        `/api/user/follow/${targetId}`,
+        { method: 'POST' },
+        token
+      ),
+    
+    unfollow: async (targetId: string, token: string) =>
+      fetchWithAuth(
+        `/api/user/unfollow/${targetId}`,
+        { method: 'DELETE' },
+        token
+      ),
   },
 };

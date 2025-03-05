@@ -62,8 +62,14 @@ export function EditArtistProfileModal({
         toast.error('Please login again');
         return;
       }
-      console.log('formData', formData);
-      await api.artists.updateProfile(artistProfile.id, formData, token);
+      const apiFormData = new FormData();
+      apiFormData.append('artistName', formData.artistName);
+      apiFormData.append('bio', formData.bio);
+      if (formData.avatar instanceof File) {
+        apiFormData.append('avatar', formData.avatar);
+      }
+
+      await api.artists.updateProfile(artistProfile.id, apiFormData, token);
 
       toast.success('Updated Artist Profile');
       onOpenChange(false);
@@ -117,7 +123,7 @@ export function EditArtistProfileModal({
           <div className="space-y-4">
             <label
               htmlFor="artistName"
-              className="block text-sm font-medium text-white/70 mb-2"
+              className="block text-sm font-medium text-white/70 mb-2 dark:text-black/70"
             >
               Artist Name
             </label>
@@ -128,13 +134,13 @@ export function EditArtistProfileModal({
               placeholder="Artist Name"
               value={formData.artistName}
               onChange={handleInputChange}
-              className="text-white"
+              className="text-white dark:text-black"
               required
             />
 
             <label
               htmlFor="bio"
-              className="block text-sm font-medium text-white/70 mb-2"
+              className="block text-sm font-medium text-white/70 mb-2 dark:text-black/70"
             >
               Bio
             </label>
@@ -146,7 +152,7 @@ export function EditArtistProfileModal({
               value={formData.bio}
               onChange={handleInputChange}
               rows={3}
-              className="text-white"
+              className="text-white dark:text-black"
               required
             />
           </div>

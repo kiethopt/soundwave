@@ -82,7 +82,7 @@ const HorizontalTrackListItem: React.FC<TrackListItemProps> = ({
       <div className="flex flex-col md:flex-row justify-center md:justify-between items-center min-w-0 w-full">
         {/* Track Title */}
         <span
-          className={`font-medium truncate w-full md:w-auto ${
+          className={`font-medium truncate w-full md:w-auto dark:text-black/60 ${
             currentTrack?.id === track.id && queueType === 'track'
               ? 'text-[#A57865]'
               : 'text-white'
