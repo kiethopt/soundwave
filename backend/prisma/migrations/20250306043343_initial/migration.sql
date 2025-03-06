@@ -48,6 +48,7 @@ CREATE TABLE "artist_profiles" (
     "artistName" TEXT NOT NULL,
     "bio" TEXT,
     "avatar" TEXT,
+    "artistBanner" TEXT,
     "role" "Role" NOT NULL DEFAULT 'ARTIST',
     "socialMediaLinks" JSONB,
     "monthlyListeners" INTEGER NOT NULL DEFAULT 0,

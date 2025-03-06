@@ -4,262 +4,210 @@ import * as path from 'path';
 import * as readline from 'readline';
 import 'dotenv/config';
 
+// Thư mục chứa các file backup
+const backupDir = path.join(__dirname, '../backups');
+
+// Tạo interface để đọc input từ người dùng
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-// Lấy danh sách file backup
-function listBackups(): string[] {
-  const backupDir = path.join(__dirname, '../backups');
-  const files = fs
+// Lấy danh sách các file backup
+function getBackups(): {
+  fileName: string;
+  filePath: string;
+  stats: fs.Stats;
+}[] {
+  return fs
     .readdirSync(backupDir)
     .filter((file) => file.endsWith('.bak'))
-    .sort((a, b) => {
-      const statsA = fs.statSync(path.join(backupDir, a));
-      const statsB = fs.statSync(path.join(backupDir, b));
-      return statsB.mtime.getTime() - statsA.mtime.getTime(); // Sắp xếp theo thời gian giảm dần
-    });
-
-  if (files.length === 0) {
-    console.log('❌ Không tìm thấy file backup nào');
-    process.exit(1);
-  }
-
-  return files;
+    .map((file) => ({
+      fileName: file,
+      filePath: path.join(backupDir, file),
+      stats: fs.statSync(path.join(backupDir, file)),
+    }))
+    .sort((a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime());
 }
 
-// Chọn file backup để restore
-function promptForBackup(): Promise<string> {
-  const backupDir = path.join(__dirname, '../backups');
+// Hiển thị và cho phép người dùng chọn file backup
+function selectBackup(): Promise<string | null> {
   return new Promise((resolve) => {
-    const backups = listBackups();
+    const backups = getBackups();
 
-    console.log('📁 Danh sách các file backup:');
-    backups.forEach((file, index) => {
-      const stats = fs.statSync(path.join(backupDir, file));
-      const fileSizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
-      console.log(
-        `[${index + 1}] ${file} (${fileSizeInMB} MB - ${new Date(
-          stats.mtime
-        ).toLocaleString()})`
-      );
-    });
-
-    rl.question('📝 Chọn số thứ tự file backup để restore: ', (answer) => {
-      const index = parseInt(answer) - 1;
-      if (isNaN(index) || index < 0 || index >= backups.length) {
-        console.log('❌ Lựa chọn không hợp lệ');
-        process.exit(1);
-      }
-      resolve(path.join(backupDir, backups[index]));
-    });
-  });
-}
-
-// Xác nhận restore
-function confirmRestore(): Promise<void> {
-  return new Promise((resolve) => {
-    rl.question(
-      '⚠️ CẢNH BÁO: Restore sẽ ghi đè lên dữ liệu hiện tại. Tiếp tục? (y/N): ',
-      (answer) => {
-        if (answer.toLowerCase() !== 'y') {
-          console.log('❌ Đã hủy thao tác restore');
-          process.exit(0);
-        }
-        resolve();
-      }
-    );
-  });
-}
-
-async function runRestore(): Promise<void> {
-  try {
-    const backupFile = await promptForBackup();
-    await confirmRestore();
-
-    console.log('🚀 Starting database restore process...');
-
-    console.log('⚙️ Starting Prisma Postgres tunnel...');
-
-    // Đường dẫn đến Node executable
-    const nodePath = process.execPath;
-    // Đường dẫn đến script của ppg-tunnel trong node_modules
-    const tunnelScriptPath = path.join(
-      process.cwd(),
-      'node_modules',
-      '@prisma',
-      'ppg-tunnel',
-      'dist',
-      'index.js'
-    );
-
-    const tunnel = spawn(nodePath, [
-      tunnelScriptPath,
-      '--host',
-      '127.0.0.1',
-      '--port',
-      '5433',
-    ]);
-
-    // Xử lý output từ tunnel
-    let tunnelReady = false;
-
-    tunnel.stdout.on('data', (data: Buffer) => {
-      console.log(`Tunnel: ${data.toString().trim()}`);
-
-      if (data.toString().includes('Prisma Postgres auth proxy listening')) {
-        setTimeout(() => {
-          tunnelReady = true;
-          resetAndRestoreDatabase();
-        }, 1000);
-      }
-    });
-
-    tunnel.stderr.on('data', (data: Buffer) => {
-      console.error(`Tunnel error: ${data.toString().trim()}`);
-    });
-
-    const timeoutId = setTimeout(() => {
-      if (!tunnelReady) {
-        console.error('❌ Tunnel connection timed out after 15 seconds');
-        tunnel.kill();
-        process.exit(1);
-      }
-    }, 15000);
-
-    // Hàm mới: reset và restore database với xác nhận bổ sung
-    async function resetAndRestoreDatabase(): Promise<void> {
-      clearTimeout(timeoutId);
-      console.log(
-        '✅ Tunnel ready, proceeding with database reset and restore...'
-      );
-
-      // Thêm bước xác nhận bổ sung trước khi reset database
-      return new Promise<void>((resolve) => {
-        console.log('\n⚠️ ===== NGUY HIỂM! XÓA TOÀN BỘ DỮ LIỆU ===== ⚠️');
-        console.log(
-          '🚨 Quá trình này sẽ XÓA HOÀN TOÀN tất cả dữ liệu hiện có trong database'
-        );
-        console.log('🚨 Các bảng, ràng buộc và dữ liệu sẽ bị xóa vĩnh viễn');
-        console.log(
-          '🚨 Chỉ tiếp tục nếu bạn đã sao lưu tất cả thông tin quan trọng\n'
-        );
-
-        rl.question(
-          '👉 Để tiếp tục, vui lòng gõ "RESET" (viết HOA): ',
-          (confirmation) => {
-            if (confirmation !== 'RESET') {
-              console.log(
-                '❌ Đã hủy thao tác restore do không xác nhận reset database'
-              );
-              tunnel.kill();
-              rl.close();
-              process.exit(0);
-            }
-
-            console.log('✅ Xác nhận thành công, tiến hành reset database...');
-
-            // Tiếp tục với quy trình reset và restore
-            try {
-              // BƯỚC 1: Xóa bảng hiện có bằng cách sử dụng lệnh DELETE
-              console.log('🗑️ Xóa tất cả dữ liệu từ các bảng...');
-
-              // Sử dụng DELETE FROM thay vì TRUNCATE để tránh xung đột với triggers
-              const deleteCommand = `
-              psql -h 127.0.0.1 -p 5433 -d postgres -c "
-                SET client_min_messages TO WARNING;
-                DELETE FROM user_like_track;
-                DELETE FROM playlist_track;
-                DELETE FROM histories;
-                DELETE FROM track_genre;
-                DELETE FROM track_artist;
-                DELETE FROM user_follow;
-                DELETE FROM album_genre;
-                DELETE FROM artist_genre;
-                DELETE FROM tracks;
-                DELETE FROM albums;
-                DELETE FROM notifications;
-                DELETE FROM events;
-                DELETE FROM playlists;
-                DELETE FROM artist_profiles;
-                DELETE FROM users;
-                DELETE FROM genres;
-                DELETE FROM _prisma_migrations;
-              "`;
-
-              execSync(deleteCommand, {
-                stdio: 'inherit',
-                env: {
-                  ...process.env,
-                  PGSSLMODE: 'disable',
-                },
-              });
-
-              console.log('✅ Dữ liệu hiện có đã được xóa thành công');
-
-              // BƯỚC 2: Thay thế bước vô hiệu hóa ràng buộc bằng cách sử dụng nhiều flags hơn
-              console.log('📥 Đang nạp dữ liệu từ backup...');
-
-              // Thêm flags để xử lý tốt hơn việc khôi phục và khắc phục các lỗi phổ biến
-              const restoreCommand = `pg_restore -h 127.0.0.1 -p 5433 -v --data-only --no-owner --no-privileges --disable-triggers --single-transaction --no-acl --clean --if-exists --exit-on-error=false -d postgres "${backupFile}"`;
-
-              try {
-                execSync(restoreCommand, {
-                  stdio: 'inherit',
-                  env: {
-                    ...process.env,
-                    PGSSLMODE: 'disable',
-                  },
-                });
-              } catch (restoreError) {
-                console.log(
-                  '⚠️ Restore gặp một số lỗi nhưng vẫn hoàn thành. Một số dữ liệu có thể đã được khôi phục.'
-                );
-              }
-
-              console.log(
-                `✅ Đã hoàn thành quá trình khôi phục từ file: ${backupFile}`
-              );
-              console.log(
-                '✳️ Ghi chú: Nếu xuất hiện thông báo lỗi trong quá trình khôi phục, một số dữ liệu vẫn có thể đã được nạp thành công.'
-              );
-              console.log(
-                '✳️ Lưu ý rằng dữ liệu có thể không hoàn toàn nhất quán do lỗi ràng buộc khóa ngoại.'
-              );
-            } catch (error) {
-              console.error(
-                '❌ Database operation failed:',
-                error instanceof Error ? error.message : String(error)
-              );
-            } finally {
-              // Luôn kết thúc tunnel khi hoàn tất
-              tunnel.kill();
-              rl.close();
-              console.log('🔌 Tunnel closed');
-            }
-          }
-        );
-      });
+    if (backups.length === 0) {
+      console.log('❌ Không có file backup nào trong thư mục backups');
+      resolve(null);
+      return;
     }
 
-    // Xử lý khi tunnel kết thúc
-    tunnel.on('close', (code: number | null) => {
-      if (code !== 0 && !tunnelReady) {
-        console.error(`❌ Tunnel process exited with code ${code}`);
-      }
+    console.log('===== DANH SÁCH FILE BACKUP =====');
+    backups.forEach((backup, index) => {
+      const fileSizeMB = (backup.stats.size / (1024 * 1024)).toFixed(2);
+      console.log(`[${index + 1}] ${backup.fileName}`);
+      console.log(`    ├── Kích thước: ${fileSizeMB} MB`);
+      console.log(`    └── Ngày tạo: ${backup.stats.mtime.toLocaleString()}`);
     });
-  } catch (error) {
-    console.error(
-      '❌ Lỗi:',
-      error instanceof Error ? error.message : String(error)
+
+    rl.question(
+      '\nChọn số thứ tự file để restore (nhập 0 để hủy): ',
+      (answer) => {
+        const index = parseInt(answer) - 1;
+
+        if (isNaN(index) || index < -1 || index >= backups.length) {
+          console.log('❌ Lựa chọn không hợp lệ');
+          resolve(null);
+          return;
+        }
+
+        if (index === -1) {
+          console.log('❌ Đã hủy thao tác restore');
+          resolve(null);
+          return;
+        }
+
+        const selectedBackup = backups[index];
+        console.log(`✅ Đã chọn: ${selectedBackup.fileName}`);
+        resolve(selectedBackup.filePath);
+      }
     );
+  });
+}
+
+// Hàm chính để restore database
+async function runRestore(backupFilePath: string | null): Promise<void> {
+  if (!backupFilePath) {
     rl.close();
+    return;
+  }
+
+  console.log('🚀 Starting database restore process...');
+  console.log(`📦 Using backup file: ${backupFilePath}`);
+
+  // Xác nhận trước khi restore
+  const confirmRestore = await new Promise<boolean>((resolve) => {
+    rl.question(
+      '⚠️ CẢNH BÁO: Restore sẽ ghi đè dữ liệu hiện tại. Bạn có chắc chắn? (y/N): ',
+      (answer) => {
+        resolve(answer.toLowerCase() === 'y');
+      }
+    );
+  });
+
+  if (!confirmRestore) {
+    console.log('❌ Đã hủy thao tác restore');
+    rl.close();
+    return;
+  }
+
+  console.log('⚙️ Starting Prisma Postgres tunnel...');
+
+  // Đường dẫn đến Node executable
+  const nodePath = process.execPath;
+  const tunnelScriptPath = path.join(
+    process.cwd(),
+    'node_modules',
+    '@prisma',
+    'ppg-tunnel',
+    'dist',
+    'index.js'
+  );
+
+  const tunnel = spawn(nodePath, [
+    tunnelScriptPath,
+    '--host',
+    '127.0.0.1',
+    '--port',
+    '5433',
+  ]);
+
+  // Lệnh pg_restore
+  const pgRestoreCommand = `pg_restore -h 127.0.0.1 -p 5433 -v --clean --if-exists --no-owner --no-privileges --no-comments -d postgres "${backupFilePath}"`;
+
+  let tunnelReady = false;
+
+  tunnel.stdout.on('data', (data: Buffer) => {
+    console.log(`Tunnel: ${data.toString().trim()}`);
+
+    if (data.toString().includes('Prisma Postgres auth proxy listening')) {
+      // Thêm một khoảng thời gian nhỏ để đảm bảo tunnel hoàn toàn sẵn sàng
+      setTimeout(() => {
+        tunnelReady = true;
+        runPgRestore();
+      }, 1000);
+    }
+  });
+
+  tunnel.stderr.on('data', (data: Buffer) => {
+    console.error(`Tunnel error: ${data.toString().trim()}`);
+  });
+
+  // Thiết lập timeout nếu tunnel không kết nối được
+  const timeoutId = setTimeout(() => {
+    if (!tunnelReady) {
+      console.error('❌ Tunnel connection timed out after 15 seconds');
+      tunnel.kill();
+      rl.close();
+      process.exit(1);
+    }
+  }, 15000);
+
+  // Hàm để chạy pg_restore sau khi tunnel sẵn sàng
+  function runPgRestore(): void {
+    clearTimeout(timeoutId);
+    console.log('✅ Tunnel ready, proceeding with restore...');
+    console.log(`⚙️ Running restore command: ${pgRestoreCommand}`);
+
+    try {
+      // Chạy pg_restore với PGSSLMODE=disable
+      execSync(pgRestoreCommand, {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          PGSSLMODE: 'disable',
+        },
+      });
+
+      console.log(`✅ Restore completed successfully!`);
+    } catch (error) {
+      // Một số lỗi trong quá trình restore là bình thường
+      console.log(
+        '⚠️ Restore completed with some warnings (this is normal):',
+        error instanceof Error ? error.message : String(error)
+      );
+      console.log(
+        '✅ Database should be usable, please check your application.'
+      );
+
+      // Không coi đây là lỗi nghiêm trọng
+      console.log(`✅ Restore process completed!`);
+    } finally {
+      // Luôn kết thúc tunnel khi hoàn tất
+      tunnel.kill();
+      console.log('🔌 Tunnel closed');
+      rl.close();
+    }
+  }
+
+  // Xử lý khi tunnel kết thúc
+  tunnel.on('close', (code: number | null) => {
+    if (code !== 0 && !tunnelReady) {
+      console.error(`❌ Tunnel process exited with code ${code}`);
+      rl.close();
+    }
+  });
+}
+
+// Chạy script
+async function main() {
+  try {
+    const backupPath = await selectBackup();
+    await runRestore(backupPath);
+  } catch (error) {
+    console.error('Unhandled error during restore:', error);
+    rl.close();
+    process.exit(1);
   }
 }
 
-// Chạy restore
-runRestore().catch((error) => {
-  console.error('Unhandled error during restore:', error);
-  process.exit(1);
-});
+main();

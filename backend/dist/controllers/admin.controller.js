@@ -15,15 +15,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getAllGenres = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
-const cache_middleware_1 = require("../middleware/cache.middleware");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const cloudinary_service_1 = require("../services/cloudinary.service");
+const handle_utils_1 = require("src/utils/handle-utils");
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { page = 1, limit = 10, search = '', status } = req.query;
-        const pageNumber = Number(page);
-        const limitNumber = Number(limit);
-        const offset = (pageNumber - 1) * limitNumber;
+        const { search = '', status } = req.query;
         const where = Object.assign(Object.assign({ role: 'USER' }, (search
             ? {
                 OR: [
@@ -33,84 +30,49 @@ const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 ],
             }
             : {})), (status !== undefined ? { isActive: status === 'true' } : {}));
-        const [users, totalUsers] = yield Promise.all([
-            db_1.default.user.findMany({
-                where,
-                skip: offset,
-                take: limitNumber,
-                include: {
-                    artistProfile: {
-                        include: {
-                            genres: {
-                                include: {
-                                    genre: true,
-                                },
-                            },
-                        },
-                    },
+        const result = yield (0, handle_utils_1.paginate)(db_1.default.user, req, {
+            where,
+            include: {
+                artistProfile: {
+                    include: { genres: { include: { genre: true } } },
                 },
-                orderBy: {
-                    createdAt: 'desc',
-                },
-            }),
-            db_1.default.user.count({ where }),
-        ]);
-        res.json({
-            users: users.map((user) => (Object.assign(Object.assign({}, user), { artistProfile: user.artistProfile
-                    ? Object.assign(Object.assign({}, user.artistProfile), { socialMediaLinks: user.artistProfile.socialMediaLinks || {}, verifiedAt: user.artistProfile.verifiedAt }) : null }))),
-            pagination: {
-                total: totalUsers,
-                page: pageNumber,
-                limit: limitNumber,
-                totalPages: Math.ceil(totalUsers / limitNumber),
             },
+            orderBy: { createdAt: 'desc' },
+        });
+        res.json({
+            users: result.data.map((user) => (Object.assign(Object.assign({}, user), { artistProfile: user.artistProfile
+                    ? Object.assign(Object.assign({}, user.artistProfile), { socialMediaLinks: user.artistProfile.socialMediaLinks || {}, verifiedAt: user.artistProfile.verifiedAt }) : null }))),
+            pagination: result.pagination,
         });
     }
     catch (error) {
-        console.error('Get all users error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get all users');
     }
 });
 exports.getAllUsers = getAllUsers;
 const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const cacheKey = req.originalUrl;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-        }
-        const user = yield db_1.default.user.findUnique({
-            where: { id },
-            select: prisma_selects_1.userSelect,
-        });
+        const user = yield (0, handle_utils_1.handleCache)(req, () => __awaiter(void 0, void 0, void 0, function* () {
+            return db_1.default.user.findUnique({
+                where: { id },
+                select: prisma_selects_1.userSelect,
+            });
+        }));
         if (!user) {
             res.status(404).json({ message: 'User not found' });
             return;
         }
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            console.log(`[Redis] Caching data for key: ${cacheKey}`);
-            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(user));
-        }
         res.json(user);
     }
     catch (error) {
-        console.error('Get user by id error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get user by id');
     }
 });
 exports.getUserById = getUserById;
 const getAllArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { page = 1, limit = 10, startDate, endDate, status, search, } = req.query;
-        const pageNumber = Number(page);
-        const limitNumber = Number(limit);
-        const offset = (pageNumber - 1) * limitNumber;
+        const { startDate, endDate, status, search } = req.query;
         const where = Object.assign(Object.assign(Object.assign({ verificationRequestedAt: { not: null } }, (status === 'pending' ? { isVerified: false } : {})), (startDate && endDate
             ? {
                 verificationRequestedAt: {
@@ -130,64 +92,38 @@ const getAllArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, fun
                 ],
             }
             : {}));
-        const [requests, totalRequests] = yield Promise.all([
-            db_1.default.artistProfile.findMany({
-                where,
-                skip: offset,
-                take: limitNumber,
-                select: prisma_selects_1.artistRequestSelect,
-                orderBy: {
-                    verificationRequestedAt: 'desc',
-                },
-            }),
-            db_1.default.artistProfile.count({ where }),
-        ]);
+        const result = yield (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, {
+            where,
+            select: prisma_selects_1.artistRequestSelect,
+            orderBy: { verificationRequestedAt: 'desc' },
+        });
         res.json({
-            requests,
-            pagination: {
-                total: totalRequests,
-                page: pageNumber,
-                limit: limitNumber,
-                totalPages: Math.ceil(totalRequests / limitNumber),
-            },
+            requests: result.data,
+            pagination: result.pagination,
         });
     }
     catch (error) {
-        console.error('Get artist requests error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get artist requests');
     }
 });
 exports.getAllArtistRequests = getAllArtistRequests;
 const getArtistRequestDetail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const cacheKey = req.originalUrl;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-        }
-        const request = yield db_1.default.artistProfile.findUnique({
-            where: { id },
-            select: prisma_selects_1.artistRequestDetailsSelect,
-        });
+        const request = yield (0, handle_utils_1.handleCache)(req, () => __awaiter(void 0, void 0, void 0, function* () {
+            return db_1.default.artistProfile.findUnique({
+                where: { id },
+                select: prisma_selects_1.artistRequestDetailsSelect,
+            });
+        }));
         if (!request) {
             res.status(404).json({ message: 'Request not found' });
             return;
         }
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            console.log(`[Redis] Caching data for key: ${cacheKey}`);
-            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(request));
-        }
         res.json(request);
     }
     catch (error) {
-        console.error('Get artist request details error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get artist request details');
     }
 });
 exports.getArtistRequestDetail = getArtistRequestDetail;
@@ -196,23 +132,22 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         const { id } = req.params;
         const { name, email, username, isActive, role } = req.body;
         const avatarFile = req.file;
-        const validationErrors = [];
-        if (!id)
-            validationErrors.push('User ID is required');
-        if (email && !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-            validationErrors.push('Invalid email format');
-        }
-        if (username && username.length < 3) {
-            validationErrors.push('Username must be at least 3 characters long');
-        }
+        const validationErrors = (0, handle_utils_1.runValidations)([
+            (0, handle_utils_1.validateField)(id, 'User ID', { required: true }),
+            email &&
+                (0, handle_utils_1.validateField)(email, 'Email', {
+                    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: 'Invalid email format',
+                }),
+            username && (0, handle_utils_1.validateField)(username, 'Username', { minLength: 3 }),
+            role &&
+                (0, handle_utils_1.validateField)(role, 'Role', { enum: ['USER', 'ARTIST', 'ADMIN'] }),
+        ]);
         if (validationErrors.length > 0) {
             res
                 .status(400)
                 .json({ message: 'Validation failed', errors: validationErrors });
             return;
-        }
-        if (role && !['USER', 'ARTIST', 'ADMIN'].includes(role)) {
-            validationErrors.push('Invalid role value');
         }
         const currentUser = yield db_1.default.user.findUnique({
             where: { id },
@@ -245,9 +180,7 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'users/avatars');
             avatarUrl = uploadResult.secure_url;
         }
-        const isActiveBool = isActive !== undefined
-            ? isActive === 'true' || isActive === true
-            : undefined;
+        const isActiveBool = (0, handle_utils_1.toBooleanValue)(isActive);
         const updatedUser = yield db_1.default.user.update({
             where: { id },
             data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (email && { email })), (username && { username })), (avatarUrl &&
@@ -262,8 +195,7 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         });
     }
     catch (error) {
-        console.error('Update user error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Update user');
     }
 });
 exports.updateUser = updateUser;
@@ -272,15 +204,11 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         const { id } = req.params;
         const { artistName, bio, socialMediaLinks, isActive } = req.body;
         const avatarFile = req.file;
-        const validationErrors = [];
-        if (!id)
-            validationErrors.push('Artist ID is required');
-        if (artistName && artistName.length < 2) {
-            validationErrors.push('Artist name must be at least 2 characters long');
-        }
-        if (bio && bio.length > 1000) {
-            validationErrors.push('Bio must not exceed 1000 characters');
-        }
+        const validationErrors = (0, handle_utils_1.runValidations)([
+            (0, handle_utils_1.validateField)(id, 'Artist ID', { required: true }),
+            artistName && (0, handle_utils_1.validateField)(artistName, 'Artist name', { minLength: 2 }),
+            bio && (0, handle_utils_1.validateField)(bio, 'Bio', { maxLength: 1000 }),
+        ]);
         if (validationErrors.length > 0) {
             res
                 .status(400)
@@ -309,9 +237,7 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'artists/avatars');
             avatarUrl = uploadResult.secure_url;
         }
-        const isActiveBool = isActive !== undefined
-            ? isActive === 'true' || isActive === true
-            : undefined;
+        const isActiveBool = (0, handle_utils_1.toBooleanValue)(isActive);
         const updatedArtist = yield db_1.default.artistProfile.update({
             where: { id },
             data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (artistName && { artistName })), (bio && { bio })), (socialMediaLinks && { socialMediaLinks })), (avatarUrl &&
@@ -326,8 +252,7 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         });
     }
     catch (error) {
-        console.error('Update artist error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Update artist');
     }
 });
 exports.updateArtist = updateArtist;
@@ -338,8 +263,7 @@ const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         res.json({ message: 'User deleted successfully' });
     }
     catch (error) {
-        console.error('Delete user error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Delete user');
     }
 });
 exports.deleteUser = deleteUser;
@@ -350,17 +274,13 @@ const deleteArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         res.json({ message: 'Artist deleted permanently' });
     }
     catch (error) {
-        console.error('Delete artist error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Delete artist');
     }
 });
 exports.deleteArtist = deleteArtist;
 const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { page = 1, limit = 10, search = '', status } = req.query;
-        const pageNumber = Number(page);
-        const limitNumber = Number(limit);
-        const offset = (pageNumber - 1) * limitNumber;
+        const { search = '', status } = req.query;
         const where = Object.assign(Object.assign({ role: client_1.Role.ARTIST, isVerified: true }, (search
             ? {
                 OR: [
@@ -373,81 +293,54 @@ const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 ],
             }
             : {})), (status !== undefined ? { isActive: status === 'true' } : {}));
-        const [artists, totalArtists] = yield Promise.all([
-            db_1.default.artistProfile.findMany({
-                where,
-                skip: offset,
-                take: limitNumber,
-                select: prisma_selects_1.artistProfileSelect,
-                orderBy: { createdAt: 'desc' },
-            }),
-            db_1.default.artistProfile.count({ where }),
-        ]);
+        const result = yield (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, {
+            where,
+            select: prisma_selects_1.artistProfileSelect,
+            orderBy: { createdAt: 'desc' },
+        });
         res.json({
-            artists,
-            pagination: {
-                total: totalArtists,
-                page: pageNumber,
-                limit: limitNumber,
-                totalPages: Math.ceil(totalArtists / limitNumber),
-            },
+            artists: result.data,
+            pagination: result.pagination,
         });
     }
     catch (error) {
-        console.error('Get all artists error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get all artists');
     }
 });
 exports.getAllArtists = getAllArtists;
 const getArtistById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const cacheKey = req.originalUrl;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-        }
-        const artist = yield db_1.default.artistProfile.findUnique({
-            where: { id },
-            select: Object.assign(Object.assign({}, prisma_selects_1.artistProfileSelect), { albums: {
-                    orderBy: { releaseDate: 'desc' },
-                    select: prisma_selects_1.artistProfileSelect.albums.select,
-                }, tracks: {
-                    where: {
-                        type: 'SINGLE',
-                        albumId: null,
-                    },
-                    orderBy: { releaseDate: 'desc' },
-                    select: prisma_selects_1.artistProfileSelect.tracks.select,
-                } }),
-        });
+        const artist = yield (0, handle_utils_1.handleCache)(req, () => __awaiter(void 0, void 0, void 0, function* () {
+            return db_1.default.artistProfile.findUnique({
+                where: { id },
+                select: Object.assign(Object.assign({}, prisma_selects_1.artistProfileSelect), { albums: {
+                        orderBy: { releaseDate: 'desc' },
+                        select: prisma_selects_1.artistProfileSelect.albums.select,
+                    }, tracks: {
+                        where: {
+                            type: 'SINGLE',
+                            albumId: null,
+                        },
+                        orderBy: { releaseDate: 'desc' },
+                        select: prisma_selects_1.artistProfileSelect.tracks.select,
+                    } }),
+            });
+        }));
         if (!artist) {
             res.status(404).json({ message: 'Artist not found' });
             return;
         }
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            console.log(`[Redis] Caching data for key: ${cacheKey}`);
-            yield cache_middleware_1.client.setEx(cacheKey, 300, JSON.stringify(artist));
-        }
         res.json(artist);
     }
     catch (error) {
-        console.error('Get artist by id error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get artist by id');
     }
 });
 exports.getArtistById = getArtistById;
 const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { page = 1, limit = 10, search = '' } = req.query;
-        const pageNumber = Number(page);
-        const limitNumber = Number(limit);
-        const offset = (pageNumber - 1) * limitNumber;
+        const { search = '' } = req.query;
         const where = Object.assign({}, (search
             ? {
                 name: {
@@ -456,45 +349,29 @@ const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 },
             }
             : {}));
-        const [genres, totalGenres] = yield Promise.all([
-            db_1.default.genre.findMany({
-                where,
-                skip: offset,
-                take: limitNumber,
-                select: prisma_selects_1.genreSelect,
-                orderBy: {
-                    createdAt: 'desc',
-                },
-            }),
-            db_1.default.genre.count({ where }),
-        ]);
+        const result = yield (0, handle_utils_1.paginate)(db_1.default.genre, req, {
+            where,
+            select: prisma_selects_1.genreSelect,
+            orderBy: { createdAt: 'desc' },
+        });
         res.json({
-            genres,
-            pagination: {
-                total: totalGenres,
-                page: pageNumber,
-                limit: limitNumber,
-                totalPages: Math.ceil(totalGenres / limitNumber),
-            },
+            genres: result.data,
+            pagination: result.pagination,
         });
     }
     catch (error) {
-        console.error('Get all genres error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get all genres');
     }
 });
 exports.getAllGenres = getAllGenres;
 const createGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { name } = req.body;
-        const validationErrors = [];
-        if (!name)
-            validationErrors.push('Name is required');
-        if (name && name.trim() === '')
-            validationErrors.push('Name cannot be empty');
-        if (name && name.length > 50) {
-            validationErrors.push('Name exceeds maximum length (50 characters)');
-        }
+        const validationErrors = (0, handle_utils_1.runValidations)([
+            (0, handle_utils_1.validateField)(name, 'Name', { required: true }),
+            name && (0, handle_utils_1.validateField)(name.trim(), 'Name', { minLength: 1 }),
+            name && (0, handle_utils_1.validateField)(name, 'Name', { maxLength: 50 }),
+        ]);
         if (validationErrors.length > 0) {
             res
                 .status(400)
@@ -514,8 +391,7 @@ const createGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         res.status(201).json({ message: 'Genre created successfully', genre });
     }
     catch (error) {
-        console.error('Create genre error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Create genre');
     }
 });
 exports.createGenre = createGenre;
@@ -523,16 +399,12 @@ const updateGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     try {
         const { id } = req.params;
         const { name } = req.body;
-        const validationErrors = [];
-        if (!id)
-            validationErrors.push('Genre ID is required');
-        if (!name)
-            validationErrors.push('Name is required');
-        if (name && name.trim() === '')
-            validationErrors.push('Name cannot be empty');
-        if (name && name.length > 50) {
-            validationErrors.push('Name exceeds maximum length (50 characters)');
-        }
+        const validationErrors = (0, handle_utils_1.runValidations)([
+            (0, handle_utils_1.validateField)(id, 'Genre ID', { required: true }),
+            (0, handle_utils_1.validateField)(name, 'Name', { required: true }),
+            name && (0, handle_utils_1.validateField)(name.trim(), 'Name', { minLength: 1 }),
+            name && (0, handle_utils_1.validateField)(name, 'Name', { maxLength: 50 }),
+        ]);
         if (validationErrors.length > 0) {
             res
                 .status(400)
@@ -565,8 +437,7 @@ const updateGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         });
     }
     catch (error) {
-        console.error('Update genre error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Update genre');
     }
 });
 exports.updateGenre = updateGenre;
@@ -577,8 +448,7 @@ const deleteGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         res.json({ message: 'Genre deleted successfully' });
     }
     catch (error) {
-        console.error('Delete genre error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Delete genre');
     }
 });
 exports.deleteGenre = deleteGenre;
@@ -621,8 +491,7 @@ const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, fun
         });
     }
     catch (error) {
-        console.error('Approve artist request error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Approve artist request');
     }
 });
 exports.approveArtistRequest = approveArtistRequest;
@@ -653,73 +522,62 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
         });
     }
     catch (error) {
-        console.error('Reject artist request error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Reject artist request');
     }
 });
 exports.rejectArtistRequest = rejectArtistRequest;
 const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const cacheKey = req.originalUrl;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedStats = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedStats) {
-                console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-                res.json(JSON.parse(cachedStats));
-                return;
-            }
-            console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-        }
-        const stats = yield Promise.all([
-            db_1.default.user.count(),
-            db_1.default.artistProfile.count({
-                where: {
-                    role: client_1.Role.ARTIST,
-                    isVerified: true,
-                },
-            }),
-            db_1.default.artistProfile.count({
-                where: {
-                    verificationRequestedAt: { not: null },
-                    isVerified: false,
-                },
-            }),
-            db_1.default.artistProfile.findFirst({
-                where: {
-                    role: client_1.Role.ARTIST,
-                    isVerified: true,
-                },
-                orderBy: [{ monthlyListeners: 'desc' }],
-                select: {
-                    id: true,
-                    artistName: true,
-                    monthlyListeners: true,
-                },
-            }),
-            db_1.default.genre.count(),
-        ]);
-        const [totalUsers, totalArtists, totalArtistRequests, mostActiveArtist, totalGenres,] = stats;
-        const statsData = {
-            totalUsers,
-            totalArtists,
-            totalArtistRequests,
-            totalGenres,
-            trendingArtist: {
-                id: (mostActiveArtist === null || mostActiveArtist === void 0 ? void 0 : mostActiveArtist.id) || '',
-                artistName: (mostActiveArtist === null || mostActiveArtist === void 0 ? void 0 : mostActiveArtist.artistName) || '',
-                monthlyListeners: (mostActiveArtist === null || mostActiveArtist === void 0 ? void 0 : mostActiveArtist.monthlyListeners) || 0,
-            },
-            updatedAt: new Date().toISOString(),
-        };
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            console.log(`[Redis] Caching data for key: ${cacheKey}`);
-            yield cache_middleware_1.client.setEx(cacheKey, 3600, JSON.stringify(statsData));
-        }
+        const statsData = yield (0, handle_utils_1.handleCache)(req, () => __awaiter(void 0, void 0, void 0, function* () {
+            const stats = yield Promise.all([
+                db_1.default.user.count({ where: { role: client_1.Role.USER } }),
+                db_1.default.artistProfile.count({
+                    where: {
+                        role: client_1.Role.ARTIST,
+                        isVerified: true,
+                    },
+                }),
+                db_1.default.artistProfile.count({
+                    where: {
+                        verificationRequestedAt: { not: null },
+                        isVerified: false,
+                    },
+                }),
+                db_1.default.artistProfile.findMany({
+                    where: {
+                        role: client_1.Role.ARTIST,
+                        isVerified: true,
+                    },
+                    orderBy: [{ monthlyListeners: 'desc' }],
+                    take: 4,
+                    select: {
+                        id: true,
+                        artistName: true,
+                        avatar: true,
+                        monthlyListeners: true,
+                    },
+                }),
+                db_1.default.genre.count(),
+            ]);
+            const [totalUsers, totalArtists, totalArtistRequests, topArtists, totalGenres,] = stats;
+            return {
+                totalUsers,
+                totalArtists,
+                totalArtistRequests,
+                totalGenres,
+                topArtists: topArtists.map((artist) => ({
+                    id: artist.id,
+                    artistName: artist.artistName,
+                    avatar: artist.avatar,
+                    monthlyListeners: artist.monthlyListeners,
+                })),
+                updatedAt: new Date().toISOString(),
+            };
+        }), 3600);
         res.json(statsData);
     }
     catch (error) {
-        console.error('Get stats error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get stats');
     }
 });
 exports.getStats = getStats;
