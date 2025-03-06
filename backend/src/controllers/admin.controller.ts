@@ -26,7 +26,7 @@ export const getAllUsers = async (
   try {
     const { search = '', status } = req.query;
 
-    // Build where conditions
+    // Xây dựng điều kiện where
     const where = {
       role: 'USER',
       ...(search
@@ -41,29 +41,18 @@ export const getAllUsers = async (
       ...(status !== undefined ? { isActive: status === 'true' } : {}),
     };
 
-    // Use the paginate helper
+    // Dùng hàm paginate trong file handle-utils
     const result = await paginate(prisma.user, req, {
       where,
       include: {
-        artistProfile: {
-          include: { genres: { include: { genre: true } } },
-        },
+        artistProfile: true,
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Format the response
+    // Trả về response dạng json
     res.json({
-      users: result.data.map((user: any) => ({
-        ...user,
-        artistProfile: user.artistProfile
-          ? {
-              ...user.artistProfile,
-              socialMediaLinks: user.artistProfile.socialMediaLinks || {},
-              verifiedAt: user.artistProfile.verifiedAt,
-            }
-          : null,
-      })),
+      users: result.data,
       pagination: result.pagination,
     });
   } catch (error) {
@@ -106,14 +95,14 @@ export const getAllArtistRequests = async (
     const { startDate, endDate, status, search } = req.query;
 
     // Xây dựng điều kiện where
-    const where: any = {
+    const where = {
       verificationRequestedAt: { not: null }, // Chỉ lấy các request đã được gửi
       ...(status === 'pending' ? { isVerified: false } : {}),
       ...(startDate && endDate
         ? {
             verificationRequestedAt: {
-              gte: new Date(startDate as string),
-              lte: new Date(endDate as string),
+              gte: new Date(String(startDate)),
+              lte: new Date(String(endDate)),
             },
           }
         : {}),
@@ -182,26 +171,6 @@ export const updateUser = async (
     const { name, email, username, isActive, role } = req.body;
     const avatarFile = req.file;
 
-    // Validation
-    const validationErrors = runValidations([
-      validateField(id, 'User ID', { required: true }),
-      email &&
-        validateField(email, 'Email', {
-          pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-          message: 'Invalid email format',
-        }),
-      username && validateField(username, 'Username', { minLength: 3 }),
-      role &&
-        validateField(role, 'Role', { enum: ['USER', 'ARTIST', 'ADMIN'] }),
-    ]);
-
-    if (validationErrors.length > 0) {
-      res
-        .status(400)
-        .json({ message: 'Validation failed', errors: validationErrors });
-      return;
-    }
-
     // Kiểm tra user tồn tại
     const currentUser = await prisma.user.findUnique({
       where: { id },
@@ -213,7 +182,7 @@ export const updateUser = async (
       return;
     }
 
-    // Kiểm tra trùng lặp email/username
+    // Kiểm tra trùng lặp email nếu có thay đổi
     if (email && email !== currentUser.email) {
       const existingEmail = await prisma.user.findFirst({
         where: { email, NOT: { id } },
@@ -224,6 +193,7 @@ export const updateUser = async (
       }
     }
 
+    // Kiểm tra trùng lặp username nếu có thay đổi
     if (username && username !== currentUser.username) {
       const existingUsername = await prisma.user.findFirst({
         where: { username, NOT: { id } },
@@ -234,36 +204,33 @@ export const updateUser = async (
       }
     }
 
-    // Xử lý avatar
+    // Xử lý avatar nếu có
     let avatarUrl = currentUser.avatar;
     if (avatarFile) {
       const uploadResult = await uploadFile(avatarFile.buffer, 'users/avatars');
       avatarUrl = uploadResult.secure_url;
     }
 
-    // Chuyển đổi isActive thành boolean
-    const isActiveBool = toBooleanValue(isActive);
+    // Chuyển đổi isActive thành boolean nếu có
+    const isActiveBool =
+      isActive !== undefined ? toBooleanValue(isActive) : undefined;
 
-    // Cập nhật user
+    // Cập nhật user với các trường đã gửi
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(username && { username }),
-        ...(avatarUrl &&
-          avatarUrl !== currentUser.avatar && { avatar: avatarUrl }),
+        ...(name !== undefined && { name }),
+        ...(email !== undefined && { email }),
+        ...(username !== undefined && { username }),
+        ...(avatarUrl !== currentUser.avatar && { avatar: avatarUrl }),
         ...(isActiveBool !== undefined && { isActive: isActiveBool }),
-        ...(role && { role }),
+        ...(role !== undefined && { role }),
       },
       select: userSelect,
     });
 
     res.json({
-      message:
-        isActiveBool !== undefined
-          ? `User ${isActiveBool ? 'activated' : 'deactivated'} successfully`
-          : 'User updated successfully',
+      message: 'User updated successfully',
       user: updatedUser,
     });
   } catch (error) {
@@ -278,27 +245,11 @@ export const updateArtist = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { artistName, bio, socialMediaLinks, isActive } = req.body;
-    const avatarFile = req.file;
+    const { artistName, bio, isActive } = req.body;
 
-    // Validation
-    const validationErrors = runValidations([
-      validateField(id, 'Artist ID', { required: true }),
-      artistName && validateField(artistName, 'Artist name', { minLength: 2 }),
-      bio && validateField(bio, 'Bio', { maxLength: 1000 }),
-    ]);
-
-    if (validationErrors.length > 0) {
-      res
-        .status(400)
-        .json({ message: 'Validation failed', errors: validationErrors });
-      return;
-    }
-
-    // Kiểm tra artist tồn tại
+    // Kiểm tra artist có tồn tại không
     const existingArtist = await prisma.artistProfile.findUnique({
       where: { id },
-      include: { user: true },
     });
 
     if (!existingArtist) {
@@ -306,49 +257,51 @@ export const updateArtist = async (
       return;
     }
 
-    // Kiểm tra trùng lặp artist name
+    // Kiểm tra tên nghệ sĩ nếu có thay đổi
+    let validatedArtistName = undefined;
     if (artistName && artistName !== existingArtist.artistName) {
-      const existingArtistName = await prisma.artistProfile.findFirst({
-        where: { artistName, NOT: { id } },
+      // Kiểm tra tên đã tồn tại chưa
+      const nameExists = await prisma.artistProfile.findFirst({
+        where: {
+          artistName,
+          id: { not: id },
+        },
       });
-      if (existingArtistName) {
-        res.status(400).json({ message: 'Artist name already exists' });
+
+      if (nameExists) {
+        res.status(400).json({
+          message: 'Artist name already exists',
+        });
         return;
       }
+      validatedArtistName = artistName;
     }
 
-    // Xử lý avatar
-    let avatarUrl = existingArtist.avatar;
-    if (avatarFile) {
-      const uploadResult = await uploadFile(
-        avatarFile.buffer,
-        'artists/avatars'
+    // Xử lý avatar nếu có file tải lên
+    let avatarUrl = undefined;
+    if (req.file) {
+      const result = await uploadFile(
+        req.file.buffer,
+        'artists/avatars',
+        'image'
       );
-      avatarUrl = uploadResult.secure_url;
+      avatarUrl = result.secure_url;
     }
 
-    // Chuyển đổi isActive thành boolean
-    const isActiveBool = toBooleanValue(isActive);
-
-    // Cập nhật artist
+    // Cập nhật artist trực tiếp với các trường đã gửi
     const updatedArtist = await prisma.artistProfile.update({
       where: { id },
       data: {
-        ...(artistName && { artistName }),
-        ...(bio && { bio }),
-        ...(socialMediaLinks && { socialMediaLinks }),
-        ...(avatarUrl &&
-          avatarUrl !== existingArtist.avatar && { avatar: avatarUrl }),
-        ...(isActiveBool !== undefined && { isActive: isActiveBool }),
+        ...(validatedArtistName && { artistName: validatedArtistName }),
+        ...(bio !== undefined && { bio }),
+        ...(isActive !== undefined && { isActive: toBooleanValue(isActive) }),
+        ...(avatarUrl && { avatar: avatarUrl }),
       },
       select: artistProfileSelect,
     });
 
     res.json({
-      message:
-        isActiveBool !== undefined
-          ? `Artist ${isActiveBool ? 'activated' : 'deactivated'} successfully`
-          : 'Artist updated successfully',
+      message: 'Artist updated successfully',
       artist: updatedArtist,
     });
   } catch (error) {
@@ -393,7 +346,7 @@ export const getAllArtists = async (
     const { search = '', status } = req.query;
 
     // Xây dựng điều kiện where
-    const where: any = {
+    const where = {
       role: Role.ARTIST,
       isVerified: true,
       ...(search
@@ -475,16 +428,14 @@ export const getAllGenres = async (
     const { search = '' } = req.query;
 
     // Xây dựng điều kiện where
-    const where: any = {
-      ...(search
-        ? {
-            name: {
-              contains: String(search),
-              mode: 'insensitive',
-            },
-          }
-        : {}),
-    };
+    const where = search
+      ? {
+          name: {
+            contains: String(search),
+            mode: 'insensitive',
+          },
+        }
+      : {};
 
     const result = await paginate(prisma.genre, req, {
       where,
@@ -625,30 +576,23 @@ export const approveArtistRequest = async (
   try {
     const { requestId } = req.body;
 
-    // Lấy và kiểm tra ArtistProfile
-    const artistProfile = await prisma.artistProfile.findUnique({
-      where: { id: requestId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            username: true,
-            name: true,
-            role: true,
-          },
-        },
+    // Kiểm tra request có tồn tại, đang chờ duyệt và artist chưa đc xác minh
+    const artistProfile = await prisma.artistProfile.findFirst({
+      where: {
+        id: requestId,
+        verificationRequestedAt: { not: null },
+        isVerified: false,
       },
     });
 
-    if (!artistProfile?.verificationRequestedAt || artistProfile.isVerified) {
+    if (!artistProfile) {
       res
         .status(404)
         .json({ message: 'Artist request not found or already verified' });
       return;
     }
 
-    // Cập nhật ArtistProfile và lấy thông tin user ngay trong một truy vấn
+    // Cập nhật trạng thái
     const updatedProfile = await prisma.artistProfile.update({
       where: { id: requestId },
       data: {
@@ -677,24 +621,27 @@ export const rejectArtistRequest = async (
   try {
     const { requestId } = req.body;
 
-    const artistProfile = await prisma.artistProfile.findUnique({
-      where: { id: requestId },
+    // Kiểm tra hồ sơ dựa vào id, có thời gian xác minh khác null, và artist chưa được xác minh
+    const artistProfile = await prisma.artistProfile.findFirst({
+      where: {
+        id: requestId,
+        verificationRequestedAt: { not: null },
+        isVerified: false,
+      },
       include: {
+        // lấy thêm thông tin User đã gửi request
         user: { select: { id: true, email: true, name: true, role: true } },
       },
     });
 
-    if (
-      !artistProfile ||
-      !artistProfile.verificationRequestedAt ||
-      artistProfile.isVerified
-    ) {
+    if (!artistProfile) {
       res
         .status(404)
         .json({ message: 'Artist request not found or already verified' });
       return;
     }
 
+    // Xóa artist profile
     await prisma.artistProfile.delete({
       where: { id: requestId },
     });

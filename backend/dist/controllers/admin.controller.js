@@ -33,15 +33,12 @@ const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const result = yield (0, handle_utils_1.paginate)(db_1.default.user, req, {
             where,
             include: {
-                artistProfile: {
-                    include: { genres: { include: { genre: true } } },
-                },
+                artistProfile: true,
             },
             orderBy: { createdAt: 'desc' },
         });
         res.json({
-            users: result.data.map((user) => (Object.assign(Object.assign({}, user), { artistProfile: user.artistProfile
-                    ? Object.assign(Object.assign({}, user.artistProfile), { socialMediaLinks: user.artistProfile.socialMediaLinks || {}, verifiedAt: user.artistProfile.verifiedAt }) : null }))),
+            users: result.data,
             pagination: result.pagination,
         });
     }
@@ -76,8 +73,8 @@ const getAllArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, fun
         const where = Object.assign(Object.assign(Object.assign({ verificationRequestedAt: { not: null } }, (status === 'pending' ? { isVerified: false } : {})), (startDate && endDate
             ? {
                 verificationRequestedAt: {
-                    gte: new Date(startDate),
-                    lte: new Date(endDate),
+                    gte: new Date(String(startDate)),
+                    lte: new Date(String(endDate)),
                 },
             }
             : {})), (search
@@ -132,23 +129,6 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         const { id } = req.params;
         const { name, email, username, isActive, role } = req.body;
         const avatarFile = req.file;
-        const validationErrors = (0, handle_utils_1.runValidations)([
-            (0, handle_utils_1.validateField)(id, 'User ID', { required: true }),
-            email &&
-                (0, handle_utils_1.validateField)(email, 'Email', {
-                    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                    message: 'Invalid email format',
-                }),
-            username && (0, handle_utils_1.validateField)(username, 'Username', { minLength: 3 }),
-            role &&
-                (0, handle_utils_1.validateField)(role, 'Role', { enum: ['USER', 'ARTIST', 'ADMIN'] }),
-        ]);
-        if (validationErrors.length > 0) {
-            res
-                .status(400)
-                .json({ message: 'Validation failed', errors: validationErrors });
-            return;
-        }
         const currentUser = yield db_1.default.user.findUnique({
             where: { id },
             select: prisma_selects_1.userSelect,
@@ -180,17 +160,14 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'users/avatars');
             avatarUrl = uploadResult.secure_url;
         }
-        const isActiveBool = (0, handle_utils_1.toBooleanValue)(isActive);
+        const isActiveBool = isActive !== undefined ? (0, handle_utils_1.toBooleanValue)(isActive) : undefined;
         const updatedUser = yield db_1.default.user.update({
             where: { id },
-            data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name && { name })), (email && { email })), (username && { username })), (avatarUrl &&
-                avatarUrl !== currentUser.avatar && { avatar: avatarUrl })), (isActiveBool !== undefined && { isActive: isActiveBool })), (role && { role })),
+            data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name !== undefined && { name })), (email !== undefined && { email })), (username !== undefined && { username })), (avatarUrl !== currentUser.avatar && { avatar: avatarUrl })), (isActiveBool !== undefined && { isActive: isActiveBool })), (role !== undefined && { role })),
             select: prisma_selects_1.userSelect,
         });
         res.json({
-            message: isActiveBool !== undefined
-                ? `User ${isActiveBool ? 'activated' : 'deactivated'} successfully`
-                : 'User updated successfully',
+            message: 'User updated successfully',
             user: updatedUser,
         });
     }
@@ -202,52 +179,42 @@ exports.updateUser = updateUser;
 const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { artistName, bio, socialMediaLinks, isActive } = req.body;
-        const avatarFile = req.file;
-        const validationErrors = (0, handle_utils_1.runValidations)([
-            (0, handle_utils_1.validateField)(id, 'Artist ID', { required: true }),
-            artistName && (0, handle_utils_1.validateField)(artistName, 'Artist name', { minLength: 2 }),
-            bio && (0, handle_utils_1.validateField)(bio, 'Bio', { maxLength: 1000 }),
-        ]);
-        if (validationErrors.length > 0) {
-            res
-                .status(400)
-                .json({ message: 'Validation failed', errors: validationErrors });
-            return;
-        }
+        const { artistName, bio, isActive } = req.body;
         const existingArtist = yield db_1.default.artistProfile.findUnique({
             where: { id },
-            include: { user: true },
         });
         if (!existingArtist) {
             res.status(404).json({ message: 'Artist not found' });
             return;
         }
+        let validatedArtistName = undefined;
         if (artistName && artistName !== existingArtist.artistName) {
-            const existingArtistName = yield db_1.default.artistProfile.findFirst({
-                where: { artistName, NOT: { id } },
+            const nameExists = yield db_1.default.artistProfile.findFirst({
+                where: {
+                    artistName,
+                    id: { not: id },
+                },
             });
-            if (existingArtistName) {
-                res.status(400).json({ message: 'Artist name already exists' });
+            if (nameExists) {
+                res.status(400).json({
+                    message: 'Artist name already exists',
+                });
                 return;
             }
+            validatedArtistName = artistName;
         }
-        let avatarUrl = existingArtist.avatar;
-        if (avatarFile) {
-            const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'artists/avatars');
-            avatarUrl = uploadResult.secure_url;
+        let avatarUrl = undefined;
+        if (req.file) {
+            const result = yield (0, cloudinary_service_1.uploadFile)(req.file.buffer, 'artists/avatars', 'image');
+            avatarUrl = result.secure_url;
         }
-        const isActiveBool = (0, handle_utils_1.toBooleanValue)(isActive);
         const updatedArtist = yield db_1.default.artistProfile.update({
             where: { id },
-            data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (artistName && { artistName })), (bio && { bio })), (socialMediaLinks && { socialMediaLinks })), (avatarUrl &&
-                avatarUrl !== existingArtist.avatar && { avatar: avatarUrl })), (isActiveBool !== undefined && { isActive: isActiveBool })),
+            data: Object.assign(Object.assign(Object.assign(Object.assign({}, (validatedArtistName && { artistName: validatedArtistName })), (bio !== undefined && { bio })), (isActive !== undefined && { isActive: (0, handle_utils_1.toBooleanValue)(isActive) })), (avatarUrl && { avatar: avatarUrl })),
             select: prisma_selects_1.artistProfileSelect,
         });
         res.json({
-            message: isActiveBool !== undefined
-                ? `Artist ${isActiveBool ? 'activated' : 'deactivated'} successfully`
-                : 'Artist updated successfully',
+            message: 'Artist updated successfully',
             artist: updatedArtist,
         });
     }
@@ -341,14 +308,14 @@ exports.getArtistById = getArtistById;
 const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { search = '' } = req.query;
-        const where = Object.assign({}, (search
+        const where = search
             ? {
                 name: {
                     contains: String(search),
                     mode: 'insensitive',
                 },
             }
-            : {}));
+            : {};
         const result = yield (0, handle_utils_1.paginate)(db_1.default.genre, req, {
             where,
             select: prisma_selects_1.genreSelect,
@@ -455,21 +422,14 @@ exports.deleteGenre = deleteGenre;
 const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { requestId } = req.body;
-        const artistProfile = yield db_1.default.artistProfile.findUnique({
-            where: { id: requestId },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        email: true,
-                        username: true,
-                        name: true,
-                        role: true,
-                    },
-                },
+        const artistProfile = yield db_1.default.artistProfile.findFirst({
+            where: {
+                id: requestId,
+                verificationRequestedAt: { not: null },
+                isVerified: false,
             },
         });
-        if (!(artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.verificationRequestedAt) || artistProfile.isVerified) {
+        if (!artistProfile) {
             res
                 .status(404)
                 .json({ message: 'Artist request not found or already verified' });
@@ -498,15 +458,17 @@ exports.approveArtistRequest = approveArtistRequest;
 const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { requestId } = req.body;
-        const artistProfile = yield db_1.default.artistProfile.findUnique({
-            where: { id: requestId },
+        const artistProfile = yield db_1.default.artistProfile.findFirst({
+            where: {
+                id: requestId,
+                verificationRequestedAt: { not: null },
+                isVerified: false,
+            },
             include: {
                 user: { select: { id: true, email: true, name: true, role: true } },
             },
         });
-        if (!artistProfile ||
-            !artistProfile.verificationRequestedAt ||
-            artistProfile.isVerified) {
+        if (!artistProfile) {
             res
                 .status(404)
                 .json({ message: 'Artist request not found or already verified' });

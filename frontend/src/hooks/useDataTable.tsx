@@ -80,7 +80,7 @@ export function useDataTable<T>({
       if (!params.has('limit')) params.set('limit', limit.toString());
 
       // Apply other filters
-      if (searchInput) params.set('q', searchInput);
+      if (searchInput) params.set('search', searchInput);
       if (statusFilter.length === 1) params.set('status', statusFilter[0]);
       if (genreFilter.length > 0) {
         genreFilter.forEach((genre) => params.append('genres', genre));
