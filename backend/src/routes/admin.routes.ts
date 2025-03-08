@@ -5,7 +5,6 @@ import {
   updateUser,
   deleteUser,
   getAllArtists,
-  getAllGenres,
   createGenre,
   updateGenre,
   deleteGenre,
@@ -18,6 +17,7 @@ import {
   deleteArtist,
   updateArtist,
 } from '../controllers/admin.controller';
+import * as genreController from '../controllers/genre.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import { cacheMiddleware } from '../middleware/cache.middleware';
@@ -87,7 +87,7 @@ router.get(
   authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
-  getAllGenres
+  genreController.getAllGenres
 );
 router.post('/genres', authenticate, authorize([Role.ADMIN]), createGenre);
 router.put(

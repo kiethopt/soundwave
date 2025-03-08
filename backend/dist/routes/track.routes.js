@@ -42,7 +42,6 @@ const auth_middleware_1 = require("../middleware/auth.middleware");
 const client_1 = require("@prisma/client");
 const upload_middleware_1 = __importStar(require("../middleware/upload.middleware"));
 const cache_middleware_1 = require("../middleware/cache.middleware");
-const session_middleware_1 = require("../middleware/session.middleware");
 const router = express_1.default.Router();
 router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), track_controller_1.getAllTracks);
 router.get('/:id', auth_middleware_1.authenticate, track_controller_1.getTrackById);
@@ -54,7 +53,7 @@ router.get('/type/:type', auth_middleware_1.authenticate, track_controller_1.get
 router.get('/genre/:genreId', auth_middleware_1.authenticate, track_controller_1.getTracksByGenre);
 router.get('/type/:type/genre/:genreId', auth_middleware_1.authenticate, track_controller_1.getTracksByTypeAndGenre);
 router.get('/search', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, track_controller_1.searchTrack);
-router.post('/:trackId/play', auth_middleware_1.authenticate, session_middleware_1.sessionMiddleware, track_controller_1.playTrack);
+router.post('/:trackId/play', auth_middleware_1.authenticate, track_controller_1.playTrack);
 router.put('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), upload_middleware_1.default.fields([
     { name: 'audioFile', maxCount: 1 },
     { name: 'coverFile', maxCount: 1 },

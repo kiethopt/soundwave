@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
-import { clearCacheForEntity } from './cache.middleware';
-import { client as redisClient } from './cache.middleware';
+import { clearCacheForEntity } from '../../middleware/cache.middleware';
+import { client as redisClient } from '../../middleware/cache.middleware';
 
 export const userExtension = Prisma.defineExtension((client) => {
   return client.$extends({
@@ -102,7 +102,9 @@ export const userExtension = Prisma.defineExtension((client) => {
 
           if (args.data.userId && args.data.type === 'PLAY') {
             await Promise.all([
-              redisClient.del(`/api/user/${args.data.userId}/recommended-artists`),
+              redisClient.del(
+                `/api/user/${args.data.userId}/recommended-artists`
+              ),
               redisClient.del('/api/top-tracks'),
               redisClient.del('/api/top-albums'),
               redisClient.del('/api/top-artists'),
@@ -125,7 +127,9 @@ export const userExtension = Prisma.defineExtension((client) => {
 
           if (history?.userId && history.type === 'PLAY') {
             await Promise.all([
-              redisClient.del(`/api/user/${history.userId}/recommended-artists`),
+              redisClient.del(
+                `/api/user/${history.userId}/recommended-artists`
+              ),
               redisClient.del('/api/top-tracks'),
               redisClient.del('/api/top-albums'),
               redisClient.del('/api/top-artists'),

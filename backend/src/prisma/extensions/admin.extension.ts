@@ -1,6 +1,6 @@
 import { Prisma, Role } from '@prisma/client';
-import { clearCacheForEntity } from './cache.middleware';
-import { client as redis } from './cache.middleware';
+import { clearCacheForEntity } from '../../middleware/cache.middleware';
+import { client as redis } from '../../middleware/cache.middleware';
 
 export const adminExtension = Prisma.defineExtension((client) => {
   return client.$extends({

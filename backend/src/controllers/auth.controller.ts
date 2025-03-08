@@ -6,7 +6,6 @@ import { Role } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { addHours } from 'date-fns';
 import sgMail from '@sendgrid/mail';
-import { sessionService } from '../services/session.service';
 import { userSelect } from '../utils/prisma-selects';
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -222,7 +221,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-
 // Đăng nhập (Login)
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -230,7 +228,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Kiểm tra xem emailOrUsername và password có được cung cấp không
     if (!emailOrUsername || !password) {
-      res.status(400).json({ message: 'Email/username and password are required' });
+      res
+        .status(400)
+        .json({ message: 'Email/username and password are required' });
       return;
     }
 
@@ -240,10 +240,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // 3. Không phải high-frequency operation
     const user = await prisma.user.findFirst({
       where: {
-        OR: [
-          { email: emailOrUsername },
-          { username: emailOrUsername }
-        ]
+        OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
       },
       select: { ...userSelect, password: true, isActive: true },
     });
@@ -280,11 +277,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Sử dụng role thực tế của user (USER hoặc ADMIN)
     const token = generateToken(user.id, user.role);
 
-    const sessionId = await sessionService.createSession({
-      ...updatedUser,
-      password: user.password,
-    });
-
     // Trả về response với role thực tế của user
     const userResponse = {
       ...updatedUser,
@@ -294,7 +286,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     res.json({
       message: 'Login successful',
       token,
-      sessionId,
+      // sessionId,
       user: userResponse,
     });
   } catch (error) {
@@ -307,9 +299,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 export const logout = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const sessionId = req.header('Session-ID');
 
-    if (!userId || !sessionId) {
+    if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
@@ -326,9 +317,6 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
       // Nếu update thất bại (ví dụ user không tồn tại), vẫn tiếp tục xóa session
       console.error('Error updating user profile:', error);
     }
-
-    // Xóa session hiện tại
-    await sessionService.removeUserSession(userId, sessionId);
 
     res.json({ message: 'Logged out successfully' });
   } catch (error) {
@@ -458,9 +446,8 @@ export const switchProfile = async (
 ): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const sessionId = req.header('Session-ID');
 
-    if (!userId || !sessionId) {
+    if (!userId) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
@@ -499,9 +486,6 @@ export const switchProfile = async (
       data: { currentProfile: newProfile },
       select: userSelect,
     });
-
-    // Cập nhật session
-    await sessionService.updateSessionProfile(userId, sessionId, newProfile);
 
     res.json({
       message: 'Profile switched successfully',

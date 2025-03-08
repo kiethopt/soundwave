@@ -12,57 +12,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authorize = exports.authenticate = exports.authExtension = void 0;
+exports.authorize = exports.authenticate = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
-const cache_middleware_1 = require("./cache.middleware");
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-exports.authExtension = client_1.Prisma.defineExtension((client) => {
-    return client.$extends({
-        query: {
-            user: {
-                create(_a) {
-                    return __awaiter(this, arguments, void 0, function* ({ args, query }) {
-                        const result = yield query(args);
-                        yield Promise.all([
-                            (0, cache_middleware_1.clearCacheForEntity)('user', { clearSearch: true }),
-                            (0, cache_middleware_1.clearCacheForEntity)('stats', {}),
-                        ]);
-                        return result;
-                    });
-                },
-                update(_a) {
-                    return __awaiter(this, arguments, void 0, function* ({ args, query }) {
-                        const result = yield query(args);
-                        yield Promise.all([
-                            (0, cache_middleware_1.clearCacheForEntity)('user', {
-                                entityId: args.where.id,
-                                clearSearch: true,
-                            }),
-                            (0, cache_middleware_1.clearCacheForEntity)('stats', {}),
-                        ]);
-                        return result;
-                    });
-                },
-                delete(_a) {
-                    return __awaiter(this, arguments, void 0, function* ({ args, query }) {
-                        const result = yield query(args);
-                        yield Promise.all([
-                            (0, cache_middleware_1.clearCacheForEntity)('user', {
-                                entityId: args.where.id,
-                                clearSearch: true,
-                            }),
-                            (0, cache_middleware_1.clearCacheForEntity)('stats', {}),
-                        ]);
-                        return result;
-                    });
-                },
-            },
-        },
-    });
-});
 const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {

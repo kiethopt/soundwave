@@ -1,11 +1,11 @@
 import { PrismaClient } from '@prisma/client';
-import { albumExtension } from '../middleware/album.middleware';
 import { withAccelerate } from '@prisma/extension-accelerate';
-import { authExtension } from '../middleware/auth.middleware';
-import { artistExtension } from '../middleware/artist.middleware';
-import { adminExtension } from '../middleware/admin.middleware';
-import { userExtension } from '../middleware/user.middleware';
-import { trackExtension } from '../middleware/track.middleware';
+import { authExtension } from '../prisma/extensions/auth.extension';
+import { adminExtension } from '../prisma/extensions/admin.extension';
+import { artistExtension } from '../prisma/extensions/artist.extension';
+import { userExtension } from '../prisma/extensions/user.extension';
+import { albumExtension } from '../prisma/extensions/album.extension';
+import { trackExtension } from '../prisma/extensions/track.extension';
 
 // Tạo Prisma Client và áp dụng extension
 const prisma = new PrismaClient({
@@ -16,10 +16,10 @@ const prisma = new PrismaClient({
 const extendedPrisma = prisma
   .$extends(authExtension)
   .$extends(adminExtension)
-  .$extends(albumExtension)
   .$extends(artistExtension)
   .$extends(userExtension)
   .$extends(trackExtension)
+  .$extends(albumExtension)
   .$extends(withAccelerate());
 
 export default extendedPrisma;

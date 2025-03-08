@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
-import { uploadFile } from '../services/cloudinary.service';
+import { uploadFile } from '../services/upload.service';
 import { Role, AlbumType, Prisma, HistoryType } from '@prisma/client';
-import { sessionService } from '../services/session.service';
+// import { sessionService } from '../services/session.service';
 import { albumSelect, trackSelect } from '../utils/prisma-selects';
 import { NotificationType, RecipientType } from '@prisma/client';
 import pusher from '../config/pusher';
@@ -55,6 +55,8 @@ export const createAlbum = async (
       artistId,
     } = req.body;
     const coverFile = req.file;
+
+    const genreArray = Array.isArray(genres) ? genres : genres ? [genres] : [];
 
     const validationError = validateAlbumData({ title, releaseDate, type });
     if (validationError) {
@@ -113,7 +115,7 @@ export const createAlbum = async (
         artistId: targetArtistProfileId,
         isActive,
         genres: {
-          create: genres.map((genreId: string) => ({
+          create: genreArray.map((genreId: string) => ({
             genre: { connect: { id: genreId } },
           })),
         },
@@ -747,8 +749,8 @@ export const getAlbumById = async (
     }
 
     const album = await prisma.album.findUnique({
-      where: { 
-        id 
+      where: {
+        id,
       },
       select: albumSelect,
     });
@@ -759,7 +761,6 @@ export const getAlbumById = async (
     }
 
     res.json(album);
-
   } catch (error) {
     console.error('Get album error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -771,22 +772,22 @@ export const playAlbum = async (req: Request, res: Response): Promise<void> => {
   try {
     const { albumId } = req.params;
     const user = req.user;
-    const sessionId = req.header('Session-ID');
+    // const sessionId = req.header('Session-ID');
 
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    if (
-      !sessionId ||
-      !(await sessionService.validateSession(user.id, sessionId))
-    ) {
-      res.status(401).json({ message: 'Invalid or expired session' });
-      return;
-    }
+    // if (
+    //   !sessionId ||
+    //   !(await sessionService.validateSession(user.id, sessionId))
+    // ) {
+    //   res.status(401).json({ message: 'Invalid or expired session' });
+    //   return;
+    // }
 
-    await sessionService.handleAudioPlay(user.id, sessionId);
+    // await sessionService.handleAudioPlay(user.id, sessionId);
 
     // Lấy album và track đầu tiên
     const album = await prisma.album.findFirst({

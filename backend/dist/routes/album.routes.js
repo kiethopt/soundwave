@@ -42,7 +42,6 @@ const auth_middleware_1 = require("../middleware/auth.middleware");
 const client_1 = require("@prisma/client");
 const upload_middleware_1 = __importStar(require("../middleware/upload.middleware"));
 const cache_middleware_1 = require("../middleware/cache.middleware");
-const session_middleware_1 = require("../middleware/session.middleware");
 const router = express_1.default.Router();
 router.post('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), upload_middleware_1.default.single('coverFile'), upload_middleware_1.handleUploadError, album_controller_1.createAlbum);
 router.put('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), upload_middleware_1.default.single('coverFile'), upload_middleware_1.handleUploadError, album_controller_1.updateAlbum);
@@ -50,7 +49,7 @@ router.delete('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.auth
 router.put('/:id/toggle-visibility', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), album_controller_1.toggleAlbumVisibility);
 router.post('/:albumId/tracks', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), upload_middleware_1.default.array('tracks'), upload_middleware_1.handleUploadError, album_controller_1.addTracksToAlbum);
 router.get('/search', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, album_controller_1.searchAlbum);
-router.post('/:albumId/play', auth_middleware_1.authenticate, session_middleware_1.sessionMiddleware, cache_middleware_1.cacheMiddleware, album_controller_1.playAlbum);
+router.post('/:albumId/play', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, album_controller_1.playAlbum);
 router.get('/:id', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, album_controller_1.getAlbumById);
 router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), album_controller_1.getAllAlbums);
 exports.default = router;

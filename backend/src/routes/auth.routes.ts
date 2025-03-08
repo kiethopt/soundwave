@@ -10,7 +10,7 @@ import {
   logout,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { sessionMiddleware } from '../middleware/session.middleware';
+// import { sessionMiddleware } from '../middleware/session.middleware';
 
 const router = express.Router();
 
@@ -24,8 +24,8 @@ router.post('/reset-password', resetPassword);
 // Route đăng ký admin (chỉ dành cho development)
 router.post('/register-admin', registerAdmin);
 
-router.get('/validate-token', authenticate, sessionMiddleware, validateToken);
+router.get('/validate-token', authenticate, validateToken);
 
-router.post('/switch-profile', authenticate, sessionMiddleware, switchProfile);
+router.post('/switch-profile', authenticate, switchProfile);
 
 export default router;

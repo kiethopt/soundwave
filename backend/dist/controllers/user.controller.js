@@ -16,7 +16,7 @@ exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = expor
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
-const cloudinary_service_1 = require("../services/cloudinary.service");
+const upload_service_1 = require("../services/upload.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const pusher_1 = __importDefault(require("../config/pusher"));
 const getMonthStartDate = () => {
@@ -107,7 +107,7 @@ const requestArtistRole = (req, res) => __awaiter(void 0, void 0, void 0, functi
         }
         let avatarUrl = null;
         if (avatarFile) {
-            const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'artist-avatars');
+            const uploadResult = yield (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artist-avatars');
             avatarUrl = uploadResult.secure_url;
         }
         yield db_1.default.artistProfile.create({
@@ -697,7 +697,7 @@ const editProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         let avatarUrl = null;
         if (avatarFile) {
-            const uploadResult = yield (0, cloudinary_service_1.uploadFile)(avatarFile.buffer, 'user-avatars');
+            const uploadResult = yield (0, upload_service_1.uploadFile)(avatarFile.buffer, 'user-avatars');
             avatarUrl = uploadResult.secure_url;
         }
         const updateData = {};

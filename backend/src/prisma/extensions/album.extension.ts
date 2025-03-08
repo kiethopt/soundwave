@@ -46,6 +46,22 @@ async function checkAndUpdateAlbumStatus(client: any) {
   }
 }
 
+async function updateAlbumTotalTracks(client: any, albumId: string) {
+  try {
+    const trackCount = await client.track.count({
+      where: { albumId },
+    });
+
+    await client.album.update({
+      where: { id: albumId },
+      data: { totalTracks: trackCount },
+    });
+  } catch (error) {
+    console.error('Error updating album totalTracks:', error);
+    throw error;
+  }
+}
+
 export const albumExtension = Prisma.defineExtension((client) => {
   // Thiết lập cron job để kiểm tra và cập nhật trạng thái album mỗi phút
   cron.schedule('* * * * *', () => checkAndUpdateAlbumStatus(client));
@@ -196,19 +212,3 @@ export const albumExtension = Prisma.defineExtension((client) => {
     },
   });
 });
-
-async function updateAlbumTotalTracks(client: any, albumId: string) {
-  try {
-    const trackCount = await client.track.count({
-      where: { albumId },
-    });
-
-    await client.album.update({
-      where: { id: albumId },
-      data: { totalTracks: trackCount },
-    });
-  } catch (error) {
-    console.error('Error updating album totalTracks:', error);
-    throw error;
-  }
-}

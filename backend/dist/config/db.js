@@ -1,23 +1,23 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const client_1 = require("@prisma/client");
-const album_middleware_1 = require("../middleware/album.middleware");
 const extension_accelerate_1 = require("@prisma/extension-accelerate");
-const auth_middleware_1 = require("../middleware/auth.middleware");
-const artist_middleware_1 = require("../middleware/artist.middleware");
-const admin_middleware_1 = require("../middleware/admin.middleware");
-const user_middleware_1 = require("../middleware/user.middleware");
-const track_middleware_1 = require("../middleware/track.middleware");
+const auth_extension_1 = require("../prisma/extensions/auth.extension");
+const admin_extension_1 = require("../prisma/extensions/admin.extension");
+const artist_extension_1 = require("../prisma/extensions/artist.extension");
+const user_extension_1 = require("../prisma/extensions/user.extension");
+const album_extension_1 = require("../prisma/extensions/album.extension");
+const track_extension_1 = require("../prisma/extensions/track.extension");
 const prisma = new client_1.PrismaClient({
     log: [{ emit: 'event', level: 'query' }],
 });
 const extendedPrisma = prisma
-    .$extends(auth_middleware_1.authExtension)
-    .$extends(admin_middleware_1.adminExtension)
-    .$extends(album_middleware_1.albumExtension)
-    .$extends(artist_middleware_1.artistExtension)
-    .$extends(user_middleware_1.userExtension)
-    .$extends(track_middleware_1.trackExtension)
+    .$extends(auth_extension_1.authExtension)
+    .$extends(admin_extension_1.adminExtension)
+    .$extends(artist_extension_1.artistExtension)
+    .$extends(user_extension_1.userExtension)
+    .$extends(track_extension_1.trackExtension)
+    .$extends(album_extension_1.albumExtension)
     .$extends((0, extension_accelerate_1.withAccelerate)());
 exports.default = extendedPrisma;
 //# sourceMappingURL=db.js.map

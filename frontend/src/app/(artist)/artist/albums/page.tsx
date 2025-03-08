@@ -81,9 +81,10 @@ export default function AlbumManagement() {
       if (!token) return;
 
       const genresResponse = await api.artists.getAllGenres(token);
+      console.log('Genres response:', genresResponse);
 
       setAvailableGenres(
-        genresResponse.data.map((genre: { id: string; name: string }) => ({
+        genresResponse.genres.map((genre: { id: string; name: string }) => ({
           id: genre.id,
           name: genre.name,
         }))

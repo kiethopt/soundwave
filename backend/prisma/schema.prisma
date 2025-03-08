@@ -71,12 +71,12 @@ model ArtistProfile {
 }
 
 model ArtistGenre {
-  id              String        @id @default(cuid())
-  artistId        String
-  genreId         String
-  createdAt       DateTime      @default(now())
-  artistProfile   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  genre           Genre         @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  id            String        @id @default(cuid())
+  artistId      String
+  genreId       String
+  createdAt     DateTime      @default(now())
+  artistProfile ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  genre         Genre         @relation(fields: [genreId], references: [id], onDelete: Cascade)
 
   @@unique([artistId, genreId])
   @@map("artist_genre")
@@ -179,7 +179,6 @@ model Playlist {
   userId        String
   tracks        PlaylistTrack[]
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-
 
   @@index([userId])
   @@index([privacy])
@@ -291,12 +290,12 @@ model TrackGenre {
 }
 
 model TrackArtist {
-  id              String        @id @default(cuid())
-  trackId         String
-  artistId String
-  createdAt       DateTime      @default(now())
-  artistProfile   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  track           Track         @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  id            String        @id @default(cuid())
+  trackId       String
+  artistId      String
+  createdAt     DateTime      @default(now())
+  artistProfile ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  track         Track         @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([trackId, artistId])
   @@index([trackId])
@@ -368,7 +367,6 @@ enum NotificationType {
   ARTIST_REQUEST_APPROVE
   ARTIST_REQUEST_REJECT
 }
-
 
 enum FollowingType {
   USER

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { FollowingType, HistoryType, Role } from '@prisma/client';
 import { client, setCache } from '../middleware/cache.middleware';
-import { uploadFile } from '../services/cloudinary.service';
+import { uploadFile } from '../services/upload.service';
 import {
   searchAlbumSelect,
   searchTrackSelect,
@@ -1268,7 +1268,6 @@ export const getTopArtists = async (
       .sort((a, b) => b.monthlyListeners - a.monthlyListeners)
       .slice(0, 20);
 
-
     if (process.env.USE_REDIS_CACHE === 'true') {
       await setCache(cacheKey, topArtists, 1800); // Cache for 30 mins
     }
@@ -1363,7 +1362,7 @@ export const getTopTracks = async (
     }));
 
     if (process.env.USE_REDIS_CACHE === 'true') {
-      await setCache(cacheKey, tracksWithMonthlyPlays, 1800); // Cache for 30 mins  
+      await setCache(cacheKey, tracksWithMonthlyPlays, 1800); // Cache for 30 mins
     }
 
     res.json(tracksWithMonthlyPlays);

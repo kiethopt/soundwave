@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { Role } from '@prisma/client';
-import { uploadFile } from '../services/cloudinary.service';
+import { uploadFile } from '../services/upload.service';
 import { client, setCache } from '../middleware/cache.middleware';
 import {
   albumSelect,
@@ -196,32 +196,32 @@ export const getArtistProfile = async (
 };
 
 // Lấy danh sách tất cả thể loại nhạc (chỉ đọc)
-export const getAllGenres = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { page = 1, limit = 100 } = req.query;
+// export const getAllGenres = async (
+//   req: Request,
+//   res: Response
+// ): Promise<void> => {
+//   try {
+//     const { page = 1, limit = 100 } = req.query;
 
-    const genres = await prisma.genre.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-      skip: (Number(page) - 1) * Number(limit),
-      take: Number(limit),
-    });
+//     const genres = await prisma.genre.findMany({
+//       select: { id: true, name: true },
+//       orderBy: { name: 'asc' },
+//       skip: (Number(page) - 1) * Number(limit),
+//       take: Number(limit),
+//     });
 
-    // Thêm cấu trúc response có pagination
-    res.json({
-      data: genres,
-      total: await prisma.genre.count(),
-      page: Number(page),
-      limit: Number(limit),
-    });
-  } catch (error) {
-    console.error('Get all genres error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
+//     // Thêm cấu trúc response có pagination
+//     res.json({
+//       data: genres,
+//       total: await prisma.genre.count(),
+//       page: Number(page),
+//       limit: Number(limit),
+//     });
+//   } catch (error) {
+//     console.error('Get all genres error:', error);
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// };
 
 export const getArtistAlbums = async (
   req: Request,

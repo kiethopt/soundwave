@@ -20,7 +20,6 @@ const client_1 = require("@prisma/client");
 const uuid_1 = require("uuid");
 const date_fns_1 = require("date-fns");
 const mail_1 = __importDefault(require("@sendgrid/mail"));
-const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -189,15 +188,14 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { emailOrUsername, password } = req.body;
         if (!emailOrUsername || !password) {
-            res.status(400).json({ message: 'Email/username and password are required' });
+            res
+                .status(400)
+                .json({ message: 'Email/username and password are required' });
             return;
         }
         const user = yield db_1.default.user.findFirst({
             where: {
-                OR: [
-                    { email: emailOrUsername },
-                    { username: emailOrUsername }
-                ]
+                OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
             },
             select: Object.assign(Object.assign({}, prisma_selects_1.userSelect), { password: true, isActive: true }),
         });
@@ -225,12 +223,10 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             select: prisma_selects_1.userSelect,
         });
         const token = generateToken(user.id, user.role);
-        const sessionId = yield session_service_1.sessionService.createSession(Object.assign(Object.assign({}, updatedUser), { password: user.password }));
         const userResponse = Object.assign(Object.assign({}, updatedUser), { password: undefined });
         res.json({
             message: 'Login successful',
             token,
-            sessionId,
             user: userResponse,
         });
     }
@@ -244,8 +240,7 @@ const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-        const sessionId = req.header('Session-ID');
-        if (!userId || !sessionId) {
+        if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
@@ -260,7 +255,6 @@ const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         catch (error) {
             console.error('Error updating user profile:', error);
         }
-        yield session_service_1.sessionService.removeUserSession(userId, sessionId);
         res.json({ message: 'Logged out successfully' });
     }
     catch (error) {
@@ -348,8 +342,7 @@ const switchProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     var _a, _b, _c;
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-        const sessionId = req.header('Session-ID');
-        if (!userId || !sessionId) {
+        if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
@@ -379,7 +372,6 @@ const switchProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             data: { currentProfile: newProfile },
             select: prisma_selects_1.userSelect,
         });
-        yield session_service_1.sessionService.updateSessionProfile(userId, sessionId, newProfile);
         res.json({
             message: 'Profile switched successfully',
             user: updatedUser,

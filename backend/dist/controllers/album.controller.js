@@ -47,9 +47,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.playAlbum = exports.getAlbumById = exports.getAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = void 0;
 const db_1 = __importDefault(require("../config/db"));
-const cloudinary_service_1 = require("../services/cloudinary.service");
+const upload_service_1 = require("../services/upload.service");
 const client_1 = require("@prisma/client");
-const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_2 = require("@prisma/client");
 const pusher_1 = __importDefault(require("../config/pusher"));
@@ -83,6 +82,7 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         const { title, releaseDate, type = client_1.AlbumType.ALBUM, genres = [], artistId, } = req.body;
         const coverFile = req.file;
+        const genreArray = Array.isArray(genres) ? genres : genres ? [genres] : [];
         const validationError = validateAlbumData({ title, releaseDate, type });
         if (validationError) {
             res.status(400).json({ message: validationError });
@@ -118,7 +118,7 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         let coverUrl = null;
         if (coverFile) {
-            const coverUpload = yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
+            const coverUpload = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
             coverUrl = coverUpload.secure_url;
         }
         const releaseDateObj = new Date(releaseDate);
@@ -134,7 +134,7 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 artistId: targetArtistProfileId,
                 isActive,
                 genres: {
-                    create: genres.map((genreId) => ({
+                    create: genreArray.map((genreId) => ({
                         genre: { connect: { id: genreId } },
                     })),
                 },
@@ -249,7 +249,7 @@ const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, functio
             try {
                 const metadata = yield mm.parseBuffer(file.buffer);
                 const duration = Math.floor(metadata.format.duration || 0);
-                const uploadResult = yield (0, cloudinary_service_1.uploadFile)(file.buffer, 'tracks', 'auto');
+                const uploadResult = yield (0, upload_service_1.uploadFile)(file.buffer, 'tracks', 'auto');
                 const existingTrack = yield db_1.default.track.findFirst({
                     where: {
                         title: titles[index],
@@ -333,7 +333,7 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         let coverUrl;
         if (coverFile) {
-            const coverUpload = yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
+            const coverUpload = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
             coverUrl = coverUpload.secure_url;
         }
         const updateData = {};
@@ -635,7 +635,7 @@ const getAlbumById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         const album = yield db_1.default.album.findUnique({
             where: {
-                id
+                id,
             },
             select: prisma_selects_1.albumSelect,
         });
@@ -655,17 +655,10 @@ const playAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { albumId } = req.params;
         const user = req.user;
-        const sessionId = req.header('Session-ID');
         if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        if (!sessionId ||
-            !(yield session_service_1.sessionService.validateSession(user.id, sessionId))) {
-            res.status(401).json({ message: 'Invalid or expired session' });
-            return;
-        }
-        yield session_service_1.sessionService.handleAudioPlay(user.id, sessionId);
         const album = yield db_1.default.album.findFirst({
             where: {
                 id: albumId,

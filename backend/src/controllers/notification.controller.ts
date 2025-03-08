@@ -1,5 +1,3 @@
-// notification.controller.ts
-
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { Role, RecipientType } from '@prisma/client';

@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { clearCacheForEntity } from './cache.middleware';
+import { clearCacheForEntity } from '../../middleware/cache.middleware';
 import cron from 'node-cron';
 
 export const artistExtension = Prisma.defineExtension((client) => {

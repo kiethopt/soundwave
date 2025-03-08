@@ -16,7 +16,7 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload, { handleUploadError } from '../middleware/upload.middleware';
 import { cacheMiddleware } from '../middleware/cache.middleware';
-import { sessionMiddleware } from '../middleware/session.middleware';
+// import { sessionMiddleware } from '../middleware/session.middleware';
 
 const router = express.Router();
 
@@ -57,7 +57,7 @@ router.get('/type/:type/genre/:genreId', authenticate, getTracksByTypeAndGenre);
 router.get('/search', authenticate, cacheMiddleware, searchTrack);
 
 // Route nghe nhạc (KHÔNG áp dụng cache để đảm bảo cập nhật playCount)
-router.post('/:trackId/play', authenticate, sessionMiddleware, playTrack);
+router.post('/:trackId/play', authenticate, playTrack);
 
 // Route cập nhật track (ADMIN & ARTIST only)
 router.put(

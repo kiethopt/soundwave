@@ -88,7 +88,7 @@ export default function TrackManagement() {
 
       const [artistsResponse, genresResponse] = await Promise.all([
         api.artists.getAllArtistsProfile(token, 1, 100),
-        api.artists.getAllGenres(token),
+        api.genres.getAll(token),
       ]);
 
       setAvailableArtists(
@@ -99,7 +99,7 @@ export default function TrackManagement() {
       );
 
       setAvailableGenres(
-        genresResponse.data.map((genre: { id: string; name: string }) => ({
+        genresResponse.genres.map((genre: { id: string; name: string }) => ({
           id: genre.id,
           name: genre.name,
         }))

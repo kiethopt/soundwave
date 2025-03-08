@@ -671,6 +671,20 @@ export const api = {
       fetchWithAuth(`/api/albums/${albumId}/play`, { method: 'POST' }, token),
   },
 
+  genres: {
+    getAll: async (
+      token: string,
+      page: number = 1,
+      limit: number = 10,
+      queryParams?: string
+    ) =>
+      fetchWithAuth(
+        `/api/genres?${queryParams || `page=${page}&limit=${limit}`}`,
+        { method: 'GET' },
+        token
+      ),
+  },
+
   dashboard: {
     getStats: async (token: string) =>
       fetchWithAuth('/api/admin/stats', { method: 'GET' }, token),
@@ -853,20 +867,21 @@ export const api = {
   },
 
   follows: {
-    checkFollow: async (userId: string, targetId: string, type: string, token: string) =>
+    checkFollow: async (
+      userId: string,
+      targetId: string,
+      type: string,
+      token: string
+    ) =>
       fetchWithAuth(
         `/api/user/check-follow/${targetId}?type=${type}`,
         { method: 'GET' },
         token
       ),
-    
+
     follow: async (targetId: string, token: string) =>
-      fetchWithAuth(
-        `/api/user/follow/${targetId}`,
-        { method: 'POST' },
-        token
-      ),
-    
+      fetchWithAuth(`/api/user/follow/${targetId}`, { method: 'POST' }, token),
+
     unfollow: async (targetId: string, token: string) =>
       fetchWithAuth(
         `/api/user/unfollow/${targetId}`,

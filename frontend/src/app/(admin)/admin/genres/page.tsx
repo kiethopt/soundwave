@@ -44,12 +44,7 @@ export default function GenreManagement() {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      const response = await api.admin.getAllGenres(
-        token,
-        page,
-        limit,
-        params.toString()
-      );
+      const response = await api.genres.getAll(token, page, limit);
       return {
         data: response.genres,
         pagination: response.pagination,
@@ -77,12 +72,7 @@ export default function GenreManagement() {
       // Refresh trang hiện tại
       const params = new URLSearchParams();
       if (searchInput) params.append('q', searchInput);
-      const response = await api.admin.getAllGenres(
-        token,
-        currentPage,
-        limit,
-        params.toString()
-      );
+      const response = await api.genres.getAll(token, currentPage, limit);
       setGenres(response.genres);
 
       toast.success('Genre created successfully');
@@ -121,12 +111,7 @@ export default function GenreManagement() {
         const params = new URLSearchParams();
         if (searchInput) params.append('q', searchInput);
 
-        const response = await api.admin.getAllGenres(
-          token,
-          currentPage,
-          limit,
-          params.toString()
-        );
+        const response = await api.genres.getAll(token, currentPage, limit);
         setGenres(response.genres);
       }
 
@@ -151,12 +136,7 @@ export default function GenreManagement() {
       const params = new URLSearchParams();
       if (searchInput) params.append('q', searchInput);
 
-      const response = await api.admin.getAllGenres(
-        token,
-        currentPage,
-        limit,
-        params.toString()
-      );
+      const response = await api.genres.getAll(token, currentPage, limit);
       setGenres(response.genres);
 
       setEditingGenre(null);
@@ -258,7 +238,7 @@ export default function GenreManagement() {
             fetchAllData: async () => {
               const token = localStorage.getItem('userToken');
               if (!token) throw new Error('No authentication token found');
-              const response = await api.admin.getAllGenres(token, 1, 10000);
+              const response = await api.genres.getAll(token, 1, 10000);
               return response.genres;
             },
           },

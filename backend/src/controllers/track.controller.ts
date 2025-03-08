@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
-import { uploadFile } from '../services/cloudinary.service';
+import { uploadFile } from '../services/upload.service';
 import { AlbumType, Role, Prisma } from '@prisma/client';
 import { client, setCache } from '../middleware/cache.middleware';
-import { sessionService } from '../services/session.service';
+// import { sessionService } from '../services/session.service';
 import { trackSelect } from '../utils/prisma-selects';
 import { NotificationType, RecipientType } from '@prisma/client';
 import pusher from '../config/pusher';
@@ -972,16 +972,6 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
-
-    if (
-      !sessionId ||
-      !(await sessionService.validateSession(user.id, sessionId))
-    ) {
-      res.status(401).json({ message: 'Invalid or expired session' });
-      return;
-    }
-
-    await sessionService.handleAudioPlay(user.id, sessionId);
 
     const track = await prisma.track.findFirst({
       where: {

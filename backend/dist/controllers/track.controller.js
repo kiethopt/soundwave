@@ -47,10 +47,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
 const db_1 = __importDefault(require("../config/db"));
-const cloudinary_service_1 = require("../services/cloudinary.service");
+const upload_service_1 = require("../services/upload.service");
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
-const session_service_1 = require("../services/session.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_2 = require("@prisma/client");
 const pusher_1 = __importDefault(require("../config/pusher"));
@@ -94,9 +93,9 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(400).json({ message: 'Audio file is required' });
             return;
         }
-        const audioUpload = yield (0, cloudinary_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto');
+        const audioUpload = yield (0, upload_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto');
         const coverUrl = coverFile
-            ? (yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image')).secure_url
+            ? (yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image')).secure_url
             : null;
         const mm = yield Promise.resolve().then(() => __importStar(require('music-metadata')));
         const metadata = yield mm.parseBuffer(audioFile.buffer);
@@ -239,7 +238,7 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             updateData.albumId = albumId || null;
         if (req.files && req.files.coverFile) {
             const coverFile = req.files.coverFile[0];
-            const coverUpload = yield (0, cloudinary_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
+            const coverUpload = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
             updateData.coverUrl = coverUpload.secure_url;
         }
         if (releaseDate) {
@@ -818,12 +817,6 @@ const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        if (!sessionId ||
-            !(yield session_service_1.sessionService.validateSession(user.id, sessionId))) {
-            res.status(401).json({ message: 'Invalid or expired session' });
-            return;
-        }
-        yield session_service_1.sessionService.handleAudioPlay(user.id, sessionId);
         const track = yield db_1.default.track.findFirst({
             where: {
                 id: trackId,
