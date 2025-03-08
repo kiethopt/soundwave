@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as genreService from '../services/genre.service';
-import { handleError } from 'src/utils/handle-utils';
+import { handleError } from '../utils/handle-utils';
 
 export const getAllGenres = async (
   req: Request,

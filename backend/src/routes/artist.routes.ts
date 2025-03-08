@@ -7,7 +7,6 @@ import {
   getArtistAlbums,
   updateArtistProfile,
   getRelatedArtists,
-  // getAllGenres,
 } from '../controllers/artist.controller';
 import * as genreController from '../controllers/genre.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';

@@ -10,7 +10,6 @@ import {
   logout,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
-// import { sessionMiddleware } from '../middleware/session.middleware';
 
 const router = express.Router();
 
