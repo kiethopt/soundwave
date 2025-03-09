@@ -50,6 +50,7 @@ const db_1 = __importDefault(require("../config/db"));
 const upload_service_1 = require("../services/upload.service");
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
+const trackService = __importStar(require("../services/track.service"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_2 = require("@prisma/client");
 const pusher_1 = __importDefault(require("../config/pusher"));
@@ -332,9 +333,7 @@ const deleteTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             });
             return;
         }
-        yield db_1.default.track.delete({
-            where: { id },
-        });
+        yield trackService.deleteTrackById(id);
         res.json({ message: 'Track deleted successfully' });
     }
     catch (error) {

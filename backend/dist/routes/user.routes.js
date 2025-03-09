@@ -50,7 +50,7 @@ router.get('/following', auth_middleware_1.authenticate, cache_middleware_1.cach
 router.get('/search-all', auth_middleware_1.authenticate, user_controller_1.searchAll);
 router.get('/genres', user_controller_1.getAllGenres);
 router.get('/profile/:id', user_controller_1.getUserProfile);
-router.post('/request-artist', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.USER]), upload_middleware_1.default.single('avatar'), upload_middleware_1.handleUploadError, user_controller_1.requestArtistRole);
+router.post('/request-artist', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.USER]), upload_middleware_1.default.single('avatar'), upload_middleware_1.handleUploadError, user_controller_1.requestToBecomeArtist);
 router.put('/edit-profile', auth_middleware_1.authenticate, upload_middleware_1.default.single('avatar'), upload_middleware_1.handleUploadError, user_controller_1.editProfile);
 router.get('/check-artist-request', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.USER]), user_controller_1.checkArtistRequest);
 router.get('/recommendedArtists', auth_middleware_1.authenticate, user_controller_1.getRecommendedArtists);

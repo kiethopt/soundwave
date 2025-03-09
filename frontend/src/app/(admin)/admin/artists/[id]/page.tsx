@@ -7,9 +7,16 @@ import type { ArtistProfile } from '@/types';
 import Image from 'next/image';
 import { Star, Search, MoreVertical } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { ArrowLeft } from '@/components/ui/Icons';
+import { ArrowLeft, Trash2 } from '@/components/ui/Icons';
 import Link from 'next/link';
 import { EditArtistModal } from '@/components/data-table/data-table-modals';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { toast } from 'react-toastify';
 
 export default function ArtistDetail() {
   const { id } = useParams();
@@ -104,6 +111,70 @@ export default function ArtistDetail() {
       ].sort((a, b) => b.playCount - a.playCount), // sắp xếp theo playCount
     [artist?.albums, artist?.tracks]
   );
+
+  const handleDeleteTrack = async (trackId: string) => {
+    if (
+      !confirm(
+        'Are you sure you want to delete this track? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        toast.error('Authentication token not found');
+        return;
+      }
+
+      await api.tracks.delete(trackId, token);
+      toast.success('Track deleted successfully');
+
+      // Update the UI by removing the deleted track
+      if (artist) {
+        setArtist({
+          ...artist,
+          tracks: artist.tracks?.filter((track) => track.id !== trackId) || [],
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting track:', error);
+      toast.error('Failed to delete track');
+    }
+  };
+
+  const handleDeleteAlbum = async (albumId: string) => {
+    if (
+      !confirm(
+        'Are you sure you want to delete this album? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        toast.error('Authentication token not found');
+        return;
+      }
+
+      await api.albums.delete(albumId, token);
+      toast.success('Album deleted successfully');
+
+      // Update the UI by removing the deleted album
+      if (artist) {
+        setArtist({
+          ...artist,
+          albums: artist.albums?.filter((album) => album.id !== albumId) || [],
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting album:', error);
+      toast.error('Failed to delete album');
+    }
+  };
 
   if (loading) {
     return (
@@ -448,41 +519,45 @@ export default function ArtistDetail() {
                   <div className="col-span-2 text-center">Plays</div>
                 </div>
                 {displayedAlbums.map((album) => (
-                  <Link
+                  <div
                     key={album.id}
-                    href={`/admin/artists/${id}/albums/${album.id}`}
                     className={`grid grid-cols-12 text-sm items-center ${
                       theme === 'light'
                         ? 'hover:bg-gray-100'
                         : 'hover:bg-gray-700'
-                    } cursor-pointer`}
+                    }`}
                   >
                     <div className="col-span-6 flex items-center gap-3">
-                      <img
-                        src={album.coverUrl || '/default-album.png'}
-                        alt={album.title}
-                        className="w-10 h-10 object-cover rounded"
-                      />
-                      <div>
-                        <div
-                          className={`font-medium ${
-                            theme === 'light'
-                              ? 'text-gray-900'
-                              : 'text-gray-100'
-                          }`}
-                        >
-                          {album.title}
+                      <Link
+                        href={`/admin/artists/${id}/albums/${album.id}`}
+                        className="flex items-center gap-3"
+                      >
+                        <img
+                          src={album.coverUrl}
+                          alt={album.title}
+                          className="w-10 h-10 object-cover rounded"
+                        />
+                        <div>
+                          <div
+                            className={`font-medium ${
+                              theme === 'light'
+                                ? 'text-gray-900'
+                                : 'text-gray-100'
+                            }`}
+                          >
+                            {album.title}
+                          </div>
+                          <div
+                            className={`text-xs ${
+                              theme === 'light'
+                                ? 'text-gray-500'
+                                : 'text-gray-400'
+                            }`}
+                          >
+                            {album.type}
+                          </div>
                         </div>
-                        <div
-                          className={`text-xs ${
-                            theme === 'light'
-                              ? 'text-gray-500'
-                              : 'text-gray-400'
-                          }`}
-                        >
-                          {album.type}
-                        </div>
-                      </div>
+                      </Link>
                     </div>
                     <div
                       className={`col-span-2 text-center ${
@@ -499,7 +574,7 @@ export default function ArtistDetail() {
                       {formatDuration(album.duration)}
                     </div>
                     <div
-                      className={`col-span-2 text-center ${
+                      className={`col-span-1 text-center ${
                         theme === 'light' ? 'text-gray-900' : 'text-gray-100'
                       }`}
                     >
@@ -507,7 +582,23 @@ export default function ArtistDetail() {
                         .reduce((sum, track) => sum + track.playCount, 0)
                         .toLocaleString()}
                     </div>
-                  </Link>
+                    <div className="col-span-1 flex justify-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger>
+                          <MoreVertical className="h-4 w-4 cursor-pointer" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteAlbum(album.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Album
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -600,11 +691,27 @@ export default function ArtistDetail() {
                       {formatDuration(track.duration)}
                     </div>
                     <div
-                      className={`col-span-2 text-center ${
+                      className={`col-span-1 text-center ${
                         theme === 'light' ? 'text-gray-900' : 'text-gray-100'
                       }`}
                     >
                       {track.playCount.toLocaleString()}
+                    </div>
+                    <div className="col-span-1 flex justify-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger>
+                          <MoreVertical className="h-4 w-4 cursor-pointer" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteTrack(track.id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Track
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 ))}

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestArtistRole = void 0;
+exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
@@ -51,7 +51,7 @@ const validateArtistData = (data) => {
     }
     return null;
 };
-const requestArtistRole = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const requestToBecomeArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
         const user = req.user;
@@ -133,7 +133,7 @@ const requestArtistRole = (req, res) => __awaiter(void 0, void 0, void 0, functi
         res.status(500).json({ message: 'Internal server error' });
     }
 });
-exports.requestArtistRole = requestArtistRole;
+exports.requestToBecomeArtist = requestToBecomeArtist;
 const searchAll = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { q } = req.query;

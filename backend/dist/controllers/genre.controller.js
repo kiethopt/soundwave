@@ -44,7 +44,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllGenres = void 0;
 const genreService = __importStar(require("../services/genre.service"));
-const handle_utils_1 = require("src/utils/handle-utils");
+const handle_utils_1 = require("../utils/handle-utils");
 const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { genres, pagination } = yield genreService.getAllGenres(req);

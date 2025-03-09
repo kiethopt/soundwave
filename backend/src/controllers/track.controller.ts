@@ -3,7 +3,7 @@ import prisma from '../config/db';
 import { uploadFile } from '../services/upload.service';
 import { AlbumType, Role, Prisma } from '@prisma/client';
 import { client, setCache } from '../middleware/cache.middleware';
-// import { sessionService } from '../services/session.service';
+import * as trackService from '../services/track.service';
 import { trackSelect } from '../utils/prisma-selects';
 import { NotificationType, RecipientType } from '@prisma/client';
 import pusher from '../config/pusher';
@@ -380,9 +380,8 @@ export const deleteTrack = async (
       return;
     }
 
-    await prisma.track.delete({
-      where: { id },
-    });
+    // Use the service to delete the track
+    await trackService.deleteTrackById(id);
 
     res.json({ message: 'Track deleted successfully' });
   } catch (error) {

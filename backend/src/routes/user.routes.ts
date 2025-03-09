@@ -6,7 +6,7 @@ import {
   getFollowing,
   searchAll,
   getAllGenres,
-  requestArtistRole,
+  requestToBecomeArtist,
   editProfile,
   checkArtistRequest,
   getRecommendedArtists,
@@ -38,7 +38,7 @@ router.post(
   authorize([Role.USER]),
   upload.single('avatar'),
   handleUploadError,
-  requestArtistRole
+  requestToBecomeArtist
 );
 
 // Route chỉnh sửa thông tin người dùng

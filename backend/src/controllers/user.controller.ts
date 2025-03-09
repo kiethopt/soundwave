@@ -54,7 +54,7 @@ const validateArtistData = (data: any): string | null => {
 };
 
 // Yêu cầu trở thành Artist (Request Artist Role)
-export const requestArtistRole = async (
+export const requestToBecomeArtist = async (
   req: Request,
   res: Response
 ): Promise<void> => {

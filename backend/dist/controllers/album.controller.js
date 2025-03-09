@@ -49,6 +49,7 @@ exports.playAlbum = exports.getAlbumById = exports.getAllAlbums = exports.search
 const db_1 = __importDefault(require("../config/db"));
 const upload_service_1 = require("../services/upload.service");
 const client_1 = require("@prisma/client");
+const albumService = __importStar(require("../services/album.service"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_2 = require("@prisma/client");
 const pusher_1 = __importDefault(require("../config/pusher"));
@@ -396,12 +397,13 @@ const deleteAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             return;
         }
         if (!canManageAlbum(user, album.artistId)) {
-            res.status(403).json({ message: 'You can only delete your own albums' });
+            res.status(403).json({
+                message: 'You can only delete your own albums',
+                code: 'NOT_ALBUM_OWNER',
+            });
             return;
         }
-        yield db_1.default.album.delete({
-            where: { id },
-        });
+        yield albumService.deleteAlbumById(id);
         res.json({ message: 'Album deleted successfully' });
     }
     catch (error) {

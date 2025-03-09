@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { uploadFile } from '../services/upload.service';
 import { Role, AlbumType, Prisma, HistoryType } from '@prisma/client';
-// import { sessionService } from '../services/session.service';
+import * as albumService from '../services/album.service';
 import { albumSelect, trackSelect } from '../utils/prisma-selects';
 import { NotificationType, RecipientType } from '@prisma/client';
 import pusher from '../config/pusher';
@@ -457,13 +457,15 @@ export const deleteAlbum = async (
     }
 
     if (!canManageAlbum(user, album.artistId)) {
-      res.status(403).json({ message: 'You can only delete your own albums' });
+      res.status(403).json({
+        message: 'You can only delete your own albums',
+        code: 'NOT_ALBUM_OWNER',
+      });
       return;
     }
 
-    await prisma.album.delete({
-      where: { id },
-    });
+    // Sử dụng service để xóa album
+    await albumService.deleteAlbumById(id);
 
     res.json({ message: 'Album deleted successfully' });
   } catch (error) {
