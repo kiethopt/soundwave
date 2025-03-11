@@ -42,33 +42,6 @@ export const paginate = async <T>(
   };
 };
 
-// Xử lý cache
-export const handleCache = async <T>(
-  req: Request,
-  fetchDataFn: () => Promise<T>,
-  ttl: number = 300
-): Promise<T> => {
-  const cacheKey = req.originalUrl;
-
-  if (process.env.USE_REDIS_CACHE === 'true') {
-    const cachedData = await client.get(cacheKey);
-    if (cachedData) {
-      console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-      return JSON.parse(cachedData);
-    }
-    console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-  }
-
-  const data = await fetchDataFn();
-
-  if (process.env.USE_REDIS_CACHE === 'true' && data) {
-    console.log(`[Redis] Caching data for key: ${cacheKey}`);
-    await client.setEx(cacheKey, ttl, JSON.stringify(data));
-  }
-
-  return data;
-};
-
 // Validation helper
 export const validateField = (
   value: any,

@@ -10,24 +10,38 @@ export const client = createClient({
   },
 });
 
-client.on('error', (err) => console.log('Redis Client Error', err));
+client.on('error', (err) => console.error('Redis error:', err));
 
-(async () => {
-  try {
-    await client.connect();
-    console.log('Connected to Redis');
-  } catch (error) {
-    console.error('Failed to connect to Redis:', error);
-  }
-})();
+// Kết nối Redis nếu cache được bật
+if (process.env.USE_REDIS_CACHE === 'true') {
+  (async () => {
+    try {
+      if (!client.isOpen) {
+        await client.connect();
+      }
+    } catch (error) {
+      console.error('Redis connection failed:', error);
+    }
+  })();
+}
 
 export const cacheMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
-  if (process.env.USE_REDIS_CACHE === 'false') {
-    console.log('[Redis] Cache is disabled - bypassing middleware');
+  if (process.env.USE_REDIS_CACHE !== 'true') {
+    console.log(
+      `[Redis] Cache disabled - bypassing cache for: ${req.originalUrl}`
+    );
+    next();
+    return;
+  }
+
+  if (!client.isOpen) {
+    console.log(
+      `[Redis] Client not connected - bypassing cache for: ${req.originalUrl}`
+    );
     next();
     return;
   }
@@ -37,26 +51,23 @@ export const cacheMiddleware = (
 
   (async () => {
     try {
-      console.log(`[Redis] Checking cache for key: ${key}`);
       const cachedData = await client.get(key);
 
       if (cachedData) {
-        console.log(`[Redis] Cache hit for key: ${key}`);
-        console.log('[Redis] Serving data from cache');
+        console.log(`[Redis] Cache hit for: ${key}`);
         res.json(JSON.parse(cachedData));
         responseSent = true;
         return;
       }
 
-      console.log(`[Redis] Cache miss for key: ${key}`);
-      console.log('[Redis] Fetching data from database');
+      console.log(`[Redis] Cache miss for: ${key}`);
 
       const originalJson = res.json;
       res.json = function (body: any) {
         if (!responseSent) {
-          console.log(`[Redis] Caching new data for key: ${key}`);
+          console.log(`[Redis] Caching data for: ${key}`);
           setCache(key, body).catch((error) =>
-            console.error('[Redis] Cache save error:', error)
+            console.error('Cache save error:', error)
           );
         }
         return originalJson.call(this, body);
@@ -64,21 +75,19 @@ export const cacheMiddleware = (
 
       next();
     } catch (error) {
-      console.error('[Redis] Middleware error:', error);
+      console.error('Cache middleware error:', error);
       next();
     }
   })();
 };
 
 export const setCache = async (key: string, data: any, ttl: number = 600) => {
-  if (process.env.USE_REDIS_CACHE === 'false') return;
+  if (process.env.USE_REDIS_CACHE !== 'true' || !client.isOpen) return;
 
   try {
-    console.log(`[Redis] Setting cache for key: ${key} (TTL: ${ttl}s)`);
     await client.set(key, JSON.stringify(data), { EX: ttl });
-    console.log(`[Redis] Cache set successfully for key: ${key}`);
   } catch (error) {
-    console.error('[Redis] Error setting cache:', error);
+    console.error('Cache set error:', error);
   }
 };
 
@@ -91,11 +100,9 @@ export const clearCacheForEntity = async (
     clearSearch?: boolean;
   }
 ) => {
-  if (process.env.USE_REDIS_CACHE === 'false') return;
+  if (process.env.USE_REDIS_CACHE !== 'true' || !client.isOpen) return;
 
   try {
-    console.log(`[Redis] Clearing cache for entity: ${entity}`);
-
     // Tạo danh sách các pattern cần xóa
     const patterns = [
       `/api/${entity}s*`,
@@ -109,7 +116,7 @@ export const clearCacheForEntity = async (
       patterns.push(`/api/admin/${entity}s*`);
     }
 
-    // Xử lý cụ thể cho từng entity nếu cần
+    // Xử lý entity đặc biệt
     if (entity === 'artist') {
       patterns.push(
         '/api/admin/artists*',
@@ -180,9 +187,6 @@ export const clearCacheForEntity = async (
     for (const pattern of patterns) {
       const keys = await client.keys(pattern);
       if (keys.length) {
-        console.log(
-          `[Redis] Clearing ${keys.length} keys for pattern: ${pattern}`
-        );
         await Promise.all(keys.map((key) => client.del(key)));
       }
     }
@@ -190,11 +194,10 @@ export const clearCacheForEntity = async (
     if (entity === 'user' || entity === 'stats' || entity === 'history') {
       const statsKeys = await client.keys('/api/admin/stats*');
       if (statsKeys.length) {
-        console.log(`[Redis] Clearing stats cache`);
         await Promise.all(statsKeys.map((key) => client.del(key)));
       }
     }
   } catch (error) {
-    console.error(`[Redis] Error clearing ${entity} cache:`, error);
+    console.error(`Error clearing ${entity} cache:`, error);
   }
 };

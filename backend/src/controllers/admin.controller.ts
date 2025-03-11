@@ -1,9 +1,6 @@
 import { Request, Response } from 'express';
-import prisma from '../config/db';
 import {
-  handleCache,
   handleError,
-  paginate,
   runValidations,
   validateField,
 } from '../utils/handle-utils';
@@ -30,9 +27,7 @@ export const getUserById = async (
   try {
     const { id } = req.params;
 
-    const user = await handleCache(req, async () => {
-      return adminService.getUserById(id);
-    });
+    const user = await adminService.getUserById(id);
 
     if (!user) {
       res.status(404).json({ message: 'User not found' });
@@ -70,9 +65,7 @@ export const getArtistRequestDetail = async (
   try {
     const { id } = req.params;
 
-    const request = await handleCache(req, async () => {
-      return adminService.getArtistRequestDetail(id);
-    });
+    const request = await adminService.getArtistRequestDetail(id);
 
     res.json(request);
   } catch (error) {
@@ -110,6 +103,9 @@ export const updateUser = async (
         error.message === 'Email already exists' ||
         error.message === 'Username already exists'
       ) {
+        res.status(400).json({ message: error.message });
+        return;
+      } else if (error.message === 'Current password is incorrect') {
         res.status(400).json({ message: error.message });
         return;
       }
@@ -199,9 +195,7 @@ export const getArtistById = async (
   try {
     const { id } = req.params;
 
-    const artist = await handleCache(req, async () => {
-      return adminService.getArtistById(id);
-    });
+    const artist = await adminService.getArtistById(id);
 
     res.json(artist);
   } catch (error) {
@@ -365,16 +359,23 @@ export const rejectArtistRequest = async (
 // Lấy thông số tổng quan để thống kê - ADMIN only
 export const getStats = async (req: Request, res: Response): Promise<void> => {
   try {
-    const statsData = await handleCache(
-      req,
-      async () => {
-        return adminService.getSystemStats();
-      },
-      3600 // TTL 1 giờ
-    );
-
+    const statsData = await adminService.getSystemStats();
     res.json(statsData);
   } catch (error) {
     handleError(res, error, 'Get stats');
+  }
+};
+
+// Cập nhật trạng thái cache - ADMIN only
+export const handleCacheStatus = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { enabled } = req.method === 'POST' ? req.body : {};
+    const result = await adminService.updateCacheStatus(enabled);
+    res.json(result);
+  } catch (error) {
+    handleError(res, error, 'Manage cache status');
   }
 };

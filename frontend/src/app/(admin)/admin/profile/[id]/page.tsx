@@ -1,17 +1,38 @@
 'use client';
 
+import type React from 'react';
+
 import { useState, useRef, use, useEffect } from 'react';
 import { api } from '@/utils/api';
-import { User } from '@/types';
+import type { User } from '@/types';
 import { toast } from 'react-toastify';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Sparkles } from 'lucide-react';
+import {
+  Camera,
+  UserIcon,
+  Mail,
+  AtSign,
+  Shield,
+  CircleCheck,
+  Lock,
+  KeyRound,
+  Save,
+  X,
+} from 'lucide-react';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { AvatarFallback } from '@radix-ui/react-avatar';
 import { useTheme } from '@/contexts/ThemeContext';
 import { usePathname } from 'next/navigation';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardFooter,
+} from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 export default function AdminProfile({
   params,
@@ -26,6 +47,12 @@ export default function AdminProfile({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [passwordError, setPasswordError] = useState('');
 
   useEffect(() => {
     setIsEditing(false);
@@ -49,24 +76,27 @@ export default function AdminProfile({
     fetchUserData();
   }, [id]);
 
-  // Handle updating profile information
+  // Handle Save
   const handleSave = async () => {
     if (!userData) return;
 
     const token = localStorage.getItem('userToken');
     if (!token) return;
 
-    // Kiểm tra xem có thay đổi gì không
-    const storedUserData = JSON.parse(localStorage.getItem('userData') || '{}');
-    const hasChanges =
-      userData.name !== storedUserData.name ||
-      userData.email !== storedUserData.email ||
-      userData.username !== storedUserData.username ||
-      selectedAvatar;
-
-    if (!hasChanges) {
-      setIsEditing(false);
-      return;
+    // Kiểm tra mật khẩu nếu người dùng đang thay đổi mật khẩu
+    if (passwordData.password) {
+      if (passwordData.password !== passwordData.confirmPassword) {
+        setPasswordError('Passwords do not match');
+        return;
+      }
+      if (passwordData.password.length < 6) {
+        setPasswordError('Password must be at least 6 characters');
+        return;
+      }
+      if (!passwordData.currentPassword) {
+        setPasswordError('Current password is required');
+        return;
+      }
     }
 
     try {
@@ -74,6 +104,13 @@ export default function AdminProfile({
       formData.append('name', userData.name || '');
       formData.append('email', userData.email);
       formData.append('username', userData.username || '');
+
+      // Thêm mật khẩu vào formData nếu có
+      if (passwordData.password) {
+        formData.append('currentPassword', passwordData.currentPassword);
+        formData.append('password', passwordData.password);
+      }
+
       if (selectedAvatar) {
         formData.append('avatar', selectedAvatar);
       }
@@ -87,15 +124,32 @@ export default function AdminProfile({
       const newUserData = { ...userData, ...updatedUser };
       localStorage.setItem('userData', JSON.stringify(newUserData));
       setUserData(newUserData);
+
+      // Reset trường password sau khi cập nhật
+      setPasswordData({
+        currentPassword: '',
+        password: '',
+        confirmPassword: '',
+      });
+
       toast.success('Profile updated successfully');
     } catch (error) {
-      toast.error('Failed to update profile');
+      if (error instanceof Error) {
+        if (error.message === 'Current password is incorrect') {
+          setPasswordError('Current password is incorrect');
+        } else {
+          toast.error(error.message || 'Failed to update profile');
+        }
+      } else {
+        toast.error('Failed to update profile');
+      }
       return;
     }
 
     setIsEditing(false);
     setAvatarPreview(null);
     setSelectedAvatar(null);
+    setPasswordError('');
   };
 
   const handleAvatarClick = () => {
@@ -113,45 +167,65 @@ export default function AdminProfile({
     }
   };
 
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPasswordData({
+      ...passwordData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  if (!userData) {
+    return (
+      <div className="w-full h-[60vh] flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="h-24 w-24 rounded-full bg-zinc-200"></div>
+          <div className="h-6 w-48 rounded bg-zinc-200"></div>
+          <div className="h-4 w-64 rounded bg-zinc-200"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={`w-full max-w-2xl mx-auto space-y-8 p-6 backdrop-blur-xs rounded-xl border shadow-xs ${
+    <Card
+      className={`w-full max-w-3xl mx-auto shadow-md ${
         theme === 'light'
-          ? 'bg-white border-zinc-200/80 text-zinc-700'
-          : 'bg-[#121212] border-zinc-700/80 text-zinc-200'
+          ? 'bg-white border-zinc-200/80'
+          : 'bg-zinc-900 border-zinc-700/80'
       }`}
     >
-      {!userData ? (
-        <div
-          className={`text-center ${
-            theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'
-          }`}
-        >
-          Loading...
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center justify-center gap-6">
+      <CardHeader className="pb-0">
+        <div className="flex flex-col md:flex-row items-center gap-6 pt-2">
+          <div className="relative group">
             <Avatar
-              className={`h-24 w-24 rounded-full border-2 shadow-xs ${
-                theme === 'light' ? 'border-zinc-200/80' : 'border-zinc-700/80'
+              className={`h-28 w-28 rounded-full border-4 ${
+                isEditing
+                  ? 'cursor-pointer border-primary/50'
+                  : theme === 'light'
+                  ? 'border-zinc-100'
+                  : 'border-zinc-800'
               }`}
+              onClick={handleAvatarClick}
             >
               <AvatarImage
                 src={avatarPreview || userData.avatar || '/default-avatar.png'}
                 className="rounded-full object-cover"
+                alt={userData.name || 'Profile'}
               />
-              <AvatarFallback className="bg-zinc-100">
+              <AvatarFallback
+                className={`${
+                  theme === 'light' ? 'bg-zinc-100' : 'bg-zinc-800'
+                }`}
+              >
                 {userData.name?.charAt(0) || 'A'}
               </AvatarFallback>
             </Avatar>
             {isEditing && (
-              <Button
-                variant="uploadAvatar"
-                className="h-24 w-24 rounded-full border-2 border-dashed shadow-sm cursor-pointer"
+              <div
+                className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30 opacity-0 group-hover:opacity-100 cursor-pointer"
                 onClick={handleAvatarClick}
               >
-                <Sparkles className="h-6 w-6" />
+                <Camera className="h-8 w-8 text-white" />
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -159,118 +233,344 @@ export default function AdminProfile({
                   onChange={handleAvatarChange}
                   className="hidden"
                 />
-              </Button>
+              </div>
             )}
           </div>
-          <p className="text-zinc-700 w-full text-center text-sm hover:cursor-pointer">
-            {isEditing ? 'Upload a new avatar' : userData.email}
-          </p>
 
-          <div className="grid gap-6">
-            <div className="grid gap-2">
-              <Label htmlFor="name" className="text-zinc-700">
-                Display Name
-              </Label>
-              <Input
-                id="name"
-                placeholder="Your full name"
-                value={userData.name || ''}
-                onChange={(e) =>
-                  setUserData({ ...userData, name: e.target.value })
-                }
-                disabled={!isEditing}
-                className="text-black"
-              />
+          <div className="flex flex-col items-center md:items-start space-y-2">
+            <h2
+              className={`text-2xl font-bold ${
+                theme === 'light' ? 'text-zinc-800' : 'text-zinc-100'
+              }`}
+            >
+              {userData.name || 'Admin User'}
+            </h2>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant={userData.isActive ? 'success' : 'destructive'}
+                className="px-2 py-0.5"
+              >
+                {userData.isActive ? 'Active' : 'Inactive'}
+              </Badge>
+              <Badge variant="outline" className="px-2 py-0.5 capitalize">
+                {userData.role}
+              </Badge>
+            </div>
+            <p
+              className={`text-sm ${
+                theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'
+              }`}
+            >
+              {userData.email}
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-6 space-y-6">
+        <Separator
+          className={theme === 'light' ? 'bg-zinc-200' : 'bg-zinc-700'}
+        />
+
+        <div className="grid gap-6">
+          <div className="space-y-4">
+            <h3
+              className={`text-sm font-medium flex items-center gap-2 ${
+                theme === 'light' ? 'text-zinc-800' : 'text-zinc-200'
+              }`}
+            >
+              <UserIcon className="h-4 w-4" />
+              Personal Information
+            </h3>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label
+                  htmlFor="name"
+                  className={
+                    theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'
+                  }
+                >
+                  Display Name
+                </Label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    placeholder="Your full name"
+                    value={userData.name || ''}
+                    onChange={(e) =>
+                      setUserData({ ...userData, name: e.target.value })
+                    }
+                    disabled={!isEditing}
+                    className={`pl-10 ${
+                      theme === 'light'
+                        ? 'bg-white border-zinc-200 focus:border-zinc-300'
+                        : 'bg-zinc-800 border-zinc-700 focus:border-zinc-600'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label
+                  htmlFor="username"
+                  className={
+                    theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'
+                  }
+                >
+                  Username
+                </Label>
+                <div className="relative">
+                  <AtSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="username"
+                    placeholder="@username"
+                    value={userData.username || ''}
+                    onChange={(e) =>
+                      setUserData({ ...userData, username: e.target.value })
+                    }
+                    disabled={!isEditing}
+                    className={`pl-10 ${
+                      theme === 'light'
+                        ? 'bg-white border-zinc-200 focus:border-zinc-300'
+                        : 'bg-zinc-800 border-zinc-700 focus:border-zinc-600'
+                    }`}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="username" className="text-zinc-700">
-                Username
-              </Label>
-              <Input
-                id="username"
-                placeholder="@username"
-                value={userData.username || ''}
-                onChange={(e) =>
-                  setUserData({ ...userData, username: e.target.value })
+              <Label
+                htmlFor="email"
+                className={
+                  theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'
                 }
-                disabled={!isEditing}
-                className="bg-white border-zinc-200/80 focus:border-zinc-300 
-                          focus:ring-1 focus:ring-zinc-200 placeholder:text-zinc-400"
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="email" className="text-zinc-700">
-                Email
+              >
+                Email Address
               </Label>
-              <Input
-                id="email"
-                type="email"
-                value={userData.email}
-                onChange={(e) =>
-                  setUserData({ ...userData, email: e.target.value })
-                }
-                disabled={!isEditing}
-                className="bg-white border-zinc-200/80 focus:border-zinc-300 
-                          focus:ring-1 focus:ring-zinc-200 placeholder:text-zinc-400"
-              />
+              <div className="relative">
+                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={userData.email}
+                  onChange={(e) =>
+                    setUserData({ ...userData, email: e.target.value })
+                  }
+                  disabled={!isEditing}
+                  className={`pl-10 ${
+                    theme === 'light'
+                      ? 'bg-white border-zinc-200 focus:border-zinc-300'
+                      : 'bg-zinc-800 border-zinc-700 focus:border-zinc-600'
+                  }`}
+                />
+              </div>
             </div>
+          </div>
 
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium text-zinc-700">
-                Account Information
-              </h3>
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label className="text-zinc-700">Role</Label>
+          <Separator
+            className={theme === 'light' ? 'bg-zinc-200' : 'bg-zinc-700'}
+          />
+
+          <div className="space-y-4">
+            <h3
+              className={`text-sm font-medium flex items-center gap-2 ${
+                theme === 'light' ? 'text-zinc-800' : 'text-zinc-200'
+              }`}
+            >
+              <Shield className="h-4 w-4" />
+              Account Information
+            </h3>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label
+                  className={
+                    theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'
+                  }
+                >
+                  Role
+                </Label>
+                <div className="relative">
+                  <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={userData.role}
                     disabled
-                    className="bg-white border-zinc-200/80"
+                    className={`pl-10 ${
+                      theme === 'light'
+                        ? 'bg-zinc-50 border-zinc-200'
+                        : 'bg-zinc-800/50 border-zinc-700'
+                    }`}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label className="text-zinc-700">Account Status</Label>
+              </div>
+
+              <div className="grid gap-2">
+                <Label
+                  className={
+                    theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'
+                  }
+                >
+                  Account Status
+                </Label>
+                <div className="relative">
+                  <CircleCheck className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={userData.isActive ? 'Active' : 'Inactive'}
                     disabled
-                    className="bg-white border-zinc-200/80"
+                    className={`pl-10 ${
+                      theme === 'light'
+                        ? 'bg-zinc-50 border-zinc-200'
+                        : 'bg-zinc-800/50 border-zinc-700'
+                    }`}
                   />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-4">
-            {isEditing ? (
-              <>
-                <Button
-                  variant="cancel"
-                  className="cursor-pointer text-white"
-                  onClick={() => setIsEditing(false)}
+          {isEditing && (
+            <>
+              <Separator
+                className={theme === 'light' ? 'bg-zinc-200' : 'bg-zinc-700'}
+              />
+
+              <div className="space-y-4">
+                <h3
+                  className={`text-sm font-medium flex items-center gap-2 ${
+                    theme === 'light' ? 'text-zinc-800' : 'text-zinc-200'
+                  }`}
                 >
-                  Cancel
-                </Button>
-                <Button
-                  variant="saveChanges"
-                  className="cursor-pointer"
-                  onClick={handleSave}
-                >
-                  Save Changes
-                </Button>
-              </>
-            ) : (
-              <Button
-                onClick={() => setIsEditing(true)}
-                className="bg-zinc-900 text-white hover:bg-zinc-800 cursor-pointer"
-              >
-                Edit Profile
-              </Button>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+                  <Lock className="h-4 w-4" />
+                  Change Password
+                </h3>
+
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label
+                      htmlFor="currentPassword"
+                      className={
+                        theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'
+                      }
+                    >
+                      Current Password
+                    </Label>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="currentPassword"
+                        name="currentPassword"
+                        type="password"
+                        value={passwordData.currentPassword}
+                        onChange={handlePasswordChange}
+                        className={`pl-10 ${
+                          theme === 'light'
+                            ? 'bg-white border-zinc-200 focus:border-zinc-300'
+                            : 'bg-zinc-800 border-zinc-700 focus:border-zinc-600'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label
+                        htmlFor="password"
+                        className={
+                          theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'
+                        }
+                      >
+                        New Password
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="password"
+                          name="password"
+                          type="password"
+                          value={passwordData.password}
+                          onChange={handlePasswordChange}
+                          className={`pl-10 ${
+                            theme === 'light'
+                              ? 'bg-white border-zinc-200 focus:border-zinc-300'
+                              : 'bg-zinc-800 border-zinc-700 focus:border-zinc-600'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label
+                        htmlFor="confirmPassword"
+                        className={
+                          theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'
+                        }
+                      >
+                        Confirm New Password
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="confirmPassword"
+                          name="confirmPassword"
+                          type="password"
+                          value={passwordData.confirmPassword}
+                          onChange={handlePasswordChange}
+                          className={`pl-10 ${
+                            theme === 'light'
+                              ? 'bg-white border-zinc-200 focus:border-zinc-300'
+                              : 'bg-zinc-800 border-zinc-700 focus:border-zinc-600'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {passwordError && (
+                    <p className="text-destructive text-sm font-medium">
+                      {passwordError}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </CardContent>
+
+      <CardFooter className="flex justify-end gap-4 pt-2">
+        {isEditing ? (
+          <>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                setIsEditing(false);
+                setPasswordData({
+                  currentPassword: '',
+                  password: '',
+                  confirmPassword: '',
+                });
+                setPasswordError('');
+              }}
+            >
+              <X className="h-4 w-4" />
+              Cancel
+            </Button>
+            <Button className="gap-2" onClick={handleSave}>
+              <Save className="h-4 w-4" />
+              Save Changes
+            </Button>
+          </>
+        ) : (
+          <Button onClick={() => setIsEditing(true)} className="gap-2">
+            <UserIcon className="h-4 w-4" />
+            Edit Profile
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
   );
 }

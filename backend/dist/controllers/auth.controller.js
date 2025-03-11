@@ -65,11 +65,6 @@ const generateToken = (userId, role, artistProfile) => {
         role,
     }, JWT_SECRET, { expiresIn: '24h' });
 };
-const cacheConfig = {
-    short: { ttl: 300, swr: 60 },
-    medium: { ttl: 1800, swr: 300 },
-    long: { ttl: 3600, swr: 600 },
-};
 const validateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -82,7 +77,6 @@ const validateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, func
         const user = yield db_1.default.user.findUnique({
             where: { id: decoded.id },
             select: prisma_selects_1.userSelect,
-            cacheStrategy: cacheConfig.medium,
         });
         if (!user) {
             res.status(404).json({ message: 'User not found' });

@@ -315,7 +315,6 @@ export interface CreatePlaylistData {
   type?: 'FAVORITE' | 'NORMAL';
 }
 
-// Thêm interface cho API responses
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
@@ -327,4 +326,12 @@ export interface PlaylistResponse {
   name: string;
   description?: string;
   tracks: Track[];
+}
+
+export interface SystemSettings {
+  cacheEnabled: boolean;
+  maintenanceMode: boolean;
+  debugMode: boolean;
+  sessionTimeout: number;
+  maxUploadSize: number;
 }

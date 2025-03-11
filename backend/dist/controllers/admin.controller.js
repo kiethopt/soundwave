@@ -42,7 +42,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -58,9 +58,7 @@ exports.getAllUsers = getAllUsers;
 const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const user = yield (0, handle_utils_1.handleCache)(req, () => __awaiter(void 0, void 0, void 0, function* () {
-            return adminService.getUserById(id);
-        }));
+        const user = yield adminService.getUserById(id);
         if (!user) {
             res.status(404).json({ message: 'User not found' });
             return;
@@ -89,9 +87,7 @@ exports.getAllArtistRequests = getAllArtistRequests;
 const getArtistRequestDetail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const request = yield (0, handle_utils_1.handleCache)(req, () => __awaiter(void 0, void 0, void 0, function* () {
-            return adminService.getArtistRequestDetail(id);
-        }));
+        const request = yield adminService.getArtistRequestDetail(id);
         res.json(request);
     }
     catch (error) {
@@ -120,6 +116,10 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             }
             else if (error.message === 'Email already exists' ||
                 error.message === 'Username already exists') {
+                res.status(400).json({ message: error.message });
+                return;
+            }
+            else if (error.message === 'Current password is incorrect') {
                 res.status(400).json({ message: error.message });
                 return;
             }
@@ -187,9 +187,7 @@ exports.getAllArtists = getAllArtists;
 const getArtistById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const artist = yield (0, handle_utils_1.handleCache)(req, () => __awaiter(void 0, void 0, void 0, function* () {
-            return adminService.getArtistById(id);
-        }));
+        const artist = yield adminService.getArtistById(id);
         res.json(artist);
     }
     catch (error) {
@@ -321,9 +319,7 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
 exports.rejectArtistRequest = rejectArtistRequest;
 const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const statsData = yield (0, handle_utils_1.handleCache)(req, () => __awaiter(void 0, void 0, void 0, function* () {
-            return adminService.getSystemStats();
-        }), 3600);
+        const statsData = yield adminService.getSystemStats();
         res.json(statsData);
     }
     catch (error) {
@@ -331,4 +327,15 @@ const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.getStats = getStats;
+const handleCacheStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { enabled } = req.method === 'POST' ? req.body : {};
+        const result = yield adminService.updateCacheStatus(enabled);
+        res.json(result);
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Manage cache status');
+    }
+});
+exports.handleCacheStatus = handleCacheStatus;
 //# sourceMappingURL=admin.controller.js.map

@@ -9,8 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleError = exports.toBooleanValue = exports.runValidations = exports.validateField = exports.handleCache = exports.paginate = void 0;
-const cache_middleware_1 = require("../middleware/cache.middleware");
+exports.handleError = exports.toBooleanValue = exports.runValidations = exports.validateField = exports.paginate = void 0;
 const paginate = (model_1, req_1, ...args_1) => __awaiter(void 0, [model_1, req_1, ...args_1], void 0, function* (model, req, options = {}) {
     const { page = 1, limit = 10 } = req.query;
     const pageNumber = Number(page);
@@ -33,24 +32,6 @@ const paginate = (model_1, req_1, ...args_1) => __awaiter(void 0, [model_1, req_
     };
 });
 exports.paginate = paginate;
-const handleCache = (req_1, fetchDataFn_1, ...args_1) => __awaiter(void 0, [req_1, fetchDataFn_1, ...args_1], void 0, function* (req, fetchDataFn, ttl = 300) {
-    const cacheKey = req.originalUrl;
-    if (process.env.USE_REDIS_CACHE === 'true') {
-        const cachedData = yield cache_middleware_1.client.get(cacheKey);
-        if (cachedData) {
-            console.log(`[Redis] Cache hit for key: ${cacheKey}`);
-            return JSON.parse(cachedData);
-        }
-        console.log(`[Redis] Cache miss for key: ${cacheKey}`);
-    }
-    const data = yield fetchDataFn();
-    if (process.env.USE_REDIS_CACHE === 'true' && data) {
-        console.log(`[Redis] Caching data for key: ${cacheKey}`);
-        yield cache_middleware_1.client.setEx(cacheKey, ttl, JSON.stringify(data));
-    }
-    return data;
-});
-exports.handleCache = handleCache;
 const validateField = (value, fieldName, options = {}) => {
     if (options.required && !value) {
         return `${fieldName} is required`;

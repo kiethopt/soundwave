@@ -10,6 +10,8 @@ import {
 } from '../utils/prisma-selects';
 import { uploadFile } from './upload.service';
 import { paginate, toBooleanValue } from '../utils/handle-utils';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // User management services
 export const getUsers = async (req: Request) => {
@@ -123,14 +125,33 @@ export const updateUserInfo = async (
   // Kiểm tra user tồn tại
   const currentUser = await prisma.user.findUnique({
     where: { id },
-    select: userSelect,
+    select: { ...userSelect, password: true },
   });
 
   if (!currentUser) {
     throw new Error('User not found');
   }
 
-  const { name, email, username, isActive, role } = data;
+  const { name, email, username, isActive, role, password, currentPassword } =
+    data;
+  let passwordHash;
+  if (password) {
+    const bcrypt = require('bcrypt');
+
+    // Kiểm tra mk hiện tại người dùng nhập có phải là mk cũ không
+    if (currentPassword) {
+      const isPasswordValid = await bcrypt.compare(
+        currentPassword,
+        currentUser.password
+      );
+      if (!isPasswordValid) {
+        throw new Error('Current password is incorrect');
+      }
+
+      // Mã hóa mk mới
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+  }
 
   // Kiểm tra trùng lặp email nếu có thay đổi
   if (email && email !== currentUser.email) {
@@ -173,6 +194,7 @@ export const updateUserInfo = async (
       ...(avatarUrl !== currentUser.avatar && { avatar: avatarUrl }),
       ...(isActiveBool !== undefined && { isActive: isActiveBool }),
       ...(role !== undefined && { role }),
+      ...(passwordHash && { password: passwordHash }),
     },
     select: userSelect,
   });
@@ -497,4 +519,45 @@ export const getSystemStats = async () => {
     })),
     updatedAt: new Date().toISOString(),
   };
+};
+
+// System settings services
+export const updateCacheStatus = async (enabled: boolean) => {
+  try {
+    const envPath = path.resolve(__dirname, '../../.env');
+    const envContent = fs.readFileSync(envPath, 'utf8');
+
+    if (enabled === undefined) {
+      const currentStatus = process.env.USE_REDIS_CACHE === 'true';
+      return { enabled: currentStatus };
+    }
+
+    // Update USE_REDIS_CACHE
+    const updatedContent = envContent.replace(
+      /USE_REDIS_CACHE=.*/,
+      `USE_REDIS_CACHE=${enabled}`
+    );
+
+    fs.writeFileSync(envPath, updatedContent);
+
+    // Cập nhật biến môi trường và xử lý kết nối Redis
+    const previousStatus = process.env.USE_REDIS_CACHE === 'true';
+    process.env.USE_REDIS_CACHE = String(enabled);
+
+    console.log(`[Redis] Cache ${enabled ? 'enabled' : 'disabled'}`);
+
+    // Xử lý kết nối Redis dựa trên trạng thái mới
+    const { client } = require('../middleware/cache.middleware');
+
+    if (enabled && !previousStatus && !client.isOpen) {
+      await client.connect();
+    } else if (!enabled && previousStatus && client.isOpen) {
+      await client.disconnect();
+    }
+
+    return { enabled };
+  } catch (error) {
+    console.error('Error updating cache status', error);
+    throw new Error('Failed to update cache status');
+  }
 };

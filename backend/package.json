@@ -21,8 +21,6 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@faker-js/faker": "^9.4.0",
-    "@prisma/ppg-tunnel": "^0.3.0",
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.17",
     "@types/date-fns": "^2.5.3",
@@ -32,7 +30,6 @@
     "@types/node": "^22.13.0",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.17",
-    "@types/pusher-js": "^4.2.2",
     "@types/uuid": "^10.0.0",
     "prisma": "^6.4.1",
     "tsx": "^4.19.2",
@@ -41,10 +38,8 @@
   "dependencies": {
     "@prisma/client": "^6.4.1",
     "@prisma/extension-accelerate": "^1.2.1",
-    "@prisma/extension-optimize": "^1.1.4",
     "@sendgrid/mail": "^8.1.4",
     "@types/fs-extra": "^11.0.4",
-    "axios": "^1.7.9",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.5.1",
     "cors": "^2.8.5",

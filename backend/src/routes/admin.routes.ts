@@ -16,6 +16,7 @@ import {
   getArtistRequestDetail,
   deleteArtist,
   updateArtist,
+  handleCacheStatus,
 } from '../controllers/admin.controller';
 import * as genreController from '../controllers/genre.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
@@ -34,9 +35,21 @@ router.get(
   getStats
 );
 
+// Cập nhật trạng thái cache
+router
+  .route('/system/cache')
+  .get(authenticate, authorize([Role.ADMIN]), handleCacheStatus)
+  .post(authenticate, authorize([Role.ADMIN]), handleCacheStatus);
+
 // Quản lý người dùng
 router.get('/users', authenticate, authorize([Role.ADMIN]), getAllUsers);
-router.get('/users/:id', authenticate, authorize([Role.ADMIN]), getUserById);
+router.get(
+  '/users/:id',
+  authenticate,
+  authorize([Role.ADMIN]),
+  cacheMiddleware,
+  getUserById
+);
 router.put(
   '/users/:id',
   authenticate,
@@ -65,6 +78,7 @@ router.get(
   '/artists/:id',
   authenticate,
   authorize([Role.ADMIN]),
+  cacheMiddleware,
   getArtistById
 );
 
@@ -78,6 +92,7 @@ router.get(
   '/artist-requests/:id',
   authenticate,
   authorize([Role.ADMIN]),
+  cacheMiddleware,
   getArtistRequestDetail
 );
 

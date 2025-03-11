@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -12,12 +45,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSystemStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.updateCacheStatus = exports.getSystemStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const upload_service_1 = require("./upload.service");
 const handle_utils_1 = require("../utils/handle-utils");
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
 const getUsers = (req) => __awaiter(void 0, void 0, void 0, function* () {
     const { search = '', status } = req.query;
     const where = Object.assign(Object.assign({ role: 'USER' }, (search
@@ -101,12 +136,23 @@ exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUserInfo = (id, data, avatarFile) => __awaiter(void 0, void 0, void 0, function* () {
     const currentUser = yield db_1.default.user.findUnique({
         where: { id },
-        select: prisma_selects_1.userSelect,
+        select: Object.assign(Object.assign({}, prisma_selects_1.userSelect), { password: true }),
     });
     if (!currentUser) {
         throw new Error('User not found');
     }
-    const { name, email, username, isActive, role } = data;
+    const { name, email, username, isActive, role, password, currentPassword } = data;
+    let passwordHash;
+    if (password) {
+        const bcrypt = require('bcrypt');
+        if (currentPassword) {
+            const isPasswordValid = yield bcrypt.compare(currentPassword, currentUser.password);
+            if (!isPasswordValid) {
+                throw new Error('Current password is incorrect');
+            }
+            passwordHash = yield bcrypt.hash(password, 10);
+        }
+    }
     if (email && email !== currentUser.email) {
         const existingEmail = yield db_1.default.user.findFirst({
             where: { email, NOT: { id } },
@@ -131,7 +177,7 @@ const updateUserInfo = (id, data, avatarFile) => __awaiter(void 0, void 0, void 
     const isActiveBool = isActive !== undefined ? (0, handle_utils_1.toBooleanValue)(isActive) : undefined;
     const updatedUser = yield db_1.default.user.update({
         where: { id },
-        data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name !== undefined && { name })), (email !== undefined && { email })), (username !== undefined && { username })), (avatarUrl !== currentUser.avatar && { avatar: avatarUrl })), (isActiveBool !== undefined && { isActive: isActiveBool })), (role !== undefined && { role })),
+        data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name !== undefined && { name })), (email !== undefined && { email })), (username !== undefined && { username })), (avatarUrl !== currentUser.avatar && { avatar: avatarUrl })), (isActiveBool !== undefined && { isActive: isActiveBool })), (role !== undefined && { role })), (passwordHash && { password: passwordHash })),
         select: prisma_selects_1.userSelect,
     });
     return updatedUser;
@@ -378,4 +424,32 @@ const getSystemStats = () => __awaiter(void 0, void 0, void 0, function* () {
     };
 });
 exports.getSystemStats = getSystemStats;
+const updateCacheStatus = (enabled) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const envPath = path.resolve(__dirname, '../../.env');
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        if (enabled === undefined) {
+            const currentStatus = process.env.USE_REDIS_CACHE === 'true';
+            return { enabled: currentStatus };
+        }
+        const updatedContent = envContent.replace(/USE_REDIS_CACHE=.*/, `USE_REDIS_CACHE=${enabled}`);
+        fs.writeFileSync(envPath, updatedContent);
+        const previousStatus = process.env.USE_REDIS_CACHE === 'true';
+        process.env.USE_REDIS_CACHE = String(enabled);
+        console.log(`[Redis] Cache ${enabled ? 'enabled' : 'disabled'}`);
+        const { client } = require('../middleware/cache.middleware');
+        if (enabled && !previousStatus && !client.isOpen) {
+            yield client.connect();
+        }
+        else if (!enabled && previousStatus && client.isOpen) {
+            yield client.disconnect();
+        }
+        return { enabled };
+    }
+    catch (error) {
+        console.error('Error updating cache status', error);
+        throw new Error('Failed to update cache status');
+    }
+});
+exports.updateCacheStatus = updateCacheStatus;
 //# sourceMappingURL=admin.service.js.map

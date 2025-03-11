@@ -12,6 +12,7 @@ import {
   LibraryOutline,
   LibraryFilled,
   HomeOutline,
+  Settings,
 } from '@/components/ui/Icons';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -349,6 +350,7 @@ export default function Sidebar({
                     Admin Dashboard
                   </div>
                 )}
+                {/* Dashboard Section */}
                 <Link
                   href="/admin/dashboard"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md ${
@@ -370,6 +372,8 @@ export default function Sidebar({
                     </>
                   )}
                 </Link>
+
+                {/* Artist Requests Section */}
                 <Link
                   href="/admin/artist-requests"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md ${
@@ -391,6 +395,7 @@ export default function Sidebar({
                     </>
                   )}
                 </Link>
+                {/* Users Section */}
                 <Link
                   href="/admin/users"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md ${
@@ -412,6 +417,7 @@ export default function Sidebar({
                     </>
                   )}
                 </Link>
+                {/* Artists Section */}
                 <Link
                   href="/admin/artists"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md ${
@@ -433,6 +439,7 @@ export default function Sidebar({
                     </>
                   )}
                 </Link>
+                {/* Genres Section */}
                 <Link
                   href="/admin/genres"
                   className={`flex items-center gap-3 px-3 py-2 rounded-md ${
@@ -451,6 +458,28 @@ export default function Sidebar({
                     <>
                       <Genres className="w-6 h-6" />
                       <span>Genres</span>
+                    </>
+                  )}
+                </Link>
+                {/* System Section */}
+                <Link
+                  href="/admin/system"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                    pathname.startsWith('/admin/system')
+                      ? theme === 'light'
+                        ? 'bg-gray-200 text-gray-900'
+                        : 'bg-white/10 text-white'
+                      : theme === 'light'
+                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {isCollapsed ? (
+                    <Settings className="w-6 h-6 mx-auto" />
+                  ) : (
+                    <>
+                      <Settings className="w-6 h-6" />
+                      <span>System</span>
                     </>
                   )}
                 </Link>
