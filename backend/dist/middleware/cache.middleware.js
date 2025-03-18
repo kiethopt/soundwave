@@ -11,16 +11,60 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.clearCacheForEntity = exports.setCache = exports.cacheMiddleware = exports.client = void 0;
 const redis_1 = require("redis");
-exports.client = (0, redis_1.createClient)({
-    username: 'default',
-    password: 'BAjFVLaluLLeQzEwR7IoOuKWUHSyJtas',
-    socket: {
-        host: 'redis-12768.c1.ap-southeast-1-1.ec2.redns.redis-cloud.com',
-        port: 12768,
-    },
-});
-exports.client.on('error', (err) => console.error('Redis error:', err));
+class MockRedisClient {
+    constructor() {
+        this.isOpen = false;
+    }
+    on(event, listener) {
+        return this;
+    }
+    connect() {
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log('[Redis] Mock client connected');
+            this.isOpen = true;
+            return this;
+        });
+    }
+    disconnect() {
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log('[Redis] Mock client disconnected');
+            this.isOpen = false;
+            return this;
+        });
+    }
+    get() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return null;
+        });
+    }
+    set(key, value, options) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return 'OK';
+        });
+    }
+    del() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return 1;
+        });
+    }
+    keys() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return [];
+        });
+    }
+}
+exports.client = process.env.USE_REDIS_CACHE === 'true'
+    ? (0, redis_1.createClient)({
+        username: 'default',
+        password: 'BAjFVLaluLLeQzEwR7IoOuKWUHSyJtas',
+        socket: {
+            host: 'redis-12768.c1.ap-southeast-1-1.ec2.redns.redis-cloud.com',
+            port: 12768,
+        },
+    })
+    : new MockRedisClient();
 if (process.env.USE_REDIS_CACHE === 'true') {
+    exports.client.on('error', (err) => console.error('Redis error:', err));
     (() => __awaiter(void 0, void 0, void 0, function* () {
         try {
             if (!exports.client.isOpen) {
@@ -31,6 +75,9 @@ if (process.env.USE_REDIS_CACHE === 'true') {
             console.error('Redis connection failed:', error);
         }
     }))();
+}
+else {
+    console.log('[Redis] Using mock Redis client - cache disabled');
 }
 const cacheMiddleware = (req, res, next) => {
     if (process.env.USE_REDIS_CACHE !== 'true') {

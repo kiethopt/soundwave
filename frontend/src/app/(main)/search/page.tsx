@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { Suspense, useRef, useState, useEffect, use } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Track, Album, Artist, User, Playlist } from "@/types";
-import { api } from "@/utils/api";
-import { Pause, Play, AddSimple } from "@/components/ui/Icons";
+import { Suspense, useRef, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Track, Album, Artist, User, Playlist } from '@/types';
+import { api } from '@/utils/api';
+import { Pause, Play, AddSimple } from '@/components/ui/Icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,13 +15,13 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
   DropdownMenuPortal,
-} from "@/components/ui/dropdown-menu";
-import { Heart, MoreHorizontal, Share2 } from "lucide-react";
-import pusher from "@/utils/pusher";
-import { toast } from "react-toastify";
-import { useTrack } from "@/contexts/TrackContext";
+} from '@/components/ui/dropdown-menu';
+import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
+import pusher from '@/utils/pusher';
+import { toast } from 'react-toastify';
+import { useTrack } from '@/contexts/TrackContext';
 
-type FilterType = "all" | "albums" | "tracks" | "artists" | "users";
+type FilterType = 'all' | 'albums' | 'tracks' | 'artists' | 'users';
 
 // Loading UI component
 function LoadingUI() {
@@ -59,7 +59,7 @@ function LoadingUI() {
 function SearchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const query = searchParams.get("q");
+  const query = searchParams.get('q');
   const [results, setResults] = useState<{
     artists: Artist[];
     albums: Album[];
@@ -67,7 +67,7 @@ function SearchContent() {
     users: User[];
   }>({ artists: [], albums: [], tracks: [], users: [] });
   const [isLoading, setIsLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
   // Audio states
   const {
@@ -94,11 +94,11 @@ function SearchContent() {
 
   // Filter buttons
   const filterButtons: { label: string; value: FilterType }[] = [
-    { label: "All", value: "all" },
-    { label: "Albums", value: "albums" },
-    { label: "Tracks", value: "tracks" },
-    { label: "Artists", value: "artists" },
-    { label: "Users", value: "users" },
+    { label: 'All', value: 'all' },
+    { label: 'Albums', value: 'albums' },
+    { label: 'Tracks', value: 'tracks' },
+    { label: 'Artists', value: 'artists' },
+    { label: 'Users', value: 'users' },
   ];
 
   // Playlists state
@@ -114,21 +114,21 @@ function SearchContent() {
 
       setIsLoading(true);
       try {
-        const token = localStorage.getItem("userToken");
+        const token = localStorage.getItem('userToken');
         if (!token) {
-          router.push("/login");
+          router.push('/login');
           return;
         }
 
         const searchResult = await api.user.searchAll(query, token);
         setResults(searchResult);
       } catch (error: any) {
-        console.error("Search error:", error);
+        console.error('Search error:', error);
         if (
-          error.message === "Unauthorized" ||
-          error.message === "User not found"
+          error.message === 'Unauthorized' ||
+          error.message === 'User not found'
         ) {
-          router.push("/login");
+          router.push('/login');
         }
       } finally {
         setIsLoading(false);
@@ -139,7 +139,7 @@ function SearchContent() {
   }, [query, router]);
 
   useEffect(() => {
-    const userDataStr = localStorage.getItem("userData");
+    const userDataStr = localStorage.getItem('userData');
     if (userDataStr) {
       const user = JSON.parse(userDataStr);
 
@@ -147,8 +147,8 @@ function SearchContent() {
       const channel = pusher.subscribe(`user-${user.id}`);
 
       // Lắng nghe sự kiện audio-control
-      channel.bind("audio-control", (data: any) => {
-        if (data.type === "STOP_OTHER_SESSIONS") {
+      channel.bind('audio-control', (data: any) => {
+        if (data.type === 'STOP_OTHER_SESSIONS') {
           // Dừng phát nhạc nếu đang phát
           if (audioRef.current) {
             audioRef.current.pause();
@@ -158,14 +158,14 @@ function SearchContent() {
       });
 
       return () => {
-        channel.unbind("audio-control");
+        channel.unbind('audio-control');
         pusher.unsubscribe(`user-${user.id}`);
       };
     }
   }, []);
 
   useEffect(() => {
-    if (currentTrack && queueType !== "album" && queueType !== "artist") {
+    if (currentTrack && queueType !== 'album' && queueType !== 'artist') {
       setCurrentlyPlaying(currentTrack.id);
     }
   }, [currentTrack, queueType]);
@@ -173,13 +173,13 @@ function SearchContent() {
   useEffect(() => {
     const fetchPlaylists = async () => {
       try {
-        const token = localStorage.getItem("userToken");
+        const token = localStorage.getItem('userToken');
         if (!token) return;
 
         const response = await api.playlists.getAll(token);
         setPlaylists(response.data);
       } catch (error) {
-        console.error("Error fetching playlists:", error);
+        console.error('Error fetching playlists:', error);
       }
     };
 
@@ -188,13 +188,13 @@ function SearchContent() {
 
   const handlePlay = async (item: Track | Album | Artist) => {
     try {
-      const token = localStorage.getItem("userToken");
+      const token = localStorage.getItem('userToken');
       if (!token) {
-        router.push("/login");
+        router.push('/login');
         return;
       }
 
-      if ("audioUrl" in item) {
+      if ('audioUrl' in item) {
         // Xử lý phát Track
         if (currentTrack?.id === item.id && queueType === 'track') {
           if (isPlaying) {
@@ -207,12 +207,12 @@ function SearchContent() {
           setQueueType('track');
           trackQueue(results.tracks);
         }
-      } else if ("tracks" in item) {
+      } else if ('tracks' in item) {
         // Xử lý phát Album
         if (item.tracks.length > 0) {
-          const isCurrentAlbumPlaying = 
-            currentTrack && 
-            item.tracks.some(track => track.id === currentTrack.id) &&
+          const isCurrentAlbumPlaying =
+            currentTrack &&
+            item.tracks.some((track) => track.id === currentTrack.id) &&
             queueType === 'album' &&
             isPlaying;
 
@@ -224,13 +224,13 @@ function SearchContent() {
             trackQueue(item.tracks);
           }
         } else {
-          toast.error("No tracks available for this album");
+          toast.error('No tracks available for this album');
         }
-      } else if ("artistProfile" in item) {
-        // Xử lý phát Artist
-        const isCurrentArtistPlaying = 
-          currentTrack && 
-          currentTrack.artistId === item.artistProfile.id &&
+      } else {
+        // Xử lý phát Artist - Đã cập nhật để phù hợp với cấu trúc dữ liệu mới
+        const isCurrentArtistPlaying =
+          currentTrack &&
+          currentTrack.artist.id === item.id &&
           queueType === 'artist' &&
           isPlaying;
 
@@ -238,41 +238,38 @@ function SearchContent() {
           pauseTrack();
         } else {
           // Lấy tracks của artist
-          const response = await api.artists.getTrackByArtistId(
-            item.artistProfile.id,
-            token
-          );
+          const response = await api.artists.getTrackByArtistId(item.id, token);
           const artistTracks = response?.tracks || [];
 
           if (artistTracks.length > 0) {
             const sortedTracks = artistTracks.sort(
-              (a:any, b:any) => b.playCount - a.playCount
+              (a: any, b: any) => b.playCount - a.playCount
             );
             playTrack(sortedTracks[0]);
             setQueueType('artist');
             trackQueue(sortedTracks);
           } else {
-            toast.error("No tracks available for this artist");
+            toast.error('No tracks available for this artist');
           }
         }
       }
     } catch (error) {
-      console.error("Error playing:", error);
-      toast.error("An error occurred while playing");
+      console.error('Error playing:', error);
+      toast.error('An error occurred while playing');
     }
   };
 
   const handleAddToPlaylist = async (playlistId: string, trackId: string) => {
     try {
-      console.log("Adding track to playlist:", { playlistId, trackId });
-      const token = localStorage.getItem("userToken");
-      console.log("Token:", token);
+      console.log('Adding track to playlist:', { playlistId, trackId });
+      const token = localStorage.getItem('userToken');
+      console.log('Token:', token);
 
-      await api.playlists.addTrack(playlistId, trackId, token || "");
-      toast.success("Track added to playlist");
+      await api.playlists.addTrack(playlistId, trackId, token || '');
+      toast.success('Track added to playlist');
     } catch (error: any) {
-      console.error("Error adding track:", error);
-      toast.error(error.message || "Cannot add track to playlist");
+      console.error('Error adding track:', error);
+      toast.error(error.message || 'Cannot add track to playlist');
     }
   };
 
@@ -287,8 +284,8 @@ function SearchContent() {
               onClick={() => setActiveFilter(button.value)}
               className={`py-2.5 text-sm font-medium transition-colors relative ${
                 activeFilter === button.value
-                  ? "text-white"
-                  : "text-white/70 hover:text-white"
+                  ? 'text-white'
+                  : 'text-white/70 hover:text-white'
               }`}
             >
               {button.label}
@@ -304,7 +301,7 @@ function SearchContent() {
       <div className="p-6">
         <div className="space-y-8">
           {/* Artists Section */}
-          {(activeFilter === "all" || activeFilter === "artists") &&
+          {(activeFilter === 'all' || activeFilter === 'artists') &&
             results.artists.length > 0 && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">Artists</h2>
@@ -312,55 +309,48 @@ function SearchContent() {
                   {results.artists.map((artist) => (
                     <div
                       key={artist.id}
-                      className="group relative p-4 rounded-lg hover:bg-white/5 transition-colors"
+                      className="group relative p-4 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
                       onClick={() =>
-                        router.push(
-                          `/artist/profile/${artist.artistProfile.id}`
-                        )
+                        router.push(`/artist/profile/${artist.id}`)
                       }
                     >
                       <div className="relative">
                         <div className="aspect-square mb-4">
                           <img
-                            src={
-                              artist.artistProfile?.avatar ||
-                              "/images/default-avatar.jpg"
-                            }
-                            alt={artist.artistProfile?.artistName || "Artist"}
+                            src={artist.avatar || '/images/default-avatar.jpg'}
+                            alt={artist.artistName || 'Artist'}
                             className="w-full h-full object-cover rounded-full"
                           />
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handlePlay(artist);
+                            }}
+                            className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            {currentTrack?.artist?.id === artist.id &&
+                            queueType === 'artist' &&
+                            isPlaying ? (
+                              <Pause className="w-6 h-6 text-white" />
+                            ) : (
+                              <Play className="w-6 h-6 text-white" />
+                            )}
+                          </button>
                         </div>
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handlePlay(artist);
-                          }}
-                          className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity shadow-lg transform translate-y-2 group-hover:translate-y-0"
-                        >
-                          {currentTrack &&
-                          queueType === "artist" &&
-                          currentTrack.artistId === artist.artistProfile?.id &&
-                          isPlaying ? (
-                            <Pause className="w-6 h-6 text-white" />
-                          ) : (
-                            <Play className="w-6 h-6 text-white" />
-                          )}
-                        </button>
                       </div>
                       <div className="text-center">
                         <h3
                           className={`font-medium truncate ${
-                            currentTrack &&
-                            queueType === "artist" &&
-                            currentTrack.artistId === artist.artistProfile?.id
-                              ? "text-[#A57865]"
-                              : "text-white"
+                            currentTrack?.artist?.id === artist.id &&
+                            queueType === 'artist'
+                              ? 'text-[#A57865]'
+                              : 'text-white'
                           }`}
                         >
-                          {artist.artistProfile?.artistName}
+                          {artist.artistName}
                         </h3>
                         <p className="text-white/60 text-sm truncate">
-                          {artist.artistProfile?.monthlyListeners.toLocaleString()}{" "}
+                          {artist.monthlyListeners?.toLocaleString() || 0}{' '}
                           monthly listeners
                         </p>
                       </div>
@@ -371,7 +361,7 @@ function SearchContent() {
             )}
 
           {/* Albums Section */}
-          {(activeFilter === "all" || activeFilter === "albums") &&
+          {(activeFilter === 'all' || activeFilter === 'albums') &&
             results.albums.length > 0 && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">Albums</h2>
@@ -384,7 +374,7 @@ function SearchContent() {
                     >
                       <div className="relative">
                         <img
-                          src={album.coverUrl || "/images/default-album.png"}
+                          src={album.coverUrl || '/images/default-album.png'}
                           alt={album.title}
                           className="w-full aspect-square object-cover rounded-md mb-4"
                         />
@@ -400,7 +390,7 @@ function SearchContent() {
                             (track) => track.id === currentTrack.id
                           ) &&
                           isPlaying &&
-                          queueType === "album" ? (
+                          queueType === 'album' ? (
                             <Pause className="w-6 h-6 text-white" />
                           ) : (
                             <Play className="w-6 h-6 text-white" />
@@ -410,16 +400,16 @@ function SearchContent() {
                       <h3
                         className={`font-medium truncate ${
                           currentlyPlaying === album.id
-                            ? "text-[#A57865]"
-                            : "text-white"
+                            ? 'text-[#A57865]'
+                            : 'text-white'
                         }`}
                       >
                         {album.title}
                       </h3>
                       <p className="text-white/60 text-sm truncate">
-                        {typeof album.artist === "string"
+                        {typeof album.artist === 'string'
                           ? album.artist
-                          : album.artist?.artistName || "Unknown Artist"}
+                          : album.artist?.artistName || 'Unknown Artist'}
                       </p>
                     </div>
                   ))}
@@ -428,7 +418,7 @@ function SearchContent() {
             )}
 
           {/* Tracks Section */}
-          {(activeFilter === "all" || activeFilter === "tracks") &&
+          {(activeFilter === 'all' || activeFilter === 'tracks') &&
             results.tracks.length > 0 && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">Tracks</h2>
@@ -441,13 +431,13 @@ function SearchContent() {
                         className={`flex items-center gap-3 p-2 rounded-lg group
                         ${
                           currentlyPlaying === track.id
-                            ? "bg-white/5"
-                            : "hover:bg-white/5"
+                            ? 'bg-white/5'
+                            : 'hover:bg-white/5'
                         }`}
                       >
                         <div className="relative flex-shrink-0">
                           <img
-                            src={track.coverUrl || "/images/default-avatar.jpg"}
+                            src={track.coverUrl || '/images/default-avatar.jpg'}
                             alt={track.title}
                             className="w-12 h-12 object-cover rounded"
                           />
@@ -458,7 +448,7 @@ function SearchContent() {
                             {currentTrack &&
                             track.id === currentTrack.id &&
                             isPlaying &&
-                            queueType === "track" ? (
+                            queueType === 'track' ? (
                               <Pause className="w-5 h-5 text-white" />
                             ) : (
                               <Play className="w-5 h-5 text-white" />
@@ -469,8 +459,8 @@ function SearchContent() {
                           <h3
                             className={`font-medium truncate ${
                               currentlyPlaying === track.id
-                                ? "text-[#A57865]"
-                                : "text-white"
+                                ? 'text-[#A57865]'
+                                : 'text-white'
                             }`}
                           >
                             {track.title}
@@ -478,14 +468,14 @@ function SearchContent() {
                           <p className="text-white/60 text-sm truncate">
                             {[
                               track.artist
-                                ? typeof track.artist === "string"
+                                ? typeof track.artist === 'string'
                                   ? track.artist
                                   : track.artist.artistName
-                                : "Unknown Artist",
+                                : 'Unknown Artist',
                               ...(track.featuredArtists?.map(
                                 (fa) => fa.artistProfile.artistName
                               ) || []),
-                            ].join(", ")}
+                            ].join(', ')}
                           </p>
                         </div>
                         <DropdownMenu>
@@ -569,13 +559,13 @@ function SearchContent() {
                       className={`hidden md:block bg-white/5 p-4 rounded-lg group relative
                       ${
                         currentlyPlaying === track.id
-                          ? "bg-white/5"
-                          : "hover:bg-white/5"
+                          ? 'bg-white/5'
+                          : 'hover:bg-white/5'
                       }`}
                     >
                       <div className="relative">
                         <img
-                          src={track.coverUrl || "/images/default-avatar.jpg"}
+                          src={track.coverUrl || '/images/default-avatar.jpg'}
                           alt={track.title}
                           className="w-full aspect-square object-cover rounded-md mb-4"
                         />
@@ -586,7 +576,7 @@ function SearchContent() {
                           {currentTrack &&
                           track.id === currentTrack.id &&
                           isPlaying &&
-                          queueType === "track" ? (
+                          queueType === 'track' ? (
                             <Pause className="w-6 h-6 text-white" />
                           ) : (
                             <Play className="w-6 h-6 text-white" />
@@ -598,8 +588,8 @@ function SearchContent() {
                           <h3
                             className={`font-medium truncate ${
                               currentlyPlaying === track.id
-                                ? "text-[#A57865]"
-                                : "text-white"
+                                ? 'text-[#A57865]'
+                                : 'text-white'
                             }`}
                           >
                             {track.title}
@@ -607,14 +597,14 @@ function SearchContent() {
                           <p className="text-white/60 text-sm truncate">
                             {[
                               track.artist
-                                ? typeof track.artist === "string"
+                                ? typeof track.artist === 'string'
                                   ? track.artist
                                   : track.artist.artistName
-                                : "Unknown Artist",
+                                : 'Unknown Artist',
                               ...(track.featuredArtists?.map(
                                 (fa) => fa.artistProfile.artistName
                               ) || []),
-                            ].join(", ")}
+                            ].join(', ')}
                           </p>
                         </div>
                         <DropdownMenu>
@@ -700,7 +690,7 @@ function SearchContent() {
           const router = useRouter(); */}
 
           {/* Users Section */}
-          {(activeFilter === "all" || activeFilter === "users") &&
+          {(activeFilter === 'all' || activeFilter === 'users') &&
             results.users.length > 0 && (
               <div>
                 <h2 className="text-2xl font-bold mb-4">Users</h2>
@@ -714,8 +704,8 @@ function SearchContent() {
                       <div className="relative">
                         <div className="aspect-square mb-4">
                           <img
-                            src={user.avatar || "/images/default-avatar.jpg"}
-                            alt={user.name || "User"}
+                            src={user.avatar || '/images/default-avatar.jpg'}
+                            alt={user.name || 'User'}
                             className="w-full h-full object-cover rounded-full"
                           />
                         </div>
@@ -725,7 +715,7 @@ function SearchContent() {
                           {user.name}
                         </h3>
                         <p className="text-white/60 text-sm truncate">
-                          {user.username || "No username"}
+                          {user.username || 'No username'}
                         </p>
                       </div>
                     </div>

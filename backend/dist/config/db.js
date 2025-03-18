@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const client_1 = require("@prisma/client");
-const extension_accelerate_1 = require("@prisma/extension-accelerate");
 const auth_extension_1 = require("../prisma/extensions/auth.extension");
 const admin_extension_1 = require("../prisma/extensions/admin.extension");
 const artist_extension_1 = require("../prisma/extensions/artist.extension");
@@ -17,7 +16,6 @@ const extendedPrisma = prisma
     .$extends(artist_extension_1.artistExtension)
     .$extends(user_extension_1.userExtension)
     .$extends(track_extension_1.trackExtension)
-    .$extends(album_extension_1.albumExtension)
-    .$extends((0, extension_accelerate_1.withAccelerate)());
+    .$extends(album_extension_1.albumExtension);
 exports.default = extendedPrisma;
 //# sourceMappingURL=db.js.map

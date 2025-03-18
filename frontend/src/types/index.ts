@@ -117,11 +117,26 @@ export interface UserFollow {
 
 export interface Artist {
   id: string;
-  email: string;
-  name: string | null;
-  avatar: string | null;
-  createdAt: string;
-  artistProfile: ArtistProfile;
+  artistName: string;
+  bio?: string;
+  avatar?: string;
+  isVerified: boolean;
+  socialMediaLinks?: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+  };
+  monthlyListeners?: number;
+  user?: {
+    id: string;
+    email: string;
+    username?: string;
+    name?: string;
+    avatar?: string;
+    role: string;
+    isActive: boolean;
+  };
+  genres?: { genre: Genre }[];
 }
 
 export interface ArtistRequest {

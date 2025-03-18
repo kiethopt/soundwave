@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -18,7 +51,8 @@ const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const upload_service_1 = require("../services/upload.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
-const pusher_1 = __importDefault(require("../config/pusher"));
+const userService = __importStar(require("../services/user.service"));
+const handle_utils_1 = require("src/utils/handle-utils");
 const getMonthStartDate = () => {
     const date = new Date();
     return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -52,619 +86,138 @@ const validateArtistData = (data) => {
     return null;
 };
 const requestToBecomeArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
-        const user = req.user;
-        const { artistName, bio, socialMediaLinks: socialMediaLinksString, genres: genresString, } = req.body;
-        const avatarFile = req.file;
-        let socialMediaLinks = {};
-        if (socialMediaLinksString) {
-            try {
-                socialMediaLinks = JSON.parse(socialMediaLinksString);
-            }
-            catch (error) {
-                res
-                    .status(400)
-                    .json({ message: 'Invalid JSON format for socialMediaLinks' });
-                return;
-            }
-        }
-        let genres = [];
-        if (genresString) {
-            try {
-                genres = genresString.split(',');
-            }
-            catch (error) {
-                res.status(400).json({ message: 'Invalid format for genres' });
-                return;
-            }
-        }
-        const validationError = validateArtistData({
-            artistName,
-            bio,
-            socialMediaLinks,
-            genres,
-        });
-        if (validationError) {
-            res.status(400).json({ message: validationError });
-            return;
-        }
-        if (!user ||
-            user.role !== client_1.Role.USER ||
-            ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.role) === client_1.Role.ARTIST) {
-            res.status(403).json({ message: 'Forbidden' });
-            return;
-        }
-        const existingRequest = yield db_1.default.artistProfile.findUnique({
-            where: { userId: user.id },
-            select: { verificationRequestedAt: true },
-        });
-        if (existingRequest === null || existingRequest === void 0 ? void 0 : existingRequest.verificationRequestedAt) {
-            res
-                .status(400)
-                .json({ message: 'You have already requested to become an artist' });
-            return;
-        }
-        let avatarUrl = null;
-        if (avatarFile) {
-            const uploadResult = yield (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artist-avatars');
-            avatarUrl = uploadResult.secure_url;
-        }
-        yield db_1.default.artistProfile.create({
-            data: {
-                artistName,
-                bio,
-                socialMediaLinks,
-                avatar: avatarUrl,
-                role: client_1.Role.ARTIST,
-                verificationRequestedAt: new Date(),
-                user: { connect: { id: user.id } },
-                genres: {
-                    create: genres.map((genreId) => ({
-                        genre: { connect: { id: genreId } },
-                    })),
-                },
-            },
-        });
+        yield userService.requestArtistRole(req.user, req.body, req.file);
         res.json({ message: 'Artist role request submitted successfully' });
     }
     catch (error) {
-        console.error('Request artist role error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        if (error instanceof Error) {
+            if (error.message === 'Forbidden') {
+                res.status(403).json({ message: 'Forbidden' });
+                return;
+            }
+            else if (error.message.includes('already requested')) {
+                res.status(400).json({ message: error.message });
+                return;
+            }
+            else if (error.message.includes('Invalid JSON format')) {
+                res.status(400).json({ message: error.message });
+                return;
+            }
+        }
+        (0, handle_utils_1.handleError)(res, error, 'Request artist role');
     }
 });
 exports.requestToBecomeArtist = requestToBecomeArtist;
 const searchAll = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { q } = req.query;
-        const user = req.user;
-        if (!user) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
         if (!q) {
             res.status(400).json({ message: 'Query is required' });
             return;
         }
         const searchQuery = String(q).trim();
-        const cacheKey = `/search-all?q=${searchQuery}`;
-        const useRedisCache = process.env.USE_REDIS_CACHE === 'true';
-        if (useRedisCache) {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                console.log('Serving from Redis cache:', cacheKey);
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-        }
-        const existingHistory = yield db_1.default.history.findFirst({
-            where: {
-                userId: user.id,
-                type: client_1.HistoryType.SEARCH,
-                query: {
-                    equals: searchQuery,
-                    mode: 'insensitive',
-                },
-            },
-        });
-        if (existingHistory) {
-            yield db_1.default.history.update({
-                where: { id: existingHistory.id },
-                data: { updatedAt: new Date() },
-            });
-        }
-        else {
-            yield db_1.default.history.create({
-                data: {
-                    type: client_1.HistoryType.SEARCH,
-                    query: searchQuery,
-                    userId: user.id,
-                },
-            });
-        }
-        const [artists, albums, tracks, users] = yield Promise.all([
-            db_1.default.user.findMany({
-                where: {
-                    isActive: true,
-                    artistProfile: {
-                        isActive: true,
-                        OR: [
-                            {
-                                artistName: { contains: searchQuery, mode: 'insensitive' },
-                            },
-                            {
-                                genres: {
-                                    some: {
-                                        genre: {
-                                            name: { contains: searchQuery, mode: 'insensitive' },
-                                        },
-                                    },
-                                },
-                            },
-                        ],
-                    },
-                },
-                select: {
-                    id: true,
-                    email: true,
-                    username: true,
-                    name: true,
-                    avatar: true,
-                    role: true,
-                    isActive: true,
-                    artistProfile: {
-                        select: {
-                            id: true,
-                            artistName: true,
-                            bio: true,
-                            isVerified: true,
-                            avatar: true,
-                            socialMediaLinks: true,
-                            monthlyListeners: true,
-                            genres: {
-                                select: {
-                                    genre: {
-                                        select: {
-                                            id: true,
-                                            name: true,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            }),
-            db_1.default.album.findMany({
-                where: {
-                    isActive: true,
-                    OR: [
-                        { title: { contains: searchQuery, mode: 'insensitive' } },
-                        {
-                            artist: {
-                                artistName: { contains: searchQuery, mode: 'insensitive' },
-                            },
-                        },
-                        {
-                            genres: {
-                                some: {
-                                    genre: {
-                                        name: { contains: searchQuery, mode: 'insensitive' },
-                                    },
-                                },
-                            },
-                        },
-                    ],
-                },
-                select: prisma_selects_1.searchAlbumSelect,
-            }),
-            db_1.default.track.findMany({
-                where: {
-                    isActive: true,
-                    OR: [
-                        { title: { contains: searchQuery, mode: 'insensitive' } },
-                        {
-                            artist: {
-                                artistName: { contains: searchQuery, mode: 'insensitive' },
-                            },
-                        },
-                        {
-                            featuredArtists: {
-                                some: {
-                                    artistProfile: {
-                                        artistName: { contains: searchQuery, mode: 'insensitive' },
-                                    },
-                                },
-                            },
-                        },
-                        {
-                            genres: {
-                                some: {
-                                    genre: {
-                                        name: { contains: searchQuery, mode: 'insensitive' },
-                                    },
-                                },
-                            },
-                        },
-                    ],
-                },
-                select: prisma_selects_1.searchTrackSelect,
-                orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
-            }),
-            db_1.default.user.findMany({
-                where: {
-                    id: { not: user.id },
-                    role: client_1.Role.USER,
-                    isActive: true,
-                    OR: [
-                        { name: { contains: searchQuery, mode: 'insensitive' } },
-                        { username: { contains: searchQuery, mode: 'insensitive' } },
-                    ],
-                },
-                select: {
-                    id: true,
-                    email: true,
-                    username: true,
-                    name: true,
-                    avatar: true,
-                    isActive: true,
-                },
-            }),
-        ]);
-        const searchResult = {
-            artists,
-            albums,
-            tracks,
-            users,
-        };
-        if (useRedisCache) {
-            yield (0, cache_middleware_1.setCache)(cacheKey, searchResult, 600);
-        }
-        res.json(searchResult);
+        const results = yield userService.search(req.user, searchQuery);
+        res.json(results);
     }
     catch (error) {
-        console.error('Search all error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        if (error instanceof Error && error.message === 'Unauthorized') {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        (0, handle_utils_1.handleError)(res, error, 'Search');
     }
 });
 exports.searchAll = searchAll;
 const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const genres = yield db_1.default.genre.findMany({
-            select: {
-                id: true,
-                name: true,
-            },
-        });
+        const genres = yield userService.getAllGenres();
         res.json(genres);
     }
     catch (error) {
-        console.error('Get all genres error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get all genres');
     }
 });
 exports.getAllGenres = getAllGenres;
 const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
-        console.log('=== DEBUG: followUser => route called');
-        const user = req.user;
         const { id: followingId } = req.params;
-        console.log('=== DEBUG: user =', user === null || user === void 0 ? void 0 : user.id);
-        console.log('=== DEBUG: followingId =', followingId);
-        if (!user) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const [userExists, artistExists] = yield Promise.all([
-            db_1.default.user.findUnique({ where: { id: followingId } }),
-            db_1.default.artistProfile.findUnique({
-                where: { id: followingId },
-                select: { id: true },
-            }),
-        ]);
-        let followingType;
-        const followData = {
-            followerId: user.id,
-            followingType: 'USER',
-        };
-        if (userExists) {
-            followingType = client_1.FollowingType.USER;
-            followData.followingUserId = followingId;
-        }
-        else if (artistExists) {
-            followingType = client_1.FollowingType.ARTIST;
-            followData.followingArtistId = followingId;
-            followData.followingType = client_1.FollowingType.ARTIST;
-        }
-        else {
-            res.status(404).json({ message: 'Target not found' });
-            return;
-        }
-        if (((followingType === 'USER' || followingType === 'ARTIST') &&
-            followingId === user.id) ||
-            followingId === ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
-            res.status(400).json({ message: 'Cannot follow yourself' });
-            return;
-        }
-        const existingFollow = yield db_1.default.userFollow.findFirst({
-            where: {
-                followerId: user.id,
-                OR: [
-                    {
-                        followingUserId: followingId,
-                        followingType: client_1.FollowingType.USER,
-                    },
-                    {
-                        followingArtistId: followingId,
-                        followingType: client_1.FollowingType.ARTIST,
-                    },
-                ],
-            },
-        });
-        if (existingFollow) {
-            res.status(400).json({ message: 'Already following' });
-            return;
-        }
-        yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-            yield tx.userFollow.create({ data: followData });
-            const currentUser = yield tx.user.findUnique({
-                where: { id: user.id },
-                select: { username: true, email: true },
-            });
-            const followerName = (currentUser === null || currentUser === void 0 ? void 0 : currentUser.username) || (currentUser === null || currentUser === void 0 ? void 0 : currentUser.email) || 'Unknown';
-            if (followingType === 'ARTIST') {
-                console.log('=== DEBUG: followUser => about to create notification for ARTIST');
-                const notification = yield tx.notification.create({
-                    data: {
-                        type: 'NEW_FOLLOW',
-                        message: `New follower: ${followerName}`,
-                        recipientType: 'ARTIST',
-                        artistId: followingId,
-                        senderId: user.id,
-                    },
-                });
-                yield tx.artistProfile.update({
-                    where: { id: followingId },
-                    data: { monthlyListeners: { increment: 1 } },
-                });
-                yield pusher_1.default.trigger(`user-${followingId}`, 'notification', {
-                    type: 'NEW_FOLLOW',
-                    message: `New follower: ${followerName}`,
-                    notificationId: notification.id,
-                });
-            }
-            else {
-                console.log('=== DEBUG: followUser => about to create notification for USER->USER follow');
-                const notification = yield tx.notification.create({
-                    data: {
-                        type: 'NEW_FOLLOW',
-                        message: `New follower: ${followerName}`,
-                        recipientType: 'USER',
-                        userId: followingId,
-                        senderId: user.id,
-                    },
-                });
-                console.log('=== DEBUG: followUser => notification for followed USER created!');
-                yield pusher_1.default.trigger(`user-${followingId}`, 'notification', {
-                    type: 'NEW_FOLLOW',
-                    message: `New follower: ${followerName}`,
-                    notificationId: notification.id,
-                });
-            }
-        }));
-        res.json({ message: 'Followed successfully' });
+        const result = yield userService.followTarget(req.user, followingId);
+        res.json(result);
     }
     catch (error) {
-        console.error('Follow error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        if (error instanceof Error) {
+            if (error.message === 'Target not found') {
+                res.status(404).json({ message: 'Target not found' });
+                return;
+            }
+            else if (error.message === 'Cannot follow yourself') {
+                res.status(400).json({ message: 'Cannot follow yourself' });
+                return;
+            }
+            else if (error.message === 'Already following') {
+                res.status(400).json({ message: 'Already following' });
+                return;
+            }
+            else if (error.message === 'Unauthorized') {
+                res.status(401).json({ message: 'Unauthorized' });
+                return;
+            }
+        }
+        (0, handle_utils_1.handleError)(res, error, 'Follow user');
     }
 });
 exports.followUser = followUser;
 const unfollowUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const user = req.user;
         const { id: followingId } = req.params;
-        if (!user) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const [userExists, artistExists] = yield Promise.all([
-            db_1.default.user.findUnique({ where: { id: followingId } }),
-            db_1.default.artistProfile.findUnique({
-                where: { id: followingId },
-                select: { id: true },
-            }),
-        ]);
-        let followingType;
-        const whereConditions = {
-            followerId: user.id,
-            followingType: 'USER',
-        };
-        if (userExists) {
-            followingType = client_1.FollowingType.USER;
-            whereConditions.followingUserId = followingId;
-        }
-        else if (artistExists) {
-            followingType = client_1.FollowingType.ARTIST;
-            whereConditions.followingArtistId = followingId;
-            whereConditions.followingType = client_1.FollowingType.ARTIST;
-        }
-        else {
-            res.status(404).json({ message: 'Target not found' });
-            return;
-        }
-        const followRecord = yield db_1.default.userFollow.findFirst({
-            where: whereConditions,
-        });
-        if (!followRecord) {
-            res.status(404).json({ message: 'Follow not found' });
-            return;
-        }
-        yield db_1.default.userFollow.delete({
-            where: { id: followRecord.id },
-        });
-        if (followingType === client_1.FollowingType.ARTIST) {
-            yield db_1.default.artistProfile.update({
-                where: { id: followingId },
-                data: { monthlyListeners: { decrement: 1 } },
-            });
-        }
-        res.json({ message: 'Unfollowed successfully' });
+        const result = yield userService.unfollowTarget(req.user, followingId);
+        res.json(result);
     }
     catch (error) {
-        console.error('Unfollow error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        if (error instanceof Error) {
+            if (error.message === 'Target not found') {
+                res.status(404).json({ message: 'Target not found' });
+                return;
+            }
+            else if (error.message === 'Not following this target') {
+                res.status(400).json({ message: 'Not following this target' });
+                return;
+            }
+            else if (error.message === 'Unauthorized') {
+                res.status(401).json({ message: 'Unauthorized' });
+                return;
+            }
+        }
+        (0, handle_utils_1.handleError)(res, error, 'Unfollow user');
     }
 });
 exports.unfollowUser = unfollowUser;
 const getFollowers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
-        const user = req.user;
-        const { type } = req.query;
-        if (!user) {
+        const followers = yield userService.getUserFollowers(req);
+        res.json(followers);
+    }
+    catch (error) {
+        if (error instanceof Error && error.message === 'Unauthorized') {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const cacheKey = `/api/user/followers?userId=${user.id}${type ? `&type=${type}` : ''}`;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-        }
-        const whereConditions = {
-            OR: [
-                {
-                    followingUserId: user.id,
-                    followingType: client_1.FollowingType.USER,
-                },
-                {
-                    followingArtistId: (_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.id,
-                    followingType: client_1.FollowingType.ARTIST,
-                },
-            ],
-        };
-        if (type) {
-            if (type === 'USER') {
-                whereConditions.OR = [
-                    {
-                        followingUserId: user.id,
-                        followingType: client_1.FollowingType.USER,
-                    },
-                ];
-            }
-            else if (type === 'ARTIST') {
-                whereConditions.OR = [
-                    {
-                        followingArtistId: user.id,
-                        followingType: client_1.FollowingType.ARTIST,
-                    },
-                ];
-            }
-        }
-        const followers = yield db_1.default.userFollow.findMany({
-            where: whereConditions,
-            select: {
-                follower: {
-                    select: prisma_selects_1.userSelect,
-                },
-                followingType: true,
-            },
-        });
-        const result = followers.map((f) => (Object.assign(Object.assign({}, f.follower), { followingType: f.followingType })));
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            yield (0, cache_middleware_1.setCache)(cacheKey, result, 300);
-        }
-        res.json(result);
-    }
-    catch (error) {
-        console.error('Get followers error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get followers');
     }
 });
 exports.getFollowers = getFollowers;
 const getFollowing = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const user = req.user;
-        if (!user) {
+        const following = yield userService.getUserFollowing(req);
+        res.json(following);
+    }
+    catch (error) {
+        if (error instanceof Error && error.message === 'Unauthorized') {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const cacheKey = `/api/user/following?userId=${user.id}`;
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
-            if (cachedData) {
-                res.json(JSON.parse(cachedData));
-                return;
-            }
-        }
-        const following = yield db_1.default.userFollow.findMany({
-            where: {
-                followerId: user.id,
-            },
-            select: {
-                followingUserId: true,
-                followingArtistId: true,
-                followingType: true,
-                followingUser: {
-                    select: {
-                        id: true,
-                        name: true,
-                        avatar: true,
-                        role: true,
-                        artistProfile: {
-                            select: {
-                                id: true,
-                                artistName: true,
-                            },
-                        },
-                    },
-                },
-                followingArtist: {
-                    select: {
-                        id: true,
-                        artistName: true,
-                        avatar: true,
-                        monthlyListeners: true,
-                        genres: {
-                            select: {
-                                genre: {
-                                    select: {
-                                        id: true,
-                                        name: true,
-                                    },
-                                },
-                            },
-                        },
-                        user: {
-                            select: {
-                                id: true,
-                                name: true,
-                                avatar: true,
-                            },
-                        },
-                    },
-                },
-            },
-        });
-        const formattedResults = following.map((follow) => {
-            var _a;
-            if (follow.followingType === 'USER') {
-                return Object.assign({ type: 'USER' }, follow.followingUser);
-            }
-            return Object.assign(Object.assign({ type: 'ARTIST' }, follow.followingArtist), { user: (_a = follow.followingArtist) === null || _a === void 0 ? void 0 : _a.user });
-        });
-        if (process.env.USE_REDIS_CACHE === 'true') {
-            yield (0, cache_middleware_1.setCache)(cacheKey, formattedResults, 300);
-        }
-        res.json(formattedResults);
-    }
-    catch (error) {
-        console.error('Get following error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Get following');
     }
 });
 exports.getFollowing = getFollowing;
@@ -730,32 +283,15 @@ const editProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.editProfile = editProfile;
 const checkArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const user = req.user;
-        if (!user) {
+        if (!req.user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const artistProfile = yield db_1.default.artistProfile.findUnique({
-            where: { userId: user.id },
-            select: {
-                id: true,
-                isVerified: true,
-                verificationRequestedAt: true,
-            },
-        });
-        if (artistProfile) {
-            res.json({
-                hasPendingRequest: !!artistProfile.verificationRequestedAt,
-                isVerified: artistProfile.isVerified,
-            });
-        }
-        else {
-            res.json({ hasPendingRequest: false, isVerified: false });
-        }
+        const request = yield userService.getArtistRequest(req.user.id);
+        res.json(request);
     }
     catch (error) {
-        console.error('Check artist request error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Check artist request');
     }
 });
 exports.checkArtistRequest = checkArtistRequest;

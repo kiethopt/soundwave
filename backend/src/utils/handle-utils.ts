@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { client } from '../middleware/cache.middleware';
 
 // Xử lý phân trang
 export const paginate = async <T>(

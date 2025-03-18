@@ -9,6 +9,8 @@ import {
   userSelect,
 } from '../utils/prisma-selects';
 import pusher from '../config/pusher';
+import * as userService from '../services/user.service';
+import { handleError } from 'src/utils/handle-utils';
 
 const getMonthStartDate = (): Date => {
   const date = new Date();
@@ -59,106 +61,22 @@ export const requestToBecomeArtist = async (
   res: Response
 ): Promise<void> => {
   try {
-    const user = req.user;
-    const {
-      artistName,
-      bio,
-      socialMediaLinks: socialMediaLinksString,
-      genres: genresString,
-    } = req.body;
-    const avatarFile = req.file; // Lấy file từ request
-
-    // Chuyển đổi socialMediaLinks từ chuỗi JSON sang đối tượng JavaScript
-    let socialMediaLinks = {};
-    if (socialMediaLinksString) {
-      try {
-        socialMediaLinks = JSON.parse(socialMediaLinksString);
-      } catch (error) {
-        res
-          .status(400)
-          .json({ message: 'Invalid JSON format for socialMediaLinks' });
-        return;
-      }
-    }
-
-    // Chuyển đổi genres từ chuỗi sang mảng
-    let genres = [];
-    if (genresString) {
-      try {
-        genres = genresString.split(','); // Chuyển chuỗi thành mảng dựa trên dấu phẩy
-      } catch (error) {
-        res.status(400).json({ message: 'Invalid format for genres' });
-        return;
-      }
-    }
-
-    // Validate dữ liệu nghệ sĩ
-    const validationError = validateArtistData({
-      artistName,
-      bio,
-      socialMediaLinks,
-      genres,
-    });
-    if (validationError) {
-      res.status(400).json({ message: validationError });
-      return;
-    }
-
-    // Chỉ USER mới có thể yêu cầu trở thành ARTIST
-    if (
-      !user ||
-      user.role !== Role.USER ||
-      user.artistProfile?.role === Role.ARTIST
-    ) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
-    }
-
-    // Kiểm tra xem USER đã gửi yêu cầu trước đó chưa
-    const existingRequest = await prisma.artistProfile.findUnique({
-      where: { userId: user.id },
-      select: { verificationRequestedAt: true },
-    });
-
-    if (existingRequest?.verificationRequestedAt) {
-      res
-        .status(400)
-        .json({ message: 'You have already requested to become an artist' });
-      return;
-    }
-
-    // Upload avatar lên Cloudinary
-    let avatarUrl = null;
-    if (avatarFile) {
-      const uploadResult = await uploadFile(
-        avatarFile.buffer,
-        'artist-avatars'
-      );
-      avatarUrl = uploadResult.secure_url;
-    }
-
-    // Tạo ArtistProfile với thông tin cung cấp
-    await prisma.artistProfile.create({
-      data: {
-        artistName,
-        bio,
-        socialMediaLinks,
-        avatar: avatarUrl,
-        role: Role.ARTIST,
-        verificationRequestedAt: new Date(),
-        user: { connect: { id: user.id } },
-        genres: {
-          create: genres.map((genreId: string) => ({
-            genre: { connect: { id: genreId } },
-          })),
-        },
-      },
-    });
-
+    await userService.requestArtistRole(req.user, req.body, req.file);
     res.json({ message: 'Artist role request submitted successfully' });
   } catch (error) {
-    console.error('Request artist role error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    if (error instanceof Error) {
+      if (error.message === 'Forbidden') {
+        res.status(403).json({ message: 'Forbidden' });
+        return;
+      } else if (error.message.includes('already requested')) {
+        res.status(400).json({ message: error.message });
+        return;
+      } else if (error.message.includes('Invalid JSON format')) {
+        res.status(400).json({ message: error.message });
+        return;
+      }
+    }
+    handleError(res, error, 'Request artist role');
   }
 };
 
@@ -166,12 +84,6 @@ export const requestToBecomeArtist = async (
 export const searchAll = async (req: Request, res: Response): Promise<void> => {
   try {
     const { q } = req.query;
-    const user = req.user;
-
-    if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
 
     if (!q) {
       res.status(400).json({ message: 'Query is required' });
@@ -179,200 +91,15 @@ export const searchAll = async (req: Request, res: Response): Promise<void> => {
     }
 
     const searchQuery = String(q).trim();
-    const cacheKey = `/search-all?q=${searchQuery}`;
+    const results = await userService.search(req.user, searchQuery);
 
-    // Kiểm tra xem có sử dụng Redis cache không
-    const useRedisCache = process.env.USE_REDIS_CACHE === 'true';
-
-    if (useRedisCache) {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log('Serving from Redis cache:', cacheKey);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-    }
-
-    // Lưu lịch sử tìm kiếm
-    const existingHistory = await prisma.history.findFirst({
-      where: {
-        userId: user.id,
-        type: HistoryType.SEARCH,
-        query: {
-          equals: searchQuery,
-          mode: 'insensitive',
-        },
-      },
-    });
-
-    if (existingHistory) {
-      await prisma.history.update({
-        where: { id: existingHistory.id },
-        data: { updatedAt: new Date() },
-      });
-    } else {
-      await prisma.history.create({
-        data: {
-          type: HistoryType.SEARCH,
-          query: searchQuery,
-          userId: user.id,
-        },
-      });
-    }
-
-    // Thực hiện tìm kiếm album và track song song
-    const [artists, albums, tracks, users] = await Promise.all([
-      // Artist
-      prisma.user.findMany({
-        where: {
-          isActive: true,
-          artistProfile: {
-            isActive: true,
-            OR: [
-              {
-                artistName: { contains: searchQuery, mode: 'insensitive' },
-              },
-              {
-                genres: {
-                  some: {
-                    genre: {
-                      name: { contains: searchQuery, mode: 'insensitive' },
-                    },
-                  },
-                },
-              },
-            ],
-          },
-        },
-        select: {
-          id: true,
-          email: true,
-          username: true,
-          name: true,
-          avatar: true,
-          role: true,
-          isActive: true,
-          artistProfile: {
-            select: {
-              id: true,
-              artistName: true,
-              bio: true,
-              isVerified: true,
-              avatar: true,
-              socialMediaLinks: true,
-              monthlyListeners: true,
-              genres: {
-                select: {
-                  genre: {
-                    select: {
-                      id: true,
-                      name: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      }),
-
-      // Album
-      prisma.album.findMany({
-        where: {
-          isActive: true,
-          OR: [
-            { title: { contains: searchQuery, mode: 'insensitive' } },
-            {
-              artist: {
-                artistName: { contains: searchQuery, mode: 'insensitive' },
-              },
-            },
-            {
-              genres: {
-                some: {
-                  genre: {
-                    name: { contains: searchQuery, mode: 'insensitive' },
-                  },
-                },
-              },
-            },
-          ],
-        },
-        select: searchAlbumSelect,
-      }),
-
-      // Track
-      prisma.track.findMany({
-        where: {
-          isActive: true,
-          OR: [
-            { title: { contains: searchQuery, mode: 'insensitive' } },
-            {
-              artist: {
-                artistName: { contains: searchQuery, mode: 'insensitive' },
-              },
-            },
-            {
-              featuredArtists: {
-                some: {
-                  artistProfile: {
-                    artistName: { contains: searchQuery, mode: 'insensitive' },
-                  },
-                },
-              },
-            },
-            {
-              genres: {
-                some: {
-                  genre: {
-                    name: { contains: searchQuery, mode: 'insensitive' },
-                  },
-                },
-              },
-            },
-          ],
-        },
-        select: searchTrackSelect,
-        orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
-      }),
-
-      // User
-      prisma.user.findMany({
-        where: {
-          id: { not: user.id },
-          role: Role.USER,
-          isActive: true,
-          OR: [
-            { name: { contains: searchQuery, mode: 'insensitive' } },
-            { username: { contains: searchQuery, mode: 'insensitive' } },
-          ],
-        },
-        select: {
-          id: true,
-          email: true,
-          username: true,
-          name: true,
-          avatar: true,
-          isActive: true,
-        },
-      }),
-    ]);
-
-    const searchResult = {
-      artists,
-      albums,
-      tracks,
-      users,
-    };
-
-    if (useRedisCache) {
-      await setCache(cacheKey, searchResult, 600); // Cache trong 10 phút
-    }
-
-    res.json(searchResult);
+    res.json(results);
   } catch (error) {
-    console.error('Search all error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    handleError(res, error, 'Search');
   }
 };
 
@@ -382,17 +109,10 @@ export const getAllGenres = async (
   res: Response
 ): Promise<void> => {
   try {
-    const genres = await prisma.genre.findMany({
-      select: {
-        id: true,
-        name: true,
-      },
-    });
-
+    const genres = await userService.getAllGenres();
     res.json(genres);
   } catch (error) {
-    console.error('Get all genres error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get all genres');
   }
 };
 
@@ -402,165 +122,26 @@ export const followUser = async (
   res: Response
 ): Promise<void> => {
   try {
-    console.log('=== DEBUG: followUser => route called');
-    const user = req.user; // Người đang follow
     const { id: followingId } = req.params;
-
-    console.log('=== DEBUG: user =', user?.id);
-    console.log('=== DEBUG: followingId =', followingId);
-
-    if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    // Kiểm tra xem đang follow User hay Artist
-    const [userExists, artistExists] = await Promise.all([
-      prisma.user.findUnique({ where: { id: followingId } }),
-      prisma.artistProfile.findUnique({
-        where: { id: followingId },
-        select: { id: true },
-      }),
-    ]);
-
-    let followingType: FollowingType;
-    const followData: any = {
-      followerId: user.id,
-      followingType: 'USER' as FollowingType, // mặc định
-    };
-
-    if (userExists) {
-      // follow user
-      followingType = FollowingType.USER;
-      followData.followingUserId = followingId;
-    } else if (artistExists) {
-      // follow artist
-      followingType = FollowingType.ARTIST;
-      followData.followingArtistId = followingId;
-      followData.followingType = FollowingType.ARTIST;
-    } else {
-      res.status(404).json({ message: 'Target not found' });
-      return;
-    }
-
-    // Validate self-follow
-    if (
-      ((followingType === 'USER' || followingType === 'ARTIST') &&
-        followingId === user.id) ||
-      followingId === user.artistProfile?.id
-    ) {
-      res.status(400).json({ message: 'Cannot follow yourself' });
-      return;
-    }
-
-    // Check existing follow
-    const existingFollow = await prisma.userFollow.findFirst({
-      where: {
-        followerId: user.id,
-        OR: [
-          {
-            followingUserId: followingId,
-            followingType: FollowingType.USER,
-          },
-          {
-            followingArtistId: followingId,
-            followingType: FollowingType.ARTIST,
-          },
-        ],
-      },
-    });
-    if (existingFollow) {
-      res.status(400).json({ message: 'Already following' });
-      return;
-    }
-
-    // Transaction
-    await prisma.$transaction(async (tx) => {
-      // 1) Tạo record follow
-      await tx.userFollow.create({ data: followData });
-
-      // 2) Lấy info user (follower) để hiển thị
-      const currentUser = await tx.user.findUnique({
-        where: { id: user.id },
-        select: { username: true, email: true },
-      });
-      const followerName =
-        currentUser?.username || currentUser?.email || 'Unknown';
-
-      // 3) Tạo NOTIFICATION cho người được theo dõi
-      if (followingType === 'ARTIST') {
-        console.log(
-          '=== DEBUG: followUser => about to create notification for ARTIST'
-        );
-        const notification = await tx.notification.create({
-          data: {
-            type: 'NEW_FOLLOW',
-            message: `New follower: ${followerName}`,
-            recipientType: 'ARTIST',
-            artistId: followingId,
-            senderId: user.id,
-          },
-        });
-
-        // Update artist stats
-        await tx.artistProfile.update({
-          where: { id: followingId },
-          data: { monthlyListeners: { increment: 1 } },
-        });
-
-        // Phát sự kiện realtime qua Pusher cho artist
-        await pusher.trigger(`user-${followingId}`, 'notification', {
-          type: 'NEW_FOLLOW',
-          message: `New follower: ${followerName}`,
-          notificationId: notification.id, // Nếu cần gửi ID
-        });
-      } else {
-        // follow user => Tạo noti cho user bị follow
-        console.log(
-          '=== DEBUG: followUser => about to create notification for USER->USER follow'
-        );
-        const notification = await tx.notification.create({
-          data: {
-            type: 'NEW_FOLLOW',
-            message: `New follower: ${followerName}`,
-            recipientType: 'USER',
-            userId: followingId,
-            senderId: user.id,
-          },
-        });
-        console.log(
-          '=== DEBUG: followUser => notification for followed USER created!'
-        );
-
-        // Phát sự kiện realtime qua Pusher cho user được follow
-        await pusher.trigger(`user-${followingId}`, 'notification', {
-          type: 'NEW_FOLLOW',
-          message: `New follower: ${followerName}`,
-          notificationId: notification.id,
-        });
-      }
-    });
-
-    // 4) Tạo NOTIFICATION cho CHÍNH user (follower)
-    //    để user thấy mình vừa follow ai
-    // await tx.notification.create({
-    //   data: {
-    //     type: 'FOLLOW_CONFIRMATION',
-    //     message:
-    //       followingType === 'ARTIST'
-    //         ? `You are now following artist with id: ${followingId}`
-    //         : `You are now following user with id: ${followingId}`,
-    //     recipientType: 'USER',     // Vì follower luôn là 1 user
-    //     userId: user.id,           // Gửi cho chính user
-    //     senderId: user.id,
-    //   },
-    // });
-    // console.log('=== DEBUG: followUser => notification for the follower created!');
-
-    res.json({ message: 'Followed successfully' });
+    const result = await userService.followTarget(req.user, followingId);
+    res.json(result);
   } catch (error) {
-    console.error('Follow error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    if (error instanceof Error) {
+      if (error.message === 'Target not found') {
+        res.status(404).json({ message: 'Target not found' });
+        return;
+      } else if (error.message === 'Cannot follow yourself') {
+        res.status(400).json({ message: 'Cannot follow yourself' });
+        return;
+      } else if (error.message === 'Already following') {
+        res.status(400).json({ message: 'Already following' });
+        return;
+      } else if (error.message === 'Unauthorized') {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+      }
+    }
+    handleError(res, error, 'Follow user');
   }
 };
 
@@ -570,68 +151,23 @@ export const unfollowUser = async (
   res: Response
 ): Promise<void> => {
   try {
-    const user = req.user;
     const { id: followingId } = req.params;
-
-    if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    // Kiểm tra xem đang follow User hay Artist
-    const [userExists, artistExists] = await Promise.all([
-      prisma.user.findUnique({ where: { id: followingId } }),
-      prisma.artistProfile.findUnique({
-        where: { id: followingId },
-        select: { id: true },
-      }),
-    ]);
-
-    let followingType: FollowingType;
-    const whereConditions: any = {
-      followerId: user.id,
-      followingType: 'USER' as FollowingType, // mặc định
-    };
-
-    if (userExists) {
-      followingType = FollowingType.USER;
-      whereConditions.followingUserId = followingId;
-    } else if (artistExists) {
-      followingType = FollowingType.ARTIST;
-      whereConditions.followingArtistId = followingId;
-      whereConditions.followingType = FollowingType.ARTIST;
-    } else {
-      res.status(404).json({ message: 'Target not found' });
-      return;
-    }
-
-    // Tìm follow record cụ thể
-    const followRecord = await prisma.userFollow.findFirst({
-      where: whereConditions,
-    });
-
-    if (!followRecord) {
-      res.status(404).json({ message: 'Follow not found' });
-      return;
-    }
-
-    // delete thay vì deleteMany để trigger middleware
-    await prisma.userFollow.delete({
-      where: { id: followRecord.id },
-    });
-
-    // Cập nhật monthlyListeners nếu unfollow artist
-    if (followingType === FollowingType.ARTIST) {
-      await prisma.artistProfile.update({
-        where: { id: followingId },
-        data: { monthlyListeners: { decrement: 1 } },
-      });
-    }
-
-    res.json({ message: 'Unfollowed successfully' });
+    const result = await userService.unfollowTarget(req.user, followingId);
+    res.json(result);
   } catch (error) {
-    console.error('Unfollow error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    if (error instanceof Error) {
+      if (error.message === 'Target not found') {
+        res.status(404).json({ message: 'Target not found' });
+        return;
+      } else if (error.message === 'Not following this target') {
+        res.status(400).json({ message: 'Not following this target' });
+        return;
+      } else if (error.message === 'Unauthorized') {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+      }
+    }
+    handleError(res, error, 'Unfollow user');
   }
 };
 
@@ -641,84 +177,14 @@ export const getFollowers = async (
   res: Response
 ): Promise<void> => {
   try {
-    const user = req.user;
-    const { type } = req.query;
-
-    if (!user) {
+    const followers = await userService.getUserFollowers(req);
+    res.json(followers);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
-
-    const cacheKey = `/api/user/followers?userId=${user.id}${
-      type ? `&type=${type}` : ''
-    }`;
-
-    // Kiểm tra cache
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-    }
-
-    // Xây dựng điều kiện where
-    const whereConditions: any = {
-      OR: [
-        {
-          followingUserId: user.id,
-          followingType: FollowingType.USER,
-        },
-        {
-          followingArtistId: user?.artistProfile?.id,
-          followingType: FollowingType.ARTIST,
-        },
-      ],
-    };
-
-    // Lọc theo type nếu có
-    if (type) {
-      if (type === 'USER') {
-        whereConditions.OR = [
-          {
-            followingUserId: user.id,
-            followingType: FollowingType.USER,
-          },
-        ];
-      } else if (type === 'ARTIST') {
-        whereConditions.OR = [
-          {
-            followingArtistId: user.id,
-            followingType: FollowingType.ARTIST,
-          },
-        ];
-      }
-    }
-
-    const followers = await prisma.userFollow.findMany({
-      where: whereConditions,
-      select: {
-        follower: {
-          select: userSelect,
-        },
-        followingType: true,
-      },
-    });
-
-    const result = followers.map((f) => ({
-      ...f.follower,
-      followingType: f.followingType,
-    }));
-
-    // Cache kết quả
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await setCache(cacheKey, result, 300); // Cache trong 5 phút
-    }
-
-    res.json(result);
-  } catch (error) {
-    console.error('Get followers error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get followers');
   }
 };
 
@@ -728,97 +194,14 @@ export const getFollowing = async (
   res: Response
 ): Promise<void> => {
   try {
-    const user = req.user;
-
-    if (!user) {
+    const following = await userService.getUserFollowing(req);
+    res.json(following);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
-
-    const cacheKey = `/api/user/following?userId=${user.id}`;
-
-    // Kiểm tra cache
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-    }
-
-    const following = await prisma.userFollow.findMany({
-      where: {
-        followerId: user.id,
-      },
-      select: {
-        followingUserId: true,
-        followingArtistId: true,
-        followingType: true,
-        followingUser: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true,
-            role: true,
-            artistProfile: {
-              select: {
-                id: true,
-                artistName: true,
-              },
-            },
-          },
-        },
-        followingArtist: {
-          select: {
-            id: true,
-            artistName: true,
-            avatar: true,
-            monthlyListeners: true,
-            genres: {
-              select: {
-                genre: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
-            user: {
-              select: {
-                id: true,
-                name: true,
-                avatar: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    const formattedResults = following.map((follow) => {
-      if (follow.followingType === 'USER') {
-        return {
-          type: 'USER',
-          ...follow.followingUser,
-        };
-      }
-      return {
-        type: 'ARTIST',
-        ...follow.followingArtist,
-        user: follow.followingArtist?.user,
-      };
-    });
-
-    // Cache kết quả
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await setCache(cacheKey, formattedResults, 300); // Cache trong 5 phút
-    }
-
-    res.json(formattedResults);
-  } catch (error) {
-    console.error('Get following error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Get following');
   }
 };
 
@@ -902,34 +285,15 @@ export const checkArtistRequest = async (
   res: Response
 ): Promise<void> => {
   try {
-    const user = req.user;
-
-    if (!user) {
+    if (!req.user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    // Kiểm tra xem người dùng đã có yêu cầu trở thành Artist chưa
-    const artistProfile = await prisma.artistProfile.findUnique({
-      where: { userId: user.id },
-      select: {
-        id: true,
-        isVerified: true,
-        verificationRequestedAt: true,
-      },
-    });
-
-    if (artistProfile) {
-      res.json({
-        hasPendingRequest: !!artistProfile.verificationRequestedAt,
-        isVerified: artistProfile.isVerified,
-      });
-    } else {
-      res.json({ hasPendingRequest: false, isVerified: false });
-    }
+    const request = await userService.getArtistRequest(req.user.id);
+    res.json(request);
   } catch (error) {
-    console.error('Check artist request error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Check artist request');
   }
 };
 
