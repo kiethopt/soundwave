@@ -36,6 +36,7 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
     "@prisma/client": "^6.4.1",
     "@prisma/extension-accelerate": "^1.2.1",
     "@sendgrid/mail": "^8.1.4",

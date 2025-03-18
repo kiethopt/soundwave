@@ -1,26 +1,68 @@
-import { Request, Response, NextFunction } from "express";
-import { PrismaClient, Prisma, PlaylistPrivacy } from "@prisma/client";
-import { RequestHandler } from "express";
+import { Request, Response } from 'express';
+import { PrismaClient, Prisma } from '@prisma/client';
+import { RequestHandler } from 'express';
+import * as aiService from '../services/ai.service';
+import { handleError } from 'src/utils/handle-utils';
 
 const prisma = new PrismaClient();
 
+// Tạo playlist AI dựa trên các yếu tố được chọn
+export const createPersonalizedPlaylist = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+    const {
+      name,
+      description,
+      trackCount,
+      basedOnMood,
+      basedOnGenre,
+      basedOnArtist,
+      includeTopTracks,
+      includeNewReleases,
+    } = req.body;
+
+    const playlist = await aiService.generatePersonalizedPlaylist(userId, {
+      name,
+      description,
+      trackCount,
+      basedOnMood,
+      basedOnGenre,
+      basedOnArtist,
+      includeTopTracks,
+      includeNewReleases,
+    });
+
+    res.status(201).json({
+      message: 'AI Playlist created successfully',
+      playlist,
+    });
+  } catch (error) {
+    handleError(res, error, 'Create AI playlist');
+  }
+};
+
+// Tạo playlist FAVORITE (mặc định khi tạo tài khoản sẽ có 1 cái playlist này)
 export const createFavoritePlaylist = async (userId: string): Promise<void> => {
   try {
     await prisma.playlist.create({
       data: {
-        name: "Bài hát yêu thích",
-        description: "Danh sách những bài hát yêu thích của bạn",
-        privacy: "PRIVATE",
-        type: "FAVORITE",
+        name: 'Bài hát yêu thích',
+        description: 'Danh sách những bài hát yêu thích của bạn',
+        privacy: 'PRIVATE',
+        type: 'FAVORITE',
         userId,
       },
     });
   } catch (error) {
-    console.error("Error creating favorite playlist:", error);
+    console.error('Error creating favorite playlist:', error);
     throw error;
   }
 };
 
+// Tạo playlist mới
 export const createPlaylist: RequestHandler = async (
   req,
   res,
@@ -31,31 +73,31 @@ export const createPlaylist: RequestHandler = async (
     const {
       name,
       description,
-      privacy = "PRIVATE",
-      type = "NORMAL",
+      privacy = 'PRIVATE',
+      type = 'NORMAL',
     } = req.body;
 
     if (!userId) {
       res.status(401).json({
         success: false,
-        message: "Unauthorized",
+        message: 'Unauthorized',
       });
       return;
     }
 
     // Nếu đang cố tạo playlist FAVORITE, kiểm tra xem đã có chưa
-    if (type === "FAVORITE") {
+    if (type === 'FAVORITE') {
       const existingFavorite = await prisma.playlist.findFirst({
         where: {
           userId,
-          type: "FAVORITE",
+          type: 'FAVORITE',
         },
       });
 
       if (existingFavorite) {
         res.status(400).json({
           success: false,
-          message: "Bạn đã có playlist Yêu thích",
+          message: 'Bạn đã có playlist Yêu thích',
         });
         return;
       }
@@ -74,7 +116,7 @@ export const createPlaylist: RequestHandler = async (
 
     res.status(201).json({
       success: true,
-      message: "Đã tạo playlist thành công",
+      message: 'Đã tạo playlist thành công',
       data: playlist,
     });
   } catch (error) {
@@ -82,6 +124,7 @@ export const createPlaylist: RequestHandler = async (
   }
 };
 
+// Lấy danh sách playlist của user
 export const getPlaylists: RequestHandler = async (
   req,
   res,
@@ -93,7 +136,7 @@ export const getPlaylists: RequestHandler = async (
     if (!userId) {
       res.status(401).json({
         success: false,
-        message: "Unauthorized",
+        message: 'Unauthorized',
       });
       return;
     }
@@ -102,7 +145,7 @@ export const getPlaylists: RequestHandler = async (
     let favoritePlaylist = await prisma.playlist.findFirst({
       where: {
         userId,
-        type: "FAVORITE",
+        type: 'FAVORITE',
       },
     });
 
@@ -110,10 +153,10 @@ export const getPlaylists: RequestHandler = async (
     if (!favoritePlaylist) {
       favoritePlaylist = await prisma.playlist.create({
         data: {
-          name: "Bài hát yêu thích",
-          description: "Danh sách những bài hát yêu thích của bạn",
-          privacy: "PRIVATE",
-          type: "FAVORITE",
+          name: 'Bài hát yêu thích',
+          description: 'Danh sách những bài hát yêu thích của bạn',
+          privacy: 'PRIVATE',
+          type: 'FAVORITE',
           userId,
         },
       });
@@ -132,7 +175,7 @@ export const getPlaylists: RequestHandler = async (
         },
       },
       orderBy: {
-        createdAt: "desc",
+        createdAt: 'desc',
       },
     });
 
@@ -152,12 +195,13 @@ export const getPlaylists: RequestHandler = async (
   }
 };
 
+// Lấy playlist theo id
 export const getPlaylistById: RequestHandler = async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
 
-    console.log("Getting playlist with params:", {
+    console.log('Getting playlist with params:', {
       playlistId: id,
       userId,
       userFromReq: req.user, // Log toàn bộ user object
@@ -168,12 +212,12 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       where: { id },
     });
 
-    console.log("Playlist exists check:", playlistExists);
+    console.log('Playlist exists check:', playlistExists);
 
     if (!playlistExists) {
       res.status(404).json({
         success: false,
-        message: "Playlist not found",
+        message: 'Playlist not found',
       });
       return;
     }
@@ -198,7 +242,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       },
     });
 
-    console.log("Full playlist data:", {
+    console.log('Full playlist data:', {
       found: !!playlist,
       trackCount: playlist?.tracks?.length,
       playlistData: playlist,
@@ -231,14 +275,15 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       },
     });
   } catch (error) {
-    console.error("Error in getPlaylistById:", error);
+    console.error('Error in getPlaylistById:', error);
     next(error);
   }
 };
 
+// Thêm bài hát vào playlist
 export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
   try {
-    console.log("AddToPlaylist request:", {
+    console.log('AddToPlaylist request:', {
       params: req.params,
       body: req.body,
       user: req.user,
@@ -251,7 +296,7 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
     if (!trackId) {
       res.status(400).json({
         success: false,
-        message: "Track ID is required",
+        message: 'Track ID is required',
       });
       return;
     }
@@ -270,7 +315,7 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
     if (!playlist) {
       res.status(404).json({
         success: false,
-        message: "Playlist not found",
+        message: 'Playlist not found',
       });
       return;
     }
@@ -285,7 +330,7 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
     if (!track) {
       res.status(404).json({
         success: false,
-        message: "Track not found",
+        message: 'Track not found',
       });
       return;
     }
@@ -301,7 +346,7 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
     if (existingTrack) {
       res.status(400).json({
         success: false,
-        message: "Track already exists in playlist",
+        message: 'Track already exists in playlist',
       });
       return;
     }
@@ -334,16 +379,17 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: "Track added to playlist successfully",
+      message: 'Track added to playlist successfully',
     });
     return;
   } catch (error) {
-    console.error("Error in addTrackToPlaylist:", error);
+    console.error('Error in addTrackToPlaylist:', error);
     next(error);
     return;
   }
 };
 
+// Xóa bài hát khỏi playlist
 export const removeTrackFromPlaylist: RequestHandler = async (
   req,
   res,
@@ -353,7 +399,7 @@ export const removeTrackFromPlaylist: RequestHandler = async (
     const { playlistId, trackId } = req.params;
     const userId = req.user?.id;
 
-    console.log("Removing track from playlist:", {
+    console.log('Removing track from playlist:', {
       playlistId,
       trackId,
       userId,
@@ -370,7 +416,7 @@ export const removeTrackFromPlaylist: RequestHandler = async (
     if (!playlist) {
       res.status(404).json({
         success: false,
-        message: "Playlist không tồn tại hoặc bạn không có quyền truy cập",
+        message: 'Playlist không tồn tại hoặc bạn không có quyền truy cập',
       });
       return;
     }
@@ -397,16 +443,17 @@ export const removeTrackFromPlaylist: RequestHandler = async (
 
     res.json({
       success: true,
-      message: "Đã xóa bài hát khỏi playlist",
+      message: 'Đã xóa bài hát khỏi playlist',
     });
     return;
   } catch (error) {
-    console.error("Error removing track:", error);
+    console.error('Error removing track:', error);
     next(error);
     return;
   }
 };
 
+// Cập nhật playlist
 export const updatePlaylist: RequestHandler = async (
   req,
   res,
@@ -420,7 +467,7 @@ export const updatePlaylist: RequestHandler = async (
     if (!userId) {
       res.status(401).json({
         success: false,
-        message: "Unauthorized",
+        message: 'Unauthorized',
       });
       return;
     }
@@ -435,7 +482,7 @@ export const updatePlaylist: RequestHandler = async (
     if (!playlist) {
       res.status(404).json({
         success: false,
-        message: "Không tìm thấy playlist",
+        message: 'Không tìm thấy playlist',
       });
       return;
     }
@@ -457,7 +504,7 @@ export const updatePlaylist: RequestHandler = async (
             },
           },
           orderBy: {
-            trackOrder: "asc",
+            trackOrder: 'asc',
           },
         },
       },
@@ -469,20 +516,21 @@ export const updatePlaylist: RequestHandler = async (
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === "P2002") {
+      if (error.code === 'P2002') {
         res.status(400).json({
           success: false,
-          message: "Bạn đã có playlist với tên này",
+          message: 'Bạn đã có playlist với tên này',
         });
       }
     }
     res.status(500).json({
       success: false,
-      message: "Đã có lỗi xảy ra",
+      message: 'Đã có lỗi xảy ra',
     });
   }
 };
 
+// Xóa playlist
 export const deletePlaylist: RequestHandler = async (
   req,
   res,
@@ -495,7 +543,7 @@ export const deletePlaylist: RequestHandler = async (
     if (!userId) {
       res.status(401).json({
         success: false,
-        message: "Unauthorized",
+        message: 'Unauthorized',
       });
       return;
     }
@@ -510,7 +558,7 @@ export const deletePlaylist: RequestHandler = async (
     if (!playlist) {
       res.status(404).json({
         success: false,
-        message: "Không tìm thấy playlist",
+        message: 'Không tìm thấy playlist',
       });
       return;
     }
@@ -521,7 +569,7 @@ export const deletePlaylist: RequestHandler = async (
 
     res.json({
       success: true,
-      message: "Đã xóa playlist thành công",
+      message: 'Đã xóa playlist thành công',
     });
   } catch (error) {
     next(error);

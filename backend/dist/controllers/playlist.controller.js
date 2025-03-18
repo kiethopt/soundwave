@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -9,23 +42,49 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = void 0;
+exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = exports.createPersonalizedPlaylist = void 0;
 const client_1 = require("@prisma/client");
+const aiService = __importStar(require("../services/ai.service"));
+const handle_utils_1 = require("src/utils/handle-utils");
 const prisma = new client_1.PrismaClient();
+const createPersonalizedPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const userId = req.user.id;
+        const { name, description, trackCount, basedOnMood, basedOnGenre, basedOnArtist, includeTopTracks, includeNewReleases, } = req.body;
+        const playlist = yield aiService.generatePersonalizedPlaylist(userId, {
+            name,
+            description,
+            trackCount,
+            basedOnMood,
+            basedOnGenre,
+            basedOnArtist,
+            includeTopTracks,
+            includeNewReleases,
+        });
+        res.status(201).json({
+            message: 'AI Playlist created successfully',
+            playlist,
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Create AI playlist');
+    }
+});
+exports.createPersonalizedPlaylist = createPersonalizedPlaylist;
 const createFavoritePlaylist = (userId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield prisma.playlist.create({
             data: {
-                name: "Bài hát yêu thích",
-                description: "Danh sách những bài hát yêu thích của bạn",
-                privacy: "PRIVATE",
-                type: "FAVORITE",
+                name: 'Bài hát yêu thích',
+                description: 'Danh sách những bài hát yêu thích của bạn',
+                privacy: 'PRIVATE',
+                type: 'FAVORITE',
                 userId,
             },
         });
     }
     catch (error) {
-        console.error("Error creating favorite playlist:", error);
+        console.error('Error creating favorite playlist:', error);
         throw error;
     }
 });
@@ -34,25 +93,25 @@ const createPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
     var _a;
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-        const { name, description, privacy = "PRIVATE", type = "NORMAL", } = req.body;
+        const { name, description, privacy = 'PRIVATE', type = 'NORMAL', } = req.body;
         if (!userId) {
             res.status(401).json({
                 success: false,
-                message: "Unauthorized",
+                message: 'Unauthorized',
             });
             return;
         }
-        if (type === "FAVORITE") {
+        if (type === 'FAVORITE') {
             const existingFavorite = yield prisma.playlist.findFirst({
                 where: {
                     userId,
-                    type: "FAVORITE",
+                    type: 'FAVORITE',
                 },
             });
             if (existingFavorite) {
                 res.status(400).json({
                     success: false,
-                    message: "Bạn đã có playlist Yêu thích",
+                    message: 'Bạn đã có playlist Yêu thích',
                 });
                 return;
             }
@@ -68,7 +127,7 @@ const createPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         });
         res.status(201).json({
             success: true,
-            message: "Đã tạo playlist thành công",
+            message: 'Đã tạo playlist thành công',
             data: playlist,
         });
     }
@@ -84,23 +143,23 @@ const getPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
         if (!userId) {
             res.status(401).json({
                 success: false,
-                message: "Unauthorized",
+                message: 'Unauthorized',
             });
             return;
         }
         let favoritePlaylist = yield prisma.playlist.findFirst({
             where: {
                 userId,
-                type: "FAVORITE",
+                type: 'FAVORITE',
             },
         });
         if (!favoritePlaylist) {
             favoritePlaylist = yield prisma.playlist.create({
                 data: {
-                    name: "Bài hát yêu thích",
-                    description: "Danh sách những bài hát yêu thích của bạn",
-                    privacy: "PRIVATE",
-                    type: "FAVORITE",
+                    name: 'Bài hát yêu thích',
+                    description: 'Danh sách những bài hát yêu thích của bạn',
+                    privacy: 'PRIVATE',
+                    type: 'FAVORITE',
                     userId,
                 },
             });
@@ -117,7 +176,7 @@ const getPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
                 },
             },
             orderBy: {
-                createdAt: "desc",
+                createdAt: 'desc',
             },
         });
         const playlistsWithCount = playlists.map((playlist) => (Object.assign(Object.assign({}, playlist), { totalTracks: playlist._count.tracks, _count: undefined })));
@@ -136,7 +195,7 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
     try {
         const { id } = req.params;
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-        console.log("Getting playlist with params:", {
+        console.log('Getting playlist with params:', {
             playlistId: id,
             userId,
             userFromReq: req.user,
@@ -144,11 +203,11 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
         const playlistExists = yield prisma.playlist.findUnique({
             where: { id },
         });
-        console.log("Playlist exists check:", playlistExists);
+        console.log('Playlist exists check:', playlistExists);
         if (!playlistExists) {
             res.status(404).json({
                 success: false,
-                message: "Playlist not found",
+                message: 'Playlist not found',
             });
             return;
         }
@@ -170,7 +229,7 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
                 },
             },
         });
-        console.log("Full playlist data:", {
+        console.log('Full playlist data:', {
             found: !!playlist,
             trackCount: (_b = playlist === null || playlist === void 0 ? void 0 : playlist.tracks) === null || _b === void 0 ? void 0 : _b.length,
             playlistData: playlist,
@@ -197,7 +256,7 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
         });
     }
     catch (error) {
-        console.error("Error in getPlaylistById:", error);
+        console.error('Error in getPlaylistById:', error);
         next(error);
     }
 });
@@ -205,7 +264,7 @@ exports.getPlaylistById = getPlaylistById;
 const addTrackToPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        console.log("AddToPlaylist request:", {
+        console.log('AddToPlaylist request:', {
             params: req.params,
             body: req.body,
             user: req.user,
@@ -216,7 +275,7 @@ const addTrackToPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0,
         if (!trackId) {
             res.status(400).json({
                 success: false,
-                message: "Track ID is required",
+                message: 'Track ID is required',
             });
             return;
         }
@@ -232,7 +291,7 @@ const addTrackToPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0,
         if (!playlist) {
             res.status(404).json({
                 success: false,
-                message: "Playlist not found",
+                message: 'Playlist not found',
             });
             return;
         }
@@ -244,7 +303,7 @@ const addTrackToPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0,
         if (!track) {
             res.status(404).json({
                 success: false,
-                message: "Track not found",
+                message: 'Track not found',
             });
             return;
         }
@@ -257,7 +316,7 @@ const addTrackToPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0,
         if (existingTrack) {
             res.status(400).json({
                 success: false,
-                message: "Track already exists in playlist",
+                message: 'Track already exists in playlist',
             });
             return;
         }
@@ -284,12 +343,12 @@ const addTrackToPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0,
         });
         res.status(200).json({
             success: true,
-            message: "Track added to playlist successfully",
+            message: 'Track added to playlist successfully',
         });
         return;
     }
     catch (error) {
-        console.error("Error in addTrackToPlaylist:", error);
+        console.error('Error in addTrackToPlaylist:', error);
         next(error);
         return;
     }
@@ -300,7 +359,7 @@ const removeTrackFromPlaylist = (req, res, next) => __awaiter(void 0, void 0, vo
     try {
         const { playlistId, trackId } = req.params;
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-        console.log("Removing track from playlist:", {
+        console.log('Removing track from playlist:', {
             playlistId,
             trackId,
             userId,
@@ -314,7 +373,7 @@ const removeTrackFromPlaylist = (req, res, next) => __awaiter(void 0, void 0, vo
         if (!playlist) {
             res.status(404).json({
                 success: false,
-                message: "Playlist không tồn tại hoặc bạn không có quyền truy cập",
+                message: 'Playlist không tồn tại hoặc bạn không có quyền truy cập',
             });
             return;
         }
@@ -336,12 +395,12 @@ const removeTrackFromPlaylist = (req, res, next) => __awaiter(void 0, void 0, vo
         });
         res.json({
             success: true,
-            message: "Đã xóa bài hát khỏi playlist",
+            message: 'Đã xóa bài hát khỏi playlist',
         });
         return;
     }
     catch (error) {
-        console.error("Error removing track:", error);
+        console.error('Error removing track:', error);
         next(error);
         return;
     }
@@ -356,7 +415,7 @@ const updatePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!userId) {
             res.status(401).json({
                 success: false,
-                message: "Unauthorized",
+                message: 'Unauthorized',
             });
             return;
         }
@@ -369,7 +428,7 @@ const updatePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!playlist) {
             res.status(404).json({
                 success: false,
-                message: "Không tìm thấy playlist",
+                message: 'Không tìm thấy playlist',
             });
             return;
         }
@@ -390,7 +449,7 @@ const updatePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                         },
                     },
                     orderBy: {
-                        trackOrder: "asc",
+                        trackOrder: 'asc',
                     },
                 },
             },
@@ -402,16 +461,16 @@ const updatePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
     }
     catch (error) {
         if (error instanceof client_1.Prisma.PrismaClientKnownRequestError) {
-            if (error.code === "P2002") {
+            if (error.code === 'P2002') {
                 res.status(400).json({
                     success: false,
-                    message: "Bạn đã có playlist với tên này",
+                    message: 'Bạn đã có playlist với tên này',
                 });
             }
         }
         res.status(500).json({
             success: false,
-            message: "Đã có lỗi xảy ra",
+            message: 'Đã có lỗi xảy ra',
         });
     }
 });
@@ -424,7 +483,7 @@ const deletePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!userId) {
             res.status(401).json({
                 success: false,
-                message: "Unauthorized",
+                message: 'Unauthorized',
             });
             return;
         }
@@ -437,7 +496,7 @@ const deletePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         if (!playlist) {
             res.status(404).json({
                 success: false,
-                message: "Không tìm thấy playlist",
+                message: 'Không tìm thấy playlist',
             });
             return;
         }
@@ -446,7 +505,7 @@ const deletePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
         });
         res.json({
             success: true,
-            message: "Đã xóa playlist thành công",
+            message: 'Đã xóa playlist thành công',
         });
     }
     catch (error) {
