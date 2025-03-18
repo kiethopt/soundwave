@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { withAccelerate } from '@prisma/extension-accelerate';
+// import { withAccelerate } from '@prisma/extension-accelerate';
 import { authExtension } from '../prisma/extensions/auth.extension';
 import { adminExtension } from '../prisma/extensions/admin.extension';
 import { artistExtension } from '../prisma/extensions/artist.extension';
@@ -19,7 +19,7 @@ const extendedPrisma = prisma
   .$extends(artistExtension)
   .$extends(userExtension)
   .$extends(trackExtension)
-  .$extends(albumExtension)
-  .$extends(withAccelerate());
+  .$extends(albumExtension);
+// .$extends(withAccelerate());
 
 export default extendedPrisma;

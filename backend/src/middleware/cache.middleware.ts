@@ -1,19 +1,63 @@
 import { Request, Response, NextFunction } from 'express';
-import { createClient } from 'redis';
+import { createClient, RedisClientType } from 'redis';
 
-export const client = createClient({
-  username: 'default',
-  password: 'BAjFVLaluLLeQzEwR7IoOuKWUHSyJtas',
-  socket: {
-    host: 'redis-12768.c1.ap-southeast-1-1.ec2.redns.redis-cloud.com',
-    port: 12768,
-  },
-});
+class MockRedisClient {
+  isOpen = false;
 
-client.on('error', (err) => console.error('Redis error:', err));
+  // Thêm phương thức on để giải quyết lỗi 1
+  on(event: string, listener: (err: Error) => void): this {
+    // Không làm gì cả - chỉ là mock
+    return this;
+  }
 
-// Kết nối Redis nếu cache được bật
+  async connect() {
+    console.log('[Redis] Mock client connected');
+    this.isOpen = true;
+    return this;
+  }
+
+  async disconnect() {
+    console.log('[Redis] Mock client disconnected');
+    this.isOpen = false;
+    return this;
+  }
+
+  async get() {
+    return null;
+  }
+
+  // Sửa cách khai báo set để phù hợp với cách gọi ở hàm setCache
+  async set(key: string, value: string, options?: any) {
+    return 'OK';
+  }
+
+  async del() {
+    return 1;
+  }
+
+  async keys() {
+    return [];
+  }
+}
+
+// Type assertion để TypeScript không phàn nàn
+export const client =
+  process.env.USE_REDIS_CACHE === 'true'
+    ? createClient({
+        username: 'default',
+        password: 'BAjFVLaluLLeQzEwR7IoOuKWUHSyJtas',
+        socket: {
+          host: 'redis-12768.c1.ap-southeast-1-1.ec2.redns.redis-cloud.com',
+          port: 12768,
+        },
+      })
+    : (new MockRedisClient() as unknown as RedisClientType);
+
 if (process.env.USE_REDIS_CACHE === 'true') {
+  // Đã được định danh kiểu rõ ràng tham số err
+  client.on('error', (err: Error) => console.error('Redis error:', err));
+
+  // Kết nối Redis nếu cache được bật
   (async () => {
     try {
       if (!client.isOpen) {
@@ -23,6 +67,8 @@ if (process.env.USE_REDIS_CACHE === 'true') {
       console.error('Redis connection failed:', error);
     }
   })();
+} else {
+  console.log('[Redis] Using mock Redis client - cache disabled');
 }
 
 export const cacheMiddleware = (
