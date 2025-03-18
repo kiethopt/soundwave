@@ -139,9 +139,8 @@ export const createAlbum = async (
 
     const notificationsData = followers.map((follower) => ({
       type: NotificationType.NEW_ALBUM,
-      message: `${
-        artistProfile?.artistName || 'Unknown'
-      } vừa ra album mới: ${title}`,
+      message: `${artistProfile?.artistName || 'Unknown'
+        } vừa ra album mới: ${title}`,
       recipientType: RecipientType.USER,
       userId: follower.followerId,
       artistId: targetArtistProfileId,
@@ -248,8 +247,8 @@ export const addTracksToAlbum = async (
     const featuredArtists = Array.isArray(req.body.featuredArtists)
       ? req.body.featuredArtists.map((artists: string) => artists.split(','))
       : req.body.featuredArtists
-      ? [req.body.featuredArtists.split(',')]
-      : [];
+        ? [req.body.featuredArtists.split(',')]
+        : [];
 
     const mm = await import('music-metadata');
 
@@ -404,8 +403,8 @@ export const updateAlbum = async (
       const genresArray = !genres
         ? []
         : Array.isArray(genres)
-        ? genres
-        : [genres];
+          ? genres
+          : [genres];
 
       if (genresArray.length > 0) {
         updateData.genres = {
@@ -510,9 +509,8 @@ export const toggleAlbumVisibility = async (
     });
 
     res.json({
-      message: `Album ${
-        updatedAlbum.isActive ? 'activated' : 'hidden'
-      } successfully`,
+      message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'
+        } successfully`,
       album: updatedAlbum,
     });
   } catch (error) {

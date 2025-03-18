@@ -27,9 +27,8 @@ const TrackUploadForm = ({
     <form onSubmit={onSubmit} className="space-y-6">
       <div>
         <label
-          className={`block text-sm font-medium mb-2 ${
-            theme === 'light' ? 'text-gray-700' : 'text-white/60'
-          }`}
+          className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
+            }`}
         >
           Select Track Files
         </label>
@@ -44,11 +43,10 @@ const TrackUploadForm = ({
               file:rounded-full file:border-0
               file:text-sm file:font-semibold
               disabled:opacity-50 disabled:cursor-not-allowed
-              ${
-                theme === 'light'
-                  ? 'text-gray-600 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200'
-                  : 'text-white/60 file:bg-white/10 file:text-white hover:file:bg-white/20'
-              }`}
+              ${theme === 'light'
+              ? 'text-gray-600 file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200'
+              : 'text-white/60 file:bg-white/10 file:text-white hover:file:bg-white/20'
+            }`}
         />
       </div>
 
@@ -57,16 +55,14 @@ const TrackUploadForm = ({
           {newTracks.map((file, index) => (
             <div
               key={file.name}
-              className={`p-4 rounded-lg space-y-4 ${
-                theme === 'light'
-                  ? 'bg-gray-50 border border-gray-200'
-                  : 'bg-white/5'
-              }`}
+              className={`p-4 rounded-lg space-y-4 ${theme === 'light'
+                ? 'bg-gray-50 border border-gray-200'
+                : 'bg-white/5'
+                }`}
             >
               <div
-                className={`text-sm font-medium mb-2 ${
-                  theme === 'light' ? 'text-gray-900' : 'text-white/80'
-                }`}
+                className={`text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white/80'
+                  }`}
               >
                 File: {file.name}
               </div>
@@ -74,9 +70,8 @@ const TrackUploadForm = ({
                 {/* Title input */}
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-2 ${
-                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                    }`}
+                    className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                      }`}
                   >
                     Title
                   </label>
@@ -87,11 +82,10 @@ const TrackUploadForm = ({
                       onTrackDetailChange(file.name, 'title', e.target.value)
                     }
                     required
-                    className={`rounded-md px-3 py-2 w-full ${
-                      theme === 'light'
-                        ? 'bg-white border border-gray-300 text-gray-900 focus:ring-blue-500/20'
-                        : 'bg-white/5 text-white'
-                    }`}
+                    className={`rounded-md px-3 py-2 w-full ${theme === 'light'
+                      ? 'bg-white border border-gray-300 text-gray-900 focus:ring-blue-500/20'
+                      : 'bg-white/5 text-white'
+                      }`}
                     placeholder="Enter track title"
                   />
                 </div>
@@ -99,9 +93,8 @@ const TrackUploadForm = ({
                 {/* Track Number input (readonly) */}
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-2 ${
-                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                    }`}
+                    className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                      }`}
                   >
                     Track Number
                   </label>
@@ -109,49 +102,46 @@ const TrackUploadForm = ({
                     type="number"
                     value={existingTrackCount + index + 1}
                     readOnly
-                    className={`rounded-md px-3 py-2 w-full cursor-not-allowed ${
-                      theme === 'light'
-                        ? 'bg-gray-100 text-gray-500 border border-gray-300'
-                        : 'bg-white/5 text-white'
-                    }`}
+                    className={`rounded-md px-3 py-2 w-full cursor-not-allowed ${theme === 'light'
+                      ? 'bg-gray-100 text-gray-500 border border-gray-300'
+                      : 'bg-white/5 text-white'
+                      }`}
                   />
                 </div>
               </div>
 
-              {/* Release Date input */}
+              {/* Release Date display (readonly) with VN format */}
               <div>
                 <label
-                  className={`block text-sm font-medium mb-2 ${
-                    theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                  }`}
+                  className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
                 >
                   Release Date
                 </label>
                 <input
-                  type="date"
-                  value={trackDetails[file.name]?.releaseDate || ''}
-                  onChange={(e) =>
-                    onTrackDetailChange(
-                      file.name,
-                      'releaseDate',
-                      e.target.value
-                    )
+                  type="text"
+                  value={
+                    album?.releaseDate
+                      ? new Date(album.releaseDate).toLocaleDateString('vi-VN', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      })
+                      : 'N/A'
                   }
-                  required
-                  className={`rounded-md px-3 py-2 w-full ${
-                    theme === 'light'
-                      ? 'bg-white border border-gray-300 text-gray-900 focus:ring-blue-500/20'
-                      : 'bg-white/5 text-white'
-                  }`}
+                  className={`rounded-md px-3 py-2 w-full bg-gray-100/50 cursor-not-allowed ${theme === 'light'
+                    ? 'border border-gray-300 text-gray-700'
+                    : 'border-white/10 text-white/60 bg-white/5'
+                    }`}
+                  disabled
                 />
               </div>
 
               {/* Featured Artists select */}
               <div>
                 <label
-                  className={`block text-sm font-medium mb-2 ${
-                    theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                  }`}
+                  className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
                 >
                   Featured Artists
                 </label>
@@ -174,11 +164,10 @@ const TrackUploadForm = ({
         type="submit"
         disabled={isUploading || newTracks.length === 0}
         className={`w-full py-2 px-4 rounded-full font-medium transition-colors
-            ${
-              theme === 'light'
-                ? 'bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-300'
-                : 'bg-white text-black hover:bg-white/90 disabled:opacity-50'
-            } disabled:cursor-not-allowed`}
+            ${theme === 'light'
+            ? 'bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-300'
+            : 'bg-white text-black hover:bg-white/90 disabled:opacity-50'
+          } disabled:cursor-not-allowed`}
       >
         {isUploading ? 'Uploading...' : 'Upload Tracks'}
       </button>

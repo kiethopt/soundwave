@@ -15,7 +15,7 @@ export interface TrackUploadFormProps {
       artist: string;
       featuredArtists: string[];
       trackNumber: number;
-      releaseDate: string;
+      releaseDate?: string;
     };
   };
   isUploading: boolean;
