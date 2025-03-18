@@ -534,7 +534,7 @@ export default function ArtistProfilePage({
               <div className="flex items-center gap-4">
                 <h2 className="text-2xl font-bold">About</h2>
               </div>
-              <p className="text-white/60 mt-2 dark:text-black/60">
+              <p className="text-dark/60 mt-2 dark:text-white/60">
                 {artist.bio || 'No biography available'}
               </p>
             </div>
@@ -576,7 +576,7 @@ export default function ArtistProfilePage({
                       </button>
                     </div>
                     <h3
-                      className={`font-medium truncate dark:text-black/60 ${
+                      className={`font-medium truncate text-black/60 dark:text-white ${
                         currentTrack &&
                         album.tracks.some(
                           (track) =>
@@ -589,7 +589,7 @@ export default function ArtistProfilePage({
                     >
                       {album.title}
                     </h3>
-                    <p className="text-white/60 text-sm truncate dark:text-black/60">
+                    <p className="text-white/60 text-sm truncate">
                       {typeof album.artist === 'string'
                         ? album.artist
                         : album.artist?.artistName || 'Unknown Artist'}

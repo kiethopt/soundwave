@@ -692,3 +692,404 @@ export const getAllGenres = async () => {
 
   return genres;
 };
+
+export const editProfile = async (user: any, profileData: any, avatarFile: Express.Multer.File | undefined) => {
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
+
+  const { email, username, name, avatar } = profileData;
+
+  // Kiểm tra email đã tồn tại chưa
+  if (email) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser && existingUser.id !== user.id) {
+      throw new Error('Email already in use');
+    }
+  }
+
+  // Kiểm tra username đã tồn tại chưa
+  if (username) {
+    const existingUsername = await prisma.user.findUnique({
+      where: { username },
+    });
+
+    if (existingUsername && existingUsername.id !== user.id) {
+      throw new Error('Username already in use');
+    }
+  }
+
+  // Upload avatar lên Cloudinary nếu có file
+  let avatarUrl = null;
+  if (avatarFile) {
+    const uploadResult = await uploadFile(avatarFile.buffer, 'user-avatars');
+    avatarUrl = uploadResult.secure_url;
+  }
+
+  // Xây dựng dữ liệu cập nhật chỉ với các trường hợp lệ
+  const updateData: Record<string, any> = {};
+  if (email) updateData.email = email;
+  if (username) updateData.username = username;
+  if (name) updateData.name = name;
+  if (avatarFile) updateData.avatar = avatarUrl;
+  else if (avatar) updateData.avatar = avatar;
+
+  // Nếu không có gì để cập nhật
+  if (Object.keys(updateData).length === 0) {
+    throw new Error('No data provided for update');
+  }
+
+  // Cập nhật thông tin người dùng
+  return prisma.user.update({
+    where: { id: user.id },
+    data: updateData,
+    select: userSelect,
+  });
+};
+
+export const getUserProfile = async (id: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      username: true,
+      avatar: true,
+      role: true,
+      isActive: true,
+    },
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  return user;
+};
+
+export const getRecommendedArtists = async (user: any) => {
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
+
+  const cacheKey = `/api/user/${user.id}/recommended-artists`;
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    const cachedData = await client.get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+  }
+
+  const history = await prisma.history.findMany({
+    where: {
+      userId: user.id,
+      type: HistoryType.PLAY,
+      playCount: { gt: 0 },
+    },
+    select: {
+      track: {
+        select: {
+          artist: {
+            select: {
+              id: true,
+              artistName: true,
+              avatar: true,
+              genres: {
+                select: {
+                  genre: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    take: 3,
+  });
+
+  const genreIds = history
+    .flatMap((h) => h.track?.artist.genres.map((g) => g.genre.id) || [])
+    .filter((id) => id !== null);
+
+  const recommendedArtists = await prisma.artistProfile.findMany({
+    where: {
+      isVerified: true,
+      genres: {
+        some: {
+          genreId: {
+            in: genreIds,
+          },
+        },
+      },
+    },
+    select: {
+      id: true,
+      artistName: true,
+      bio: true,
+      avatar: true,
+      role: true,
+      socialMediaLinks: true,
+      monthlyListeners: true,
+      isVerified: true,
+      isActive: true,
+      verificationRequestedAt: true,
+      verifiedAt: true,
+      genres: {
+        select: {
+          genre: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    await setCache(cacheKey, recommendedArtists, 1800); // Cache for 30 mins
+  }
+
+  return recommendedArtists;
+};
+
+export const getTopAlbums = async () => {
+  const cacheKey = '/api/top-albums';
+  const monthStart = getMonthStartDate();
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    const cachedData = await client.get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+  }
+
+  const albums = await prisma.album.findMany({
+    where: {
+      isActive: true,
+      tracks: {
+        some: {
+          isActive: true,
+          history: {
+            some: {
+              type: 'PLAY',
+              createdAt: { gte: monthStart },
+            },
+          },
+        },
+      },
+    },
+    select: searchAlbumSelect,
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+  });
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    await setCache(cacheKey, albums, 1800); // Cache for 30 mins
+  }
+
+  return albums;
+};
+
+export const getTopArtists = async () => {
+  const cacheKey = '/api/top-artists';
+  const monthStart = getMonthStartDate();
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    const cachedData = await client.get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+  }
+
+  const artists = await prisma.artistProfile.findMany({
+    where: {
+      isVerified: true,
+      tracks: {
+        some: {
+          isActive: true,
+          history: {
+            some: {
+              type: 'PLAY',
+              createdAt: { gte: monthStart },
+            },
+          },
+        },
+      },
+    },
+    select: {
+      id: true,
+      artistName: true,
+      avatar: true,
+      monthlyListeners: true,
+      genres: {
+        select: {
+          genre: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      tracks: {
+        where: { isActive: true },
+        select: {
+          history: {
+            where: {
+              type: 'PLAY',
+              createdAt: { gte: monthStart },
+            },
+            select: {
+              userId: true,
+              playCount: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // Calculate actual monthly listeners (unique users) and plays
+  const artistsWithMonthlyMetrics = artists.map((artist) => {
+    const uniqueListeners = new Set();
+    let monthlyPlays = 0;
+
+    artist.tracks.forEach((track) => {
+      track.history.forEach((h) => {
+        uniqueListeners.add(h.userId);
+        monthlyPlays += h.playCount || 0;
+      });
+    });
+
+    return {
+      ...artist,
+      monthlyListeners: uniqueListeners.size,
+      monthlyPlays,
+    };
+  });
+
+  // Sort by monthly listeners and take top 20
+  const topArtists = artistsWithMonthlyMetrics
+    .sort((a, b) => b.monthlyListeners - a.monthlyListeners)
+    .slice(0, 20);
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    await setCache(cacheKey, topArtists, 1800); // Cache for 30 mins
+  }
+
+  return topArtists;
+};
+
+export const getTopTracks = async () => {
+  const cacheKey = '/api/top-tracks';
+  const monthStart = getMonthStartDate();
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    const cachedData = await client.get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+  }
+
+  const tracks = await prisma.track.findMany({
+    where: {
+      isActive: true,
+      history: {
+        some: {
+          type: 'PLAY',
+          createdAt: { gte: monthStart },
+        },
+      },
+    },
+    select: {
+      id: true,
+      title: true,
+      coverUrl: true,
+      duration: true,
+      audioUrl: true,
+      playCount: true,
+      artist: {
+        select: {
+          id: true,
+          artistName: true,
+          avatar: true,
+        },
+      },
+      album: {
+        select: {
+          id: true,
+          title: true,
+          coverUrl: true,
+        },
+      },
+      featuredArtists: {
+        select: {
+          artistProfile: {
+            select: {
+              id: true,
+              artistName: true,
+            },
+          },
+        },
+      },
+      history: {
+        where: {
+          type: 'PLAY',
+          createdAt: { gte: monthStart },
+        },
+        select: {
+          playCount: true,
+        },
+      },
+    },
+    orderBy: {
+      playCount: 'desc',
+    },
+    take: 20,
+  });
+
+  // Calculate monthly plays for each track
+  const tracksWithMonthlyPlays = tracks.map((track) => ({
+    ...track,
+    monthlyPlays: track.history.reduce(
+      (sum, h) => sum + (h.playCount || 0),
+      0
+    ),
+  }));
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    await setCache(cacheKey, tracksWithMonthlyPlays, 1800); // Cache for 30 mins
+  }
+
+  return tracksWithMonthlyPlays;
+};
+
+export const getNewestTracks = async () => {
+  return prisma.track.findMany({
+    where: { isActive: true },
+    select: searchTrackSelect,
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+};
+
+export const getNewestAlbums = async () => {
+  return prisma.album.findMany({
+    where: { isActive: true },
+    select: searchAlbumSelect,
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+};

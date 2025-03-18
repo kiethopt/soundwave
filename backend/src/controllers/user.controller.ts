@@ -205,77 +205,30 @@ export const getFollowing = async (
   }
 };
 
-// Cập nhật thông tin người dùng thông tin là FormData
+// Cập nhật thông tin người dùng
 export const editProfile = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    const user = req.user;
-    const { email, username, name, avatar } = req.body;
-    const avatarFile = req.file; // Lấy file từ request
-
-    if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    // Kiểm tra email đã tồn tại chưa
-    if (email) {
-      const existingUser = await prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (existingUser && existingUser.id !== user.id) {
-        res.status(400).json({ message: 'Email already in use' });
-        return;
-      }
-    }
-
-    // Kiểm tra username đã tồn tại chưa
-    if (username) {
-      const existingUsername = await prisma.user.findUnique({
-        where: { username },
-      });
-
-      if (existingUsername && existingUsername.id !== user.id) {
-        res.status(400).json({ message: 'Username already in use' });
-        return;
-      }
-    }
-
-    // Upload avatar lên Cloudinary nếu có file
-    let avatarUrl = null;
-    if (avatarFile) {
-      const uploadResult = await uploadFile(avatarFile.buffer, 'user-avatars');
-      avatarUrl = uploadResult.secure_url;
-    }
-
-    // Xây dựng dữ liệu cập nhật chỉ với các trường hợp lệ
-    const updateData: Record<string, any> = {};
-    if (email) updateData.email = email;
-    if (username) updateData.username = username;
-    if (name) updateData.name = name;
-    if (avatarFile) updateData.avatar = avatarUrl;
-    else if (avatar) updateData.avatar = avatar;
-
-    // Nếu không có gì để cập nhật
-    if (Object.keys(updateData).length === 0) {
-      res.status(400).json({ message: 'No data provided for update' });
-      return;
-    }
-
-    // Cập nhật thông tin người dùng
-    const updatedUser = await prisma.user.update({
-      where: { id: user.id },
-      data: updateData,
-      select: userSelect,
-    });
-
+    const updatedUser = await userService.editProfile(req.user, req.body, req.file);
     res.json(updatedUser);
   } catch (error) {
-    console.error('Edit profile error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    if (error instanceof Error) {
+      if (error.message === 'Unauthorized') {
+        res.status(401).json({ message: 'Unauthorized' });
+      } else if (error.message === 'Email already in use') {
+        res.status(400).json({ message: 'Email already in use' });
+      } else if (error.message === 'Username already in use') {
+        res.status(400).json({ message: 'Username already in use' });
+      } else if (error.message === 'No data provided for update') {
+        res.status(400).json({ message: 'No data provided for update' });
+      } else {
+        res.status(500).json({ message: 'Internal server error' });
+      }
+    } else {
+      res.status(500).json({ message: 'Internal server error' });
+    }
   }
 };
 
@@ -303,134 +256,30 @@ export const getUserProfile = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        username: true,
-        avatar: true,
-        role: true,
-        isActive: true,
-      },
-    });
-
-    if (!user) {
-      res.status(404).json({ message: 'User not found' });
-      return;
-    }
-
+    const user = await userService.getUserProfile(id);
     res.json(user);
   } catch (error) {
-    console.error('Get user profile error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    if (error instanceof Error && error.message === 'User not found') {
+      res.status(404).json({ message: 'User not found' });
+    } else {
+      res.status(500).json({ message: 'Internal server error' });
+    }
   }
 };
 
-// Lấy danh sách nghệ sĩ được đề xuất theo genre trong lịch sử nghe nhạc
 export const getRecommendedArtists = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    const user = req.user;
-
-    if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
-
-    const cacheKey = `/api/user/${user.id}/recommended-artists`;
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-    }
-
-    const history = await prisma.history.findMany({
-      where: {
-        userId: user.id,
-        type: HistoryType.PLAY,
-        playCount: { gt: 0 },
-      },
-      select: {
-        track: {
-          select: {
-            artist: {
-              select: {
-                id: true,
-                artistName: true,
-                avatar: true,
-                genres: {
-                  select: {
-                    genre: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      take: 3,
-    });
-
-    const genreIds = history
-      .flatMap((h) => h.track?.artist.genres.map((g) => g.genre.id) || [])
-      .filter((id) => id !== null);
-
-    const recommendedArtists = await prisma.artistProfile.findMany({
-      where: {
-        isVerified: true,
-        genres: {
-          some: {
-            genreId: {
-              in: genreIds,
-            },
-          },
-        },
-      },
-      select: {
-        id: true,
-        artistName: true,
-        bio: true,
-        avatar: true,
-        role: true,
-        socialMediaLinks: true,
-        monthlyListeners: true,
-        isVerified: true,
-        isActive: true,
-        verificationRequestedAt: true,
-        verifiedAt: true,
-        genres: {
-          select: {
-            genre: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await setCache(cacheKey, recommendedArtists, 1800); // Cache for 30 mins
-    }
-
+    const recommendedArtists = await userService.getRecommendedArtists(req.user);
     res.json(recommendedArtists);
   } catch (error) {
-    console.error('Get recommended artists error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      res.status(401).json({ message: 'Unauthorized' });
+    } else {
+      res.status(500).json({ message: 'Internal server error' });
+    }
   }
 };
 
@@ -439,107 +288,9 @@ export const getTopAlbums = async (
   res: Response
 ): Promise<void> => {
   try {
-    const cacheKey = '/api/top-albums';
-    const monthStart = getMonthStartDate();
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-    }
-
-    const albums = await prisma.album.findMany({
-      where: {
-        isActive: true,
-        tracks: {
-          some: {
-            isActive: true,
-            history: {
-              some: {
-                type: 'PLAY',
-                createdAt: { gte: monthStart },
-              },
-            },
-          },
-        },
-      },
-      select: {
-        id: true,
-        title: true,
-        coverUrl: true,
-        type: true,
-        artist: {
-          select: {
-            id: true,
-            artistName: true,
-            avatar: true,
-          },
-        },
-        tracks: {
-          where: { isActive: true },
-          select: {
-            id: true,
-            title: true,
-            coverUrl: true,
-            duration: true,
-            audioUrl: true,
-            playCount: true,
-            history: {
-              where: {
-                type: 'PLAY',
-                createdAt: { gte: monthStart },
-              },
-              select: {
-                playCount: true,
-              },
-            },
-          },
-          orderBy: { trackNumber: 'asc' },
-        },
-        _count: {
-          select: {
-            tracks: {
-              where: {
-                isActive: true,
-                history: {
-                  some: {
-                    type: 'PLAY',
-                    createdAt: { gte: monthStart },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        tracks: {
-          _count: 'desc',
-        },
-      },
-      take: 20,
-    });
-
-    // Calculate monthly plays for each album
-    const albumsWithMonthlyPlays = albums.map((album) => ({
-      ...album,
-      monthlyPlays: album.tracks.reduce(
-        (sum, track) =>
-          sum +
-          track.history.reduce((plays, h) => plays + (h.playCount || 0), 0),
-        0
-      ),
-    }));
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await setCache(cacheKey, albumsWithMonthlyPlays, 1800); // Cache for 30 mins
-    }
-
-    res.json(albumsWithMonthlyPlays);
+    const topAlbums = await userService.getTopAlbums();
+    res.json(topAlbums);
   } catch (error) {
-    console.error('Get top albums error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -549,96 +300,9 @@ export const getTopArtists = async (
   res: Response
 ): Promise<void> => {
   try {
-    const cacheKey = '/api/top-artists';
-    const monthStart = getMonthStartDate();
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-    }
-
-    const artists = await prisma.artistProfile.findMany({
-      where: {
-        isVerified: true,
-        tracks: {
-          some: {
-            isActive: true,
-            history: {
-              some: {
-                type: 'PLAY',
-                createdAt: { gte: monthStart },
-              },
-            },
-          },
-        },
-      },
-      select: {
-        id: true,
-        artistName: true,
-        avatar: true,
-        monthlyListeners: true,
-        genres: {
-          select: {
-            genre: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        tracks: {
-          where: { isActive: true },
-          select: {
-            history: {
-              where: {
-                type: 'PLAY',
-                createdAt: { gte: monthStart },
-              },
-              select: {
-                userId: true,
-                playCount: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    // Calculate actual monthly listeners (unique users) and plays
-    const artistsWithMonthlyMetrics = artists.map((artist) => {
-      const uniqueListeners = new Set();
-      let monthlyPlays = 0;
-
-      artist.tracks.forEach((track) => {
-        track.history.forEach((h) => {
-          uniqueListeners.add(h.userId);
-          monthlyPlays += h.playCount || 0;
-        });
-      });
-
-      return {
-        ...artist,
-        monthlyListeners: uniqueListeners.size,
-        monthlyPlays,
-      };
-    });
-
-    // Sort by monthly listeners and take top 20
-    const topArtists = artistsWithMonthlyMetrics
-      .sort((a, b) => b.monthlyListeners - a.monthlyListeners)
-      .slice(0, 20);
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await setCache(cacheKey, topArtists, 1800); // Cache for 30 mins
-    }
-
+    const topArtists = await userService.getTopArtists();
     res.json(topArtists);
   } catch (error) {
-    console.error('Get top artists error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -648,130 +312,33 @@ export const getTopTracks = async (
   res: Response
 ): Promise<void> => {
   try {
-    const cacheKey = '/api/top-tracks';
-    const monthStart = getMonthStartDate();
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        res.json(JSON.parse(cachedData));
-        return;
-      }
-    }
-
-    const tracks = await prisma.track.findMany({
-      where: {
-        isActive: true,
-        history: {
-          some: {
-            type: 'PLAY',
-            createdAt: { gte: monthStart },
-          },
-        },
-      },
-      select: {
-        id: true,
-        title: true,
-        coverUrl: true,
-        duration: true,
-        audioUrl: true,
-        playCount: true,
-        artist: {
-          select: {
-            id: true,
-            artistName: true,
-            avatar: true,
-          },
-        },
-        album: {
-          select: {
-            id: true,
-            title: true,
-            coverUrl: true,
-          },
-        },
-        featuredArtists: {
-          select: {
-            artistProfile: {
-              select: {
-                id: true,
-                artistName: true,
-              },
-            },
-          },
-        },
-        history: {
-          where: {
-            type: 'PLAY',
-            createdAt: { gte: monthStart },
-          },
-          select: {
-            playCount: true,
-          },
-        },
-      },
-      orderBy: {
-        playCount: 'desc',
-      },
-      take: 20,
-    });
-
-    // Calculate monthly plays for each track
-    const tracksWithMonthlyPlays = tracks.map((track) => ({
-      ...track,
-      monthlyPlays: track.history.reduce(
-        (sum, h) => sum + (h.playCount || 0),
-        0
-      ),
-    }));
-
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await setCache(cacheKey, tracksWithMonthlyPlays, 1800); // Cache for 30 mins
-    }
-
-    res.json(tracksWithMonthlyPlays);
+    const topTracks = await userService.getTopTracks();
+    res.json(topTracks);
   } catch (error) {
-    console.error('Get top tracks error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// Lấy danh sách track mới nhất
 export const getNewestTracks = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    const tracks = await prisma.track.findMany({
-      where: { isActive: true },
-      select: searchTrackSelect,
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
-
+    const tracks = await userService.getNewestTracks();
     res.json(tracks);
   } catch (error) {
-    console.error('Get newest tracks error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// Lấy danh sách album mới nhất
 export const getNewestAlbums = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    const albums = await prisma.album.findMany({
-      where: { isActive: true },
-      select: searchAlbumSelect,
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
-
+    const albums = await userService.getNewestAlbums();
     res.json(albums);
   } catch (error) {
-    console.error('Get newest albums error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
