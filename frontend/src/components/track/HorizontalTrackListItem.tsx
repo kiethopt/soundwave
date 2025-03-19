@@ -1,6 +1,6 @@
 import React from 'react';
 import { Play, Pause, AddSimple} from '@/components/ui/Icons';
-import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
+import { Heart, ListMusic, MoreHorizontal, Share2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Track } from '@/types';
-
+import { useTrack } from '@/contexts/TrackContext';
 interface TrackListItemProps {
   track: Track
   index: number;
@@ -35,6 +35,8 @@ const HorizontalTrackListItem: React.FC<TrackListItemProps> = ({
   theme,
   onTrackClick,
 }) => {
+  const { addToQueue } = useTrack();
+
   return (
     <div
       className={`grid grid-cols-[32px_48px_auto_auto] sm:grid-cols-[32px_48px_2fr_3fr_auto] gap-2 md:gap-4 py-2 md:px-2 group cursor-pointer rounded-lg ${
@@ -143,6 +145,16 @@ const HorizontalTrackListItem: React.FC<TrackListItemProps> = ({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                addToQueue(track);
+              }}
+            >
+              <ListMusic className="w-4 h-4 mr-2" />
+              Add to Queue
+            </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={(e) => e.stopPropagation()}

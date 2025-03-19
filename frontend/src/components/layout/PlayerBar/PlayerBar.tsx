@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { Pause, Play, Shuffle, Loop, Volume, Prev, Next, Down } from '@/components/ui/Icons';
 import { useTrack } from '@/contexts/TrackContext';
+import { ListMusic } from 'lucide-react';
+import { QueuePanel } from '@/components/player/QueuePanel';
 
 export default function PlayerBar() {
   const [showMobileExpanded, setShowMobileExpanded] = useState(false);
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
   
   const {
     currentTrack,
@@ -24,6 +27,7 @@ export default function PlayerBar() {
     skipNext,
     skipPrevious,
     skipRandom,
+    queue,
   } = useTrack();
 
   const formatTime = (seconds: number) => {
@@ -162,8 +166,23 @@ export default function PlayerBar() {
           </div>
         </div>
 
-        {/* Volume Control */}
-        <div className="hidden items-center justify-end space-x-4 md:flex col-span-1">
+        {/* Volume Control & Queue */}
+        <div className="flex items-center justify-end space-x-4 col-span-1">
+          {/* Queue Button */}
+          <button 
+            onClick={() => setIsQueueOpen(prev => !prev)} 
+            className={`relative p-2 rounded-full hover:bg-[#383838] transition-colors duration-200 ${
+              isQueueOpen ? 'text-[#A57865]' : 'text-white'
+            }`}
+          >
+            <ListMusic className="w-5 h-5" />
+            {queue.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-[#A57865] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {queue.length}
+              </span>
+            )}
+          </button>
+          
           {/* Volume Icon */}
           <Volume className="w-5 h-5 text-white" />
 
@@ -382,6 +401,14 @@ export default function PlayerBar() {
           )}
         </>
       )}
+
+      {/* Queue panel overlay */}
+      {isQueueOpen && (
+        <div className="fixed inset-0 bg-black/50 z-30" onClick={() => setIsQueueOpen(false)} />
+      )}
+      
+      {/* Queue panel */}
+      <QueuePanel isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
     </>
   );
 }

@@ -16,7 +16,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
-import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
+import { Heart, ListMusic, MoreHorizontal, Share2 } from 'lucide-react';
 import pusher from '@/utils/pusher';
 import { toast } from 'react-toastify';
 import { useTrack } from '@/contexts/TrackContext';
@@ -68,6 +68,7 @@ function SearchContent() {
   }>({ artists: [], albums: [], tracks: [], users: [] });
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const { addToQueue } = useTrack();
 
   // Audio states
   const {
@@ -485,6 +486,16 @@ function SearchContent() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addToQueue(track);
+                              }}
+                            >
+                              <ListMusic className="w-4 h-4 mr-2" />
+                              Add to Queue
+                            </DropdownMenuItem>
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger>
                                 <AddSimple className="w-4 h-4 mr-2" />
@@ -614,6 +625,16 @@ function SearchContent() {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addToQueue(track);
+                              }}
+                            >
+                              <ListMusic className="w-4 h-4 mr-2" />
+                              Add to Queue
+                            </DropdownMenuItem>
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger>
                                 <AddSimple className="w-4 h-4 mr-2" />

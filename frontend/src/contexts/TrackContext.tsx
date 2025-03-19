@@ -11,6 +11,7 @@ import {
 } from "react";
 import { Track } from "@/types";
 import { api } from "@/utils/api";
+import { toast } from "react-toastify";
 
 interface TrackContextType {
   currentTrack: Track | null;
@@ -34,6 +35,11 @@ interface TrackContextType {
   skipNext: () => void;
   skipPrevious: () => void;
   togglePlayPause: () => void;
+  queue: Track[];
+  addToQueue: (track: Track) => void;
+  removeFromQueue: (index: number) => void;
+  clearQueue: () => void;
+  reorderQueue: (startIndex: number, endIndex: number) => void;
 }
 
 export const TrackContext = createContext<TrackContextType>({
@@ -58,6 +64,11 @@ export const TrackContext = createContext<TrackContextType>({
   skipNext: () => {},
   skipPrevious: () => {},
   togglePlayPause: () => {},
+  queue: [],
+  addToQueue: () => {},
+  removeFromQueue: () => {},
+  clearQueue: () => {},
+  reorderQueue: () => {},
 });
 
 export const TrackProvider = ({ children }: { children: ReactNode }) => {
@@ -75,6 +86,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const [lastSavedTime, setLastSavedTime] = useState<number>(0);
   const [token, setToken] = useState<string | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
+  const [queue, setQueue] = useState<Track[]>([]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackQueueRef = useRef<Track[]>([]);
@@ -414,6 +426,101 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // Update trackQueue function to set both state and ref
+  const setTrackQueueFn = useCallback((tracks: Track[]) => {
+    setTrackQueue(tracks);
+    trackQueueRef.current = tracks;
+    setQueue(tracks); // Keep the queue state in sync
+  }, []);
+  
+  // Add new queue management functions
+  const addToQueue = useCallback((track: Track) => {
+    setQueue(prevQueue => {
+      // Check if the track already exists in the queue
+      const isTrackInQueue = prevQueue.some(item => item.id === track.id);
+      
+      // Only add the track if it's not already in the queue
+      if (!isTrackInQueue) {
+        const newQueue = [...prevQueue, track];
+        return newQueue;
+      }
+            
+      // Return the unchanged queue if the track already exists
+      return prevQueue;
+    });
+    
+    // Also update the trackQueue if it's empty
+    if (trackQueueRef.current.length === 0) {
+      setTrackQueue([track]);
+      trackQueueRef.current = [track];
+    }
+  }, []);
+
+  const removeFromQueue = useCallback((index: number) => {
+    setQueue(prevQueue => {
+      const newQueue = prevQueue.filter((_, i) => i !== index);
+      
+      // If removing current track, play next track if available
+      if (index === currentIndex) {
+        if (newQueue.length > 0) {
+          const nextIndex = Math.min(index, newQueue.length - 1);
+          setCurrentIndex(nextIndex);
+          playTrack(newQueue[nextIndex]);
+        } else {
+          pauseTrack();
+          setCurrentTrack(null);
+        }
+      } else if (index < currentIndex) {
+        // Adjust currentIndex if removing a track before it
+        setCurrentIndex(currentIndex - 1);
+      }
+      
+      // Update trackQueue ref
+      setTrackQueue(newQueue);
+      trackQueueRef.current = newQueue;
+      
+      return newQueue;
+    });
+  }, [currentIndex, pauseTrack, playTrack]);
+
+  const clearQueue = useCallback(() => {
+    pauseTrack();
+    setCurrentTrack(null);
+    setQueue([]);
+    setTrackQueue([]);
+    trackQueueRef.current = [];
+    setCurrentIndex(0);
+  }, [pauseTrack]);
+
+  const reorderQueue = useCallback((startIndex: number, endIndex: number) => {
+    setQueue(prevQueue => {
+      const result = Array.from(prevQueue);
+      const [removed] = result.splice(startIndex, 1);
+      result.splice(endIndex, 0, removed);
+      
+      // Update trackQueue
+      setTrackQueue(result);
+      trackQueueRef.current = result;
+      
+      // Update currentIndex if the current track was moved
+      if (currentIndex === startIndex) {
+        setCurrentIndex(endIndex);
+      } else if (
+        startIndex < currentIndex && 
+        endIndex >= currentIndex
+      ) {
+        setCurrentIndex(currentIndex - 1);
+      } else if (
+        startIndex > currentIndex && 
+        endIndex <= currentIndex
+      ) {
+        setCurrentIndex(currentIndex + 1);
+      }
+      
+      return result;
+    });
+  }, [currentIndex]);
+
   return (
     <TrackContext.Provider
       value={{
@@ -427,7 +534,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         pauseTrack,
         duration,
         setVolume: setAudioVolume,
-        trackQueue: setTrackQueue,
+        trackQueue: setTrackQueueFn,
         queueType,
         setQueueType,
         skipRandom,
@@ -438,6 +545,11 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         skipPrevious,
         showPlayer,
         togglePlayPause: pauseTrack,
+        queue,
+        addToQueue,
+        removeFromQueue,
+        clearQueue,
+        reorderQueue
       }}
     >
       {children}
