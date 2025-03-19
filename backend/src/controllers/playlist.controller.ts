@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { RequestHandler } from 'express';
 import * as aiService from '../services/ai.service';
-// import * as playlistService from '../services/playlist.service';
+import * as playlistService from '../services/playlist.service';
 import { handleError } from '../utils/handle-utils';
 
 const prisma = new PrismaClient();
@@ -42,6 +42,23 @@ export const createPersonalizedPlaylist = async (
     });
   } catch (error) {
     handleError(res, error, 'Create AI playlist');
+  }
+};
+
+// Lấy playlist đề xuất toàn cầu (không yêu cầu đăng nhập)
+export const getGlobalRecommendedPlaylist = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { limit = 20 } = req.query;
+    const playlist = await playlistService.generateGlobalRecommendedPlaylist(
+      Number(limit)
+    );
+    res.json({ playlist });
+  } catch (error) {
+    console.error('Get global recommended playlist error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 

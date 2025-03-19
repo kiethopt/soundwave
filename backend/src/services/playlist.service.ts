@@ -879,3 +879,112 @@ export const analyzeUserTaste = async (userId: string) => {
     throw new Error('Failed to analyze user listening habits');
   }
 };
+
+/**
+ * Tạo playlist đề xuất chung cho tất cả người dùng sử dụng Collaborative Filtering
+ * @param limit Số lượng bài hát tối đa trong playlist
+ * @returns Playlist chung cho tất cả người dùng
+ */
+export const generateGlobalRecommendedPlaylist = async (
+  limit = 20
+): Promise<any> => {
+  try {
+    // 1. Lấy tất cả lịch sử nghe của các người dùng active
+    const userHistories = await prisma.history.findMany({
+      where: {
+        type: 'PLAY',
+        trackId: { not: null },
+        playCount: { gt: 0 },
+      },
+      select: {
+        userId: true,
+        trackId: true,
+        playCount: true,
+      },
+    });
+
+    // 2. Lấy tất cả lượt like bài hát
+    const userLikes = await prisma.userLikeTrack.findMany({
+      select: {
+        userId: true,
+        trackId: true,
+      },
+    });
+
+    // 3. Tạo ma trận user-item để phân tích
+    const tracks = new Map<string, { count: number; score: number }>();
+
+    // Thêm điểm từ lượt nghe
+    userHistories.forEach((history) => {
+      if (history.trackId) {
+        const trackId = history.trackId;
+        const trackInfo = tracks.get(trackId) || { count: 0, score: 0 };
+        trackInfo.count += 1;
+        trackInfo.score += history.playCount || 1;
+        tracks.set(trackId, trackInfo);
+      }
+    });
+
+    // Thêm điểm từ lượt like (trọng số cao hơn)
+    userLikes.forEach((like) => {
+      if (like.trackId) {
+        const trackId = like.trackId;
+        const trackInfo = tracks.get(trackId) || { count: 0, score: 0 };
+        trackInfo.count += 1;
+        trackInfo.score += 3; // Trọng số cao hơn cho like
+        tracks.set(trackId, trackInfo);
+      }
+    });
+
+    // 4. Sắp xếp bài hát theo điểm và số lượt tương tác
+    const sortedTracks = Array.from(tracks.entries())
+      .sort((a, b) => {
+        // Sắp xếp theo score trước, sau đó đến count
+        if (b[1].score !== a[1].score) {
+          return b[1].score - a[1].score;
+        }
+        return b[1].count - a[1].count;
+      })
+      .slice(0, limit)
+      .map((entry) => entry[0]);
+
+    // 5. Lấy thông tin chi tiết của các bài hát được chọn
+    const recommendedTracks = await prisma.track.findMany({
+      where: {
+        id: { in: sortedTracks },
+        isActive: true,
+      },
+      include: {
+        artist: true,
+        album: true,
+        genres: {
+          include: {
+            genre: true,
+          },
+        },
+      },
+    });
+
+    // 6. Tạo một playlist với tên và mô tả phù hợp
+    const playlist = {
+      name: 'Soundwave Hits: Trending Right Now',
+      description:
+        'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave',
+      tracks: recommendedTracks,
+      isGlobal: true,
+      totalTracks: recommendedTracks.length,
+      totalDuration: recommendedTracks.reduce(
+        (sum, track) => sum + (track.duration || 0),
+        0
+      ),
+      // Sử dụng URL cố định cho cover
+      coverUrl:
+        'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
+    };
+
+    return playlist;
+  } catch (error) {
+    console.error('Error generating global recommended playlist:', error);
+    throw new Error('Failed to generate global recommended playlist');
+  }
+};

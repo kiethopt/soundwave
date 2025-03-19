@@ -42,9 +42,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = exports.createPersonalizedPlaylist = void 0;
+exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = exports.getGlobalRecommendedPlaylist = exports.createPersonalizedPlaylist = void 0;
 const client_1 = require("@prisma/client");
 const aiService = __importStar(require("../services/ai.service"));
+const playlistService = __importStar(require("../services/playlist.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const prisma = new client_1.PrismaClient();
 const createPersonalizedPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -71,6 +72,18 @@ const createPersonalizedPlaylist = (req, res) => __awaiter(void 0, void 0, void 
     }
 });
 exports.createPersonalizedPlaylist = createPersonalizedPlaylist;
+const getGlobalRecommendedPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { limit = 20 } = req.query;
+        const playlist = yield playlistService.generateGlobalRecommendedPlaylist(Number(limit));
+        res.json({ playlist });
+    }
+    catch (error) {
+        console.error('Get global recommended playlist error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getGlobalRecommendedPlaylist = getGlobalRecommendedPlaylist;
 const createFavoritePlaylist = (userId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield prisma.playlist.create({

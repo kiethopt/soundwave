@@ -701,6 +701,12 @@ export const api = {
 
     playAlbum: async (albumId: string, token: string) =>
       fetchWithAuth(`/api/albums/${albumId}/play`, { method: 'POST' }, token),
+
+    getNewestAlbums: async (token?: string) =>
+      fetchWithAuth('/api/albums/newest', { method: 'GET' }, token),
+
+    getHotAlbums: async (token?: string) =>
+      fetchWithAuth('/api/albums/hot', { method: 'GET' }, token),
   },
 
   genres: {
@@ -887,6 +893,13 @@ export const api = {
 
       return response.json();
     },
+
+    getGlobalRecommendedPlaylist: async (token?: string) =>
+      fetchWithAuth(
+        '/api/playlists/global-recommended',
+        { method: 'GET' },
+        token
+      ),
   },
 
   upload: {

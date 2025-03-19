@@ -139,8 +139,9 @@ export const createAlbum = async (
 
     const notificationsData = followers.map((follower) => ({
       type: NotificationType.NEW_ALBUM,
-      message: `${artistProfile?.artistName || 'Unknown'
-        } vừa ra album mới: ${title}`,
+      message: `${
+        artistProfile?.artistName || 'Unknown'
+      } vừa ra album mới: ${title}`,
       recipientType: RecipientType.USER,
       userId: follower.followerId,
       artistId: targetArtistProfileId,
@@ -247,8 +248,8 @@ export const addTracksToAlbum = async (
     const featuredArtists = Array.isArray(req.body.featuredArtists)
       ? req.body.featuredArtists.map((artists: string) => artists.split(','))
       : req.body.featuredArtists
-        ? [req.body.featuredArtists.split(',')]
-        : [];
+      ? [req.body.featuredArtists.split(',')]
+      : [];
 
     const mm = await import('music-metadata');
 
@@ -403,8 +404,8 @@ export const updateAlbum = async (
       const genresArray = !genres
         ? []
         : Array.isArray(genres)
-          ? genres
-          : [genres];
+        ? genres
+        : [genres];
 
       if (genresArray.length > 0) {
         updateData.genres = {
@@ -509,8 +510,9 @@ export const toggleAlbumVisibility = async (
     });
 
     res.json({
-      message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'
-        } successfully`,
+      message: `Album ${
+        updatedAlbum.isActive ? 'activated' : 'hidden'
+      } successfully`,
       album: updatedAlbum,
     });
   } catch (error) {
@@ -848,6 +850,36 @@ export const playAlbum = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     console.error('Play album error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Lấy album mới nhất
+export const getNewestAlbums = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { limit = 10 } = req.query;
+    const albums = await albumService.getNewestAlbums(Number(limit));
+    res.json({ albums });
+  } catch (error) {
+    console.error('Get newest albums error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Lấy album hot nhất
+export const getHotAlbums = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { limit = 10 } = req.query;
+    const albums = await albumService.getHotAlbums(Number(limit));
+    res.json({ albums });
+  } catch (error) {
+    console.error('Get hot albums error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

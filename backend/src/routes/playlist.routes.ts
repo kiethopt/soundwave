@@ -8,7 +8,9 @@ import {
   removeTrackFromPlaylist,
   addTrackToPlaylist,
   createPersonalizedPlaylist,
+  getGlobalRecommendedPlaylist,
 } from '../controllers/playlist.controller';
+import { cacheMiddleware } from '../middleware/cache.middleware';
 
 const router = express.Router();
 
@@ -17,6 +19,13 @@ router.use(authenticate);
 
 // Route AI-generated playlist
 router.post('/personalized', createPersonalizedPlaylist);
+
+// Route lấy playlist đề xuất toàn cầu
+router.get(
+  '/global-recommended',
+  cacheMiddleware,
+  getGlobalRecommendedPlaylist
+);
 
 // Các routes khác
 router.post('/', createPlaylist);

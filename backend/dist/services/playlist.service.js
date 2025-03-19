@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.analyzeUserTaste = exports.generatePersonalizedPlaylist = void 0;
+exports.generateGlobalRecommendedPlaylist = exports.analyzeUserTaste = exports.generatePersonalizedPlaylist = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const ml_matrix_1 = require("ml-matrix");
 const generatePersonalizedPlaylist = (userId, options) => __awaiter(void 0, void 0, void 0, function* () {
@@ -592,4 +592,84 @@ const analyzeUserTaste = (userId) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 exports.analyzeUserTaste = analyzeUserTaste;
+const generateGlobalRecommendedPlaylist = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (limit = 20) {
+    try {
+        const userHistories = yield db_1.default.history.findMany({
+            where: {
+                type: 'PLAY',
+                trackId: { not: null },
+                playCount: { gt: 0 },
+            },
+            select: {
+                userId: true,
+                trackId: true,
+                playCount: true,
+            },
+        });
+        const userLikes = yield db_1.default.userLikeTrack.findMany({
+            select: {
+                userId: true,
+                trackId: true,
+            },
+        });
+        const tracks = new Map();
+        userHistories.forEach((history) => {
+            if (history.trackId) {
+                const trackId = history.trackId;
+                const trackInfo = tracks.get(trackId) || { count: 0, score: 0 };
+                trackInfo.count += 1;
+                trackInfo.score += history.playCount || 1;
+                tracks.set(trackId, trackInfo);
+            }
+        });
+        userLikes.forEach((like) => {
+            if (like.trackId) {
+                const trackId = like.trackId;
+                const trackInfo = tracks.get(trackId) || { count: 0, score: 0 };
+                trackInfo.count += 1;
+                trackInfo.score += 3;
+                tracks.set(trackId, trackInfo);
+            }
+        });
+        const sortedTracks = Array.from(tracks.entries())
+            .sort((a, b) => {
+            if (b[1].score !== a[1].score) {
+                return b[1].score - a[1].score;
+            }
+            return b[1].count - a[1].count;
+        })
+            .slice(0, limit)
+            .map((entry) => entry[0]);
+        const recommendedTracks = yield db_1.default.track.findMany({
+            where: {
+                id: { in: sortedTracks },
+                isActive: true,
+            },
+            include: {
+                artist: true,
+                album: true,
+                genres: {
+                    include: {
+                        genre: true,
+                    },
+                },
+            },
+        });
+        const playlist = {
+            name: 'Soundwave Hits: Trending Right Now',
+            description: 'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave',
+            tracks: recommendedTracks,
+            isGlobal: true,
+            totalTracks: recommendedTracks.length,
+            totalDuration: recommendedTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+            coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
+        };
+        return playlist;
+    }
+    catch (error) {
+        console.error('Error generating global recommended playlist:', error);
+        throw new Error('Failed to generate global recommended playlist');
+    }
+});
+exports.generateGlobalRecommendedPlaylist = generateGlobalRecommendedPlaylist;
 //# sourceMappingURL=playlist.service.js.map

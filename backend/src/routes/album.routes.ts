@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import {
   createAlbum,
   updateAlbum,
@@ -9,12 +9,13 @@ import {
   getAllAlbums,
   playAlbum,
   toggleAlbumVisibility,
+  getNewestAlbums,
+  getHotAlbums,
 } from '../controllers/album.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload, { handleUploadError } from '../middleware/upload.middleware';
 import { cacheMiddleware } from '../middleware/cache.middleware';
-// import { sessionMiddleware } from '../middleware/session.middleware';
 
 const router = express.Router();
 
@@ -67,6 +68,10 @@ router.get('/search', authenticate, cacheMiddleware, searchAlbum);
 router.post('/:albumId/play', authenticate, cacheMiddleware, playAlbum);
 
 // PUBLIC routes
+// Các route tĩnh
+router.get('/newest', cacheMiddleware, getNewestAlbums);
+router.get('/hot', cacheMiddleware, getHotAlbums);
+
 // Route lấy thông tin album theo ID (có cache)
 router.get('/:id', authenticate, cacheMiddleware, getAlbumById);
 

@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.playAlbum = exports.getAlbumById = exports.getAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = void 0;
+exports.getHotAlbums = exports.getNewestAlbums = exports.playAlbum = exports.getAlbumById = exports.getAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const upload_service_1 = require("../services/upload.service");
 const client_1 = require("@prisma/client");
@@ -716,4 +716,28 @@ const playAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.playAlbum = playAlbum;
+const getNewestAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { limit = 10 } = req.query;
+        const albums = yield albumService.getNewestAlbums(Number(limit));
+        res.json({ albums });
+    }
+    catch (error) {
+        console.error('Get newest albums error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getNewestAlbums = getNewestAlbums;
+const getHotAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { limit = 10 } = req.query;
+        const albums = yield albumService.getHotAlbums(Number(limit));
+        res.json({ albums });
+    }
+    catch (error) {
+        console.error('Get hot albums error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getHotAlbums = getHotAlbums;
 //# sourceMappingURL=album.controller.js.map
