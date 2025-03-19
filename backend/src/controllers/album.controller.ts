@@ -688,21 +688,9 @@ export const getAllAlbums = async (
     // Thêm điều kiện artist nếu user là artist
     if (user.role !== Role.ADMIN && user.artistProfile?.id) {
       conditions.push({
-        OR: [
-          { artistId: user.artistProfile.id },
-          {
-            tracks: {
-              some: {
-                featuredArtists: {
-                  some: { artistId: user.artistProfile.id },
-                },
-              },
-            },
-          },
-        ],
+        artistId: user.artistProfile.id,
       });
     }
-
     // Kết hợp tất cả điều kiện
     if (conditions.length > 0) {
       whereClause.AND = conditions;
