@@ -12,6 +12,7 @@ import { uploadFile } from './upload.service';
 import { paginate, toBooleanValue } from '../utils/handle-utils';
 import * as fs from 'fs';
 import * as path from 'path';
+import Matrix from 'ml-matrix';
 
 // User management services
 export const getUsers = async (req: Request) => {
@@ -560,4 +561,299 @@ export const updateCacheStatus = async (enabled: boolean) => {
     console.error('Error updating cache status', error);
     throw new Error('Failed to update cache status');
   }
+};
+
+// Cập nhật trạng thái model AI
+export const updateAIModel = async (model?: string) => {
+  try {
+    const envPath = path.resolve(__dirname, '../../.env');
+    const envContent = fs.readFileSync(envPath, 'utf8');
+
+    // Danh sách model được hỗ trợ
+    const supportedModels = [
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-thinking-exp-01-21', // Experimental model
+      'gemini-2.0-flash-lite',
+      'gemini-2.0-pro-exp-02-05',
+      'gemini-1.5-flash',
+    ];
+
+    // Nếu chỉ lấy model hiện tại mà không cập nhật
+    if (model === undefined) {
+      const currentModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+      return {
+        model: currentModel,
+        supportedModels,
+      };
+    }
+
+    // Kiểm tra model có hợp lệ không
+    if (!supportedModels.includes(model)) {
+      throw new Error('Unsupported AI model');
+    }
+
+    // Cập nhật GEMINI_MODEL trong file .env
+    if (envContent.includes('GEMINI_MODEL=')) {
+      // Nếu biến đã tồn tại, cập nhật giá trị
+      const updatedContent = envContent.replace(
+        /GEMINI_MODEL=.*/,
+        `GEMINI_MODEL=${model}`
+      );
+      fs.writeFileSync(envPath, updatedContent);
+    } else {
+      // Nếu biến chưa tồn tại, thêm mới
+      fs.writeFileSync(envPath, `${envContent}\nGEMINI_MODEL=${model}`);
+    }
+
+    // Cập nhật biến môi trường
+    process.env.GEMINI_MODEL = model;
+
+    console.log(`[AI] Model set to: ${model}`);
+
+    return {
+      model,
+      supportedModels,
+    };
+  } catch (error) {
+    console.error('Error updating AI model', error);
+    throw new Error('Failed to update AI model');
+  }
+};
+
+// Lấy ma trận tương tác giữa các bài hát và người dùng
+export const getRecommendationMatrix = async (limit = 100) => {
+  try {
+    // Lấy những user có lượt play > 2 bài
+    const activeUsers = await prisma.user.findMany({
+      where: {
+        history: {
+          some: {
+            type: 'PLAY',
+            playCount: { gt: 2 },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        email: true,
+        avatar: true,
+      },
+      take: limit,
+    });
+
+    if (activeUsers.length < 2) {
+      return {
+        success: false,
+        message: 'Not enough user data for matrix analysis',
+        data: null,
+      };
+    }
+
+    const userIds = activeUsers.map((u) => u.id);
+
+    // Lấy bài hát được nghe nhiều nhất
+    const popularTracks = await prisma.track.findMany({
+      where: {
+        history: {
+          some: {
+            userId: { in: userIds },
+          },
+        },
+      },
+      orderBy: { playCount: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        artistId: true,
+        artist: {
+          select: {
+            artistName: true,
+          },
+        },
+        playCount: true,
+        coverUrl: true,
+      },
+      take: limit,
+    });
+
+    const trackIds = popularTracks.map((t) => t.id);
+
+    // Lấy lịch sử nghe của các user
+    const userHistory = await prisma.history.findMany({
+      where: {
+        userId: { in: userIds },
+        trackId: { in: trackIds },
+        type: 'PLAY',
+      },
+      select: {
+        userId: true,
+        trackId: true,
+        playCount: true,
+      },
+    });
+
+    // Lấy lượt like
+    const userLikes = await prisma.userLikeTrack.findMany({
+      where: {
+        userId: { in: userIds },
+        trackId: { in: trackIds },
+      },
+      select: {
+        userId: true,
+        trackId: true,
+      },
+    });
+
+    // Tạo mapping index
+    const userIdToIndex = new Map<string, number>();
+    const trackIdToIndex = new Map<string, number>();
+
+    activeUsers.forEach((user, index) => {
+      userIdToIndex.set(user.id, index);
+    });
+
+    popularTracks.forEach((track, index) => {
+      trackIdToIndex.set(track.id, index);
+    });
+
+    // Tạo ma trận tương tác
+    const matrix = new Matrix(userIds.length, trackIds.length);
+
+    // Điền dữ liệu từ lịch sử nghe
+    userHistory.forEach((history) => {
+      const userIndex = userIdToIndex.get(history.userId);
+      const trackIndex = trackIdToIndex.get(history.trackId!);
+
+      if (userIndex !== undefined && trackIndex !== undefined) {
+        matrix.set(userIndex, trackIndex, history.playCount || 1);
+      }
+    });
+
+    // Tăng trọng số cho lượt like
+    userLikes.forEach((like) => {
+      const userIndex = userIdToIndex.get(like.userId);
+      const trackIndex = trackIdToIndex.get(like.trackId);
+
+      if (userIndex !== undefined && trackIndex !== undefined) {
+        const currentValue = matrix.get(userIndex, trackIndex);
+        matrix.set(userIndex, trackIndex, currentValue + 3); // Tăng trọng số cho like
+      }
+    });
+
+    // Chuẩn hóa ma trận
+    const normalizedMatrix = normalizeMatrix(matrix);
+
+    // Tính toán ma trận tương đồng giữa các bài hát
+    const itemSimilarityMatrix = calculateItemSimilarity(normalizedMatrix);
+
+    // Format dữ liệu để hiển thị trên frontend
+    return {
+      success: true,
+      data: {
+        users: activeUsers,
+        tracks: popularTracks,
+        matrix: matrix.to2DArray(),
+        normalizedMatrix: normalizedMatrix.to2DArray(),
+        itemSimilarityMatrix: itemSimilarityMatrix.to2DArray(),
+        stats: {
+          userCount: activeUsers.length,
+          trackCount: popularTracks.length,
+          totalInteractions: userHistory.length + userLikes.length,
+          sparsity: calculateSparsity(matrix),
+        },
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching recommendation matrix:', error);
+    return {
+      success: false,
+      message: 'Failed to retrieve recommendation matrix',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+};
+
+// Hàm tiện ích để tính toán độ thưa thớt của ma trận
+const calculateSparsity = (matrix: Matrix): number => {
+  const rows = matrix.rows;
+  const cols = matrix.columns;
+  let nonZeroCount = 0;
+
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      if (matrix.get(i, j) !== 0) {
+        nonZeroCount++;
+      }
+    }
+  }
+
+  return 1 - nonZeroCount / (rows * cols);
+};
+
+// Chuẩn hóa ma trận
+const normalizeMatrix = (matrix: Matrix): Matrix => {
+  const normalizedMatrix = matrix.clone();
+  const rows = normalizedMatrix.rows;
+  const columns = normalizedMatrix.columns;
+
+  for (let i = 0; i < rows; i++) {
+    const rowValues = normalizedMatrix.getRow(i);
+    const sum = rowValues.reduce((acc, val) => acc + val, 0);
+
+    if (sum > 0) {
+      for (let j = 0; j < columns; j++) {
+        const currentValue = normalizedMatrix.get(i, j);
+        const normalizedValue = currentValue / sum;
+        normalizedMatrix.set(i, j, normalizedValue);
+      }
+    }
+  }
+
+  return normalizedMatrix;
+};
+
+// Tính toán ma trận tương đồng giữa các bài hát
+const calculateItemSimilarity = (matrix: Matrix): Matrix => {
+  const transposedMatrix = matrix.transpose();
+  const itemCount = transposedMatrix.rows;
+  const similarityMatrix = new Matrix(itemCount, itemCount);
+
+  for (let i = 0; i < itemCount; i++) {
+    for (let j = 0; j < itemCount; j++) {
+      if (i === j) {
+        similarityMatrix.set(i, j, 1);
+      } else {
+        const itemVectorI = transposedMatrix.getRow(i);
+        const itemVectorJ = transposedMatrix.getRow(j);
+        const similarity = cosineSimilarity(itemVectorI, itemVectorJ);
+        similarityMatrix.set(i, j, similarity);
+      }
+    }
+  }
+
+  return similarityMatrix;
+};
+
+// Tính cosine similarity giữa hai vector
+const cosineSimilarity = (vectorA: number[], vectorB: number[]): number => {
+  let dotProduct = 0;
+  let magnitudeA = 0;
+  let magnitudeB = 0;
+
+  for (let i = 0; i < vectorA.length; i++) {
+    dotProduct += vectorA[i] * vectorB[i];
+    magnitudeA += vectorA[i] * vectorA[i];
+    magnitudeB += vectorB[i] * vectorB[i];
+  }
+
+  magnitudeA = Math.sqrt(magnitudeA);
+  magnitudeB = Math.sqrt(magnitudeB);
+
+  if (magnitudeA === 0 || magnitudeB === 0) {
+    return 0;
+  }
+
+  return dotProduct / (magnitudeA * magnitudeB);
 };

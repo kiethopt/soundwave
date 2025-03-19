@@ -21,10 +21,12 @@ if (!GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not defined in environment variables');
 }
 const genAI = new generative_ai_1.GoogleGenerativeAI(GEMINI_API_KEY);
+const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: modelName,
     systemInstruction: "You are an expert music curator who creates personalized playlists. Analyze user's music preferences and suggest tracks that match their taste.",
 });
+console.log(`[AI] Using Gemini model: ${modelName}`);
 const generatePersonalizedPlaylist = (userId_1, ...args_1) => __awaiter(void 0, [userId_1, ...args_1], void 0, function* (userId, options = {}) {
     try {
         const userListeningData = yield getUserListeningData(userId);

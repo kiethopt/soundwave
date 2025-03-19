@@ -10,6 +10,8 @@ import {
   Server,
   Shield,
   Clock,
+  Bot,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Card,
@@ -24,6 +26,13 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { SystemSettings } from '@/types';
 import { api } from '@/utils/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function SystemPage() {
   const { theme } = useTheme();
@@ -35,29 +44,38 @@ export default function SystemPage() {
     debugMode: false,
     sessionTimeout: 60,
     maxUploadSize: 10,
+    aiModel: 'gemini-2.0-flash',
+    supportedAIModels: [],
   });
 
   // Load system settings
   useEffect(() => {
-    const initializeCacheStatus = async () => {
+    const initializeSystemSettings = async () => {
       try {
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        const response = await api.admin.getCacheStatus(token);
+        // Lấy trạng thái cache
+        const cacheResponse = await api.admin.getCacheStatus(token);
+
+        // Lấy trạng thái AI model
+        const aiModelResponse = await api.admin.getAIModelStatus(token);
+
         setSettings((prev) => ({
           ...prev,
-          cacheEnabled: response.enabled,
+          cacheEnabled: cacheResponse.enabled,
+          aiModel: aiModelResponse.model,
+          supportedAIModels: aiModelResponse.supportedModels || [],
         }));
       } catch (error) {
-        console.error('Failed to get cache status:', error);
-        toast.error('Failed to load cache status');
+        console.error('Failed to get system settings:', error);
+        toast.error('Failed to load system settings');
       } finally {
         setLoading(false);
       }
     };
 
-    initializeCacheStatus();
+    initializeSystemSettings();
   }, []);
 
   // Update a system setting
@@ -72,7 +90,11 @@ export default function SystemPage() {
       if (key === 'cacheEnabled') {
         await api.admin.updateCacheStatus(value, token);
         toast.success('Cache settings updated successfully');
+      } else if (key === 'aiModel') {
+        await api.admin.updateAIModelStatus(value, token);
+        toast.success('AI model updated successfully');
       }
+
       setSettings((prev) => ({ ...prev, [key]: value }));
     } catch (error) {
       toast.error('Failed to update setting');
@@ -98,24 +120,6 @@ export default function SystemPage() {
       setRefreshing(null);
     }
   };
-
-  // Clear system cache
-  //   const clearCache = async () => {
-  //     try {
-  //       setRefreshing('cache');
-  //       // Simulate API request
-  //       await new Promise((resolve) => setTimeout(resolve, 1500));
-
-  //       // In a real implementation, you would call your API here
-  //       // await api.admin.clearCache(token);
-
-  //       toast.success('Cache cleared successfully');
-  //     } catch (error) {
-  //       toast.error('Failed to clear cache');
-  //     } finally {
-  //       setRefreshing(null);
-  //     }
-  //   };
 
   return (
     <div
@@ -194,7 +198,6 @@ export default function SystemPage() {
                 <Button
                   variant="outline"
                   className="w-full flex items-center justify-center gap-2"
-                  //   onClick={clearCache}
                   disabled={refreshing === 'cache'}
                 >
                   {refreshing === 'cache' ? (
@@ -209,6 +212,68 @@ export default function SystemPage() {
                     </>
                   )}
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* AI Model Management Card */}
+          <Card
+            className={
+              theme === 'light' ? 'bg-white' : 'bg-zinc-900 border-zinc-700'
+            }
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-emerald-500" />
+                AI Model Management
+              </CardTitle>
+              <CardDescription>
+                Configure Gemini AI model for automatic playlist generation
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Selected AI Model</Label>
+                <p
+                  className={`text-sm mb-2 ${
+                    theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                  }`}
+                >
+                  Choose the Gemini AI model to use for playlist generation
+                </p>
+
+                <Select
+                  value={settings.aiModel}
+                  onValueChange={(value) => updateSetting('aiModel', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select AI model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {settings.supportedAIModels?.map((model) => (
+                      <SelectItem key={model} value={model}>
+                        {model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div
+                  className={`
+                    flex items-center gap-2 mt-3 p-3 rounded-md
+                    ${
+                      theme === 'light'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-emerald-950/30 text-emerald-400 border border-emerald-900'
+                    }
+                  `}
+                >
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-xs font-medium">
+                    Selected model will be used for all AI-powered playlist
+                    generation
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -263,67 +328,6 @@ export default function SystemPage() {
                   </p>
                 </div>
                 <Switch disabled checked={settings.debugMode} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Security Settings Card - Disabled */}
-          <Card
-            className={`${
-              theme === 'light' ? 'bg-white' : 'bg-zinc-900 border-zinc-700'
-            } opacity-60 relative`}
-          >
-            <div className="absolute inset-0 flex items-center justify-center z-10">
-              <Shield className="h-10 w-10 text-gray-500 opacity-80" />
-            </div>
-            <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 opacity-30 z-0"></div>
-            <CardHeader className="relative z-1">
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-green-500" />
-                Security Settings
-              </CardTitle>
-              <CardDescription>
-                Configure system security parameters
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 relative z-1">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Session Timeout (minutes)</Label>
-                  <p
-                    className={`text-sm ${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
-                    }`}
-                  >
-                    Time before inactive users are logged out
-                  </p>
-                </div>
-                <select
-                  disabled
-                  value={settings.sessionTimeout}
-                  className={`rounded-md px-3 py-1.5 ${
-                    theme === 'light'
-                      ? 'bg-white border-gray-300'
-                      : 'bg-zinc-800 border-zinc-700 text-white'
-                  }`}
-                >
-                  <option value={60}>60</option>
-                </select>
-              </div>
-
-              <Separator
-                className={theme === 'light' ? 'bg-gray-200' : 'bg-gray-700'}
-              />
-
-              <div className="pt-2">
-                <Button
-                  variant="outline"
-                  className="w-full flex items-center justify-center gap-2"
-                  disabled
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh Security Settings
-                </Button>
               </div>
             </CardContent>
           </Card>

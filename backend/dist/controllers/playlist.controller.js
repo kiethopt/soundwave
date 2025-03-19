@@ -45,7 +45,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = exports.createPersonalizedPlaylist = void 0;
 const client_1 = require("@prisma/client");
 const aiService = __importStar(require("../services/ai.service"));
-const handle_utils_1 = require("src/utils/handle-utils");
+const handle_utils_1 = require("../utils/handle-utils");
 const prisma = new client_1.PrismaClient();
 const createPersonalizedPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {

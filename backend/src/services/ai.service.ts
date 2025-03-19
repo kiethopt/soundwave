@@ -8,11 +8,15 @@ if (!GEMINI_API_KEY) {
 }
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
+// Sử dụng model từ biến môi trường, mặc định là gemini-2.0-flash nếu không được cấu hình
+const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+
 const model = genAI.getGenerativeModel({
-  model: 'gemini-2.0-flash',
+  model: modelName,
   systemInstruction:
     "You are an expert music curator who creates personalized playlists. Analyze user's music preferences and suggest tracks that match their taste.",
 });
+console.log(`[AI] Using Gemini model: ${modelName}`);
 
 interface PlaylistGenerationOptions {
   name?: string;

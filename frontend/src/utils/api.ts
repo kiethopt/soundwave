@@ -120,6 +120,19 @@ export const api = {
   },
 
   admin: {
+    getAIModelStatus: async (token: string) =>
+      fetchWithAuth('/api/admin/system/ai-model', { method: 'GET' }, token),
+
+    updateAIModelStatus: async (model: string, token: string) =>
+      fetchWithAuth(
+        '/api/admin/system/ai-model',
+        {
+          method: 'POST',
+          body: JSON.stringify({ model }),
+        },
+        token
+      ),
+
     getArtistRequests: async (
       token: string,
       page: number = 1,
@@ -285,6 +298,13 @@ export const api = {
           method: 'POST',
           body: JSON.stringify({ enabled }),
         },
+        token
+      ),
+
+    getRecommendationMatrix: async (limit: number, token: string) =>
+      fetchWithAuth(
+        `/api/admin/analytics/matrix?limit=${limit}`,
+        { method: 'GET' },
         token
       ),
   },
@@ -843,6 +863,26 @@ export const api = {
         const text = await response.text();
         console.error('Error response:', text);
         throw new Error('Không thể thêm bài hát vào playlist');
+      }
+
+      return response.json();
+    },
+
+    createPersonalized: async (token: string, data: any) => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/playlists/personalized`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(data),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to create personalized playlist');
       }
 
       return response.json();

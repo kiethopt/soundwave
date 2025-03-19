@@ -379,3 +379,39 @@ export const handleCacheStatus = async (
     handleError(res, error, 'Manage cache status');
   }
 };
+
+// Lấy và cập nhật trạng thái model AI - ADMIN only
+export const handleAIModelStatus = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { model } = req.method === 'POST' ? req.body : {};
+    const result = await adminService.updateAIModel(model);
+    res.json(result);
+  } catch (error) {
+    handleError(res, error, 'Manage AI model');
+  }
+};
+
+// Lấy ma trận đề xuất - ADMIN only
+export const getRecommendationMatrix = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+    const matrix = await adminService.getRecommendationMatrix(limit);
+
+    if (!matrix.success) {
+      res.status(400).json({
+        message: matrix.message || 'Failed to retrieve recommendation matrix',
+      });
+      return;
+    }
+
+    res.json(matrix);
+  } catch (error) {
+    handleError(res, error, 'Get recommendation matrix');
+  }
+};

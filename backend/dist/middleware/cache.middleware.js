@@ -65,10 +65,13 @@ exports.client = process.env.USE_REDIS_CACHE === 'true'
     : new MockRedisClient();
 if (process.env.USE_REDIS_CACHE === 'true') {
     exports.client.on('error', (err) => console.error('Redis error:', err));
+    exports.client.on('connect', () => console.log('[Redis] Client connected successfully'));
+    exports.client.on('ready', () => console.log('[Redis] Client ready to use'));
     (() => __awaiter(void 0, void 0, void 0, function* () {
         try {
             if (!exports.client.isOpen) {
                 yield exports.client.connect();
+                console.log('[Redis] Connection status:', exports.client.isOpen ? 'Connected' : 'Disconnected');
             }
         }
         catch (error) {
@@ -97,7 +100,8 @@ const cacheMiddleware = (req, res, next) => {
             const cachedData = yield exports.client.get(key);
             if (cachedData) {
                 console.log(`[Redis] Cache hit for: ${key}`);
-                res.json(JSON.parse(cachedData));
+                const parsedData = JSON.parse(cachedData);
+                res.json(parsedData);
                 responseSent = true;
                 return;
             }
@@ -105,6 +109,7 @@ const cacheMiddleware = (req, res, next) => {
             const originalJson = res.json;
             res.json = function (body) {
                 if (!responseSent) {
+                    responseSent = true;
                     console.log(`[Redis] Caching data for: ${key}`);
                     (0, exports.setCache)(key, body).catch((error) => console.error('Cache save error:', error));
                 }
@@ -119,11 +124,13 @@ const cacheMiddleware = (req, res, next) => {
     }))();
 };
 exports.cacheMiddleware = cacheMiddleware;
-const setCache = (key_1, data_1, ...args_1) => __awaiter(void 0, [key_1, data_1, ...args_1], void 0, function* (key, data, ttl = 600) {
+const setCache = (key_1, data_1, ...args_1) => __awaiter(void 0, [key_1, data_1, ...args_1], void 0, function* (key, data, ttl = 3600) {
     if (process.env.USE_REDIS_CACHE !== 'true' || !exports.client.isOpen)
         return;
     try {
+        console.log(`[Redis] Setting cache for ${key} with TTL ${ttl}s`);
         yield exports.client.set(key, JSON.stringify(data), { EX: ttl });
+        console.log(`[Redis] Cache set successfully for ${key}`);
     }
     catch (error) {
         console.error('Cache set error:', error);

@@ -23,7 +23,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
@@ -582,4 +582,356 @@ const getAllGenres = () => __awaiter(void 0, void 0, void 0, function* () {
     return genres;
 });
 exports.getAllGenres = getAllGenres;
+const editProfile = (user, profileData, avatarFile) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!user) {
+        throw new Error('Unauthorized');
+    }
+    const { email, username, name, avatar } = profileData;
+    if (email) {
+        const existingUser = yield db_1.default.user.findUnique({
+            where: { email },
+        });
+        if (existingUser && existingUser.id !== user.id) {
+            throw new Error('Email already in use');
+        }
+    }
+    if (username) {
+        const existingUsername = yield db_1.default.user.findUnique({
+            where: { username },
+        });
+        if (existingUsername && existingUsername.id !== user.id) {
+            throw new Error('Username already in use');
+        }
+    }
+    let avatarUrl = null;
+    if (avatarFile) {
+        const uploadResult = yield (0, upload_service_1.uploadFile)(avatarFile.buffer, 'user-avatars');
+        avatarUrl = uploadResult.secure_url;
+    }
+    const updateData = {};
+    if (email)
+        updateData.email = email;
+    if (username)
+        updateData.username = username;
+    if (name)
+        updateData.name = name;
+    if (avatarFile)
+        updateData.avatar = avatarUrl;
+    else if (avatar)
+        updateData.avatar = avatar;
+    if (Object.keys(updateData).length === 0) {
+        throw new Error('No data provided for update');
+    }
+    return db_1.default.user.update({
+        where: { id: user.id },
+        data: updateData,
+        select: prisma_selects_1.userSelect,
+    });
+});
+exports.editProfile = editProfile;
+const getUserProfile = (id) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield db_1.default.user.findUnique({
+        where: { id },
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            username: true,
+            avatar: true,
+            role: true,
+            isActive: true,
+        },
+    });
+    if (!user) {
+        throw new Error('User not found');
+    }
+    return user;
+});
+exports.getUserProfile = getUserProfile;
+const getRecommendedArtists = (user) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!user) {
+        throw new Error('Unauthorized');
+    }
+    const cacheKey = `/api/user/${user.id}/recommended-artists`;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        const cachedData = yield cache_middleware_1.client.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+    }
+    const history = yield db_1.default.history.findMany({
+        where: {
+            userId: user.id,
+            type: client_1.HistoryType.PLAY,
+            playCount: { gt: 0 },
+        },
+        select: {
+            track: {
+                select: {
+                    artist: {
+                        select: {
+                            id: true,
+                            artistName: true,
+                            avatar: true,
+                            genres: {
+                                select: {
+                                    genre: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        take: 3,
+    });
+    const genreIds = history
+        .flatMap((h) => { var _a; return ((_a = h.track) === null || _a === void 0 ? void 0 : _a.artist.genres.map((g) => g.genre.id)) || []; })
+        .filter((id) => id !== null);
+    const recommendedArtists = yield db_1.default.artistProfile.findMany({
+        where: {
+            isVerified: true,
+            genres: {
+                some: {
+                    genreId: {
+                        in: genreIds,
+                    },
+                },
+            },
+        },
+        select: {
+            id: true,
+            artistName: true,
+            bio: true,
+            avatar: true,
+            role: true,
+            socialMediaLinks: true,
+            monthlyListeners: true,
+            isVerified: true,
+            isActive: true,
+            verificationRequestedAt: true,
+            verifiedAt: true,
+            genres: {
+                select: {
+                    genre: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        yield (0, cache_middleware_1.setCache)(cacheKey, recommendedArtists, 1800);
+    }
+    return recommendedArtists;
+});
+exports.getRecommendedArtists = getRecommendedArtists;
+const getTopAlbums = () => __awaiter(void 0, void 0, void 0, function* () {
+    const cacheKey = '/api/top-albums';
+    const monthStart = getMonthStartDate();
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        const cachedData = yield cache_middleware_1.client.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+    }
+    const albums = yield db_1.default.album.findMany({
+        where: {
+            isActive: true,
+            tracks: {
+                some: {
+                    isActive: true,
+                    history: {
+                        some: {
+                            type: 'PLAY',
+                            createdAt: { gte: monthStart },
+                        },
+                    },
+                },
+            },
+        },
+        select: prisma_selects_1.searchAlbumSelect,
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+    });
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        yield (0, cache_middleware_1.setCache)(cacheKey, albums, 1800);
+    }
+    return albums;
+});
+exports.getTopAlbums = getTopAlbums;
+const getTopArtists = () => __awaiter(void 0, void 0, void 0, function* () {
+    const cacheKey = '/api/top-artists';
+    const monthStart = getMonthStartDate();
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        const cachedData = yield cache_middleware_1.client.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+    }
+    const artists = yield db_1.default.artistProfile.findMany({
+        where: {
+            isVerified: true,
+            tracks: {
+                some: {
+                    isActive: true,
+                    history: {
+                        some: {
+                            type: 'PLAY',
+                            createdAt: { gte: monthStart },
+                        },
+                    },
+                },
+            },
+        },
+        select: {
+            id: true,
+            artistName: true,
+            avatar: true,
+            monthlyListeners: true,
+            genres: {
+                select: {
+                    genre: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                },
+            },
+            tracks: {
+                where: { isActive: true },
+                select: {
+                    history: {
+                        where: {
+                            type: 'PLAY',
+                            createdAt: { gte: monthStart },
+                        },
+                        select: {
+                            userId: true,
+                            playCount: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+    const artistsWithMonthlyMetrics = artists.map((artist) => {
+        const uniqueListeners = new Set();
+        let monthlyPlays = 0;
+        artist.tracks.forEach((track) => {
+            track.history.forEach((h) => {
+                uniqueListeners.add(h.userId);
+                monthlyPlays += h.playCount || 0;
+            });
+        });
+        return Object.assign(Object.assign({}, artist), { monthlyListeners: uniqueListeners.size, monthlyPlays });
+    });
+    const topArtists = artistsWithMonthlyMetrics
+        .sort((a, b) => b.monthlyListeners - a.monthlyListeners)
+        .slice(0, 20);
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        yield (0, cache_middleware_1.setCache)(cacheKey, topArtists, 1800);
+    }
+    return topArtists;
+});
+exports.getTopArtists = getTopArtists;
+const getTopTracks = () => __awaiter(void 0, void 0, void 0, function* () {
+    const cacheKey = '/api/top-tracks';
+    const monthStart = getMonthStartDate();
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        const cachedData = yield cache_middleware_1.client.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+    }
+    const tracks = yield db_1.default.track.findMany({
+        where: {
+            isActive: true,
+            history: {
+                some: {
+                    type: 'PLAY',
+                    createdAt: { gte: monthStart },
+                },
+            },
+        },
+        select: {
+            id: true,
+            title: true,
+            coverUrl: true,
+            duration: true,
+            audioUrl: true,
+            playCount: true,
+            artist: {
+                select: {
+                    id: true,
+                    artistName: true,
+                    avatar: true,
+                },
+            },
+            album: {
+                select: {
+                    id: true,
+                    title: true,
+                    coverUrl: true,
+                },
+            },
+            featuredArtists: {
+                select: {
+                    artistProfile: {
+                        select: {
+                            id: true,
+                            artistName: true,
+                        },
+                    },
+                },
+            },
+            history: {
+                where: {
+                    type: 'PLAY',
+                    createdAt: { gte: monthStart },
+                },
+                select: {
+                    playCount: true,
+                },
+            },
+        },
+        orderBy: {
+            playCount: 'desc',
+        },
+        take: 20,
+    });
+    const tracksWithMonthlyPlays = tracks.map((track) => (Object.assign(Object.assign({}, track), { monthlyPlays: track.history.reduce((sum, h) => sum + (h.playCount || 0), 0) })));
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        yield (0, cache_middleware_1.setCache)(cacheKey, tracksWithMonthlyPlays, 1800);
+    }
+    return tracksWithMonthlyPlays;
+});
+exports.getTopTracks = getTopTracks;
+const getNewestTracks = () => __awaiter(void 0, void 0, void 0, function* () {
+    return db_1.default.track.findMany({
+        where: { isActive: true },
+        select: prisma_selects_1.searchTrackSelect,
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+    });
+});
+exports.getNewestTracks = getNewestTracks;
+const getNewestAlbums = () => __awaiter(void 0, void 0, void 0, function* () {
+    return db_1.default.album.findMany({
+        where: { isActive: true },
+        select: prisma_selects_1.searchAlbumSelect,
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+    });
+});
+exports.getNewestAlbums = getNewestAlbums;
 //# sourceMappingURL=user.service.js.map

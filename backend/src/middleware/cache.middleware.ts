@@ -56,12 +56,20 @@ export const client =
 if (process.env.USE_REDIS_CACHE === 'true') {
   // Đã được định danh kiểu rõ ràng tham số err
   client.on('error', (err: Error) => console.error('Redis error:', err));
+  client.on('connect', () =>
+    console.log('[Redis] Client connected successfully')
+  );
+  client.on('ready', () => console.log('[Redis] Client ready to use'));
 
   // Kết nối Redis nếu cache được bật
   (async () => {
     try {
       if (!client.isOpen) {
         await client.connect();
+        console.log(
+          '[Redis] Connection status:',
+          client.isOpen ? 'Connected' : 'Disconnected'
+        );
       }
     } catch (error) {
       console.error('Redis connection failed:', error);
@@ -101,16 +109,19 @@ export const cacheMiddleware = (
 
       if (cachedData) {
         console.log(`[Redis] Cache hit for: ${key}`);
-        res.json(JSON.parse(cachedData));
+        const parsedData = JSON.parse(cachedData);
+        res.json(parsedData);
         responseSent = true;
         return;
       }
 
       console.log(`[Redis] Cache miss for: ${key}`);
 
+      // Lưu JSON gốc
       const originalJson = res.json;
       res.json = function (body: any) {
         if (!responseSent) {
+          responseSent = true; // Tránh set cache nhiều lần
           console.log(`[Redis] Caching data for: ${key}`);
           setCache(key, body).catch((error) =>
             console.error('Cache save error:', error)
@@ -127,11 +138,13 @@ export const cacheMiddleware = (
   })();
 };
 
-export const setCache = async (key: string, data: any, ttl: number = 600) => {
+export const setCache = async (key: string, data: any, ttl: number = 3600) => {
   if (process.env.USE_REDIS_CACHE !== 'true' || !client.isOpen) return;
 
   try {
+    console.log(`[Redis] Setting cache for ${key} with TTL ${ttl}s`);
     await client.set(key, JSON.stringify(data), { EX: ttl });
+    console.log(`[Redis] Cache set successfully for ${key}`);
   } catch (error) {
     console.error('Cache set error:', error);
   }

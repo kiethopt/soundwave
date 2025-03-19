@@ -42,7 +42,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.getRecommendationMatrix = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -338,4 +338,32 @@ const handleCacheStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.handleCacheStatus = handleCacheStatus;
+const handleAIModelStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { model } = req.method === 'POST' ? req.body : {};
+        const result = yield adminService.updateAIModel(model);
+        res.json(result);
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Manage AI model');
+    }
+});
+exports.handleAIModelStatus = handleAIModelStatus;
+const getRecommendationMatrix = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const limit = req.query.limit ? parseInt(req.query.limit) : 100;
+        const matrix = yield adminService.getRecommendationMatrix(limit);
+        if (!matrix.success) {
+            res.status(400).json({
+                message: matrix.message || 'Failed to retrieve recommendation matrix',
+            });
+            return;
+        }
+        res.json(matrix);
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Get recommendation matrix');
+    }
+});
+exports.getRecommendationMatrix = getRecommendationMatrix;
 //# sourceMappingURL=admin.controller.js.map

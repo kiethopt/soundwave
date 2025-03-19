@@ -1,5 +1,3 @@
-import exp from 'constants';
-
 // Settings Icon
 export const Settings = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -1115,3 +1113,46 @@ export const Volume = (props: React.SVGProps<SVGSVGElement>) => (
     />
   </svg>
 );
+
+export function MagicWand(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="m8 9 3 3-3 3 3-3 3 3" />
+      <path d="M20 4v6.5a7.5 7.5 0 0 1-7.5 7.5h-7.5a3 3 0 0 0 0 6H12" />
+      <path d="M4 12a3 3 0 0 1 3-3h5.5a7.5 7.5 0 0 0 7.5-7.5V1" />
+    </svg>
+  );
+}
+
+export function ChartIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M3 3v18h18" />
+      <path d="M18 17V9" />
+      <path d="M13 17V5" />
+      <path d="M8 17v-3" />
+    </svg>
+  );
+}

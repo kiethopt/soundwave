@@ -584,18 +584,7 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         if (user.role !== client_1.Role.ADMIN && ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id)) {
             conditions.push({
-                OR: [
-                    { artistId: user.artistProfile.id },
-                    {
-                        tracks: {
-                            some: {
-                                featuredArtists: {
-                                    some: { artistId: user.artistProfile.id },
-                                },
-                            },
-                        },
-                    },
-                ],
+                artistId: user.artistProfile.id,
             });
         }
         if (conditions.length > 0) {

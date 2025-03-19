@@ -2,11 +2,12 @@ import { Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { RequestHandler } from 'express';
 import * as aiService from '../services/ai.service';
-import { handleError } from 'src/utils/handle-utils';
+// import * as playlistService from '../services/playlist.service';
+import { handleError } from '../utils/handle-utils';
 
 const prisma = new PrismaClient();
 
-// Tạo playlist AI dựa trên các yếu tố được chọn
+// Tạo playlist dựa trên các yếu tố được chọn
 export const createPersonalizedPlaylist = async (
   req: Request,
   res: Response

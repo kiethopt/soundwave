@@ -13,6 +13,7 @@ import {
   LibraryFilled,
   HomeOutline,
   Settings,
+  ChartIcon,
 } from '@/components/ui/Icons';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -369,6 +370,29 @@ export default function Sidebar({
                     <>
                       <HomeOutline className="w-6 h-6" />
                       <span>Dashboard</span>
+                    </>
+                  )}
+                </Link>
+
+                {/* Analytics Section */}
+                <Link
+                  href="/admin/analytics"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                    pathname.startsWith('/admin/analytics')
+                      ? theme === 'light'
+                        ? 'bg-gray-200 text-gray-900'
+                        : 'bg-white/10 text-white'
+                      : theme === 'light'
+                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {isCollapsed ? (
+                    <ChartIcon className="w-6 h-6 mx-auto" />
+                  ) : (
+                    <>
+                      <ChartIcon className="w-6 h-6" />
+                      <span>Analytics</span>
                     </>
                   )}
                 </Link>

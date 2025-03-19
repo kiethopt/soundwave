@@ -1,59 +1,6 @@
 import { Request, Response } from 'express';
-import prisma from '../config/db';
-import { FollowingType, HistoryType, Role } from '@prisma/client';
-import { client, setCache } from '../middleware/cache.middleware';
-import { uploadFile } from '../services/upload.service';
-import {
-  searchAlbumSelect,
-  searchTrackSelect,
-  userSelect,
-} from '../utils/prisma-selects';
-import pusher from '../config/pusher';
 import * as userService from '../services/user.service';
-import { handleError } from 'src/utils/handle-utils';
-
-const getMonthStartDate = (): Date => {
-  const date = new Date();
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-};
-
-// Hàm validation cho dữ liệu nghệ sĩ
-const validateArtistData = (data: any): string | null => {
-  const { artistName, bio, socialMediaLinks, genres } = data;
-
-  if (!artistName?.trim()) return 'Artist name is required';
-  if (artistName.length < 3) return 'Artist name must be at least 3 characters';
-
-  if (bio && bio.length > 500) return 'Bio must be less than 500 characters';
-
-  // Kiểm tra socialMediaLinks
-  if (socialMediaLinks) {
-    if (
-      typeof socialMediaLinks !== 'object' ||
-      Array.isArray(socialMediaLinks)
-    ) {
-      return 'socialMediaLinks must be an object';
-    }
-
-    // Chỉ cho phép facebook và instagram
-    const allowedPlatforms = ['facebook', 'instagram'];
-    for (const key in socialMediaLinks) {
-      if (!allowedPlatforms.includes(key)) {
-        return `Invalid social media platform: ${key}`;
-      }
-      if (typeof socialMediaLinks[key] !== 'string') {
-        return `socialMediaLinks.${key} must be a string`;
-      }
-    }
-  }
-
-  // Kiểm tra genres
-  if (!genres || !Array.isArray(genres) || genres.length === 0) {
-    return 'At least one genre is required';
-  }
-
-  return null;
-};
+import { handleError } from '../utils/handle-utils';
 
 // Yêu cầu trở thành Artist (Request Artist Role)
 export const requestToBecomeArtist = async (
@@ -211,7 +158,11 @@ export const editProfile = async (
   res: Response
 ): Promise<void> => {
   try {
-    const updatedUser = await userService.editProfile(req.user, req.body, req.file);
+    const updatedUser = await userService.editProfile(
+      req.user,
+      req.body,
+      req.file
+    );
     res.json(updatedUser);
   } catch (error) {
     if (error instanceof Error) {
@@ -272,7 +223,9 @@ export const getRecommendedArtists = async (
   res: Response
 ): Promise<void> => {
   try {
-    const recommendedArtists = await userService.getRecommendedArtists(req.user);
+    const recommendedArtists = await userService.getRecommendedArtists(
+      req.user
+    );
     res.json(recommendedArtists);
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {

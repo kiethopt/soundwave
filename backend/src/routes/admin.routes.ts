@@ -17,6 +17,8 @@ import {
   deleteArtist,
   updateArtist,
   handleCacheStatus,
+  handleAIModelStatus,
+  getRecommendationMatrix,
 } from '../controllers/admin.controller';
 import * as genreController from '../controllers/genre.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
@@ -131,6 +133,20 @@ router.post(
   authenticate,
   authorize([Role.ADMIN]),
   rejectArtistRequest
+);
+
+// Cập nhật trạng thái model AI
+router
+  .route('/system/ai-model')
+  .get(authenticate, authorize([Role.ADMIN]), handleAIModelStatus)
+  .post(authenticate, authorize([Role.ADMIN]), handleAIModelStatus);
+
+// Analytics routes
+router.get(
+  '/analytics/matrix',
+  authenticate,
+  authorize([Role.ADMIN]),
+  getRecommendationMatrix
 );
 
 export default router;
