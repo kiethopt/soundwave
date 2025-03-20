@@ -594,80 +594,256 @@ const analyzeUserTaste = (userId) => __awaiter(void 0, void 0, void 0, function*
 exports.analyzeUserTaste = analyzeUserTaste;
 const generateGlobalRecommendedPlaylist = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (limit = 20) {
     try {
-        const userHistories = yield db_1.default.history.findMany({
-            where: {
-                type: 'PLAY',
-                trackId: { not: null },
-                playCount: { gt: 0 },
-            },
-            select: {
-                userId: true,
-                trackId: true,
-                playCount: true,
-            },
-        });
-        const userLikes = yield db_1.default.userLikeTrack.findMany({
-            select: {
-                userId: true,
-                trackId: true,
-            },
-        });
-        const tracks = new Map();
-        userHistories.forEach((history) => {
-            if (history.trackId) {
-                const trackId = history.trackId;
-                const trackInfo = tracks.get(trackId) || { count: 0, score: 0 };
-                trackInfo.count += 1;
-                trackInfo.score += history.playCount || 1;
-                tracks.set(trackId, trackInfo);
-            }
-        });
-        userLikes.forEach((like) => {
-            if (like.trackId) {
-                const trackId = like.trackId;
-                const trackInfo = tracks.get(trackId) || { count: 0, score: 0 };
-                trackInfo.count += 1;
-                trackInfo.score += 3;
-                tracks.set(trackId, trackInfo);
-            }
-        });
-        const sortedTracks = Array.from(tracks.entries())
-            .sort((a, b) => {
-            if (b[1].score !== a[1].score) {
-                return b[1].score - a[1].score;
-            }
-            return b[1].count - a[1].count;
-        })
-            .slice(0, limit)
-            .map((entry) => entry[0]);
-        const recommendedTracks = yield db_1.default.track.findMany({
-            where: {
-                id: { in: sortedTracks },
-                isActive: true,
-            },
-            include: {
-                artist: true,
-                album: true,
-                genres: {
-                    include: {
-                        genre: true,
+        console.log('[PlaylistService] Starting global recommended playlist generation, limit:', limit);
+        console.log('[PlaylistService] Fetching user interactions data...');
+        const [userHistories, userLikes, allTracks] = yield Promise.all([
+            db_1.default.history.findMany({
+                where: {
+                    type: 'PLAY',
+                    trackId: { not: null },
+                    playCount: { gt: 0 },
+                },
+                include: {
+                    track: {
+                        include: {
+                            genres: {
+                                include: {
+                                    genre: true,
+                                },
+                            },
+                            artist: true,
+                        },
                     },
                 },
-            },
+            }),
+            db_1.default.userLikeTrack.findMany({
+                where: {},
+                include: {
+                    track: {
+                        include: {
+                            genres: {
+                                include: {
+                                    genre: true,
+                                },
+                            },
+                            artist: true,
+                        },
+                    },
+                },
+            }),
+            db_1.default.track.findMany({
+                where: {
+                    isActive: true,
+                },
+                include: {
+                    genres: {
+                        include: {
+                            genre: true,
+                        },
+                    },
+                    artist: true,
+                },
+            }),
+        ]);
+        console.log('[PlaylistService] Data fetched:', 'userHistories:', userHistories.length, 'userLikes:', userLikes.length, 'allTracks:', allTracks.length);
+        if (allTracks.length === 0) {
+            console.log('[PlaylistService] No active tracks found in the database');
+            return {
+                name: '',
+                description: '',
+                tracks: [],
+                totalTracks: 0,
+                totalDuration: 0,
+            };
+        }
+        console.log('[PlaylistService] Calculating track scores...');
+        const trackScores = new Map();
+        allTracks.forEach((track) => {
+            trackScores.set(track.id, {
+                score: 0,
+                playCount: 0,
+                likeCount: 0,
+                completionRate: 0.5,
+                lastPlayed: new Date(0),
+                genres: new Set(track.genres.map((g) => g.genre.name)),
+                artistId: track.artistId,
+                track,
+            });
+        });
+        console.log('[PlaylistService] Processing play history...');
+        userHistories.forEach((history) => {
+            if (!history.track)
+                return;
+            const trackInfo = trackScores.get(history.trackId);
+            if (!trackInfo)
+                return;
+            const daysAgo = (Date.now() - history.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+            const timeDecayFactor = Math.exp(-0.1 * daysAgo);
+            const completion = history.duration && history.track.duration
+                ? Math.min(history.duration / history.track.duration, 1)
+                : 0.5;
+            trackInfo.playCount += history.playCount || 1;
+            if (history.duration && history.track.duration) {
+                trackInfo.completionRate =
+                    (trackInfo.completionRate * (trackInfo.playCount - 1) + completion) /
+                        trackInfo.playCount;
+            }
+            trackInfo.score +=
+                (history.playCount || 1) * timeDecayFactor * (0.5 + 0.5 * completion);
+            trackInfo.lastPlayed = new Date(Math.max(trackInfo.lastPlayed.getTime(), history.createdAt.getTime()));
+        });
+        allTracks.forEach((track) => {
+            const trackInfo = trackScores.get(track.id);
+            if (trackInfo) {
+                trackInfo.playCount = Math.max(trackInfo.playCount, track.playCount);
+                trackInfo.score += track.playCount;
+            }
+        });
+        console.log('[PlaylistService] Processing likes...');
+        userLikes.forEach((like) => {
+            if (!like.track)
+                return;
+            const trackInfo = trackScores.get(like.trackId);
+            if (!trackInfo)
+                return;
+            const daysAgo = (Date.now() - like.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+            const timeDecayFactor = Math.exp(-0.05 * daysAgo);
+            trackInfo.likeCount += 1;
+            trackInfo.score += 3 * timeDecayFactor;
+        });
+        console.log('[PlaylistService] Track scores summary:');
+        const trackScoresList = Array.from(trackScores.entries());
+        trackScoresList
+            .sort((a, b) => b[1].score - a[1].score)
+            .slice(0, 10)
+            .forEach(([trackId, info]) => {
+            console.log(`Track: ${info.track.title} - PlayCount: ${info.playCount} - LikeCount: ${info.likeCount} - Score: ${info.score.toFixed(2)} - CompletionRate: ${info.completionRate.toFixed(2)}`);
+        });
+        console.log('[PlaylistService] Applying quality filters...');
+        const popularity = {
+            highPlayCount: 10,
+            highLikeCount: 3,
+            highScore: 20,
+            mediumPlayCount: 5,
+            mediumLikeCount: 2,
+            mediumScore: 10,
+            minPlayCount: 1,
+            minLikeCount: 1,
+        };
+        let qualityTracks = trackScoresList.filter(([_, info]) => info.playCount >= popularity.highPlayCount ||
+            info.likeCount >= popularity.highLikeCount ||
+            info.score >= popularity.highScore);
+        console.log('[PlaylistService] Tracks after high quality filter:', qualityTracks.length);
+        if (qualityTracks.length < Math.min(limit, 10)) {
+            qualityTracks = trackScoresList.filter(([_, info]) => info.playCount >= popularity.mediumPlayCount ||
+                info.likeCount >= popularity.mediumLikeCount ||
+                info.score >= popularity.mediumScore);
+            console.log('[PlaylistService] Tracks after medium quality filter:', qualityTracks.length);
+        }
+        if (qualityTracks.length < Math.min(limit / 2, 5)) {
+            qualityTracks = trackScoresList.filter(([_, info]) => info.playCount >= popularity.minPlayCount ||
+                info.likeCount >= popularity.minLikeCount);
+            console.log('[PlaylistService] Tracks after minimum quality filter:', qualityTracks.length);
+        }
+        qualityTracks.sort((a, b) => b[1].score - a[1].score);
+        qualityTracks.slice(0, 5).forEach(([_, info]) => {
+            console.log(`After filter - Track: ${info.track.title} - Score: ${info.score.toFixed(2)} - PlayCount: ${info.playCount} - LikeCount: ${info.likeCount}`);
+        });
+        if (qualityTracks.length === 0) {
+            console.log('[PlaylistService] No tracks meet quality criteria, using most played tracks instead...');
+            const topTracks = trackScoresList
+                .sort((a, b) => b[1].playCount - a[1].playCount)
+                .slice(0, limit);
+            console.log('[PlaylistService] Tracks after using play count only:', topTracks.length);
+            if (topTracks.length === 0) {
+                console.log('[PlaylistService] No tracks with plays, using random active tracks fallback');
+                if (allTracks.length > 0) {
+                    console.log('[PlaylistService] Using random tracks fallback');
+                    const shuffledTracks = [...allTracks].sort(() => 0.5 - Math.random());
+                    const randomTracks = shuffledTracks.slice(0, Math.min(limit, shuffledTracks.length));
+                    const playlist = {
+                        name: 'Soundwave Hits: Trending Right Now',
+                        description: 'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave, được cập nhật tự động dựa trên hoạt động nghe nhạc của cộng đồng.',
+                        tracks: randomTracks,
+                        isGlobal: true,
+                        totalTracks: randomTracks.length,
+                        totalDuration: randomTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+                        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
+                    };
+                    console.log('[PlaylistService] Generated playlist with random tracks - count:', randomTracks.length);
+                    return playlist;
+                }
+                console.log('[PlaylistService] No tracks after all fallbacks, returning empty playlist');
+                return {
+                    name: '',
+                    description: '',
+                    tracks: [],
+                    totalTracks: 0,
+                    totalDuration: 0,
+                };
+            }
+            const finalTracks = topTracks.map(([_, info]) => info.track);
+            const playlist = {
+                name: 'Soundwave Hits: Trending Right Now',
+                description: 'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave, được cập nhật tự động dựa trên hoạt động nghe nhạc của cộng đồng.',
+                tracks: finalTracks,
+                isGlobal: true,
+                totalTracks: finalTracks.length,
+                totalDuration: finalTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+                coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
+            };
+            console.log('[PlaylistService] Generated playlist with relaxed criteria - tracks:', finalTracks.length);
+            return playlist;
+        }
+        console.log('[PlaylistService] Creating diverse playlist...');
+        const selectedTracks = new Set();
+        const selectedGenres = new Map();
+        const selectedArtists = new Map();
+        const finalTracks = [];
+        for (const [trackId, info] of qualityTracks) {
+            if (finalTracks.length >= limit)
+                break;
+            if (selectedTracks.has(trackId))
+                continue;
+            const artistCount = selectedArtists.get(info.artistId) || 0;
+            if (artistCount >= 3)
+                continue;
+            let genreOk = true;
+            for (const genre of info.genres) {
+                const genreCount = selectedGenres.get(genre) || 0;
+                if (genreCount >= 5) {
+                    genreOk = false;
+                    break;
+                }
+            }
+            if (!genreOk)
+                continue;
+            selectedTracks.add(trackId);
+            selectedArtists.set(info.artistId, artistCount + 1);
+            info.genres.forEach((genre) => {
+                selectedGenres.set(genre, (selectedGenres.get(genre) || 0) + 1);
+            });
+            finalTracks.push(info.track);
+        }
+        console.log('[PlaylistService] Final tracks selected:', finalTracks.length);
+        console.log('[PlaylistService] Selected tracks:');
+        finalTracks.slice(0, 5).forEach((track) => {
+            console.log(`- ${track.title} (PlayCount: ${track.playCount})`);
         });
         const playlist = {
             name: 'Soundwave Hits: Trending Right Now',
-            description: 'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave',
-            tracks: recommendedTracks,
+            description: 'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave, được cập nhật tự động dựa trên hoạt động nghe nhạc của cộng đồng.',
+            tracks: finalTracks,
             isGlobal: true,
-            totalTracks: recommendedTracks.length,
-            totalDuration: recommendedTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+            totalTracks: finalTracks.length,
+            totalDuration: finalTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
             coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
         };
+        console.log('[PlaylistService] Generated playlist - tracks:', finalTracks.length);
         return playlist;
     }
     catch (error) {
-        console.error('Error generating global recommended playlist:', error);
+        console.error('[PlaylistService] Error generating global recommended playlist:', error);
         throw new Error('Failed to generate global recommended playlist');
     }
 });

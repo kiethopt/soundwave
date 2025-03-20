@@ -5,6 +5,7 @@ import {
   validateField,
 } from '../utils/handle-utils';
 import * as adminService from '../services/admin.service';
+import prisma from '../config/db';
 
 // Lấy danh sách tất cả người dùng - ADMIN only
 export const getAllUsers = async (
@@ -413,5 +414,91 @@ export const getRecommendationMatrix = async (
     res.json(matrix);
   } catch (error) {
     handleError(res, error, 'Get recommendation matrix');
+  }
+};
+
+// Update global playlist
+export const updateGlobalPlaylist = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    console.log('[Admin Controller] Starting global playlist update...');
+
+    // Call the method directly from the extended prisma client
+    const result = await prisma.playlist.updateGlobalPlaylist();
+
+    // Let the user know the result of the update
+    res.json({
+      success: true,
+      message: 'Global playlist update process completed',
+      result: result,
+    });
+  } catch (error) {
+    console.error('Error updating global playlist:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update global playlist',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+// Debug hàm update global playlist
+export const debugActiveTracks = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const activeTracks = await prisma.track.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        title: true,
+        artistId: true,
+        artist: {
+          select: {
+            artistName: true,
+          },
+        },
+        playCount: true,
+        _count: {
+          select: {
+            likedBy: true,
+          },
+        },
+      },
+      take: 20,
+    });
+
+    // Also get counts for histories and likes
+    const historyCount = await prisma.history.count({
+      where: {
+        type: 'PLAY',
+        trackId: { not: null },
+        playCount: { gt: 0 },
+      },
+    });
+
+    const likesCount = await prisma.userLikeTrack.count();
+
+    res.json({
+      message: 'Debug active tracks',
+      activeTracks: activeTracks,
+      trackCount: activeTracks.length,
+      historyCount,
+      likesCount,
+      qualityThresholds: {
+        requiredPlayCount: 5,
+        requiredLikeCount: 2,
+        minCompletionRate: 0.3,
+      },
+    });
+  } catch (error) {
+    console.error('Error getting debug tracks:', error);
+    res.status(500).json({
+      message: 'Failed to get debug tracks',
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 };

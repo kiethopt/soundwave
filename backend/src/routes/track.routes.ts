@@ -11,6 +11,8 @@ import {
   playTrack,
   toggleTrackVisibility,
   getTrackById,
+  likeTrack,
+  unlikeTrack,
 } from '../controllers/track.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -57,6 +59,10 @@ router.get('/search', authenticate, cacheMiddleware, searchTrack);
 
 // Route nghe nhạc (KHÔNG áp dụng cache để đảm bảo cập nhật playCount)
 router.post('/:trackId/play', authenticate, playTrack);
+
+// Route like/unlike track
+router.post('/:trackId/like', authenticate, likeTrack);
+router.delete('/:trackId/like', authenticate, unlikeTrack);
 
 // Route cập nhật track (ADMIN & ARTIST only)
 router.put(

@@ -266,6 +266,7 @@ export interface Playlist {
   createdAt: string;
   updatedAt: string;
   tracks: Track[];
+  canEdit?: boolean;
 }
 
 export interface Notification {

@@ -127,9 +127,11 @@ export default function PlaylistPage() {
             <span>{playlist.tracks.length} bài hát</span>
           </div>
           <div className="mt-4">
-            <Button onClick={() => setIsEditOpen(true)}>
-              Chỉnh sửa playlist
-            </Button>
+            {playlist.canEdit && (
+              <Button onClick={() => setIsEditOpen(true)}>
+                Chỉnh sửa playlist
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -150,7 +152,7 @@ export default function PlaylistPage() {
           tracks={playlist.tracks}
           showAlbum
           showDateAdded
-          allowRemove
+          allowRemove={playlist.canEdit}
           onRemove={handleRemoveTrack}
         />
       </div>

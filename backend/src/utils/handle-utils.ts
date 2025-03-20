@@ -95,9 +95,16 @@ export const toBooleanValue = (value: any): boolean | undefined => {
 // Handle common errors
 export const handleError = (
   res: Response,
-  error: any,
+  error: unknown,
   operation: string
 ): void => {
   console.error(`${operation} error:`, error);
-  res.status(500).json({ message: 'Internal server error' });
+
+  const errorMessage =
+    error instanceof Error ? error.message : 'Internal server error';
+
+  res.status(500).json({
+    message: 'Internal server error',
+    error: errorMessage,
+  });
 };

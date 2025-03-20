@@ -46,12 +46,21 @@ export default function Home() {
           await Promise.all([
             api.albums.getNewestAlbums(token),
             api.albums.getHotAlbums(token),
-            api.playlists.getGlobalRecommendedPlaylist(token),
+            api.playlists.getSystemPlaylist(),
           ]);
 
         setNewestAlbums(newestAlbumsRes.albums || []);
         setHotAlbums(hotAlbumsRes.albums || []);
-        setRecommendedPlaylist(recommendedPlaylistRes.playlist || null);
+
+        // Handle the global playlist from the standard API response
+        if (recommendedPlaylistRes.success) {
+          setRecommendedPlaylist(recommendedPlaylistRes.data);
+        } else {
+          console.error(
+            'Failed to load system playlist:',
+            recommendedPlaylistRes.message
+          );
+        }
       } catch (error) {
         console.error('Error fetching home data:', error);
       } finally {
@@ -213,7 +222,7 @@ export default function Home() {
         {recommendedPlaylist && (
           <div
             className="cursor-pointer"
-            onClick={() => router.push(`/playlist/${recommendedPlaylist.id}`)}
+            onClick={() => router.push(`/playlists/${recommendedPlaylist.id}`)}
           >
             <div className="mb-3">
               <div className="uppercase text-xs font-medium text-primary mb-1.5">

@@ -67,7 +67,11 @@ const toBooleanValue = (value) => {
 exports.toBooleanValue = toBooleanValue;
 const handleError = (res, error, operation) => {
     console.error(`${operation} error:`, error);
-    res.status(500).json({ message: 'Internal server error' });
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    res.status(500).json({
+        message: 'Internal server error',
+        error: errorMessage,
+    });
 };
 exports.handleError = handleError;
 //# sourceMappingURL=handle-utils.js.map

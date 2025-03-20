@@ -307,6 +307,13 @@ export const api = {
         { method: 'GET' },
         token
       ),
+
+    updateGlobalPlaylist: async (token: string) =>
+      fetchWithAuth(
+        '/api/admin/playlists/global/update',
+        { method: 'POST' },
+        token
+      ),
   },
 
   user: {
@@ -775,30 +782,15 @@ export const api = {
           throw new Error('Vui lòng đăng nhập lại');
         }
 
-        console.log(
-          'Making request to:',
-          `${API_BASE}/api/playlists/${playlistId}`
-        );
-        console.log('With token:', token);
-
-        const response = await fetch(
-          `${API_BASE}/api/playlists/${playlistId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }
+        console.log('API call to get playlist by ID:', playlistId);
+        const response = await fetchWithAuth(
+          `/api/playlists/${playlistId}`,
+          { method: 'GET' },
+          token
         );
 
-        const data = await response.json();
-        console.log('API response:', data);
-
-        if (!response.ok) {
-          throw new Error(data.message || 'Không thể tải playlist');
-        }
-
-        return data;
+        console.log('API response for playlist:', response);
+        return response;
       } catch (error) {
         console.error('API Error:', error);
         throw error;
@@ -806,7 +798,7 @@ export const api = {
     },
 
     update: async (id: string, data: any, token: string) => {
-      const response = await fetch(`${API_BASE}/playlists/${id}`, {
+      const response = await fetch(`${API_BASE}/api/playlists/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -894,12 +886,24 @@ export const api = {
       return response.json();
     },
 
-    getGlobalRecommendedPlaylist: async (token?: string) =>
-      fetchWithAuth(
-        '/api/playlists/global-recommended',
-        { method: 'GET' },
-        token
-      ),
+    getSystemPlaylist: async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) {
+          throw new Error('Vui lòng đăng nhập lại');
+        }
+
+        // Use the dedicated endpoint for the system playlist
+        return await fetchWithAuth(
+          '/api/playlists/system',
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error('API Error:', error);
+        throw error;
+      }
+    },
   },
 
   upload: {

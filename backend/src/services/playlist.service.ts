@@ -882,6 +882,7 @@ export const analyzeUserTaste = async (userId: string) => {
 
 /**
  * Tạo playlist đề xuất chung cho tất cả người dùng sử dụng Collaborative Filtering
+ * với các cải tiến về scoring và đa dạng nội dung
  * @param limit Số lượng bài hát tối đa trong playlist
  * @returns Playlist chung cho tất cả người dùng
  */
@@ -889,102 +890,430 @@ export const generateGlobalRecommendedPlaylist = async (
   limit = 20
 ): Promise<any> => {
   try {
-    // 1. Lấy tất cả lịch sử nghe của các người dùng active
-    const userHistories = await prisma.history.findMany({
-      where: {
-        type: 'PLAY',
-        trackId: { not: null },
-        playCount: { gt: 0 },
-      },
-      select: {
-        userId: true,
-        trackId: true,
-        playCount: true,
-      },
-    });
+    console.log(
+      '[PlaylistService] Starting global recommended playlist generation, limit:',
+      limit
+    );
 
-    // 2. Lấy tất cả lượt like bài hát
-    const userLikes = await prisma.userLikeTrack.findMany({
-      select: {
-        userId: true,
-        trackId: true,
-      },
-    });
-
-    // 3. Tạo ma trận user-item để phân tích
-    const tracks = new Map<string, { count: number; score: number }>();
-
-    // Thêm điểm từ lượt nghe
-    userHistories.forEach((history) => {
-      if (history.trackId) {
-        const trackId = history.trackId;
-        const trackInfo = tracks.get(trackId) || { count: 0, score: 0 };
-        trackInfo.count += 1;
-        trackInfo.score += history.playCount || 1;
-        tracks.set(trackId, trackInfo);
-      }
-    });
-
-    // Thêm điểm từ lượt like (trọng số cao hơn)
-    userLikes.forEach((like) => {
-      if (like.trackId) {
-        const trackId = like.trackId;
-        const trackInfo = tracks.get(trackId) || { count: 0, score: 0 };
-        trackInfo.count += 1;
-        trackInfo.score += 3; // Trọng số cao hơn cho like
-        tracks.set(trackId, trackInfo);
-      }
-    });
-
-    // 4. Sắp xếp bài hát theo điểm và số lượt tương tác
-    const sortedTracks = Array.from(tracks.entries())
-      .sort((a, b) => {
-        // Sắp xếp theo score trước, sau đó đến count
-        if (b[1].score !== a[1].score) {
-          return b[1].score - a[1].score;
-        }
-        return b[1].count - a[1].count;
-      })
-      .slice(0, limit)
-      .map((entry) => entry[0]);
-
-    // 5. Lấy thông tin chi tiết của các bài hát được chọn
-    const recommendedTracks = await prisma.track.findMany({
-      where: {
-        id: { in: sortedTracks },
-        isActive: true,
-      },
-      include: {
-        artist: true,
-        album: true,
-        genres: {
-          include: {
-            genre: true,
+    // 1. Lấy dữ liệu tương tác của người dùng
+    console.log('[PlaylistService] Fetching user interactions data...');
+    const [userHistories, userLikes, allTracks] = await Promise.all([
+      prisma.history.findMany({
+        where: {
+          type: 'PLAY',
+          trackId: { not: null },
+          playCount: { gt: 0 },
+        },
+        include: {
+          track: {
+            include: {
+              genres: {
+                include: {
+                  genre: true,
+                },
+              },
+              artist: true,
+            },
           },
         },
-      },
+      }),
+      prisma.userLikeTrack.findMany({
+        where: {},
+        include: {
+          track: {
+            include: {
+              genres: {
+                include: {
+                  genre: true,
+                },
+              },
+              artist: true,
+            },
+          },
+        },
+      }),
+      prisma.track.findMany({
+        where: {
+          isActive: true,
+        },
+        include: {
+          genres: {
+            include: {
+              genre: true,
+            },
+          },
+          artist: true,
+        },
+      }),
+    ]);
+
+    console.log(
+      '[PlaylistService] Data fetched:',
+      'userHistories:',
+      userHistories.length,
+      'userLikes:',
+      userLikes.length,
+      'allTracks:',
+      allTracks.length
+    );
+
+    if (allTracks.length === 0) {
+      console.log('[PlaylistService] No active tracks found in the database');
+      return {
+        name: '',
+        description: '',
+        tracks: [],
+        totalTracks: 0,
+        totalDuration: 0,
+      };
+    }
+
+    // 2. Tính toán điểm số cho mỗi bài hát
+    console.log('[PlaylistService] Calculating track scores...');
+    const trackScores = new Map<
+      string,
+      {
+        score: number;
+        playCount: number;
+        likeCount: number;
+        completionRate: number;
+        lastPlayed: Date;
+        genres: Set<string>;
+        artistId: string;
+        track: any;
+      }
+    >();
+
+    // Khởi tạo thông tin cơ bản cho mỗi bài hát
+    allTracks.forEach((track) => {
+      trackScores.set(track.id, {
+        score: 0,
+        playCount: 0,
+        likeCount: 0,
+        completionRate: 0.5, // Set default completionRate to 0.5 instead of 0
+        lastPlayed: new Date(0),
+        genres: new Set(track.genres.map((g) => g.genre.name)),
+        artistId: track.artistId,
+        track,
+      });
     });
 
-    // 6. Tạo một playlist với tên và mô tả phù hợp
+    // Xử lý lịch sử nghe
+    console.log('[PlaylistService] Processing play history...');
+    userHistories.forEach((history) => {
+      if (!history.track) return;
+
+      const trackInfo = trackScores.get(history.trackId!);
+      if (!trackInfo) return;
+
+      const daysAgo =
+        (Date.now() - history.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      const timeDecayFactor = Math.exp(-0.1 * daysAgo); // Giảm dần theo thời gian
+
+      // Tính completion rate
+      const completion =
+        history.duration && history.track.duration
+          ? Math.min(history.duration / history.track.duration, 1)
+          : 0.5;
+
+      trackInfo.playCount += history.playCount || 1;
+
+      // Cập nhật completionRate chỉ khi có thông tin duration hợp lệ
+      if (history.duration && history.track.duration) {
+        trackInfo.completionRate =
+          (trackInfo.completionRate * (trackInfo.playCount - 1) + completion) /
+          trackInfo.playCount;
+      }
+
+      trackInfo.score +=
+        (history.playCount || 1) * timeDecayFactor * (0.5 + 0.5 * completion);
+      trackInfo.lastPlayed = new Date(
+        Math.max(trackInfo.lastPlayed.getTime(), history.createdAt.getTime())
+      );
+    });
+
+    // Update play count from track's own playCount - this is important for tracks that get plays
+    // from anonymous users or users that don't have history recorded
+    allTracks.forEach((track) => {
+      const trackInfo = trackScores.get(track.id);
+      if (trackInfo) {
+        trackInfo.playCount = Math.max(trackInfo.playCount, track.playCount);
+        // Add direct track playCount to score
+        trackInfo.score += track.playCount;
+      }
+    });
+
+    // Xử lý lượt like
+    console.log('[PlaylistService] Processing likes...');
+    userLikes.forEach((like) => {
+      if (!like.track) return;
+
+      const trackInfo = trackScores.get(like.trackId);
+      if (!trackInfo) return;
+
+      const daysAgo =
+        (Date.now() - like.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      const timeDecayFactor = Math.exp(-0.05 * daysAgo); // Giảm dần chậm hơn play count
+
+      trackInfo.likeCount += 1;
+      trackInfo.score += 3 * timeDecayFactor; // Like có trọng số cao hơn
+    });
+
+    // Log track scores for debugging
+    console.log('[PlaylistService] Track scores summary:');
+    const trackScoresList = Array.from(trackScores.entries());
+    trackScoresList
+      .sort((a, b) => b[1].score - a[1].score)
+      .slice(0, 10)
+      .forEach(([trackId, info]) => {
+        console.log(
+          `Track: ${info.track.title} - PlayCount: ${
+            info.playCount
+          } - LikeCount: ${info.likeCount} - Score: ${info.score.toFixed(
+            2
+          )} - CompletionRate: ${info.completionRate.toFixed(2)}`
+        );
+      });
+
+    // 3. Áp dụng các bộ lọc chất lượng - IMPROVED FILTERING LOGIC
+    console.log('[PlaylistService] Applying quality filters...');
+
+    // Thiết lập ngưỡng phổ biến dựa trên số lượng bài hát
+    const popularity = {
+      // Ngưỡng cao: Sử dụng cho trường hợp có nhiều bài hát phổ biến
+      highPlayCount: 10, // Ít nhất 10 lượt nghe
+      highLikeCount: 3, // Ít nhất 3 lượt thích
+      highScore: 20, // Ít nhất điểm 20
+
+      // Ngưỡng trung bình: Sử dụng khi ít bài hát đạt ngưỡng cao
+      mediumPlayCount: 5, // Ít nhất 5 lượt nghe
+      mediumLikeCount: 2, // Ít nhất 2 lượt thích
+      mediumScore: 10, // Ít nhất điểm 10
+
+      // Ngưỡng cơ bản: Chấp nhận mọi bài hát có tương tác
+      minPlayCount: 1, // Ít nhất 1 lượt nghe
+      minLikeCount: 1, // Ít nhất 1 lượt thích
+    };
+
+    // Lọc bài hát theo ngưỡng cao -> trung bình -> cơ bản, đảm bảo đủ số lượng bài hát
+    // Thử lọc với ngưỡng cao trước
+    let qualityTracks = trackScoresList.filter(
+      ([_, info]) =>
+        info.playCount >= popularity.highPlayCount ||
+        info.likeCount >= popularity.highLikeCount ||
+        info.score >= popularity.highScore
+    );
+
+    console.log(
+      '[PlaylistService] Tracks after high quality filter:',
+      qualityTracks.length
+    );
+
+    // Nếu không đủ số lượng, lọc với ngưỡng trung bình
+    if (qualityTracks.length < Math.min(limit, 10)) {
+      qualityTracks = trackScoresList.filter(
+        ([_, info]) =>
+          info.playCount >= popularity.mediumPlayCount ||
+          info.likeCount >= popularity.mediumLikeCount ||
+          info.score >= popularity.mediumScore
+      );
+
+      console.log(
+        '[PlaylistService] Tracks after medium quality filter:',
+        qualityTracks.length
+      );
+    }
+
+    // Nếu vẫn không đủ, sử dụng ngưỡng cơ bản
+    if (qualityTracks.length < Math.min(limit / 2, 5)) {
+      qualityTracks = trackScoresList.filter(
+        ([_, info]) =>
+          info.playCount >= popularity.minPlayCount ||
+          info.likeCount >= popularity.minLikeCount
+      );
+
+      console.log(
+        '[PlaylistService] Tracks after minimum quality filter:',
+        qualityTracks.length
+      );
+    }
+
+    // Sắp xếp bài hát theo điểm số giảm dần
+    qualityTracks.sort((a, b) => b[1].score - a[1].score);
+
+    // Log lại top tracks sau khi lọc để kiểm tra
+    qualityTracks.slice(0, 5).forEach(([_, info]) => {
+      console.log(
+        `After filter - Track: ${
+          info.track.title
+        } - Score: ${info.score.toFixed(2)} - PlayCount: ${
+          info.playCount
+        } - LikeCount: ${info.likeCount}`
+      );
+    });
+
+    // If no tracks meet the quality criteria, relax the filters entirely
+    if (qualityTracks.length === 0) {
+      console.log(
+        '[PlaylistService] No tracks meet quality criteria, using most played tracks instead...'
+      );
+      // Just take the top tracks by play count without any filtering
+      const topTracks = trackScoresList
+        .sort((a, b) => b[1].playCount - a[1].playCount)
+        .slice(0, limit);
+
+      console.log(
+        '[PlaylistService] Tracks after using play count only:',
+        topTracks.length
+      );
+
+      // If still no tracks, fall back to random active tracks
+      if (topTracks.length === 0) {
+        console.log(
+          '[PlaylistService] No tracks with plays, using random active tracks fallback'
+        );
+
+        // Simply use any active tracks available
+        if (allTracks.length > 0) {
+          // Select random tracks from all active tracks
+          console.log('[PlaylistService] Using random tracks fallback');
+          const shuffledTracks = [...allTracks].sort(() => 0.5 - Math.random());
+          const randomTracks = shuffledTracks.slice(
+            0,
+            Math.min(limit, shuffledTracks.length)
+          );
+
+          const playlist = {
+            name: 'Soundwave Hits: Trending Right Now',
+            description:
+              'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave, được cập nhật tự động dựa trên hoạt động nghe nhạc của cộng đồng.',
+            tracks: randomTracks,
+            isGlobal: true,
+            totalTracks: randomTracks.length,
+            totalDuration: randomTracks.reduce(
+              (sum, track) => sum + (track.duration || 0),
+              0
+            ),
+            coverUrl:
+              'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
+          };
+
+          console.log(
+            '[PlaylistService] Generated playlist with random tracks - count:',
+            randomTracks.length
+          );
+          return playlist;
+        }
+
+        console.log(
+          '[PlaylistService] No tracks after all fallbacks, returning empty playlist'
+        );
+        return {
+          name: '',
+          description: '',
+          tracks: [],
+          totalTracks: 0,
+          totalDuration: 0,
+        };
+      }
+
+      // Use the relaxed tracks
+      const finalTracks = topTracks.map(([_, info]) => info.track);
+
+      const playlist = {
+        name: 'Soundwave Hits: Trending Right Now',
+        description:
+          'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave, được cập nhật tự động dựa trên hoạt động nghe nhạc của cộng đồng.',
+        tracks: finalTracks,
+        isGlobal: true,
+        totalTracks: finalTracks.length,
+        totalDuration: finalTracks.reduce(
+          (sum, track) => sum + (track.duration || 0),
+          0
+        ),
+        coverUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
+      };
+
+      console.log(
+        '[PlaylistService] Generated playlist with relaxed criteria - tracks:',
+        finalTracks.length
+      );
+      return playlist;
+    }
+
+    // 4. Tạo playlist với sự đa dạng
+    console.log('[PlaylistService] Creating diverse playlist...');
+    const selectedTracks = new Set<string>();
+    const selectedGenres = new Map<string, number>();
+    const selectedArtists = new Map<string, number>();
+    const finalTracks = [];
+
+    for (const [trackId, info] of qualityTracks) {
+      // Kiểm tra giới hạn bài hát
+      if (finalTracks.length >= limit) break;
+
+      // Kiểm tra xem bài hát đã được chọn chưa
+      if (selectedTracks.has(trackId)) continue;
+
+      // Kiểm tra giới hạn nghệ sĩ (tối đa 3 bài/nghệ sĩ)
+      const artistCount = selectedArtists.get(info.artistId) || 0;
+      if (artistCount >= 3) continue;
+
+      // Kiểm tra giới hạn thể loại (tối đa 5 bài/thể loại)
+      let genreOk = true;
+      for (const genre of info.genres) {
+        const genreCount = selectedGenres.get(genre) || 0;
+        if (genreCount >= 5) {
+          genreOk = false;
+          break;
+        }
+      }
+      if (!genreOk) continue;
+
+      // Thêm bài hát vào playlist
+      selectedTracks.add(trackId);
+      selectedArtists.set(info.artistId, artistCount + 1);
+      info.genres.forEach((genre) => {
+        selectedGenres.set(genre, (selectedGenres.get(genre) || 0) + 1);
+      });
+      finalTracks.push(info.track);
+    }
+
+    console.log('[PlaylistService] Final tracks selected:', finalTracks.length);
+
+    // Log the selected tracks for debugging
+    console.log('[PlaylistService] Selected tracks:');
+    finalTracks.slice(0, 5).forEach((track) => {
+      console.log(`- ${track.title} (PlayCount: ${track.playCount})`);
+    });
+
+    // 5. Tạo playlist với tên và mô tả phù hợp
     const playlist = {
       name: 'Soundwave Hits: Trending Right Now',
       description:
-        'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave',
-      tracks: recommendedTracks,
+        'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave, được cập nhật tự động dựa trên hoạt động nghe nhạc của cộng đồng.',
+      tracks: finalTracks,
       isGlobal: true,
-      totalTracks: recommendedTracks.length,
-      totalDuration: recommendedTracks.reduce(
+      totalTracks: finalTracks.length,
+      totalDuration: finalTracks.reduce(
         (sum, track) => sum + (track.duration || 0),
         0
       ),
-      // Sử dụng URL cố định cho cover
       coverUrl:
         'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
     };
 
+    console.log(
+      '[PlaylistService] Generated playlist - tracks:',
+      finalTracks.length
+    );
     return playlist;
   } catch (error) {
-    console.error('Error generating global recommended playlist:', error);
+    console.error(
+      '[PlaylistService] Error generating global recommended playlist:',
+      error
+    );
     throw new Error('Failed to generate global recommended playlist');
   }
 };

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteTrackById = void 0;
+exports.unlikeTrack = exports.likeTrack = exports.deleteTrackById = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const deleteTrackById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     const track = yield db_1.default.track.findUnique({
@@ -27,4 +27,62 @@ const deleteTrackById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     });
 });
 exports.deleteTrackById = deleteTrackById;
+const likeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, function* () {
+    const track = yield db_1.default.track.findFirst({
+        where: {
+            id: trackId,
+            isActive: true,
+        },
+    });
+    if (!track) {
+        throw new Error('Track not found or not active');
+    }
+    const existingLike = yield db_1.default.userLikeTrack.findUnique({
+        where: {
+            userId_trackId: {
+                userId,
+                trackId,
+            },
+        },
+    });
+    if (existingLike) {
+        throw new Error('Track already liked');
+    }
+    return db_1.default.userLikeTrack.create({
+        data: {
+            userId,
+            trackId,
+        },
+        include: {
+            track: {
+                include: {
+                    artist: true,
+                },
+            },
+        },
+    });
+});
+exports.likeTrack = likeTrack;
+const unlikeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, function* () {
+    const existingLike = yield db_1.default.userLikeTrack.findUnique({
+        where: {
+            userId_trackId: {
+                userId,
+                trackId,
+            },
+        },
+    });
+    if (!existingLike) {
+        throw new Error('Track not liked');
+    }
+    return db_1.default.userLikeTrack.delete({
+        where: {
+            userId_trackId: {
+                userId,
+                trackId,
+            },
+        },
+    });
+});
+exports.unlikeTrack = unlikeTrack;
 //# sourceMappingURL=track.service.js.map

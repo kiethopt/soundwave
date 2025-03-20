@@ -357,6 +357,7 @@ enum PlaylistPrivacy {
 enum PlaylistType {
   FAVORITE
   NORMAL
+  SYSTEM
 }
 
 enum NotificationType {

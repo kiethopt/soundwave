@@ -1043,3 +1043,67 @@ export const playTrack = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// Like a track
+export const likeTrack = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { trackId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const result = await trackService.likeTrack(userId, trackId);
+
+    res.json({
+      message: 'Track liked successfully',
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Track already liked') {
+        res.status(400).json({ message: error.message });
+        return;
+      }
+      if (error.message === 'Track not found or not active') {
+        res.status(404).json({ message: error.message });
+        return;
+      }
+    }
+    console.error('Like track error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Unlike a track
+export const unlikeTrack = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { trackId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    await trackService.unlikeTrack(userId, trackId);
+
+    res.json({
+      message: 'Track unliked successfully',
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'Track not liked') {
+        res.status(400).json({ message: error.message });
+        return;
+      }
+    }
+    console.error('Unlike track error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

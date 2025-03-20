@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
+exports.unlikeTrack = exports.likeTrack = exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const upload_service_1 = require("../services/upload.service");
 const client_1 = require("@prisma/client");
@@ -879,4 +879,61 @@ const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.playTrack = playTrack;
+const likeTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { trackId } = req.params;
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const result = yield trackService.likeTrack(userId, trackId);
+        res.json({
+            message: 'Track liked successfully',
+            data: result,
+        });
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            if (error.message === 'Track already liked') {
+                res.status(400).json({ message: error.message });
+                return;
+            }
+            if (error.message === 'Track not found or not active') {
+                res.status(404).json({ message: error.message });
+                return;
+            }
+        }
+        console.error('Like track error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.likeTrack = likeTrack;
+const unlikeTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { trackId } = req.params;
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        yield trackService.unlikeTrack(userId, trackId);
+        res.json({
+            message: 'Track unliked successfully',
+        });
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            if (error.message === 'Track not liked') {
+                res.status(400).json({ message: error.message });
+                return;
+            }
+        }
+        console.error('Unlike track error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.unlikeTrack = unlikeTrack;
 //# sourceMappingURL=track.controller.js.map

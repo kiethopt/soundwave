@@ -41,10 +41,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRecommendationMatrix = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.debugActiveTracks = exports.updateGlobalPlaylist = exports.getRecommendationMatrix = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
+const db_1 = __importDefault(require("../config/db"));
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { users, pagination } = yield adminService.getUsers(req);
@@ -366,4 +370,76 @@ const getRecommendationMatrix = (req, res) => __awaiter(void 0, void 0, void 0, 
     }
 });
 exports.getRecommendationMatrix = getRecommendationMatrix;
+const updateGlobalPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        console.log('[Admin Controller] Starting global playlist update...');
+        const result = yield db_1.default.playlist.updateGlobalPlaylist();
+        res.json({
+            success: true,
+            message: 'Global playlist update process completed',
+            result: result,
+        });
+    }
+    catch (error) {
+        console.error('Error updating global playlist:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update global playlist',
+            error: error instanceof Error ? error.message : String(error),
+        });
+    }
+});
+exports.updateGlobalPlaylist = updateGlobalPlaylist;
+const debugActiveTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const activeTracks = yield db_1.default.track.findMany({
+            where: { isActive: true },
+            select: {
+                id: true,
+                title: true,
+                artistId: true,
+                artist: {
+                    select: {
+                        artistName: true,
+                    },
+                },
+                playCount: true,
+                _count: {
+                    select: {
+                        likedBy: true,
+                    },
+                },
+            },
+            take: 20,
+        });
+        const historyCount = yield db_1.default.history.count({
+            where: {
+                type: 'PLAY',
+                trackId: { not: null },
+                playCount: { gt: 0 },
+            },
+        });
+        const likesCount = yield db_1.default.userLikeTrack.count();
+        res.json({
+            message: 'Debug active tracks',
+            activeTracks: activeTracks,
+            trackCount: activeTracks.length,
+            historyCount,
+            likesCount,
+            qualityThresholds: {
+                requiredPlayCount: 5,
+                requiredLikeCount: 2,
+                minCompletionRate: 0.3,
+            },
+        });
+    }
+    catch (error) {
+        console.error('Error getting debug tracks:', error);
+        res.status(500).json({
+            message: 'Failed to get debug tracks',
+            error: error instanceof Error ? error.message : String(error),
+        });
+    }
+});
+exports.debugActiveTracks = debugActiveTracks;
 //# sourceMappingURL=admin.controller.js.map

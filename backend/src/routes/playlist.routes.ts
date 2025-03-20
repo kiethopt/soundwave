@@ -8,7 +8,7 @@ import {
   removeTrackFromPlaylist,
   addTrackToPlaylist,
   createPersonalizedPlaylist,
-  getGlobalRecommendedPlaylist,
+  getSystemPlaylist,
 } from '../controllers/playlist.controller';
 import { cacheMiddleware } from '../middleware/cache.middleware';
 
@@ -20,17 +20,13 @@ router.use(authenticate);
 // Route AI-generated playlist
 router.post('/personalized', createPersonalizedPlaylist);
 
-// Route lấy playlist đề xuất toàn cầu
-router.get(
-  '/global-recommended',
-  cacheMiddleware,
-  getGlobalRecommendedPlaylist
-);
+// Route to get the system playlist
+router.get('/system', cacheMiddleware, getSystemPlaylist);
 
 // Các routes khác
 router.post('/', createPlaylist);
 router.get('/', getPlaylists);
-router.get('/:id', getPlaylistById);
+router.get('/:id', cacheMiddleware, getPlaylistById);
 router.patch('/:id', updatePlaylist);
 router.delete('/:playlistId/tracks/:trackId', removeTrackFromPlaylist);
 

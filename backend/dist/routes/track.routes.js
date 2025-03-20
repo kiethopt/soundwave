@@ -54,6 +54,8 @@ router.get('/genre/:genreId', auth_middleware_1.authenticate, track_controller_1
 router.get('/type/:type/genre/:genreId', auth_middleware_1.authenticate, track_controller_1.getTracksByTypeAndGenre);
 router.get('/search', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, track_controller_1.searchTrack);
 router.post('/:trackId/play', auth_middleware_1.authenticate, track_controller_1.playTrack);
+router.post('/:trackId/like', auth_middleware_1.authenticate, track_controller_1.likeTrack);
+router.delete('/:trackId/like', auth_middleware_1.authenticate, track_controller_1.unlikeTrack);
 router.put('/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), upload_middleware_1.default.fields([
     { name: 'audioFile', maxCount: 1 },
     { name: 'coverFile', maxCount: 1 },

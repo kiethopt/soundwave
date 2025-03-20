@@ -9,7 +9,6 @@ import {
   Database,
   Server,
   Shield,
-  Clock,
   Bot,
   AlertCircle,
 } from 'lucide-react';
@@ -100,24 +99,6 @@ export default function SystemPage() {
       toast.error('Failed to update setting');
       // Revert the setting back if update fails
       setSettings((prev) => ({ ...prev }));
-    }
-  };
-
-  // Refresh different parts of the system
-  const refreshSystem = async (type: string) => {
-    try {
-      setRefreshing(type);
-      // Simulate API request
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // In a real implementation, you would call your API here
-      // await api.admin.refreshSystem(type, token);
-
-      toast.success(`${type} refreshed successfully`);
-    } catch (error) {
-      toast.error(`Failed to refresh ${type}`);
-    } finally {
-      setRefreshing(null);
     }
   };
 
@@ -282,7 +263,7 @@ export default function SystemPage() {
           <Card
             className={`${
               theme === 'light' ? 'bg-white' : 'bg-zinc-900 border-zinc-700'
-            } opacity-60 relative`}
+            } opacity-60 relative md:col-span-2`}
           >
             <div className="absolute inset-0 flex items-center justify-center z-10">
               <Shield className="h-10 w-10 text-gray-500 opacity-80" />
@@ -328,67 +309,6 @@ export default function SystemPage() {
                   </p>
                 </div>
                 <Switch disabled checked={settings.debugMode} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Upload Settings Card - Disabled */}
-          <Card
-            className={`${
-              theme === 'light' ? 'bg-white' : 'bg-zinc-900 border-zinc-700'
-            } opacity-60 relative`}
-          >
-            <div className="absolute inset-0 flex items-center justify-center z-10">
-              <Shield className="h-10 w-10 text-gray-500 opacity-80" />
-            </div>
-            <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 opacity-30 z-0"></div>
-            <CardHeader className="relative z-1">
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-amber-500" />
-                Upload Settings
-              </CardTitle>
-              <CardDescription>
-                Configure file upload parameters
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 relative z-1">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Max Upload Size (MB)</Label>
-                  <p
-                    className={`text-sm ${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
-                    }`}
-                  >
-                    Maximum file size for uploads
-                  </p>
-                </div>
-                <select
-                  disabled
-                  value={settings.maxUploadSize}
-                  className={`rounded-md px-3 py-1.5 ${
-                    theme === 'light'
-                      ? 'bg-white border-gray-300'
-                      : 'bg-zinc-800 border-zinc-700 text-white'
-                  }`}
-                >
-                  <option value={10}>10 MB</option>
-                </select>
-              </div>
-
-              <Separator
-                className={theme === 'light' ? 'bg-gray-200' : 'bg-gray-700'}
-              />
-
-              <div className="pt-2">
-                <Button
-                  variant="outline"
-                  className="w-full flex items-center justify-center gap-2"
-                  disabled
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh Storage Settings
-                </Button>
               </div>
             </CardContent>
           </Card>
