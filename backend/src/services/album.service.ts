@@ -1,4 +1,4 @@
-import { albumSelect } from 'src/utils/prisma-selects';
+import { albumSelect } from '../utils/prisma-selects';
 import prisma from '../config/db';
 
 export const deleteAlbumById = async (id: string) => {
