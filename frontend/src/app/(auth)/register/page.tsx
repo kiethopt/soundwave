@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { api } from '@/utils/api';
 import { Music } from '@/components/ui/Icons';
 import { Eye, EyeOff } from 'lucide-react';
@@ -31,26 +32,28 @@ function RegisterForm() {
   const [error, setError] = useState<string>('');
   const [passwordMatch, setPasswordMatch] = useState<boolean | null>(null);
 
-  const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const confirmPasswordValue = e.target.value;
-  setFormData({ ...formData, confirmPassword: confirmPasswordValue });
+  const handleConfirmPasswordChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const confirmPasswordValue = e.target.value;
+    setFormData({ ...formData, confirmPassword: confirmPasswordValue });
 
-  if (confirmPasswordValue && formData.password) {
-    setPasswordMatch(confirmPasswordValue === formData.password);
-  } else {
-    setPasswordMatch(null);
-  }
-};
-const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const passwordValue = e.target.value;
-  setFormData({ ...formData, password: passwordValue });
+    if (confirmPasswordValue && formData.password) {
+      setPasswordMatch(confirmPasswordValue === formData.password);
+    } else {
+      setPasswordMatch(null);
+    }
+  };
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const passwordValue = e.target.value;
+    setFormData({ ...formData, password: passwordValue });
 
-  if (formData.confirmPassword && passwordValue) {
-    setPasswordMatch(passwordValue === formData.confirmPassword);
-  } else {
-    setPasswordMatch(null);
-  }
-};
+    if (formData.confirmPassword && passwordValue) {
+      setPasswordMatch(passwordValue === formData.confirmPassword);
+    } else {
+      setPasswordMatch(null);
+    }
+  };
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
@@ -108,7 +111,10 @@ const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         </div>
 
         <div className="grid gap-2 ">
-          <label htmlFor="username" className="text-sm font-medium text-white/70">
+          <label
+            htmlFor="username"
+            className="text-sm font-medium text-white/70"
+          >
             Username
           </label>
           <input
@@ -127,13 +133,16 @@ const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         </div>
 
         <div className="grid gap-2">
-          <label htmlFor="password" className="text-sm font-medium text-white/70">
+          <label
+            htmlFor="password"
+            className="text-sm font-medium text-white/70"
+          >
             Password
           </label>
           <div className="relative">
             <input
               id="password"
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? 'text' : 'password'}
               required
               value={formData.password}
               onChange={handlePasswordChange}
@@ -144,19 +153,26 @@ const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
               onClick={togglePasswordVisibility}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
             >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
             </button>
           </div>
         </div>
 
         <div className="grid gap-2">
-          <label htmlFor="confirmPassword" className="text-sm font-medium text-white/70">
+          <label
+            htmlFor="confirmPassword"
+            className="text-sm font-medium text-white/70"
+          >
             Confirm Password
           </label>
           <div className="relative">
             <input
               id="confirmPassword"
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? 'text' : 'password'}
               required
               value={formData.confirmPassword}
               onChange={handleConfirmPasswordChange}
@@ -167,13 +183,23 @@ const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
               onClick={togglePasswordVisibility}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
             >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
             </button>
           </div>
-          
+
           {formData.password && formData.confirmPassword && (
-            <p className={`text-sm ${passwordMatch ? 'text-green-400' : 'text-red-400'}`}>
-              {passwordMatch ? '✅ Passwords match' : '❌ Passwords do not match'}
+            <p
+              className={`text-sm ${
+                passwordMatch ? 'text-green-400' : 'text-red-400'
+              }`}
+            >
+              {passwordMatch
+                ? '✅ Passwords match'
+                : '❌ Passwords do not match'}
             </p>
           )}
         </div>
@@ -188,12 +214,14 @@ const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
       <div className="text-center text-sm text-white/70">
         Already have an account?{' '}
-        <Link href="/login" className="text-white hover:underline underline-offset-4">
+        <Link
+          href="/login"
+          className="text-white hover:underline underline-offset-4"
+        >
           Log in
         </Link>
       </div>
     </form>
-    
   );
 }
 
@@ -201,15 +229,15 @@ export default function RegisterPage() {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10 bg-[#121212]">
-        <div className="flex justify-center gap-2 md:justify-start">
-          <a
-            href="/"
-            className="flex items-center gap-2 font-medium text-white"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-white text-black">
-              <Music className="size-4" />
-            </div>
-            Soundwave
+        <div className="flex justify-center md:justify-start">
+          <a href="/" className="inline-block">
+            <Image
+              src="/images/Soundwave_full.webp"
+              alt="Soundwave Logo"
+              width={140}
+              height={40}
+              className="object-contain"
+            />
           </a>
         </div>
         <div className="flex flex-1 items-center justify-center">

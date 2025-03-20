@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   AddSimple,
   Music,
@@ -144,7 +145,30 @@ export default function Sidebar({
             </button>
           </div>
 
-          <nav className="flex-1 px-4">
+          {/* Admin Sidebar Logo */}
+          {userRole === 'ADMIN' && (
+            <div className="px-4 py-6">
+              <div
+                className={
+                  isCollapsed ? 'flex justify-center' : 'flex justify-start'
+                }
+              >
+                <Image
+                  src={
+                    isCollapsed
+                      ? '/images/Soundwave_onlySword.webp'
+                      : '/images/Soundwave_full.webp'
+                  }
+                  alt="Soundwave Logo"
+                  width={isCollapsed ? 40 : 140}
+                  height={isCollapsed ? 40 : 40}
+                  className="object-contain"
+                />
+              </div>
+            </div>
+          )}
+
+          <nav className={`flex-1 ${userRole === 'ADMIN' ? 'px-2' : 'px-4'}`}>
             {/* Library Section - Only for regular users */}
             {currentProfile === 'USER' && userRole === 'USER' && (
               <div className="flex flex-col">
@@ -339,37 +363,34 @@ export default function Sidebar({
                 </div>
               )}
 
-            {/* Admin Section */}
+            {/* Admin Section - Redesigned */}
             {userRole === 'ADMIN' && (
-              <div className="mt-4 space-y-2">
+              <div className="mt-2 flex flex-col gap-1">
                 {!isCollapsed && (
-                  <div
-                    className={`px-3 text-sm font-medium ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/70'
-                    }`}
-                  >
-                    Admin Dashboard
+                  <div className="px-3 py-2 text-xs font-medium uppercase text-gray-500">
+                    Menu
                   </div>
                 )}
+
                 {/* Dashboard Section */}
                 <Link
                   href="/admin/dashboard"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                  className={`flex items-center px-3 py-2.5 ${
                     isActive('/admin/dashboard')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      ? 'bg-gray-200 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {isCollapsed ? (
                     <HomeOutline className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <HomeOutline className="w-6 h-6" />
-                      <span>Dashboard</span>
+                      <div className="min-w-[32px] flex justify-center">
+                        <HomeOutline className="w-5 h-5" />
+                      </div>
+                      <span className="ml-3 font-medium text-sm">
+                        Dashboard
+                      </span>
                     </>
                   )}
                 </Link>
@@ -377,22 +398,22 @@ export default function Sidebar({
                 {/* Analytics Section */}
                 <Link
                   href="/admin/analytics"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                  className={`flex items-center px-3 py-2.5 ${
                     pathname.startsWith('/admin/analytics')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      ? 'bg-gray-200 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {isCollapsed ? (
                     <ChartIcon className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <ChartIcon className="w-6 h-6" />
-                      <span>Analytics</span>
+                      <div className="min-w-[32px] flex justify-center">
+                        <ChartIcon className="w-5 h-5" />
+                      </div>
+                      <span className="ml-3 font-medium text-sm">
+                        Analytics
+                      </span>
                     </>
                   )}
                 </Link>
@@ -400,110 +421,118 @@ export default function Sidebar({
                 {/* Artist Requests Section */}
                 <Link
                   href="/admin/artist-requests"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                  className={`flex items-center px-3 py-2.5 ${
                     pathname.startsWith('/admin/artist-requests')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      ? 'bg-gray-200 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {isCollapsed ? (
                     <Requests className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <Requests className="w-6 h-6" />
-                      <span>Artist Requests</span>
+                      <div className="min-w-[32px] flex justify-center">
+                        <Requests className="w-5 h-5" />
+                      </div>
+                      <span className="ml-3 font-medium text-sm">
+                        Artist Requests
+                      </span>
                     </>
                   )}
                 </Link>
+
+                {!isCollapsed && (
+                  <div className="mt-4 px-3 py-2 text-xs font-medium uppercase text-gray-500">
+                    Management
+                  </div>
+                )}
+
                 {/* Users Section */}
                 <Link
                   href="/admin/users"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                  className={`flex items-center px-3 py-2.5 ${
                     pathname.startsWith('/admin/users')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      ? 'bg-gray-200 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {isCollapsed ? (
                     <Users className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <Users className="w-6 h-6" />
-                      <span>Users</span>
+                      <div className="min-w-[32px] flex justify-center">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <span className="ml-3 font-medium text-sm">Users</span>
                     </>
                   )}
                 </Link>
+
                 {/* Artists Section */}
                 <Link
                   href="/admin/artists"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                  className={`flex items-center px-3 py-2.5 ${
                     pathname.startsWith('/admin/artists')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      ? 'bg-gray-200 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {isCollapsed ? (
                     <Users className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <Users className="w-6 h-6" />
-                      <span>Artists</span>
+                      <div className="min-w-[32px] flex justify-center">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <span className="ml-3 font-medium text-sm">Artists</span>
                     </>
                   )}
                 </Link>
+
                 {/* Genres Section */}
                 <Link
                   href="/admin/genres"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                  className={`flex items-center px-3 py-2.5 ${
                     pathname.startsWith('/admin/genres')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      ? 'bg-gray-200 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {isCollapsed ? (
                     <Genres className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <Genres className="w-6 h-6" />
-                      <span>Genres</span>
+                      <div className="min-w-[32px] flex justify-center">
+                        <Genres className="w-5 h-5" />
+                      </div>
+                      <span className="ml-3 font-medium text-sm">Genres</span>
                     </>
                   )}
                 </Link>
+
+                {!isCollapsed && (
+                  <div className="mt-4 px-3 py-2 text-xs font-medium uppercase text-gray-500">
+                    Configuration
+                  </div>
+                )}
+
                 {/* System Section */}
                 <Link
                   href="/admin/system"
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                  className={`flex items-center px-3 py-2.5 ${
                     pathname.startsWith('/admin/system')
-                      ? theme === 'light'
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'bg-white/10 text-white'
-                      : theme === 'light'
-                      ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-                      : 'text-white/70 hover:bg-white/10 hover:text-white'
+                      ? 'bg-gray-200 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   {isCollapsed ? (
                     <Settings className="w-6 h-6 mx-auto" />
                   ) : (
                     <>
-                      <Settings className="w-6 h-6" />
-                      <span>System</span>
+                      <div className="min-w-[32px] flex justify-center">
+                        <Settings className="w-5 h-5" />
+                      </div>
+                      <span className="ml-3 font-medium text-sm">System</span>
                     </>
                   )}
                 </Link>
@@ -511,11 +540,13 @@ export default function Sidebar({
             )}
           </nav>
 
-          <div className="p-4">
+          <div className={`p-4 ${userRole === 'ADMIN' ? 'mt-auto' : ''}`}>
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className={`w-10 h-10 flex items-center justify-center rounded-full ${
-                theme === 'light'
+                userRole === 'ADMIN'
+                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  : theme === 'light'
                   ? 'bg-gray-200 hover:bg-gray-200 text-gray-600'
                   : 'bg-white/10 hover:bg-white/20 text-white'
               }`}

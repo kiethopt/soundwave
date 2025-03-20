@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { api } from '@/utils/api';
 import { Music } from '@/components/ui/Icons';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -204,15 +205,15 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       <div className="flex flex-col gap-4 p-6 md:p-10 bg-[#121212]">
-        <div className="flex justify-center gap-2 md:justify-start">
-          <a
-            href="/"
-            className="flex items-center gap-2 font-medium text-white"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-white text-black">
-              <Music className="size-4" />
-            </div>
-            Soundwave
+        <div className="flex justify-center md:justify-start">
+          <a href="/" className="inline-block">
+            <Image
+              src="/images/Soundwave_full.webp"
+              alt="Soundwave Logo"
+              width={140}
+              height={40}
+              className="object-contain"
+            />
           </a>
         </div>
         <div className="flex flex-1 items-center justify-center">
