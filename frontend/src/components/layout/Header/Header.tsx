@@ -393,10 +393,10 @@ export default function Header({
                 <div className="relative">
                   <Notifications
                     className={`w-5 h-5 ${theme === 'light'
-                        ? 'text-gray-700'
-                        : unreadCount > 0
-                          ? 'text-blue-400'
-                          : 'text-white'
+                      ? 'text-gray-700'
+                      : unreadCount > 0
+                        ? 'text-blue-400'
+                        : 'text-white'
                       }`}
                   />
                   {unreadCount > 0 && (
@@ -404,7 +404,7 @@ export default function Header({
                       style={{ height: '10px', width: '10px', right: '-10px' }}
                       className="absolute -top-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-ping"
                     >
-                      {unreadCount > 9 ? '9+' : unreadCount}
+                      {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
                 </div>
@@ -448,8 +448,8 @@ export default function Header({
                     <Link href="/notifications">
                       <button
                         className={`w-full text-center text-sm py-2 rounded-lg transition-colors duration-200 ${theme === 'light'
-                            ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            : 'bg-gray-800 text-white hover:bg-gray-700'
+                          ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          : 'bg-gray-800 text-white hover:bg-gray-700'
                           }`}
                       >
                         Xem tất cả
