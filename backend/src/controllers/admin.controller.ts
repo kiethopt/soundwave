@@ -310,7 +310,16 @@ export const approveArtistRequest = async (
   try {
     const { requestId } = req.body;
     const updatedProfile = await adminService.approveArtistRequest(requestId);
-
+    // tao thong bao cho nguoi dung
+    await prisma.notification.create({
+      data: {
+        type: 'ARTIST_REQUEST_APPROVE',
+        message: 'Your request to become an Artist has been approved!',
+        recipientType: 'USER',
+        userId: updatedProfile.user.id,
+        isRead: false,
+      },
+    });
     res.json({
       message: 'Artist role approved successfully',
       user: updatedProfile.user,
@@ -337,7 +346,16 @@ export const rejectArtistRequest = async (
   try {
     const { requestId } = req.body;
     const result = await adminService.rejectArtistRequest(requestId);
-
+    // tao thong bao cho nguoi dung
+    await prisma.notification.create({
+      data: {
+        type: 'ARTIST_REQUEST_REJECT', // Sử dụng giá trị từ enum
+        message: 'Your request to become an Artist has been rejected.',
+        recipientType: 'USER',
+        userId: result.user.id,
+        isRead: false,
+      },
+    });
     res.json({
       message: 'Artist role request rejected successfully',
       user: result.user,

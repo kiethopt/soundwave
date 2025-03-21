@@ -49,6 +49,25 @@ export default function Header({
 
   const isAdminOrArtist =
     userData?.role === 'ADMIN' || userData?.currentProfile === 'ARTIST';
+  // Tính số thông báo chưa đọc từ danh sách notifications
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  useEffect(() => {
+    const fetchInitialNotifications = async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) return;
+        const notificationsData = await api.notifications.getList(token);
+        setNotifications(notificationsData);
+      } catch (error) {
+        console.error('Error fetching initial notifications:', error);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchInitialNotifications();
+    }
+  }, [isAuthenticated]);
+
 
   useEffect(() => {
     const userDataStr = localStorage.getItem('userData');
@@ -221,6 +240,7 @@ export default function Header({
     setShowDropdown(false);
   };
 
+  // Xử lý Pusher cho thông báo real-time
   useEffect(() => {
     const userDataStr = localStorage.getItem('userData');
     if (!userDataStr) return;
@@ -232,17 +252,15 @@ export default function Header({
     console.log('Subscribed to Pusher channel:', `user-${userId}`);
 
     const handleNewNotification = (data: {
+      id: string;
       type: string;
       message: string;
+      isRead: boolean;
+      createdAt: string;
       [key: string]: any;
     }) => {
       console.log('Received new notification event:', data);
-      setNotificationCount((prev) => {
-        const newCount = prev + 1;
-        localStorage.setItem('notificationCount', String(newCount));
-        return newCount;
-      });
-      setNotifications((prev) => [data, ...prev]);
+      setNotifications((prev) => [data, ...prev]); // Thêm thông báo mới vào đầu danh sách
     };
 
     channel.bind('notification', handleNewNotification);
@@ -281,21 +299,19 @@ export default function Header({
 
   return (
     <header
-      className={`h-[72px] flex items-center justify-between px-2 md:px-4 lg:px-6 border-b ${
-        theme === 'light'
-          ? 'bg-white border-gray-200'
-          : 'bg-[#111111] border-white/10'
-      }`}
+      className={`h-[72px] flex items-center justify-between px-2 md:px-4 lg:px-6 border-b ${theme === 'light'
+        ? 'bg-white border-gray-200'
+        : 'bg-[#111111] border-white/10'
+        }`}
     >
       {/* Left Side */}
       <div className="flex items-center gap-2 md:gap-4 lg:gap-6">
         <button
           onClick={onMenuClick}
-          className={`md:hidden p-2 ${
-            theme === 'light'
-              ? 'text-gray-600 hover:text-gray-900'
-              : 'text-white/70 hover:text-white'
-          }`}
+          className={`md:hidden p-2 ${theme === 'light'
+            ? 'text-gray-600 hover:text-gray-900'
+            : 'text-white/70 hover:text-white'
+            }`}
         >
           <Menu className="w-6 h-6" />
         </button>
@@ -304,15 +320,14 @@ export default function Header({
           <div className="hidden md:flex items-center gap-4 lg:gap-6">
             <Link
               href="/"
-              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${
-                isActive('/')
-                  ? theme === 'light'
-                    ? 'text-gray-900 bg-gray-200'
-                    : 'text-white bg-[#282828]'
-                  : theme === 'light'
+              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${isActive('/')
+                ? theme === 'light'
+                  ? 'text-gray-900 bg-gray-200'
+                  : 'text-white bg-[#282828]'
+                : theme === 'light'
                   ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                   : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
-              }`}
+                }`}
             >
               {isActive('/') ? (
                 <HomeFilled className="w-5 h-5" />
@@ -324,15 +339,14 @@ export default function Header({
 
             <Link
               href="/discover"
-              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${
-                isActive('/discover')
-                  ? theme === 'light'
-                    ? 'text-gray-900 bg-gray-200'
-                    : 'text-white bg-[#282828]'
-                  : theme === 'light'
+              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${isActive('/discover')
+                ? theme === 'light'
+                  ? 'text-gray-900 bg-gray-200'
+                  : 'text-white bg-[#282828]'
+                : theme === 'light'
                   ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                   : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
-              }`}
+                }`}
             >
               {isActive('/discover') ? (
                 <DiscoverFilled className="w-5 h-5" />
@@ -344,20 +358,18 @@ export default function Header({
 
             <form onSubmit={handleSearch} className="relative w-[400px]">
               <Search
-                className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-                  theme === 'light' ? 'text-gray-400' : 'text-white/40'
-                }`}
+                className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${theme === 'light' ? 'text-gray-400' : 'text-white/40'
+                  }`}
               />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search"
-                className={`w-full rounded-md py-1.5 md:py-2 pl-10 pr-4 text-sm focus:outline-none ${
-                  theme === 'light'
-                    ? 'bg-gray-100 text-gray-900 placeholder:text-gray-500 focus:bg-gray-200'
-                    : 'bg-white/10 text-white placeholder:text-white/40 focus:bg-white/20'
-                }`}
+                className={`w-full rounded-md py-1.5 md:py-2 pl-10 pr-4 text-sm focus:outline-none ${theme === 'light'
+                  ? 'bg-gray-100 text-gray-900 placeholder:text-gray-500 focus:bg-gray-200'
+                  : 'bg-white/10 text-white placeholder:text-white/40 focus:bg-white/20'
+                  }`}
               />
             </form>
           </div>
@@ -369,38 +381,43 @@ export default function Header({
         {isAuthenticated ? (
           <>
             <div className="relative" ref={notificationRef}>
-              {/* Notification Button */}
+              {/* Nút thông báo với hiệu ứng phát sáng dựa trên unreadCount */}
               <button
-                className={`p-2 rounded-full relative cursor-pointer ${
-                  theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-                }`}
+                className={`p-2 rounded-full relative cursor-pointer transition-all duration-300 ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
+                  } ${unreadCount > 0
+                    ? 'animate-pulse bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.8)]'
+                    : ''
+                  }`}
                 onClick={handleBellClick}
               >
                 <div className="relative">
                   <Notifications
-                    className={`w-5 h-5 ${
-                      theme === 'light' ? 'text-gray-700' : 'text-white'
-                    }`}
+                    className={`w-5 h-5 ${theme === 'light'
+                        ? 'text-gray-700'
+                        : unreadCount > 0
+                          ? 'text-blue-400'
+                          : 'text-white'
+                      }`}
                   />
-                  {notificationCount > 0 && (
+                  {unreadCount > 0 && (
                     <span
                       style={{ height: '10px', width: '10px', right: '-10px' }}
-                      className="absolute -top-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center"
-                    ></span>
+                      className="absolute -top-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-ping"
+                    >
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
                   )}
                 </div>
               </button>
               {showNotifications && (
                 <div
-                  className={`absolute right-0 mt-2 w-80 max-h-[300px] overflow-auto rounded-lg shadow-lg py-3 z-50 ${
-                    theme === 'light' ? 'bg-white' : 'bg-[#282828]'
-                  }`}
+                  className={`absolute right-0 mt-2 w-80 max-h-[300px] overflow-auto rounded-lg shadow-lg py-3 z-50 ${theme === 'light' ? 'bg-white' : 'bg-[#282828]'
+                    }`}
                 >
                   {notifications.length === 0 ? (
                     <p
-                      className={`px-4 py-3 text-sm ${
-                        theme === 'light' ? 'text-gray-700' : 'text-gray-300'
-                      }`}
+                      className={`px-4 py-3 text-sm ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'
+                        }`}
                     >
                       No notifications
                     </p>
@@ -409,35 +426,31 @@ export default function Header({
                       <div
                         key={item.id}
                         className={`cursor-pointer px-4 py-3 transition-colors duration-200 
-                        ${
-                          item.isRead
+                        ${item.isRead
                             ? theme === 'light'
                               ? 'bg-gray-50 text-gray-700'
                               : 'bg-gray-700 text-gray-200'
                             : theme === 'light'
-                            ? 'bg-blue-50 text-gray-900 font-medium'
-                            : 'bg-blue-900 text-white font-medium'
-                        }
-                        hover:opacity-90 ${
-                          index !== notifications.length - 1
+                              ? 'bg-blue-50 text-gray-900 font-medium'
+                              : 'bg-blue-900 text-white font-medium'
+                          }
+                        hover:opacity-90 ${index !== notifications.length - 1
                             ? 'border-b border-gray-200'
                             : ''
-                        }`}
+                          }`}
                         onClick={() => handleNotificationClick(item)}
                       >
                         <p className="line-clamp-2 text-sm">{item.message}</p>
                       </div>
                     ))
                   )}
-
                   <div className="px-4 py-3">
                     <Link href="/notifications">
                       <button
-                        className={`w-full text-center text-sm py-2 rounded-lg transition-colors duration-200 ${
-                          theme === 'light'
+                        className={`w-full text-center text-sm py-2 rounded-lg transition-colors duration-200 ${theme === 'light'
                             ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             : 'bg-gray-800 text-white hover:bg-gray-700'
-                        }`}
+                          }`}
                       >
                         Xem tất cả
                       </button>
@@ -468,11 +481,10 @@ export default function Header({
 
               {showDropdown && (
                 <div
-                  className={`absolute right-0 mt-2 w-64 rounded-2xl shadow-lg overflow-hidden z-50 border ${
-                    theme === 'light'
-                      ? 'bg-white border-zinc-200'
-                      : 'bg-[#111111] border-zinc-800'
-                  }`}
+                  className={`absolute right-0 mt-2 w-64 rounded-2xl shadow-lg overflow-hidden z-50 border ${theme === 'light'
+                    ? 'bg-white border-zinc-200'
+                    : 'bg-[#111111] border-zinc-800'
+                    }`}
                 >
                   <div className="px-6 pt-6 pb-4">
                     <div className="flex items-center gap-4 mb-4">
@@ -490,42 +502,38 @@ export default function Header({
                           />
                         </div>
                         <div
-                          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ${
-                            theme === 'light' ? 'ring-white' : 'ring-zinc-900'
-                          }`}
+                          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ${theme === 'light' ? 'ring-white' : 'ring-zinc-900'
+                            }`}
                         />
                       </div>
                       <div className="flex-1">
                         <h2
-                          className={`text-base font-semibold ${
-                            theme === 'light'
-                              ? 'text-zinc-900'
-                              : 'text-zinc-100'
-                          }`}
+                          className={`text-base font-semibold ${theme === 'light'
+                            ? 'text-zinc-900'
+                            : 'text-zinc-100'
+                            }`}
                         >
                           {userData?.name || userData?.username || 'User'}
                         </h2>
                         <p
-                          className={`text-sm ${
-                            theme === 'light'
-                              ? 'text-zinc-600'
-                              : 'text-zinc-400'
-                          }`}
+                          className={`text-sm ${theme === 'light'
+                            ? 'text-zinc-600'
+                            : 'text-zinc-400'
+                            }`}
                         >
                           {userData?.role === 'ADMIN'
                             ? 'Administrator'
                             : userData?.currentProfile === 'ARTIST'
-                            ? 'Artist'
-                            : 'User'}
+                              ? 'Artist'
+                              : 'User'}
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <div
-                    className={`h-px ${
-                      theme === 'light' ? 'bg-zinc-200' : 'bg-zinc-800'
-                    }`}
+                    className={`h-px ${theme === 'light' ? 'bg-zinc-200' : 'bg-zinc-800'
+                      }`}
                   />
 
                   <div className="p-2">
@@ -534,14 +542,13 @@ export default function Header({
                         userData?.role === 'ADMIN'
                           ? `/admin/profile/${userData.id}`
                           : userData?.currentProfile === 'USER'
-                          ? `/profile/${userData?.id}`
-                          : `/artist/profile/${userData?.artistProfile?.id}`
+                            ? `/profile/${userData?.id}`
+                            : `/artist/profile/${userData?.artistProfile?.id}`
                       }
-                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${
-                        theme === 'light'
-                          ? 'hover:bg-zinc-50 text-zinc-900'
-                          : 'hover:bg-zinc-800/50 text-zinc-100'
-                      }`}
+                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light'
+                        ? 'hover:bg-zinc-50 text-zinc-900'
+                        : 'hover:bg-zinc-800/50 text-zinc-100'
+                        }`}
                       onClick={() => setShowDropdown(false)}
                     >
                       <ProfileIcon className="w-4 h-4" />
@@ -550,11 +557,10 @@ export default function Header({
 
                     <Link
                       href="/settings"
-                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${
-                        theme === 'light'
-                          ? 'hover:bg-zinc-50 text-zinc-900'
-                          : 'hover:bg-zinc-800/50 text-zinc-100'
-                      }`}
+                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light'
+                        ? 'hover:bg-zinc-50 text-zinc-900'
+                        : 'hover:bg-zinc-800/50 text-zinc-100'
+                        }`}
                       onClick={() => setShowDropdown(false)}
                     >
                       <Settings className="w-4 h-4" />
@@ -564,11 +570,10 @@ export default function Header({
                     {userData?.artistProfile?.isVerified && (
                       <button
                         onClick={handleSwitchProfile}
-                        className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 text-left ${
-                          theme === 'light'
-                            ? 'hover:bg-zinc-50 text-zinc-900'
-                            : 'hover:bg-zinc-800/50 text-zinc-100'
-                        }`}
+                        className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 text-left ${theme === 'light'
+                          ? 'hover:bg-zinc-50 text-zinc-900'
+                          : 'hover:bg-zinc-800/50 text-zinc-100'
+                          }`}
                       >
                         {userData.currentProfile === 'USER' ? (
                           <ArrowRight className="w-4 h-4" />
@@ -588,11 +593,10 @@ export default function Header({
                     {userData?.role === 'USER' && !userData?.artistProfile && (
                       <Link
                         href="/request-artist"
-                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${
-                          theme === 'light'
-                            ? 'hover:bg-zinc-50 text-zinc-900'
-                            : 'hover:bg-zinc-800/50 text-zinc-100'
-                        }`}
+                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light'
+                          ? 'hover:bg-zinc-50 text-zinc-900'
+                          : 'hover:bg-zinc-800/50 text-zinc-100'
+                          }`}
                         onClick={() => setShowDropdown(false)}
                       >
                         <svg
@@ -620,11 +624,10 @@ export default function Header({
                         handleLogout();
                         setShowDropdown(false);
                       }}
-                      className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 text-left ${
-                        theme === 'light'
-                          ? 'hover:bg-zinc-50 text-zinc-900'
-                          : 'hover:bg-zinc-800/50 text-zinc-100'
-                      }`}
+                      className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 text-left ${theme === 'light'
+                        ? 'hover:bg-zinc-50 text-zinc-900'
+                        : 'hover:bg-zinc-800/50 text-zinc-100'
+                        }`}
                     >
                       <LogOut className="w-4 h-4" />
                       <span className="text-sm font-medium">Logout</span>
@@ -638,11 +641,10 @@ export default function Header({
           <div className="flex items-center gap-2 md:gap-4">
             <Link
               href="/register"
-              className={`text-sm font-medium hidden md:block ${
-                theme === 'light'
-                  ? 'text-gray-600 hover:text-gray-900'
-                  : 'text-white/70 hover:text-white'
-              }`}
+              className={`text-sm font-medium hidden md:block ${theme === 'light'
+                ? 'text-gray-600 hover:text-gray-900'
+                : 'text-white/70 hover:text-white'
+                }`}
             >
               Sign up
             </Link>
