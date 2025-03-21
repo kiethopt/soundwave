@@ -45,10 +45,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.debugActiveTracks = exports.updateGlobalPlaylist = exports.getRecommendationMatrix = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.debugActiveTracks = exports.updateSystemPlaylists = exports.getRecommendationMatrix = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
 const db_1 = __importDefault(require("../config/db"));
+const playlist_service_1 = require("../services/playlist.service");
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { users, pagination } = yield adminService.getUsers(req);
@@ -370,26 +371,59 @@ const getRecommendationMatrix = (req, res) => __awaiter(void 0, void 0, void 0, 
     }
 });
 exports.getRecommendationMatrix = getRecommendationMatrix;
-const updateGlobalPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateSystemPlaylists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log('[Admin Controller] Starting global playlist update...');
-        const result = yield db_1.default.playlist.updateGlobalPlaylist();
-        res.json({
-            success: true,
-            message: 'Global playlist update process completed',
-            result: result,
-        });
+        const { type } = req.query;
+        console.log(`[Admin Controller] Starting playlist update. Type: ${type || 'all'}`);
+        if (!type || type === 'all') {
+            yield playlist_service_1.systemPlaylistService.updateAllSystemPlaylists();
+            res.json({
+                success: true,
+                message: 'All system playlists have been updated successfully',
+            });
+            return;
+        }
+        switch (type) {
+            case 'global':
+            case 'trending':
+            case 'top-hits':
+                yield db_1.default.playlist.updateGlobalPlaylist();
+                res.json({
+                    success: true,
+                    message: 'Trending Now playlists have been updated successfully',
+                });
+                break;
+            case 'discover-weekly':
+                yield db_1.default.playlist.updateDiscoverWeeklyPlaylists();
+                res.json({
+                    success: true,
+                    message: 'Discover Weekly playlists have been updated successfully',
+                });
+                break;
+            case 'new-releases':
+                yield db_1.default.playlist.updateNewReleasesPlaylists();
+                res.json({
+                    success: true,
+                    message: 'New Releases playlists have been updated successfully',
+                });
+                break;
+            default:
+                res.status(400).json({
+                    success: false,
+                    message: `Invalid playlist type: ${type}. Valid types are: all, global, trending, top-hits, discover-weekly, new-releases`,
+                });
+        }
     }
     catch (error) {
-        console.error('Error updating global playlist:', error);
+        console.error('Error updating playlists:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update global playlist',
+            message: 'Failed to update playlists',
             error: error instanceof Error ? error.message : String(error),
         });
     }
 });
-exports.updateGlobalPlaylist = updateGlobalPlaylist;
+exports.updateSystemPlaylists = updateSystemPlaylists;
 const debugActiveTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const activeTracks = yield db_1.default.track.findMany({

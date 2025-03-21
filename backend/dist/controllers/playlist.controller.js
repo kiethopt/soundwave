@@ -42,16 +42,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSystemPlaylist = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = exports.createPersonalizedPlaylist = void 0;
+exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.updateAllSystemPlaylists = exports.getPersonalizedSystemPlaylists = exports.getSystemPlaylist = exports.createFavoritePlaylist = exports.createPersonalizedPlaylist = void 0;
 const client_1 = require("@prisma/client");
-const aiService = __importStar(require("../services/ai.service"));
+const playlistService = __importStar(require("../services/playlist.service"));
+const playlist_service_1 = require("../services/playlist.service");
 const handle_utils_1 = require("../utils/handle-utils");
 const prisma = new client_1.PrismaClient();
 const createPersonalizedPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const userId = req.user.id;
         const { name, description, trackCount, basedOnMood, basedOnGenre, basedOnArtist, includeTopTracks, includeNewReleases, } = req.body;
-        const playlist = yield aiService.generatePersonalizedPlaylist(userId, {
+        const playlist = yield playlistService.generatePersonalizedPlaylist(userId, {
             name,
             description,
             trackCount,
@@ -89,6 +90,120 @@ const createFavoritePlaylist = (userId) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.createFavoritePlaylist = createFavoritePlaylist;
+const getSystemPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const systemPlaylist = yield prisma.playlist.findFirst({
+            where: {
+                OR: [
+                    { type: 'SYSTEM' },
+                    { name: 'Soundwave Hits: Trending Right Now' },
+                ],
+            },
+        });
+        if (!systemPlaylist) {
+            res.status(404).json({
+                success: false,
+                message: 'System playlist not found',
+            });
+            return;
+        }
+        const playlist = yield prisma.playlist.findUnique({
+            where: { id: systemPlaylist.id },
+            include: {
+                tracks: {
+                    include: {
+                        track: {
+                            include: {
+                                artist: true,
+                                album: true,
+                            },
+                        },
+                    },
+                    orderBy: {
+                        trackOrder: 'asc',
+                    },
+                },
+            },
+        });
+        const userRole = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
+        const canEdit = userRole === 'ADMIN';
+        const formattedTracks = (playlist === null || playlist === void 0 ? void 0 : playlist.tracks.map((pt) => ({
+            id: pt.track.id,
+            title: pt.track.title,
+            duration: pt.track.duration,
+            coverUrl: pt.track.coverUrl,
+            artist: pt.track.artist,
+            album: pt.track.album,
+            createdAt: pt.track.createdAt.toISOString(),
+        }))) || [];
+        res.json({
+            success: true,
+            data: Object.assign(Object.assign({}, playlist), { tracks: formattedTracks, canEdit }),
+        });
+    }
+    catch (error) {
+        console.error('Error in getSystemPlaylist:', error);
+        next(error);
+    }
+});
+exports.getSystemPlaylist = getSystemPlaylist;
+const getPersonalizedSystemPlaylists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const userId = req.user.id;
+        const playlists = yield prisma.playlist.findMany({
+            where: {
+                userId,
+                type: 'SYSTEM',
+            },
+            include: {
+                tracks: {
+                    include: {
+                        track: {
+                            include: {
+                                artist: true,
+                                album: true,
+                            },
+                        },
+                    },
+                    orderBy: {
+                        trackOrder: 'asc',
+                    },
+                },
+            },
+        });
+        res.json({
+            success: true,
+            data: playlists,
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Get personalized system playlists');
+    }
+});
+exports.getPersonalizedSystemPlaylists = getPersonalizedSystemPlaylists;
+const updateAllSystemPlaylists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const userRole = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
+        if (userRole !== 'ADMIN') {
+            res.status(403).json({
+                success: false,
+                message: 'Only administrators can update system playlists',
+            });
+            return;
+        }
+        const result = yield playlist_service_1.systemPlaylistService.updateAllSystemPlaylists();
+        res.json({
+            success: true,
+            message: 'All system playlists have been updated successfully',
+        });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Update all system playlists');
+    }
+});
+exports.updateAllSystemPlaylists = updateAllSystemPlaylists;
 const createPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -586,26 +701,37 @@ const deletePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.deletePlaylist = deletePlaylist;
-const getSystemPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const getSystemPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
     try {
-        const systemPlaylist = yield prisma.playlist.findFirst({
-            where: {
-                OR: [
-                    { type: 'SYSTEM' },
-                    { name: 'Soundwave Hits: Trending Right Now' },
-                ],
-            },
-        });
-        if (!systemPlaylist) {
-            res.status(404).json({
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        if (!userId) {
+            res.status(401).json({
                 success: false,
-                message: 'System playlist not found',
+                message: 'Unauthorized',
             });
             return;
         }
-        const playlist = yield prisma.playlist.findUnique({
-            where: { id: systemPlaylist.id },
+        const systemPlaylists = yield prisma.playlist.findMany({
+            where: {
+                type: 'SYSTEM',
+                OR: [
+                    {
+                        user: {
+                            role: 'ADMIN',
+                        },
+                        name: {
+                            in: [
+                                'Soundwave Hits: Trending Right Now',
+                                'Soundwave Fresh: New Releases',
+                            ],
+                        },
+                    },
+                    {
+                        userId: userId,
+                    },
+                ],
+            },
             include: {
                 tracks: {
                     include: {
@@ -622,26 +748,29 @@ const getSystemPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, 
                 },
             },
         });
-        const userRole = (_a = req.user) === null || _a === void 0 ? void 0 : _a.role;
-        const canEdit = userRole === 'ADMIN';
-        const formattedTracks = (playlist === null || playlist === void 0 ? void 0 : playlist.tracks.map((pt) => ({
-            id: pt.track.id,
-            title: pt.track.title,
-            duration: pt.track.duration,
-            coverUrl: pt.track.coverUrl,
-            artist: pt.track.artist,
-            album: pt.track.album,
-            createdAt: pt.track.createdAt.toISOString(),
-        }))) || [];
+        const userRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
+        const formattedPlaylists = systemPlaylists.map((playlist) => {
+            const canEdit = userRole === 'ADMIN' || playlist.userId === userId;
+            const formattedTracks = playlist.tracks.map((pt) => ({
+                id: pt.track.id,
+                title: pt.track.title,
+                duration: pt.track.duration,
+                coverUrl: pt.track.coverUrl,
+                artist: pt.track.artist,
+                album: pt.track.album,
+                createdAt: pt.track.createdAt.toISOString(),
+            }));
+            return Object.assign(Object.assign({}, playlist), { tracks: formattedTracks, canEdit });
+        });
         res.json({
             success: true,
-            data: Object.assign(Object.assign({}, playlist), { tracks: formattedTracks, canEdit }),
+            data: formattedPlaylists,
         });
     }
     catch (error) {
-        console.error('Error in getSystemPlaylist:', error);
+        console.error('Error in getSystemPlaylists:', error);
         next(error);
     }
 });
-exports.getSystemPlaylist = getSystemPlaylist;
+exports.getSystemPlaylists = getSystemPlaylists;
 //# sourceMappingURL=playlist.controller.js.map

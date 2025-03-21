@@ -12,9 +12,474 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateGlobalRecommendedPlaylist = exports.analyzeUserTaste = exports.generatePersonalizedPlaylist = void 0;
+exports.generateGlobalRecommendedPlaylist = exports.analyzeUserTaste = exports.generatePersonalizedPlaylist = exports.systemPlaylistService = exports.SystemPlaylistService = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const ml_matrix_1 = require("ml-matrix");
+const SYSTEM_PLAYLIST_TYPES = {
+    TOP_HITS: 'TOP_HITS',
+    NEW_RELEASES: 'NEW_RELEASES',
+    GENRE_BASED: 'GENRE_BASED',
+    MOOD_BASED: 'MOOD_BASED',
+    DISCOVER_WEEKLY: 'DISCOVER_WEEKLY',
+    TIME_CAPSULE: 'TIME_CAPSULE',
+};
+const SYSTEM_PLAYLIST_NAMES = {
+    [SYSTEM_PLAYLIST_TYPES.TOP_HITS]: 'Soundwave Hits: Trending Right Now',
+    [SYSTEM_PLAYLIST_TYPES.NEW_RELEASES]: 'Soundwave Fresh: New Releases',
+    [SYSTEM_PLAYLIST_TYPES.GENRE_BASED]: 'Soundwave Genre Mix',
+    [SYSTEM_PLAYLIST_TYPES.MOOD_BASED]: 'Soundwave Mood Mix',
+    [SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY]: 'Discover Weekly',
+    [SYSTEM_PLAYLIST_TYPES.TIME_CAPSULE]: 'Your Time Capsule',
+};
+class SystemPlaylistService {
+    initializeForNewUser(userId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                console.log(`[SystemPlaylistService] Initializing playlists for new user: ${userId}`);
+                const user = yield db_1.default.user.findUnique({ where: { id: userId } });
+                if (!user) {
+                    throw new Error(`User with ID ${userId} not found`);
+                }
+                yield Promise.all([
+                    this.connectUserToGlobalPlaylist(userId, SYSTEM_PLAYLIST_TYPES.TOP_HITS),
+                    this.createDiscoverWeeklyPlaylist(userId),
+                    this.createNewReleasesPlaylist(userId),
+                ]);
+                console.log(`[SystemPlaylistService] Successfully initialized playlists for user: ${userId}`);
+            }
+            catch (error) {
+                console.error(`[SystemPlaylistService] Error initializing playlists for user ${userId}:`, error);
+                throw new Error(`Failed to initialize playlists for new user: ${error}`);
+            }
+        });
+    }
+    connectUserToGlobalPlaylist(userId, playlistType) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const globalPlaylist = yield db_1.default.playlist.findFirst({
+                    where: {
+                        name: SYSTEM_PLAYLIST_NAMES[playlistType],
+                        type: 'SYSTEM',
+                    },
+                });
+                if (!globalPlaylist) {
+                    console.log(`[SystemPlaylistService] Global ${playlistType} playlist not found, creating it...`);
+                    yield this.createOrUpdateGlobalPlaylist(playlistType);
+                    return this.connectUserToGlobalPlaylist(userId, playlistType);
+                }
+                console.log(`[SystemPlaylistService] Connected user ${userId} to global ${playlistType} playlist`);
+            }
+            catch (error) {
+                console.error(`[SystemPlaylistService] Error connecting user to global playlist:`, error);
+            }
+        });
+    }
+    createDiscoverWeeklyPlaylist(userId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const existingPlaylist = yield db_1.default.playlist.findFirst({
+                    where: {
+                        userId,
+                        name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY],
+                        type: 'SYSTEM',
+                    },
+                });
+                if (existingPlaylist) {
+                    yield this.updateDiscoverWeeklyPlaylist(existingPlaylist.id);
+                    return existingPlaylist;
+                }
+                const playlist = yield db_1.default.playlist.create({
+                    data: {
+                        name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY],
+                        description: 'Khám phá những bài hát mới được cá nhân hóa dành riêng cho bạn. Cập nhật hàng tuần vào Thứ Hai.',
+                        type: 'SYSTEM',
+                        privacy: 'PUBLIC',
+                        userId,
+                        coverUrl: 'https://newjams-images.scdn.co/image/ab676477000033ad/dt/v3/discover-weekly/4O2moMBFA5GYrAnwXLtFDVEVPCc0WhFTI0aWB3b9bpDcL3CQ4dzOmLlizDEvd4Ia0o3B5vUTT-1pD72G0LDfyGH-CQi5qH97BppF-pQ82ww=/NzQ6ODA6NzBUNDAtNDAtNQ==',
+                    },
+                });
+                yield this.updateDiscoverWeeklyPlaylist(playlist.id);
+                return playlist;
+            }
+            catch (error) {
+                console.error(`[SystemPlaylistService] Error creating Discover Weekly playlist:`, error);
+                return null;
+            }
+        });
+    }
+    updateDiscoverWeeklyPlaylist(playlistId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const playlist = yield db_1.default.playlist.findUnique({
+                    where: { id: playlistId },
+                    include: { tracks: true },
+                });
+                if (!playlist) {
+                    throw new Error(`Playlist with ID ${playlistId} not found`);
+                }
+                yield db_1.default.playlistTrack.deleteMany({
+                    where: { playlistId },
+                });
+                const recommendedTracks = yield getRecommendedTracks(playlist.userId, 30, {
+                    includeTopTracks: false,
+                    includeNewReleases: true,
+                });
+                if (recommendedTracks.length > 0) {
+                    const playlistTrackData = recommendedTracks.map((track, index) => ({
+                        playlistId,
+                        trackId: track.id,
+                        trackOrder: index,
+                    }));
+                    yield db_1.default.$transaction([
+                        db_1.default.playlistTrack.createMany({
+                            data: playlistTrackData,
+                        }),
+                        db_1.default.playlist.update({
+                            where: { id: playlistId },
+                            data: {
+                                totalTracks: recommendedTracks.length,
+                                totalDuration: recommendedTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+                                updatedAt: new Date(),
+                            },
+                        }),
+                    ]);
+                }
+                else {
+                    yield db_1.default.playlist.update({
+                        where: { id: playlistId },
+                        data: {
+                            totalTracks: 0,
+                            totalDuration: 0,
+                            updatedAt: new Date(),
+                        },
+                    });
+                }
+                console.log(`[SystemPlaylistService] Updated Discover Weekly playlist: ${playlistId}`);
+            }
+            catch (error) {
+                console.error(`[SystemPlaylistService] Error updating Discover Weekly playlist:`, error);
+            }
+        });
+    }
+    createNewReleasesPlaylist(userId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const existingPlaylist = yield db_1.default.playlist.findFirst({
+                    where: {
+                        userId,
+                        name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.NEW_RELEASES],
+                        type: 'SYSTEM',
+                    },
+                });
+                if (existingPlaylist) {
+                    yield this.updateNewReleasesPlaylist(existingPlaylist.id);
+                    return existingPlaylist;
+                }
+                const playlist = yield db_1.default.playlist.create({
+                    data: {
+                        name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.NEW_RELEASES],
+                        description: 'Những bản phát hành mới nhất từ các nghệ sĩ mà bạn yêu thích và có thể sẽ thích. Cập nhật hàng tuần vào Thứ Sáu.',
+                        type: 'SYSTEM',
+                        privacy: 'PUBLIC',
+                        userId,
+                        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742551340/testAlbum/cv6rm3txh8beiln4x5u1.jpg',
+                    },
+                });
+                yield this.updateNewReleasesPlaylist(playlist.id);
+                return playlist;
+            }
+            catch (error) {
+                console.error(`[SystemPlaylistService] Error creating New Releases playlist:`, error);
+                return null;
+            }
+        });
+    }
+    updateNewReleasesPlaylist(playlistId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const playlist = yield db_1.default.playlist.findUnique({
+                    where: { id: playlistId },
+                    include: { user: true, tracks: true },
+                });
+                if (!playlist) {
+                    throw new Error(`Playlist with ID ${playlistId} not found`);
+                }
+                yield db_1.default.playlistTrack.deleteMany({
+                    where: { playlistId },
+                });
+                const userHistory = yield db_1.default.history.findMany({
+                    where: {
+                        userId: playlist.userId,
+                        type: 'PLAY',
+                    },
+                    include: {
+                        track: {
+                            include: {
+                                artist: true,
+                            },
+                        },
+                    },
+                });
+                const artistCounts = new Map();
+                userHistory.forEach((history) => {
+                    var _a;
+                    if ((_a = history.track) === null || _a === void 0 ? void 0 : _a.artistId) {
+                        const artistId = history.track.artistId;
+                        artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
+                    }
+                });
+                const favoriteArtistIds = [...artistCounts.entries()]
+                    .sort((a, b) => b[1] - a[1])
+                    .map((entry) => entry[0]);
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                const newReleases = yield db_1.default.track.findMany({
+                    where: {
+                        releaseDate: {
+                            gte: thirtyDaysAgo,
+                        },
+                        isActive: true,
+                        OR: [
+                            { artistId: { in: favoriteArtistIds } },
+                            { releaseDate: { gte: thirtyDaysAgo } },
+                        ],
+                    },
+                    orderBy: [
+                        { releaseDate: 'desc' },
+                    ],
+                    include: {
+                        artist: true,
+                        album: true,
+                    },
+                    take: 30,
+                });
+                if (newReleases.length > 0) {
+                    const playlistTrackData = newReleases.map((track, index) => ({
+                        playlistId,
+                        trackId: track.id,
+                        trackOrder: index,
+                    }));
+                    yield db_1.default.$transaction([
+                        db_1.default.playlistTrack.createMany({
+                            data: playlistTrackData,
+                        }),
+                        db_1.default.playlist.update({
+                            where: { id: playlistId },
+                            data: {
+                                totalTracks: newReleases.length,
+                                totalDuration: newReleases.reduce((sum, track) => sum + (track.duration || 0), 0),
+                                updatedAt: new Date(),
+                            },
+                        }),
+                    ]);
+                }
+                else {
+                    yield db_1.default.playlist.update({
+                        where: { id: playlistId },
+                        data: {
+                            totalTracks: 0,
+                            totalDuration: 0,
+                            updatedAt: new Date(),
+                        },
+                    });
+                }
+                console.log(`[SystemPlaylistService] Updated New Releases playlist: ${playlistId}`);
+            }
+            catch (error) {
+                console.error(`[SystemPlaylistService] Error updating New Releases playlist:`, error);
+            }
+        });
+    }
+    createOrUpdateGlobalPlaylist(playlistType) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const existingPlaylist = yield db_1.default.playlist.findFirst({
+                    where: {
+                        name: SYSTEM_PLAYLIST_NAMES[playlistType],
+                        type: 'SYSTEM',
+                    },
+                });
+                if (existingPlaylist) {
+                    return yield this.updateGlobalPlaylistContent(existingPlaylist.id, playlistType);
+                }
+                const adminUser = yield db_1.default.user.findFirst({
+                    where: { role: 'ADMIN' },
+                });
+                if (!adminUser) {
+                    throw new Error('No admin user found to assign global playlist ownership');
+                }
+                const playlist = yield db_1.default.playlist.create({
+                    data: {
+                        name: SYSTEM_PLAYLIST_NAMES[playlistType],
+                        description: this.getPlaylistDescription(playlistType),
+                        type: 'SYSTEM',
+                        privacy: 'PUBLIC',
+                        userId: adminUser.id,
+                        coverUrl: this.getPlaylistCoverUrl(playlistType),
+                    },
+                });
+                return yield this.updateGlobalPlaylistContent(playlist.id, playlistType);
+            }
+            catch (error) {
+                console.error(`[SystemPlaylistService] Error creating global playlist:`, error);
+                return null;
+            }
+        });
+    }
+    updateGlobalPlaylistContent(playlistId, playlistType) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield db_1.default.playlistTrack.deleteMany({
+                    where: { playlistId },
+                });
+                let tracks = [];
+                switch (playlistType) {
+                    case SYSTEM_PLAYLIST_TYPES.TOP_HITS:
+                        const recommendations = yield (0, exports.generateGlobalRecommendedPlaylist)(30);
+                        tracks = recommendations.tracks;
+                        break;
+                    case SYSTEM_PLAYLIST_TYPES.NEW_RELEASES:
+                        const twoWeeksAgo = new Date();
+                        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+                        tracks = yield db_1.default.track.findMany({
+                            where: {
+                                releaseDate: { gte: twoWeeksAgo },
+                                isActive: true,
+                            },
+                            orderBy: { releaseDate: 'desc' },
+                            include: {
+                                artist: true,
+                                album: true,
+                            },
+                            take: 30,
+                        });
+                        break;
+                }
+                if (tracks.length > 0) {
+                    const playlistTrackData = tracks.map((track, index) => ({
+                        playlistId,
+                        trackId: track.id,
+                        trackOrder: index,
+                    }));
+                    yield db_1.default.$transaction([
+                        db_1.default.playlistTrack.createMany({
+                            data: playlistTrackData,
+                        }),
+                        db_1.default.playlist.update({
+                            where: { id: playlistId },
+                            data: {
+                                totalTracks: tracks.length,
+                                totalDuration: tracks.reduce((sum, track) => sum + (track.duration || 0), 0),
+                                updatedAt: new Date(),
+                            },
+                        }),
+                    ]);
+                }
+                else {
+                    yield db_1.default.playlist.update({
+                        where: { id: playlistId },
+                        data: {
+                            totalTracks: 0,
+                            totalDuration: 0,
+                            updatedAt: new Date(),
+                        },
+                    });
+                }
+                const updatedPlaylist = yield db_1.default.playlist.findUnique({
+                    where: { id: playlistId },
+                    include: {
+                        tracks: {
+                            include: {
+                                track: {
+                                    include: {
+                                        artist: true,
+                                        album: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                });
+                console.log(`[SystemPlaylistService] Updated ${playlistType} global playlist: ${playlistId}`);
+                return updatedPlaylist;
+            }
+            catch (error) {
+                console.error(`[SystemPlaylistService] Error updating global playlist content:`, error);
+                return null;
+            }
+        });
+    }
+    updateAllSystemPlaylists() {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                console.log(`[SystemPlaylistService] Starting update of all system playlists`);
+                const globalPlaylistPromises = [
+                    this.createOrUpdateGlobalPlaylist(SYSTEM_PLAYLIST_TYPES.TOP_HITS),
+                    this.createOrUpdateGlobalPlaylist(SYSTEM_PLAYLIST_TYPES.NEW_RELEASES),
+                ];
+                yield Promise.all(globalPlaylistPromises);
+                const userPlaylists = yield db_1.default.playlist.findMany({
+                    where: {
+                        type: 'SYSTEM',
+                        OR: [
+                            {
+                                name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY],
+                            },
+                            { name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.NEW_RELEASES] },
+                        ],
+                    },
+                });
+                const batchSize = 10;
+                for (let i = 0; i < userPlaylists.length; i += batchSize) {
+                    const batch = userPlaylists.slice(i, i + batchSize);
+                    yield Promise.all(batch.map((playlist) => {
+                        if (playlist.name ===
+                            SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY]) {
+                            return this.updateDiscoverWeeklyPlaylist(playlist.id);
+                        }
+                        else if (playlist.name ===
+                            SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.NEW_RELEASES]) {
+                            return this.updateNewReleasesPlaylist(playlist.id);
+                        }
+                    }));
+                }
+                console.log(`[SystemPlaylistService] Completed update of all system playlists`);
+            }
+            catch (error) {
+                console.error(`[SystemPlaylistService] Error updating all system playlists:`, error);
+                throw new Error(`Failed to update all system playlists: ${error}`);
+            }
+        });
+    }
+    getPlaylistDescription(playlistType) {
+        switch (playlistType) {
+            case SYSTEM_PLAYLIST_TYPES.TOP_HITS:
+                return 'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave, được cập nhật tự động dựa trên hoạt động nghe nhạc của cộng đồng.';
+            case SYSTEM_PLAYLIST_TYPES.NEW_RELEASES:
+                return 'Những bản phát hành mới nhất và hot nhất trên nền tảng Soundwave. Cập nhật hàng tuần vào Thứ Sáu.';
+            case SYSTEM_PLAYLIST_TYPES.GENRE_BASED:
+                return 'Collection of tracks based on your favorite genres.';
+            case SYSTEM_PLAYLIST_TYPES.MOOD_BASED:
+                return 'Music tuned to your current mood.';
+            default:
+                return 'A playlist curated by Soundwave.';
+        }
+    }
+    getPlaylistCoverUrl(playlistType) {
+        switch (playlistType) {
+            case SYSTEM_PLAYLIST_TYPES.TOP_HITS:
+                return 'https://charts-images.scdn.co/assets/locale_en/regional/daily/region_vn_default.jpg';
+            case SYSTEM_PLAYLIST_TYPES.NEW_RELEASES:
+                return 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742551340/testAlbum/cv6rm3txh8beiln4x5u1.jpg';
+            case SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY:
+                return 'https://newjams-images.scdn.co/image/ab676477000033ad/dt/v3/discover-weekly/4O2moMBFA5GYrAnwXLtFDVEVPCc0WhFTI0aWB3b9bpDcL3CQ4dzOmLlizDEvd4Ia0o3B5vUTT-1pD72G0LDfyGH-CQi5qH97BppF-pQ82ww=/NzQ6ODA6NzBUNDAtNDAtNQ==';
+            default:
+                return 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
+        }
+    }
+}
+exports.SystemPlaylistService = SystemPlaylistService;
+exports.systemPlaylistService = new SystemPlaylistService();
 const generatePersonalizedPlaylist = (userId, options) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { name = 'Playlist được đề xuất cho bạn', description = 'Danh sách nhạc được tạo tự động dựa trên sở thích của bạn', trackCount = 20, basedOnGenre, basedOnArtist, includeTopTracks = true, includeNewReleases = false, } = options;
@@ -33,22 +498,28 @@ const generatePersonalizedPlaylist = (userId, options) => __awaiter(void 0, void
             includeTopTracks,
             includeNewReleases,
         });
-        for (let i = 0; i < recommendedTracks.length; i++) {
-            yield db_1.default.playlistTrack.create({
-                data: {
-                    playlistId: playlist.id,
-                    trackId: recommendedTracks[i].id,
-                    trackOrder: i,
-                },
-            });
+        if (recommendedTracks.length > 0) {
+            const playlistTrackData = recommendedTracks.map((track, index) => ({
+                playlistId: playlist.id,
+                trackId: track.id,
+                trackOrder: index,
+            }));
+            const totalDuration = recommendedTracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+            yield db_1.default.$transaction([
+                db_1.default.playlistTrack.createMany({
+                    data: playlistTrackData,
+                }),
+                db_1.default.playlist.update({
+                    where: { id: playlist.id },
+                    data: {
+                        totalTracks: recommendedTracks.length,
+                        totalDuration,
+                    },
+                }),
+            ]);
         }
-        const totalDuration = recommendedTracks.reduce((sum, track) => sum + (track.duration || 0), 0);
-        const updatedPlaylist = yield db_1.default.playlist.update({
+        const updatedPlaylist = yield db_1.default.playlist.findUnique({
             where: { id: playlist.id },
-            data: {
-                totalTracks: recommendedTracks.length,
-                totalDuration,
-            },
             include: {
                 tracks: {
                     include: {
@@ -62,6 +533,9 @@ const generatePersonalizedPlaylist = (userId, options) => __awaiter(void 0, void
                 },
             },
         });
+        if (!updatedPlaylist) {
+            throw new Error('Failed to retrieve updated playlist');
+        }
         return updatedPlaylist;
     }
     catch (error) {
@@ -72,18 +546,20 @@ const generatePersonalizedPlaylist = (userId, options) => __awaiter(void 0, void
 exports.generatePersonalizedPlaylist = generatePersonalizedPlaylist;
 const getRecommendedTracks = (userId, limit, options) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const userHistory = yield db_1.default.history.findMany({
-            where: {
-                userId,
-                type: 'PLAY',
-                trackId: { not: null },
-            },
-            select: { trackId: true, playCount: true },
-        });
-        const userLikes = yield db_1.default.userLikeTrack.findMany({
-            where: { userId },
-            select: { trackId: true },
-        });
+        const [userHistory, userLikes] = yield Promise.all([
+            db_1.default.history.findMany({
+                where: {
+                    userId,
+                    type: 'PLAY',
+                    trackId: { not: null },
+                },
+                select: { trackId: true, playCount: true },
+            }),
+            db_1.default.userLikeTrack.findMany({
+                where: { userId },
+                select: { trackId: true },
+            }),
+        ]);
         const interactedTrackIds = new Set([
             ...userHistory.map((h) => h.trackId),
             ...userLikes.map((l) => l.trackId),
@@ -97,14 +573,42 @@ const getRecommendedTracks = (userId, limit, options) => __awaiter(void 0, void 
         userLikes.forEach((l) => {
             if (l.trackId) {
                 const currentScore = userTrackInteractions.get(l.trackId) || 0;
-                userTrackInteractions.set(l.trackId, currentScore + 3);
+                userTrackInteractions.set(l.trackId, currentScore + 5);
+            }
+        });
+        const artistInteractions = new Map();
+        const trackArtists = yield db_1.default.track.findMany({
+            where: {
+                id: { in: Array.from(interactedTrackIds) },
+            },
+            select: {
+                id: true,
+                artistId: true,
+            },
+        });
+        trackArtists.forEach((track) => {
+            if (track.artistId) {
+                const interactionStrength = userTrackInteractions.get(track.id) || 0;
+                const currentCount = artistInteractions.get(track.artistId) || 0;
+                artistInteractions.set(track.artistId, currentCount + interactionStrength);
             }
         });
         let recommendedTracks = [];
-        const matrixRecommendations = yield getMatrixFactorizationRecommendations(userId, Array.from(interactedTrackIds), userTrackInteractions, Math.ceil(limit * 0.6), options);
+        const totalInteractionScore = Array.from(userTrackInteractions.values()).reduce((sum, score) => sum + score, 0);
+        const hasEnoughInteractions = interactedTrackIds.size >= 3;
+        const hasStrongPreferences = totalInteractionScore >= 20;
+        const matrixLimit = hasEnoughInteractions
+            ? hasStrongPreferences
+                ? Math.ceil(limit * 0.7)
+                : Math.ceil(limit * 0.6)
+            : Math.ceil(limit * 0.4);
+        const matrixRecommendations = yield getMatrixFactorizationRecommendations(userId, Array.from(interactedTrackIds), userTrackInteractions, matrixLimit, options);
         recommendedTracks.push(...matrixRecommendations);
         if (recommendedTracks.length < limit) {
-            const itemBasedTracks = yield getItemBasedRecommendations(userId, Array.from(interactedTrackIds), limit - recommendedTracks.length, options);
+            const itemBasedLimit = hasEnoughInteractions
+                ? limit - recommendedTracks.length
+                : Math.ceil((limit - recommendedTracks.length) * 0.6);
+            const itemBasedTracks = yield getItemBasedRecommendations(userId, Array.from(interactedTrackIds), itemBasedLimit, options);
             for (const track of itemBasedTracks) {
                 if (!recommendedTracks.some((t) => t.id === track.id)) {
                     recommendedTracks.push(track);
@@ -123,6 +627,29 @@ const getRecommendedTracks = (userId, limit, options) => __awaiter(void 0, void 
                 }
             }
         }
+        if (artistInteractions.size > 0 && recommendedTracks.length > 0) {
+            recommendedTracks = recommendedTracks.sort((trackA, trackB) => {
+                const artistScoreA = artistInteractions.get(trackA.artistId) || 0;
+                const artistScoreB = artistInteractions.get(trackB.artistId) || 0;
+                if (Math.abs(artistScoreA - artistScoreB) > 10) {
+                    return artistScoreB - artistScoreA;
+                }
+                return 0;
+            });
+        }
+        if (recommendedTracks.length > 5) {
+            const topCount = Math.ceil(recommendedTracks.length * 0.3);
+            const bottomCount = Math.floor(recommendedTracks.length * 0.2);
+            const middleCount = recommendedTracks.length - topCount - bottomCount;
+            const topTracks = recommendedTracks.slice(0, topCount);
+            let middleTracks = recommendedTracks.slice(topCount, topCount + middleCount);
+            const middleSegmentSize = Math.ceil(middleTracks.length / 2);
+            const middleUpperTracks = shuffleArray(middleTracks.slice(0, middleSegmentSize));
+            const middleLowerTracks = shuffleArray(middleTracks.slice(middleSegmentSize));
+            middleTracks = [...middleUpperTracks, ...middleLowerTracks];
+            const bottomTracks = recommendedTracks.slice(topCount + middleCount);
+            recommendedTracks = [...topTracks, ...middleTracks, ...bottomTracks];
+        }
         return recommendedTracks;
     }
     catch (error) {
@@ -130,6 +657,14 @@ const getRecommendedTracks = (userId, limit, options) => __awaiter(void 0, void 
         return getPopularTracks([], limit, options);
     }
 });
+function shuffleArray(array) {
+    const result = [...array];
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+}
 const getMatrixFactorizationRecommendations = (userId, interactedTrackIds, userTrackInteractions, limit, options) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const activeUsers = yield db_1.default.user.findMany({
@@ -144,8 +679,94 @@ const getMatrixFactorizationRecommendations = (userId, interactedTrackIds, userT
             select: { id: true },
         });
         const activeUserIds = activeUsers.map((u) => u.id);
-        if (activeUserIds.length < 5) {
-            console.log('Not enough user data for matrix factorization');
+        if (activeUserIds.length < 2) {
+            console.log('Not enough user data for matrix factorization, using user history for simple personalization');
+            const userFavoriteGenres = yield db_1.default.track.findMany({
+                where: {
+                    id: { in: interactedTrackIds },
+                },
+                include: {
+                    genres: {
+                        include: {
+                            genre: true,
+                        },
+                    },
+                    artist: true,
+                },
+            });
+            const genreCounts = new Map();
+            const artistCounts = new Map();
+            userFavoriteGenres.forEach((track) => {
+                const artistId = track.artistId;
+                artistCounts.set(artistId, (artistCounts.get(artistId) || 0) +
+                    (userTrackInteractions.get(track.id) || 1));
+                track.genres.forEach((genreRel) => {
+                    const genreId = genreRel.genre.id;
+                    genreCounts.set(genreId, (genreCounts.get(genreId) || 0) +
+                        (userTrackInteractions.get(track.id) || 1));
+                });
+            });
+            const topGenreIds = [...genreCounts.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map((entry) => entry[0]);
+            const topArtistIds = [...artistCounts.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map((entry) => entry[0]);
+            if (topGenreIds.length > 0 || topArtistIds.length > 0) {
+                const personalizedTracks = yield db_1.default.track.findMany({
+                    where: Object.assign(Object.assign({ id: { notIn: interactedTrackIds }, isActive: true, OR: [
+                            topGenreIds.length > 0
+                                ? {
+                                    genres: {
+                                        some: {
+                                            genreId: { in: topGenreIds },
+                                        },
+                                    },
+                                }
+                                : {},
+                            topArtistIds.length > 0 ? { artistId: { in: topArtistIds } } : {},
+                        ] }, (options.basedOnGenre
+                        ? {
+                            genres: {
+                                some: {
+                                    genre: {
+                                        name: options.basedOnGenre,
+                                    },
+                                },
+                            },
+                        }
+                        : {})), (options.basedOnArtist
+                        ? {
+                            OR: [
+                                { artistId: options.basedOnArtist },
+                                {
+                                    featuredArtists: {
+                                        some: {
+                                            artistId: options.basedOnArtist,
+                                        },
+                                    },
+                                },
+                            ],
+                        }
+                        : {})),
+                    include: {
+                        artist: true,
+                        album: true,
+                        genres: {
+                            include: {
+                                genre: true,
+                            },
+                        },
+                    },
+                    orderBy: options.includeNewReleases
+                        ? [{ releaseDate: 'desc' }, { playCount: 'desc' }]
+                        : [{ playCount: 'desc' }],
+                    take: limit,
+                });
+                return personalizedTracks;
+            }
             return [];
         }
         const allUserHistory = yield db_1.default.history.findMany({

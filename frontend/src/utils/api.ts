@@ -886,14 +886,30 @@ export const api = {
       return response.json();
     },
 
+    getSystemPlaylists: async (token: string) => {
+      try {
+        if (!token) {
+          throw new Error('User token not found');
+        }
+
+        return await fetchWithAuth(
+          '/api/playlists/system-all',
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error('API Error:', error);
+        throw error;
+      }
+    },
+
     getSystemPlaylist: async () => {
       try {
         const token = localStorage.getItem('userToken');
         if (!token) {
-          throw new Error('Vui lòng đăng nhập lại');
+          throw new Error('Token não encontrado');
         }
 
-        // Use the dedicated endpoint for the system playlist
         return await fetchWithAuth(
           '/api/playlists/system',
           { method: 'GET' },

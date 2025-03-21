@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { RequestHandler } from 'express';
-import * as aiService from '../services/ai.service';
 import * as playlistService from '../services/playlist.service';
+import { systemPlaylistService } from '../services/playlist.service';
 import { handleError } from '../utils/handle-utils';
 
 const prisma = new PrismaClient();
@@ -25,16 +25,19 @@ export const createPersonalizedPlaylist = async (
       includeNewReleases,
     } = req.body;
 
-    const playlist = await aiService.generatePersonalizedPlaylist(userId, {
-      name,
-      description,
-      trackCount,
-      basedOnMood,
-      basedOnGenre,
-      basedOnArtist,
-      includeTopTracks,
-      includeNewReleases,
-    });
+    const playlist = await playlistService.generatePersonalizedPlaylist(
+      userId,
+      {
+        name,
+        description,
+        trackCount,
+        basedOnMood,
+        basedOnGenre,
+        basedOnArtist,
+        includeTopTracks,
+        includeNewReleases,
+      }
+    );
 
     res.status(201).json({
       message: 'AI Playlist created successfully',
@@ -60,6 +63,145 @@ export const createFavoritePlaylist = async (userId: string): Promise<void> => {
   } catch (error) {
     console.error('Error creating favorite playlist:', error);
     throw error;
+  }
+};
+
+// Get the system playlist (Soundwave Hits)
+export const getSystemPlaylist: RequestHandler = async (req, res, next) => {
+  try {
+    // Find the system playlist
+    const systemPlaylist = await prisma.playlist.findFirst({
+      where: {
+        OR: [
+          { type: 'SYSTEM' },
+          { name: 'Soundwave Hits: Trending Right Now' },
+        ],
+      },
+    });
+
+    if (!systemPlaylist) {
+      res.status(404).json({
+        success: false,
+        message: 'System playlist not found',
+      });
+      return;
+    }
+
+    // Get the full details of the playlist with tracks
+    const playlist = await prisma.playlist.findUnique({
+      where: { id: systemPlaylist.id },
+      include: {
+        tracks: {
+          include: {
+            track: {
+              include: {
+                artist: true,
+                album: true,
+              },
+            },
+          },
+          orderBy: {
+            trackOrder: 'asc',
+          },
+        },
+      },
+    });
+
+    // Add the canEdit field based on user role
+    const userRole = req.user?.role;
+    const canEdit = userRole === 'ADMIN';
+
+    // Transform data structure
+    const formattedTracks =
+      playlist?.tracks.map((pt) => ({
+        id: pt.track.id,
+        title: pt.track.title,
+        duration: pt.track.duration,
+        coverUrl: pt.track.coverUrl,
+        artist: pt.track.artist,
+        album: pt.track.album,
+        createdAt: pt.track.createdAt.toISOString(),
+      })) || [];
+
+    res.json({
+      success: true,
+      data: {
+        ...playlist,
+        tracks: formattedTracks,
+        canEdit,
+      },
+    });
+  } catch (error) {
+    console.error('Error in getSystemPlaylist:', error);
+    next(error);
+  }
+};
+
+// Lấy các playlist được hệ thống tạo riêng cho user đang đăng nhập
+export const getPersonalizedSystemPlaylists = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user!.id;
+
+    const playlists = await prisma.playlist.findMany({
+      where: {
+        userId,
+        type: 'SYSTEM',
+      },
+      include: {
+        tracks: {
+          include: {
+            track: {
+              include: {
+                artist: true,
+                album: true,
+              },
+            },
+          },
+          orderBy: {
+            trackOrder: 'asc',
+          },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: playlists,
+    });
+  } catch (error) {
+    handleError(res, error, 'Get personalized system playlists');
+  }
+};
+
+// Cập nhật tất cả playlist hệ thống
+export const updateAllSystemPlaylists = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userRole = req.user?.role;
+
+    // Chỉ ADMIN mới có quyền gọi API này
+    if (userRole !== 'ADMIN') {
+      res.status(403).json({
+        success: false,
+        message: 'Only administrators can update system playlists',
+      });
+      return;
+    }
+
+    // Gọi service để cập nhật tất cả playlist hệ thống
+    const result = await systemPlaylistService.updateAllSystemPlaylists();
+
+    res.json({
+      success: true,
+      message: 'All system playlists have been updated successfully',
+    });
+  } catch (error) {
+    handleError(res, error, 'Update all system playlists');
   }
 };
 
@@ -676,30 +818,42 @@ export const deletePlaylist: RequestHandler = async (
   }
 };
 
-// Get the system playlist (Soundwave Hits)
-export const getSystemPlaylist: RequestHandler = async (req, res, next) => {
+// Add this new controller function
+export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
   try {
-    // Find the system playlist
-    const systemPlaylist = await prisma.playlist.findFirst({
-      where: {
-        OR: [
-          { type: 'SYSTEM' },
-          { name: 'Soundwave Hits: Trending Right Now' },
-        ],
-      },
-    });
+    const userId = req.user?.id;
 
-    if (!systemPlaylist) {
-      res.status(404).json({
+    if (!userId) {
+      res.status(401).json({
         success: false,
-        message: 'System playlist not found',
+        message: 'Unauthorized',
       });
       return;
     }
 
-    // Get the full details of the playlist with tracks
-    const playlist = await prisma.playlist.findUnique({
-      where: { id: systemPlaylist.id },
+    // Find all system playlists accessible to the user
+    const systemPlaylists = await prisma.playlist.findMany({
+      where: {
+        type: 'SYSTEM',
+        OR: [
+          // Global system playlists owned by admin users
+          {
+            user: {
+              role: 'ADMIN',
+            },
+            name: {
+              in: [
+                'Soundwave Hits: Trending Right Now',
+                'Soundwave Fresh: New Releases',
+              ],
+            },
+          },
+          // User-specific system playlists
+          {
+            userId: userId,
+          },
+        ],
+      },
       include: {
         tracks: {
           include: {
@@ -719,11 +873,12 @@ export const getSystemPlaylist: RequestHandler = async (req, res, next) => {
 
     // Add the canEdit field based on user role
     const userRole = req.user?.role;
-    const canEdit = userRole === 'ADMIN';
 
-    // Transform data structure
-    const formattedTracks =
-      playlist?.tracks.map((pt) => ({
+    // Transform data structure for consistent formatting
+    const formattedPlaylists = systemPlaylists.map((playlist) => {
+      const canEdit = userRole === 'ADMIN' || playlist.userId === userId;
+
+      const formattedTracks = playlist.tracks.map((pt) => ({
         id: pt.track.id,
         title: pt.track.title,
         duration: pt.track.duration,
@@ -731,18 +886,21 @@ export const getSystemPlaylist: RequestHandler = async (req, res, next) => {
         artist: pt.track.artist,
         album: pt.track.album,
         createdAt: pt.track.createdAt.toISOString(),
-      })) || [];
+      }));
 
-    res.json({
-      success: true,
-      data: {
+      return {
         ...playlist,
         tracks: formattedTracks,
         canEdit,
-      },
+      };
+    });
+
+    res.json({
+      success: true,
+      data: formattedPlaylists,
     });
   } catch (error) {
-    console.error('Error in getSystemPlaylist:', error);
+    console.error('Error in getSystemPlaylists:', error);
     next(error);
   }
 };

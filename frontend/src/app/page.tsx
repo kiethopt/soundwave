@@ -15,6 +15,7 @@ export default function Home() {
   const [recommendedPlaylist, setRecommendedPlaylist] =
     useState<Playlist | null>(null);
   const [updatedPlaylists, setUpdatedPlaylists] = useState<Playlist[]>([]);
+  const [systemPlaylists, setSystemPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const {
     playTrack,
@@ -40,27 +41,31 @@ export default function Home() {
       try {
         setLoading(true);
 
-        const [newestAlbumsRes, hotAlbumsRes, recommendedPlaylistRes] =
+        const [newestAlbumsRes, hotAlbumsRes, systemPlaylistsRes] =
           await Promise.all([
             api.albums.getNewestAlbums(token),
             api.albums.getHotAlbums(token),
-            api.playlists.getSystemPlaylist(),
+            api.playlists.getSystemPlaylists(token),
           ]);
 
         setNewestAlbums(newestAlbumsRes.albums || []);
         setHotAlbums(hotAlbumsRes.albums || []);
 
-        // Handle the global playlist from the standard API response
-        if (recommendedPlaylistRes.success) {
-          setRecommendedPlaylist(recommendedPlaylistRes.data);
+        if (systemPlaylistsRes.success) {
+          const mainPlaylist =
+            systemPlaylistsRes.data.find(
+              (playlist: Playlist) =>
+                playlist.name === 'Soundwave Hits: Trending Right Now'
+            ) || systemPlaylistsRes.data[0];
 
-          // Also set the same playlist for updatedPlaylists temporarily
-          // In a real scenario, you would fetch the list of updated playlists
-          setUpdatedPlaylists([recommendedPlaylistRes.data]);
+          setRecommendedPlaylist(mainPlaylist);
+
+          setSystemPlaylists(systemPlaylistsRes.data);
+          setUpdatedPlaylists(systemPlaylistsRes.data);
         } else {
           console.error(
-            'Failed to load system playlist:',
-            recommendedPlaylistRes.message
+            'Failed to load system playlists:',
+            systemPlaylistsRes.message
           );
         }
       } catch (error) {
@@ -226,7 +231,7 @@ export default function Home() {
                 <Image
                   src={
                     recommendedPlaylist.coverUrl ||
-                    '/images/default-playlist.png'
+                    '/images/default-playlist.jpg'
                   }
                   alt={recommendedPlaylist.name}
                   fill
@@ -258,7 +263,7 @@ export default function Home() {
             <div className="editorial-card group">
               <div className="relative aspect-[16/9] overflow-hidden rounded-lg">
                 <Image
-                  src={newestAlbums[0].coverUrl || '/images/default-album.png'}
+                  src={newestAlbums[0].coverUrl || '/images/default-album.jpg'}
                   alt={newestAlbums[0].title}
                   fill
                   className="object-cover"
@@ -287,7 +292,7 @@ export default function Home() {
             <div className="editorial-card group">
               <div className="relative aspect-[16/9] overflow-hidden rounded-lg">
                 <Image
-                  src={hotAlbums[0].coverUrl || '/images/default-album.png'}
+                  src={hotAlbums[0].coverUrl || '/images/default-album.jpg'}
                   alt={hotAlbums[0].title}
                   fill
                   className="object-cover"
@@ -298,6 +303,63 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* System Playlists Section - New Section */}
+      {systemPlaylists.length > 0 && (
+        <Section title="Your Recommended Playlists">
+          <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
+            {systemPlaylists.map((playlist) => (
+              <div
+                key={playlist.id}
+                className="cursor-pointer flex-shrink-0 w-40"
+                onClick={() => router.push(`/playlists/${playlist.id}`)}
+                onMouseEnter={() => setHoveredAlbum(`system-${playlist.id}`)}
+                onMouseLeave={() => setHoveredAlbum(null)}
+              >
+                <div className="flex flex-col space-y-2">
+                  <div className="relative aspect-square overflow-hidden rounded-lg">
+                    <Image
+                      src={playlist.coverUrl || '/images/default-playlist.jpg'}
+                      alt={playlist.name}
+                      fill
+                      className="object-cover"
+                    />
+                    <div
+                      className={`absolute inset-0 transition-all duration-150 ${
+                        hoveredAlbum === `system-${playlist.id}`
+                          ? 'bg-black/30'
+                          : 'bg-black/0'
+                      }`}
+                    ></div>
+
+                    {hoveredAlbum === `system-${playlist.id}` && (
+                      <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+                        <button
+                          className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/playlists/${playlist.id}`);
+                          }}
+                        >
+                          <Play size={18} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium line-clamp-1">
+                      {playlist.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground line-clamp-1">
+                      {playlist.totalTracks} tracks • Soundwave
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Latest Songs Section (2-column layout like Apple Music) */}
       {recommendedPlaylist && recommendedPlaylist.tracks && (
@@ -320,7 +382,7 @@ export default function Home() {
                 </div>
                 <div className="relative w-12 h-12 flex-shrink-0">
                   <Image
-                    src={track.coverUrl || '/images/default-track.png'}
+                    src={track.coverUrl || '/images/default-track.jpg'}
                     alt={track.title}
                     fill
                     className="rounded object-cover"
@@ -377,7 +439,7 @@ export default function Home() {
               <div className="flex flex-col space-y-2">
                 <div className="relative aspect-square overflow-hidden rounded-lg">
                   <Image
-                    src={album.coverUrl || '/images/default-album.png'}
+                    src={album.coverUrl || '/images/default-album.jpg'}
                     alt={album.title}
                     fill
                     className="object-cover"
@@ -440,7 +502,7 @@ export default function Home() {
               <div className="flex flex-col space-y-2">
                 <div className="relative aspect-square overflow-hidden rounded-lg">
                   <Image
-                    src={playlist.coverUrl || '/images/default-playlist.png'}
+                    src={playlist.coverUrl || '/images/default-playlist.jpg'}
                     alt={playlist.name}
                     fill
                     className="object-cover"
@@ -506,7 +568,7 @@ export default function Home() {
                 </div>
                 <div className="relative w-12 h-12 flex-shrink-0">
                   <Image
-                    src={track.coverUrl || '/images/default-track.png'}
+                    src={track.coverUrl || '/images/default-track.jpg'}
                     alt={track.title}
                     fill
                     className="rounded object-cover"
@@ -572,7 +634,7 @@ export default function Home() {
               <div className="flex flex-col space-y-2">
                 <div className="relative aspect-square overflow-hidden rounded-lg">
                   <Image
-                    src={album.coverUrl || '/images/default-album.png'}
+                    src={album.coverUrl || '/images/default-album.jpg'}
                     alt={album.title}
                     fill
                     className="object-cover"

@@ -16,7 +16,7 @@ async function main() {
       'R&B',
       'Electronic',
       'Jazz',
-      'Classical',
+      'ClassFical',
       'Country',
       'Folk',
       'Soul',
