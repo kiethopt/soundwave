@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   createContext,
@@ -8,10 +8,9 @@ import {
   useRef,
   useEffect,
   useCallback,
-} from "react";
-import { Track } from "@/types";
-import { api } from "@/utils/api";
-import { toast } from "react-toastify";
+} from 'react';
+import { Track } from '@/types';
+import { api } from '@/utils/api';
 
 interface TrackContextType {
   currentTrack: Track | null;
@@ -50,7 +49,7 @@ export const TrackContext = createContext<TrackContextType>({
   loop: false,
   shuffle: false,
   duration: 0,
-  queueType: "track",
+  queueType: 'track',
   showPlayer: false,
   setQueueType: () => {},
   playTrack: () => {},
@@ -81,7 +80,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const [shuffle, setShuffle] = useState(false);
   const [trackQueue, setTrackQueue] = useState<Track[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [queueType, setQueueType] = useState<string>("track");
+  const [queueType, setQueueType] = useState<string>('track');
   const [playStartTime, setPlayStartTime] = useState<number | null>(null);
   const [lastSavedTime, setLastSavedTime] = useState<number>(0);
   const [token, setToken] = useState<string | null>(null);
@@ -99,8 +98,8 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   // Initialize audio and broadcast channel
   useEffect(() => {
     audioRef.current = new Audio();
-    broadcastChannel.current = new BroadcastChannel("musicPlayback");
-    const token = localStorage.getItem("userToken");
+    broadcastChannel.current = new BroadcastChannel('musicPlayback');
+    const token = localStorage.getItem('userToken');
     if (token) setToken(token);
 
     // Clean up function
@@ -130,7 +129,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
           token
         );
       } catch (error) {
-        console.error("Failed to save play history:", error);
+        console.error('Failed to save play history:', error);
       }
     },
     [token]
@@ -139,7 +138,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const playTrack = useCallback(
     async (track: Track) => {
       if (!track.audioUrl) {
-        console.error("Audio URL is missing for this track.");
+        console.error('Audio URL is missing for this track.');
         return;
       }
 
@@ -155,7 +154,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         currentPlayRequestRef.current = new AbortController();
 
         if (broadcastChannel.current) {
-          broadcastChannel.current.postMessage({ type: "play", tabId });
+          broadcastChannel.current.postMessage({ type: 'play', tabId });
         }
 
         setShowPlayer(true);
@@ -167,7 +166,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
             setIsPlaying(true);
           } catch (error) {
             if (error instanceof Error && error.name !== 'AbortError') {
-              console.error("Playback error:", error);
+              console.error('Playback error:', error);
               setIsPlaying(false);
             }
           }
@@ -178,10 +177,10 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         setPlayStartTime(Date.now());
         setLastSavedTime(0);
         setProgress(0);
-        
+
         // Tạm dừng audio hiện tại trước khi load bài mới
         audioRef.current.pause();
-        
+
         // Load source mới
         audioRef.current.src = track.audioUrl;
         audioRef.current.currentTime = 0;
@@ -217,10 +216,9 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
           await audioRef.current.play();
           saveHistory(track.id, 0, false);
         }
-
       } catch (error) {
         if (error instanceof Error && error.name !== 'AbortError') {
-          console.error("Playback error:", error);
+          console.error('Playback error:', error);
           setIsPlaying(false);
         }
       }
@@ -287,7 +285,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {
-        console.error("Error skipping to next track:", error);
+        console.error('Error skipping to next track:', error);
       }
     }
   }, [currentIndex, playTrack]);
@@ -308,7 +306,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {
-        console.error("Error skipping to previous track:", error);
+        console.error('Error skipping to previous track:', error);
       }
     }
   }, [currentIndex, playTrack]);
@@ -359,7 +357,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         audio
           .play()
           .catch((error) =>
-            console.error("Error playing track after loop:", error)
+            console.error('Error playing track after loop:', error)
           );
       } else if (shuffle) {
         setIsPlaying(false);
@@ -371,39 +369,39 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const handleBroadcastMessage = (event: MessageEvent) => {
-      if (event.data.type === "play" && event.data.tabId !== tabId) {
+      if (event.data.type === 'play' && event.data.tabId !== tabId) {
         // Nếu tab khác đã bắt đầu phát, tạm dừng tab hiện tại
         pauseTrack();
       }
     };
 
-    audio.addEventListener("loadedmetadata", handleMetadataLoaded);
-    audio.addEventListener("timeupdate", handleTimeUpdate);
-    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener('loadedmetadata', handleMetadataLoaded);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
     broadcastChannel.current.addEventListener(
-      "message",
+      'message',
       handleBroadcastMessage
     );
 
     const handleBeforeUnload = () => {
       if (broadcastChannel.current) {
-        broadcastChannel.current.postMessage({ type: "stop", tabId });
+        broadcastChannel.current.postMessage({ type: 'stop', tabId });
       }
     };
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      audio.removeEventListener("loadedmetadata", handleMetadataLoaded);
-      audio.removeEventListener("timeupdate", handleTimeUpdate);
-      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener('loadedmetadata', handleMetadataLoaded);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
       if (broadcastChannel.current) {
         broadcastChannel.current.removeEventListener(
-          "message",
+          'message',
           handleBroadcastMessage
         );
       }
-      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [
     loop,
@@ -432,23 +430,23 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     trackQueueRef.current = tracks;
     setQueue(tracks); // Keep the queue state in sync
   }, []);
-  
+
   // Add new queue management functions
   const addToQueue = useCallback((track: Track) => {
-    setQueue(prevQueue => {
+    setQueue((prevQueue) => {
       // Check if the track already exists in the queue
-      const isTrackInQueue = prevQueue.some(item => item.id === track.id);
-      
+      const isTrackInQueue = prevQueue.some((item) => item.id === track.id);
+
       // Only add the track if it's not already in the queue
       if (!isTrackInQueue) {
         const newQueue = [...prevQueue, track];
         return newQueue;
       }
-            
+
       // Return the unchanged queue if the track already exists
       return prevQueue;
     });
-    
+
     // Also update the trackQueue if it's empty
     if (trackQueueRef.current.length === 0) {
       setTrackQueue([track]);
@@ -456,32 +454,35 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const removeFromQueue = useCallback((index: number) => {
-    setQueue(prevQueue => {
-      const newQueue = prevQueue.filter((_, i) => i !== index);
-      
-      // If removing current track, play next track if available
-      if (index === currentIndex) {
-        if (newQueue.length > 0) {
-          const nextIndex = Math.min(index, newQueue.length - 1);
-          setCurrentIndex(nextIndex);
-          playTrack(newQueue[nextIndex]);
-        } else {
-          pauseTrack();
-          setCurrentTrack(null);
+  const removeFromQueue = useCallback(
+    (index: number) => {
+      setQueue((prevQueue) => {
+        const newQueue = prevQueue.filter((_, i) => i !== index);
+
+        // If removing current track, play next track if available
+        if (index === currentIndex) {
+          if (newQueue.length > 0) {
+            const nextIndex = Math.min(index, newQueue.length - 1);
+            setCurrentIndex(nextIndex);
+            playTrack(newQueue[nextIndex]);
+          } else {
+            pauseTrack();
+            setCurrentTrack(null);
+          }
+        } else if (index < currentIndex) {
+          // Adjust currentIndex if removing a track before it
+          setCurrentIndex(currentIndex - 1);
         }
-      } else if (index < currentIndex) {
-        // Adjust currentIndex if removing a track before it
-        setCurrentIndex(currentIndex - 1);
-      }
-      
-      // Update trackQueue ref
-      setTrackQueue(newQueue);
-      trackQueueRef.current = newQueue;
-      
-      return newQueue;
-    });
-  }, [currentIndex, pauseTrack, playTrack]);
+
+        // Update trackQueue ref
+        setTrackQueue(newQueue);
+        trackQueueRef.current = newQueue;
+
+        return newQueue;
+      });
+    },
+    [currentIndex, pauseTrack, playTrack]
+  );
 
   const clearQueue = useCallback(() => {
     pauseTrack();
@@ -492,34 +493,31 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     setCurrentIndex(0);
   }, [pauseTrack]);
 
-  const reorderQueue = useCallback((startIndex: number, endIndex: number) => {
-    setQueue(prevQueue => {
-      const result = Array.from(prevQueue);
-      const [removed] = result.splice(startIndex, 1);
-      result.splice(endIndex, 0, removed);
-      
-      // Update trackQueue
-      setTrackQueue(result);
-      trackQueueRef.current = result;
-      
-      // Update currentIndex if the current track was moved
-      if (currentIndex === startIndex) {
-        setCurrentIndex(endIndex);
-      } else if (
-        startIndex < currentIndex && 
-        endIndex >= currentIndex
-      ) {
-        setCurrentIndex(currentIndex - 1);
-      } else if (
-        startIndex > currentIndex && 
-        endIndex <= currentIndex
-      ) {
-        setCurrentIndex(currentIndex + 1);
-      }
-      
-      return result;
-    });
-  }, [currentIndex]);
+  const reorderQueue = useCallback(
+    (startIndex: number, endIndex: number) => {
+      setQueue((prevQueue) => {
+        const result = Array.from(prevQueue);
+        const [removed] = result.splice(startIndex, 1);
+        result.splice(endIndex, 0, removed);
+
+        // Update trackQueue
+        setTrackQueue(result);
+        trackQueueRef.current = result;
+
+        // Update currentIndex if the current track was moved
+        if (currentIndex === startIndex) {
+          setCurrentIndex(endIndex);
+        } else if (startIndex < currentIndex && endIndex >= currentIndex) {
+          setCurrentIndex(currentIndex - 1);
+        } else if (startIndex > currentIndex && endIndex <= currentIndex) {
+          setCurrentIndex(currentIndex + 1);
+        }
+
+        return result;
+      });
+    },
+    [currentIndex]
+  );
 
   return (
     <TrackContext.Provider
@@ -549,7 +547,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         addToQueue,
         removeFromQueue,
         clearQueue,
-        reorderQueue
+        reorderQueue,
       }}
     >
       {children}
@@ -560,7 +558,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 export const useTrack = () => {
   const context = useContext(TrackContext);
   if (context === undefined) {
-    throw new Error("useTrack must be used within a TrackProvider");
+    throw new Error('useTrack must be used within a TrackProvider');
   }
   return context;
 };
