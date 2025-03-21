@@ -42,6 +42,28 @@ export default function NotificationsPage() {
     fetchNotifications();
   }, []);
 
+  const handleMarkAllAsRead = async () => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        toast.error('Bạn cần đăng nhập để thực hiện hành động này!');
+        return;
+      }
+
+      // Gọi API để đánh dấu tất cả thông báo là đã đọc (giả sử có endpoint này)
+      await api.notifications.markAllAsRead(token);
+
+      // Cập nhật state cục bộ
+      setNotifications((prev) =>
+        prev.map((notification) => ({ ...notification, isRead: true }))
+      );
+      toast.success('Đã đánh dấu tất cả thông báo là đã đọc!');
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      toast.error('Có lỗi xảy ra khi đánh dấu đã đọc!');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#111111]">
@@ -54,17 +76,30 @@ export default function NotificationsPage() {
     <div className="min-h-screen bg-[#111111] py-8 px-6 pt-[72px]">
       {/* Nội dung chính - Chừa khoảng trống cho Header từ RootLayout */}
       <div className="max-w-4xl mx-auto pb-8">
-        {/* Tiêu đề và số lượng thông báo bên trái */}
-        <div className="mb-6 animate-fade-in">
-          <h1 className="text-2xl font-bold text-primary inline-block">Thông báo</h1>
-          <span className="ml-2 text-sm text-secondary">
-            ({notifications.length})
-          </span>
+        {/* Tiêu đề và nút đánh dấu tất cả đã đọc */}
+        <div className="mb-6 flex justify-between items-center animate-fade-in">
+          <div>
+            <h1 className="text-2xl font-bold text-primary inline-block">Thông báo</h1>
+            <span className="ml-2 text-sm text-secondary">
+              ({notifications.length})
+            </span>
+          </div>
+          {notifications.length > 0 && notifications.some(n => !n.isRead) && (
+            <button
+              onClick={handleMarkAllAsRead}
+              className="btn-secondary"
+            >
+              Đánh dấu tất cả đã đọc
+            </button>
+          )}
         </div>
 
         {notifications.length === 0 ? (
           <div className="text-center py-12 animate-fade-in">
             <p className="text-lg text-secondary">Không có thông báo nào.</p>
+            <Link href="/">
+              <button className="btn-primary mt-4 animate-slide-up">Quay về trang chủ</button>
+            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
@@ -73,8 +108,8 @@ export default function NotificationsPage() {
                 <Link href={`/notification/${notification.id}`}>
                   <div
                     className={`dashboard-card flex items-center p-4 transition-all duration-300 ${notification.isRead
-                      ? 'opacity-80'
-                      : 'border-l-4 border-blue-500'
+                        ? 'opacity-80'
+                        : 'border-l-4 border-blue-500'
                       } ${index !== notifications.length - 1
                         ? 'border-b border-white/20'
                         : ''
@@ -102,8 +137,8 @@ export default function NotificationsPage() {
                     <div className="flex-1">
                       <h2
                         className={`text-lg font-semibold transition-colors duration-200 ${notification.isRead
-                          ? 'text-secondary'
-                          : 'text-blue-400'
+                            ? 'text-secondary'
+                            : 'text-blue-400'
                           }`}
                       >
                         {notification.title || notification.message}
