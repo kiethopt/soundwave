@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { Track } from '@/types';
 import { api } from '@/utils/api';
+import { Loop } from '../components/ui/Icons';
 
 interface TrackContextType {
   currentTrack: Track | null;
@@ -254,6 +255,16 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     setVolume(newVolume);
   }, []);
 
+  const loopTrack = useCallback(async() => {
+    if (trackQueueRef.current.length === 0) return;
+
+    const currentTrack = trackQueueRef.current[currentIndex];
+    if (currentTrack) {
+      playTrack(currentTrack);
+    }
+
+  }, [currentIndex, playTrack]);
+
   const skipRandom = useCallback(() => {
     if (trackQueueRef.current.length <= 1) return;
 
@@ -317,7 +328,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
     const audio = audioRef.current;
     audio.volume = volume;
-    audio.loop = loop;
+    audio.loop = false; 
 
     const handleTimeUpdate = () => {
       if (audio.duration && !isNaN(audio.duration)) {
@@ -353,12 +364,8 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (loop) {
-        audio.currentTime = 0;
-        audio
-          .play()
-          .catch((error) =>
-            console.error('Error playing track after loop:', error)
-          );
+        setIsPlaying(false);
+        loopTrack();
       } else if (shuffle) {
         setIsPlaying(false);
         skipRandom();
@@ -414,6 +421,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     saveHistory,
     pauseTrack,
     tabId,
+    loopTrack,
   ]);
 
   useEffect(() => {
@@ -428,7 +436,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const setTrackQueueFn = useCallback((tracks: Track[]) => {
     setTrackQueue(tracks);
     trackQueueRef.current = tracks;
-    setQueue(tracks); // Keep the queue state in sync
+    setQueue(tracks);
   }, []);
 
   // Add new queue management functions
