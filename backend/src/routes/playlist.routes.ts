@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate, authorize } from '../middleware/auth.middleware';
 import {
   createPlaylist,
   getPlaylists,
@@ -9,8 +9,9 @@ import {
   addTrackToPlaylist,
   createPersonalizedPlaylist,
   getSystemPlaylist,
+  updateAllSystemPlaylists,
+  getSystemPlaylists,
 } from '../controllers/playlist.controller';
-import { cacheMiddleware } from '../middleware/cache.middleware';
 
 const router = express.Router();
 
@@ -21,12 +22,21 @@ router.use(authenticate);
 router.post('/personalized', createPersonalizedPlaylist);
 
 // Route to get the system playlist
-router.get('/system', cacheMiddleware, getSystemPlaylist);
+router.get('/system', getSystemPlaylist);
+router.post(
+  '/system/update-all',
+  authenticate,
+  authorize(['ADMIN']),
+  updateAllSystemPlaylists
+);
+
+// Add this route to get all system playlists
+router.get('/system-all', getSystemPlaylists);
 
 // Các routes khác
 router.post('/', createPlaylist);
 router.get('/', getPlaylists);
-router.get('/:id', cacheMiddleware, getPlaylistById);
+router.get('/:id', getPlaylistById);
 router.patch('/:id', updatePlaylist);
 router.delete('/:playlistId/tracks/:trackId', removeTrackFromPlaylist);
 

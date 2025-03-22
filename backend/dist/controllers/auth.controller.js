@@ -21,6 +21,7 @@ const uuid_1 = require("uuid");
 const date_fns_1 = require("date-fns");
 const mail_1 = __importDefault(require("@sendgrid/mail"));
 const prisma_selects_1 = require("../utils/prisma-selects");
+const playlist_service_1 = require("../services/playlist.service");
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('Missing JWT_SECRET in environment variables');
@@ -170,6 +171,13 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             },
             select: prisma_selects_1.userSelect,
         });
+        try {
+            yield playlist_service_1.systemPlaylistService.initializeForNewUser(user.id);
+            console.log(`System playlists initialized for new user: ${user.id}`);
+        }
+        catch (error) {
+            console.error('Failed to initialize system playlists for new user:', error);
+        }
         res.status(201).json({ message: 'User registered successfully', user });
     }
     catch (error) {

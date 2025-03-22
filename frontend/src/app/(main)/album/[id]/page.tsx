@@ -1,11 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { api } from '@/utils/api';
 import { useParams, useRouter } from 'next/navigation';
-import { toast } from 'react-toastify';
-import { ArrowLeft, Calendar, Music, MoreVertical, Play, Pause, AddSimple } from '@/components/ui/Icons';
+import {
+  ArrowLeft,
+  Calendar,
+  Music,
+  Play,
+  Pause,
+  AddSimple,
+} from '@/components/ui/Icons';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Album, Track } from '@/types';
@@ -49,7 +54,7 @@ export default function AlbumDetailPage() {
 
       const data = await api.albums.getById(albumId as string, token);
       setAlbum(data);
-      console.log('data', data); 
+      console.log('data', data);
     } catch (err) {
       console.error('Error fetching album:', err);
       setError(err instanceof Error ? err.message : 'Failed to load album');
@@ -159,7 +164,9 @@ export default function AlbumDetailPage() {
                   className={`cursor-pointer hover:underline underline-offset-4 ${
                     theme === 'light' ? 'text-gray-900' : 'text-white/90'
                   }`}
-                  onClick={() => router.push(`/artist/profile/${album.artist.id}`)}
+                  onClick={() =>
+                    router.push(`/artist/profile/${album.artist.id}`)
+                  }
                 >
                   {album.artist.artistName}
                 </span>
@@ -208,7 +215,7 @@ export default function AlbumDetailPage() {
               )}
 
               {/* Track Options */}
-              <div className='mt-4'>
+              <div className="mt-4">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -362,9 +369,12 @@ export default function AlbumDetailPage() {
                         )}
                       </div>
 
-                      <div className='flex items-center justify-center'>
-                        <span className={`text-sm ${
-                            theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                      <div className="flex items-center justify-center">
+                        <span
+                          className={`text-sm ${
+                            theme === 'light'
+                              ? 'text-gray-500'
+                              : 'text-white/60'
                           }`}
                         >
                           {track.playCount}
@@ -380,7 +390,7 @@ export default function AlbumDetailPage() {
                         {(track.duration % 60).toString().padStart(2, '0')}
                       </div>
 
-                      <div className='flex items-center justify-center'>
+                      <div className="flex items-center justify-center">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button

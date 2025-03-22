@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient, Role, AlbumType, User, Track } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 
@@ -6,397 +6,832 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 
-const genres = [
-  'Pop',
-  'Rock',
-  'Hip-Hop',
-  'R&B',
-  'Country',
-  'Jazz',
-  'Classical',
-  'Electronic',
-  'Blues',
-  'Reggae',
-  'Metal',
-  'Folk',
-  'Punk',
-  'Soul',
-  'Funk',
-  'Disco',
-  'Techno',
-  'House',
-  'Trance',
-  'Dance',
-  'Indie',
-  'Alternative',
-  'K-Pop',
-  'Latin',
-  'World',
-];
-
-// Dữ liệu mẫu cho User với ArtistProfile
-const artists = [
-  {
-    email: 'taylor.swift@example.com',
-    username: 'taylorswift',
-    name: 'Taylor Swift',
-    password: 'Taylor123!',
-    artistName: 'Taylor Swift',
-    bio: 'Singer-songwriter known for narrative songwriting.',
-    avatar: 'https://i.scdn.co/image/ab6761670000ecd4cfb500c2d2059c6cf61f507c',
-    socialMediaLinks: { instagram: 'taylorswift', twitter: 'taylorswift13' },
-  },
-  {
-    email: 'ed.sheeran@example.com',
-    username: 'edsheeran',
-    name: 'Ed Sheeran',
-    password: 'Ed123!',
-    artistName: 'Ed Sheeran',
-    bio: 'British singer-songwriter with soulful hits.',
-    avatar: 'https://i.scdn.co/image/ab6761670000ecd4e110fb3ba78e05dc6f79e61a',
-    socialMediaLinks: { instagram: 'teddysphotos', twitter: 'edsheeran' },
-  },
-  {
-    email: 'billie.eilish@example.com',
-    username: 'billieeilish',
-    name: 'Billie Eilish',
-    password: 'Billie123!',
-    artistName: 'Billie Eilish',
-    bio: 'Alternative pop sensation with a unique style.',
-    avatar: 'https://i.scdn.co/image/ab6761670000ecd4b970fb40e80ed10c870c20d4',
-    socialMediaLinks: { instagram: 'billieeilish', twitter: 'billieeilish' },
-  },
-];
-
-// Dữ liệu mẫu cho Event
-const events = [
-  {
-    title: 'Summer Vibes Concert',
-    description: 'Một đêm nhạc đầy sôi động với những bản hit mới nhất',
-    location: 'Nhà hát Hòa Bình, Quận 10, TP.HCM',
-    startDate: new Date('2024-07-15T18:00:00Z'),
-    endDate: new Date('2024-07-15T22:00:00Z'),
-    isActive: true,
-  },
-  {
-    title: 'Acoustic Night',
-    description: 'Đêm nhạc acoustic ấm cúng với những bản ballad nhẹ nhàng',
-    location: 'Cung Văn hóa Hữu nghị Việt Xô, Hà Nội',
-    startDate: new Date('2024-08-20T19:00:00Z'),
-    endDate: new Date('2024-08-20T22:30:00Z'),
-    isActive: true,
-  },
-  {
-    title: 'Fan Meeting 2024',
-    description: 'Gặp gỡ và giao lưu cùng người hâm mộ',
-    location: 'Trung tâm Hội nghị Quốc gia, Hà Nội',
-    startDate: new Date('2024-09-10T14:00:00Z'),
-    endDate: new Date('2024-09-10T17:00:00Z'),
-    isActive: true,
-  },
-  {
-    title: 'Album Release Party',
-    description: 'Buổi ra mắt album mới với nhiều hoạt động thú vị',
-    location: 'Gem Center, Quận 1, TP.HCM',
-    startDate: new Date('2024-10-05T18:30:00Z'),
-    endDate: new Date('2024-10-05T23:00:00Z'),
-    isActive: true,
-  },
-  {
-    title: 'Year End Festival',
-    description: 'Festival âm nhạc cuối năm quy tụ nhiều nghệ sĩ nổi tiếng',
-    location: 'Sân vận động Mỹ Đình, Hà Nội',
-    startDate: new Date('2024-12-28T16:00:00Z'),
-    endDate: new Date('2024-12-28T23:59:00Z'),
-    isActive: true,
-  },
-];
-
-// ID đã cung cấp
-const userIds = [
-  'cm81wkqcm0000ml0viizqrklg',
-  'cm81ws3m90008ml0vnncrw3jj',
-  'cm81wsop60009ml0v6yam7o9o',
-  'cm81wsulm000dml0vff7k8020',
-  'cm81wt2fs000eml0vrvctejje',
-];
-
-const artistIds = [
-  'cm7wuqmxf000th10xt4bazgjr',
-  'cm7wuqmq4000rh10xu4o5hgw4',
-  'cm7wuqn4j000vh10xao4p3tk8',
-];
-
-const playlistIds = [
-  'cm7wustaw001th10xvil4ael0',
-  'cm7wuv65d001wh10xm77aa1e0',
-  'cm7x33j1q0020h10x9cdt4zaw',
-  'cm7x33j9t0022h10xvb491je6',
-  'cm81wky9x0002ml0v0vt2gup0',
-];
-
-async function seedGenres() {
-  console.log('Seeding genres...');
-  for (const genreName of genres) {
-    await prisma.genre.upsert({
-      where: { name: genreName },
-      update: {},
-      create: { name: genreName },
-    });
-  }
-  console.log('Genres seeded successfully');
-}
-
-async function seedAdmin() {
-  console.log('Seeding admin account...');
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-  const hashedPassword = await bcrypt.hash(adminPassword, 10);
-
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {},
-    create: {
-      email: adminEmail,
-      password: hashedPassword,
-      username: 'admin',
-      name: 'Administrator',
-      role: Role.ADMIN,
-      isActive: true,
-    },
-  });
-  console.log(`Admin account created with email: ${adminEmail}`);
-}
-
-async function seedArtists() {
-  console.log('Seeding artist accounts...');
-  for (const artist of artists) {
-    const hashedPassword = await bcrypt.hash(artist.password, 10);
-
-    // Tạo User với ArtistProfile đi kèm
-    await prisma.user.upsert({
-      where: { email: artist.email },
-      update: {},
-      create: {
-        email: artist.email,
-        username: artist.username,
-        name: artist.name,
-        password: hashedPassword,
-        role: Role.USER, // Role của User là USER
-        isActive: true,
-        artistProfile: {
-          create: {
-            artistName: artist.artistName,
-            bio: artist.bio,
-            avatar: artist.avatar,
-            role: Role.ARTIST, // Role trong ArtistProfile là ARTIST
-            socialMediaLinks: artist.socialMediaLinks,
-            monthlyListeners: 0,
-            isVerified: true, // Giả định đã được duyệt
-            isActive: true,
-          },
-        },
-      },
-    });
-
-    console.log(`Artist ${artist.artistName} seeded successfully`);
-  }
-  console.log('All artists seeded successfully');
-}
-
-async function seedEvents() {
-  console.log('Seeding events...');
-
-  // Lấy artistId từ database
-  const artistId = 'cm81wuzr9000jml0vj56x8bnn'; // ID của artist đã được chỉ định
-
-  // Kiểm tra xem artist có tồn tại không
-  const artist = await prisma.artistProfile.findUnique({
-    where: { id: artistId },
-  });
-
-  if (!artist) {
-    console.log(
-      `Artist with ID ${artistId} not found. Events will not be seeded.`
-    );
-    return;
-  }
-
-  // Tạo các sự kiện cho artist
-  for (const event of events) {
-    await prisma.event.create({
-      data: {
-        title: event.title,
-        description: event.description,
-        location: event.location,
-        startDate: event.startDate,
-        endDate: event.endDate,
-        isActive: event.isActive,
-        artistId: artistId,
-      },
-    });
-
-    console.log(
-      `Event "${event.title}" created for artist ${artist.artistName}`
-    );
-  }
-
-  console.log('All events seeded successfully');
-}
-
-async function seedPlaylistTracks() {
-  console.log('Seeding playlist tracks...');
-
-  // Lấy danh sách tracks từ database
-  const tracks = await prisma.track.findMany({
-    where: {
-      isActive: true,
-    },
-    take: 20, // Lấy tối đa 20 tracks
-  });
-
-  if (tracks.length === 0) {
-    console.log('No active tracks found. Playlist tracks will not be seeded.');
-    return;
-  }
-
-  // Kiểm tra xem playlists có tồn tại không
-  for (const playlistId of playlistIds) {
-    const playlist = await prisma.playlist.findUnique({
-      where: { id: playlistId },
-    });
-
-    if (!playlist) {
-      console.log(`Playlist with ID ${playlistId} not found. Skipping.`);
-      continue;
-    }
-
-    // Số lượng tracks ngẫu nhiên cho mỗi playlist (3-8 tracks)
-    const numTracks = Math.floor(Math.random() * 6) + 3;
-    const selectedTracks = tracks
-      .sort(() => 0.5 - Math.random()) // Xáo trộn mảng
-      .slice(0, numTracks); // Lấy số lượng tracks cần thiết
-
-    // Thêm tracks vào playlist
-    for (let i = 0; i < selectedTracks.length; i++) {
-      const track = selectedTracks[i];
-
-      try {
-        await prisma.playlistTrack.create({
-          data: {
-            playlistId: playlistId,
-            trackId: track.id,
-            trackOrder: i + 1,
-            addedAt: new Date(
-              Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
-            ), // Ngày ngẫu nhiên trong 30 ngày qua
-          },
-        });
-
-        console.log(
-          `Added track "${track.title}" to playlist ${playlist.name}`
-        );
-      } catch (error) {
-        console.log(`Error adding track to playlist: ${error.message}`);
-        // Nếu đã tồn tại, bỏ qua
-      }
-    }
-
-    // Cập nhật totalTracks và totalDuration cho playlist
-    const playlistTracks = await prisma.playlistTrack.findMany({
-      where: { playlistId: playlistId },
-      include: { track: true },
-    });
-
-    const totalTracks = playlistTracks.length;
-    const totalDuration = playlistTracks.reduce(
-      (sum, pt) => sum + (pt.track?.duration || 0),
-      0
-    );
-
-    await prisma.playlist.update({
-      where: { id: playlistId },
-      data: {
-        totalTracks,
-        totalDuration,
-      },
-    });
-
-    console.log(
-      `Updated playlist ${playlist.name} with ${totalTracks} tracks and ${totalDuration} seconds duration`
-    );
-  }
-
-  console.log('All playlist tracks seeded successfully');
-}
-
-async function seedUserLikeTracks() {
-  console.log('Seeding user likes for tracks...');
-
-  // Lấy danh sách tracks từ database
-  const tracks = await prisma.track.findMany({
-    where: {
-      isActive: true,
-    },
-    take: 30, // Lấy tối đa 30 tracks
-  });
-
-  if (tracks.length === 0) {
-    console.log('No active tracks found. User likes will not be seeded.');
-    return;
-  }
-
-  // Kiểm tra xem users có tồn tại không
-  for (const userId of userIds) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      console.log(`User with ID ${userId} not found. Skipping.`);
-      continue;
-    }
-
-    // Số lượng tracks ngẫu nhiên mà user thích (5-15 tracks)
-    const numLikes = Math.floor(Math.random() * 11) + 5;
-    const likedTracks = tracks
-      .sort(() => 0.5 - Math.random()) // Xáo trộn mảng
-      .slice(0, numLikes); // Lấy số lượng tracks cần thiết
-
-    // Thêm likes cho user
-    for (const track of likedTracks) {
-      try {
-        await prisma.userLikeTrack.create({
-          data: {
-            userId: userId,
-            trackId: track.id,
-            createdAt: new Date(
-              Date.now() - Math.floor(Math.random() * 60) * 24 * 60 * 60 * 1000
-            ), // Ngày ngẫu nhiên trong 60 ngày qua
-          },
-        });
-
-        console.log(
-          `User ${user.name || user.username} liked track "${track.title}"`
-        );
-      } catch (error) {
-        console.log(`Error adding like: ${error.message}`);
-        // Nếu đã tồn tại, bỏ qua
-      }
-    }
-  }
-
-  console.log('All user likes seeded successfully');
-}
-
 async function main() {
   try {
-    await seedGenres();
-    await seedAdmin();
-    await seedArtists();
-    // await seedEvents();
-    // await seedPlaylistTracks();
-    // await seedUserLikeTracks();
+    // Seed genres
+    const genres = [
+      'Pop',
+      'Rock',
+      'Hip-Hop',
+      'R&B',
+      'Electronic',
+      'Jazz',
+      'ClassFical',
+      'Country',
+      'Folk',
+      'Soul',
+      'Blues',
+      'Indie',
+      'Alternative',
+      'Latin',
+      'K-Pop',
+    ];
+
+    console.log('Seeding genres...');
+    for (const name of genres) {
+      await prisma.genre.upsert({
+        where: { name },
+        update: {},
+        create: { name },
+      });
+    }
+
+    // Seed admin
+    console.log('Seeding admin...');
+    const hashedAdminPassword = await bcrypt.hash('admin123@', 10);
+
+    // Check if admin exists first
+    const existingAdmin = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: 'admin@soundwave.com' }, { username: 'admin' }],
+      },
+    });
+
+    if (!existingAdmin) {
+      await prisma.user.create({
+        data: {
+          email: 'admin@soundwave.com',
+          username: 'admin',
+          password: hashedAdminPassword,
+          name: 'Admin',
+          role: Role.ADMIN,
+          isActive: true,
+        },
+      });
+      console.log('Admin user created');
+    } else {
+      console.log('Admin user already exists, skipping creation');
+    }
+
+    // Seed artists
+    console.log('Seeding artists...');
+
+    // Get genre IDs
+    const indieGenre = await prisma.genre.findFirst({
+      where: { name: 'Indie' },
+    });
+    const popGenre = await prisma.genre.findFirst({ where: { name: 'Pop' } });
+    const alternativeGenre = await prisma.genre.findFirst({
+      where: { name: 'Alternative' },
+    });
+    const hiphopGenre = await prisma.genre.findFirst({
+      where: { name: 'Hip-Hop' },
+    });
+    const rnbGenre = await prisma.genre.findFirst({ where: { name: 'R&B' } });
+
+    // Create Chillies
+    const chilliesPassword = await bcrypt.hash('Chillies123!', 10);
+    // Check if Chillies exist
+    const existingChillies = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: 'chillies@example.com' }, { username: 'chillies' }],
+      },
+    });
+
+    let chilliesUser;
+    if (!existingChillies) {
+      chilliesUser = await prisma.user.create({
+        data: {
+          email: 'chillies@example.com',
+          username: 'chillies',
+          password: chilliesPassword,
+          name: 'Chillies',
+          avatar:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742539893/testAlbum/Qua%20Khung%20C%E1%BB%ADa%20S%E1%BB%95/f6pdrcj6i2rjg68afsci.jpg',
+          role: Role.ARTIST,
+          currentProfile: 'ARTIST',
+          isActive: true,
+        },
+      });
+    } else {
+      chilliesUser = existingChillies;
+      console.log('Chillies user already exists, using existing user');
+    }
+
+    // Check if Chillies artist profile exists
+    const existingChilliesProfile = await prisma.artistProfile.findFirst({
+      where: {
+        OR: [{ userId: chilliesUser.id }, { artistName: 'Chillies' }],
+      },
+    });
+
+    let chillies;
+    if (!existingChilliesProfile) {
+      chillies = await prisma.artistProfile.create({
+        data: {
+          artistName: 'Chillies',
+          bio: 'Indie/Alternative band from Vietnam.',
+          avatar:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742539893/testAlbum/Qua%20Khung%20C%E1%BB%ADa%20S%E1%BB%95/f6pdrcj6i2rjg68afsci.jpg',
+          socialMediaLinks: {
+            instagram: 'chillies.band',
+            facebook: 'chilliesband',
+          },
+          isVerified: true,
+          isActive: true,
+          verifiedAt: new Date(),
+          userId: chilliesUser.id,
+        },
+      });
+    } else {
+      chillies = existingChilliesProfile;
+      console.log(
+        'Chillies artist profile already exists, using existing profile'
+      );
+    }
+
+    // Add genres to Chillies - only if they don't already exist
+    if (indieGenre) {
+      const existingGenre = await prisma.artistGenre.findFirst({
+        where: {
+          artistId: chillies.id,
+          genreId: indieGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.artistGenre.create({
+          data: { artistId: chillies.id, genreId: indieGenre.id },
+        });
+      }
+    }
+    if (popGenre) {
+      const existingGenre = await prisma.artistGenre.findFirst({
+        where: {
+          artistId: chillies.id,
+          genreId: popGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.artistGenre.create({
+          data: { artistId: chillies.id, genreId: popGenre.id },
+        });
+      }
+    }
+    if (alternativeGenre) {
+      const existingGenre = await prisma.artistGenre.findFirst({
+        where: {
+          artistId: chillies.id,
+          genreId: alternativeGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.artistGenre.create({
+          data: { artistId: chillies.id, genreId: alternativeGenre.id },
+        });
+      }
+    }
+
+    // Create Playboi Carti
+    const cartiPassword = await bcrypt.hash('Carti123!', 10);
+
+    // Check if Carti exists
+    const existingCarti = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: 'playboicarti@example.com' },
+          { username: 'playboicarti' },
+        ],
+      },
+    });
+
+    let cartiUser;
+    if (!existingCarti) {
+      cartiUser = await prisma.user.create({
+        data: {
+          email: 'playboicarti@example.com',
+          username: 'playboicarti',
+          password: cartiPassword,
+          name: 'Playboi Carti',
+          avatar:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742540118/testAlbum/MUSIC/h7ocs5fd3byinvj4prpm.jpg',
+          role: Role.ARTIST,
+          currentProfile: 'ARTIST',
+          isActive: true,
+        },
+      });
+    } else {
+      cartiUser = existingCarti;
+      console.log('Playboi Carti user already exists, using existing user');
+    }
+
+    // Check if Carti artist profile exists
+    const existingCartiProfile = await prisma.artistProfile.findFirst({
+      where: {
+        OR: [{ userId: cartiUser.id }, { artistName: 'Playboi Carti' }],
+      },
+    });
+
+    let playboi;
+    if (!existingCartiProfile) {
+      playboi = await prisma.artistProfile.create({
+        data: {
+          artistName: 'Playboi Carti',
+          bio: 'American rapper, singer, and songwriter.',
+          avatar:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742540118/testAlbum/MUSIC/h7ocs5fd3byinvj4prpm.jpg',
+          socialMediaLinks: {
+            instagram: 'playboicarti',
+            facebook: 'playboicarti',
+          },
+          isVerified: true,
+          isActive: true,
+          verifiedAt: new Date(),
+          userId: cartiUser.id,
+        },
+      });
+    } else {
+      playboi = existingCartiProfile;
+      console.log(
+        'Playboi Carti artist profile already exists, using existing profile'
+      );
+    }
+
+    // Add genres to Playboi Carti
+    if (hiphopGenre) {
+      const existingGenre = await prisma.artistGenre.findFirst({
+        where: {
+          artistId: playboi.id,
+          genreId: hiphopGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.artistGenre.create({
+          data: { artistId: playboi.id, genreId: hiphopGenre.id },
+        });
+      }
+    }
+
+    // Create Kendrick Lamar
+    const kendrickPassword = await bcrypt.hash('Kendrick123!', 10);
+
+    // Check if Kendrick exists
+    const existingKendrick = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: 'kendricklamar@example.com' },
+          { username: 'kendricklamar' },
+        ],
+      },
+    });
+
+    let kendrickUser;
+    if (!existingKendrick) {
+      kendrickUser = await prisma.user.create({
+        data: {
+          email: 'kendricklamar@example.com',
+          username: 'kendricklamar',
+          password: kendrickPassword,
+          name: 'Kendrick Lamar',
+          avatar:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742540304/testAlbum/GNX/zgqgjfvh6gxs90pwwj1x.jpg',
+          role: Role.ARTIST,
+          currentProfile: 'ARTIST',
+          isActive: true,
+        },
+      });
+    } else {
+      kendrickUser = existingKendrick;
+      console.log('Kendrick Lamar user already exists, using existing user');
+    }
+
+    // Check if Kendrick artist profile exists
+    const existingKendrickProfile = await prisma.artistProfile.findFirst({
+      where: {
+        OR: [{ userId: kendrickUser.id }, { artistName: 'Kendrick Lamar' }],
+      },
+    });
+
+    let kendrick;
+    if (!existingKendrickProfile) {
+      kendrick = await prisma.artistProfile.create({
+        data: {
+          artistName: 'Kendrick Lamar',
+          bio: 'American rapper, songwriter, and record producer.',
+          avatar:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742540304/testAlbum/GNX/zgqgjfvh6gxs90pwwj1x.jpg',
+          socialMediaLinks: {
+            instagram: 'kendricklamar',
+            facebook: 'kendricklamar',
+          },
+          isVerified: true,
+          isActive: true,
+          verifiedAt: new Date(),
+          userId: kendrickUser.id,
+        },
+      });
+    } else {
+      kendrick = existingKendrickProfile;
+      console.log(
+        'Kendrick Lamar artist profile already exists, using existing profile'
+      );
+    }
+
+    // Add genres to Kendrick Lamar
+    if (hiphopGenre) {
+      const existingGenre = await prisma.artistGenre.findFirst({
+        where: {
+          artistId: kendrick.id,
+          genreId: hiphopGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.artistGenre.create({
+          data: { artistId: kendrick.id, genreId: hiphopGenre.id },
+        });
+      }
+    }
+    if (rnbGenre) {
+      const existingGenre = await prisma.artistGenre.findFirst({
+        where: {
+          artistId: kendrick.id,
+          genreId: rnbGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.artistGenre.create({
+          data: { artistId: kendrick.id, genreId: rnbGenre.id },
+        });
+      }
+    }
+
+    // Seed normal users
+    console.log('Seeding normal users...');
+    const users: User[] = [];
+
+    for (let i = 1; i <= 5; i++) {
+      // Check if user already exists
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: `user${i}@example.com` },
+            { username: `musiclover${i}` },
+          ],
+        },
+      });
+
+      if (!existingUser) {
+        const hashedPassword = await bcrypt.hash('User123!', 10);
+        const user = await prisma.user.create({
+          data: {
+            email: `user${i}@example.com`,
+            username: `musiclover${i}`,
+            password: hashedPassword,
+            name: `User ${i}`,
+            avatar: `https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742540900/avatars/user${i}.jpg`,
+            role: Role.USER,
+            isActive: true,
+          },
+        });
+        users.push(user);
+      } else {
+        users.push(existingUser);
+        console.log(`User ${i} already exists, using existing user`);
+      }
+    }
+
+    // Seed albums and tracks
+    console.log('Seeding albums and tracks...');
+
+    // Check if Chillies album exists
+    const existingChilliesAlbum = await prisma.album.findFirst({
+      where: {
+        title: 'Qua Khung Cửa Sổ',
+        artistId: chillies.id,
+      },
+    });
+
+    let chilliesAlbum;
+    if (!existingChilliesAlbum) {
+      // Chillies album
+      chilliesAlbum = await prisma.album.create({
+        data: {
+          title: 'Qua Khung Cửa Sổ',
+          coverUrl:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742539893/testAlbum/Qua%20Khung%20C%E1%BB%ADa%20S%E1%BB%95/f6pdrcj6i2rjg68afsci.jpg',
+          releaseDate: new Date('2021-05-15'),
+          duration: 900, // ~15 minutes
+          totalTracks: 4,
+          type: AlbumType.ALBUM,
+          isActive: true,
+          artistId: chillies.id,
+        },
+      });
+    } else {
+      chilliesAlbum = existingChilliesAlbum;
+      console.log('Chillies album already exists, using existing album');
+    }
+
+    // Add genres to Chillies album
+    if (indieGenre) {
+      const existingGenre = await prisma.albumGenre.findFirst({
+        where: {
+          albumId: chilliesAlbum.id,
+          genreId: indieGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.albumGenre.create({
+          data: { albumId: chilliesAlbum.id, genreId: indieGenre.id },
+        });
+      }
+    }
+    if (popGenre) {
+      const existingGenre = await prisma.albumGenre.findFirst({
+        where: {
+          albumId: chilliesAlbum.id,
+          genreId: popGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.albumGenre.create({
+          data: { albumId: chilliesAlbum.id, genreId: popGenre.id },
+        });
+      }
+    }
+
+    // Chillies tracks
+    const chilliesTracks = [
+      {
+        title: 'Vùng Ký Ức',
+        duration: 254, // ~4:14
+        audioUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1742539938/testAlbum/Qua%20Khung%20C%E1%BB%ADa%20S%E1%BB%95/xfl4mrclnw3ft833eo2i.mp3',
+        trackNumber: 1,
+      },
+      {
+        title: 'Mộng Du',
+        duration: 228, // ~3:48
+        audioUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1742539929/testAlbum/Qua%20Khung%20C%E1%BB%ADa%20S%E1%BB%95/wpvbccdtkfnrdxyys5go.mp3',
+        trackNumber: 2,
+      },
+      {
+        title: 'Qua Khung Cửa Sổ',
+        duration: 241, // ~4:01
+        audioUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1742539938/testAlbum/Qua%20Khung%20C%E1%BB%ADa%20S%E1%BB%95/tqhzgu72gwiogxl8thsp.mp3',
+        trackNumber: 3,
+      },
+      {
+        title: 'Một Cái Tên',
+        duration: 232, // ~3:52
+        audioUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1742539932/testAlbum/Qua%20Khung%20C%E1%BB%ADa%20S%E1%BB%95/jgacx8ts8tnkkjawclrl.mp3',
+        trackNumber: 4,
+      },
+    ];
+
+    // Create Chillies tracks
+    for (const trackData of chilliesTracks) {
+      // Check if track already exists
+      const existingTrack = await prisma.track.findFirst({
+        where: {
+          title: trackData.title,
+          artistId: chillies.id,
+        },
+      });
+
+      if (!existingTrack) {
+        const track = await prisma.track.create({
+          data: {
+            title: trackData.title,
+            duration: trackData.duration,
+            releaseDate: chilliesAlbum.releaseDate,
+            trackNumber: trackData.trackNumber,
+            coverUrl: chilliesAlbum.coverUrl,
+            audioUrl: trackData.audioUrl,
+            playCount: Math.floor(Math.random() * 1000),
+            type: AlbumType.ALBUM,
+            isActive: true,
+            artistId: chillies.id,
+            albumId: chilliesAlbum.id,
+          },
+        });
+
+        // Add genres to track
+        if (indieGenre) {
+          await prisma.trackGenre.create({
+            data: { trackId: track.id, genreId: indieGenre.id },
+          });
+        }
+        if (popGenre) {
+          await prisma.trackGenre.create({
+            data: { trackId: track.id, genreId: popGenre.id },
+          });
+        }
+      } else {
+        console.log(`Track ${trackData.title} already exists, skipping`);
+      }
+    }
+
+    // Check if Carti album exists
+    const existingCartiAlbum = await prisma.album.findFirst({
+      where: {
+        title: 'MUSIC',
+        artistId: playboi.id,
+      },
+    });
+
+    let cartiAlbum;
+    if (!existingCartiAlbum) {
+      // Playboi Carti album
+      cartiAlbum = await prisma.album.create({
+        data: {
+          title: 'MUSIC',
+          coverUrl:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742540118/testAlbum/MUSIC/h7ocs5fd3byinvj4prpm.jpg',
+          releaseDate: new Date('2023-09-10'),
+          duration: 530, // ~8:50
+          totalTracks: 3,
+          type: AlbumType.ALBUM,
+          isActive: true,
+          artistId: playboi.id,
+        },
+      });
+    } else {
+      cartiAlbum = existingCartiAlbum;
+      console.log('Playboi Carti album already exists, using existing album');
+    }
+
+    // Add genres to Playboi Carti album
+    if (hiphopGenre) {
+      const existingGenre = await prisma.albumGenre.findFirst({
+        where: {
+          albumId: cartiAlbum.id,
+          genreId: hiphopGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.albumGenre.create({
+          data: { albumId: cartiAlbum.id, genreId: hiphopGenre.id },
+        });
+      }
+    }
+
+    // Playboi Carti tracks
+    const cartiTracks = [
+      {
+        title: 'PHILLY',
+        duration: 181, // ~3:01
+        audioUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1742540171/testAlbum/MUSIC/z3lh67ygrlyc0qvyx8hk.mp3',
+        trackNumber: 1,
+      },
+      {
+        title: 'RATHER LIE',
+        duration: 164, // ~2:44
+        audioUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1742540166/testAlbum/MUSIC/dikzevnomueqpdmhgzhw.mp3',
+        trackNumber: 2,
+      },
+      {
+        title: 'BACKD00R',
+        duration: 173, // ~2:53
+        audioUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1742540175/testAlbum/MUSIC/blyhwlcqhuf5uf29hecr.mp3',
+        trackNumber: 3,
+      },
+    ];
+
+    // Create Playboi Carti tracks
+    for (const trackData of cartiTracks) {
+      // Check if track already exists
+      const existingTrack = await prisma.track.findFirst({
+        where: {
+          title: trackData.title,
+          artistId: playboi.id,
+        },
+      });
+
+      if (!existingTrack) {
+        const track = await prisma.track.create({
+          data: {
+            title: trackData.title,
+            duration: trackData.duration,
+            releaseDate: cartiAlbum.releaseDate,
+            trackNumber: trackData.trackNumber,
+            coverUrl: cartiAlbum.coverUrl,
+            audioUrl: trackData.audioUrl,
+            playCount: Math.floor(Math.random() * 1000),
+            type: AlbumType.ALBUM,
+            isActive: true,
+            artistId: playboi.id,
+            albumId: cartiAlbum.id,
+          },
+        });
+
+        // Add genres to track
+        if (hiphopGenre) {
+          await prisma.trackGenre.create({
+            data: { trackId: track.id, genreId: hiphopGenre.id },
+          });
+        }
+      } else {
+        console.log(`Track ${trackData.title} already exists, skipping`);
+      }
+    }
+
+    // Check if Kendrick album exists
+    const existingKendrickAlbum = await prisma.album.findFirst({
+      where: {
+        title: 'GNX',
+        artistId: kendrick.id,
+      },
+    });
+
+    let kendrickAlbum;
+    if (!existingKendrickAlbum) {
+      // Kendrick Lamar album
+      kendrickAlbum = await prisma.album.create({
+        data: {
+          title: 'GNX',
+          coverUrl:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742540304/testAlbum/GNX/zgqgjfvh6gxs90pwwj1x.jpg',
+          releaseDate: new Date('2024-01-05'),
+          duration: 600, // ~10:00
+          totalTracks: 3,
+          type: AlbumType.ALBUM,
+          isActive: true,
+          artistId: kendrick.id,
+        },
+      });
+    } else {
+      kendrickAlbum = existingKendrickAlbum;
+      console.log('Kendrick Lamar album already exists, using existing album');
+    }
+
+    // Add genres to Kendrick Lamar album
+    if (hiphopGenre) {
+      const existingGenre = await prisma.albumGenre.findFirst({
+        where: {
+          albumId: kendrickAlbum.id,
+          genreId: hiphopGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.albumGenre.create({
+          data: { albumId: kendrickAlbum.id, genreId: hiphopGenre.id },
+        });
+      }
+    }
+    if (rnbGenre) {
+      const existingGenre = await prisma.albumGenre.findFirst({
+        where: {
+          albumId: kendrickAlbum.id,
+          genreId: rnbGenre.id,
+        },
+      });
+
+      if (!existingGenre) {
+        await prisma.albumGenre.create({
+          data: { albumId: kendrickAlbum.id, genreId: rnbGenre.id },
+        });
+      }
+    }
+
+    // Kendrick Lamar tracks
+    const kendrickTracks = [
+      {
+        title: 'wacced out murals',
+        duration: 224, // ~3:44
+        audioUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1742540722/testAlbum/GNX/srd0aeofrrxhxodgqjgs.mp3',
+        trackNumber: 1,
+      },
+      {
+        title: 'luther',
+        duration: 213, // ~3:33
+        audioUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1742540717/testAlbum/GNX/xheoiq4ny7flu2zack5g.mp3',
+        trackNumber: 2,
+      },
+      {
+        title: 'tv off',
+        duration: 197, // ~3:17
+        audioUrl:
+          'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1742540719/testAlbum/GNX/a0i5pakxq2i9vzan9exd.mp3',
+        trackNumber: 3,
+      },
+    ];
+
+    // Create Kendrick Lamar tracks
+    const allTracks: Track[] = [];
+    for (const trackData of kendrickTracks) {
+      // Check if track already exists
+      const existingTrack = await prisma.track.findFirst({
+        where: {
+          title: trackData.title,
+          artistId: kendrick.id,
+        },
+      });
+
+      let track;
+      if (!existingTrack) {
+        track = await prisma.track.create({
+          data: {
+            title: trackData.title,
+            duration: trackData.duration,
+            releaseDate: kendrickAlbum.releaseDate,
+            trackNumber: trackData.trackNumber,
+            coverUrl: kendrickAlbum.coverUrl,
+            audioUrl: trackData.audioUrl,
+            playCount: Math.floor(Math.random() * 1000),
+            type: AlbumType.ALBUM,
+            isActive: true,
+            artistId: kendrick.id,
+            albumId: kendrickAlbum.id,
+          },
+        });
+
+        // Add genres to track
+        if (hiphopGenre) {
+          await prisma.trackGenre.create({
+            data: { trackId: track.id, genreId: hiphopGenre.id },
+          });
+        }
+        if (rnbGenre) {
+          await prisma.trackGenre.create({
+            data: { trackId: track.id, genreId: rnbGenre.id },
+          });
+        }
+      } else {
+        track = existingTrack;
+        console.log(
+          `Track ${trackData.title} already exists, using existing track`
+        );
+      }
+
+      allTracks.push(track);
+    }
+
+    // Get all tracks
+    const tracks = await prisma.track.findMany();
+
+    // Seed user interactions
+    console.log('Seeding user interactions...');
+    for (const user of users) {
+      // Each user listens to a random number of tracks
+      const numberOfTracksToListen =
+        Math.floor(Math.random() * tracks.length) + 3;
+      const tracksToListen = tracks
+        .sort(() => 0.5 - Math.random())
+        .slice(0, numberOfTracksToListen);
+
+      for (const track of tracksToListen) {
+        // Check if history already exists
+        const existingHistory = await prisma.history.findFirst({
+          where: {
+            userId: user.id,
+            trackId: track.id,
+            type: 'PLAY',
+          },
+        });
+
+        if (!existingHistory) {
+          // Create history with random play count
+          const playCount = Math.floor(Math.random() * 5) + 1;
+          await prisma.history.create({
+            data: {
+              type: 'PLAY',
+              playCount: playCount,
+              completed: true,
+              userId: user.id,
+              trackId: track.id,
+            },
+          });
+        }
+
+        // Check if like already exists
+        const existingLike = await prisma.userLikeTrack.findFirst({
+          where: {
+            userId: user.id,
+            trackId: track.id,
+          },
+        });
+
+        // 40% chance user will like the track if no existing like
+        if (!existingLike && Math.random() < 0.4) {
+          await prisma.userLikeTrack.create({
+            data: {
+              userId: user.id,
+              trackId: track.id,
+            },
+          });
+        }
+      }
+    }
+
+    console.log('Database seeding completed successfully');
   } catch (error) {
     console.error('Error during seeding:', error);
     process.exit(1);

@@ -13,7 +13,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getHotAlbums = exports.getNewestAlbums = exports.deleteAlbumById = void 0;
-const prisma_selects_1 = require("src/utils/prisma-selects");
+const prisma_selects_1 = require("../utils/prisma-selects");
 const db_1 = __importDefault(require("../config/db"));
 const deleteAlbumById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     const album = yield db_1.default.album.findUnique({

@@ -3,12 +3,11 @@ import prisma from '../config/db';
 import { FollowingType, HistoryType, Role } from '@prisma/client';
 import { uploadFile } from './upload.service';
 import {
-  artistProfileSelect,
   searchAlbumSelect,
   searchTrackSelect,
   userSelect,
 } from '../utils/prisma-selects';
-import { paginate, toBooleanValue } from '../utils/handle-utils';
+import { paginate } from '../utils/handle-utils';
 import { client, setCache } from '../middleware/cache.middleware';
 import pusher from '../config/pusher';
 
@@ -693,7 +692,11 @@ export const getAllGenres = async () => {
   return genres;
 };
 
-export const editProfile = async (user: any, profileData: any, avatarFile: Express.Multer.File | undefined) => {
+export const editProfile = async (
+  user: any,
+  profileData: any,
+  avatarFile: Express.Multer.File | undefined
+) => {
   if (!user) {
     throw new Error('Unauthorized');
   }
@@ -1063,10 +1066,7 @@ export const getTopTracks = async () => {
   // Calculate monthly plays for each track
   const tracksWithMonthlyPlays = tracks.map((track) => ({
     ...track,
-    monthlyPlays: track.history.reduce(
-      (sum, h) => sum + (h.playCount || 0),
-      0
-    ),
+    monthlyPlays: track.history.reduce((sum, h) => sum + (h.playCount || 0), 0),
   }));
 
   if (process.env.USE_REDIS_CACHE === 'true') {

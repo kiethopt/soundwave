@@ -1,6 +1,678 @@
 import prisma from '../config/db';
 import { Playlist } from '@prisma/client';
-import { Matrix } from 'ml-matrix'; // Thay thế mathjs bằng ml-matrix
+import { Matrix } from 'ml-matrix';
+
+// Các hằng số cho playlist hệ thống
+const SYSTEM_PLAYLIST_TYPES = {
+  TOP_HITS: 'TOP_HITS',
+  NEW_RELEASES: 'NEW_RELEASES',
+  GENRE_BASED: 'GENRE_BASED',
+  MOOD_BASED: 'MOOD_BASED',
+  DISCOVER_WEEKLY: 'DISCOVER_WEEKLY',
+  TIME_CAPSULE: 'TIME_CAPSULE',
+};
+
+// Map tên hiển thị cho các loại playlist hệ thống
+const SYSTEM_PLAYLIST_NAMES = {
+  [SYSTEM_PLAYLIST_TYPES.TOP_HITS]: 'Soundwave Hits: Trending Right Now',
+  [SYSTEM_PLAYLIST_TYPES.NEW_RELEASES]: 'Soundwave Fresh: New Releases',
+  [SYSTEM_PLAYLIST_TYPES.GENRE_BASED]: 'Soundwave Genre Mix',
+  [SYSTEM_PLAYLIST_TYPES.MOOD_BASED]: 'Soundwave Mood Mix',
+  [SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY]: 'Discover Weekly',
+  [SYSTEM_PLAYLIST_TYPES.TIME_CAPSULE]: 'Your Time Capsule',
+};
+
+/**
+ * Tạo và quản lý tất cả các playlist hệ thống
+ */
+export class SystemPlaylistService {
+  /**
+   * Tạo tất cả các playlist hệ thống cho người dùng mới
+   * @param userId ID của người dùng mới
+   */
+  async initializeForNewUser(userId: string): Promise<void> {
+    try {
+      console.log(
+        `[SystemPlaylistService] Initializing playlists for new user: ${userId}`
+      );
+
+      // Kiểm tra người dùng tồn tại
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        throw new Error(`User with ID ${userId} not found`);
+      }
+
+      // Thực hiện các tác vụ song song để tăng hiệu suất
+      await Promise.all([
+        // 1. Connect user to global TOP_HITS playlist
+        this.connectUserToGlobalPlaylist(
+          userId,
+          SYSTEM_PLAYLIST_TYPES.TOP_HITS
+        ),
+
+        // 2. Create personalized DISCOVER_WEEKLY playlist
+        this.createDiscoverWeeklyPlaylist(userId),
+
+        // 3. Create personalized NEW_RELEASES playlist
+        this.createNewReleasesPlaylist(userId),
+      ]);
+
+      console.log(
+        `[SystemPlaylistService] Successfully initialized playlists for user: ${userId}`
+      );
+    } catch (error) {
+      console.error(
+        `[SystemPlaylistService] Error initializing playlists for user ${userId}:`,
+        error
+      );
+      throw new Error(`Failed to initialize playlists for new user: ${error}`);
+    }
+  }
+
+  /**
+   * Kết nối người dùng với playlist toàn cầu có sẵn
+   */
+  async connectUserToGlobalPlaylist(
+    userId: string,
+    playlistType: string
+  ): Promise<void> {
+    try {
+      // Tìm playlist toàn cầu theo loại
+      const globalPlaylist = await prisma.playlist.findFirst({
+        where: {
+          name: SYSTEM_PLAYLIST_NAMES[playlistType],
+          type: 'SYSTEM',
+        },
+      });
+
+      if (!globalPlaylist) {
+        console.log(
+          `[SystemPlaylistService] Global ${playlistType} playlist not found, creating it...`
+        );
+        await this.createOrUpdateGlobalPlaylist(playlistType);
+        return this.connectUserToGlobalPlaylist(userId, playlistType); // Gọi lại để kết nối sau khi tạo
+      }
+
+      // Không cần tạo UserPlaylist vì user có thể truy cập trực tiếp
+      console.log(
+        `[SystemPlaylistService] Connected user ${userId} to global ${playlistType} playlist`
+      );
+    } catch (error) {
+      console.error(
+        `[SystemPlaylistService] Error connecting user to global playlist:`,
+        error
+      );
+    }
+  }
+
+  /**
+   * Tạo Discover Weekly playlist cá nhân hóa cho người dùng
+   */
+  async createDiscoverWeeklyPlaylist(userId: string): Promise<Playlist | null> {
+    try {
+      // Kiểm tra xem đã có playlist này chưa
+      const existingPlaylist = await prisma.playlist.findFirst({
+        where: {
+          userId,
+          name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY],
+          type: 'SYSTEM',
+        },
+      });
+
+      if (existingPlaylist) {
+        // Nếu đã tồn tại, cập nhật nội dung
+        await this.updateDiscoverWeeklyPlaylist(existingPlaylist.id);
+        return existingPlaylist;
+      }
+
+      // Tạo playlist mới cho user này
+      const playlist = await prisma.playlist.create({
+        data: {
+          name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY],
+          description:
+            'Khám phá những bài hát mới được cá nhân hóa dành riêng cho bạn. Cập nhật hàng tuần vào Thứ Hai.',
+          type: 'SYSTEM',
+          privacy: 'PUBLIC',
+          userId,
+          coverUrl:
+            'https://newjams-images.scdn.co/image/ab676477000033ad/dt/v3/discover-weekly/4O2moMBFA5GYrAnwXLtFDVEVPCc0WhFTI0aWB3b9bpDcL3CQ4dzOmLlizDEvd4Ia0o3B5vUTT-1pD72G0LDfyGH-CQi5qH97BppF-pQ82ww=/NzQ6ODA6NzBUNDAtNDAtNQ==',
+        },
+      });
+
+      // Cập nhật nội dung cho playlist mới tạo
+      await this.updateDiscoverWeeklyPlaylist(playlist.id);
+
+      return playlist;
+    } catch (error) {
+      console.error(
+        `[SystemPlaylistService] Error creating Discover Weekly playlist:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Cập nhật nội dung cho Discover Weekly playlist
+   */
+  async updateDiscoverWeeklyPlaylist(playlistId: string): Promise<void> {
+    try {
+      // Lấy thông tin playlist
+      const playlist = await prisma.playlist.findUnique({
+        where: { id: playlistId },
+        include: { tracks: true },
+      });
+
+      if (!playlist) {
+        throw new Error(`Playlist with ID ${playlistId} not found`);
+      }
+
+      // Xóa tracks hiện tại
+      await prisma.playlistTrack.deleteMany({
+        where: { playlistId },
+      });
+
+      // Tạo recommendations dựa trên sở thích người dùng
+      const recommendedTracks = await getRecommendedTracks(
+        playlist.userId,
+        30,
+        {
+          includeTopTracks: false, // Không lấy top hits phổ biến
+          includeNewReleases: true, // Ưu tiên bài hát mới
+        }
+      );
+
+      if (recommendedTracks.length > 0) {
+        // Tạo mảng dữ liệu để thêm vào một lần
+        const playlistTrackData = recommendedTracks.map((track, index) => ({
+          playlistId,
+          trackId: track.id,
+          trackOrder: index,
+        }));
+
+        // Thêm tracks mới vào playlist trong một lần chạy transaction
+        await prisma.$transaction([
+          prisma.playlistTrack.createMany({
+            data: playlistTrackData,
+          }),
+          prisma.playlist.update({
+            where: { id: playlistId },
+            data: {
+              totalTracks: recommendedTracks.length,
+              totalDuration: recommendedTracks.reduce(
+                (sum, track) => sum + (track.duration || 0),
+                0
+              ),
+              updatedAt: new Date(),
+            },
+          }),
+        ]);
+      } else {
+        // Cập nhật thông tin playlist nếu không có tracks
+        await prisma.playlist.update({
+          where: { id: playlistId },
+          data: {
+            totalTracks: 0,
+            totalDuration: 0,
+            updatedAt: new Date(),
+          },
+        });
+      }
+
+      console.log(
+        `[SystemPlaylistService] Updated Discover Weekly playlist: ${playlistId}`
+      );
+    } catch (error) {
+      console.error(
+        `[SystemPlaylistService] Error updating Discover Weekly playlist:`,
+        error
+      );
+    }
+  }
+
+  /**
+   * Tạo New Releases playlist cá nhân hóa cho người dùng
+   */
+  async createNewReleasesPlaylist(userId: string): Promise<Playlist | null> {
+    try {
+      // Kiểm tra xem đã có playlist này chưa
+      const existingPlaylist = await prisma.playlist.findFirst({
+        where: {
+          userId,
+          name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.NEW_RELEASES],
+          type: 'SYSTEM',
+        },
+      });
+
+      if (existingPlaylist) {
+        // Nếu đã tồn tại, cập nhật nội dung
+        await this.updateNewReleasesPlaylist(existingPlaylist.id);
+        return existingPlaylist;
+      }
+
+      // Tạo playlist mới cho user này
+      const playlist = await prisma.playlist.create({
+        data: {
+          name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.NEW_RELEASES],
+          description:
+            'Những bản phát hành mới nhất từ các nghệ sĩ mà bạn yêu thích và có thể sẽ thích. Cập nhật hàng tuần vào Thứ Sáu.',
+          type: 'SYSTEM',
+          privacy: 'PUBLIC',
+          userId,
+          coverUrl:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742551340/testAlbum/cv6rm3txh8beiln4x5u1.jpg',
+        },
+      });
+
+      // Cập nhật nội dung cho playlist mới tạo
+      await this.updateNewReleasesPlaylist(playlist.id);
+
+      return playlist;
+    } catch (error) {
+      console.error(
+        `[SystemPlaylistService] Error creating New Releases playlist:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Cập nhật nội dung cho New Releases playlist
+   */
+  async updateNewReleasesPlaylist(playlistId: string): Promise<void> {
+    try {
+      // Lấy thông tin playlist
+      const playlist = await prisma.playlist.findUnique({
+        where: { id: playlistId },
+        include: { user: true, tracks: true },
+      });
+
+      if (!playlist) {
+        throw new Error(`Playlist with ID ${playlistId} not found`);
+      }
+
+      // Xóa tracks hiện tại
+      await prisma.playlistTrack.deleteMany({
+        where: { playlistId },
+      });
+
+      // Lấy danh sách nghệ sĩ mà người dùng thích nghe
+      const userHistory = await prisma.history.findMany({
+        where: {
+          userId: playlist.userId,
+          type: 'PLAY',
+        },
+        include: {
+          track: {
+            include: {
+              artist: true,
+            },
+          },
+        },
+      });
+
+      // Đếm số lần xuất hiện từng nghệ sĩ
+      const artistCounts = new Map<string, number>();
+      userHistory.forEach((history) => {
+        if (history.track?.artistId) {
+          const artistId = history.track.artistId;
+          artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
+        }
+      });
+
+      // Sắp xếp nghệ sĩ theo mức độ ưa thích
+      const favoriteArtistIds = [...artistCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map((entry) => entry[0]);
+
+      // Tìm các bài hát mới ra mắt (trong 30 ngày gần đây)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const newReleases = await prisma.track.findMany({
+        where: {
+          releaseDate: {
+            gte: thirtyDaysAgo,
+          },
+          isActive: true,
+          OR: [
+            // Ưu tiên từ nghệ sĩ yêu thích
+            { artistId: { in: favoriteArtistIds } },
+            // Nếu không đủ, lấy các release mới nhất
+            { releaseDate: { gte: thirtyDaysAgo } },
+          ],
+        },
+        orderBy: [
+          // Sắp xếp ưu tiên: nghệ sĩ yêu thích -> ngày phát hành gần nhất
+          { releaseDate: 'desc' },
+        ],
+        include: {
+          artist: true,
+          album: true,
+        },
+        take: 30,
+      });
+
+      if (newReleases.length > 0) {
+        // Tạo mảng dữ liệu để thêm vào một lần
+        const playlistTrackData = newReleases.map((track, index) => ({
+          playlistId,
+          trackId: track.id,
+          trackOrder: index,
+        }));
+
+        // Thêm tracks mới và cập nhật thông tin playlist trong một transaction
+        await prisma.$transaction([
+          prisma.playlistTrack.createMany({
+            data: playlistTrackData,
+          }),
+          prisma.playlist.update({
+            where: { id: playlistId },
+            data: {
+              totalTracks: newReleases.length,
+              totalDuration: newReleases.reduce(
+                (sum, track) => sum + (track.duration || 0),
+                0
+              ),
+              updatedAt: new Date(),
+            },
+          }),
+        ]);
+      } else {
+        // Cập nhật nếu không có bài hát mới
+        await prisma.playlist.update({
+          where: { id: playlistId },
+          data: {
+            totalTracks: 0,
+            totalDuration: 0,
+            updatedAt: new Date(),
+          },
+        });
+      }
+
+      console.log(
+        `[SystemPlaylistService] Updated New Releases playlist: ${playlistId}`
+      );
+    } catch (error) {
+      console.error(
+        `[SystemPlaylistService] Error updating New Releases playlist:`,
+        error
+      );
+    }
+  }
+
+  /**
+   * Tạo hoặc cập nhật playlist toàn cầu
+   */
+  async createOrUpdateGlobalPlaylist(
+    playlistType: string
+  ): Promise<Playlist | null> {
+    try {
+      // Tìm playlist hiện có
+      const existingPlaylist = await prisma.playlist.findFirst({
+        where: {
+          name: SYSTEM_PLAYLIST_NAMES[playlistType],
+          type: 'SYSTEM',
+        },
+      });
+
+      if (existingPlaylist) {
+        // Cập nhật playlist hiện có
+        return await this.updateGlobalPlaylistContent(
+          existingPlaylist.id,
+          playlistType
+        );
+      }
+
+      // Tìm admin user để gán ownership
+      const adminUser = await prisma.user.findFirst({
+        where: { role: 'ADMIN' },
+      });
+
+      if (!adminUser) {
+        throw new Error(
+          'No admin user found to assign global playlist ownership'
+        );
+      }
+
+      // Tạo playlist mới
+      const playlist = await prisma.playlist.create({
+        data: {
+          name: SYSTEM_PLAYLIST_NAMES[playlistType],
+          description: this.getPlaylistDescription(playlistType),
+          type: 'SYSTEM',
+          privacy: 'PUBLIC',
+          userId: adminUser.id,
+          coverUrl: this.getPlaylistCoverUrl(playlistType),
+        },
+      });
+
+      // Cập nhật nội dung
+      return await this.updateGlobalPlaylistContent(playlist.id, playlistType);
+    } catch (error) {
+      console.error(
+        `[SystemPlaylistService] Error creating global playlist:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Cập nhật nội dung cho global playlist dựa trên loại
+   */
+  async updateGlobalPlaylistContent(
+    playlistId: string,
+    playlistType: string
+  ): Promise<Playlist | null> {
+    try {
+      // Xóa tracks hiện tại
+      await prisma.playlistTrack.deleteMany({
+        where: { playlistId },
+      });
+
+      let tracks: any[] = [];
+
+      // Tùy theo loại playlist mà lấy các bài hát khác nhau
+      switch (playlistType) {
+        case SYSTEM_PLAYLIST_TYPES.TOP_HITS:
+          // Sử dụng hàm có sẵn để tạo top hits
+          const recommendations = await generateGlobalRecommendedPlaylist(30);
+          tracks = recommendations.tracks;
+          break;
+
+        case SYSTEM_PLAYLIST_TYPES.NEW_RELEASES:
+          // Lấy các bài hát mới phát hành trong 14 ngày qua
+          const twoWeeksAgo = new Date();
+          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+
+          tracks = await prisma.track.findMany({
+            where: {
+              releaseDate: { gte: twoWeeksAgo },
+              isActive: true,
+            },
+            orderBy: { releaseDate: 'desc' },
+            include: {
+              artist: true,
+              album: true,
+            },
+            take: 30,
+          });
+          break;
+      }
+
+      if (tracks.length > 0) {
+        // Tạo dữ liệu cho việc thêm nhiều track cùng lúc
+        const playlistTrackData = tracks.map((track, index) => ({
+          playlistId,
+          trackId: track.id,
+          trackOrder: index,
+        }));
+
+        // Thực hiện transaction để đảm bảo tính nhất quán dữ liệu
+        await prisma.$transaction([
+          prisma.playlistTrack.createMany({
+            data: playlistTrackData,
+          }),
+          prisma.playlist.update({
+            where: { id: playlistId },
+            data: {
+              totalTracks: tracks.length,
+              totalDuration: tracks.reduce(
+                (sum, track) => sum + (track.duration || 0),
+                0
+              ),
+              updatedAt: new Date(),
+            },
+          }),
+        ]);
+      } else {
+        // Cập nhật nếu không có tracks
+        await prisma.playlist.update({
+          where: { id: playlistId },
+          data: {
+            totalTracks: 0,
+            totalDuration: 0,
+            updatedAt: new Date(),
+          },
+        });
+      }
+
+      // Lấy playlist đã cập nhật cùng với các tracks
+      const updatedPlaylist = await prisma.playlist.findUnique({
+        where: { id: playlistId },
+        include: {
+          tracks: {
+            include: {
+              track: {
+                include: {
+                  artist: true,
+                  album: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      console.log(
+        `[SystemPlaylistService] Updated ${playlistType} global playlist: ${playlistId}`
+      );
+      return updatedPlaylist;
+    } catch (error) {
+      console.error(
+        `[SystemPlaylistService] Error updating global playlist content:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Cập nhật tất cả các playlist hệ thống cho tất cả user
+   */
+  async updateAllSystemPlaylists(): Promise<void> {
+    try {
+      console.log(
+        `[SystemPlaylistService] Starting update of all system playlists`
+      );
+
+      // 1. Cập nhật các playlist toàn cầu
+      const globalPlaylistPromises = [
+        this.createOrUpdateGlobalPlaylist(SYSTEM_PLAYLIST_TYPES.TOP_HITS),
+        this.createOrUpdateGlobalPlaylist(SYSTEM_PLAYLIST_TYPES.NEW_RELEASES),
+      ];
+
+      await Promise.all(globalPlaylistPromises);
+
+      // 2. Cập nhật các playlist cá nhân hóa
+      const userPlaylists = await prisma.playlist.findMany({
+        where: {
+          type: 'SYSTEM',
+          OR: [
+            {
+              name: SYSTEM_PLAYLIST_NAMES[
+                SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY
+              ],
+            },
+            { name: SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.NEW_RELEASES] },
+          ],
+        },
+      });
+
+      // Chia playlists thành các batch để không quá tải server
+      const batchSize = 10;
+      for (let i = 0; i < userPlaylists.length; i += batchSize) {
+        const batch = userPlaylists.slice(i, i + batchSize);
+
+        // Xử lý song song các playlist trong batch
+        await Promise.all(
+          batch.map((playlist) => {
+            if (
+              playlist.name ===
+              SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY]
+            ) {
+              return this.updateDiscoverWeeklyPlaylist(playlist.id);
+            } else if (
+              playlist.name ===
+              SYSTEM_PLAYLIST_NAMES[SYSTEM_PLAYLIST_TYPES.NEW_RELEASES]
+            ) {
+              return this.updateNewReleasesPlaylist(playlist.id);
+            }
+          })
+        );
+      }
+
+      console.log(
+        `[SystemPlaylistService] Completed update of all system playlists`
+      );
+    } catch (error) {
+      console.error(
+        `[SystemPlaylistService] Error updating all system playlists:`,
+        error
+      );
+      throw new Error(`Failed to update all system playlists: ${error}`);
+    }
+  }
+
+  /**
+   * Lấy mô tả cho playlist dựa trên loại
+   */
+  private getPlaylistDescription(playlistType: string): string {
+    switch (playlistType) {
+      case SYSTEM_PLAYLIST_TYPES.TOP_HITS:
+        return 'Những bài hát được yêu thích nhất hiện nay trên nền tảng Soundwave, được cập nhật tự động dựa trên hoạt động nghe nhạc của cộng đồng.';
+      case SYSTEM_PLAYLIST_TYPES.NEW_RELEASES:
+        return 'Những bản phát hành mới nhất và hot nhất trên nền tảng Soundwave. Cập nhật hàng tuần vào Thứ Sáu.';
+      case SYSTEM_PLAYLIST_TYPES.GENRE_BASED:
+        return 'Collection of tracks based on your favorite genres.';
+      case SYSTEM_PLAYLIST_TYPES.MOOD_BASED:
+        return 'Music tuned to your current mood.';
+      default:
+        return 'A playlist curated by Soundwave.';
+    }
+  }
+
+  /**
+   * Lấy URL hình ảnh bìa cho playlist dựa trên loại
+   */
+  private getPlaylistCoverUrl(playlistType: string): string {
+    switch (playlistType) {
+      case SYSTEM_PLAYLIST_TYPES.TOP_HITS:
+        return 'https://charts-images.scdn.co/assets/locale_en/regional/daily/region_vn_default.jpg';
+      case SYSTEM_PLAYLIST_TYPES.NEW_RELEASES:
+        return 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742551340/testAlbum/cv6rm3txh8beiln4x5u1.jpg';
+      case SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY:
+        return 'https://newjams-images.scdn.co/image/ab676477000033ad/dt/v3/discover-weekly/4O2moMBFA5GYrAnwXLtFDVEVPCc0WhFTI0aWB3b9bpDcL3CQ4dzOmLlizDEvd4Ia0o3B5vUTT-1pD72G0LDfyGH-CQi5qH97BppF-pQ82ww=/NzQ6ODA6NzBUNDAtNDAtNQ==';
+      default:
+        return 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
+    }
+  }
+}
+
+// Singleton instance
+export const systemPlaylistService = new SystemPlaylistService();
 
 /**
  * Tạo playlist được cá nhân hóa dựa trên thuật toán Collaborative Filtering
@@ -51,29 +723,38 @@ export const generatePersonalizedPlaylist = async (
       includeNewReleases,
     });
 
-    // 3. Thêm tracks vào playlist
-    for (let i = 0; i < recommendedTracks.length; i++) {
-      await prisma.playlistTrack.create({
-        data: {
-          playlistId: playlist.id,
-          trackId: recommendedTracks[i].id,
-          trackOrder: i,
-        },
-      });
+    if (recommendedTracks.length > 0) {
+      // 3. Chuẩn bị dữ liệu cho việc thêm nhiều track cùng lúc
+      const playlistTrackData = recommendedTracks.map((track, index) => ({
+        playlistId: playlist.id,
+        trackId: track.id,
+        trackOrder: index,
+      }));
+
+      // Tính tổng thời lượng
+      const totalDuration = recommendedTracks.reduce(
+        (sum, track) => sum + (track.duration || 0),
+        0
+      );
+
+      // Thực hiện transaction để đảm bảo tính nhất quán
+      await prisma.$transaction([
+        prisma.playlistTrack.createMany({
+          data: playlistTrackData,
+        }),
+        prisma.playlist.update({
+          where: { id: playlist.id },
+          data: {
+            totalTracks: recommendedTracks.length,
+            totalDuration,
+          },
+        }),
+      ]);
     }
 
-    // 4. Cập nhật thông tin tổng số bài hát và thời lượng
-    const totalDuration = recommendedTracks.reduce(
-      (sum, track) => sum + (track.duration || 0),
-      0
-    );
-
-    const updatedPlaylist = await prisma.playlist.update({
+    // 4. Trả về playlist đã cập nhật với đầy đủ thông tin
+    const updatedPlaylist = await prisma.playlist.findUnique({
       where: { id: playlist.id },
-      data: {
-        totalTracks: recommendedTracks.length,
-        totalDuration,
-      },
       include: {
         tracks: {
           include: {
@@ -87,6 +768,10 @@ export const generatePersonalizedPlaylist = async (
         },
       },
     });
+
+    if (!updatedPlaylist) {
+      throw new Error('Failed to retrieve updated playlist');
+    }
 
     return updatedPlaylist;
   } catch (error) {
@@ -111,19 +796,20 @@ const getRecommendedTracks = async (
 ): Promise<any[]> => {
   try {
     // Lấy các bài hát mà người dùng đã nghe hoặc thích
-    const userHistory = await prisma.history.findMany({
-      where: {
-        userId,
-        type: 'PLAY',
-        trackId: { not: null },
-      },
-      select: { trackId: true, playCount: true },
-    });
-
-    const userLikes = await prisma.userLikeTrack.findMany({
-      where: { userId },
-      select: { trackId: true },
-    });
+    const [userHistory, userLikes] = await Promise.all([
+      prisma.history.findMany({
+        where: {
+          userId,
+          type: 'PLAY',
+          trackId: { not: null },
+        },
+        select: { trackId: true, playCount: true },
+      }),
+      prisma.userLikeTrack.findMany({
+        where: { userId },
+        select: { trackId: true },
+      }),
+    ]);
 
     // Tạo danh sách các ID bài hát mà người dùng đã tương tác
     const interactedTrackIds = new Set(
@@ -147,19 +833,57 @@ const getRecommendedTracks = async (
     userLikes.forEach((l) => {
       if (l.trackId) {
         const currentScore = userTrackInteractions.get(l.trackId) || 0;
-        userTrackInteractions.set(l.trackId, currentScore + 3); // Tăng trọng số cho like
+        userTrackInteractions.set(l.trackId, currentScore + 5); // Tăng trọng số cho like từ 3 lên 5
+      }
+    });
+
+    // Phân tích artist preferences để phân bổ kết quả theo tỷ lệ
+    const artistInteractions = new Map<string, number>();
+    const trackArtists = await prisma.track.findMany({
+      where: {
+        id: { in: Array.from(interactedTrackIds) },
+      },
+      select: {
+        id: true,
+        artistId: true,
+      },
+    });
+
+    // Build map of artist preferences based on play counts and likes
+    trackArtists.forEach((track) => {
+      if (track.artistId) {
+        const interactionStrength = userTrackInteractions.get(track.id) || 0;
+        const currentCount = artistInteractions.get(track.artistId) || 0;
+        artistInteractions.set(
+          track.artistId,
+          currentCount + interactionStrength
+        );
       }
     });
 
     // Kết hợp các phương pháp gợi ý
     let recommendedTracks: any[] = [];
 
-    // 1. Matrix Factorization (kỹ thuật chính của Spotify)
+    // Điều chỉnh tỷ lệ phân bổ từ các phương pháp khác nhau dựa trên lượng tương tác
+    // Tính toán tổng interaction score để đánh giá mức độ tương tác
+    const totalInteractionScore = Array.from(
+      userTrackInteractions.values()
+    ).reduce((sum, score) => sum + score, 0);
+    const hasEnoughInteractions = interactedTrackIds.size >= 3; // Giảm ngưỡng từ 5 xuống 3
+    const hasStrongPreferences = totalInteractionScore >= 20; // New metric to check if user has strong preferences
+
+    // 1. Matrix Factorization (kỹ thuật chính của Spotify) - tăng tỷ lệ khi có strong preferences
+    const matrixLimit = hasEnoughInteractions
+      ? hasStrongPreferences
+        ? Math.ceil(limit * 0.7)
+        : Math.ceil(limit * 0.6) // Tăng lên 70% nếu có strong preferences
+      : Math.ceil(limit * 0.4); // Tăng từ 30% lên 40% khi ít dữ liệu
+
     const matrixRecommendations = await getMatrixFactorizationRecommendations(
       userId,
       Array.from(interactedTrackIds),
       userTrackInteractions,
-      Math.ceil(limit * 0.6), // 60% bài hát từ kỹ thuật matrix factorization
+      matrixLimit,
       options
     );
 
@@ -167,10 +891,14 @@ const getRecommendedTracks = async (
 
     // 2. Item-based Collaborative Filtering (tìm bài hát tương tự)
     if (recommendedTracks.length < limit) {
+      const itemBasedLimit = hasEnoughInteractions
+        ? limit - recommendedTracks.length
+        : Math.ceil((limit - recommendedTracks.length) * 0.6); // Giảm từ 0.7 xuống 0.6 để cân bằng hơn
+
       const itemBasedTracks = await getItemBasedRecommendations(
         userId,
         Array.from(interactedTrackIds),
-        limit - recommendedTracks.length,
+        itemBasedLimit,
         options
       );
 
@@ -199,6 +927,53 @@ const getRecommendedTracks = async (
       }
     }
 
+    // 4. Re-sort tracks by artist preference to ensure favorite artists appear earlier
+    if (artistInteractions.size > 0 && recommendedTracks.length > 0) {
+      recommendedTracks = recommendedTracks.sort((trackA, trackB) => {
+        const artistScoreA = artistInteractions.get(trackA.artistId) || 0;
+        const artistScoreB = artistInteractions.get(trackB.artistId) || 0;
+        // If scores are very different, prioritize by artist score
+        if (Math.abs(artistScoreA - artistScoreB) > 10) {
+          return artistScoreB - artistScoreA;
+        }
+        // Otherwise maintain the original order (which includes diversity)
+        return 0;
+      });
+    }
+
+    // 5. Apply controlled shuffling with smaller segments for better diversity while preserving relevance
+    if (recommendedTracks.length > 5) {
+      // Chia danh sách thành các phần nhỏ hơn: top 30%, middle 50%, bottom 20%
+      const topCount = Math.ceil(recommendedTracks.length * 0.3); // Increased from 20% to 30%
+      const bottomCount = Math.floor(recommendedTracks.length * 0.2);
+      const middleCount = recommendedTracks.length - topCount - bottomCount;
+
+      // Giữ nguyên top tracks để đảm bảo tracks phù hợp nhất hiện đầu tiên
+      const topTracks = recommendedTracks.slice(0, topCount);
+
+      // Xáo trộn phần giữa thành 2-3 nhóm nhỏ để duy trì thứ tự tương đối
+      let middleTracks = recommendedTracks.slice(
+        topCount,
+        topCount + middleCount
+      );
+
+      // Chia phần giữa thành 2 nhóm để shuffling có kiểm soát hơn
+      const middleSegmentSize = Math.ceil(middleTracks.length / 2);
+      const middleUpperTracks = shuffleArray(
+        middleTracks.slice(0, middleSegmentSize)
+      );
+      const middleLowerTracks = shuffleArray(
+        middleTracks.slice(middleSegmentSize)
+      );
+      middleTracks = [...middleUpperTracks, ...middleLowerTracks];
+
+      // Giữ nguyên bottom tracks
+      const bottomTracks = recommendedTracks.slice(topCount + middleCount);
+
+      // Ghép lại
+      recommendedTracks = [...topTracks, ...middleTracks, ...bottomTracks];
+    }
+
     return recommendedTracks;
   } catch (error) {
     console.error('Error in getRecommendedTracks:', error);
@@ -206,6 +981,16 @@ const getRecommendedTracks = async (
     return getPopularTracks([], limit, options);
   }
 };
+
+// Hàm trợ giúp để xáo trộn mảng (Fisher-Yates shuffle)
+function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 
 /**
  * Matrix Factorization Collaborative Filtering
@@ -225,7 +1010,7 @@ const getMatrixFactorizationRecommendations = async (
 ): Promise<any[]> => {
   try {
     // Bước 1: Lấy dữ liệu từ cơ sở dữ liệu
-    // Lấy những user có lượt play > 20 bài để có đủ dữ liệu tính toán
+    // Lấy những user có lượt play > 5 bài để có đủ dữ liệu tính toán
     const activeUsers = await prisma.user.findMany({
       where: {
         history: {
@@ -240,9 +1025,124 @@ const getMatrixFactorizationRecommendations = async (
 
     const activeUserIds = activeUsers.map((u) => u.id);
 
-    if (activeUserIds.length < 5) {
-      // Không đủ dữ liệu người dùng để thực hiện matrix factorization hiệu quả
-      console.log('Not enough user data for matrix factorization');
+    // Giảm min users từ 5 xuống 2 để hoạt động tốt hơn trong môi trường ít người dùng
+    if (activeUserIds.length < 2) {
+      console.log(
+        'Not enough user data for matrix factorization, using user history for simple personalization'
+      );
+
+      // Nếu không đủ user, tìm kiếm bài hát tương tự dựa trên thể loại và nghệ sĩ mà người dùng đã nghe
+      const userFavoriteGenres = await prisma.track.findMany({
+        where: {
+          id: { in: interactedTrackIds },
+        },
+        include: {
+          genres: {
+            include: {
+              genre: true,
+            },
+          },
+          artist: true,
+        },
+      });
+
+      // Trích xuất thể loại và nghệ sĩ yêu thích
+      const genreCounts = new Map<string, number>();
+      const artistCounts = new Map<string, number>();
+
+      userFavoriteGenres.forEach((track) => {
+        // Đếm nghệ sĩ
+        const artistId = track.artistId;
+        artistCounts.set(
+          artistId,
+          (artistCounts.get(artistId) || 0) +
+            (userTrackInteractions.get(track.id) || 1)
+        );
+
+        // Đếm thể loại
+        track.genres.forEach((genreRel) => {
+          const genreId = genreRel.genre.id;
+          genreCounts.set(
+            genreId,
+            (genreCounts.get(genreId) || 0) +
+              (userTrackInteractions.get(track.id) || 1)
+          );
+        });
+      });
+
+      // Sắp xếp và lấy top
+      const topGenreIds = [...genreCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map((entry) => entry[0]);
+
+      const topArtistIds = [...artistCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map((entry) => entry[0]);
+
+      // Tìm bài hát tương tự dựa trên thể loại và nghệ sĩ yêu thích
+      if (topGenreIds.length > 0 || topArtistIds.length > 0) {
+        const personalizedTracks = await prisma.track.findMany({
+          where: {
+            id: { notIn: interactedTrackIds },
+            isActive: true,
+            OR: [
+              topGenreIds.length > 0
+                ? {
+                    genres: {
+                      some: {
+                        genreId: { in: topGenreIds },
+                      },
+                    },
+                  }
+                : {},
+              topArtistIds.length > 0 ? { artistId: { in: topArtistIds } } : {},
+            ],
+            ...(options.basedOnGenre
+              ? {
+                  genres: {
+                    some: {
+                      genre: {
+                        name: options.basedOnGenre,
+                      },
+                    },
+                  },
+                }
+              : {}),
+            ...(options.basedOnArtist
+              ? {
+                  OR: [
+                    { artistId: options.basedOnArtist },
+                    {
+                      featuredArtists: {
+                        some: {
+                          artistId: options.basedOnArtist,
+                        },
+                      },
+                    },
+                  ],
+                }
+              : {}),
+          },
+          include: {
+            artist: true,
+            album: true,
+            genres: {
+              include: {
+                genre: true,
+              },
+            },
+          },
+          orderBy: options.includeNewReleases
+            ? [{ releaseDate: 'desc' }, { playCount: 'desc' }]
+            : [{ playCount: 'desc' }],
+          take: limit,
+        });
+
+        return personalizedTracks;
+      }
+
       return [];
     }
 

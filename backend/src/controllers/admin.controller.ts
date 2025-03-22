@@ -5,6 +5,7 @@ import {
   validateField,
 } from '../utils/handle-utils';
 import * as adminService from '../services/admin.service';
+import * as playlistService from '../services/playlist.service';
 import prisma from '../config/db';
 
 // Lấy danh sách tất cả người dùng - ADMIN only
@@ -435,28 +436,68 @@ export const getRecommendationMatrix = async (
   }
 };
 
-// Update global playlist
-export const updateGlobalPlaylist = async (
+// Update playlists - unified endpoint for all playlist types
+export const updateSystemPlaylists = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    console.log('[Admin Controller] Starting global playlist update...');
+    const { type } = req.query;
 
-    // Call the method directly from the extended prisma client
-    const result = await prisma.playlist.updateGlobalPlaylist();
+    console.log(
+      `[Admin Controller] Starting playlist update. Type: ${type || 'all'}`
+    );
 
-    // Let the user know the result of the update
-    res.json({
-      success: true,
-      message: 'Global playlist update process completed',
-      result: result,
-    });
+    if (!type || type === 'all') {
+      // Update all system playlists
+      await playlistService.systemPlaylistService.updateAllSystemPlaylists();
+
+      res.json({
+        success: true,
+        message: 'All system playlists have been updated successfully',
+      });
+      return;
+    }
+
+    // Update specific playlist type
+    switch (type) {
+      case 'global':
+      case 'trending':
+      case 'top-hits':
+        await prisma.playlist.updateGlobalPlaylist();
+        res.json({
+          success: true,
+          message: 'Trending Now playlists have been updated successfully',
+        });
+        break;
+
+      case 'discover-weekly':
+        await prisma.playlist.updateDiscoverWeeklyPlaylists();
+        res.json({
+          success: true,
+          message: 'Discover Weekly playlists have been updated successfully',
+        });
+        break;
+
+      case 'new-releases':
+        await prisma.playlist.updateNewReleasesPlaylists();
+        res.json({
+          success: true,
+          message: 'New Releases playlists have been updated successfully',
+        });
+        break;
+
+      default:
+        res.status(400).json({
+          success: false,
+          message: `Invalid playlist type: ${type}. Valid types are: all, global, trending, top-hits, discover-weekly, new-releases`,
+        });
+    }
   } catch (error) {
-    console.error('Error updating global playlist:', error);
+    console.error('Error updating playlists:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update global playlist',
+      message: 'Failed to update playlists',
       error: error instanceof Error ? error.message : String(error),
     });
   }

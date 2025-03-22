@@ -14,9 +14,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.playlistExtension = void 0;
 exports.autoUpdateGlobalPlaylist = autoUpdateGlobalPlaylist;
+exports.autoUpdateDiscoverWeeklyPlaylists = autoUpdateDiscoverWeeklyPlaylists;
+exports.autoUpdateNewReleasesPlaylists = autoUpdateNewReleasesPlaylists;
 const client_1 = require("@prisma/client");
 const node_cron_1 = __importDefault(require("node-cron"));
 const playlist_service_1 = require("../../services/playlist.service");
+const systemPlaylistService = new playlist_service_1.SystemPlaylistService();
 function findGlobalPlaylist(client) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -118,21 +121,97 @@ function autoUpdateGlobalPlaylist(client) {
         }
     });
 }
+function autoUpdateDiscoverWeeklyPlaylists(client) {
+    return __awaiter(this, void 0, void 0, function* () {
+        console.log('[Playlist] Starting Discover Weekly playlists update...');
+        try {
+            const discoverWeeklyPlaylists = yield client.playlist.findMany({
+                where: {
+                    name: 'Discover Weekly',
+                    type: 'SYSTEM',
+                },
+            });
+            console.log(`[Playlist] Found ${discoverWeeklyPlaylists.length} Discover Weekly playlists`);
+            if (discoverWeeklyPlaylists.length === 0) {
+                console.log('[Playlist] No Discover Weekly playlists found to update');
+                return;
+            }
+            for (const playlist of discoverWeeklyPlaylists) {
+                yield systemPlaylistService.updateDiscoverWeeklyPlaylist(playlist.id);
+                console.log(`[Playlist] Updated Discover Weekly playlist for user: ${playlist.userId}`);
+            }
+            console.log('[Playlist] All Discover Weekly playlists updated successfully');
+        }
+        catch (error) {
+            console.error('[Playlist] Error updating Discover Weekly playlists:', error);
+        }
+    });
+}
+function autoUpdateNewReleasesPlaylists(client) {
+    return __awaiter(this, void 0, void 0, function* () {
+        console.log('[Playlist] Starting New Releases playlists update...');
+        try {
+            const newReleasesPlaylists = yield client.playlist.findMany({
+                where: {
+                    name: 'Soundwave Fresh: New Releases',
+                    type: 'SYSTEM',
+                },
+            });
+            console.log(`[Playlist] Found ${newReleasesPlaylists.length} New Releases playlists`);
+            if (newReleasesPlaylists.length === 0) {
+                console.log('[Playlist] No New Releases playlists found to update');
+                return;
+            }
+            for (const playlist of newReleasesPlaylists) {
+                yield systemPlaylistService.updateNewReleasesPlaylist(playlist.id);
+                console.log(`[Playlist] Updated New Releases playlist for user: ${playlist.userId}`);
+            }
+            console.log('[Playlist] All New Releases playlists updated successfully');
+        }
+        catch (error) {
+            console.error('[Playlist] Error updating New Releases playlists:', error);
+        }
+    });
+}
 let cronJobInitialized = false;
 exports.playlistExtension = client_1.Prisma.defineExtension((client) => {
     if (!cronJobInitialized) {
-        const CRON_EXPRESSION = '0 0 * * *';
-        console.log('[Playlist] Setting up cron schedule:', CRON_EXPRESSION);
         try {
-            node_cron_1.default.schedule(CRON_EXPRESSION, () => {
-                console.log(`[Playlist] Cron job triggered at ${new Date().toISOString()}`);
+            const DAILY_CRON = '0 0 * * *';
+            console.log('[Playlist] Setting up daily cron schedule for Top Hits:', DAILY_CRON);
+            node_cron_1.default.schedule(DAILY_CRON, () => {
+                console.log(`[Playlist] Daily cron job triggered at ${new Date().toISOString()}`);
                 autoUpdateGlobalPlaylist(client);
             });
-            console.log('[Playlist] Cron job successfully scheduled');
+            const MONDAY_CRON = '0 0 * * 1';
+            console.log('[Playlist] Setting up weekly cron schedule for Discover Weekly:', MONDAY_CRON);
+            node_cron_1.default.schedule(MONDAY_CRON, () => {
+                console.log(`[Playlist] Monday cron job triggered at ${new Date().toISOString()}`);
+                autoUpdateDiscoverWeeklyPlaylists(client);
+            });
+            const FRIDAY_MIDNIGHT_CRON = '0 0 * * 5';
+            console.log('[Playlist] Setting up Friday midnight cron for New Releases:', FRIDAY_MIDNIGHT_CRON);
+            node_cron_1.default.schedule(FRIDAY_MIDNIGHT_CRON, () => {
+                console.log(`[Playlist] Friday midnight cron triggered at ${new Date().toISOString()}`);
+                autoUpdateNewReleasesPlaylists(client);
+            });
+            const FRIDAY_NOON_CRON = '0 12 * * 5';
+            console.log('[Playlist] Setting up Friday noon cron for New Releases:', FRIDAY_NOON_CRON);
+            node_cron_1.default.schedule(FRIDAY_NOON_CRON, () => {
+                console.log(`[Playlist] Friday noon cron triggered at ${new Date().toISOString()}`);
+                autoUpdateNewReleasesPlaylists(client);
+            });
+            const FRIDAY_EVENING_CRON = '0 18 * * 5';
+            console.log('[Playlist] Setting up Friday evening cron for New Releases:', FRIDAY_EVENING_CRON);
+            node_cron_1.default.schedule(FRIDAY_EVENING_CRON, () => {
+                console.log(`[Playlist] Friday evening cron triggered at ${new Date().toISOString()}`);
+                autoUpdateNewReleasesPlaylists(client);
+            });
+            console.log('[Playlist] All cron jobs successfully scheduled');
             cronJobInitialized = true;
         }
         catch (error) {
-            console.error('[Playlist] Error setting up cron job:', error);
+            console.error('[Playlist] Error setting up cron jobs:', error);
         }
     }
     return client.$extends({
@@ -141,6 +220,16 @@ exports.playlistExtension = client_1.Prisma.defineExtension((client) => {
                 updateGlobalPlaylist() {
                     return __awaiter(this, void 0, void 0, function* () {
                         return autoUpdateGlobalPlaylist(client);
+                    });
+                },
+                updateDiscoverWeeklyPlaylists() {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        return autoUpdateDiscoverWeeklyPlaylists(client);
+                    });
+                },
+                updateNewReleasesPlaylists() {
+                    return __awaiter(this, void 0, void 0, function* () {
+                        return autoUpdateNewReleasesPlaylists(client);
                     });
                 },
             },

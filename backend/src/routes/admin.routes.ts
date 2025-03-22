@@ -19,7 +19,7 @@ import {
   handleCacheStatus,
   handleAIModelStatus,
   getRecommendationMatrix,
-  updateGlobalPlaylist,
+  updateSystemPlaylists,
   debugActiveTracks,
 } from '../controllers/admin.controller';
 import * as genreController from '../controllers/genre.controller';
@@ -151,12 +151,12 @@ router.get(
   getRecommendationMatrix
 );
 
-// Global playlist management routes
+// Unified playlist management route
 router.post(
-  '/playlists/global/update',
+  '/playlists/update',
   authenticate,
   authorize([Role.ADMIN]),
-  updateGlobalPlaylist
+  updateSystemPlaylists
 );
 
 // Debug routes

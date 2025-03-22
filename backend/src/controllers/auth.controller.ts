@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { addHours } from 'date-fns';
 import sgMail from '@sendgrid/mail';
 import { userSelect } from '../utils/prisma-selects';
+import { systemPlaylistService } from '../services/playlist.service';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -152,6 +153,63 @@ export const registerAdmin = async (
 };
 
 // Đăng ký (Register)
+// export const register = async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     const { email, password, confirmPassword, name, username } = req.body;
+
+//     // Kiểm tra password và confirmPassword có khớp không
+//     if (password !== confirmPassword) {
+//       res.status(400).json({ message: 'Passwords do not match' });
+//       return;
+//     }
+
+//     // Validate dữ liệu đăng ký
+//     const validationError = validateRegisterData({ email, password, username });
+//     if (validationError) {
+//       res.status(400).json({ message: validationError });
+//       return;
+//     }
+
+//     // Kiểm tra email đã tồn tại chưa
+//     const existingUser = await prisma.user.findUnique({ where: { email } });
+//     if (existingUser) {
+//       res.status(400).json({ message: 'Email already exists' });
+//       return;
+//     }
+
+//     // Kiểm tra username đã tồn tại chưa
+//     if (username) {
+//       const existingUsername = await prisma.user.findUnique({
+//         where: { username },
+//       });
+//       if (existingUsername) {
+//         res.status(400).json({ message: 'Username already exists' });
+//         return;
+//       }
+//     }
+
+//     // Mã hóa mật khẩu
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     // Tạo người dùng mới với role mặc định là USER
+//     const user = await prisma.user.create({
+//       data: {
+//         email,
+//         password: hashedPassword,
+//         name,
+//         username,
+//         role: Role.USER, // Mặc định là USER
+//       },
+//       select: userSelect,
+//     });
+
+//     res.status(201).json({ message: 'User registered successfully', user });
+//   } catch (error) {
+//     console.error('Register error:', error);
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// };
+
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password, confirmPassword, name, username } = req.body;
@@ -201,6 +259,17 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       },
       select: userSelect,
     });
+
+    // Khởi tạo các playlist hệ thống cho người dùng mới
+    try {
+      await systemPlaylistService.initializeForNewUser(user.id);
+      console.log(`System playlists initialized for new user: ${user.id}`);
+    } catch (error) {
+      console.error(
+        'Failed to initialize system playlists for new user:',
+        error
+      );
+    }
 
     res.status(201).json({ message: 'User registered successfully', user });
   } catch (error) {
@@ -375,7 +444,6 @@ export const resetPassword = async (
       return;
     }
 
-    // Mã hóa mật khẩu mới
     // Mã hóa mật khẩu mới
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 

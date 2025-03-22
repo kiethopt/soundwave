@@ -26,7 +26,17 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'newjams-images.scdn.co',
+        port: '',
+      },
+      {
+        protocol: 'https',
         hostname: 'example.com',
+        port: '',
+      },
+      {
+        protocol: 'https',
+        hostname: 'charts-images.scdn.co',
         port: '',
       },
     ],

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { api } from '@/utils/api';
@@ -14,6 +14,8 @@ export default function Home() {
   const [hotAlbums, setHotAlbums] = useState<Album[]>([]);
   const [recommendedPlaylist, setRecommendedPlaylist] =
     useState<Playlist | null>(null);
+  const [updatedPlaylists, setUpdatedPlaylists] = useState<Playlist[]>([]);
+  const [systemPlaylists, setSystemPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const {
     playTrack,
@@ -27,9 +29,6 @@ export default function Home() {
   const [hoveredAlbum, setHoveredAlbum] = useState<string | null>(null);
   const [playingAlbumId, setPlayingAlbumId] = useState<string | null>(null);
 
-  // Các ref để theo dõi timeout của hover
-  const hoverTimeoutRef = useRef<any>(null);
-
   const token = localStorage.getItem('userToken') || '';
 
   useEffect(() => {
@@ -42,23 +41,31 @@ export default function Home() {
       try {
         setLoading(true);
 
-        const [newestAlbumsRes, hotAlbumsRes, recommendedPlaylistRes] =
+        const [newestAlbumsRes, hotAlbumsRes, systemPlaylistsRes] =
           await Promise.all([
             api.albums.getNewestAlbums(token),
             api.albums.getHotAlbums(token),
-            api.playlists.getSystemPlaylist(),
+            api.playlists.getSystemPlaylists(token),
           ]);
 
         setNewestAlbums(newestAlbumsRes.albums || []);
         setHotAlbums(hotAlbumsRes.albums || []);
 
-        // Handle the global playlist from the standard API response
-        if (recommendedPlaylistRes.success) {
-          setRecommendedPlaylist(recommendedPlaylistRes.data);
+        if (systemPlaylistsRes.success) {
+          const mainPlaylist =
+            systemPlaylistsRes.data.find(
+              (playlist: Playlist) =>
+                playlist.name === 'Soundwave Hits: Trending Right Now'
+            ) || systemPlaylistsRes.data[0];
+
+          setRecommendedPlaylist(mainPlaylist);
+
+          setSystemPlaylists(systemPlaylistsRes.data);
+          setUpdatedPlaylists(systemPlaylistsRes.data);
         } else {
           console.error(
-            'Failed to load system playlist:',
-            recommendedPlaylistRes.message
+            'Failed to load system playlists:',
+            systemPlaylistsRes.message
           );
         }
       } catch (error) {
@@ -80,57 +87,38 @@ export default function Home() {
     }
   }, [currentTrack, isPlaying]);
 
-  // Cleanup timeouts khi component unmount
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Cải thiện các hàm xử lý hover
-  const handleMouseEnter = (
-    id: string,
-    type: 'track' | 'album',
-    prefix: string = ''
-  ) => {
-    // Xóa timeout hiện tại nếu có
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
-
-    // Thiết lập hoverState ngay lập tức
-    if (type === 'track') {
-      const trackId = prefix ? `${prefix}-${id}` : id;
-      setHoveredTrack(trackId);
-    } else {
-      const albumId = prefix ? `${prefix}-${id}` : id;
-      setHoveredAlbum(albumId);
-    }
-  };
-
-  const handleMouseLeave = (type: 'track' | 'album') => {
-    // Sử dụng timeout để tránh mất trạng thái hover khi di chuyển chuột nhanh
-    hoverTimeoutRef.current = setTimeout(() => {
-      if (type === 'track') {
-        setHoveredTrack(null);
-      } else {
-        setHoveredAlbum(null);
-      }
-    }, 50); // Độ trễ nhỏ để tránh flicker
-  };
-
-  const handlePlayTrack = (track: Track, e?: React.MouseEvent) => {
+  const handlePlayTrack = async (track: Track, e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
 
-    if (isCurrentlyPlaying(track.id)) {
-      pauseTrack();
-    } else {
-      playTrack(track);
+    try {
+      // Kiểm tra nếu track này là track hiện tại và đang phát
+      if (isCurrentlyPlaying(track.id)) {
+        pauseTrack();
+        return;
+      }
+
+      // Nếu track không có audioUrl, cần tải đầy đủ thông tin track
+      if (!track.audioUrl) {
+        const token = localStorage.getItem('userToken');
+        if (!token) {
+          console.error('User token not found');
+          return;
+        }
+
+        // Lấy thông tin đầy đủ của track trước khi phát
+        const trackDetailResponse = await api.tracks.getById(track.id, token);
+        if (trackDetailResponse) {
+          playTrack(trackDetailResponse);
+        }
+      } else {
+        // Nếu đã có audioUrl, phát ngay
+        playTrack(track);
+      }
+    } catch (error) {
+      console.error('Error playing track:', error);
     }
   };
 
@@ -151,10 +139,15 @@ export default function Home() {
     }
   };
 
-  const handlePlayAll = (tracks: Track[]) => {
-    if (tracks && tracks.length > 0) {
-      trackQueue(tracks);
-      playTrack(tracks[0]);
+  const handlePlayPlaylist = (playlist: Playlist, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    if (playlist.tracks && playlist.tracks.length > 0) {
+      trackQueue(playlist.tracks);
+      playTrack(playlist.tracks[0]);
     }
   };
 
@@ -238,7 +231,7 @@ export default function Home() {
                 <Image
                   src={
                     recommendedPlaylist.coverUrl ||
-                    '/images/default-playlist.png'
+                    '/images/default-playlist.jpg'
                   }
                   alt={recommendedPlaylist.name}
                   fill
@@ -270,7 +263,7 @@ export default function Home() {
             <div className="editorial-card group">
               <div className="relative aspect-[16/9] overflow-hidden rounded-lg">
                 <Image
-                  src={newestAlbums[0].coverUrl || '/images/default-album.png'}
+                  src={newestAlbums[0].coverUrl || '/images/default-album.jpg'}
                   alt={newestAlbums[0].title}
                   fill
                   className="object-cover"
@@ -299,7 +292,7 @@ export default function Home() {
             <div className="editorial-card group">
               <div className="relative aspect-[16/9] overflow-hidden rounded-lg">
                 <Image
-                  src={hotAlbums[0].coverUrl || '/images/default-album.png'}
+                  src={hotAlbums[0].coverUrl || '/images/default-album.jpg'}
                   alt={hotAlbums[0].title}
                   fill
                   className="object-cover"
@@ -311,6 +304,63 @@ export default function Home() {
         )}
       </div>
 
+      {/* System Playlists Section - New Section */}
+      {systemPlaylists.length > 0 && (
+        <Section title="Your Recommended Playlists">
+          <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
+            {systemPlaylists.map((playlist) => (
+              <div
+                key={playlist.id}
+                className="cursor-pointer flex-shrink-0 w-40"
+                onClick={() => router.push(`/playlists/${playlist.id}`)}
+                onMouseEnter={() => setHoveredAlbum(`system-${playlist.id}`)}
+                onMouseLeave={() => setHoveredAlbum(null)}
+              >
+                <div className="flex flex-col space-y-2">
+                  <div className="relative aspect-square overflow-hidden rounded-lg">
+                    <Image
+                      src={playlist.coverUrl || '/images/default-playlist.jpg'}
+                      alt={playlist.name}
+                      fill
+                      className="object-cover"
+                    />
+                    <div
+                      className={`absolute inset-0 transition-all duration-150 ${
+                        hoveredAlbum === `system-${playlist.id}`
+                          ? 'bg-black/30'
+                          : 'bg-black/0'
+                      }`}
+                    ></div>
+
+                    {hoveredAlbum === `system-${playlist.id}` && (
+                      <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+                        <button
+                          className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/playlists/${playlist.id}`);
+                          }}
+                        >
+                          <Play size={18} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium line-clamp-1">
+                      {playlist.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground line-clamp-1">
+                      {playlist.totalTracks} tracks • Soundwave
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {/* Latest Songs Section (2-column layout like Apple Music) */}
       {recommendedPlaylist && recommendedPlaylist.tracks && (
         <Section title="Latest Songs">
@@ -319,9 +369,9 @@ export default function Home() {
               <div
                 key={track.id}
                 className="flex items-center space-x-3 p-3 rounded-md hover:bg-accent/10 cursor-pointer transition-all duration-200 group relative"
-                onClick={() => router.push(`/track/${track.id}`)}
-                onMouseEnter={() => handleMouseEnter(track.id, 'track')}
-                onMouseLeave={() => handleMouseLeave('track')}
+                onClick={(e) => handlePlayTrack(track, e)}
+                onMouseEnter={() => setHoveredTrack(track.id)}
+                onMouseLeave={() => setHoveredTrack(null)}
               >
                 <div className="text-sm text-muted-foreground w-6 text-center">
                   {hoveredTrack === track.id ? (
@@ -332,7 +382,7 @@ export default function Home() {
                 </div>
                 <div className="relative w-12 h-12 flex-shrink-0">
                   <Image
-                    src={track.coverUrl || '/images/default-track.png'}
+                    src={track.coverUrl || '/images/default-track.jpg'}
                     alt={track.title}
                     fill
                     className="rounded object-cover"
@@ -383,13 +433,13 @@ export default function Home() {
               key={album.id}
               className="cursor-pointer flex-shrink-0 w-40"
               onClick={() => router.push(`/album/${album.id}`)}
-              onMouseEnter={() => handleMouseEnter(album.id, 'album')}
-              onMouseLeave={() => handleMouseLeave('album')}
+              onMouseEnter={() => setHoveredAlbum(album.id)}
+              onMouseLeave={() => setHoveredAlbum(null)}
             >
               <div className="flex flex-col space-y-2">
                 <div className="relative aspect-square overflow-hidden rounded-lg">
                   <Image
-                    src={album.coverUrl || '/images/default-album.png'}
+                    src={album.coverUrl || '/images/default-album.jpg'}
                     alt={album.title}
                     fill
                     className="object-cover"
@@ -438,48 +488,40 @@ export default function Home() {
         </div>
       </Section>
 
-      {/* Updated Playlists Section - Based on hotAlbums for now */}
+      {/* Updated Playlists Section */}
       <Section title="Updated Playlists">
         <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
-          {hotAlbums.slice(0, 8).map((album) => (
+          {updatedPlaylists.map((playlist) => (
             <div
-              key={album.id}
+              key={playlist.id}
               className="cursor-pointer flex-shrink-0 w-40"
-              onClick={() => router.push(`/album/${album.id}`)}
-              onMouseEnter={() =>
-                handleMouseEnter(album.id, 'album', 'playlist')
-              }
-              onMouseLeave={() => handleMouseLeave('album')}
+              onClick={() => router.push(`/playlists/${playlist.id}`)}
+              onMouseEnter={() => setHoveredAlbum(`playlist-${playlist.id}`)}
+              onMouseLeave={() => setHoveredAlbum(null)}
             >
               <div className="flex flex-col space-y-2">
                 <div className="relative aspect-square overflow-hidden rounded-lg">
                   <Image
-                    src={album.coverUrl || '/images/default-album.png'}
-                    alt={album.title}
+                    src={playlist.coverUrl || '/images/default-playlist.jpg'}
+                    alt={playlist.name}
                     fill
                     className="object-cover"
                   />
                   <div
                     className={`absolute inset-0 transition-all duration-150 ${
-                      hoveredAlbum === `playlist-${album.id}` ||
-                      isAlbumPlaying(album.id)
+                      hoveredAlbum === `playlist-${playlist.id}`
                         ? 'bg-black/30'
                         : 'bg-black/0'
                     }`}
                   ></div>
 
-                  {(hoveredAlbum === `playlist-${album.id}` ||
-                    isAlbumPlaying(album.id)) && (
+                  {hoveredAlbum === `playlist-${playlist.id}` && (
                     <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
                       <button
                         className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
-                        onClick={(e) => handlePlayAlbum(album, e)}
+                        onClick={(e) => handlePlayPlaylist(playlist, e)}
                       >
-                        {isAlbumPlaying(album.id) ? (
-                          <Pause size={18} />
-                        ) : (
-                          <Play size={18} />
-                        )}
+                        <Play size={18} />
                       </button>
 
                       <button
@@ -493,10 +535,10 @@ export default function Home() {
                 </div>
                 <div>
                   <p className="text-sm font-medium line-clamp-1">
-                    {album.title}
+                    {playlist.name}
                   </p>
                   <p className="text-xs text-muted-foreground line-clamp-1">
-                    {album.artist.artistName}
+                    Soundwave
                   </p>
                 </div>
               </div>
@@ -513,11 +555,9 @@ export default function Home() {
               <div
                 key={track.id}
                 className="flex items-center space-x-3 p-3 rounded-md hover:bg-accent/10 cursor-pointer transition-all duration-200 group relative"
-                onClick={() => router.push(`/track/${track.id}`)}
-                onMouseEnter={() =>
-                  handleMouseEnter(track.id, 'track', 'trending')
-                }
-                onMouseLeave={() => handleMouseLeave('track')}
+                onClick={(e) => handlePlayTrack(track, e)}
+                onMouseEnter={() => setHoveredTrack(`trending-${track.id}`)}
+                onMouseLeave={() => setHoveredTrack(null)}
               >
                 <div className="text-sm text-muted-foreground w-6 text-center">
                   {hoveredTrack === `trending-${track.id}` ? (
@@ -528,7 +568,7 @@ export default function Home() {
                 </div>
                 <div className="relative w-12 h-12 flex-shrink-0">
                   <Image
-                    src={track.coverUrl || '/images/default-track.png'}
+                    src={track.coverUrl || '/images/default-track.jpg'}
                     alt={track.title}
                     fill
                     className="rounded object-cover"
@@ -588,15 +628,13 @@ export default function Home() {
               key={album.id}
               className="cursor-pointer flex-shrink-0 w-40"
               onClick={() => router.push(`/album/${album.id}`)}
-              onMouseEnter={() =>
-                handleMouseEnter(album.id, 'album', 'everyone')
-              }
-              onMouseLeave={() => handleMouseLeave('album')}
+              onMouseEnter={() => setHoveredAlbum(`everyone-${album.id}`)}
+              onMouseLeave={() => setHoveredAlbum(null)}
             >
               <div className="flex flex-col space-y-2">
                 <div className="relative aspect-square overflow-hidden rounded-lg">
                   <Image
-                    src={album.coverUrl || '/images/default-album.png'}
+                    src={album.coverUrl || '/images/default-album.jpg'}
                     alt={album.title}
                     fill
                     className="object-cover"

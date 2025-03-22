@@ -1107,3 +1107,36 @@ export const unlikeTrack = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// Check if a track is liked by the current user
+export const checkTrackLiked = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { trackId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Check if the user has liked this track
+    const like = await prisma.userLikeTrack.findUnique({
+      where: {
+        userId_trackId: {
+          userId,
+          trackId,
+        },
+      },
+    });
+
+    res.json({
+      isLiked: !!like,
+    });
+  } catch (error) {
+    console.error('Check track liked error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

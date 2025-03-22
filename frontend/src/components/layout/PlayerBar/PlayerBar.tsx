@@ -1,15 +1,17 @@
 'use client'
 
-import { useState } from 'react';
-import { Pause, Play, Shuffle, Loop, Volume, Prev, Next, Down } from '@/components/ui/Icons';
+import { useState, useEffect } from 'react';
+import { Pause, Play, Shuffle, Loop, Volume, Prev, Next, Down, LikeOutline, LikeFilled } from '@/components/ui/Icons';
 import { useTrack } from '@/contexts/TrackContext';
 import { ListMusic } from 'lucide-react';
 import { QueuePanel } from '@/components/player/QueuePanel';
+import { api } from '@/utils/api';
 
 export default function PlayerBar() {
   const [showMobileExpanded, setShowMobileExpanded] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
-  
+  const [isLiked, setIsLiked] = useState(false);
+
   const {
     currentTrack,
     isPlaying,
@@ -40,6 +42,28 @@ export default function PlayerBar() {
     setShowMobileExpanded(!showMobileExpanded);
   };
 
+  const handleLike = async (e:any) => {
+  };
+
+  useEffect(() => {
+    const checkLikeStatus = async () => {
+      if (!currentTrack) return;
+      
+      const token = localStorage.getItem('userToken');
+      if (!token) return;
+      
+      try {
+        // Using the API endpoint from your backend
+        const data = await api.tracks.checkLiked(currentTrack.id, token);
+        setIsLiked(!!data.isLiked);
+      } catch (error) {
+        console.error('Failed to check like status:', error);
+      }
+    };
+    
+    checkLikeStatus();
+  }, [currentTrack?.id]); // Only re-run when the track ID changes
+
   return (
     <>
       {/* Desktop & Tablet Player Bar */}
@@ -63,6 +87,18 @@ export default function PlayerBar() {
                     : currentTrack.artist.artistName}
                 </p>
               </div>
+              
+              {/* Like Button */}
+              <button 
+                onClick={handleLike}
+                className="p-2 rounded-full hover:bg-[#383838] transition-colors duration-200"
+              >
+                {isLiked ? (
+                  <LikeFilled className="w-8 h-8 text-[#A57865]" />
+                ) : (
+                  <LikeOutline className="w-8 h-8 text-white" />
+                )}
+              </button>
             </>
           )}
         </div>

@@ -18,6 +18,26 @@
 
 /* Add to global.css */
 @layer components {
+  /* Smooth hover transitions */
+  .hover-overlay {
+    @apply absolute inset-0 bg-black/0 transition-colors duration-300;
+  }
+
+  .hover-overlay.active,
+  .hover-overlay:hover {
+    @apply bg-black/30;
+  }
+
+  /* Media items with smooth transitions */
+  .media-item {
+    @apply relative overflow-hidden rounded-lg;
+  }
+
+  .media-item-overlay {
+    @apply absolute inset-0 bg-black/0 transition-colors duration-300;
+  }
+
+  /* Existing dashboard cards */
   .dashboard-card {
     @apply p-3 sm:p-4 md:p-6 rounded-lg transition-colors;
   }
