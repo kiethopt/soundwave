@@ -1,4 +1,5 @@
 import { ArtistRequestFilters, CreatePlaylistData } from '@/types';
+import { get } from 'lodash';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -413,6 +414,16 @@ export const api = {
 
     getTopAlbums: async (token: string) =>
       fetchWithAuth('/api/user/topAlbums', { method: 'GET' }, token),
+
+    // User profile API
+    getUserTopAlbums: async (id: string, token: string) =>
+      fetchWithAuth(`/api/user/topAlbums/${id}`, { method: 'GET' }, token),
+
+    getUserTopTracks: async (id: string, token: string) =>
+      fetchWithAuth(`/api/user/topTracks/${id}`, { method: 'GET' }, token),
+
+    getUserTopArtists: async (id: string, token: string) =>
+      fetchWithAuth(`/api/user/topArtists/${id}`, { method: 'GET' }, token),
   },
 
   artists: {

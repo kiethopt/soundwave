@@ -101,7 +101,7 @@ export default function UserProfilePage({
 
     const fetchTopArtists = async () => {
       try {
-        const topArtistsResponse = await api.user.getTopArtists(storedToken);
+        const topArtistsResponse = await api.user.getUserTopArtists(userData.id, storedToken);
         setTopArtists(topArtistsResponse);
       } catch (error) {
         console.error('Failed to fetch top artists:', error);
@@ -110,7 +110,7 @@ export default function UserProfilePage({
 
     const fetchTopTracks = async () => {
       try {
-        const topTracksResponse = await api.user.getTopTracks(storedToken);
+        const topTracksResponse = await api.user.getUserTopTracks(userData.id, storedToken);
         setTopTracks(topTracksResponse);
       } catch (error) {
         console.error('Failed to fetch top tracks:', error);

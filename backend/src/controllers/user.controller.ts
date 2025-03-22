@@ -295,3 +295,42 @@ export const getNewestAlbums = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// get user most listened tracks this month
+export const getUserTopTracks = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const tracks = await userService.getUserTopTracks(req.user);
+    res.json(tracks);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// get user most listened artists this month
+export const getUserTopArtists = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const artists = await userService.getUserTopArtists(req.user);
+    res.json(artists);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+// get user most listened artist's album this month
+export const getUserTopAlbums = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const albums = await userService.getUserTopAlbums(req.user);
+    res.json(albums);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}

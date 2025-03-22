@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import prisma from '../config/db';
-import { FollowingType, HistoryType, Role } from '@prisma/client';
+import { FollowingType, HistoryType, Role, User } from '@prisma/client';
 import { uploadFile } from './upload.service';
 import {
   searchAlbumSelect,
@@ -1093,3 +1093,210 @@ export const getNewestAlbums = async () => {
     take: 20,
   });
 };
+
+export const getUserTopTracks = async (user: any) => {
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
+
+  const monthStart = getMonthStartDate();
+
+  // Get user's history for the current month
+  const history = await prisma.history.findMany({
+    where: {
+      userId: user.id,
+      type: 'PLAY',
+      createdAt: { gte: monthStart },
+      track: {
+        isActive: true,
+      },
+    },
+    select: {
+      trackId: true,
+      playCount: true,
+    },
+  });
+
+  // Aggregate play counts by track
+  const trackPlayCounts = history.reduce((acc, curr) => {
+    if (!curr.trackId) return acc;
+    acc[curr.trackId] = (acc[curr.trackId] || 0) + (curr.playCount || 0);
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Sort track IDs by play count
+  const sortedTrackIds = Object.entries(trackPlayCounts)
+    .sort(([, countA], [, countB]) => countB - countA)
+    .map(([id]) => id)
+    .slice(0, 10);
+
+  if (sortedTrackIds.length === 0) {
+    return [];
+  }
+
+  // Get track details and preserve user's play order
+  const tracks = await prisma.track.findMany({
+    where: {
+      id: { in: sortedTrackIds },
+      isActive: true,
+    },
+    select: searchTrackSelect,
+  });
+
+  // Create a map for sorting by user's play count
+  const trackOrder = new Map(
+    sortedTrackIds.map((id, index) => [id, index])
+  );
+
+  // Sort tracks according to user's play count order
+  return tracks.sort((a, b) => 
+    (trackOrder.get(a.id) || 0) - (trackOrder.get(b.id) || 0)
+  );
+};
+
+export const getUserTopArtists = async (user: any) => {
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
+
+  const monthStart = getMonthStartDate();
+
+  // Get user's history for the current month
+  const history = await prisma.history.findMany({
+    where: {
+      userId: user.id,
+      type: 'PLAY',
+      createdAt: { gte: monthStart },
+      track: {
+        isActive: true,
+        artist: {
+          isActive: true,
+        },
+      },
+    },
+    select: {
+      track: {
+        select: {
+          artistId: true,
+        },
+      },
+    },
+  });
+
+  // Aggregate play counts by artist
+  const artistPlayCounts = history.reduce((acc, curr) => {
+    if (!curr.track?.artistId) return acc;
+    acc[curr.track.artistId] = (acc[curr.track.artistId] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Sort artist IDs by play count
+  const sortedArtistIds = Object.entries(artistPlayCounts)
+    .sort(([, countA], [, countB]) => countB - countA)
+    .map(([id]) => id)
+    .slice(0, 10);
+
+  if (sortedArtistIds.length === 0) {
+    return [];
+  }
+
+  // Get artist details and preserve user's play order
+  const artists = await prisma.artistProfile.findMany({
+    where: {
+      id: { in: sortedArtistIds },
+      isActive: true,
+    },
+    select: {
+      id: true,
+      artistName: true,
+      avatar: true,
+      genres: {
+        select: {
+          genre: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  // Create a map for sorting by user's play count
+  const artistOrder = new Map(
+    sortedArtistIds.map((id, index) => [id, index])
+  );
+
+  // Sort artists according to user's play count order
+  return artists.sort((a, b) => 
+    (artistOrder.get(a.id) || 0) - (artistOrder.get(b.id) || 0)
+  );
+}
+
+export const getUserTopAlbums = async (user: any) => {
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
+
+  const monthStart = getMonthStartDate();
+
+  // Get user's history for the current month
+  const history = await prisma.history.findMany({
+    where: {
+      userId: user.id,
+      type: 'PLAY',
+      createdAt: { gte: monthStart },
+      track: {
+        isActive: true,
+        album: {
+          isActive: true,
+        },
+      },
+    },
+    select: {
+      track: {
+        select: {
+          albumId: true,
+        },
+      },
+    },
+  });
+  
+  const albumPlayCounts = history.reduce((acc, curr) => {
+    if (!curr.track?.albumId) return acc;
+    acc[curr.track.albumId] = (acc[curr.track.albumId] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Sort album IDs by play count
+  const sortedAlbumIds = Object.entries(albumPlayCounts)
+    .sort(([, countA], [, countB]) => countB - countA)
+    .map(([id]) => id)
+    .slice(0, 10);
+
+  if (sortedAlbumIds.length === 0) {
+    return [];
+  }
+
+  // Get album details and preserve user's play order
+  const albums = await prisma.album.findMany({
+    where: {
+      id: { in: sortedAlbumIds },
+      isActive: true,
+    },
+    select: searchAlbumSelect,
+  });
+
+  // Create a map for sorting by user's play count
+  const albumOrder = new Map(
+    sortedAlbumIds.map((id, index) => [id, index])
+  );
+
+  // Sort albums according to user's play count order
+  return albums.sort((a, b) => 
+    (albumOrder.get(a.id) || 0) - (albumOrder.get(b.id) || 0)
+  );
+}
+
+

@@ -16,6 +16,9 @@ import {
   getTopArtists,
   getTopAlbums,
   getUserProfile,
+  getUserTopAlbums,
+  getUserTopTracks,
+  getUserTopArtists,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -75,5 +78,9 @@ router.get('/topArtists', authenticate, getTopArtists);
 
 // Route lấy danh sách Album phổ biến nhất
 router.get('/topAlbums', authenticate, getTopAlbums);
+
+router.get('/topAlbums/:id', authenticate, getUserTopAlbums);
+router.get('/topTracks/:id', authenticate, getUserTopTracks);
+router.get('/topArtists/:id', authenticate, getUserTopArtists);
 
 export default router;
