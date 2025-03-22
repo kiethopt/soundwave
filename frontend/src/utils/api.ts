@@ -602,8 +602,7 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/tracks/search?${
-          queryParams || `q=${query}&page=${page}&limit=${limit}`
+        `/api/tracks/search?${queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
         { method: 'GET' },
         token
@@ -615,7 +614,7 @@ export const api = {
     unlikeTrack: async (trackId: string, token: string) =>
       fetchWithAuth(`/api/tracks/${trackId}/like`, { method: 'DELETE' }, token),
 
-    checkLiked: async (trackId: string, token: string) => 
+    checkLiked: async (trackId: string, token: string) =>
       fetchWithAuth(`/api/tracks/${trackId}/liked`, {
         method: 'GET'
       }, token),
@@ -707,8 +706,7 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/albums/search?${
-          queryParams || `q=${query}&page=${page}&limit=${limit}`
+        `/api/albums/search?${queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
         { method: 'GET' },
         token
@@ -750,23 +748,23 @@ export const api = {
 
     // Lấy số lượng thông báo chưa đọc
     getUnreadCount: async (token: string) =>
-      fetchWithAuth(
-        '/api/notifications/unread-count',
-        { method: 'GET' },
-        token
-      ),
+      fetchWithAuth('/api/notifications/unread-count', { method: 'GET' }, token),
 
     // Đánh dấu 1 thông báo đã đọc
     markAsRead: async (notificationId: string, token: string) =>
-      fetchWithAuth(
-        `/api/notifications/${notificationId}/read`,
-        { method: 'PATCH' },
-        token
-      ),
+      fetchWithAuth(`/api/notifications/${notificationId}/read`, { method: 'PATCH' }, token),
 
     // Đánh dấu tất cả thông báo đã đọc
     markAllAsRead: async (token: string) =>
       fetchWithAuth('/api/notifications/read-all', { method: 'PATCH' }, token),
+
+    // Xóa tất cả thông báo
+    deleteAll: async (token: string) =>
+      fetchWithAuth('/api/notifications/delete-all', { method: 'DELETE' }, token),
+
+    // Xóa các thông báo đã đọc
+    deleteRead: async (token: string) =>
+      fetchWithAuth('/api/notifications/delete-read', { method: 'DELETE' }, token), // Thêm dòng này
   },
 
   playlists: {

@@ -5,6 +5,47 @@ import { Role, RecipientType } from '@prisma/client';
 /**
  * 1) Lấy danh sách thông báo (có thể lọc ?isRead=true/false)
  */
+export const deleteAllNotifications = async (req: Request, res: Response) => {
+  try {
+    // Lấy user từ middleware authenticate
+    const user = (req as any).user; // Giả sử middleware gắn user vào req
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    // Xóa tất cả thông báo của user
+    await prisma.notification.deleteMany({
+      where: {
+        userId: user.id, // Giả sử bảng notification có trường userId
+      },
+    });
+
+    res.status(200).json({ message: 'All notifications deleted' });
+  } catch (error) {
+    console.error('Error deleting all notifications:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+export const deleteReadNotifications = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    await prisma.notification.deleteMany({
+      where: {
+        userId: user.id,
+        isRead: true, // Chỉ xóa các thông báo đã đọc
+      },
+    });
+    res.status(200).json({ message: 'Read notifications deleted' });
+  } catch (error) {
+    console.error('Error deleting read notifications:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
 export const getNotifications = async (
   req: Request,
   res: Response

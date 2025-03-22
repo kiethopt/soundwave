@@ -444,7 +444,10 @@ export default function Header({
                       </div>
                     ))
                   )}
-                  <div className="px-4 py-3">
+                  <div
+                    className={`sticky bottom-0 px-4 py-3 ${theme === 'light' ? 'bg-white' : 'bg-[#282828]'
+                      } border-t border-gray-200`}
+                  >
                     <Link href="/notifications">
                       <button
                         className={`w-full text-center text-sm py-2 rounded-lg transition-colors duration-200 ${theme === 'light'
