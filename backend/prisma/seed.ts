@@ -408,7 +408,7 @@ async function main() {
 
     let chilliesAlbum;
     if (!existingChilliesAlbum) {
-      // Chillies album
+      // Chillies Album
       chilliesAlbum = await prisma.album.create({
         data: {
           title: 'Qua Khung Cửa Sổ',
