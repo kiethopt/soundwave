@@ -609,8 +609,16 @@ export const api = {
         token
       ),
 
-    play: async (trackId: string, token: string) =>
-      fetchWithAuth(`/api/tracks/${trackId}/play`, { method: 'POST' }, token),
+    like: async (trackId: string, token: string) =>
+      fetchWithAuth(`/api/tracks/${trackId}/like`, { method: 'POST' }, token),
+
+    unlikeTrack: async (trackId: string, token: string) =>
+      fetchWithAuth(`/api/tracks/${trackId}/like`, { method: 'DELETE' }, token),
+
+    checkLiked: async (trackId: string, token: string) => 
+      fetchWithAuth(`/api/tracks/${trackId}/liked`, {
+        method: 'GET'
+      }, token),
   },
 
   history: {

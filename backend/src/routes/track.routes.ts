@@ -13,6 +13,7 @@ import {
   getTrackById,
   likeTrack,
   unlikeTrack,
+  checkTrackLiked,
 } from '../controllers/track.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -63,6 +64,7 @@ router.post('/:trackId/play', authenticate, playTrack);
 // Route like/unlike track
 router.post('/:trackId/like', authenticate, likeTrack);
 router.delete('/:trackId/like', authenticate, unlikeTrack);
+router.get('/:trackId/liked', authenticate, checkTrackLiked);
 
 // Route cập nhật track (ADMIN & ARTIST only)
 router.put(

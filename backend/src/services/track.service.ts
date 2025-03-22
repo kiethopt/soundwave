@@ -46,17 +46,38 @@ export const likeTrack = async (userId: string, trackId: string) => {
   }
 
   // Create like record
-  return prisma.userLikeTrack.create({
+  await prisma.userLikeTrack.create({
     data: {
       userId,
       trackId,
     },
-    include: {
-      track: {
-        include: {
-          artist: true,
-        },
-      },
+  });
+
+  // Add to favorite playlist
+  // First find the favorite playlist
+  const favoritePlaylist = await prisma.playlist.findFirst({
+    where: {
+      userId,
+      type: 'FAVORITE',
+    },
+  });
+
+  if (!favoritePlaylist) {
+    throw new Error('Favorite playlist not found');
+  }
+
+  // Get the current count of tracks in the playlist to set the order
+  const tracksCount = await prisma.playlistTrack.count({
+    where: {
+      playlistId: favoritePlaylist.id,
+    },
+  });
+
+  return prisma.playlistTrack.create({
+    data: {
+      playlistId: favoritePlaylist.id,
+      trackId,
+      trackOrder: tracksCount + 1,
     },
   });
 };
@@ -78,12 +99,22 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
   }
 
   // Delete like record
-  return prisma.userLikeTrack.delete({
+  await prisma.userLikeTrack.delete({
     where: {
       userId_trackId: {
         userId,
         trackId,
       },
+    },
+  });
+
+  return prisma.playlistTrack.deleteMany({
+    where: {
+      playlist: {
+        userId,
+        type: 'FAVORITE',
+      },
+      trackId,
     },
   });
 };

@@ -34,6 +34,11 @@ const nextConfig: NextConfig = {
         hostname: 'example.com',
         port: '',
       },
+      {
+        protocol: 'https',
+        hostname: 'charts-images.scdn.co',
+        port: '',
+      },
     ],
   },
 };
