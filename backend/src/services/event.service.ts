@@ -1,120 +1,108 @@
-import { Request } from 'express';
-import { Role } from '@prisma/client';
+import { PrismaClient, Event } from '@prisma/client';
 import prisma from '../config/db';
-import { NotificationExtension } from '../prisma/extensions/notificationExtension';
 
+const prisma = new PrismaClient();
 
-export async function createEvent(data: any) {
-  return prisma.event.create({
-    data,
-  });
+interface CreateEventInput {
+  title: string;
+  description?: string;
+  location: string;
+  startDate: Date | string;
+  endDate: Date | string;
+  artistId: string;
 }
 
-
-export async function updateEvent(eventId: string, data: any) {
-  return prisma.event.update({
-    where: { id: eventId },
-    data,
-  });
+interface UpdateEventInput {
+  title: string;
+  description?: string;
+  location: string;
+  startDate: Date | string;
+  endDate: Date | string;
 }
 
-
-export async function deleteEvent(eventId: string) {
-  return prisma.event.delete({
-    where: { id: eventId },
-  });
-}
-
-
-export async function toggleEventVisibility(eventId: string) {
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
-  if (!event) throw new Error('Event không tồn tại');
-  return prisma.event.update({
-    where: { id: eventId },
+export async function createEvent(data: CreateEventInput): Promise<Event> {
+  const event = await prisma.event.create({
     data: {
-      isVisible: !event.isVisible,
+      title: data.title,
+      description: data.description,
+      location: data.location,
+      startDate: new Date(data.startDate),
+      endDate: new Date(data.endDate),
+      artistId: data.artistId,
     },
   });
+  return event;
 }
 
-
-export async function addTracksToEvent(eventId: string, trackIds: string[]) {
-  const records = [];
-  for (const trackId of trackIds) {
-    const record = await prisma.eventTrack.create({
-      data: {
-        eventId,
-        trackId,
-      },
-    });
-    records.push(record);
-  }
-  return records;
-}
-
-
-export async function searchEvent(query: string) {
-  return prisma.event.findMany({
-    where: {
-      OR: [
-        { title: { contains: query, mode: 'insensitive' } },
-      ],
+export async function updateEvent(id: string, data: UpdateEventInput): Promise<Event> {
+  const event = await prisma.event.update({
+    where: { id },
+    data: {
+      title: data.title,
+      description: data.description,
+      location: data.location,
+      startDate: new Date(data.startDate),
+      endDate: new Date(data.endDate),
     },
   });
+  return event;
 }
 
-
-export async function playEvent(eventId: string, userId: string) {
-  return { message: `User ${userId} play event ${eventId}` };
+export async function deleteEvent(id: string): Promise<Event> {
+  const event = await prisma.event.delete({
+    where: { id },
+  });
+  return event;
 }
 
+export async function getEvents(filter: any = {}): Promise<Event[]> {
+  const events = await prisma.event.findMany({
+    where: filter,
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+  return events;
+}
+
+export async function getEventById(id: string): Promise<Event | null> {
+  const event = await prisma.event.findUnique({
+    where: { id },
+  });
+  return event;
+}
 
 export async function joinEvent(eventId: string, userId: string) {
-  const joinRecord = await prisma.eventParticipant.create({
-    data: {
-      eventId,
-      userId,
-    },
+  const existing = await prisma.eventJoin.findUnique({
+    where: { eventId_userId: { eventId, userId } },
   });
-
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
-  if (event && event.artistId) {
-    NotificationExtension.sendNotification(
-      event.artistId,
-      `User ${userId} đã tham gia event "${event.title || 'N/A'}"`
-    );
+  if (existing) {
+    throw new Error('User đã join event này rồi');
   }
+  const joinRecord = await prisma.eventJoin.create({
+    data: { eventId, userId },
+  });
   return joinRecord;
 }
 
-
 export async function cancelJoinEvent(eventId: string, userId: string) {
-  const cancelRecord = await prisma.eventParticipant.deleteMany({
-    where: { eventId, userId },
+  const canceled = await prisma.eventJoin.delete({
+    where: { eventId_userId: { eventId, userId } },
   });
+  return canceled;
+}
 
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
-  if (event && event.artistId) {
-    NotificationExtension.sendNotification(
-      event.artistId,
-      `User ${userId} đã hủy tham gia event "${event.title || 'N/A'}"`
-    );
+export async function toggleEventVisibility(id: string): Promise<Event> {
+  const event = await prisma.event.findUnique({
+    where: { id },
+    select: { isActive: true },
+  });
+  if (!event) {
+    throw new Error('Event not found');
   }
-  return cancelRecord;
-}
-
-
-export async function getEventById(eventId: string) {
-  return prisma.event.findUnique({
-    where: { id: eventId },
-    include: {
-    },
+  const updatedEvent = await prisma.event.update({
+    where: { id },
+    data: { isActive: !event.isActive },
   });
-}
-
-
-export async function getAllEvents() {
-  return prisma.event.findMany({
-    orderBy: { createdAt: 'desc' },
-  });
+  return updatedEvent;
 }
