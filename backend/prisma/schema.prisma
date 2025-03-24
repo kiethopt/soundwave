@@ -29,6 +29,7 @@ model User {
   followed             UserFollow[]    @relation("Follower")
   followers            UserFollow[]    @relation("FollowingUser")
   likedTracks          UserLikeTrack[]
+  eventJoins           EventJoin[]
 
   @@unique([email, username])
   @@index([email])
@@ -212,6 +213,7 @@ model Notification {
   updatedAt     DateTime         @updatedAt
   artist        ArtistProfile?   @relation("ArtistNotifications", fields: [artistId], references: [id], onDelete: Cascade)
   user          User?            @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  eventId       String? 
 
   @@index([userId])
   @@index([artistId])
@@ -221,17 +223,18 @@ model Notification {
 }
 
 model Event {
-  id          String        @id @default(cuid())
-  title       String
-  description String?
-  location    String
-  startDate   DateTime
-  endDate     DateTime
-  isActive    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  artistId    String
-  artist      ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  id           String        @id @default(cuid())
+  title        String
+  description  String?
+  location     String
+  startDate    DateTime
+  endDate      DateTime
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  artistId     String
+  artist       ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  participants EventJoin[]
 
   @@unique([title, artistId])
   @@index([artistId])
@@ -240,6 +243,17 @@ model Event {
   @@index([isActive])
   @@index([createdAt])
   @@map("events")
+}
+
+model EventJoin {
+  id       String   @id @default(cuid())
+  event    Event    @relation(fields: [eventId], references: [id])
+  eventId  String
+  user     User     @relation(fields: [userId], references: [id])
+  userId   String
+  joinedAt DateTime @default(now())
+
+  @@unique([eventId, userId])
 }
 
 model UserFollow {
@@ -357,13 +371,13 @@ enum PlaylistPrivacy {
 enum PlaylistType {
   FAVORITE
   NORMAL
-  SYSTEM
 }
 
 enum NotificationType {
   NEW_TRACK
   NEW_ALBUM
   EVENT_REMINDER
+  NEW_EVENT
   NEW_FOLLOW
   ARTIST_REQUEST_APPROVE
   ARTIST_REQUEST_REJECT
