@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as EventService from '../services/event.service';
-
+import prisma from '../config/db';
 
 export async function createEvent(req: Request, res: Response): Promise<Response> {
   try {
