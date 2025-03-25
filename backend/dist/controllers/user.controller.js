@@ -42,7 +42,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
+exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
 const userService = __importStar(require("../services/user.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const requestToBecomeArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -305,4 +305,34 @@ const getNewestAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function
     }
 });
 exports.getNewestAlbums = getNewestAlbums;
+const getUserTopTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const tracks = yield userService.getUserTopTracks(req.user);
+        res.json(tracks);
+    }
+    catch (error) {
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getUserTopTracks = getUserTopTracks;
+const getUserTopArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const artists = yield userService.getUserTopArtists(req.user);
+        res.json(artists);
+    }
+    catch (error) {
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getUserTopArtists = getUserTopArtists;
+const getUserTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const albums = yield userService.getUserTopAlbums(req.user);
+        res.json(albums);
+    }
+    catch (error) {
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getUserTopAlbums = getUserTopAlbums;
 //# sourceMappingURL=user.controller.js.map

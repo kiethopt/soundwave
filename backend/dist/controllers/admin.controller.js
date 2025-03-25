@@ -48,8 +48,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.debugActiveTracks = exports.updateSystemPlaylists = exports.getRecommendationMatrix = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
+const playlistService = __importStar(require("../services/playlist.service"));
 const db_1 = __importDefault(require("../config/db"));
-const playlist_service_1 = require("../services/playlist.service");
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { users, pagination } = yield adminService.getUsers(req);
@@ -283,6 +283,15 @@ const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, fun
     try {
         const { requestId } = req.body;
         const updatedProfile = yield adminService.approveArtistRequest(requestId);
+        yield db_1.default.notification.create({
+            data: {
+                type: 'ARTIST_REQUEST_APPROVE',
+                message: 'Your request to become an Artist has been approved!',
+                recipientType: 'USER',
+                userId: updatedProfile.user.id,
+                isRead: false,
+            },
+        });
         res.json({
             message: 'Artist role approved successfully',
             user: updatedProfile.user,
@@ -304,6 +313,15 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
     try {
         const { requestId } = req.body;
         const result = yield adminService.rejectArtistRequest(requestId);
+        yield db_1.default.notification.create({
+            data: {
+                type: 'ARTIST_REQUEST_REJECT',
+                message: 'Your request to become an Artist has been rejected.',
+                recipientType: 'USER',
+                userId: result.user.id,
+                isRead: false,
+            },
+        });
         res.json({
             message: 'Artist role request rejected successfully',
             user: result.user,
@@ -376,7 +394,7 @@ const updateSystemPlaylists = (req, res) => __awaiter(void 0, void 0, void 0, fu
         const { type } = req.query;
         console.log(`[Admin Controller] Starting playlist update. Type: ${type || 'all'}`);
         if (!type || type === 'all') {
-            yield playlist_service_1.systemPlaylistService.updateAllSystemPlaylists();
+            yield playlistService.systemPlaylistService.updateAllSystemPlaylists();
             res.json({
                 success: true,
                 message: 'All system playlists have been updated successfully',

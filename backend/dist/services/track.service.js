@@ -48,17 +48,31 @@ const likeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, functio
     if (existingLike) {
         throw new Error('Track already liked');
     }
-    return db_1.default.userLikeTrack.create({
+    yield db_1.default.userLikeTrack.create({
         data: {
             userId,
             trackId,
         },
-        include: {
-            track: {
-                include: {
-                    artist: true,
-                },
-            },
+    });
+    const favoritePlaylist = yield db_1.default.playlist.findFirst({
+        where: {
+            userId,
+            type: 'FAVORITE',
+        },
+    });
+    if (!favoritePlaylist) {
+        throw new Error('Favorite playlist not found');
+    }
+    const tracksCount = yield db_1.default.playlistTrack.count({
+        where: {
+            playlistId: favoritePlaylist.id,
+        },
+    });
+    return db_1.default.playlistTrack.create({
+        data: {
+            playlistId: favoritePlaylist.id,
+            trackId,
+            trackOrder: tracksCount + 1,
         },
     });
 });
@@ -75,12 +89,21 @@ const unlikeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, funct
     if (!existingLike) {
         throw new Error('Track not liked');
     }
-    return db_1.default.userLikeTrack.delete({
+    yield db_1.default.userLikeTrack.delete({
         where: {
             userId_trackId: {
                 userId,
                 trackId,
             },
+        },
+    });
+    return db_1.default.playlistTrack.deleteMany({
+        where: {
+            playlist: {
+                userId,
+                type: 'FAVORITE',
+            },
+            trackId,
         },
     });
 });

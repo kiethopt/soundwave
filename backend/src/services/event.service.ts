@@ -1,5 +1,5 @@
 import { PrismaClient, Event } from '@prisma/client';
-import prisma from '../config/db';
+// import prisma from '../config/db';
 
 const prisma = new PrismaClient();
 
@@ -34,7 +34,10 @@ export async function createEvent(data: CreateEventInput): Promise<Event> {
   return event;
 }
 
-export async function updateEvent(id: string, data: UpdateEventInput): Promise<Event> {
+export async function updateEvent(
+  id: string,
+  data: UpdateEventInput
+): Promise<Event> {
   const event = await prisma.event.update({
     where: { id },
     data: {

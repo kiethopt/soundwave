@@ -13,6 +13,7 @@ import artistRoutes from './routes/artist.routes';
 import userRoutes from './routes/user.routes';
 import notificationRoutes from './routes/notification.routes';
 import playlistRoutes from './routes/playlist.routes';
+import eventRoutes from './routes/event.routes';
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.use('/api/artist', artistRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/playlists', playlistRoutes);
+app.use('/api/events', eventRoutes);
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {

@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.unlikeTrack = exports.likeTrack = exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
+exports.checkTrackLiked = exports.unlikeTrack = exports.likeTrack = exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const upload_service_1 = require("../services/upload.service");
 const client_1 = require("@prisma/client");
@@ -936,4 +936,31 @@ const unlikeTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.unlikeTrack = unlikeTrack;
+const checkTrackLiked = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { trackId } = req.params;
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        if (!userId) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const like = yield db_1.default.userLikeTrack.findUnique({
+            where: {
+                userId_trackId: {
+                    userId,
+                    trackId,
+                },
+            },
+        });
+        res.json({
+            isLiked: !!like,
+        });
+    }
+    catch (error) {
+        console.error('Check track liked error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.checkTrackLiked = checkTrackLiked;
 //# sourceMappingURL=track.controller.js.map

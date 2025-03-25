@@ -12,9 +12,50 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getUnreadNotificationsCount = exports.getNotifications = void 0;
+exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getUnreadNotificationsCount = exports.getNotifications = exports.deleteReadNotifications = exports.deleteAllNotifications = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
+const deleteAllNotifications = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = req.user;
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        yield db_1.default.notification.deleteMany({
+            where: {
+                userId: user.id,
+            },
+        });
+        res.status(200).json({ message: 'All notifications deleted' });
+    }
+    catch (error) {
+        console.error('Error deleting all notifications:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.deleteAllNotifications = deleteAllNotifications;
+const deleteReadNotifications = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = req.user;
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        yield db_1.default.notification.deleteMany({
+            where: {
+                userId: user.id,
+                isRead: true,
+            },
+        });
+        res.status(200).json({ message: 'Read notifications deleted' });
+    }
+    catch (error) {
+        console.error('Error deleting read notifications:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.deleteReadNotifications = deleteReadNotifications;
 const getNotifications = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const user = req.user;

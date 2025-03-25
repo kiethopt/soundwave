@@ -4,14 +4,13 @@ export const eventExtension = Prisma.defineExtension((client) => {
   return client.$extends({
     model: {
       event: {
-        
         createEvent(data: Prisma.EventCreateInput) {
           return client.event.create({ data });
         },
 
         /**
          * Cập nhật một Event theo ID
-         * @param where 
+         * @param where
          * @param data  - dữ liệu cập nhật
          */
         updateEvent(
@@ -25,9 +24,7 @@ export const eventExtension = Prisma.defineExtension((client) => {
          * Xoá một Event theo ID
          * @param where - điều kiện where (thường là { id: string })
          */
-        deleteEvent(
-          where: Prisma.EventWhereUniqueInput
-        ) {
+        deleteEvent(where: Prisma.EventWhereUniqueInput) {
           return client.event.delete({ where });
         },
 
@@ -37,7 +34,7 @@ export const eventExtension = Prisma.defineExtension((client) => {
          * @param userId - ID của user
          */
         joinEvent(eventId: string, userId: string) {
-          return client.eventParticipant.create({
+          return client.eventJoin.create({
             data: {
               eventId,
               userId,

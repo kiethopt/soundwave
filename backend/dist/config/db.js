@@ -8,6 +8,7 @@ const user_extension_1 = require("../prisma/extensions/user.extension");
 const album_extension_1 = require("../prisma/extensions/album.extension");
 const track_extension_1 = require("../prisma/extensions/track.extension");
 const playlist_extension_1 = require("../prisma/extensions/playlist.extension");
+const event_extension_1 = require("../prisma/extensions/event.extension");
 const prisma = new client_1.PrismaClient({
     log: [{ emit: 'event', level: 'query' }],
 });
@@ -18,6 +19,7 @@ const extendedPrisma = prisma
     .$extends(user_extension_1.userExtension)
     .$extends(track_extension_1.trackExtension)
     .$extends(album_extension_1.albumExtension)
-    .$extends(playlist_extension_1.playlistExtension);
+    .$extends(playlist_extension_1.playlistExtension)
+    .$extends(event_extension_1.eventExtension);
 exports.default = extendedPrisma;
 //# sourceMappingURL=db.js.map

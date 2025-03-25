@@ -468,7 +468,7 @@ class SystemPlaylistService {
     getPlaylistCoverUrl(playlistType) {
         switch (playlistType) {
             case SYSTEM_PLAYLIST_TYPES.TOP_HITS:
-                return 'https://charts-images.scdn.co/assets/locale_en/regional/daily/region_vn_default.jpg';
+                return 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
             case SYSTEM_PLAYLIST_TYPES.NEW_RELEASES:
                 return 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742551340/testAlbum/cv6rm3txh8beiln4x5u1.jpg';
             case SYSTEM_PLAYLIST_TYPES.DISCOVER_WEEKLY:

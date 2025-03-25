@@ -23,7 +23,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
@@ -934,4 +934,161 @@ const getNewestAlbums = () => __awaiter(void 0, void 0, void 0, function* () {
     });
 });
 exports.getNewestAlbums = getNewestAlbums;
+const getUserTopTracks = (user) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!user) {
+        throw new Error('Unauthorized');
+    }
+    const monthStart = getMonthStartDate();
+    const history = yield db_1.default.history.findMany({
+        where: {
+            userId: user.id,
+            type: 'PLAY',
+            createdAt: { gte: monthStart },
+            track: {
+                isActive: true,
+            },
+        },
+        select: {
+            trackId: true,
+            playCount: true,
+        },
+    });
+    const trackPlayCounts = history.reduce((acc, curr) => {
+        if (!curr.trackId)
+            return acc;
+        acc[curr.trackId] = (acc[curr.trackId] || 0) + (curr.playCount || 0);
+        return acc;
+    }, {});
+    const sortedTrackIds = Object.entries(trackPlayCounts)
+        .sort(([, countA], [, countB]) => countB - countA)
+        .map(([id]) => id)
+        .slice(0, 10);
+    if (sortedTrackIds.length === 0) {
+        return [];
+    }
+    const tracks = yield db_1.default.track.findMany({
+        where: {
+            id: { in: sortedTrackIds },
+            isActive: true,
+        },
+        select: prisma_selects_1.searchTrackSelect,
+    });
+    const trackOrder = new Map(sortedTrackIds.map((id, index) => [id, index]));
+    return tracks.sort((a, b) => (trackOrder.get(a.id) || 0) - (trackOrder.get(b.id) || 0));
+});
+exports.getUserTopTracks = getUserTopTracks;
+const getUserTopArtists = (user) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!user) {
+        throw new Error('Unauthorized');
+    }
+    const monthStart = getMonthStartDate();
+    const history = yield db_1.default.history.findMany({
+        where: {
+            userId: user.id,
+            type: 'PLAY',
+            createdAt: { gte: monthStart },
+            track: {
+                isActive: true,
+                artist: {
+                    isActive: true,
+                },
+            },
+        },
+        select: {
+            track: {
+                select: {
+                    artistId: true,
+                },
+            },
+        },
+    });
+    const artistPlayCounts = history.reduce((acc, curr) => {
+        var _a;
+        if (!((_a = curr.track) === null || _a === void 0 ? void 0 : _a.artistId))
+            return acc;
+        acc[curr.track.artistId] = (acc[curr.track.artistId] || 0) + 1;
+        return acc;
+    }, {});
+    const sortedArtistIds = Object.entries(artistPlayCounts)
+        .sort(([, countA], [, countB]) => countB - countA)
+        .map(([id]) => id)
+        .slice(0, 10);
+    if (sortedArtistIds.length === 0) {
+        return [];
+    }
+    const artists = yield db_1.default.artistProfile.findMany({
+        where: {
+            id: { in: sortedArtistIds },
+            isActive: true,
+        },
+        select: {
+            id: true,
+            artistName: true,
+            avatar: true,
+            genres: {
+                select: {
+                    genre: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+    const artistOrder = new Map(sortedArtistIds.map((id, index) => [id, index]));
+    return artists.sort((a, b) => (artistOrder.get(a.id) || 0) - (artistOrder.get(b.id) || 0));
+});
+exports.getUserTopArtists = getUserTopArtists;
+const getUserTopAlbums = (user) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!user) {
+        throw new Error('Unauthorized');
+    }
+    const monthStart = getMonthStartDate();
+    const history = yield db_1.default.history.findMany({
+        where: {
+            userId: user.id,
+            type: 'PLAY',
+            createdAt: { gte: monthStart },
+            track: {
+                isActive: true,
+                album: {
+                    isActive: true,
+                },
+            },
+        },
+        select: {
+            track: {
+                select: {
+                    albumId: true,
+                },
+            },
+        },
+    });
+    const albumPlayCounts = history.reduce((acc, curr) => {
+        var _a;
+        if (!((_a = curr.track) === null || _a === void 0 ? void 0 : _a.albumId))
+            return acc;
+        acc[curr.track.albumId] = (acc[curr.track.albumId] || 0) + 1;
+        return acc;
+    }, {});
+    const sortedAlbumIds = Object.entries(albumPlayCounts)
+        .sort(([, countA], [, countB]) => countB - countA)
+        .map(([id]) => id)
+        .slice(0, 10);
+    if (sortedAlbumIds.length === 0) {
+        return [];
+    }
+    const albums = yield db_1.default.album.findMany({
+        where: {
+            id: { in: sortedAlbumIds },
+            isActive: true,
+        },
+        select: prisma_selects_1.searchAlbumSelect,
+    });
+    const albumOrder = new Map(sortedAlbumIds.map((id, index) => [id, index]));
+    return albums.sort((a, b) => (albumOrder.get(a.id) || 0) - (albumOrder.get(b.id) || 0));
+});
+exports.getUserTopAlbums = getUserTopAlbums;
 //# sourceMappingURL=user.service.js.map
