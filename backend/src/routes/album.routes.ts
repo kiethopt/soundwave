@@ -67,13 +67,10 @@ router.get('/search', authenticate, cacheMiddleware, searchAlbum);
 // Route phát album
 router.post('/:albumId/play', authenticate, cacheMiddleware, playAlbum);
 
-// PUBLIC routes
-// Các route tĩnh
+// Public routes
 router.get('/newest', cacheMiddleware, getNewestAlbums);
 router.get('/hot', cacheMiddleware, getHotAlbums);
-
-// Route lấy thông tin album theo ID (có cache)
-router.get('/:id', authenticate, cacheMiddleware, getAlbumById);
+router.get('/:id', cacheMiddleware, getAlbumById);
 
 // Route lấy danh sách tất cả album (có cache)
 router.get(

@@ -5,8 +5,8 @@ import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useDataTable } from '@/hooks/useDataTable';
-import { getArtistColumns } from '@/components/data-table/data-table-columns';
-import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
+import { getArtistColumns } from '@/components/ui/data-table/data-table-columns';
+import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import { ArtistProfile } from '@/types';
 import {
   ColumnFiltersState,

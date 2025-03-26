@@ -7,15 +7,19 @@ import { api } from '@/utils/api';
 import { Album, Track, Playlist } from '@/types';
 import { useTrack } from '@/contexts/TrackContext';
 import { ChevronRight, Play, MoreHorizontal, Pause } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { MusicAuthDialog } from '@/components/ui/music-auth-dialog';
 
 export default function Home() {
   const router = useRouter();
   const [newestAlbums, setNewestAlbums] = useState<Album[]>([]);
   const [hotAlbums, setHotAlbums] = useState<Album[]>([]);
-  const [recommendedPlaylist, setRecommendedPlaylist] =
-    useState<Playlist | null>(null);
-  const [updatedPlaylists, setUpdatedPlaylists] = useState<Playlist[]>([]);
-  const [systemPlaylists, setSystemPlaylists] = useState<Playlist[]>([]);
+  const [trendingPlaylist, setTrendingPlaylist] = useState<Playlist | null>(
+    null
+  );
+  const [personalizedPlaylists, setPersonalizedPlaylists] = useState<
+    Playlist[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const {
     playTrack,
@@ -28,45 +32,54 @@ export default function Home() {
   const [hoveredTrack, setHoveredTrack] = useState<string | null>(null);
   const [hoveredAlbum, setHoveredAlbum] = useState<string | null>(null);
   const [playingAlbumId, setPlayingAlbumId] = useState<string | null>(null);
+  const { dialogOpen, setDialogOpen, handleProtectedAction, isAuthenticated } =
+    useAuth();
 
   const token = localStorage.getItem('userToken') || '';
 
   useEffect(() => {
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
     const fetchHomeData = async () => {
       try {
         setLoading(true);
 
-        const [newestAlbumsRes, hotAlbumsRes, systemPlaylistsRes] =
-          await Promise.all([
-            api.albums.getNewestAlbums(token),
-            api.albums.getHotAlbums(token),
-            api.playlists.getSystemPlaylists(token),
-          ]);
+        // Basic API calls that work for both authenticated and unauthenticated users
+        const apiCalls = [
+          api.playlists.getSystemPlaylists(token || undefined),
+          api.albums.getNewestAlbums(token || undefined),
+          api.albums.getHotAlbums(token || undefined),
+        ];
 
+        const responses = await Promise.all(apiCalls);
+
+        const systemPlaylistsRes = responses[0];
+        const newestAlbumsRes = responses[1];
+        const hotAlbumsRes = responses[2];
+
+        // Handle data regardless of authentication status
         setNewestAlbums(newestAlbumsRes.albums || []);
         setHotAlbums(hotAlbumsRes.albums || []);
 
+        // Process system playlists
         if (systemPlaylistsRes.success) {
-          const mainPlaylist =
-            systemPlaylistsRes.data.find(
-              (playlist: Playlist) =>
-                playlist.name === 'Soundwave Hits: Trending Right Now'
-            ) || systemPlaylistsRes.data[0];
-
-          setRecommendedPlaylist(mainPlaylist);
-
-          setSystemPlaylists(systemPlaylistsRes.data);
-          setUpdatedPlaylists(systemPlaylistsRes.data);
-        } else {
-          console.error(
-            'Failed to load system playlists:',
-            systemPlaylistsRes.message
+          // Identify playlists by type
+          const trendingPlaylist = systemPlaylistsRes.data.find(
+            (playlist: Playlist) =>
+              playlist.name === 'Soundwave Hits: Trending Right Now'
           );
+
+          // Set trending playlist (for the featured content and tracks section)
+          setTrendingPlaylist(trendingPlaylist || null);
+
+          // For authenticated users, show all system playlists including personalized ones
+          // For unauthenticated users, only show global playlists
+          if (token) {
+            // Filter out the trending playlist to avoid duplication
+            const userSpecificPlaylists = systemPlaylistsRes.data.filter(
+              (playlist: Playlist) =>
+                playlist.name !== 'Soundwave Hits: Trending Right Now'
+            );
+            setPersonalizedPlaylists(userSpecificPlaylists);
+          }
         }
       } catch (error) {
         console.error('Error fetching home data:', error);
@@ -76,7 +89,7 @@ export default function Home() {
     };
 
     fetchHomeData();
-  }, [token, router]);
+  }, [token]);
 
   // Update playingAlbumId based on currentTrack
   useEffect(() => {
@@ -93,6 +106,10 @@ export default function Home() {
       e.stopPropagation();
     }
 
+    // Dùng handleProtectedAction để kiểm tra xác thực và hiển thị dialog nếu cần
+    const canProceed = handleProtectedAction();
+    if (!canProceed) return;
+
     try {
       // Kiểm tra nếu track này là track hiện tại và đang phát
       if (isCurrentlyPlaying(track.id)) {
@@ -102,14 +119,12 @@ export default function Home() {
 
       // Nếu track không có audioUrl, cần tải đầy đủ thông tin track
       if (!track.audioUrl) {
-        const token = localStorage.getItem('userToken');
-        if (!token) {
-          console.error('User token not found');
-          return;
-        }
-
         // Lấy thông tin đầy đủ của track trước khi phát
-        const trackDetailResponse = await api.tracks.getById(track.id, token);
+        const token = localStorage.getItem('userToken');
+        const trackDetailResponse = await api.tracks.getById(
+          track.id,
+          token as string
+        );
         if (trackDetailResponse) {
           playTrack(trackDetailResponse);
         }
@@ -128,6 +143,10 @@ export default function Home() {
       e.stopPropagation();
     }
 
+    // Dùng handleProtectedAction để kiểm tra xác thực và hiển thị dialog nếu cần
+    const canProceed = handleProtectedAction();
+    if (!canProceed) return;
+
     if (album.tracks && album.tracks.length > 0) {
       if (playingAlbumId === album.id && isPlaying) {
         pauseTrack();
@@ -145,6 +164,10 @@ export default function Home() {
       e.stopPropagation();
     }
 
+    // Dùng handleProtectedAction để kiểm tra xác thực và hiển thị dialog nếu cần
+    const canProceed = handleProtectedAction();
+    if (!canProceed) return;
+
     if (playlist.tracks && playlist.tracks.length > 0) {
       trackQueue(playlist.tracks);
       playTrack(playlist.tracks[0]);
@@ -156,6 +179,11 @@ export default function Home() {
       e.preventDefault();
       e.stopPropagation();
     }
+
+    // Dùng handleProtectedAction để kiểm tra xác thực và hiển thị dialog nếu cần
+    const canProceed = handleProtectedAction();
+    if (!canProceed) return;
+
     addToQueue(track);
   };
 
@@ -211,18 +239,18 @@ export default function Home() {
 
       {/* Featured Cards Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        {/* Card 1: Updated Playlist */}
-        {recommendedPlaylist && (
+        {/* Card 1: Trending Playlist */}
+        {trendingPlaylist && (
           <div
             className="cursor-pointer"
-            onClick={() => router.push(`/playlists/${recommendedPlaylist.id}`)}
+            onClick={() => router.push(`/playlists/${trendingPlaylist.id}`)}
           >
             <div className="mb-3">
               <div className="uppercase text-xs font-medium text-primary mb-1.5">
-                UPDATED PLAYLIST
+                TRENDING PLAYLIST
               </div>
               <h3 className="text-lg font-bold line-clamp-1 mb-1">
-                {recommendedPlaylist.name}
+                {trendingPlaylist.name}
               </h3>
               <p className="text-sm text-muted-foreground">Soundwave</p>
             </div>
@@ -230,10 +258,9 @@ export default function Home() {
               <div className="relative aspect-[16/9] overflow-hidden rounded-lg">
                 <Image
                   src={
-                    recommendedPlaylist.coverUrl ||
-                    '/images/default-playlist.jpg'
+                    trendingPlaylist.coverUrl || '/images/default-playlist.jpg'
                   }
-                  alt={recommendedPlaylist.name}
+                  alt={trendingPlaylist.name}
                   fill
                   className="object-cover"
                 />
@@ -274,7 +301,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Card 3: Featured Album/Set List */}
+        {/* Card 3: Hot Album */}
         {hotAlbums.length > 0 && (
           <div
             className="cursor-pointer"
@@ -287,7 +314,9 @@ export default function Home() {
               <h3 className="text-lg font-bold line-clamp-1 mb-1">
                 {hotAlbums[0].title}
               </h3>
-              <p className="text-sm text-muted-foreground">Soundwave</p>
+              <p className="text-sm text-muted-foreground">
+                {hotAlbums[0].artist.artistName}
+              </p>
             </div>
             <div className="editorial-card group">
               <div className="relative aspect-[16/9] overflow-hidden rounded-lg">
@@ -304,16 +333,16 @@ export default function Home() {
         )}
       </div>
 
-      {/* System Playlists Section - New Section */}
-      {systemPlaylists.length > 0 && (
-        <Section title="Your Recommended Playlists">
+      {/* Personalized Playlists Section - Only for authenticated users */}
+      {isAuthenticated && personalizedPlaylists.length > 0 && (
+        <Section title="Your Personalized Playlists">
           <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
-            {systemPlaylists.map((playlist) => (
+            {personalizedPlaylists.map((playlist) => (
               <div
                 key={playlist.id}
                 className="cursor-pointer flex-shrink-0 w-40"
                 onClick={() => router.push(`/playlists/${playlist.id}`)}
-                onMouseEnter={() => setHoveredAlbum(`system-${playlist.id}`)}
+                onMouseEnter={() => setHoveredAlbum(`playlist-${playlist.id}`)}
                 onMouseLeave={() => setHoveredAlbum(null)}
               >
                 <div className="flex flex-col space-y-2">
@@ -326,20 +355,17 @@ export default function Home() {
                     />
                     <div
                       className={`absolute inset-0 transition-all duration-150 ${
-                        hoveredAlbum === `system-${playlist.id}`
+                        hoveredAlbum === `playlist-${playlist.id}`
                           ? 'bg-black/30'
                           : 'bg-black/0'
                       }`}
                     ></div>
 
-                    {hoveredAlbum === `system-${playlist.id}` && (
+                    {hoveredAlbum === `playlist-${playlist.id}` && (
                       <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
                         <button
                           className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/playlists/${playlist.id}`);
-                          }}
+                          onClick={(e) => handlePlayPlaylist(playlist, e)}
                         >
                           <Play size={18} />
                         </button>
@@ -351,7 +377,12 @@ export default function Home() {
                       {playlist.name}
                     </p>
                     <p className="text-xs text-muted-foreground line-clamp-1">
-                      {playlist.totalTracks} tracks • Soundwave
+                      {playlist.totalTracks} tracks •{' '}
+                      {playlist.name.includes('Discover Weekly')
+                        ? 'Updated weekly'
+                        : playlist.name.includes('New Releases')
+                        ? 'Updated on Fridays'
+                        : 'For you'}
                     </p>
                   </div>
                 </div>
@@ -361,11 +392,14 @@ export default function Home() {
         </Section>
       )}
 
-      {/* Latest Songs Section (2-column layout like Apple Music) */}
-      {recommendedPlaylist && recommendedPlaylist.tracks && (
-        <Section title="Latest Songs">
+      {/* Trending Hits Section */}
+      {trendingPlaylist && trendingPlaylist.tracks && (
+        <Section
+          title="Trending Hits"
+          viewAllLink={`/playlists/${trendingPlaylist.id}`}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {recommendedPlaylist.tracks.slice(0, 10).map((track, index) => (
+            {trendingPlaylist.tracks.slice(0, 10).map((track, index) => (
               <div
                 key={track.id}
                 className="flex items-center space-x-3 p-3 rounded-md hover:bg-accent/10 cursor-pointer transition-all duration-200 group relative"
@@ -488,147 +522,15 @@ export default function Home() {
         </div>
       </Section>
 
-      {/* Updated Playlists Section */}
-      <Section title="Updated Playlists">
+      {/* Popular Albums Section */}
+      <Section title="Everyone's Listening To..." viewAllLink="/browse/popular">
         <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
-          {updatedPlaylists.map((playlist) => (
-            <div
-              key={playlist.id}
-              className="cursor-pointer flex-shrink-0 w-40"
-              onClick={() => router.push(`/playlists/${playlist.id}`)}
-              onMouseEnter={() => setHoveredAlbum(`playlist-${playlist.id}`)}
-              onMouseLeave={() => setHoveredAlbum(null)}
-            >
-              <div className="flex flex-col space-y-2">
-                <div className="relative aspect-square overflow-hidden rounded-lg">
-                  <Image
-                    src={playlist.coverUrl || '/images/default-playlist.jpg'}
-                    alt={playlist.name}
-                    fill
-                    className="object-cover"
-                  />
-                  <div
-                    className={`absolute inset-0 transition-all duration-150 ${
-                      hoveredAlbum === `playlist-${playlist.id}`
-                        ? 'bg-black/30'
-                        : 'bg-black/0'
-                    }`}
-                  ></div>
-
-                  {hoveredAlbum === `playlist-${playlist.id}` && (
-                    <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
-                      <button
-                        className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
-                        onClick={(e) => handlePlayPlaylist(playlist, e)}
-                      >
-                        <Play size={18} />
-                      </button>
-
-                      <button
-                        className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreHorizontal size={18} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm font-medium line-clamp-1">
-                    {playlist.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground line-clamp-1">
-                    Soundwave
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* Trending Songs Section */}
-      {recommendedPlaylist && recommendedPlaylist.tracks && (
-        <Section title="Trending Songs">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {recommendedPlaylist.tracks.slice(0, 8).map((track, index) => (
-              <div
-                key={track.id}
-                className="flex items-center space-x-3 p-3 rounded-md hover:bg-accent/10 cursor-pointer transition-all duration-200 group relative"
-                onClick={(e) => handlePlayTrack(track, e)}
-                onMouseEnter={() => setHoveredTrack(`trending-${track.id}`)}
-                onMouseLeave={() => setHoveredTrack(null)}
-              >
-                <div className="text-sm text-muted-foreground w-6 text-center">
-                  {hoveredTrack === `trending-${track.id}` ? (
-                    <span className="opacity-0">{index + 1}</span>
-                  ) : (
-                    index + 1
-                  )}
-                </div>
-                <div className="relative w-12 h-12 flex-shrink-0">
-                  <Image
-                    src={track.coverUrl || '/images/default-track.jpg'}
-                    alt={track.title}
-                    fill
-                    className="rounded object-cover"
-                  />
-                  <div
-                    className={`absolute inset-0 rounded transition-all duration-150 ${
-                      hoveredTrack === `trending-${track.id}` ||
-                      isCurrentlyPlaying(track.id)
-                        ? 'bg-black/30'
-                        : 'bg-black/0'
-                    }`}
-                  ></div>
-
-                  {(hoveredTrack === `trending-${track.id}` ||
-                    isCurrentlyPlaying(track.id)) && (
-                    <div className="absolute inset-0 rounded flex items-center justify-center">
-                      <button
-                        className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
-                        onClick={(e) => handlePlayTrack(track, e)}
-                      >
-                        {isCurrentlyPlaying(track.id) ? (
-                          <Pause size={16} />
-                        ) : (
-                          <Play size={16} />
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="flex-grow min-w-0">
-                  <p className="text-sm font-medium line-clamp-1">
-                    {track.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground line-clamp-1">
-                    {track.artist.artistName}
-                  </p>
-                </div>
-                {hoveredTrack === `trending-${track.id}` && (
-                  <button
-                    className="text-white hover:text-primary"
-                    onClick={(e) => handleAddToQueue(track, e)}
-                  >
-                    <MoreHorizontal size={18} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* Everyone's Listening To... Section */}
-      <Section title="Everyone's Listening To...">
-        <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
-          {hotAlbums.slice(2, 10).map((album) => (
+          {hotAlbums.slice(0, 8).map((album) => (
             <div
               key={album.id}
               className="cursor-pointer flex-shrink-0 w-40"
               onClick={() => router.push(`/album/${album.id}`)}
-              onMouseEnter={() => setHoveredAlbum(`everyone-${album.id}`)}
+              onMouseEnter={() => setHoveredAlbum(`hot-${album.id}`)}
               onMouseLeave={() => setHoveredAlbum(null)}
             >
               <div className="flex flex-col space-y-2">
@@ -641,14 +543,14 @@ export default function Home() {
                   />
                   <div
                     className={`absolute inset-0 transition-all duration-150 ${
-                      hoveredAlbum === `everyone-${album.id}` ||
+                      hoveredAlbum === `hot-${album.id}` ||
                       isAlbumPlaying(album.id)
                         ? 'bg-black/30'
                         : 'bg-black/0'
                     }`}
                   ></div>
 
-                  {(hoveredAlbum === `everyone-${album.id}` ||
+                  {(hoveredAlbum === `hot-${album.id}` ||
                     isAlbumPlaying(album.id)) && (
                     <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
                       <button
@@ -684,6 +586,9 @@ export default function Home() {
           ))}
         </div>
       </Section>
+
+      {/* Authentication Dialog */}
+      <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }

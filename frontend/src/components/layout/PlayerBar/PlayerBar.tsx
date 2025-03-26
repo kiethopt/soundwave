@@ -1,10 +1,21 @@
-'use client'
+'use client';
 
 import { useState, useEffect } from 'react';
-import { Pause, Play, Shuffle, Loop, Volume, Prev, Next, Down, LikeOutline, LikeFilled } from '@/components/ui/Icons';
+import {
+  Pause,
+  Play,
+  Shuffle,
+  Loop,
+  Volume,
+  Prev,
+  Next,
+  Down,
+  LikeOutline,
+  LikeFilled,
+} from '@/components/ui/Icons';
 import { useTrack } from '@/contexts/TrackContext';
 import { ListMusic } from 'lucide-react';
-import { QueuePanel } from '@/components/player/QueuePanel';
+import { QueuePanel } from '@/components/user/player/QueuePanel';
 import { api } from '@/utils/api';
 
 export default function PlayerBar() {
@@ -42,16 +53,15 @@ export default function PlayerBar() {
     setShowMobileExpanded(!showMobileExpanded);
   };
 
-  const handleLike = async (e:any) => {
-  };
+  const handleLike = async (e: any) => {};
 
   useEffect(() => {
     const checkLikeStatus = async () => {
       if (!currentTrack) return;
-      
+
       const token = localStorage.getItem('userToken');
       if (!token) return;
-      
+
       try {
         // Using the API endpoint from your backend
         const data = await api.tracks.checkLiked(currentTrack.id, token);
@@ -60,7 +70,7 @@ export default function PlayerBar() {
         console.error('Failed to check like status:', error);
       }
     };
-    
+
     checkLikeStatus();
   }, [currentTrack?.id]); // Only re-run when the track ID changes
 
@@ -87,9 +97,9 @@ export default function PlayerBar() {
                     : currentTrack.artist.artistName}
                 </p>
               </div>
-              
+
               {/* Like Button */}
-              <button 
+              <button
                 onClick={handleLike}
                 className="p-2 rounded-full hover:bg-[#383838] transition-colors duration-200"
               >
@@ -127,7 +137,11 @@ export default function PlayerBar() {
 
             {/* Play/Pause Button */}
             <button
-              onClick={isPlaying ? pauseTrack : () => currentTrack && playTrack(currentTrack)}
+              onClick={
+                isPlaying
+                  ? pauseTrack
+                  : () => currentTrack && playTrack(currentTrack)
+              }
               className="p-2 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200"
             >
               {isPlaying ? (
@@ -158,14 +172,16 @@ export default function PlayerBar() {
 
           {/* Progress Bar */}
           <div className="flex w-full items-center justify-between max-w-2xl space-x-4">
-            <span className="text-white text-sm min-w-fit">{formatTime(progress / 100 * duration)}</span>
+            <span className="text-white text-sm min-w-fit">
+              {formatTime((progress / 100) * duration)}
+            </span>
             <div className="relative w-full flex items-center group">
               {/* Background bar */}
               <div className="absolute w-full h-1 bg-[#383838] rounded-lg" />
-              
+
               {/* Progress bar */}
-              <div 
-                className="absolute h-1 bg-white rounded-lg" 
+              <div
+                className="absolute h-1 bg-white rounded-lg"
                 style={{ width: `${progress ? progress : 0}%` }}
               />
 
@@ -198,15 +214,17 @@ export default function PlayerBar() {
                 max="100"
               />
             </div>
-            <span className="text-white text-sm min-w-fit">{formatTime(duration)}</span>
+            <span className="text-white text-sm min-w-fit">
+              {formatTime(duration)}
+            </span>
           </div>
         </div>
 
         {/* Volume Control & Queue */}
         <div className="flex items-center justify-end space-x-4 col-span-1">
           {/* Queue Button */}
-          <button 
-            onClick={() => setIsQueueOpen(prev => !prev)} 
+          <button
+            onClick={() => setIsQueueOpen((prev) => !prev)}
             className={`relative p-2 rounded-full hover:bg-[#383838] transition-colors duration-200 ${
               isQueueOpen ? 'text-[#A57865]' : 'text-white'
             }`}
@@ -218,7 +236,7 @@ export default function PlayerBar() {
               </span>
             )}
           </button>
-          
+
           {/* Volume Icon */}
           <Volume className="w-5 h-5 text-white" />
 
@@ -228,8 +246,8 @@ export default function PlayerBar() {
             <div className="absolute w-full h-1 bg-[#383838] rounded-lg" />
 
             {/* Filled Track */}
-            <div 
-              className="absolute h-1 bg-white rounded-lg" 
+            <div
+              className="absolute h-1 bg-white rounded-lg"
               style={{ width: `${volume * 100}%` }}
             />
 
@@ -267,7 +285,7 @@ export default function PlayerBar() {
       {/* Mobile Player Bar */}
       {currentTrack && (
         <>
-          <div 
+          <div
             onClick={toggleMobileExpanded}
             className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-black border-t border-[#383838] px-4 py-6 flex items-center w-full cursor-pointer"
           >
@@ -277,7 +295,7 @@ export default function PlayerBar() {
               alt={currentTrack.title}
               className="w-14 h-14 rounded shadow-md"
             />
-            
+
             {/* Track Info */}
             <div className="ml-3 flex-1 overflow-hidden">
               <h3 className="text-white text-base font-medium text-ellipsis overflow-hidden whitespace-nowrap">
@@ -289,14 +307,16 @@ export default function PlayerBar() {
                   : currentTrack.artist.artistName}
               </p>
             </div>
-            
+
             {/* Control Buttons */}
             <div className="flex items-center">
               {/* Play/Pause Button */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  isPlaying ? pauseTrack() : (currentTrack && playTrack(currentTrack));
+                  isPlaying
+                    ? pauseTrack()
+                    : currentTrack && playTrack(currentTrack);
                 }}
                 className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200 ml-2"
               >
@@ -308,13 +328,13 @@ export default function PlayerBar() {
               </button>
             </div>
           </div>
-          
+
           {/* Expanded Mobile Player */}
           {showMobileExpanded && (
             <div className="md:hidden fixed inset-0 z-50 bg-black bg-opacity-95 flex flex-col">
               {/* Header with close button */}
               <div className="flex items-center justify-between p-4">
-                <button 
+                <button
                   onClick={toggleMobileExpanded}
                   className="text-white p-2"
                 >
@@ -323,7 +343,7 @@ export default function PlayerBar() {
                 <h2 className="text-white text-lg font-medium">Now Playing</h2>
                 <div className="w-10"></div>
               </div>
-              
+
               {/* Track Info */}
               <div className="flex-grow flex flex-col items-start justify-center px-6">
                 <img
@@ -331,7 +351,7 @@ export default function PlayerBar() {
                   alt={currentTrack.title}
                   className="w-full rounded-md shadow-2xl mb-4"
                 />
-                
+
                 {/* Track Title */}
                 <h1 className="text-white text-lg font-bold text-center mb-2">
                   {currentTrack.title.toUpperCase()}
@@ -341,21 +361,21 @@ export default function PlayerBar() {
                     ? currentTrack.artist
                     : currentTrack.artist.artistName}
                 </p>
-                
+
                 {/* Progress Bar */}
                 <div className="w-full max-w-md mb-4">
                   <div className="flex w-full items-center justify-between space-x-4 mb-4">
                     <span className="text-white text-sm">
-                      {formatTime(progress / 100 * duration)}
+                      {formatTime((progress / 100) * duration)}
                     </span>
                     <span className="text-white text-sm">
                       {formatTime(duration)}
                     </span>
                   </div>
-                  
+
                   <div className="relative w-full h-1 bg-[#383838] rounded-lg items-center flex group">
-                    <div 
-                      className="absolute h-1 bg-white rounded-lg" 
+                    <div
+                      className="absolute h-1 bg-white rounded-lg"
                       style={{ width: `${progress ? progress : 0}%` }}
                     />
                     <input
@@ -383,7 +403,7 @@ export default function PlayerBar() {
                 </div>
 
                 {/* Controls */}
-                <div className="flex items-center my-6 w-full">                
+                <div className="flex items-center my-6 w-full">
                   {/* Main Controls */}
                   <div className="flex items-center justify-center space-x-4 w-full">
                     <button
@@ -401,9 +421,13 @@ export default function PlayerBar() {
                     >
                       <Prev className="w-8 h-8" />
                     </button>
-                    
+
                     <button
-                      onClick={isPlaying ? pauseTrack : () => currentTrack && playTrack(currentTrack)}
+                      onClick={
+                        isPlaying
+                          ? pauseTrack
+                          : () => currentTrack && playTrack(currentTrack)
+                      }
                       className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200"
                     >
                       {isPlaying ? (
@@ -412,7 +436,7 @@ export default function PlayerBar() {
                         <Play className="w-10 h-10 text-white" />
                       )}
                     </button>
-                    
+
                     <button
                       onClick={shuffle ? skipRandom : skipNext}
                       className="p-2 text-white"
@@ -431,8 +455,6 @@ export default function PlayerBar() {
                   </div>
                 </div>
               </div>
-              
-              
             </div>
           )}
         </>
@@ -440,9 +462,12 @@ export default function PlayerBar() {
 
       {/* Queue panel overlay */}
       {isQueueOpen && (
-        <div className="fixed inset-0 bg-black/50 z-30" onClick={() => setIsQueueOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/50 z-30"
+          onClick={() => setIsQueueOpen(false)}
+        />
       )}
-      
+
       {/* Queue panel */}
       <QueuePanel isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
     </>

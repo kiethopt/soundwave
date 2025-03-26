@@ -52,7 +52,7 @@ router.get('/search', auth_middleware_1.authenticate, cache_middleware_1.cacheMi
 router.post('/:albumId/play', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, album_controller_1.playAlbum);
 router.get('/newest', cache_middleware_1.cacheMiddleware, album_controller_1.getNewestAlbums);
 router.get('/hot', cache_middleware_1.cacheMiddleware, album_controller_1.getHotAlbums);
-router.get('/:id', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, album_controller_1.getAlbumById);
+router.get('/:id', cache_middleware_1.cacheMiddleware, album_controller_1.getAlbumById);
 router.get('/', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN, client_1.Role.ARTIST]), album_controller_1.getAllAlbums);
 exports.default = router;
 //# sourceMappingURL=album.routes.js.map

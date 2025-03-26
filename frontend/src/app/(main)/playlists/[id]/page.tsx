@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { TrackList } from '@/components/track/TrackList';
-import { EditPlaylistDialog } from '@/components/playlist/EditPlaylistDialog';
+import { TrackList } from '@/components/user/track/TrackList';
+import { EditPlaylistDialog } from '@/components/user/playlist/EditPlaylistDialog';
 import { api } from '@/utils/api';
 import { Playlist } from '@/types';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
+import { MusicAuthDialog } from '@/components/ui/music-auth-dialog';
 
 interface UpdatePlaylistData {
   name: string;
@@ -18,8 +19,8 @@ interface UpdatePlaylistData {
 
 export default function PlaylistPage() {
   const { id } = useParams();
-  const router = useRouter();
-  const { token, loading: authLoading } = useAuth();
+  const { isAuthenticated, dialogOpen, setDialogOpen, handleProtectedAction } =
+    useAuth();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,64 +29,72 @@ export default function PlaylistPage() {
   useEffect(() => {
     const fetchPlaylist = async () => {
       try {
-        if (!token) {
-          router.push('/login');
-          return;
-        }
+        setLoading(true);
+
+        // Get token if available
+        const token = localStorage.getItem('userToken');
 
         console.log('Fetching playlist with ID:', id);
-        const response = await api.playlists.getById(id as string);
+        const response = await api.playlists.getById(
+          id as string,
+          token ?? undefined
+        );
         console.log('Playlist response:', response);
 
         if (response.success) {
           setPlaylist(response.data);
         } else {
-          setError(response.message || 'Không thể tải playlist');
+          setError(response.message || 'Could not load playlist');
         }
       } catch (error: any) {
         console.error('Error fetching playlist:', error);
-        setError(error.message || 'Không thể tải playlist');
+        setError(error.message || 'Could not load playlist');
       } finally {
         setLoading(false);
       }
     };
 
-    if (id && !authLoading) {
+    if (id) {
       fetchPlaylist();
     }
-  }, [id, token, authLoading, router]);
+  }, [id]);
 
   const handleRemoveTrack = async (trackId: string) => {
-    try {
-      if (!token || !playlist) return;
+    handleProtectedAction(async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token || !playlist) return;
 
-      await api.playlists.removeTrack(id as string, trackId);
-      setPlaylist({
-        ...playlist,
-        tracks: playlist.tracks.filter((t) => t.id !== trackId),
-        totalTracks: playlist.totalTracks - 1,
-      });
-    } catch (error) {
-      console.error('Error removing track:', error);
-    }
+        await api.playlists.removeTrack(id as string, trackId, token);
+        setPlaylist({
+          ...playlist,
+          tracks: playlist.tracks.filter((t) => t.id !== trackId),
+          totalTracks: playlist.totalTracks - 1,
+        });
+      } catch (error) {
+        console.error('Error removing track:', error);
+      }
+    });
   };
 
   const handleUpdatePlaylist = async (data: UpdatePlaylistData) => {
-    try {
-      if (!token || !playlist) return;
+    handleProtectedAction(async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token || !playlist) return;
 
-      await api.playlists.update(id as string, data, token);
-      setPlaylist({ ...playlist, ...data });
-      setIsEditOpen(false);
-    } catch (error) {
-      console.error('Error updating playlist:', error);
-    }
+        await api.playlists.update(id as string, data, token);
+        setPlaylist({ ...playlist, ...data });
+        setIsEditOpen(false);
+      } catch (error) {
+        console.error('Error updating playlist:', error);
+      }
+    });
   };
 
-  if (authLoading || loading) return <div>Đang tải...</div>;
-  if (!token) return <div>Vui lòng đăng nhập để xem playlist</div>;
+  if (loading) return <div>Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
-  if (!playlist) return <div>Không tìm thấy playlist</div>;
+  if (!playlist) return <div>Playlist not found</div>;
 
   return (
     <div className="flex flex-col">
@@ -124,12 +133,14 @@ export default function PlaylistPage() {
             <p className="text-sm text-white/70">{playlist.description}</p>
           )}
           <div className="flex items-center gap-1 text-sm text-white/70">
-            <span>{playlist.tracks.length} bài hát</span>
+            <span>{playlist.tracks.length} songs</span>
           </div>
           <div className="mt-4">
             {playlist.canEdit && (
-              <Button onClick={() => setIsEditOpen(true)}>
-                Chỉnh sửa playlist
+              <Button
+                onClick={() => handleProtectedAction(() => setIsEditOpen(true))}
+              >
+                Edit playlist
               </Button>
             )}
           </div>
@@ -141,10 +152,10 @@ export default function PlaylistPage() {
         <div className="mb-4 border-b border-white/10">
           <div className="grid grid-cols-[16px_4fr_3fr_2fr_minmax(120px,1fr)] gap-4 px-4 py-2 text-sm text-white/70">
             <div className="text-center">#</div>
-            <div>Tiêu đề</div>
+            <div>Title</div>
             <div>Album</div>
-            <div>Ngày thêm</div>
-            <div className="text-right">Thời lượng</div>
+            <div>Date added</div>
+            <div className="text-right">Duration</div>
           </div>
         </div>
 
@@ -152,8 +163,9 @@ export default function PlaylistPage() {
           tracks={playlist.tracks}
           showAlbum
           showDateAdded
-          allowRemove={playlist.canEdit}
+          allowRemove={playlist.canEdit && isAuthenticated}
           onRemove={handleRemoveTrack}
+          requiresAuth={!isAuthenticated}
         />
       </div>
 
@@ -162,6 +174,8 @@ export default function PlaylistPage() {
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
       />
+
+      <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }

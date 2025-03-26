@@ -9,7 +9,7 @@ import { Star, Search, MoreVertical } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ArrowLeft, Trash2 } from '@/components/ui/Icons';
 import Link from 'next/link';
-import { EditArtistModal } from '@/components/data-table/data-table-modals';
+import { EditArtistModal } from '@/components/ui/data-table/data-table-modals';
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -613,7 +613,8 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/tracks/search?${queryParams || `q=${query}&page=${page}&limit=${limit}`
+        `/api/tracks/search?${
+          queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
         { method: 'GET' },
         token
@@ -626,9 +627,13 @@ export const api = {
       fetchWithAuth(`/api/tracks/${trackId}/like`, { method: 'DELETE' }, token),
 
     checkLiked: async (trackId: string, token: string) =>
-      fetchWithAuth(`/api/tracks/${trackId}/liked`, {
-        method: 'GET'
-      }, token),
+      fetchWithAuth(
+        `/api/tracks/${trackId}/liked`,
+        {
+          method: 'GET',
+        },
+        token
+      ),
   },
 
   history: {
@@ -678,8 +683,18 @@ export const api = {
         token
       ),
 
-    getById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/albums/${id}`, { method: 'GET' }, token),
+    getById: async (id: string, token?: string) => {
+      try {
+        return await fetchWithAuth(
+          `/api/albums/${id}`,
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error('API Error:', error);
+        throw error;
+      }
+    },
 
     create: async (data: FormData, token: string) =>
       fetchWithAuth('/api/albums', { method: 'POST', body: data }, token),
@@ -717,7 +732,8 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/albums/search?${queryParams || `q=${query}&page=${page}&limit=${limit}`
+        `/api/albums/search?${
+          queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
         { method: 'GET' },
         token
@@ -759,11 +775,19 @@ export const api = {
 
     // Lấy số lượng thông báo chưa đọc
     getUnreadCount: async (token: string) =>
-      fetchWithAuth('/api/notifications/unread-count', { method: 'GET' }, token),
+      fetchWithAuth(
+        '/api/notifications/unread-count',
+        { method: 'GET' },
+        token
+      ),
 
     // Đánh dấu 1 thông báo đã đọc
     markAsRead: async (notificationId: string, token: string) =>
-      fetchWithAuth(`/api/notifications/${notificationId}/read`, { method: 'PATCH' }, token),
+      fetchWithAuth(
+        `/api/notifications/${notificationId}/read`,
+        { method: 'PATCH' },
+        token
+      ),
 
     // Đánh dấu tất cả thông báo đã đọc
     markAllAsRead: async (token: string) =>
@@ -771,11 +795,19 @@ export const api = {
 
     // Xóa tất cả thông báo
     deleteAll: async (token: string) =>
-      fetchWithAuth('/api/notifications/delete-all', { method: 'DELETE' }, token),
+      fetchWithAuth(
+        '/api/notifications/delete-all',
+        { method: 'DELETE' },
+        token
+      ),
 
     // Xóa các thông báo đã đọc
     deleteRead: async (token: string) =>
-      fetchWithAuth('/api/notifications/delete-read', { method: 'DELETE' }, token), // Thêm dòng này
+      fetchWithAuth(
+        '/api/notifications/delete-read',
+        { method: 'DELETE' },
+        token
+      ), // Thêm dòng này
   },
 
   playlists: {
@@ -792,22 +824,13 @@ export const api = {
     getAll: async (token: string) =>
       fetchWithAuth('/api/playlists', { method: 'GET' }, token),
 
-    getById: async (playlistId: string) => {
+    getById: async (id: string, token?: string) => {
       try {
-        const token = localStorage.getItem('userToken');
-        if (!token) {
-          throw new Error('Vui lòng đăng nhập lại');
-        }
-
-        console.log('API call to get playlist by ID:', playlistId);
-        const response = await fetchWithAuth(
-          `/api/playlists/${playlistId}`,
+        return await fetchWithAuth(
+          `/api/playlists/${id}`,
           { method: 'GET' },
           token
         );
-
-        console.log('API response for playlist:', response);
-        return response;
       } catch (error) {
         console.error('API Error:', error);
         throw error;
@@ -831,56 +854,34 @@ export const api = {
       return response.json();
     },
 
-    removeTrack: async (playlistId: string, trackId: string) => {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('Unauthorized');
-
-      console.log('Removing track:', { playlistId, trackId }); // Debug log
-
-      const response = await fetch(
-        `${API_BASE}/api/playlists/${playlistId}/tracks/${trackId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Không thể xóa bài hát khỏi playlist');
+    removeTrack: async (playlistId: string, trackId: string, token: string) => {
+      try {
+        return await fetchWithAuth(
+          `/api/playlists/${playlistId}/tracks/${trackId}`,
+          { method: 'DELETE' },
+          token
+        );
+      } catch (error) {
+        console.error('API Error:', error);
+        throw error;
       }
-
-      return response.json();
     },
 
     addTrack: async (playlistId: string, trackId: string, token: string) => {
-      console.log('Request:', {
-        url: `${API_BASE}/api/playlists/${playlistId}/tracks`,
-        playlistId,
-        trackId,
-      });
-
-      const response = await fetch(
-        `${API_BASE}/api/playlists/${playlistId}/tracks`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+      try {
+        console.log(`API: Adding track ${trackId} to playlist ${playlistId}`);
+        return await fetchWithAuth(
+          `/api/playlists/${playlistId}/tracks`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ trackId }),
           },
-          body: JSON.stringify({ trackId }),
-        }
-      );
-
-      if (!response.ok) {
-        const text = await response.text();
-        console.error('Error response:', text);
-        throw new Error('Không thể thêm bài hát vào playlist');
+          token
+        );
+      } catch (error) {
+        console.error('API Error:', error);
+        throw error;
       }
-
-      return response.json();
     },
 
     createPersonalized: async (token: string, data: any) => {
@@ -903,17 +904,27 @@ export const api = {
       return response.json();
     },
 
-    getSystemPlaylists: async (token: string) => {
+    getSystemPlaylists: async (token?: string) => {
       try {
-        if (!token) {
-          throw new Error('User token not found');
+        // If we have a token and user is authenticated, make an authenticated request
+        if (token) {
+          // For authenticated users - use a dedicated endpoint with authentication
+          return await fetchWithAuth(
+            '/api/playlists',
+            {
+              method: 'GET',
+              headers: {
+                'X-Filter-Type': 'system',
+              },
+            },
+            token
+          );
+        } else {
+          // For unauthenticated users - use the public endpoint
+          return await fetchWithAuth('/api/playlists/system-all', {
+            method: 'GET',
+          });
         }
-
-        return await fetchWithAuth(
-          '/api/playlists/system-all',
-          { method: 'GET' },
-          token
-        );
       } catch (error) {
         console.error('API Error:', error);
         throw error;

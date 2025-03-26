@@ -1,4 +1,4 @@
-import { Spinner } from '../ui/Icons';
+import { Spinner } from '@/components/ui/Icons';
 
 interface DataTableLoadingProps {
   theme?: 'light' | 'dark';

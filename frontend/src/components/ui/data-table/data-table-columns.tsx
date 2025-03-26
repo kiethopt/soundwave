@@ -32,8 +32,8 @@ import Link from 'next/link';
 import React, { Fragment, useEffect, useState } from 'react';
 import { api } from '@/utils/api';
 import { ArtistInfoModal } from './data-table-modals';
-import { AddSimple, Edit, UserIcon } from '../ui/Icons';
-import { Button } from '../ui/button';
+import { AddSimple, Edit, UserIcon } from '@/components/ui/Icons';
+import { Button } from '@/components/ui/button';
 
 interface GetTrackColumnsOptions {
   theme?: 'light' | 'dark';

@@ -731,16 +731,13 @@ export const getAlbumById = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const user = req.user;
-
-    if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
-    }
+    const user = req.user; // Will be undefined for unauthenticated users
+    const isAuthenticated = !!user;
 
     const album = await prisma.album.findUnique({
       where: {
         id,
+        isActive: true, // Only show active albums
       },
       select: albumSelect,
     });
@@ -750,7 +747,13 @@ export const getAlbumById = async (
       return;
     }
 
-    res.json(album);
+    // For unauthenticated users, add a flag indicating auth is required for playback
+    const response = {
+      ...album,
+      requiresAuth: !isAuthenticated,
+    };
+
+    res.json(response);
   } catch (error) {
     console.error('Get album error:', error);
     res.status(500).json({ message: 'Internal server error' });

@@ -14,13 +14,13 @@ import {
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table';
-import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
-import { getUserColumns } from '@/components/data-table/data-table-columns';
+import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
+import { getUserColumns } from '@/components/ui/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
 import {
   EditUserModal,
   UserInfoModal,
-} from '@/components/data-table/data-table-modals';
+} from '@/components/ui/data-table/data-table-modals';
 
 export default function UserManagement() {
   const { theme } = useTheme();

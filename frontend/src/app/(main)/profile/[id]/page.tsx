@@ -8,7 +8,14 @@ import { Album, ArtistProfile, Track, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-toastify';
 import { useDominantColor } from '@/hooks/useDominantColor';
-import { Verified, Play, Pause, AddSimple, Edit, Music } from '@/components/ui/Icons';
+import {
+  Verified,
+  Play,
+  Pause,
+  AddSimple,
+  Edit,
+  Music,
+} from '@/components/ui/Icons';
 import { ArrowLeft, Heart, MoreHorizontal, Share2 } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
 import {
@@ -18,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import HorizontalTrackListItem from '@/components/track/HorizontalTrackListItem';
+import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
 
 const DEFAULT_AVATAR = '/images/default-avatar.jpg';
 
@@ -30,17 +37,21 @@ export default function UserProfilePage({
   const router = useRouter();
   const { theme } = useTheme();
   const { id } = use(params);
-  const [ follow, setFollow ] = useState(false);
-  const [ isOwner, setIsOwner ] = useState(false);
+  const [follow, setFollow] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-  const { dominantColor } = useDominantColor(userData?.avatar || DEFAULT_AVATAR);
-  const [ following, setFollowing ] = useState<ArtistProfile[]>([]);
-  const [ followingArtists, setFollowingArtists ] = useState<ArtistProfile[]>([]);
-  const [ user, setUser ] = useState<User | null>(null);
-  const [ topArtists, setTopArtists ] = useState<ArtistProfile[]>([]);
-  const [ topTracks, setTopTracks ] = useState<Track[]>([]);
-  const [artistTracksMap, setArtistTracksMap] = useState<Record<string, Track[]>>({});
+  const { dominantColor } = useDominantColor(
+    userData?.avatar || DEFAULT_AVATAR
+  );
+  const [following, setFollowing] = useState<ArtistProfile[]>([]);
+  const [followingArtists, setFollowingArtists] = useState<ArtistProfile[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [topArtists, setTopArtists] = useState<ArtistProfile[]>([]);
+  const [topTracks, setTopTracks] = useState<Track[]>([]);
+  const [artistTracksMap, setArtistTracksMap] = useState<
+    Record<string, Track[]>
+  >({});
   const [showAllTracks, setShowAllTracks] = useState(false);
 
   const {
@@ -88,10 +99,14 @@ export default function UserProfilePage({
 
         if (isOwner) {
           setFollowing(followingResponse);
-          const followingArtists = followingResponse.filter((followingUser:any) => followingUser.type === 'ARTIST');
+          const followingArtists = followingResponse.filter(
+            (followingUser: any) => followingUser.type === 'ARTIST'
+          );
           setFollowingArtists(followingArtists);
         } else {
-          const isFollowing = followingResponse.some((user: User) => user.id === id);
+          const isFollowing = followingResponse.some(
+            (user: User) => user.id === id
+          );
           setFollow(isFollowing);
         }
       } catch (error) {
@@ -101,7 +116,10 @@ export default function UserProfilePage({
 
     const fetchTopArtists = async () => {
       try {
-        const topArtistsResponse = await api.user.getUserTopArtists(userData.id, storedToken);
+        const topArtistsResponse = await api.user.getUserTopArtists(
+          userData.id,
+          storedToken
+        );
         setTopArtists(topArtistsResponse);
       } catch (error) {
         console.error('Failed to fetch top artists:', error);
@@ -110,7 +128,10 @@ export default function UserProfilePage({
 
     const fetchTopTracks = async () => {
       try {
-        const topTracksResponse = await api.user.getUserTopTracks(userData.id, storedToken);
+        const topTracksResponse = await api.user.getUserTopTracks(
+          userData.id,
+          storedToken
+        );
         setTopTracks(topTracksResponse);
       } catch (error) {
         console.error('Failed to fetch top tracks:', error);
@@ -157,25 +178,29 @@ export default function UserProfilePage({
     }
   };
 
-  const handleArtistPlay = async (artist: ArtistProfile, queueTypeValue: 'topArtist' | 'followingArtist', e: React.MouseEvent) => {
+  const handleArtistPlay = async (
+    artist: ArtistProfile,
+    queueTypeValue: 'topArtist' | 'followingArtist',
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
     try {
       let artistTracks = artistTracksMap[artist.id] || [];
-      
+
       if (!artistTracks.length) {
         artistTracks = await getArtistTracks(artist.id);
-        
-        setArtistTracksMap(prev => ({
+
+        setArtistTracksMap((prev) => ({
           ...prev,
-          [artist.id]: artistTracks
+          [artist.id]: artistTracks,
         }));
       }
-      
+
       if (artistTracks.length > 0) {
-        const isCurrentArtistPlaying = 
-          isPlaying && 
-          currentTrack && 
-          artistTracks.some(track => track.id === currentTrack.id) &&
+        const isCurrentArtistPlaying =
+          isPlaying &&
+          currentTrack &&
+          artistTracks.some((track) => track.id === currentTrack.id) &&
           queueType === queueTypeValue;
 
         if (isCurrentArtistPlaying) {
@@ -186,11 +211,11 @@ export default function UserProfilePage({
           trackQueue(artistTracks);
         }
       } else {
-        toast.error("No tracks available for this artist");
+        toast.error('No tracks available for this artist');
       }
     } catch (error) {
       console.error(error);
-      toast.error("Failed to load artist tracks");
+      toast.error('Failed to load artist tracks');
     }
   };
 
@@ -200,19 +225,24 @@ export default function UserProfilePage({
         throw new Error('Token is null');
       }
       const data = await api.artists.getTrackByArtistId(artistId, token);
-      return data.tracks.sort((a:any, b:any) => b.playCount - a.playCount);
+      return data.tracks.sort((a: any, b: any) => b.playCount - a.playCount);
     } catch (error) {
       console.error(error);
       return [];
     }
   };
 
-  const isArtistPlaying = (artistId: string, queueTypeValue: 'topArtist' | 'followingArtist') => {
+  const isArtistPlaying = (
+    artistId: string,
+    queueTypeValue: 'topArtist' | 'followingArtist'
+  ) => {
     const artistTracks = artistTracksMap[artistId] || [];
-    return currentTrack && 
-           artistTracks.some(track => track.id === currentTrack.id) && 
-           isPlaying && 
-           queueType === queueTypeValue;
+    return (
+      currentTrack &&
+      artistTracks.some((track) => track.id === currentTrack.id) &&
+      isPlaying &&
+      queueType === queueTypeValue
+    );
   };
 
   return (
@@ -255,22 +285,25 @@ export default function UserProfilePage({
             <div className="flex flex-row items-center justify-start w-full">
               {/* Avatar */}
               <img
-                  src={user.avatar || DEFAULT_AVATAR}
-                  alt={user.name}
-                  className="w-32 h-32 md:w-48 md:h-48 rounded-full"
-                />
-              
+                src={user.avatar || DEFAULT_AVATAR}
+                alt={user.name}
+                className="w-32 h-32 md:w-48 md:h-48 rounded-full"
+              />
+
               {/* Username */}
               <div className="flex flex-col items-start justify-center flex-1 ml-4 llg:ml-8 gap-4">
-                <span className='text-sm font-semibold '>Profile</span>
-                <h1 className='text-4xl md:text-6xl font-bold capitalize' style={{ lineHeight: '1.1' }}>
+                <span className="text-sm font-semibold ">Profile</span>
+                <h1
+                  className="text-4xl md:text-6xl font-bold capitalize"
+                  style={{ lineHeight: '1.1' }}
+                >
                   {user.name}
                 </h1>
-                { isOwner && (
+                {isOwner && (
                   <div>
                     <span>• </span>
-                    <span 
-                      className='text-sm font-semibold hover:underline cursor-pointer'
+                    <span
+                      className="text-sm font-semibold hover:underline cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
                       }}
@@ -282,7 +315,7 @@ export default function UserProfilePage({
               </div>
             </div>
           </div>
-  
+
           {/* Artist Controls */}
           <div className="px-4 md:px-6 py-6">
             <div className="flex items-center gap-5">
@@ -301,7 +334,7 @@ export default function UserProfilePage({
               {/* Option */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button 
+                  <button
                     className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -310,8 +343,8 @@ export default function UserProfilePage({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-full px-2">
                   {isOwner && (
-                    <DropdownMenuItem 
-                      className='cursor-pointer'
+                    <DropdownMenuItem
+                      className="cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
                         router.push(`/edit-profile`);
@@ -322,15 +355,15 @@ export default function UserProfilePage({
                     </DropdownMenuItem>
                   )}
                   {!isOwner && (
-                    <DropdownMenuItem 
-                      className='cursor-pointer'
+                    <DropdownMenuItem
+                      className="cursor-pointer"
                       onClick={(e) => e.stopPropagation()}
                     >
                       Follow User
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem 
-                    className='cursor-pointer'
+                  <DropdownMenuItem
+                    className="cursor-pointer"
                     onClick={(e) => e.stopPropagation()}
                   >
                     Copy Profile Link
@@ -349,7 +382,9 @@ export default function UserProfilePage({
                   <div
                     key={topArtist.id}
                     className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
-                    onClick={() => router.push(`/artist/profile/${topArtist.id}`)}
+                    onClick={() =>
+                      router.push(`/artist/profile/${topArtist.id}`)
+                    }
                   >
                     <div className="relative">
                       <img
@@ -371,45 +406,53 @@ export default function UserProfilePage({
                         )}
                       </button>
                     </div>
-                    <h3 className={`font-medium truncate ${
-                      artistTracksMap[topArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'topArtist'
-                        ? 'text-[#A57865]'
-                        : 'text-white'
+                    <h3
+                      className={`font-medium truncate ${
+                        artistTracksMap[topArtist.id]?.some(
+                          (track) => track.id === currentTrack?.id
+                        ) && queueType === 'topArtist'
+                          ? 'text-[#A57865]'
+                          : 'text-white'
                       }`}
                     >
                       {topArtist.artistName}
                     </h3>
                     <p className="text-white/60 text-sm truncate">
-                      {new Intl.NumberFormat('en-US').format(topArtist.monthlyListeners)} monthly listeners
+                      {new Intl.NumberFormat('en-US').format(
+                        topArtist.monthlyListeners
+                      )}{' '}
+                      monthly listeners
                     </p>
                   </div>
                 ))}
-              </div>   
+              </div>
             </div>
           )}
 
           {/* Top Tracks Section */}
-          { topTracks.length > 0 && (
+          {topTracks.length > 0 && (
             <div className="px-4 md:px-6 py-6">
               <h2 className="text-2xl font-bold">Top tracks this month</h2>
               <div className="grid grid-cols-1 gap-4 mt-4">
-                {(showAllTracks ? topTracks : topTracks.slice(0, 5)).map((track, index) => (
-                  <HorizontalTrackListItem
-                    key={track.id}
-                    track={track}
-                    index={index}
-                    currentTrack={currentTrack}
-                    isPlaying={isPlaying}
-                    playCount={false}
-                    albumTitle={true}
-                    queueType={queueType}
-                    theme={theme}
-                    onTrackClick={() => {
-                      handleTopTrackPlay(track);
-                    }}
-                  />
-                ))}
-              </div> 
+                {(showAllTracks ? topTracks : topTracks.slice(0, 5)).map(
+                  (track, index) => (
+                    <HorizontalTrackListItem
+                      key={track.id}
+                      track={track}
+                      index={index}
+                      currentTrack={currentTrack}
+                      isPlaying={isPlaying}
+                      playCount={false}
+                      albumTitle={true}
+                      queueType={queueType}
+                      theme={theme}
+                      onTrackClick={() => {
+                        handleTopTrackPlay(track);
+                      }}
+                    />
+                  )
+                )}
+              </div>
 
               {/* "See More" Button */}
               {topTracks.length > 5 && (
@@ -421,7 +464,7 @@ export default function UserProfilePage({
                     {showAllTracks ? 'See Less' : 'See More'}
                   </button>
                 </div>
-              )} 
+              )}
             </div>
           )}
 
@@ -434,18 +477,22 @@ export default function UserProfilePage({
                   <div
                     key={followArtist.id}
                     className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
-                    onClick={() => router.push(`/artist/profile/${followArtist.id}`)}
+                    onClick={() =>
+                      router.push(`/artist/profile/${followArtist.id}`)
+                    }
                   >
                     <div className="relative">
                       <img
-                        src={followArtist.avatar || '/images/default-avatar.jpg'}
+                        src={
+                          followArtist.avatar || '/images/default-avatar.jpg'
+                        }
                         alt={followArtist.artistName}
                         className="w-full aspect-square object-cover rounded-full mb-4"
                       />
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
-                          handleArtistPlay(followArtist, 'followingArtist', e)
+                          handleArtistPlay(followArtist, 'followingArtist', e);
                         }}
                         className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                       >
@@ -456,20 +503,26 @@ export default function UserProfilePage({
                         )}
                       </button>
                     </div>
-                    <h3 className={`font-medium truncate ${
-                      artistTracksMap[followArtist.id]?.some(track => track.id === currentTrack?.id) && queueType === 'followingArtist'
-                        ? 'text-[#A57865]'
-                        : 'text-white'
+                    <h3
+                      className={`font-medium truncate ${
+                        artistTracksMap[followArtist.id]?.some(
+                          (track) => track.id === currentTrack?.id
+                        ) && queueType === 'followingArtist'
+                          ? 'text-[#A57865]'
+                          : 'text-white'
                       }`}
                     >
                       {followArtist.artistName}
                     </h3>
                     <p className="text-white/60 text-sm truncate">
-                      {new Intl.NumberFormat('en-US').format(followArtist.monthlyListeners)} monthly listeners
+                      {new Intl.NumberFormat('en-US').format(
+                        followArtist.monthlyListeners
+                      )}{' '}
+                      monthly listeners
                     </p>
                   </div>
                 ))}
-              </div>   
+              </div>
             </div>
           )}
         </div>
