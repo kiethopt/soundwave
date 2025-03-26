@@ -305,6 +305,35 @@ export const getPlaylists: RequestHandler = async (
       });
     }
 
+    // Kiểm tra xem có playlist gợi ý chưa
+    let recommendPlaylist = await prisma.playlist.findFirst({
+      where: {
+        userId,
+        type: 'NORMAL',
+      },
+    });
+
+    // Nếu chưa có và có lịch sử nghe nhạc, tạo mới playlist gợi ý
+    if (!recommendPlaylist) {
+      const hasHistory = await prisma.history.findFirst({
+        where: {
+          userId,
+        },
+      });
+
+      if (hasHistory) {
+        recommendPlaylist = await prisma.playlist.create({
+          data: {
+            name: 'RECOMMENDED PLAYLIST',
+            description: 'Danh sách bài hát được gợi ý dựa trên lịch sử nghe nhạc của bạn',
+            privacy: 'PRIVATE',
+            type: 'NORMAL',
+            userId,
+          },
+        });
+      }
+    }
+
     // Lấy tất cả playlist của user
     const playlists = await prisma.playlist.findMany({
       where: {
@@ -358,17 +387,18 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       return;
     }
 
-    // Check if this is a system playlist (based on type)
-    // System playlists should be accessible to all users for viewing
+    // If the playlist is the Recommended Playlist, update it automatically
+    if (playlistExists.type === 'NORMAL' && playlistExists.name === 'RECOMMENDED PLAYLIST') {
+      await playlistService.updateRecommendedPlaylistTracks(userId!);
+    }
+
+    // Check if this is a system playlist or a user-owned playlist
     const isSystemPlaylist = playlistExists.type === 'SYSTEM';
 
     let playlist;
 
-    if (
-      isSystemPlaylist ||
-      playlistExists.name === 'Soundwave Hits: Trending Right Now'
-    ) {
-      // For system playlists, don't filter by userId - allow viewing by anyone
+    if (isSystemPlaylist || playlistExists.name === 'Soundwave Hits: Trending Right Now') {
+      // For system playlists, allow viewing by anyone
       playlist = await prisma.playlist.findUnique({
         where: { id },
         include: {
@@ -421,7 +451,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
     }
 
     // Add a field to indicate if the user can edit this playlist
-    // Only ADMIN can edit SYSTEM playlists
+// Only ADMIN can edit SYSTEM playlists
     const canEdit =
       isSystemPlaylist || playlist.type === 'SYSTEM'
         ? userRole === 'ADMIN'
@@ -901,6 +931,85 @@ export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
     });
   } catch (error) {
     console.error('Error in getSystemPlaylists:', error);
+    next(error);
+  }
+};
+
+export const createRecommendPlaylist = async (userId: string): Promise<void> => {
+  try {
+    // Check if the user has a listening history
+    const hasHistory = await prisma.history.findFirst({
+      where: {
+        userId,
+      },
+    });
+
+    if (!hasHistory) {
+      throw new Error('User has no listening history to generate recommendations');
+    }
+
+    // Create the recommended playlist
+    await prisma.playlist.create({
+      data: {
+        name: 'RECOMMENDED PLAYLIST',
+        description: 'Danh sách bài hát được gợi ý dựa trên lịch sử nghe nhạc của bạn',
+        privacy: 'PRIVATE',
+        type: 'NORMAL',
+        userId,
+      },
+    });
+  } catch (error) {
+    console.error('Error creating recommended playlist:', error);
+    throw error;
+  }
+};
+
+export const updateRecommendPlaylist: RequestHandler = async (
+  req,
+  res,
+  next
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+      return;
+    }
+
+    // Automatically update the recommended playlist
+    const recommendedPlaylist = await prisma.playlist.findFirst({
+      where: {
+        userId,
+        type: 'NORMAL',
+      },
+    });
+
+    if (!recommendedPlaylist) {
+      // Create the recommended playlist if it doesn't exist
+      await prisma.playlist.create({
+        data: {
+          name: 'RECOMMENDED PLAYLIST',
+          description: 'Danh sách bài hát được gợi ý dựa trên lịch sử nghe nhạc của bạn',
+          privacy: 'PRIVATE',
+          type: 'NORMAL',
+          userId,
+        },
+      });
+    }
+
+    // Call the service to update the recommended playlist tracks
+    await playlistService.updateRecommendedPlaylistTracks(userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Recommended playlist updated successfully',
+    });
+  } catch (error) {
+    console.error('Error in updateRecommendPlaylist:', error);
     next(error);
   }
 };

@@ -2217,3 +2217,171 @@ export const generateGlobalRecommendedPlaylist = async (
     throw new Error('Failed to generate global recommended playlist');
   }
 };
+
+/**
+ * Cập nhật nội dung cho RECOMMENDED PLAYLIST dựa trên lịch sử nghe nhạc & Collaborative Filtering
+ * @param userId ID của người dùng
+ */
+export const updateRecommendedPlaylistTracks = async (userId: string): Promise<void> => {
+  try {
+    // Đảm bảo danh sách phát RECOMMENDED PLAYLIST tồn tại
+    let recommendedPlaylist = await prisma.playlist.findFirst({
+      where: {
+        userId,
+        type: 'NORMAL',
+      },
+    });
+
+    if (!recommendedPlaylist) {
+      console.log(`[PlaylistService] No RECOMMENDED PLAYLIST found for user ${userId}, creating one...`);
+      recommendedPlaylist = await prisma.playlist.create({
+        data: {
+          name: 'RECOMMENDED PLAYLIST',
+          description: 'Danh sách bài hát được gợi ý dựa trên lịch sử nghe nhạc của bạn',
+          privacy: 'PRIVATE',
+          type: 'NORMAL',
+          userId,
+        },
+      });
+    }
+
+    // Lấy lịch sử nghe nhạc của người dùng (chỉ bài có playCount > 2)
+    const userHistory = await prisma.history.findMany({
+      where: {
+        userId,
+        type: 'PLAY',
+        playCount: { gt: 2 },
+      },
+      include: {
+        track: {
+          include: {
+            artist: true,
+            genres: { include: { genre: true } },
+          },
+        },
+      },
+    });
+
+    if (userHistory.length === 0) {
+      console.log(`[PlaylistService] No tracks with playCount > 2 found for user ${userId}`);
+      return;
+    }
+
+    console.log(`[PlaylistService] Found ${userHistory.length} history entries for user ${userId}`);
+
+    // Xác định thể loại & nghệ sĩ yêu thích
+    const genreCounts = new Map<string, number>();
+    const artistCounts = new Map<string, number>();
+
+    userHistory.forEach((history) => {
+      const track = history.track;
+      if (track) {
+        track.genres.forEach((genreRel) => {
+          const genreId = genreRel.genre.id;
+          genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
+        });
+
+        const artistId = track.artist?.id;
+        if (artistId) {
+          artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
+        }
+      }
+    });
+
+    const topGenres = [...genreCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map((entry) => entry[0]);
+
+    const topArtists = [...artistCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map((entry) => entry[0]);
+
+    console.log(`[PlaylistService] Top genres: ${topGenres}`);
+    console.log(`[PlaylistService] Top artists: ${topArtists}`);
+
+    // Tìm bài hát theo Content-Based Filtering
+    const recommendedTracks = await prisma.track.findMany({
+      where: {
+        OR: [
+          { genres: { some: { genreId: { in: topGenres } } } },
+          { artistId: { in: topArtists } },
+        ],
+        isActive: true,
+      },
+      include: { artist: true, album: true },
+      orderBy: { playCount: 'desc' },
+      take: 5,
+    });
+
+    console.log(`[PlaylistService] Found ${recommendedTracks.length} content-based tracks`);
+
+    // Tìm người dùng có sở thích giống nhau (Collaborative Filtering - User-Based CF)
+    const similarUsers = await prisma.history.findMany({
+      where: {
+        trackId: { in: userHistory.map((h) => h.trackId).filter((id): id is string => id !== null) },
+        userId: { not: userId },
+      },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+
+    const similarUserIds = similarUsers.map((u) => u.userId);
+    console.log(`[PlaylistService] Found ${similarUserIds.length} similar users`);
+
+    //  Lấy bài hát từ người dùng có sở thích tương tự
+    const collaborativeTracks = await prisma.history.findMany({
+      where: { userId: { in: similarUserIds } },
+      include: { track: true },
+      orderBy: { playCount: 'desc' },
+      take: 10,
+    });
+
+    console.log(`[PlaylistService] Found ${collaborativeTracks.length} collaborative filtering tracks`);
+
+    //  Gộp kết quả từ cả hai phương pháp
+    const finalRecommendedTracks = [...new Set([...recommendedTracks, ...collaborativeTracks.map((t) => t.track)])]
+      .slice(0, 10); // Giữ tối đa 10 bài hát duy nhất
+
+    if (finalRecommendedTracks.length === 0) {
+      console.log(`[PlaylistService] No tracks found to update in RECOMMENDED PLAYLIST for user ${userId}`);
+      return;
+    }
+
+    // Clear existing tracks in the playlist
+    await prisma.playlistTrack.deleteMany({
+      where: {
+        playlistId: recommendedPlaylist.id,
+      },
+    });
+
+    // Add new tracks to the playlist
+    const playlistTrackData = recommendedTracks.map((track, index) => ({
+      playlistId: recommendedPlaylist.id,
+      trackId: track.id,
+      trackOrder: index,
+    }));
+
+    await prisma.$transaction([
+      prisma.playlistTrack.createMany({
+        data: playlistTrackData,
+      }),
+      prisma.playlist.update({
+        where: { id: recommendedPlaylist.id },
+        data: {
+          totalTracks: recommendedTracks.length,
+          totalDuration: recommendedTracks.reduce(
+            (sum, track) => sum + (track.duration || 0),
+            0
+          ),
+        },
+      }),
+    ]);
+
+    console.log(`[PlaylistService] Successfully updated tracks for RECOMMENDED PLAYLIST for user ${userId}`);
+  } catch (error) {
+    console.error(`[PlaylistService] Error updating tracks for RECOMMENDED PLAYLIST for user ${userId}:`, error);
+    throw error;
+  }
+};
