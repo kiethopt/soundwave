@@ -15,6 +15,7 @@ import {
   getSystemPlaylist,
   updateAllSystemPlaylists,
   getSystemPlaylists,
+  updateVibeRewindPlaylist,
 } from '../controllers/playlist.controller';
 import { cacheMiddleware } from '../middleware/cache.middleware';
 
@@ -31,6 +32,9 @@ router.use(authenticate);
 
 // Route AI-generated playlist
 router.post('/personalized', createPersonalizedPlaylist);
+
+// Route for Vibe Rewind playlist
+router.post('/vibe-rewind', updateVibeRewindPlaylist);
 
 // Route to get the system playlist
 router.get('/system', getSystemPlaylist);

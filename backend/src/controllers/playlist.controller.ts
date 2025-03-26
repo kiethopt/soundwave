@@ -298,35 +298,134 @@ export const getPlaylists: RequestHandler = async (
         },
       });
 
-    // Nếu chưa có, tạo mới playlist yêu thích
-    if (!favoritePlaylist) {
-      favoritePlaylist = await prisma.playlist.create({
-        data: {
-          name: 'Bài hát yêu thích',
-          description: 'Danh sách những bài hát yêu thích của bạn',
-          privacy: 'PRIVATE',
-          type: 'FAVORITE',
+      // Nếu chưa có, tạo mới playlist yêu thích
+      if (!favoritePlaylist) {
+        favoritePlaylist = await prisma.playlist.create({
+          data: {
+            name: 'Bài hát yêu thích',
+            description: 'Danh sách những bài hát yêu thích của bạn',
+            privacy: 'PRIVATE',
+            type: 'FAVORITE',
+            userId,
+          },
+        });
+      }
+
+      // Also check for Vibe Rewind playlist
+      let vibeRewindPlaylist = await prisma.playlist.findFirst({
+        where: {
           userId,
+          name: 'Vibe Rewind',
         },
       });
+
+      // Create Vibe Rewind playlist if it doesn't exist
+      if (!vibeRewindPlaylist) {
+        vibeRewindPlaylist = await prisma.playlist.create({
+          data: {
+            name: 'Vibe Rewind',
+            description:
+              "Your personal time capsule - tracks you've been vibing to lately",
+            privacy: 'PRIVATE',
+            type: 'NORMAL',
+            userId,
+          },
+        });
+
+        // Automatically update it with user's history if available
+        try {
+          await playlistService.updateVibeRewindPlaylist(userId);
+        } catch (error) {
+          console.error('Error initializing Vibe Rewind playlist:', error);
+          // Continue even if this fails
+        }
+      }
     }
 
-    // Lấy tất cả playlist của user
-    const playlists = await prisma.playlist.findMany({
-      where: {
-        userId,
-      },
-      include: {
-        _count: {
-          select: {
-            tracks: true,
+    if (isSystemFilter) {
+      // For system playlists, use a more specific query
+      const systemPlaylists = await prisma.playlist.findMany({
+        where: {
+          OR: [
+            // User's own system playlists
+            {
+              userId,
+              type: 'SYSTEM',
+            },
+            // Global system playlists
+            {
+              type: 'SYSTEM',
+              privacy: 'PUBLIC',
+              user: {
+                role: 'ADMIN',
+              },
+            },
+          ],
+        },
+        include: {
+          tracks: {
+            include: {
+              track: {
+                include: {
+                  artist: true,
+                  album: true,
+                },
+              },
+            },
+            orderBy: {
+              trackOrder: 'asc',
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      // Format system playlists with track data
+      const formattedPlaylists = systemPlaylists.map((playlist) => {
+        const formattedTracks = playlist.tracks.map((pt: any) => ({
+          id: pt.track.id,
+          title: pt.track.title,
+          duration: pt.track.duration,
+          coverUrl: pt.track.coverUrl,
+          artist: pt.track.artist,
+          album: pt.track.album,
+          createdAt: pt.track.createdAt.toISOString(),
+        }));
+
+        return {
+          ...playlist,
+          tracks: formattedTracks,
+          canEdit: req.user?.role === 'ADMIN' || playlist.userId === userId,
+        };
+      });
+
+      console.log(
+        `Returning ${formattedPlaylists.length} system playlists for authenticated user.`
+      );
+
+      res.json({
+        success: true,
+        data: formattedPlaylists,
+      });
+    } else {
+      // Default behavior - get all user's playlists
+      const playlists = await prisma.playlist.findMany({
+        where: {
+          userId,
+        },
+        include: {
+          _count: {
+            select: {
+              tracks: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
 
       // Default response with playlist counts
       const playlistsWithCount = playlists.map((playlist) => ({
@@ -366,8 +465,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       return;
     }
 
-    // Check if this is a system playlist (based on type)
-    // System playlists should be accessible to all users for viewing
+    // Check if this is a system playlist, favorite playlist, or public playlist
     const isSystemPlaylist = playlistExists.type === 'SYSTEM';
     const isFavoritePlaylist = playlistExists.type === 'FAVORITE';
     const isPublicPlaylist = playlistExists.privacy === 'PUBLIC';
@@ -383,11 +481,8 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
 
     let playlist;
 
-    if (
-      isSystemPlaylist ||
-      playlistExists.name === 'Soundwave Hits: Trending Right Now'
-    ) {
-      // For system playlists, don't filter by userId - allow viewing by anyone
+    // For SYSTEM playlists or PUBLIC playlists, allow viewing by anyone
+    if (isSystemPlaylist || isPublicPlaylist) {
       playlist = await prisma.playlist.findUnique({
         where: { id },
         include: {
@@ -485,7 +580,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
     }
 
     // Add a field to indicate if the user can edit this playlist
-    // Only ADMIN can edit SYSTEM playlists
+    // Only ADMIN can edit SYSTEM playlists, and only owner can edit their playlists
     const canEdit =
       isAuthenticated && // Must be authenticated to edit anything
       ((isSystemPlaylist && userRole === 'ADMIN') ||
@@ -974,36 +1069,8 @@ export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
   }
 };
 
-export const createRecommendPlaylist = async (userId: string): Promise<void> => {
-  try {
-    // Check if the user has a listening history
-    const hasHistory = await prisma.history.findFirst({
-      where: {
-        userId,
-      },
-    });
-
-    if (!hasHistory) {
-      throw new Error('User has no listening history to generate recommendations');
-    }
-
-    // Create the recommended playlist
-    await prisma.playlist.create({
-      data: {
-        name: 'RECOMMENDED PLAYLIST',
-        description: 'Danh sách bài hát được gợi ý dựa trên lịch sử nghe nhạc của bạn',
-        privacy: 'PRIVATE',
-        type: 'NORMAL',
-        userId,
-      },
-    });
-  } catch (error) {
-    console.error('Error creating recommended playlist:', error);
-    throw error;
-  }
-};
-
-export const updateRecommendPlaylist: RequestHandler = async (
+// New function: Update the Vibe Rewind playlist (tracks user has listened to)
+export const updateVibeRewindPlaylist: RequestHandler = async (
   req,
   res,
   next
@@ -1019,36 +1086,15 @@ export const updateRecommendPlaylist: RequestHandler = async (
       return;
     }
 
-    // Automatically update the recommended playlist
-    const recommendedPlaylist = await prisma.playlist.findFirst({
-      where: {
-        userId,
-        type: 'NORMAL',
-      },
-    });
-
-    if (!recommendedPlaylist) {
-      // Create the recommended playlist if it doesn't exist
-      await prisma.playlist.create({
-        data: {
-          name: 'RECOMMENDED PLAYLIST',
-          description: 'Danh sách bài hát được gợi ý dựa trên lịch sử nghe nhạc của bạn',
-          privacy: 'PRIVATE',
-          type: 'NORMAL',
-          userId,
-        },
-      });
-    }
-
-    // Call the service to update the recommended playlist tracks
-    await playlistService.updateRecommendedPlaylistTracks(userId);
+    // Call the service to update the Vibe Rewind playlist
+    await playlistService.updateVibeRewindPlaylist(userId);
 
     res.status(200).json({
       success: true,
-      message: 'Recommended playlist updated successfully',
+      message: 'Vibe Rewind playlist updated successfully',
     });
   } catch (error) {
-    console.error('Error in updateRecommendPlaylist:', error);
+    console.error('Error in updateVibeRewindPlaylist:', error);
     next(error);
   }
 };

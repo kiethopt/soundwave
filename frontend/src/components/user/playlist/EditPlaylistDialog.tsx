@@ -25,6 +25,7 @@ interface EditPlaylistDialogProps {
   playlist: Playlist;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isSpecialPlaylist?: boolean;
 }
 
 interface FormData {
@@ -37,6 +38,7 @@ export function EditPlaylistDialog({
   playlist,
   open,
   onOpenChange,
+  isSpecialPlaylist = false,
 }: EditPlaylistDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -44,6 +46,11 @@ export function EditPlaylistDialog({
     description: playlist.description || '',
     privacy: playlist.privacy,
   });
+
+  // Check for special playlists - this covers both Vibe Rewind and Favorites
+  const isVibeRewind = playlist.name === 'Vibe Rewind';
+  const isFavorite = playlist.type === 'FAVORITE';
+  const isFixedPrivacy = isSpecialPlaylist || isVibeRewind || isFavorite;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,6 +95,11 @@ export function EditPlaylistDialog({
       <DialogContent>
         <DialogHeader className="text-white">
           <DialogTitle>Chỉnh sửa playlist</DialogTitle>
+          {isFixedPrivacy && (
+            <p className="text-sm text-white/60 mt-2">
+              This is a special playlist with fixed privacy settings
+            </p>
+          )}
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -98,6 +110,7 @@ export function EditPlaylistDialog({
               onChange={handleInputChange}
               className="text-white"
               required
+              readOnly={isVibeRewind || isFavorite}
             />
           </div>
           <div className="space-y-2">
@@ -114,6 +127,7 @@ export function EditPlaylistDialog({
             <Select
               value={formData.privacy}
               onValueChange={handlePrivacyChange}
+              disabled={isFixedPrivacy}
             >
               <SelectTrigger className="text-white">
                 <SelectValue placeholder="Chọn quyền riêng tư" />
@@ -123,6 +137,11 @@ export function EditPlaylistDialog({
                 <SelectItem value="PUBLIC">Công khai</SelectItem>
               </SelectContent>
             </Select>
+            {isFixedPrivacy && (
+              <p className="text-xs text-white/60 mt-1">
+                This playlist is always private and cannot be changed
+              </p>
+            )}
           </div>
           <div className="flex justify-end space-x-2">
             <Button

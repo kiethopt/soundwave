@@ -14,6 +14,8 @@ import userRoutes from './routes/user.routes';
 import notificationRoutes from './routes/notification.routes';
 import playlistRoutes from './routes/playlist.routes';
 import eventRoutes from './routes/event.routes';
+// Import the extended Prisma client to ensure extensions are loaded
+import prisma from './config/db';
 
 dotenv.config();
 
@@ -38,7 +40,20 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/events', eventRoutes);
 
+// Initialize database connection and extensions
+const initializeApp = async () => {
+  try {
+    // Simple query to ensure DB connection and initialize extensions
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('✅ Database connection established');
+  } catch (error) {
+    console.error('❌ Database connection error:', error);
+    process.exit(1);
+  }
+};
+
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+server.listen(PORT, async () => {
+  console.log(`🚀 Server is running on port ${PORT}`);
+  await initializeApp();
 });

@@ -42,7 +42,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.updateAllSystemPlaylists = exports.getPersonalizedSystemPlaylists = exports.getSystemPlaylist = exports.createFavoritePlaylist = exports.createPersonalizedPlaylist = void 0;
+exports.updateVibeRewindPlaylist = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.updateAllSystemPlaylists = exports.getPersonalizedSystemPlaylists = exports.getSystemPlaylist = exports.createFavoritePlaylist = exports.createPersonalizedPlaylist = void 0;
 const client_1 = require("@prisma/client");
 const playlistService = __importStar(require("../services/playlist.service"));
 const playlist_service_1 = require("../services/playlist.service");
@@ -281,6 +281,29 @@ const getPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
                         userId,
                     },
                 });
+            }
+            let vibeRewindPlaylist = yield prisma.playlist.findFirst({
+                where: {
+                    userId,
+                    name: 'Vibe Rewind',
+                },
+            });
+            if (!vibeRewindPlaylist) {
+                vibeRewindPlaylist = yield prisma.playlist.create({
+                    data: {
+                        name: 'Vibe Rewind',
+                        description: "Your personal time capsule - tracks you've been vibing to lately",
+                        privacy: 'PRIVATE',
+                        type: 'NORMAL',
+                        userId,
+                    },
+                });
+                try {
+                    yield playlistService.updateVibeRewindPlaylist(userId);
+                }
+                catch (error) {
+                    console.error('Error initializing Vibe Rewind playlist:', error);
+                }
             }
         }
         if (isSystemFilter) {
@@ -881,4 +904,27 @@ const getSystemPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0,
     }
 });
 exports.getSystemPlaylists = getSystemPlaylists;
+const updateVibeRewindPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                message: 'Unauthorized',
+            });
+            return;
+        }
+        yield playlistService.updateVibeRewindPlaylist(userId);
+        res.status(200).json({
+            success: true,
+            message: 'Vibe Rewind playlist updated successfully',
+        });
+    }
+    catch (error) {
+        console.error('Error in updateVibeRewindPlaylist:', error);
+        next(error);
+    }
+});
+exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
 //# sourceMappingURL=playlist.controller.js.map

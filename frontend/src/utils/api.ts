@@ -948,6 +948,15 @@ export const api = {
         throw error;
       }
     },
+
+    getPlaylists: async (token: string) =>
+      fetchWithAuth('/api/playlists', { method: 'GET' }, token),
+
+    getPlaylistById: async (playlistId: string, token?: string) =>
+      fetchWithAuth(`/api/playlists/${playlistId}`, { method: 'GET' }, token),
+
+    updateVibeRewindPlaylist: async (token: string) =>
+      fetchWithAuth('/api/playlists/vibe-rewind', { method: 'POST' }, token),
   },
 
   upload: {

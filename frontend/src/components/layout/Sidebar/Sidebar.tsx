@@ -102,7 +102,10 @@ export default function Sidebar({
 
   // Tách playlist yêu thích và playlist thường
   const favoritePlaylist = playlists.find((p) => p.type === 'FAVORITE');
-  const normalPlaylists = playlists.filter((p) => p.type === 'NORMAL');
+  const vibeRewindPlaylist = playlists.find((p) => p.name === 'Vibe Rewind');
+  const normalPlaylists = playlists.filter(
+    (p) => p.type === 'NORMAL' && p.name !== 'Vibe Rewind'
+  );
 
   return (
     <>
@@ -248,6 +251,72 @@ export default function Sidebar({
                         </>
                       )}
                     </Link>
+                  )}
+
+                  {/* Vibe Rewind Playlist */}
+                  {vibeRewindPlaylist && (
+                    <div className="flex flex-col">
+                      <Link
+                        href={`/playlists/${vibeRewindPlaylist.id}`}
+                        className={`flex items-center px-3 py-2 rounded-md truncate group ${
+                          pathname === `/playlists/${vibeRewindPlaylist.id}`
+                            ? theme === 'light'
+                              ? 'bg-gray-200 text-gray-900'
+                              : 'bg-white/10 text-white'
+                            : theme === 'light'
+                            ? 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        {isCollapsed ? (
+                          <Music className="w-5 h-5" />
+                        ) : (
+                          <>
+                            <Music className="w-5 h-5 mr-3 text-emerald-500" />
+                            <span className="truncate">
+                              {vibeRewindPlaylist.name}
+                            </span>
+                            <button
+                              className="ml-auto opacity-0 group-hover:opacity-100 hover:text-emerald-500 transition-opacity"
+                              title="Update with recent tracks"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const token = localStorage.getItem('userToken');
+                                if (token) {
+                                  api.playlists
+                                    .updateVibeRewindPlaylist(token)
+                                    .then(() => {
+                                      // Refresh playlists
+                                      fetchPlaylists();
+                                    })
+                                    .catch((error) => {
+                                      console.error(
+                                        'Error updating Vibe Rewind:',
+                                        error
+                                      );
+                                    });
+                                }
+                              }}
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </Link>
+                    </div>
                   )}
 
                   {/* Divider */}

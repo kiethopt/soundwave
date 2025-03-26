@@ -26,6 +26,11 @@ export default function PlaylistPage() {
   const [error, setError] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
+  // Check if this is a special system playlist
+  const isVibeRewindPlaylist = playlist?.name === 'Vibe Rewind';
+  const isFavoritePlaylist = playlist?.type === 'FAVORITE';
+  const isSpecialPlaylist = isVibeRewindPlaylist || isFavoritePlaylist;
+
   useEffect(() => {
     const fetchPlaylist = async () => {
       try {
@@ -83,8 +88,13 @@ export default function PlaylistPage() {
         const token = localStorage.getItem('userToken');
         if (!token || !playlist) return;
 
-        await api.playlists.update(id as string, data, token);
-        setPlaylist({ ...playlist, ...data });
+        // For special playlists, always keep them private
+        const updatedData = isSpecialPlaylist
+          ? { ...data, privacy: 'PRIVATE' as 'PRIVATE' }
+          : data;
+
+        await api.playlists.update(id as string, updatedData, token);
+        setPlaylist({ ...playlist, ...updatedData });
         setIsEditOpen(false);
       } catch (error) {
         console.error('Error updating playlist:', error);
@@ -126,21 +136,60 @@ export default function PlaylistPage() {
 
         <div className="flex flex-col gap-3">
           <div className="text-sm font-medium text-white/70">Playlist</div>
-          <h1 className="text-[2rem] font-bold leading-tight">
-            {playlist.name}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-[2rem] font-bold leading-tight">
+              {playlist.name}
+            </h1>
+            {isVibeRewindPlaylist && (
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-emerald-500/20 text-emerald-400">
+                Auto-Updated
+              </span>
+            )}
+            {isFavoritePlaylist && (
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-primary/20 text-primary">
+                Favorites
+              </span>
+            )}
+          </div>
           {playlist.description && (
             <p className="text-sm text-white/70">{playlist.description}</p>
           )}
           <div className="flex items-center gap-1 text-sm text-white/70">
             <span>{playlist.tracks.length} songs</span>
+            {isSpecialPlaylist && (
+              <span className="ml-2 text-xs opacity-60">• Private</span>
+            )}
           </div>
           <div className="mt-4">
             {playlist.canEdit && (
               <Button
                 onClick={() => handleProtectedAction(() => setIsEditOpen(true))}
+                disabled={false}
               >
                 Edit playlist
+              </Button>
+            )}
+            {isVibeRewindPlaylist && (
+              <Button
+                onClick={() =>
+                  handleProtectedAction(async () => {
+                    try {
+                      const token = localStorage.getItem('userToken');
+                      if (!token) return;
+
+                      await api.playlists.updateVibeRewindPlaylist(token);
+
+                      // Refresh the page to show updated playlist
+                      window.location.reload();
+                    } catch (error) {
+                      console.error('Error updating Vibe Rewind:', error);
+                    }
+                  })
+                }
+                variant="outline"
+                className="ml-2"
+              >
+                Update Now
               </Button>
             )}
           </div>
@@ -173,6 +222,7 @@ export default function PlaylistPage() {
         playlist={playlist}
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
+        isSpecialPlaylist={isSpecialPlaylist}
       />
 
       <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />

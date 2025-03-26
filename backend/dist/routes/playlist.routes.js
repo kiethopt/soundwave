@@ -12,6 +12,7 @@ router.get('/system-all', cache_middleware_1.cacheMiddleware, playlist_controlle
 router.get('/:id', auth_middleware_1.optionalAuthenticate, playlist_controller_1.getPlaylistById);
 router.use(auth_middleware_1.authenticate);
 router.post('/personalized', playlist_controller_1.createPersonalizedPlaylist);
+router.post('/vibe-rewind', playlist_controller_1.updateVibeRewindPlaylist);
 router.get('/system', playlist_controller_1.getSystemPlaylist);
 router.post('/system/update-all', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['ADMIN']), playlist_controller_1.updateAllSystemPlaylists);
 router.post('/', playlist_controller_1.createPlaylist);
