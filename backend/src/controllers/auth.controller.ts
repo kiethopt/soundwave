@@ -313,7 +313,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      res.status(401).json({ message: 'Invalid email/user or password' });
+      res.status(401).json({ message: 'Invalid email/username or password' });
       return;
     }
 
