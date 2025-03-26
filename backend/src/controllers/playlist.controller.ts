@@ -478,6 +478,10 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       });
       return;
     }
+    // If the playlist is the Recommended Playlist, update it automatically
+    if (playlistExists.type === 'NORMAL' && playlistExists.name === 'Vibe Rewind') {
+      await playlistService.updateVibeRewindPlaylist(userId!);
+    }
 
     let playlist;
 
