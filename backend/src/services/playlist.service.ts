@@ -186,7 +186,7 @@ export class SystemPlaylistService {
         // Tạo mảng dữ liệu để thêm vào một lần
         const playlistTrackData = recommendedTracks.map((track, index) => ({
           playlistId,
-          trackId: track.id,
+          trackId: track?.id ?? '',
           trackOrder: index,
         }));
 
@@ -2218,33 +2218,23 @@ export const generateGlobalRecommendedPlaylist = async (
   }
 };
 
-
-
 /**
  * Creates or updates the "Vibe Rewind" playlist based on user's listening history
  * @param userId ID of the user
  */
-export const updateVibeRewindPlaylist = async (
-  userId: string
-): Promise<void> => {
+export const updateVibeRewindPlaylist = async (userId: string): Promise<void> => {
   try {
-    // Find existing Vibe Rewind playlist or create a new one
+    // Tìm hoặc tạo playlist "Vibe Rewind"
     let vibeRewindPlaylist = await prisma.playlist.findFirst({
-      where: {
-        userId,
-        name: 'Vibe Rewind',
-      },
+      where: { userId, name: 'Vibe Rewind' },
     });
 
     if (!vibeRewindPlaylist) {
-      console.log(
-        `[PlaylistService] No Vibe Rewind playlist found for user ${userId}, creating one...`
-      );
+      console.log(`[PlaylistService] Creating new Vibe Rewind playlist for user ${userId}...`);
       vibeRewindPlaylist = await prisma.playlist.create({
         data: {
           name: 'Vibe Rewind',
-          description:
-            "Your personal time capsule - tracks you've been vibing to lately",
+          description: "Your personal time capsule - tracks you've been vibing to lately",
           privacy: 'PRIVATE',
           type: 'NORMAL',
           userId,
@@ -2252,29 +2242,28 @@ export const updateVibeRewindPlaylist = async (
       });
     }
 
-    // Lấy lịch sử nghe nhạc của người dùng (chỉ bài có playCount > 2)
+    // Lấy lịch sử nghe nhạc của người dùng (bài có playCount > 2)
     const userHistory = await prisma.history.findMany({
-      where: {
-        userId,
-        type: 'PLAY',
-        playCount: { gt: 2 },
-      },
+      where: { userId, type: 'PLAY', playCount: { gt: 2 } },
       include: {
-        track: {
-          include: {
-            artist: true,
-            genres: { include: { genre: true } },
-          },
-        },
+        track: { include: { artist: true, genres: { include: { genre: true } } } },
       },
     });
 
     if (userHistory.length === 0) {
-      console.log(`[PlaylistService] No tracks with playCount > 2 found for user ${userId}`);
+      console.log(`[PlaylistService] No history found for user ${userId}`);
       return;
     }
 
-    console.log(`[PlaylistService] Found ${userHistory.length} history entries for user ${userId}`);
+    // Lấy bài hát mà người dùng nghe nhiều nhất (playCount > 5)
+    const topPlayedTracks = await prisma.history.findMany({
+      where: { userId, playCount: { gt: 5 } },
+      include: { track: true },
+      orderBy: { playCount: 'desc' },
+      take: 10, // Giới hạn số lượng bài hát phổ biến
+    });
+
+    console.log(`[PlaylistService] Found ${topPlayedTracks.length} frequently played tracks for user ${userId}`);
 
     // Xác định thể loại & nghệ sĩ yêu thích
     const genreCounts = new Map<string, number>();
@@ -2282,7 +2271,7 @@ export const updateVibeRewindPlaylist = async (
 
     userHistory.forEach((history) => {
       const track = history.track;
-      if (track) {
+      if (track) { // Null check for track
         track.genres.forEach((genreRel) => {
           const genreId = genreRel.genre.id;
           genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
@@ -2295,20 +2284,13 @@ export const updateVibeRewindPlaylist = async (
       }
     });
 
-    const topGenres = [...genreCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map((entry) => entry[0]);
-
-    const topArtists = [...artistCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map((entry) => entry[0]);
+    const topGenres = [...genreCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map((entry) => entry[0]);
+    const topArtists = [...artistCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map((entry) => entry[0]);
 
     console.log(`[PlaylistService] Top genres: ${topGenres}`);
     console.log(`[PlaylistService] Top artists: ${topArtists}`);
 
-    // Tìm bài hát theo Content-Based Filtering
+    // Tìm bài hát dựa trên Content-Based Filtering
     const recommendedTracks = await prisma.track.findMany({
       where: {
         OR: [
@@ -2319,12 +2301,12 @@ export const updateVibeRewindPlaylist = async (
       },
       include: { artist: true, album: true },
       orderBy: { playCount: 'desc' },
-      take: 5,
+      take: 10,
     });
 
     console.log(`[PlaylistService] Found ${recommendedTracks.length} content-based tracks`);
 
-    // Tìm người dùng có sở thích giống nhau (Collaborative Filtering - User-Based CF)
+    // Collaborative Filtering - Tìm người dùng có sở thích giống nhau
     const similarUsers = await prisma.history.findMany({
       where: {
         trackId: { in: userHistory.map((h) => h.trackId).filter((id): id is string => id !== null) },
@@ -2337,7 +2319,7 @@ export const updateVibeRewindPlaylist = async (
     const similarUserIds = similarUsers.map((u) => u.userId);
     console.log(`[PlaylistService] Found ${similarUserIds.length} similar users`);
 
-    //  Lấy bài hát từ người dùng có sở thích tương tự
+    // Lấy bài hát từ người dùng có sở thích tương tự
     const collaborativeTracks = await prisma.history.findMany({
       where: { userId: { in: similarUserIds } },
       include: { track: true },
@@ -2347,9 +2329,14 @@ export const updateVibeRewindPlaylist = async (
 
     console.log(`[PlaylistService] Found ${collaborativeTracks.length} collaborative filtering tracks`);
 
-    //  Gộp kết quả từ cả hai phương pháp
-    const finalRecommendedTracks = [...new Set([...recommendedTracks, ...collaborativeTracks.map((t) => t.track)])]
-      .slice(0, 10); // Giữ tối đa 10 bài hát duy nhất
+    // Gộp kết quả từ cả ba phương pháp
+    const finalRecommendedTracks = [
+      ...new Set([
+        ...topPlayedTracks.map((t) => t.track), // Ưu tiên bài hát được nghe nhiều nhất
+        ...recommendedTracks,
+        ...collaborativeTracks.map((t) => t.track),
+      ]),
+    ].slice(0, 10); // Giữ tối đa 10 bài hát duy nhất
 
     if (finalRecommendedTracks.length === 0) {
       console.log(`[PlaylistService] No tracks found to update in Vibe Rewind for user ${userId}`);
@@ -2364,24 +2351,28 @@ export const updateVibeRewindPlaylist = async (
     });
 
     // Add new tracks to the playlist
-    const playlistTrackData = recommendedTracks.map((track, index) => ({
-      playlistId: vibeRewindPlaylist.id,
-      trackId: track.id,
-      trackOrder: index,
-    }));
+    const playlistTrackData = finalRecommendedTracks
+      .filter((track): track is NonNullable<typeof track> => track?.id !== undefined)
+      .map((track, index) => ({
+        playlistId: vibeRewindPlaylist.id,
+        trackId: track.id,
+        trackOrder: index,
+      }));
 
     await prisma.$transaction([
       prisma.playlistTrack.createMany({
-        data: playlistTrackData,
+        data: playlistTrackData.filter(
+          (track, index, self) =>
+            self.findIndex(
+              (t) => t.playlistId === track.playlistId && t.trackId === track.trackId
+            ) === index
+        ),
       }),
       prisma.playlist.update({
         where: { id: vibeRewindPlaylist.id },
         data: {
-          totalTracks: recommendedTracks.length,
-          totalDuration: recommendedTracks.reduce(
-            (sum, track) => sum + (track.duration || 0),
-            0
-          ),
+          totalTracks: finalRecommendedTracks.length,
+          totalDuration: finalRecommendedTracks.reduce((sum, track) => sum + ((track?.duration) || 0), 0),
         },
       }),
     ]);
