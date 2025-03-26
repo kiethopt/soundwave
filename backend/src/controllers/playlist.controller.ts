@@ -284,13 +284,19 @@ export const getPlaylists: RequestHandler = async (
       return;
     }
 
-    // Kiểm tra xem có playlist yêu thích chưa
-    let favoritePlaylist = await prisma.playlist.findFirst({
-      where: {
-        userId,
-        type: 'FAVORITE',
-      },
-    });
+    // Check if we're filtering for system playlists only
+    const filterType = req.header('X-Filter-Type');
+    const isSystemFilter = filterType === 'system';
+
+    // Create favorite playlist if it doesn't exist (for all non-system requests)
+    if (!isSystemFilter) {
+      // Kiểm tra xem có playlist yêu thích chưa
+      let favoritePlaylist = await prisma.playlist.findFirst({
+        where: {
+          userId,
+          type: 'FAVORITE',
+        },
+      });
 
     // Nếu chưa có, tạo mới playlist yêu thích
     if (!favoritePlaylist) {
@@ -303,35 +309,6 @@ export const getPlaylists: RequestHandler = async (
           userId,
         },
       });
-    }
-
-    // Kiểm tra xem có playlist gợi ý chưa
-    let recommendPlaylist = await prisma.playlist.findFirst({
-      where: {
-        userId,
-        type: 'NORMAL',
-      },
-    });
-
-    // Nếu chưa có và có lịch sử nghe nhạc, tạo mới playlist gợi ý
-    if (!recommendPlaylist) {
-      const hasHistory = await prisma.history.findFirst({
-        where: {
-          userId,
-        },
-      });
-
-      if (hasHistory) {
-        recommendPlaylist = await prisma.playlist.create({
-          data: {
-            name: 'RECOMMENDED PLAYLIST',
-            description: 'Danh sách bài hát được gợi ý dựa trên lịch sử nghe nhạc của bạn',
-            privacy: 'PRIVATE',
-            type: 'NORMAL',
-            userId,
-          },
-        });
-      }
     }
 
     // Lấy tất cả playlist của user
@@ -351,17 +328,18 @@ export const getPlaylists: RequestHandler = async (
       },
     });
 
-    // Thêm totalTracks vào response
-    const playlistsWithCount = playlists.map((playlist) => ({
-      ...playlist,
-      totalTracks: playlist._count.tracks,
-      _count: undefined,
-    }));
+      // Default response with playlist counts
+      const playlistsWithCount = playlists.map((playlist) => ({
+        ...playlist,
+        totalTracks: playlist._count.tracks,
+        _count: undefined,
+      }));
 
-    res.json({
-      success: true,
-      data: playlistsWithCount,
-    });
+      res.json({
+        success: true,
+        data: playlistsWithCount,
+      });
+    }
   } catch (error) {
     next(error);
   }
@@ -371,8 +349,9 @@ export const getPlaylists: RequestHandler = async (
 export const getPlaylistById: RequestHandler = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user?.id; // Will be undefined for unauthenticated users
     const userRole = req.user?.role;
+    const isAuthenticated = !!userId;
 
     // Kiểm tra xem playlist có tồn tại không, không cần check userId
     const playlistExists = await prisma.playlist.findUnique({
@@ -387,18 +366,28 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       return;
     }
 
-    // If the playlist is the Recommended Playlist, update it automatically
-    if (playlistExists.type === 'NORMAL' && playlistExists.name === 'RECOMMENDED PLAYLIST') {
-      await playlistService.updateRecommendedPlaylistTracks(userId!);
-    }
-
-    // Check if this is a system playlist or a user-owned playlist
+    // Check if this is a system playlist (based on type)
+    // System playlists should be accessible to all users for viewing
     const isSystemPlaylist = playlistExists.type === 'SYSTEM';
+    const isFavoritePlaylist = playlistExists.type === 'FAVORITE';
+    const isPublicPlaylist = playlistExists.privacy === 'PUBLIC';
+
+    // For unauthenticated users, only allow PUBLIC or SYSTEM playlists
+    if (!isAuthenticated && !isPublicPlaylist && !isSystemPlaylist) {
+      res.status(401).json({
+        success: false,
+        message: 'Please log in to view this playlist',
+      });
+      return;
+    }
 
     let playlist;
 
-    if (isSystemPlaylist || playlistExists.name === 'Soundwave Hits: Trending Right Now') {
-      // For system playlists, allow viewing by anyone
+    if (
+      isSystemPlaylist ||
+      playlistExists.name === 'Soundwave Hits: Trending Right Now'
+    ) {
+      // For system playlists, don't filter by userId - allow viewing by anyone
       playlist = await prisma.playlist.findUnique({
         where: { id },
         include: {
@@ -417,13 +406,58 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
           },
         },
       });
-    } else {
-      // For regular playlists, check if the user owns it
-      playlist = await prisma.playlist.findFirst({
-        where: {
-          id,
-          userId, // Chỉ lấy playlist của user hiện tại
+    }
+    // For FAVORITE playlists, only allow the owner to view it
+    else if (isFavoritePlaylist) {
+      // Ensure the user is the owner of this favorite playlist
+      if (!isAuthenticated || playlistExists.userId !== userId) {
+        res.status(403).json({
+          success: false,
+          message: "You don't have permission to view this playlist",
+        });
+        return;
+      }
+
+      playlist = await prisma.playlist.findUnique({
+        where: { id },
+        include: {
+          tracks: {
+            include: {
+              track: {
+                include: {
+                  artist: true,
+                  album: true,
+                },
+              },
+            },
+            orderBy: {
+              trackOrder: 'asc',
+            },
+          },
         },
+      });
+    }
+    // For regular playlists, check if the user owns it
+    else {
+      if (!isAuthenticated) {
+        res.status(401).json({
+          success: false,
+          message: 'Please log in to view this playlist',
+        });
+        return;
+      }
+
+      // Check if the user is the owner
+      if (playlistExists.userId !== userId) {
+        res.status(403).json({
+          success: false,
+          message: "You don't have permission to view this playlist",
+        });
+        return;
+      }
+
+      playlist = await prisma.playlist.findUnique({
+        where: { id },
         include: {
           tracks: {
             include: {
@@ -451,11 +485,11 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
     }
 
     // Add a field to indicate if the user can edit this playlist
-// Only ADMIN can edit SYSTEM playlists
+    // Only ADMIN can edit SYSTEM playlists
     const canEdit =
-      isSystemPlaylist || playlist.type === 'SYSTEM'
-        ? userRole === 'ADMIN'
-        : playlist.userId === userId;
+      isAuthenticated && // Must be authenticated to edit anything
+      ((isSystemPlaylist && userRole === 'ADMIN') ||
+        (!isSystemPlaylist && playlist.userId === userId));
 
     // Transform data structure
     const formattedTracks = playlist.tracks.map((pt) => ({
@@ -852,38 +886,37 @@ export const deletePlaylist: RequestHandler = async (
 export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
   try {
     const userId = req.user?.id;
+    const isAuthenticated = !!userId;
 
-    if (!userId) {
-      res.status(401).json({
-        success: false,
-        message: 'Unauthorized',
-      });
-      return;
-    }
-
-    // Find all system playlists accessible to the user
+    // Find global playlists for non-authenticated users
+    // Or both global and user-specific playlists for authenticated users
     const systemPlaylists = await prisma.playlist.findMany({
-      where: {
-        type: 'SYSTEM',
-        OR: [
-          // Global system playlists owned by admin users
-          {
+      where: isAuthenticated
+        ? {
+            OR: [
+              // Global system playlists (public)
+              {
+                type: 'SYSTEM',
+                user: {
+                  role: 'ADMIN',
+                },
+                privacy: 'PUBLIC',
+              },
+              // User-specific system playlists - no name filter here
+              {
+                type: 'SYSTEM',
+                userId: userId,
+              },
+            ],
+          }
+        : {
+            // Only global public playlists for non-authenticated users
+            type: 'SYSTEM',
+            privacy: 'PUBLIC',
             user: {
               role: 'ADMIN',
             },
-            name: {
-              in: [
-                'Soundwave Hits: Trending Right Now',
-                'Soundwave Fresh: New Releases',
-              ],
-            },
           },
-          // User-specific system playlists
-          {
-            userId: userId,
-          },
-        ],
-      },
       include: {
         tracks: {
           include: {
@@ -901,14 +934,14 @@ export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
       },
     });
 
-    // Add the canEdit field based on user role
-    const userRole = req.user?.role;
-
     // Transform data structure for consistent formatting
-    const formattedPlaylists = systemPlaylists.map((playlist) => {
-      const canEdit = userRole === 'ADMIN' || playlist.userId === userId;
+    const formattedPlaylists = systemPlaylists.map((playlist: any) => {
+      const canEdit =
+        isAuthenticated &&
+        (req.user?.role === 'ADMIN' || playlist.userId === userId);
 
-      const formattedTracks = playlist.tracks.map((pt) => ({
+      // Handle playlist tracks properly with typing
+      const formattedTracks = playlist.tracks.map((pt: any) => ({
         id: pt.track.id,
         title: pt.track.title,
         duration: pt.track.duration,
@@ -924,6 +957,12 @@ export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
         canEdit,
       };
     });
+
+    console.log(
+      `Returning ${formattedPlaylists.length} system playlists for ${
+        isAuthenticated ? 'authenticated' : 'non-authenticated'
+      } user.`
+    );
 
     res.json({
       success: true,

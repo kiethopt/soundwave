@@ -15,17 +15,17 @@ import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import type { Track, Album, ArtistProfile, User, Genre } from '@/types';
 import Image from 'next/image';
-import { Facebook, Instagram, Verified } from '../ui/Icons';
+import { Facebook, Instagram, Verified } from '@/components/ui/Icons';
 import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
-import { Switch } from '../ui/switch';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../ui/select';
+} from '@/components/ui/select';
 
 interface EditTrackModalProps {
   track: Track | null;

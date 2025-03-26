@@ -18,10 +18,11 @@ import {
 } from '@/components/ui/Icons';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTheme } from '@/contexts/ThemeContext';
-import { CreatePlaylistDialog } from '@/components/playlist/CreatePlaylistDialog';
+import { CreatePlaylistDialog } from '@/components/user/playlist/CreatePlaylistDialog';
 import { api } from '@/utils/api';
+import { useAuth } from '@/hooks/useAuth';
+import { MusicAuthDialog } from '@/components/ui/music-auth-dialog';
 
 interface Playlist {
   id: string;
@@ -38,7 +39,6 @@ export default function Sidebar({
   onClose: () => void;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [userRole, setUserRole] = useState<'USER' | 'ADMIN'>('USER');
   const [hasArtistProfile, setHasArtistProfile] = useState(false);
   const [isArtistVerified, setIsArtistVerified] = useState(false);
@@ -50,6 +50,7 @@ export default function Sidebar({
   const { theme } = useTheme();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const { dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
 
   useEffect(() => {
     const savedCollapsedState = localStorage.getItem('sidebarCollapsed');
@@ -208,7 +209,12 @@ export default function Sidebar({
                         </div>
                         <AddSimple
                           className="w-6 h-6 ml-auto hover:text-white cursor-pointer"
-                          onClick={() => setIsCreateDialogOpen(true)}
+                          onClick={() => {
+                            const canProceed = handleProtectedAction();
+                            if (canProceed) {
+                              setIsCreateDialogOpen(true);
+                            }
+                          }}
                         />
                       </>
                     )}
@@ -569,6 +575,7 @@ export default function Sidebar({
           setIsCreateDialogOpen(false);
         }}
       />
+      <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </>
   );
 }

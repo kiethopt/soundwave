@@ -262,43 +262,104 @@ const getPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
             });
             return;
         }
-        let favoritePlaylist = yield prisma.playlist.findFirst({
-            where: {
-                userId,
-                type: 'FAVORITE',
-            },
-        });
-        if (!favoritePlaylist) {
-            favoritePlaylist = yield prisma.playlist.create({
-                data: {
-                    name: 'Bài hát yêu thích',
-                    description: 'Danh sách những bài hát yêu thích của bạn',
-                    privacy: 'PRIVATE',
-                    type: 'FAVORITE',
+        const filterType = req.header('X-Filter-Type');
+        const isSystemFilter = filterType === 'system';
+        if (!isSystemFilter) {
+            let favoritePlaylist = yield prisma.playlist.findFirst({
+                where: {
                     userId,
+                    type: 'FAVORITE',
                 },
             });
+            if (!favoritePlaylist) {
+                favoritePlaylist = yield prisma.playlist.create({
+                    data: {
+                        name: 'Bài hát yêu thích',
+                        description: 'Danh sách những bài hát yêu thích của bạn',
+                        privacy: 'PRIVATE',
+                        type: 'FAVORITE',
+                        userId,
+                    },
+                });
+            }
         }
-        const playlists = yield prisma.playlist.findMany({
-            where: {
-                userId,
-            },
-            include: {
-                _count: {
-                    select: {
-                        tracks: true,
+        if (isSystemFilter) {
+            const systemPlaylists = yield prisma.playlist.findMany({
+                where: {
+                    OR: [
+                        {
+                            userId,
+                            type: 'SYSTEM',
+                        },
+                        {
+                            type: 'SYSTEM',
+                            privacy: 'PUBLIC',
+                            user: {
+                                role: 'ADMIN',
+                            },
+                        },
+                    ],
+                },
+                include: {
+                    tracks: {
+                        include: {
+                            track: {
+                                include: {
+                                    artist: true,
+                                    album: true,
+                                },
+                            },
+                        },
+                        orderBy: {
+                            trackOrder: 'asc',
+                        },
                     },
                 },
-            },
-            orderBy: {
-                createdAt: 'desc',
-            },
-        });
-        const playlistsWithCount = playlists.map((playlist) => (Object.assign(Object.assign({}, playlist), { totalTracks: playlist._count.tracks, _count: undefined })));
-        res.json({
-            success: true,
-            data: playlistsWithCount,
-        });
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            });
+            const formattedPlaylists = systemPlaylists.map((playlist) => {
+                var _a;
+                const formattedTracks = playlist.tracks.map((pt) => ({
+                    id: pt.track.id,
+                    title: pt.track.title,
+                    duration: pt.track.duration,
+                    coverUrl: pt.track.coverUrl,
+                    artist: pt.track.artist,
+                    album: pt.track.album,
+                    createdAt: pt.track.createdAt.toISOString(),
+                }));
+                return Object.assign(Object.assign({}, playlist), { tracks: formattedTracks, canEdit: ((_a = req.user) === null || _a === void 0 ? void 0 : _a.role) === 'ADMIN' || playlist.userId === userId });
+            });
+            console.log(`Returning ${formattedPlaylists.length} system playlists for authenticated user.`);
+            res.json({
+                success: true,
+                data: formattedPlaylists,
+            });
+        }
+        else {
+            const playlists = yield prisma.playlist.findMany({
+                where: {
+                    userId,
+                },
+                include: {
+                    _count: {
+                        select: {
+                            tracks: true,
+                        },
+                    },
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            });
+            const playlistsWithCount = playlists.map((playlist) => (Object.assign(Object.assign({}, playlist), { totalTracks: playlist._count.tracks, _count: undefined })));
+            res.json({
+                success: true,
+                data: playlistsWithCount,
+            });
+        }
     }
     catch (error) {
         next(error);
@@ -311,6 +372,7 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
         const { id } = req.params;
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
         const userRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
+        const isAuthenticated = !!userId;
         const playlistExists = yield prisma.playlist.findUnique({
             where: { id },
         });
@@ -322,9 +384,44 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
             return;
         }
         const isSystemPlaylist = playlistExists.type === 'SYSTEM';
+        const isFavoritePlaylist = playlistExists.type === 'FAVORITE';
+        const isPublicPlaylist = playlistExists.privacy === 'PUBLIC';
+        if (!isAuthenticated && !isPublicPlaylist && !isSystemPlaylist) {
+            res.status(401).json({
+                success: false,
+                message: 'Please log in to view this playlist',
+            });
+            return;
+        }
         let playlist;
-        if (isSystemPlaylist ||
-            playlistExists.name === 'Soundwave Hits: Trending Right Now') {
+        if (isSystemPlaylist || isPublicPlaylist) {
+            playlist = yield prisma.playlist.findUnique({
+                where: { id },
+                include: {
+                    tracks: {
+                        include: {
+                            track: {
+                                include: {
+                                    artist: true,
+                                    album: true,
+                                },
+                            },
+                        },
+                        orderBy: {
+                            trackOrder: 'asc',
+                        },
+                    },
+                },
+            });
+        }
+        else if (isFavoritePlaylist) {
+            if (!isAuthenticated || playlistExists.userId !== userId) {
+                res.status(403).json({
+                    success: false,
+                    message: "You don't have permission to view this playlist",
+                });
+                return;
+            }
             playlist = yield prisma.playlist.findUnique({
                 where: { id },
                 include: {
@@ -345,11 +442,22 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
             });
         }
         else {
-            playlist = yield prisma.playlist.findFirst({
-                where: {
-                    id,
-                    userId,
-                },
+            if (!isAuthenticated) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Please log in to view this playlist',
+                });
+                return;
+            }
+            if (playlistExists.userId !== userId) {
+                res.status(403).json({
+                    success: false,
+                    message: "You don't have permission to view this playlist",
+                });
+                return;
+            }
+            playlist = yield prisma.playlist.findUnique({
+                where: { id },
                 include: {
                     tracks: {
                         include: {
@@ -374,9 +482,9 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
             });
             return;
         }
-        const canEdit = isSystemPlaylist || playlist.type === 'SYSTEM'
-            ? userRole === 'ADMIN'
-            : playlist.userId === userId;
+        const canEdit = isAuthenticated &&
+            ((isSystemPlaylist && userRole === 'ADMIN') ||
+                (!isSystemPlaylist && playlist.userId === userId));
         const formattedTracks = playlist.tracks.map((pt) => ({
             id: pt.track.id,
             title: pt.track.title,
@@ -702,36 +810,34 @@ const deletePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
 });
 exports.deletePlaylist = deletePlaylist;
 const getSystemPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a;
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-        if (!userId) {
-            res.status(401).json({
-                success: false,
-                message: 'Unauthorized',
-            });
-            return;
-        }
+        const isAuthenticated = !!userId;
         const systemPlaylists = yield prisma.playlist.findMany({
-            where: {
-                type: 'SYSTEM',
-                OR: [
-                    {
-                        user: {
-                            role: 'ADMIN',
+            where: isAuthenticated
+                ? {
+                    OR: [
+                        {
+                            type: 'SYSTEM',
+                            user: {
+                                role: 'ADMIN',
+                            },
+                            privacy: 'PUBLIC',
                         },
-                        name: {
-                            in: [
-                                'Soundwave Hits: Trending Right Now',
-                                'Soundwave Fresh: New Releases',
-                            ],
+                        {
+                            type: 'SYSTEM',
+                            userId: userId,
                         },
+                    ],
+                }
+                : {
+                    type: 'SYSTEM',
+                    privacy: 'PUBLIC',
+                    user: {
+                        role: 'ADMIN',
                     },
-                    {
-                        userId: userId,
-                    },
-                ],
-            },
+                },
             include: {
                 tracks: {
                     include: {
@@ -748,9 +854,10 @@ const getSystemPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0,
                 },
             },
         });
-        const userRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
         const formattedPlaylists = systemPlaylists.map((playlist) => {
-            const canEdit = userRole === 'ADMIN' || playlist.userId === userId;
+            var _a;
+            const canEdit = isAuthenticated &&
+                (((_a = req.user) === null || _a === void 0 ? void 0 : _a.role) === 'ADMIN' || playlist.userId === userId);
             const formattedTracks = playlist.tracks.map((pt) => ({
                 id: pt.track.id,
                 title: pt.track.title,
@@ -762,6 +869,7 @@ const getSystemPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0,
             }));
             return Object.assign(Object.assign({}, playlist), { tracks: formattedTracks, canEdit });
         });
+        console.log(`Returning ${formattedPlaylists.length} system playlists for ${isAuthenticated ? 'authenticated' : 'non-authenticated'} user.`);
         res.json({
             success: true,
             data: formattedPlaylists,

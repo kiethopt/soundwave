@@ -46,6 +46,46 @@ export const authenticate = async (
   }
 };
 
+// Optional authentication - attempts to authenticate but doesn't block if no token
+export const optionalAuthenticate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+
+    if (!token) {
+      // Continue without authentication
+      next();
+      return;
+    }
+
+    // Token was provided, try to authenticate
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: userSelect,
+      });
+
+      if (user && user.isActive) {
+        req.user = user;
+      }
+      // Even if authentication fails, we continue
+      next();
+    } catch (error) {
+      // Token invalid, but still continue without authentication
+      console.error('Invalid token provided:', error);
+      next();
+    }
+  } catch (error) {
+    // Any other error, still continue
+    console.error('Error in optional authentication:', error);
+    next();
+  }
+};
+
 // Middleware kiểm tra quyền
 export const authorize = (roles: Role[]) => {
   return async (req: Request, res: Response, next: NextFunction) => {

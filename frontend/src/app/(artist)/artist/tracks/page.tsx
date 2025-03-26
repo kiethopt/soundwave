@@ -14,10 +14,10 @@ import {
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table';
-import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
+import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import Link from 'next/link';
-import { EditTrackModal } from '@/components/data-table/data-table-modals';
-import { getTrackColumns } from '@/components/data-table/data-table-columns';
+import { EditTrackModal } from '@/components/ui/data-table/data-table-modals';
+import { getTrackColumns } from '@/components/ui/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
 
 export default function TrackManagement() {

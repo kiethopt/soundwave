@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authorize = exports.authenticate = void 0;
+exports.authorize = exports.optionalAuthenticate = exports.authenticate = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
@@ -50,6 +50,36 @@ const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.authenticate = authenticate;
+const optionalAuthenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const token = (_a = req.header('Authorization')) === null || _a === void 0 ? void 0 : _a.replace('Bearer ', '');
+        if (!token) {
+            next();
+            return;
+        }
+        try {
+            const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+            const user = yield db_1.default.user.findUnique({
+                where: { id: decoded.id },
+                select: prisma_selects_1.userSelect,
+            });
+            if (user && user.isActive) {
+                req.user = user;
+            }
+            next();
+        }
+        catch (error) {
+            console.error('Invalid token provided:', error);
+            next();
+        }
+    }
+    catch (error) {
+        console.error('Error in optional authentication:', error);
+        next();
+    }
+});
+exports.optionalAuthenticate = optionalAuthenticate;
 const authorize = (roles) => {
     return (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
         var _a, _b;

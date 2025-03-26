@@ -620,13 +620,11 @@ const getAlbumById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     try {
         const { id } = req.params;
         const user = req.user;
-        if (!user) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
+        const isAuthenticated = !!user;
         const album = yield db_1.default.album.findUnique({
             where: {
                 id,
+                isActive: true,
             },
             select: prisma_selects_1.albumSelect,
         });
@@ -634,7 +632,8 @@ const getAlbumById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             res.status(404).json({ message: 'Album not found' });
             return;
         }
-        res.json(album);
+        const response = Object.assign(Object.assign({}, album), { requiresAuth: !isAuthenticated });
+        res.json(response);
     }
     catch (error) {
         console.error('Get album error:', error);

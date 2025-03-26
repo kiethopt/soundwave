@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import HorizontalTrackListItem from '@/components/track/HorizontalTrackListItem';
+import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
 import { EditArtistProfileModal } from '@/components/artist/EditArtistProfileModal';
 import Image from 'next/image';
 // import { EditArtistBannerModal } from '@/components/artist/EditArtistBannerModal';

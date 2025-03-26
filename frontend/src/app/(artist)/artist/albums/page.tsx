@@ -14,11 +14,11 @@ import {
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table';
-import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
+import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import Link from 'next/link';
-import { getAlbumColumns } from '@/components/data-table/data-table-columns';
+import { getAlbumColumns } from '@/components/ui/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
-import { EditAlbumModal } from '@/components/data-table/data-table-modals';
+import { EditAlbumModal } from '@/components/ui/data-table/data-table-modals';
 
 export default function AlbumManagement() {
   const { theme } = useTheme();

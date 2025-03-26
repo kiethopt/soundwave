@@ -6,8 +6,8 @@ import { api } from '@/utils/api';
 import { toast } from 'react-toastify';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useDataTable } from '@/hooks/useDataTable';
-import { getArtistRequestColumns } from '@/components/data-table/data-table-columns';
-import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
+import { getArtistRequestColumns } from '@/components/ui/data-table/data-table-columns';
+import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { ArtistRequest } from '@/types';
 import {

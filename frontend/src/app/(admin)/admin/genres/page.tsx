@@ -14,13 +14,13 @@ import {
   useReactTable,
   VisibilityState,
 } from '@tanstack/react-table';
-import { DataTableWrapper } from '@/components/data-table/data-table-wrapper';
-import { getGenreColumns } from '@/components/data-table/data-table-columns';
+import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
+import { getGenreColumns } from '@/components/ui/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
 import {
   AddGenreModal,
   EditGenreModal,
-} from '@/components/data-table/data-table-modals';
+} from '@/components/ui/data-table/data-table-modals';
 
 export default function GenreManagement() {
   const { theme } = useTheme();

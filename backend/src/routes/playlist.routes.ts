@@ -1,5 +1,9 @@
 import express from 'express';
-import { authenticate, authorize } from '../middleware/auth.middleware';
+import {
+  authenticate,
+  authorize,
+  optionalAuthenticate,
+} from '../middleware/auth.middleware';
 import {
   createPlaylist,
   getPlaylists,
@@ -12,10 +16,17 @@ import {
   updateAllSystemPlaylists,
   getSystemPlaylists,
 } from '../controllers/playlist.controller';
+import { cacheMiddleware } from '../middleware/cache.middleware';
 
 const router = express.Router();
 
-// Đảm bảo tất cả routes đều có authenticate middleware
+// Public routes (no authentication required)
+router.get('/system-all', cacheMiddleware, getSystemPlaylists);
+
+// Route that works with or without authentication
+router.get('/:id', optionalAuthenticate, getPlaylistById);
+
+// Đảm bảo tất cả routes đều có authenticate middleware (except public ones above)
 router.use(authenticate);
 
 // Route AI-generated playlist
@@ -30,13 +41,9 @@ router.post(
   updateAllSystemPlaylists
 );
 
-// Add this route to get all system playlists
-router.get('/system-all', getSystemPlaylists);
-
 // Các routes khác
 router.post('/', createPlaylist);
 router.get('/', getPlaylists);
-router.get('/:id', getPlaylistById);
 router.patch('/:id', updatePlaylist);
 router.delete('/:playlistId/tracks/:trackId', removeTrackFromPlaylist);
 

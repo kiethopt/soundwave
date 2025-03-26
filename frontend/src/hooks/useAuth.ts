@@ -1,20 +1,40 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useEffect } from 'react';
 
 export const useAuth = () => {
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
+  // Check if the user is authenticated
   useEffect(() => {
-    const storedToken = localStorage.getItem('userToken');
-    if (!storedToken) {
-      router.push('/login');
-      return;
-    }
-    setToken(storedToken);
-    setLoading(false);
-  }, [router]);
+    const token = localStorage.getItem('userToken');
+    setIsAuthenticated(!!token);
+  }, []);
 
-  return { token, loading };
+  // Function to open the dialog
+  const showAuthDialog = useCallback(() => {
+    setDialogOpen(true);
+  }, []);
+
+  // Function to handle protected actions
+  const handleProtectedAction = useCallback((callback?: () => void) => {
+    const token = localStorage.getItem('userToken');
+
+    if (token) {
+      // User is authenticated, perform the action
+      if (callback) callback();
+      return true;
+    } else {
+      // User is not authenticated, show the dialog
+      setDialogOpen(true);
+      return false;
+    }
+  }, []);
+
+  return {
+    isAuthenticated,
+    dialogOpen,
+    setDialogOpen,
+    showAuthDialog,
+    handleProtectedAction,
+  };
 };
