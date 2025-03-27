@@ -119,7 +119,7 @@ test.describe('Login - Logout - Remember Me', () => {
     // await expect(page.locator('input#password')).toHaveValue('password123');
   });
 
-  // TC4: Đăng xuất
+  // TC4: Đăng xuất thành công
   test('Logout', async ({ page }) => {
     // B1: Đăng nhập
     await page.goto('/login');

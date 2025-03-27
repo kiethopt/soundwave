@@ -18,6 +18,8 @@ interface DataTableToolbarProps {
   onSearchChange: (value: string) => void;
   selectedRowsCount?: number;
   onDelete?: () => void;
+  onActivate?: () => void;
+  onDeactivate?: () => void;
   showExport?: boolean;
   exportData?: {
     data: any[];
@@ -90,6 +92,8 @@ export function DataTableToolbar({
   onSearchChange,
   selectedRowsCount = 0,
   onDelete,
+  onActivate,
+  onDeactivate,
   showExport = false,
   exportData,
   statusFilter,
@@ -204,16 +208,48 @@ export function DataTableToolbar({
 
       <div className="flex items-center gap-2 ml-auto">
         {selectedRowsCount > 0 && (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onDelete}
-            className={`flex-shrink-0 ${
-              theme === 'dark' ? 'bg-red-500/80 hover:bg-red-500' : ''
-            }`}
-          >
-            Delete ({selectedRowsCount})
-          </Button>
+          <>
+            {onActivate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onActivate}
+                className={`flex-shrink-0 ${
+                  theme === 'dark'
+                    ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                    : 'text-green-600 border-green-200 bg-green-50 hover:bg-green-100'
+                }`}
+              >
+                Activate ({selectedRowsCount})
+              </Button>
+            )}
+            {onDeactivate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onDeactivate}
+                className={`flex-shrink-0 ${
+                  theme === 'dark'
+                    ? 'bg-orange-500/20 hover:bg-orange-500/30 text-orange-400'
+                    : 'text-orange-600 border-orange-200 bg-orange-50 hover:bg-orange-100'
+                }`}
+              >
+                Deactivate ({selectedRowsCount})
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={onDelete}
+                className={`flex-shrink-0 ${
+                  theme === 'dark' ? 'bg-red-500/80 hover:bg-red-500' : ''
+                }`}
+              >
+                Delete ({selectedRowsCount})
+              </Button>
+            )}
+          </>
         )}
         {showExport && (
           <Button

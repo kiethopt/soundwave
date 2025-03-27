@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Genre } from '@/types';
 import { api } from '@/utils/api';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   ColumnFiltersState,
@@ -44,7 +44,18 @@ export default function GenreManagement() {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      const response = await api.genres.getAll(token, page, limit);
+      const search = params.get('search') || '';
+      const queryParams = new URLSearchParams();
+      queryParams.append('page', page.toString());
+      queryParams.append('limit', limit.toString());
+      if (search) queryParams.append('search', search);
+
+      const response = await api.genres.getAll(
+        token,
+        page,
+        limit,
+        queryParams.toString()
+      );
       return {
         data: response.genres,
         pagination: response.pagination,
@@ -71,15 +82,13 @@ export default function GenreManagement() {
 
       // Refresh trang hiện tại
       const params = new URLSearchParams();
-      if (searchInput) params.append('q', searchInput);
+      if (searchInput) params.append('search', searchInput);
       const response = await api.genres.getAll(token, currentPage, limit);
       setGenres(response.genres);
 
       toast.success('Genre created successfully');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to create genre'
-      );
+      toast.error('Failed to create genre');
     }
   };
 
@@ -109,7 +118,7 @@ export default function GenreManagement() {
       } else {
         // // Refresh trang hiện tại
         const params = new URLSearchParams();
-        if (searchInput) params.append('q', searchInput);
+        if (searchInput) params.append('search', searchInput);
 
         const response = await api.genres.getAll(token, currentPage, limit);
         setGenres(response.genres);
@@ -117,9 +126,7 @@ export default function GenreManagement() {
 
       toast.success(`${ids.length} genre(s) deleted successfully`);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to delete genre(s)'
-      );
+      toast.error('Failed to delete genre(s)');
     } finally {
       if (!Array.isArray(genreIds)) setActionLoading(null);
     }
@@ -134,7 +141,7 @@ export default function GenreManagement() {
 
       // Refresh trang hiện tại
       const params = new URLSearchParams();
-      if (searchInput) params.append('q', searchInput);
+      if (searchInput) params.append('search', searchInput);
 
       const response = await api.genres.getAll(token, currentPage, limit);
       setGenres(response.genres);
@@ -142,9 +149,7 @@ export default function GenreManagement() {
       setEditingGenre(null);
       toast.success('Genre updated successfully');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to update genre'
-      );
+      toast.error('Failed to update genre');
     }
   };
 

@@ -3,7 +3,14 @@ import { paginate } from '../utils/handle-utils';
 import { Request } from 'express';
 
 export const getAllGenres = async (req: Request) => {
+  const { search } = req.query;
+
+  const where = search
+    ? { name: { contains: String(search), mode: 'insensitive' } }
+    : undefined;
+
   const options = {
+    where,
     orderBy: { name: 'asc' },
     select: {
       id: true,

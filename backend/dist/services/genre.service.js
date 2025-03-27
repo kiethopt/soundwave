@@ -16,7 +16,12 @@ exports.getAllGenres = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const handle_utils_1 = require("../utils/handle-utils");
 const getAllGenres = (req) => __awaiter(void 0, void 0, void 0, function* () {
+    const { search } = req.query;
+    const where = search
+        ? { name: { contains: String(search), mode: 'insensitive' } }
+        : undefined;
     const options = {
+        where,
         orderBy: { name: 'asc' },
         select: {
             id: true,

@@ -5,8 +5,7 @@ import Sidebar from '@/components/layout/Sidebar/Sidebar';
 import Header from '@/components/layout/Header/Header';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { Toaster } from 'react-hot-toast';
 import type React from 'react';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { TrackProvider, useTrack } from '@/contexts/TrackContext';
@@ -107,7 +106,7 @@ export default function RootLayout({
         <TrackProvider>
           <body className="bg-[#111]" suppressHydrationWarning>
             <LayoutContent>{children}</LayoutContent>
-            <ToastContainer />
+            <Toaster position="top-center" />
           </body>
         </TrackProvider>
       </ThemeProvider>

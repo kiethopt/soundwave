@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { User } from '@/types';
 import { api } from '@/utils/api';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   ColumnFiltersState,
@@ -178,6 +178,23 @@ export default function UserManagement() {
     onDelete: handleDeleteUsers,
     onEdit: setUpdatingUser,
     onView: setViewingUser,
+    onStatusChange: async (userId, isActive) => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) {
+          toast.error('No authentication token found');
+          return;
+        }
+
+        setActionLoading(userId);
+        await handleUpdateUser(userId, { isActive });
+      } catch (error) {
+        console.error('Error toggling user status:', error);
+        toast.error('Failed to update user status');
+      } finally {
+        setActionLoading(null);
+      }
+    },
   });
 
   const table = useReactTable({

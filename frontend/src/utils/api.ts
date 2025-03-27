@@ -243,7 +243,7 @@ export const api = {
         `/api/admin/artists/${artistId}`,
         {
           method: 'PUT',
-          body: data,
+          body: data instanceof FormData ? data : JSON.stringify(data),
         },
         token
       ),

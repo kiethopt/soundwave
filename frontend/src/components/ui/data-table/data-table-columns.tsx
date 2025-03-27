@@ -16,9 +16,11 @@ import {
   Music,
   Pencil,
   MoreHorizontal,
-  RefreshCw,
   Check,
   X,
+  Ban,
+  CheckCircle,
+  Trash,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -34,6 +36,7 @@ import { api } from '@/utils/api';
 import { ArtistInfoModal } from './data-table-modals';
 import { AddSimple, Edit, UserIcon } from '@/components/ui/Icons';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/Icons';
 
 interface GetTrackColumnsOptions {
   theme?: 'light' | 'dark';
@@ -683,6 +686,7 @@ export function getUserColumns({
   onEdit,
   onDelete,
   onView,
+  onStatusChange,
 }: GetUserColumnsOptions): ColumnDef<User>[] {
   return [
     {
@@ -810,18 +814,37 @@ export function getUserColumns({
               <MoreHorizontal className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onView && onView(user)}>
+                <Eye className="w-4 h-4 mr-2" />
+                View Details
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit && onEdit(user)}>
+                <Pencil className="w-4 h-4 mr-2" />
                 Edit User
               </DropdownMenuItem>
-              {/* <DropdownMenuItem
-                onClick={() => onResetPassword && onResetPassword(user.id)}
-              >
-                Reset Password
-              </DropdownMenuItem> */}
+              {onStatusChange && (
+                <DropdownMenuItem
+                  onClick={() => onStatusChange(user.id, !user.isActive)}
+                >
+                  {user.isActive ? (
+                    <>
+                      <Ban className="w-4 h-4 mr-2 text-orange-500" />
+                      <span className="text-orange-500">Deactivate</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                      <span className="text-green-500">Activate</span>
+                    </>
+                  )}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => onDelete && onDelete(user.id)}
                 className="text-red-600 focus:text-red-600"
               >
+                <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1054,49 +1077,84 @@ export function getArtistColumns({
     },
     {
       id: 'actions',
-      header: () => (
-        <div className="flex items-center justify-center">
-          <button
-            disabled={loading || actionLoading === 'updateAll'}
-            className={`p-1 rounded-full ${
-              theme === 'dark'
-                ? 'text-white hover:bg-white/10'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-            title="Update All Listeners"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${
-                actionLoading === 'updateAll' ? 'animate-spin' : ''
-              }`}
-            />
-          </button>
-        </div>
-      ),
       cell: ({ row }) => {
         const artist = row.original;
+        const isLoading = actionLoading === artist.id;
+
         return (
-          <div className="flex justify-center">
+          <div className="flex justify-end">
             <DropdownMenu>
-              <DropdownMenuTrigger>
-                <MoreVertical className="h-4 w-4" />
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="h-8 w-8 p-0"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Spinner className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MoreHorizontal className="h-4 w-4" />
+                  )}
+                </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent
+                align="end"
+                className={
+                  theme === 'dark'
+                    ? 'border-white/[0.1] bg-gray-950'
+                    : 'bg-white'
+                }
+              >
                 <DropdownMenuItem
-                  onClick={() => onDelete && onDelete(artist.id)}
-                  className="text-red-600"
+                  onClick={() => {
+                    window.location.href = `/admin/artists/${artist.id}`;
+                  }}
+                  className={
+                    theme === 'dark' ? 'hover:bg-white/10 text-white' : ''
+                  }
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Artist
+                  <Eye className="mr-2 h-4 w-4" />
+                  <span>View Details</span>
                 </DropdownMenuItem>
-                {/* <DropdownMenuSeparator /> */}
-                {/* <DropdownMenuItem
-                  onClick={() => onDelete && onDelete(artist.id)}
-                  className="text-red-600"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Artist
-                </DropdownMenuItem> */}
+
+                {onStatusChange && (
+                  <DropdownMenuItem
+                    onClick={() => onStatusChange(artist.id, artist.isActive)}
+                    className={
+                      theme === 'dark'
+                        ? 'hover:bg-white/10 text-white'
+                        : artist.isActive
+                        ? 'text-orange-600 hover:text-orange-700'
+                        : 'text-green-600 hover:text-green-700'
+                    }
+                  >
+                    {artist.isActive ? (
+                      <>
+                        <Ban className="mr-2 h-4 w-4" />
+                        <span>Deactivate</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        <span>Activate</span>
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                )}
+
+                {onDelete && (
+                  <DropdownMenuItem
+                    onClick={() => onDelete(artist.id)}
+                    className={
+                      theme === 'dark'
+                        ? 'hover:bg-white/10 text-red-500'
+                        : 'text-red-600 hover:text-red-700'
+                    }
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    <span>Delete</span>
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

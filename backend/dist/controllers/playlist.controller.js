@@ -416,6 +416,9 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
             });
             return;
         }
+        if (playlistExists.type === 'NORMAL' && playlistExists.name === 'Vibe Rewind') {
+            yield playlistService.updateVibeRewindPlaylist(userId);
+        }
         let playlist;
         if (isSystemPlaylist || isPublicPlaylist) {
             playlist = yield prisma.playlist.findUnique({

@@ -213,7 +213,7 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         const isValidPassword = yield bcrypt_1.default.compare(password, user.password);
         if (!isValidPassword) {
-            res.status(401).json({ message: 'Invalid email/user or password' });
+            res.status(401).json({ message: 'Invalid email/username or password' });
             return;
         }
         const updatedUser = yield db_1.default.user.update({

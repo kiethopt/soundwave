@@ -6,7 +6,7 @@ import { api } from '@/utils/api';
 import { ArrowLeft, Check, X } from 'lucide-react';
 import Link from 'next/link';
 import { ArtistRequest } from '@/types';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { Facebook, Instagram } from '@/components/ui/Icons';
 import { useTheme } from '@/contexts/ThemeContext';
 

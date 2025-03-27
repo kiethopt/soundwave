@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 
 export default function ArtistDetail() {
   const { id } = useParams();

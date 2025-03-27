@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateVibeRewindPlaylist = exports.updateRecommendedPlaylistTracks = exports.generateGlobalRecommendedPlaylist = exports.analyzeUserTaste = exports.generatePersonalizedPlaylist = exports.systemPlaylistService = exports.SystemPlaylistService = void 0;
+exports.updateVibeRewindPlaylist = exports.generateGlobalRecommendedPlaylist = exports.analyzeUserTaste = exports.generatePersonalizedPlaylist = exports.systemPlaylistService = exports.SystemPlaylistService = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const ml_matrix_1 = require("ml-matrix");
 const SYSTEM_PLAYLIST_TYPES = {
@@ -125,11 +125,14 @@ class SystemPlaylistService {
                     includeNewReleases: true,
                 });
                 if (recommendedTracks.length > 0) {
-                    const playlistTrackData = recommendedTracks.map((track, index) => ({
-                        playlistId,
-                        trackId: track.id,
-                        trackOrder: index,
-                    }));
+                    const playlistTrackData = recommendedTracks.map((track, index) => {
+                        var _a;
+                        return ({
+                            playlistId,
+                            trackId: (_a = track === null || track === void 0 ? void 0 : track.id) !== null && _a !== void 0 ? _a : '',
+                            trackOrder: index,
+                        });
+                    });
                     yield db_1.default.$transaction([
                         db_1.default.playlistTrack.createMany({
                             data: playlistTrackData,
@@ -1469,20 +1472,17 @@ const generateGlobalRecommendedPlaylist = (...args_1) => __awaiter(void 0, [...a
     }
 });
 exports.generateGlobalRecommendedPlaylist = generateGlobalRecommendedPlaylist;
-const updateRecommendedPlaylistTracks = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        let recommendedPlaylist = yield db_1.default.playlist.findFirst({
-            where: {
-                userId,
-                type: 'NORMAL',
-            },
+        let vibeRewindPlaylist = yield db_1.default.playlist.findFirst({
+            where: { userId, name: 'Vibe Rewind' },
         });
-        if (!recommendedPlaylist) {
-            console.log(`[PlaylistService] No RECOMMENDED PLAYLIST found for user ${userId}, creating one...`);
-            recommendedPlaylist = yield db_1.default.playlist.create({
+        if (!vibeRewindPlaylist) {
+            console.log(`[PlaylistService] Creating new Vibe Rewind playlist for user ${userId}...`);
+            vibeRewindPlaylist = yield db_1.default.playlist.create({
                 data: {
-                    name: 'RECOMMENDED PLAYLIST',
-                    description: 'Danh sách bài hát được gợi ý dựa trên lịch sử nghe nhạc của bạn',
+                    name: 'Vibe Rewind',
+                    description: "Your personal time capsule - tracks you've been vibing to lately",
                     privacy: 'PRIVATE',
                     type: 'NORMAL',
                     userId,
@@ -1490,25 +1490,22 @@ const updateRecommendedPlaylistTracks = (userId) => __awaiter(void 0, void 0, vo
             });
         }
         const userHistory = yield db_1.default.history.findMany({
-            where: {
-                userId,
-                type: 'PLAY',
-                playCount: { gt: 2 },
-            },
+            where: { userId, type: 'PLAY', playCount: { gt: 2 } },
             include: {
-                track: {
-                    include: {
-                        artist: true,
-                        genres: { include: { genre: true } },
-                    },
-                },
+                track: { include: { artist: true, genres: { include: { genre: true } } } },
             },
         });
         if (userHistory.length === 0) {
-            console.log(`[PlaylistService] No tracks with playCount > 2 found for user ${userId}`);
+            console.log(`[PlaylistService] No history found for user ${userId}`);
             return;
         }
-        console.log(`[PlaylistService] Found ${userHistory.length} history entries for user ${userId}`);
+        const topPlayedTracks = yield db_1.default.history.findMany({
+            where: { userId, playCount: { gt: 5 } },
+            include: { track: true },
+            orderBy: { playCount: 'desc' },
+            take: 10,
+        });
+        console.log(`[PlaylistService] Found ${topPlayedTracks.length} frequently played tracks for user ${userId}`);
         const genreCounts = new Map();
         const artistCounts = new Map();
         userHistory.forEach((history) => {
@@ -1525,14 +1522,8 @@ const updateRecommendedPlaylistTracks = (userId) => __awaiter(void 0, void 0, vo
                 }
             }
         });
-        const topGenres = [...genreCounts.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map((entry) => entry[0]);
-        const topArtists = [...artistCounts.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map((entry) => entry[0]);
+        const topGenres = [...genreCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map((entry) => entry[0]);
+        const topArtists = [...artistCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map((entry) => entry[0]);
         console.log(`[PlaylistService] Top genres: ${topGenres}`);
         console.log(`[PlaylistService] Top artists: ${topArtists}`);
         const recommendedTracks = yield db_1.default.track.findMany({
@@ -1545,16 +1536,12 @@ const updateRecommendedPlaylistTracks = (userId) => __awaiter(void 0, void 0, vo
             },
             include: { artist: true, album: true },
             orderBy: { playCount: 'desc' },
-            take: 5,
+            take: 10,
         });
         console.log(`[PlaylistService] Found ${recommendedTracks.length} content-based tracks`);
         const similarUsers = yield db_1.default.history.findMany({
             where: {
-                trackId: {
-                    in: userHistory
-                        .map((h) => h.trackId)
-                        .filter((id) => id !== null),
-                },
+                trackId: { in: userHistory.map((h) => h.trackId).filter((id) => id !== null) },
                 userId: { not: userId },
             },
             select: { userId: true },
@@ -1571,117 +1558,43 @@ const updateRecommendedPlaylistTracks = (userId) => __awaiter(void 0, void 0, vo
         console.log(`[PlaylistService] Found ${collaborativeTracks.length} collaborative filtering tracks`);
         const finalRecommendedTracks = [
             ...new Set([
+                ...topPlayedTracks.map((t) => t.track),
                 ...recommendedTracks,
                 ...collaborativeTracks.map((t) => t.track),
             ]),
         ].slice(0, 10);
         if (finalRecommendedTracks.length === 0) {
-            console.log(`[PlaylistService] No tracks found to update in RECOMMENDED PLAYLIST for user ${userId}`);
+            console.log(`[PlaylistService] No tracks found to update in Vibe Rewind for user ${userId}`);
             return;
         }
-        yield db_1.default.playlistTrack.deleteMany({
-            where: {
-                playlistId: recommendedPlaylist.id,
-            },
-        });
-        const playlistTrackData = recommendedTracks.map((track, index) => ({
-            playlistId: recommendedPlaylist.id,
-            trackId: track.id,
-            trackOrder: index,
-        }));
-        yield db_1.default.$transaction([
-            db_1.default.playlistTrack.createMany({
-                data: playlistTrackData,
-            }),
-            db_1.default.playlist.update({
-                where: { id: recommendedPlaylist.id },
-                data: {
-                    totalTracks: recommendedTracks.length,
-                    totalDuration: recommendedTracks.reduce((sum, track) => sum + (track.duration || 0), 0),
-                },
-            }),
-        ]);
-        console.log(`[PlaylistService] Successfully updated tracks for RECOMMENDED PLAYLIST for user ${userId}`);
-    }
-    catch (error) {
-        console.error(`[PlaylistService] Error updating tracks for RECOMMENDED PLAYLIST for user ${userId}:`, error);
-        throw error;
-    }
-});
-exports.updateRecommendedPlaylistTracks = updateRecommendedPlaylistTracks;
-const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        let vibeRewindPlaylist = yield db_1.default.playlist.findFirst({
-            where: {
-                userId,
-                name: 'Vibe Rewind',
-            },
-        });
-        if (!vibeRewindPlaylist) {
-            console.log(`[PlaylistService] No Vibe Rewind playlist found for user ${userId}, creating one...`);
-            vibeRewindPlaylist = yield db_1.default.playlist.create({
-                data: {
-                    name: 'Vibe Rewind',
-                    description: "Your personal time capsule - tracks you've been vibing to lately",
-                    privacy: 'PRIVATE',
-                    type: 'NORMAL',
-                    userId,
-                },
-            });
-        }
-        const userHistory = yield db_1.default.history.findMany({
-            where: {
-                userId,
-                type: 'PLAY',
-            },
-            include: {
-                track: {
-                    include: {
-                        artist: true,
-                        album: true,
-                    },
-                },
-            },
-            orderBy: {
-                updatedAt: 'desc',
-            },
-            distinct: ['trackId'],
-            take: 30,
-        });
-        if (userHistory.length === 0) {
-            console.log(`[PlaylistService] No playback history found for user ${userId}`);
-            return;
-        }
-        const validHistory = userHistory.filter((history) => history.track !== null);
-        console.log(`[PlaylistService] Found ${validHistory.length} recent tracks for user ${userId}`);
         yield db_1.default.playlistTrack.deleteMany({
             where: {
                 playlistId: vibeRewindPlaylist.id,
             },
         });
-        const playlistTrackData = validHistory.map((history, index) => ({
+        const playlistTrackData = finalRecommendedTracks
+            .filter((track) => (track === null || track === void 0 ? void 0 : track.id) !== undefined)
+            .map((track, index) => ({
             playlistId: vibeRewindPlaylist.id,
-            trackId: history.track.id,
+            trackId: track.id,
             trackOrder: index,
         }));
-        const totalDuration = validHistory.reduce((sum, history) => sum + (history.track.duration || 0), 0);
         yield db_1.default.$transaction([
             db_1.default.playlistTrack.createMany({
-                data: playlistTrackData,
+                data: playlistTrackData.filter((track, index, self) => self.findIndex((t) => t.playlistId === track.playlistId && t.trackId === track.trackId) === index),
             }),
             db_1.default.playlist.update({
                 where: { id: vibeRewindPlaylist.id },
                 data: {
-                    totalTracks: validHistory.length,
-                    totalDuration: totalDuration,
-                    updatedAt: new Date(),
+                    totalTracks: finalRecommendedTracks.length,
+                    totalDuration: finalRecommendedTracks.reduce((sum, track) => sum + ((track === null || track === void 0 ? void 0 : track.duration) || 0), 0),
                 },
             }),
         ]);
-        console.log(`[PlaylistService] Successfully updated Vibe Rewind playlist for user ${userId}`);
+        console.log(`[PlaylistService] Successfully updated tracks for Vibe Rewind for user ${userId}`);
     }
     catch (error) {
-        console.error(`[PlaylistService] Error updating Vibe Rewind playlist for user ${userId}:`, error);
+        console.error(`[PlaylistService] Error updating tracks for Vibe Rewind for user ${userId}:`, error);
         throw error;
     }
 });

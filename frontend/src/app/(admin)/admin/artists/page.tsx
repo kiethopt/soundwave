@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/utils/api';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useDataTable } from '@/hooks/useDataTable';
 import { getArtistColumns } from '@/components/ui/data-table/data-table-columns';
@@ -77,13 +77,97 @@ export default function ArtistManagement() {
         )
       );
 
-      toast.success(
-        `Artist ${isActive ? 'deactivated' : 'activated'} successfully`
-      );
+      toast.success('Artist updated successfully');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to update artist'
+      toast.error('Failed to update artist');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Handle bulk activation of artists
+  const handleBulkActivate = async () => {
+    if (!selectedRows.length) return;
+
+    const confirmMessage = `Activate ${selectedRows.length} selected artists?`;
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      // Only target inactive artists
+      const inactiveArtists = selectedRows.filter((artist) => !artist.isActive);
+
+      if (inactiveArtists.length === 0) {
+        toast.error('All selected artists are already active');
+        return;
+      }
+
+      setActionLoading('bulkOperation');
+
+      await Promise.all(
+        inactiveArtists.map((artist) =>
+          api.admin.updateArtist(artist.id, { isActive: true }, token)
+        )
       );
+
+      // Update local state
+      setArtists((prev) =>
+        prev.map((artist) =>
+          inactiveArtists.some((a) => a.id === artist.id)
+            ? { ...artist, isActive: true }
+            : artist
+        )
+      );
+
+      toast.success('Artists activated successfully');
+    } catch (error) {
+      toast.error('Failed to activate artists');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Handle bulk deactivation of artists
+  const handleBulkDeactivate = async () => {
+    if (!selectedRows.length) return;
+
+    const confirmMessage = `Deactivate ${selectedRows.length} selected artists?`;
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      // Only target active artists
+      const activeArtists = selectedRows.filter((artist) => artist.isActive);
+
+      if (activeArtists.length === 0) {
+        toast.error('All selected artists are already inactive');
+        return;
+      }
+
+      setActionLoading('bulkOperation');
+
+      await Promise.all(
+        activeArtists.map((artist) =>
+          api.admin.updateArtist(artist.id, { isActive: false }, token)
+        )
+      );
+
+      // Update local state
+      setArtists((prev) =>
+        prev.map((artist) =>
+          activeArtists.some((a) => a.id === artist.id)
+            ? { ...artist, isActive: false }
+            : artist
+        )
+      );
+
+      toast.success('Artists deactivated successfully');
+    } catch (error) {
+      toast.error('Failed to deactivate artists');
     } finally {
       setActionLoading(null);
     }
@@ -104,48 +188,13 @@ export default function ArtistManagement() {
       await Promise.all(ids.map((id) => api.admin.deleteArtist(id, token)));
       setArtists((prev) => prev.filter((artist) => !ids.includes(artist.id)));
       setSelectedRows([]);
-      toast.success(
-        ids.length === 1
-          ? 'Artist deleted successfully'
-          : `Deleted ${ids.length} artists successfully`
-      );
+      toast.success('Artist deleted successfully');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to delete artist(s)'
-      );
+      toast.error('Failed to delete artist(s)');
     } finally {
       if (!Array.isArray(artistIds)) setActionLoading(null);
     }
   };
-
-  // const handleUpdateAllListeners = async () => {
-  //   try {
-  //     setActionLoading('updateAll');
-  //     const token = localStorage.getItem('userToken');
-  //     if (!token) throw new Error('No authentication token found');
-  //     await api.admin.updateAllMonthlyListeners(token);
-  //     toast.success("All artists' monthly listeners updated successfully");
-  //     // Refresh data
-  //     const params = new URLSearchParams();
-  //     params.set('page', currentPage.toString());
-  //     params.set('limit', limit.toString());
-  //     if (searchInput) params.append('q', searchInput);
-  //     if (statusFilter.length === 1) params.append('status', statusFilter[0]);
-  //     const response = await api.admin.getAllArtists(
-  //       token,
-  //       currentPage,
-  //       limit,
-  //       params.toString()
-  //     );
-  //     setArtists(response.artists);
-  //   } catch (error) {
-  //     toast.error(
-  //       error instanceof Error ? error.message : 'Failed to update listeners'
-  //     );
-  //   } finally {
-  //     setActionLoading(null);
-  //   }
-  // };
 
   // Define columns
   const columns = getArtistColumns({
@@ -225,6 +274,8 @@ export default function ArtistManagement() {
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
           onDelete: () => handleDeleteArtist(selectedRows.map((row) => row.id)),
+          onActivate: handleBulkActivate,
+          onDeactivate: handleBulkDeactivate,
           showExport: true,
           exportData: {
             data: artists,

@@ -22,6 +22,8 @@ interface DataTableWrapperProps<TData> {
     onSearchChange: (value: string) => void;
     selectedRowsCount?: number;
     onDelete?: () => void;
+    onActivate?: () => void;
+    onDeactivate?: () => void;
     showExport?: boolean;
     exportData?: {
       data: any[];
@@ -70,6 +72,8 @@ export function DataTableWrapper<TData>({
           onSearchChange={handleSearchChange}
           selectedRowsCount={toolbar.selectedRowsCount}
           onDelete={toolbar.onDelete}
+          onActivate={toolbar.onActivate}
+          onDeactivate={toolbar.onDeactivate}
           showExport={toolbar.showExport}
           exportData={toolbar.exportData}
           table={table}

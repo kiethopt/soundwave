@@ -17,7 +17,7 @@ import type { Track, Album, ArtistProfile, User, Genre } from '@/types';
 import Image from 'next/image';
 import { Facebook, Instagram, Verified } from '@/components/ui/Icons';
 import { api } from '@/utils/api';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { Switch } from '@/components/ui/switch';
 import {
   Select,

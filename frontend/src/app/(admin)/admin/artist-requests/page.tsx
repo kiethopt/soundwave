@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useDataTable } from '@/hooks/useDataTable';
 import { getArtistRequestColumns } from '@/components/ui/data-table/data-table-columns';
@@ -45,7 +45,7 @@ export default function ArtistRequestManagement() {
       if (!token) throw new Error('No authentication token found');
 
       const filters = {
-        search: params.get('q') || '',
+        search: params.get('search') || '',
         startDate: params.get('startDate')
           ? new Date(params.get('startDate')!)
           : undefined,
