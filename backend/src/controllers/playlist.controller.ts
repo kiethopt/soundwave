@@ -116,6 +116,7 @@ export const getSystemPlaylist: RequestHandler = async (req, res, next) => {
       playlist?.tracks.map((pt) => ({
         id: pt.track.id,
         title: pt.track.title,
+        audioUrl: pt.track.audioUrl,
         duration: pt.track.duration,
         coverUrl: pt.track.coverUrl,
         artist: pt.track.artist,
@@ -167,9 +168,27 @@ export const getPersonalizedSystemPlaylists = async (
       },
     });
 
+    const formattedPlaylists = playlists.map(playlist => {
+      const formattedTracks = playlist.tracks.map(pt => ({
+        id: pt.track.id,
+        title: pt.track.title,
+        audioUrl: pt.track.audioUrl, // Ensure audioUrl is included
+        duration: pt.track.duration,
+        coverUrl: pt.track.coverUrl, 
+        artist: pt.track.artist,
+        album: pt.track.album,
+        createdAt: pt.track.createdAt.toISOString(),
+      }));
+      
+      return {
+        ...playlist,
+        tracks: formattedTracks
+      };
+    });
+
     res.json({
       success: true,
-      data: playlists,
+      data: formattedPlaylists,
     });
   } catch (error) {
     handleError(res, error, 'Get personalized system playlists');
@@ -387,6 +406,7 @@ export const getPlaylists: RequestHandler = async (
         const formattedTracks = playlist.tracks.map((pt: any) => ({
           id: pt.track.id,
           title: pt.track.title,
+          audioUrl: pt.track.audioUrl, // Add audioUrl here
           duration: pt.track.duration,
           coverUrl: pt.track.coverUrl,
           artist: pt.track.artist,
@@ -594,6 +614,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
     const formattedTracks = playlist.tracks.map((pt) => ({
       id: pt.track.id,
       title: pt.track.title,
+      audioUrl: pt.track.audioUrl, // Add this line to ensure audioUrl is included
       duration: pt.track.duration,
       coverUrl: pt.track.coverUrl,
       artist: pt.track.artist,
@@ -1043,6 +1064,7 @@ export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
       const formattedTracks = playlist.tracks.map((pt: any) => ({
         id: pt.track.id,
         title: pt.track.title,
+        audioUrl: pt.track.audioUrl, // Add this line to ensure audioUrl is included
         duration: pt.track.duration,
         coverUrl: pt.track.coverUrl,
         artist: pt.track.artist,
