@@ -86,10 +86,77 @@ export const updateUser = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const avatarFile = req.file;
+    const { isActive, reason, ...userData } = req.body;
+
+    // Check if we're updating isActive status (activating/deactivating)
+    const isStatusUpdate = req.body.hasOwnProperty('isActive');
+
+    // Handle user activation/deactivation with reason
+    if (isStatusUpdate) {
+      // Properly convert isActive to boolean
+      const isActiveBool =
+        isActive === 'true' || isActive === true ? true : false;
+
+      const currentUser = await prisma.user.findUnique({
+        where: { id },
+        select: { isActive: true },
+      });
+
+      if (currentUser && currentUser.isActive && !isActiveBool) {
+        // User is being deactivated
+        const updatedUser = await adminService.updateUserInfo(id, {
+          isActive: false,
+        });
+
+        // Send notification if reason is provided
+        if (reason) {
+          await prisma.notification.create({
+            data: {
+              type: 'ACCOUNT_DEACTIVATED',
+              message: `Your account has been deactivated. Reason: ${reason}`,
+              recipientType: 'USER',
+              userId: id,
+              isRead: false,
+            },
+          });
+        }
+
+        res.json({
+          message: 'User deactivated successfully',
+          user: updatedUser,
+        });
+        return;
+      } else if (currentUser && !currentUser.isActive && isActiveBool) {
+        // User is being activated
+        const updatedUser = await adminService.updateUserInfo(id, {
+          isActive: true,
+        });
+
+        // Send notification for reactivation
+        await prisma.notification.create({
+          data: {
+            type: 'ACCOUNT_ACTIVATED',
+            message: 'Your account has been reactivated.',
+            recipientType: 'USER',
+            userId: id,
+            isRead: false,
+          },
+        });
+
+        res.json({
+          message: 'User activated successfully',
+          user: updatedUser,
+        });
+        return;
+      }
+    }
+
+    // Regular user update (not status change)
     const updatedUser = await adminService.updateUserInfo(
       id,
-      req.body,
-      req.file
+      userData,
+      avatarFile
     );
 
     res.json({
@@ -123,10 +190,82 @@ export const updateArtist = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const avatarFile = req.file;
+    const { isActive, reason, ...artistData } = req.body;
+
+    // Check if we're updating isActive status (activating/deactivating)
+    const isStatusUpdate = req.body.hasOwnProperty('isActive');
+
+    // Handle artist activation/deactivation with reason
+    if (isStatusUpdate) {
+      // Properly convert isActive to boolean
+      const isActiveBool =
+        isActive === 'true' || isActive === true ? true : false;
+
+      const currentArtist = await prisma.artistProfile.findUnique({
+        where: { id },
+        select: {
+          isActive: true,
+          userId: true,
+        },
+      });
+
+      if (currentArtist && currentArtist.isActive && !isActiveBool) {
+        // Artist is being deactivated
+        const updatedArtist = await adminService.updateArtistInfo(id, {
+          isActive: false,
+        });
+
+        // Send notification if reason is provided
+        if (reason && currentArtist.userId) {
+          await prisma.notification.create({
+            data: {
+              type: 'ACCOUNT_DEACTIVATED',
+              message: `Your artist account has been deactivated. Reason: ${reason}`,
+              recipientType: 'USER',
+              userId: currentArtist.userId,
+              isRead: false,
+            },
+          });
+        }
+
+        res.json({
+          message: 'Artist deactivated successfully',
+          artist: updatedArtist,
+        });
+        return;
+      } else if (currentArtist && !currentArtist.isActive && isActiveBool) {
+        // Artist is being activated
+        const updatedArtist = await adminService.updateArtistInfo(id, {
+          isActive: true,
+        });
+
+        // Send notification for reactivation
+        if (currentArtist.userId) {
+          await prisma.notification.create({
+            data: {
+              type: 'ACCOUNT_ACTIVATED',
+              message: 'Your artist account has been reactivated.',
+              recipientType: 'USER',
+              userId: currentArtist.userId,
+              isRead: false,
+            },
+          });
+        }
+
+        res.json({
+          message: 'Artist activated successfully',
+          artist: updatedArtist,
+        });
+        return;
+      }
+    }
+
+    // Regular artist update (not status change)
     const updatedArtist = await adminService.updateArtistInfo(
       id,
-      req.body,
-      req.file
+      artistData,
+      avatarFile
     );
 
     res.json({

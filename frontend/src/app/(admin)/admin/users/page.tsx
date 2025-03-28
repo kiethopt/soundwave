@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import type { User } from '@/types';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -20,6 +21,7 @@ import { useDataTable } from '@/hooks/useDataTable';
 import {
   EditUserModal,
   UserInfoModal,
+  DeactivateModal,
 } from '@/components/ui/data-table/data-table-modals';
 
 export default function UserManagement() {
@@ -69,10 +71,17 @@ export default function UserManagement() {
   const [updatingUser, setUpdatingUser] = useState<User | null>(null);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
 
+  // Add new state variables
+  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [userIdToDeactivate, setUserIdToDeactivate] = useState<string | null>(
+    null
+  );
+  const [isBulkDeactivating, setIsBulkDeactivating] = useState(false);
+
   // Action handlers
   const handleUpdateUser = async (
     userId: string,
-    data: FormData | { isActive: boolean }
+    data: FormData | { isActive: boolean; reason?: string }
   ) => {
     try {
       const token = localStorage.getItem('userToken');
@@ -82,34 +91,14 @@ export default function UserManagement() {
       }
 
       setActionLoading(userId);
-
-      const isFormData = data instanceof FormData;
-      const requestData = isFormData ? data : JSON.stringify(data);
-
-      // Gửi yêu cầu cập nhật
-      await api.admin.updateUser(userId, requestData, token);
-
-      // Cập nhật UI
-      const params = new URLSearchParams();
-      params.set('page', currentPage.toString());
-      params.set('limit', limit.toString());
-      if (searchInput) params.append('q', searchInput);
-      if (statusFilter.length === 1) params.append('status', statusFilter[0]);
-
-      const response = await api.admin.getAllUsers(
-        token,
-        currentPage,
-        limit,
-        params.toString()
+      const response = await api.admin.updateUser(userId, data, token);
+      setUsers(
+        users.map((user) => (user.id === userId ? response.user : user))
       );
-
-      setUsers(response.users);
-      setUpdatingUser(null);
       toast.success('User updated successfully');
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to update user'
-      );
+      console.error('Error updating user:', error);
+      toast.error('Failed to update user');
     } finally {
       setActionLoading(null);
     }
@@ -172,29 +161,113 @@ export default function UserManagement() {
     }
   };
 
+  // Update handleStatusChange to include token initialization
+  const handleStatusChange = async (userId: string, isActive: boolean) => {
+    if (!isActive) {
+      // If deactivating, show the modal
+      setUserIdToDeactivate(userId);
+      setIsDeactivateModalOpen(true);
+      return;
+    }
+
+    // If activating, proceed directly
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      setActionLoading(userId);
+      await api.admin.updateUser(userId, { isActive }, token);
+      setUsers(
+        users.map((user) => (user.id === userId ? { ...user, isActive } : user))
+      );
+      toast.success(
+        `User ${isActive ? 'activated' : 'deactivated'} successfully`
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : `Failed to ${isActive ? 'activate' : 'deactivate'} user`
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Add function to handle deactivation with reason
+  const handleDeactivateConfirm = async (reason: string) => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      setIsDeactivateModalOpen(false);
+
+      if (isBulkDeactivating && selectedRows.length > 0) {
+        // Bulk deactivation
+        setActionLoading('bulk');
+        await Promise.all(
+          selectedRows.map((user) =>
+            api.admin.updateUser(user.id, { isActive: false, reason }, token)
+          )
+        );
+
+        setUsers(
+          users.map((user) =>
+            selectedRows.some((selected) => selected.id === user.id)
+              ? { ...user, isActive: false }
+              : user
+          )
+        );
+
+        toast.success(`${selectedRows.length} users deactivated successfully`);
+        setSelectedRows([]);
+      } else if (userIdToDeactivate) {
+        // Single user deactivation
+        setActionLoading(userIdToDeactivate);
+        await api.admin.updateUser(
+          userIdToDeactivate,
+          { isActive: false, reason },
+          token
+        );
+
+        setUsers(
+          users.map((user) =>
+            user.id === userIdToDeactivate ? { ...user, isActive: false } : user
+          )
+        );
+
+        toast.success('User deactivated successfully');
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to deactivate user(s)'
+      );
+    } finally {
+      setActionLoading(null);
+      setUserIdToDeactivate(null);
+      setIsBulkDeactivating(false);
+    }
+  };
+
+  // Modify handleBulkDeactivate to use modal
+  const handleBulkDeactivate = async () => {
+    if (
+      !selectedRows.length ||
+      !confirm(`Deactivate ${selectedRows.length} selected users?`)
+    )
+      return;
+
+    setIsBulkDeactivating(true);
+    setIsDeactivateModalOpen(true);
+  };
+
   // Table configuration
   const columns = getUserColumns({
     theme,
     onDelete: handleDeleteUsers,
     onEdit: setUpdatingUser,
     onView: setViewingUser,
-    onStatusChange: async (userId, isActive) => {
-      try {
-        const token = localStorage.getItem('userToken');
-        if (!token) {
-          toast.error('No authentication token found');
-          return;
-        }
-
-        setActionLoading(userId);
-        await handleUpdateUser(userId, { isActive });
-      } catch (error) {
-        console.error('Error toggling user status:', error);
-        toast.error('Failed to update user status');
-      } finally {
-        setActionLoading(null);
-      }
-    },
+    onStatusChange: handleStatusChange,
   });
 
   const table = useReactTable({
@@ -322,6 +395,18 @@ export default function UserManagement() {
         user={viewingUser}
         onClose={() => setViewingUser(null)}
         theme={theme}
+      />
+
+      <DeactivateModal
+        isOpen={isDeactivateModalOpen}
+        onClose={() => {
+          setIsDeactivateModalOpen(false);
+          setUserIdToDeactivate(null);
+          setIsBulkDeactivating(false);
+        }}
+        onConfirm={handleDeactivateConfirm}
+        theme={theme}
+        entityType="user"
       />
     </div>
   );

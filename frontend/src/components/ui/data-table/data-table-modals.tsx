@@ -774,13 +774,6 @@ export function EditArtistModal({
   );
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isActive, setIsActive] = useState(artist?.isActive ?? false);
-
-  useEffect(() => {
-    if (artist) {
-      setIsActive(artist.isActive);
-    }
-  }, [artist]);
 
   if (!artist) return null;
 
@@ -795,7 +788,6 @@ export function EditArtistModal({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    formData.append('isActive', isActive.toString());
 
     try {
       const token = localStorage.getItem('userToken');
@@ -904,29 +896,6 @@ export function EditArtistModal({
             />
           </div>
 
-          {/* Account Status */}
-          <div className="space-y-2">
-            <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
-            >
-              Account Status
-            </span>
-            <div className="flex items-center justify-between">
-              <span
-                className={theme === 'dark' ? 'text-white' : 'text-gray-700'}
-              >
-                {isActive ? 'Active' : 'Inactive'}
-              </span>
-              <Switch
-                checked={isActive}
-                onCheckedChange={setIsActive}
-                className={theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'}
-              />
-            </div>
-          </div>
-
           {/* Buttons */}
           <div className="flex justify-end gap-3">
             <Button
@@ -972,12 +941,10 @@ export function EditUserModal({
 }: EditUserModalProps) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isActive, setIsActive] = useState(user?.isActive ?? false);
   const [role, setRole] = useState<string>(user?.role ?? 'USER');
 
   useEffect(() => {
     if (user) {
-      setIsActive(user.isActive);
       setRole(user.role);
     }
   }, [user]);
@@ -987,7 +954,6 @@ export function EditUserModal({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    formData.append('isActive', isActive.toString());
     formData.append('role', role);
     onSubmit(user.id, formData);
   };
@@ -1128,29 +1094,6 @@ export function EditUserModal({
                   : 'bg-white border-gray-300'
               }`}
             />
-          </div>
-
-          {/* Account Status */}
-          <div className="space-y-2">
-            <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
-            >
-              Account Status
-            </span>
-            <div className="flex items-center justify-between">
-              <span
-                className={theme === 'dark' ? 'text-white' : 'text-gray-700'}
-              >
-                {isActive ? 'Active' : 'Inactive'}
-              </span>
-              <Switch
-                checked={isActive}
-                onCheckedChange={setIsActive}
-                className={theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'}
-              />
-            </div>
           </div>
 
           {/* Role */}
@@ -1451,26 +1394,6 @@ export function UserInfoModal({
               >
                 {user.email}
               </p>
-              <div className="flex items-center mt-1 space-x-2">
-                <span
-                  className={`px-2 py-1 text-xs rounded-full ${
-                    user.role === 'ADMIN'
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-blue-100 text-blue-800'
-                  }`}
-                >
-                  {user.role}
-                </span>
-                <span
-                  className={`px-2 py-1 text-xs rounded-full ${
-                    user.isActive
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {user.isActive ? 'Active' : 'Inactive'}
-                </span>
-              </div>
             </div>
           </div>
 
@@ -1670,22 +1593,45 @@ export function UserInfoModal({
   );
 }
 
-interface RejectModalProps {
+interface ActionReasonModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (reason: string) => void;
+  title: string;
+  description: string;
+  actionText: string;
   theme?: 'light' | 'dark';
+  predefinedReasons?: string[];
 }
 
-export function RejectModal({
+export function ActionReasonModal({
   isOpen,
   onClose,
   onConfirm,
+  title,
+  description,
+  actionText,
   theme = 'light',
-}: RejectModalProps) {
+  predefinedReasons = [],
+}: ActionReasonModalProps) {
   const [reason, setReason] = useState('');
+  const [selectedPredefined, setSelectedPredefined] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (selectedPredefined) {
+      setReason(selectedPredefined);
+    }
+  }, [selectedPredefined]);
 
   if (!isOpen) return null;
+
+  const handleConfirm = () => {
+    onConfirm(reason);
+    setReason('');
+    setSelectedPredefined(null);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1705,25 +1651,64 @@ export function RejectModal({
                 theme === 'light' ? 'text-gray-900' : 'text-white'
               }`}
             >
-              Reject Artist Request
+              {title}
             </DialogTitle>
             <DialogDescription
               className={`mb-4 text-sm ${
                 theme === 'light' ? 'text-gray-600' : 'text-gray-300'
               }`}
             >
-              Please provide a reason for rejection. This will be sent to the
-              user.
+              {description}
             </DialogDescription>
           </DialogHeader>
 
+          {predefinedReasons.length > 0 && (
+            <div className="mb-4">
+              <div
+                className={`text-sm font-medium mb-2 ${
+                  theme === 'light' ? 'text-gray-700' : 'text-gray-200'
+                }`}
+              >
+                Select a reason:
+              </div>
+              <div className="space-y-2">
+                {predefinedReasons.map((preReason) => (
+                  <div
+                    key={preReason}
+                    onClick={() => setSelectedPredefined(preReason)}
+                    className={`p-2 rounded-md cursor-pointer text-sm ${
+                      selectedPredefined === preReason
+                        ? theme === 'light'
+                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                          : 'bg-blue-900 text-blue-100 border border-blue-700'
+                        : theme === 'light'
+                        ? 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                    }`}
+                  >
+                    {preReason}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div
+            className={`text-sm font-medium mb-2 ${
+              theme === 'light' ? 'text-gray-700' : 'text-gray-200'
+            }`}
+          >
+            {predefinedReasons.length > 0
+              ? 'Or enter a custom reason:'
+              : 'Enter a reason:'}
+          </div>
           <textarea
             className={`w-full h-32 px-3 py-2 text-sm rounded-md border ${
               theme === 'light'
                 ? 'border-gray-300 focus:border-blue-500 bg-white text-gray-900'
                 : 'border-gray-700 focus:border-blue-400 bg-gray-700 text-white'
             } focus:outline-none focus:ring-1 focus:ring-blue-500`}
-            placeholder="Enter rejection reason..."
+            placeholder="Enter reason..."
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           />
@@ -1739,14 +1724,88 @@ export function RejectModal({
 
             <Button
               variant="destructive"
-              onClick={() => onConfirm(reason)}
-              className={theme === 'dark' ? 'bg-red-600 hover:bg-red-700' : ''}
+              onClick={handleConfirm}
+              disabled={!reason.trim()}
+              className={`${
+                theme === 'dark' ? 'bg-red-600 hover:bg-red-700' : ''
+              } ${!reason.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              Reject
+              {actionText}
             </Button>
           </div>
         </DialogContent>
       </DialogPortal>
     </Dialog>
+  );
+}
+
+interface RejectModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+  theme?: 'light' | 'dark';
+}
+
+export function RejectModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  theme = 'light',
+}: RejectModalProps) {
+  return (
+    <ActionReasonModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onConfirm={onConfirm}
+      title="Reject Artist Request"
+      description="Please provide a reason for rejection. This will be sent to the user."
+      actionText="Reject"
+      theme={theme}
+      predefinedReasons={[
+        'Incomplete or insufficient artist information',
+        'Invalid social media accounts or links',
+        "Doesn't meet our artist verification criteria",
+        'Inappropriate content in artist profile',
+      ]}
+    />
+  );
+}
+
+interface DeactivateModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+  theme?: 'light' | 'dark';
+  entityType?: 'user' | 'artist';
+}
+
+export function DeactivateModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  theme = 'light',
+  entityType = 'user',
+}: DeactivateModalProps) {
+  const title = `Deactivate ${entityType === 'user' ? 'User' : 'Artist'}`;
+  const description = `Please provide a reason for deactivating this ${entityType}. This will be sent to the ${entityType}.`;
+
+  const predefinedReasons = [
+    'Violation of terms of service',
+    'Inappropriate content or behavior',
+    'Account inactivity',
+    'User requested deactivation',
+  ];
+
+  return (
+    <ActionReasonModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onConfirm={onConfirm}
+      title={title}
+      description={description}
+      actionText="Deactivate"
+      theme={theme}
+      predefinedReasons={predefinedReasons}
+    />
   );
 }

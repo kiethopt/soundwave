@@ -89,7 +89,17 @@ export const runValidations = (validations: (string | null)[]) => {
 // Convert string value to boolean
 export const toBooleanValue = (value: any): boolean | undefined => {
   if (value === undefined) return undefined;
-  return value === 'true' || value === true;
+
+  // If it's already a boolean, return it directly
+  if (typeof value === 'boolean') return value;
+
+  // Convert strings to boolean
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true';
+  }
+
+  // For other types, try to convert to boolean
+  return Boolean(value);
 };
 
 // Handle common errors

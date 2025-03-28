@@ -271,7 +271,15 @@ export interface Playlist {
 
 export interface Notification {
   id: string;
-  type: 'NEW_TRACK' | 'NEW_ALBUM' | 'EVENT_REMINDER' | 'NEW_FOLLOW';
+  type:
+    | 'NEW_TRACK'
+    | 'NEW_ALBUM'
+    | 'EVENT_REMINDER'
+    | 'NEW_FOLLOW'
+    | 'ARTIST_REQUEST_APPROVE'
+    | 'ARTIST_REQUEST_REJECT'
+    | 'ACCOUNT_ACTIVATED'
+    | 'ACCOUNT_DEACTIVATED';
   message: string;
   isRead: boolean;
   recipientType: 'USER' | 'ARTIST'; // Loại người nhận (USER hoặc ARTIST)

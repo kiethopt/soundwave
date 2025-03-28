@@ -62,7 +62,12 @@ exports.runValidations = runValidations;
 const toBooleanValue = (value) => {
     if (value === undefined)
         return undefined;
-    return value === 'true' || value === true;
+    if (typeof value === 'boolean')
+        return value;
+    if (typeof value === 'string') {
+        return value.toLowerCase() === 'true';
+    }
+    return Boolean(value);
 };
 exports.toBooleanValue = toBooleanValue;
 const handleError = (res, error, operation) => {

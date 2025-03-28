@@ -8,6 +8,7 @@ import { useDataTable } from '@/hooks/useDataTable';
 import { getArtistColumns } from '@/components/ui/data-table/data-table-columns';
 import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import { ArtistProfile } from '@/types';
+import { DeactivateModal } from '@/components/ui/data-table/data-table-modals';
 import {
   ColumnFiltersState,
   getCoreRowModel,
@@ -62,26 +63,142 @@ export default function ArtistManagement() {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
 
+  // Add new state variables for deactivation modal
+  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [artistIdToDeactivate, setArtistIdToDeactivate] = useState<
+    string | null
+  >(null);
+  const [isBulkDeactivating, setIsBulkDeactivating] = useState(false);
+
   // Action handlers
   const handleArtistStatus = async (artistId: string, isActive: boolean) => {
+    if (isActive) {
+      setArtistIdToDeactivate(artistId);
+      setIsDeactivateModalOpen(true);
+      return;
+    }
+
     try {
-      setActionLoading(artistId);
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      await api.admin.updateArtist(artistId, { isActive: !isActive }, token);
+      setActionLoading(artistId);
+
+      await api.admin.updateArtist(artistId, { isActive: true }, token);
 
       setArtists((prev) =>
         prev.map((artist) =>
-          artist.id === artistId ? { ...artist, isActive: !isActive } : artist
+          artist.id === artistId ? { ...artist, isActive: true } : artist
         )
       );
 
-      toast.success('Artist updated successfully');
-    } catch (error) {
-      toast.error('Failed to update artist');
+      toast.success('Artist activated successfully');
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to activate artist'
+      );
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  // Add function to handle deactivation with reason
+  const handleDeactivateConfirm = async (reason: string) => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      setIsDeactivateModalOpen(false);
+
+      if (isBulkDeactivating && selectedRows.length > 0) {
+        // Bulk deactivation
+        setActionLoading('bulk');
+
+        await Promise.all(
+          selectedRows.map((artist) =>
+            api.admin.updateArtist(
+              artist.id,
+              { isActive: false, reason },
+              token
+            )
+          )
+        );
+
+        setArtists((prev) =>
+          prev.map((artist) =>
+            selectedRows.some((selected) => selected.id === artist.id)
+              ? { ...artist, isActive: false }
+              : artist
+          )
+        );
+
+        toast.success(
+          `${selectedRows.length} artists deactivated successfully`
+        );
+        setSelectedRows([]);
+      } else if (artistIdToDeactivate) {
+        // Single artist deactivation
+        setActionLoading(artistIdToDeactivate);
+
+        await api.admin.updateArtist(
+          artistIdToDeactivate,
+          { isActive: false, reason },
+          token
+        );
+
+        setArtists((prev) =>
+          prev.map((artist) =>
+            artist.id === artistIdToDeactivate
+              ? { ...artist, isActive: false }
+              : artist
+          )
+        );
+
+        toast.success('Artist deactivated successfully');
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to deactivate artist(s)'
+      );
+    } finally {
+      setActionLoading(null);
+      setArtistIdToDeactivate(null);
+      setIsBulkDeactivating(false);
+    }
+  };
+
+  // Modify handleBulkDeactivate to use modal
+  const handleBulkDeactivate = async () => {
+    if (
+      !selectedRows.length ||
+      !confirm(`Deactivate ${selectedRows.length} selected artists?`)
+    )
+      return;
+
+    setIsBulkDeactivating(true);
+    setIsDeactivateModalOpen(true);
+  };
+
+  const handleDeleteArtist = async (artistIds: string | string[]) => {
+    const ids = Array.isArray(artistIds) ? artistIds : [artistIds];
+    const confirmMessage =
+      ids.length === 1
+        ? 'Are you sure you want to delete this artist?'
+        : `Delete ${ids.length} selected artists?`;
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+      if (!Array.isArray(artistIds)) setActionLoading(artistIds);
+      await Promise.all(ids.map((id) => api.admin.deleteArtist(id, token)));
+      setArtists((prev) => prev.filter((artist) => !ids.includes(artist.id)));
+      setSelectedRows([]);
+      toast.success('Artist deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete artist(s)');
+    } finally {
+      if (!Array.isArray(artistIds)) setActionLoading(null);
     }
   };
 
@@ -126,73 +243,6 @@ export default function ArtistManagement() {
       toast.error('Failed to activate artists');
     } finally {
       setActionLoading(null);
-    }
-  };
-
-  // Handle bulk deactivation of artists
-  const handleBulkDeactivate = async () => {
-    if (!selectedRows.length) return;
-
-    const confirmMessage = `Deactivate ${selectedRows.length} selected artists?`;
-    if (!confirm(confirmMessage)) return;
-
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-
-      // Only target active artists
-      const activeArtists = selectedRows.filter((artist) => artist.isActive);
-
-      if (activeArtists.length === 0) {
-        toast.error('All selected artists are already inactive');
-        return;
-      }
-
-      setActionLoading('bulkOperation');
-
-      await Promise.all(
-        activeArtists.map((artist) =>
-          api.admin.updateArtist(artist.id, { isActive: false }, token)
-        )
-      );
-
-      // Update local state
-      setArtists((prev) =>
-        prev.map((artist) =>
-          activeArtists.some((a) => a.id === artist.id)
-            ? { ...artist, isActive: false }
-            : artist
-        )
-      );
-
-      toast.success('Artists deactivated successfully');
-    } catch (error) {
-      toast.error('Failed to deactivate artists');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleDeleteArtist = async (artistIds: string | string[]) => {
-    const ids = Array.isArray(artistIds) ? artistIds : [artistIds];
-    const confirmMessage =
-      ids.length === 1
-        ? 'Are you sure you want to delete this artist?'
-        : `Delete ${ids.length} selected artists?`;
-    if (!confirm(confirmMessage)) return;
-
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-      if (!Array.isArray(artistIds)) setActionLoading(artistIds);
-      await Promise.all(ids.map((id) => api.admin.deleteArtist(id, token)));
-      setArtists((prev) => prev.filter((artist) => !ids.includes(artist.id)));
-      setSelectedRows([]);
-      toast.success('Artist deleted successfully');
-    } catch (error) {
-      toast.error('Failed to delete artist(s)');
-    } finally {
-      if (!Array.isArray(artistIds)) setActionLoading(null);
     }
   };
 
@@ -298,6 +348,18 @@ export default function ArtistManagement() {
             onChange: setStatusFilter,
           },
         }}
+      />
+
+      <DeactivateModal
+        isOpen={isDeactivateModalOpen}
+        onClose={() => {
+          setIsDeactivateModalOpen(false);
+          setArtistIdToDeactivate(null);
+          setIsBulkDeactivating(false);
+        }}
+        onConfirm={handleDeactivateConfirm}
+        theme={theme}
+        entityType="artist"
       />
     </div>
   );

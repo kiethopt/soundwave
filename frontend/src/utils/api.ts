@@ -228,29 +228,70 @@ export const api = {
     getUserById: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/users/${id}`, { method: 'GET' }, token),
 
-    updateUser: async (userId: string, data: FormData | any, token: string) =>
-      fetchWithAuth(
-        `/api/admin/users/${userId}`,
-        {
-          method: 'PUT',
-          body: data,
-        },
-        token
-      ),
+    updateUser: async (
+      userId: string,
+      data: FormData | { isActive?: boolean; reason?: string },
+      token: string
+    ) => {
+      if (data instanceof FormData) {
+        return fetchWithAuth(
+          `/api/admin/users/${userId}`,
+          {
+            method: 'PUT',
+            body: data,
+          },
+          token
+        );
+      } else {
+        const postData = {
+          ...data,
+          isActive: data.isActive?.toString(),
+        };
+
+        return fetchWithAuth(
+          `/api/admin/users/${userId}`,
+          {
+            method: 'PUT',
+            body: JSON.stringify(postData),
+          },
+          token
+        );
+      }
+    },
 
     updateArtist: async (
       artistId: string,
-      data: FormData | any,
+      data: FormData | { isActive?: boolean; reason?: string } | any,
       token: string
-    ) =>
-      fetchWithAuth(
-        `/api/admin/artists/${artistId}`,
-        {
-          method: 'PUT',
-          body: data instanceof FormData ? data : JSON.stringify(data),
-        },
-        token
-      ),
+    ) => {
+      if (data instanceof FormData) {
+        return fetchWithAuth(
+          `/api/admin/artists/${artistId}`,
+          {
+            method: 'PUT',
+            body: data,
+          },
+          token
+        );
+      } else {
+        // Make sure we convert boolean values to strings consistently
+        if (data.hasOwnProperty('isActive')) {
+          data = {
+            ...data,
+            isActive: data.isActive?.toString(),
+          };
+        }
+
+        return fetchWithAuth(
+          `/api/admin/artists/${artistId}`,
+          {
+            method: 'PUT',
+            body: JSON.stringify(data),
+          },
+          token
+        );
+      }
+    },
 
     deleteUser: async (id: string, token: string) =>
       fetchWithAuth(`/api/admin/users/${id}`, { method: 'DELETE' }, token),

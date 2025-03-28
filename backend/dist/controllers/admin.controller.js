@@ -41,6 +41,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -107,7 +118,57 @@ exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const updatedUser = yield adminService.updateUserInfo(id, req.body, req.file);
+        const avatarFile = req.file;
+        const _a = req.body, { isActive, reason } = _a, userData = __rest(_a, ["isActive", "reason"]);
+        const isStatusUpdate = req.body.hasOwnProperty('isActive');
+        if (isStatusUpdate) {
+            const isActiveBool = isActive === 'true' || isActive === true ? true : false;
+            const currentUser = yield db_1.default.user.findUnique({
+                where: { id },
+                select: { isActive: true },
+            });
+            if (currentUser && currentUser.isActive && !isActiveBool) {
+                const updatedUser = yield adminService.updateUserInfo(id, {
+                    isActive: false,
+                });
+                if (reason) {
+                    yield db_1.default.notification.create({
+                        data: {
+                            type: 'ACCOUNT_DEACTIVATED',
+                            message: `Your account has been deactivated. Reason: ${reason}`,
+                            recipientType: 'USER',
+                            userId: id,
+                            isRead: false,
+                        },
+                    });
+                }
+                res.json({
+                    message: 'User deactivated successfully',
+                    user: updatedUser,
+                });
+                return;
+            }
+            else if (currentUser && !currentUser.isActive && isActiveBool) {
+                const updatedUser = yield adminService.updateUserInfo(id, {
+                    isActive: true,
+                });
+                yield db_1.default.notification.create({
+                    data: {
+                        type: 'ACCOUNT_ACTIVATED',
+                        message: 'Your account has been reactivated.',
+                        recipientType: 'USER',
+                        userId: id,
+                        isRead: false,
+                    },
+                });
+                res.json({
+                    message: 'User activated successfully',
+                    user: updatedUser,
+                });
+                return;
+            }
+        }
+        const updatedUser = yield adminService.updateUserInfo(id, userData, avatarFile);
         res.json({
             message: 'User updated successfully',
             user: updatedUser,
@@ -136,7 +197,62 @@ exports.updateUser = updateUser;
 const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const updatedArtist = yield adminService.updateArtistInfo(id, req.body, req.file);
+        const avatarFile = req.file;
+        const _a = req.body, { isActive, reason } = _a, artistData = __rest(_a, ["isActive", "reason"]);
+        const isStatusUpdate = req.body.hasOwnProperty('isActive');
+        if (isStatusUpdate) {
+            const isActiveBool = isActive === 'true' || isActive === true ? true : false;
+            const currentArtist = yield db_1.default.artistProfile.findUnique({
+                where: { id },
+                select: {
+                    isActive: true,
+                    userId: true,
+                },
+            });
+            if (currentArtist && currentArtist.isActive && !isActiveBool) {
+                const updatedArtist = yield adminService.updateArtistInfo(id, {
+                    isActive: false,
+                });
+                if (reason && currentArtist.userId) {
+                    yield db_1.default.notification.create({
+                        data: {
+                            type: 'ACCOUNT_DEACTIVATED',
+                            message: `Your artist account has been deactivated. Reason: ${reason}`,
+                            recipientType: 'USER',
+                            userId: currentArtist.userId,
+                            isRead: false,
+                        },
+                    });
+                }
+                res.json({
+                    message: 'Artist deactivated successfully',
+                    artist: updatedArtist,
+                });
+                return;
+            }
+            else if (currentArtist && !currentArtist.isActive && isActiveBool) {
+                const updatedArtist = yield adminService.updateArtistInfo(id, {
+                    isActive: true,
+                });
+                if (currentArtist.userId) {
+                    yield db_1.default.notification.create({
+                        data: {
+                            type: 'ACCOUNT_ACTIVATED',
+                            message: 'Your artist account has been reactivated.',
+                            recipientType: 'USER',
+                            userId: currentArtist.userId,
+                            isRead: false,
+                        },
+                    });
+                }
+                res.json({
+                    message: 'Artist activated successfully',
+                    artist: updatedArtist,
+                });
+                return;
+            }
+        }
+        const updatedArtist = yield adminService.updateArtistInfo(id, artistData, avatarFile);
         res.json({
             message: 'Artist updated successfully',
             artist: updatedArtist,
