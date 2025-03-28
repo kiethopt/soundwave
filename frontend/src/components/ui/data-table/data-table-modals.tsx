@@ -1669,3 +1669,84 @@ export function UserInfoModal({
     </Dialog>
   );
 }
+
+interface RejectModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+  theme?: 'light' | 'dark';
+}
+
+export function RejectModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  theme = 'light',
+}: RejectModalProps) {
+  const [reason, setReason] = useState('');
+
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogPortal>
+        <DialogOverlay className="fixed inset-0 bg-black/50" />
+        <DialogContent
+          className={cn(
+            'fixed left-[50%] top-[50%] z-50 grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 border p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg',
+            theme === 'dark'
+              ? 'bg-gray-800 border-gray-700'
+              : 'bg-white border-gray-200'
+          )}
+        >
+          <DialogHeader>
+            <DialogTitle
+              className={`text-lg font-semibold mb-4 ${
+                theme === 'light' ? 'text-gray-900' : 'text-white'
+              }`}
+            >
+              Reject Artist Request
+            </DialogTitle>
+            <DialogDescription
+              className={`mb-4 text-sm ${
+                theme === 'light' ? 'text-gray-600' : 'text-gray-300'
+              }`}
+            >
+              Please provide a reason for rejection. This will be sent to the
+              user.
+            </DialogDescription>
+          </DialogHeader>
+
+          <textarea
+            className={`w-full h-32 px-3 py-2 text-sm rounded-md border ${
+              theme === 'light'
+                ? 'border-gray-300 focus:border-blue-500 bg-white text-gray-900'
+                : 'border-gray-700 focus:border-blue-400 bg-gray-700 text-white'
+            } focus:outline-none focus:ring-1 focus:ring-blue-500`}
+            placeholder="Enter rejection reason..."
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+
+          <div className="flex justify-end space-x-3 mt-4">
+            <Button
+              variant={theme === 'light' ? 'outline' : 'secondary'}
+              onClick={onClose}
+              className={theme === 'dark' ? 'text-gray-200' : ''}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              variant="destructive"
+              onClick={() => onConfirm(reason)}
+              className={theme === 'dark' ? 'bg-red-600 hover:bg-red-700' : ''}
+            >
+              Reject
+            </Button>
+          </div>
+        </DialogContent>
+      </DialogPortal>
+    </Dialog>
+  );
+}

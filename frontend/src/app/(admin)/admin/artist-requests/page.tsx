@@ -10,6 +10,7 @@ import { getArtistRequestColumns } from '@/components/ui/data-table/data-table-c
 import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { ArtistRequest } from '@/types';
+import { RejectModal } from '@/components/ui/data-table/data-table-modals';
 import {
   ColumnFiltersState,
   getCoreRowModel,
@@ -26,6 +27,10 @@ export default function ArtistRequestManagement() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const limit = 10;
+  const [requestIdToReject, setRequestIdToReject] = useState<string | null>(
+    null
+  );
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 
   // Sử dụng useDataTable hook
   const {
@@ -95,15 +100,24 @@ export default function ArtistRequestManagement() {
     }
   };
 
-  const handleReject = async (requestId: string) => {
-    if (!confirm('Are you sure you want to reject this artist request?'))
-      return;
+  const handleRejectClick = (requestId: string) => {
+    setRequestIdToReject(requestId);
+    setIsRejectModalOpen(true);
+  };
+
+  const handleRejectConfirm = async (reason: string) => {
     try {
+      setIsRejectModalOpen(false);
+
+      if (!requestIdToReject) return;
+
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
-      await api.admin.rejectArtistRequest(requestId, token);
+
+      await api.admin.rejectArtistRequest(requestIdToReject, reason, token);
       toast.success('Artist request rejected successfully!');
-      setRequests((prev) => prev.filter((req) => req.id !== requestId));
+      setRequests((prev) => prev.filter((req) => req.id !== requestIdToReject));
+      setRequestIdToReject(null);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to reject request'
@@ -111,30 +125,40 @@ export default function ArtistRequestManagement() {
     }
   };
 
-  const handleViewDetails = (requestId: string) => {
-    router.push(`/admin/artist-requests/${requestId}`);
-  };
-
-  const handleDeleteSelected = async () => {
+  const handleBulkRejectClick = () => {
     if (
       !selectedRows.length ||
-      !confirm(`Delete ${selectedRows.length} selected requests?`)
+      !confirm(`Reject ${selectedRows.length} selected requests?`)
     )
       return;
+    setIsRejectModalOpen(true);
+  };
+
+  const handleBulkRejectConfirm = async (reason: string) => {
     try {
+      setIsRejectModalOpen(false);
+
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
+
       await Promise.all(
-        selectedRows.map((row) => api.admin.rejectArtistRequest(row.id, token))
+        selectedRows.map((row) =>
+          api.admin.rejectArtistRequest(row.id, reason, token)
+        )
       );
+
       setRequests((prev) =>
         prev.filter((req) => !selectedRows.some((row) => row.id === req.id))
       );
       setSelectedRows([]);
-      toast.success(`Deleted ${selectedRows.length} requests successfully`);
+      toast.success(`Rejected ${selectedRows.length} requests successfully`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Deletion failed');
+      toast.error(err instanceof Error ? err.message : 'Rejection failed');
     }
+  };
+
+  const handleViewDetails = (requestId: string) => {
+    router.push(`/admin/artist-requests/${requestId}`);
   };
 
   // Cập nhật URL khi thay đổi filters
@@ -153,7 +177,7 @@ export default function ArtistRequestManagement() {
   const columns = getArtistRequestColumns({
     theme,
     onApprove: handleApprove,
-    onReject: handleReject,
+    onReject: handleRejectClick,
     onViewDetails: handleViewDetails,
   });
 
@@ -242,7 +266,7 @@ export default function ArtistRequestManagement() {
           searchValue: searchInput,
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
-          onDelete: handleDeleteSelected,
+          onDelete: handleBulkRejectClick,
           showExport: true,
           exportData: {
             data: requests,
@@ -260,6 +284,19 @@ export default function ArtistRequestManagement() {
           },
           searchPlaceholder: 'Search requests...',
         }}
+      />
+
+      {/* Rejection Reason Modal */}
+      <RejectModal
+        isOpen={isRejectModalOpen}
+        onClose={() => {
+          setIsRejectModalOpen(false);
+          setRequestIdToReject(null);
+        }}
+        onConfirm={
+          requestIdToReject ? handleRejectConfirm : handleBulkRejectConfirm
+        }
+        theme={theme === 'dark' ? 'dark' : 'light'}
       />
     </div>
   );

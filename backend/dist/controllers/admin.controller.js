@@ -311,12 +311,16 @@ const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, fun
 exports.approveArtistRequest = approveArtistRequest;
 const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { requestId } = req.body;
+        const { requestId, reason } = req.body;
         const result = yield adminService.rejectArtistRequest(requestId);
+        let notificationMessage = 'Your request to become an Artist has been rejected.';
+        if (reason && reason.trim() !== '') {
+            notificationMessage += ` Reason: ${reason.trim()}`;
+        }
         yield db_1.default.notification.create({
             data: {
                 type: 'ARTIST_REQUEST_REJECT',
-                message: 'Your request to become an Artist has been rejected.',
+                message: notificationMessage,
                 recipientType: 'USER',
                 userId: result.user.id,
                 isRead: false,

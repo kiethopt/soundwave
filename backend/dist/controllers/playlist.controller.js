@@ -131,6 +131,7 @@ const getSystemPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, 
         const formattedTracks = (playlist === null || playlist === void 0 ? void 0 : playlist.tracks.map((pt) => ({
             id: pt.track.id,
             title: pt.track.title,
+            audioUrl: pt.track.audioUrl,
             duration: pt.track.duration,
             coverUrl: pt.track.coverUrl,
             artist: pt.track.artist,
@@ -172,9 +173,22 @@ const getPersonalizedSystemPlaylists = (req, res) => __awaiter(void 0, void 0, v
                 },
             },
         });
+        const formattedPlaylists = playlists.map(playlist => {
+            const formattedTracks = playlist.tracks.map(pt => ({
+                id: pt.track.id,
+                title: pt.track.title,
+                audioUrl: pt.track.audioUrl,
+                duration: pt.track.duration,
+                coverUrl: pt.track.coverUrl,
+                artist: pt.track.artist,
+                album: pt.track.album,
+                createdAt: pt.track.createdAt.toISOString(),
+            }));
+            return Object.assign(Object.assign({}, playlist), { tracks: formattedTracks });
+        });
         res.json({
             success: true,
-            data: playlists,
+            data: formattedPlaylists,
         });
     }
     catch (error) {
@@ -347,6 +361,7 @@ const getPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
                 const formattedTracks = playlist.tracks.map((pt) => ({
                     id: pt.track.id,
                     title: pt.track.title,
+                    audioUrl: pt.track.audioUrl,
                     duration: pt.track.duration,
                     coverUrl: pt.track.coverUrl,
                     artist: pt.track.artist,
@@ -514,6 +529,7 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
         const formattedTracks = playlist.tracks.map((pt) => ({
             id: pt.track.id,
             title: pt.track.title,
+            audioUrl: pt.track.audioUrl,
             duration: pt.track.duration,
             coverUrl: pt.track.coverUrl,
             artist: pt.track.artist,
@@ -887,6 +903,7 @@ const getSystemPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0,
             const formattedTracks = playlist.tracks.map((pt) => ({
                 id: pt.track.id,
                 title: pt.track.title,
+                audioUrl: pt.track.audioUrl,
                 duration: pt.track.duration,
                 coverUrl: pt.track.coverUrl,
                 artist: pt.track.artist,

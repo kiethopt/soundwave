@@ -9,6 +9,7 @@ import { ArtistRequest } from '@/types';
 import toast from 'react-hot-toast';
 import { Facebook, Instagram } from '@/components/ui/Icons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { RejectModal } from '@/components/ui/data-table/data-table-modals';
 
 export default function ArtistRequestDetail({
   params,
@@ -21,6 +22,7 @@ export default function ArtistRequestDetail({
   const [request, setRequest] = useState<ArtistRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchRequestDetails = async () => {
@@ -45,6 +47,9 @@ export default function ArtistRequestDetail({
   }, [id]);
 
   const handleApprove = async () => {
+    if (!confirm('Are you sure you want to approve this artist request?'))
+      return;
+
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
@@ -59,15 +64,22 @@ export default function ArtistRequestDetail({
     }
   };
 
-  const handleReject = async () => {
-    if (!confirm('Are you sure you want to reject this artist request?'))
-      return;
+  const handleRejectClick = () => {
+    setIsRejectModalOpen(true);
+  };
 
+  const handleRejectConfirm = async (reason: string) => {
     try {
+      setIsRejectModalOpen(false);
+
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      const response = await api.admin.rejectArtistRequest(request!.id, token);
+      const response = await api.admin.rejectArtistRequest(
+        request!.id,
+        reason,
+        token
+      );
       if (response.hasPendingRequest === false) {
         toast.success('Artist request rejected successfully!');
       } else {
@@ -166,7 +178,7 @@ export default function ArtistRequestDetail({
                 <span>Approve</span>
               </button>
               <button
-                onClick={handleReject}
+                onClick={handleRejectClick}
                 className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-red-500/20 text-red-400 rounded-lg text-xs sm:text-sm min-w-[120px] sm:min-w-[140px]"
               >
                 <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -385,6 +397,14 @@ export default function ArtistRequestDetail({
           </div>
         </div>
       </div>
+
+      {/* Rejection Reason Modal */}
+      <RejectModal
+        isOpen={isRejectModalOpen}
+        onClose={() => setIsRejectModalOpen(false)}
+        onConfirm={handleRejectConfirm}
+        theme={theme === 'dark' ? 'dark' : 'light'}
+      />
     </div>
   );
 }

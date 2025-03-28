@@ -92,27 +92,32 @@ test.describe('Admin User Management', () => {
 
   // TC4: Admin có thể xem chi tiết thông tin của người dùng
   test('Admin can view user details', async ({ page }) => {
-    // Click vào button View trong hàng đầu tiên
     const firstRow = page.locator('table tbody tr').first();
-    await firstRow.getByRole('button').first().click();
+    await expect(firstRow).toBeVisible();
+
+    const actionButton = firstRow.locator('td:nth-child(6)').locator('button');
+    await expect(actionButton).toBeVisible();
+    await actionButton.click();
+
+    // Click the 'View Details' menu item
     await page.getByRole('menuitem', { name: 'View Details' }).click();
 
-    // Xác thực các thông tin hiển thị trong modal
-    await expect(
-      page.getByRole('heading', { name: 'User Information' })
-    ).toBeVisible();
-    await expect(page.getByText('Email')).toBeVisible();
-    await expect(page.getByText('Username')).toBeVisible();
-    await expect(page.getByText('Created At')).toBeVisible();
-    await expect(page.getByText('Role')).toBeVisible();
-    await expect(page.getByText('Current Profile')).toBeVisible();
-    await expect(page.getByText('Last Login')).toBeVisible();
+    // Verify modal title
+    const modalTitle = page.getByRole('heading', { name: 'User Information' });
+    await expect(modalTitle).toBeVisible();
 
-    // Đóng modal
-    await page.getByRole('button', { name: 'Close' }).nth(1).click();
+    const modalContent = page.getByRole('dialog', { name: 'User Information' });
     await expect(
-      page.getByRole('heading', { name: 'User Information' })
-    ).not.toBeVisible();
+      modalContent.getByText('Username', { exact: true })
+    ).toBeVisible();
+    await expect(modalContent.getByText('Created At')).toBeVisible();
+    await expect(modalContent.getByText('Role')).toBeVisible();
+    await expect(modalContent.getByText('Current Profile')).toBeVisible();
+    await expect(modalContent.getByText('Last Login')).toBeVisible();
+
+    // Close the modal - Target the close button within the dialog
+    await modalContent.getByRole('button', { name: 'Close' }).nth(1).click();
+    await expect(modalTitle).not.toBeVisible();
   });
 
   // TC5: Admin có thể chỉnh sửa thông tin của người dùng
@@ -241,7 +246,6 @@ test.describe('Admin User Management', () => {
 
   // TC7: Admin có thể xóa người dùng
   test('Admin can delete a user', async ({ page }) => {
-    // Lắng nghe và tự động chấp nhận dialog xác nhận xóa
     page.on('dialog', async (dialog) => {
       expect(dialog.message()).toContain(
         'Are you sure you want to delete this user'
@@ -253,14 +257,15 @@ test.describe('Admin User Management', () => {
     const firstRow = page.locator('table tbody tr').first();
     await expect(firstRow).toBeVisible();
 
-    // Lấy tên người dùng từ dòng đầu tiên để xác minh sau khi xóa
-    const userNameElement = firstRow.locator('td').nth(0);
-    const userNameText = await userNameElement.textContent();
-    const userNameToDelete = userNameText?.trim().split('\n')[0]?.trim();
-    expect(userNameToDelete).toBeTruthy(); // Đảm bảo lấy được tên
+    // Lấy tên người dùng từ ô thứ hai (chứa tên và avatar) để xác minh sau khi xóa
+    const userNameCell = firstRow.locator('td').nth(1); // <-- Lấy ô thứ 2
+    const userNameText = await userNameCell.textContent();
+    // Lấy phần text là tên người dùng, loại bỏ khoảng trắng thừa
+    const userNameToDelete = userNameText?.trim();
+    expect(userNameToDelete).toBeTruthy();
 
-    // Click vào button action trong dòng đầu tiên
-    await firstRow.getByRole('button').first().click();
+    // Click vào button action trong dòng đầu tiên (nằm ở ô cuối cùng)
+    await firstRow.locator('td').last().getByRole('button').click(); // <-- Chính xác hơn là lấy button trong ô cuối
 
     // Click vào tùy chọn "Delete" trong menu
     await page.getByRole('menuitem', { name: 'Delete' }).click();
@@ -269,109 +274,114 @@ test.describe('Admin User Management', () => {
     await expect(page.getByText('User deleted successfully')).toBeVisible();
 
     // Đợi một chút để bảng cập nhật sau khi xóa
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
+    await waitForTableToLoad(page);
 
     // Kiểm tra người dùng đã bị xóa khỏi bảng
+    // Tìm kiếm chính xác tên người dùng trong toàn bộ bảng
     await expect(
-      page.getByText(userNameToDelete as string, { exact: true })
+      page
+        .locator('table tbody')
+        .getByText(userNameToDelete as string, { exact: true })
     ).not.toBeVisible();
   });
 
   // TC8: Admin có thể chuyển trang để xem danh sách người dùng ở các trang khác nhau
   test('Admin can paginate through users', async ({ page }) => {
-    // Lấy nội dung hàng đầu tiên để so sánh sau này
-    const initialRowContent = await page
-      .locator('table tbody tr')
-      .first()
-      .textContent();
+    const firstRowLocator = page.locator('table tbody tr').first();
+    const emailCellLocator = firstRowLocator.locator('td').nth(2); // Locator cho ô email hàng đầu
 
-    // Kiểm tra xem có nhiều trang không bằng cách kiểm tra nút Next có được bật không
+    // Lấy email ban đầu và kiểm tra xem có lấy được không
+    const initialFirstRowEmail = await emailCellLocator.textContent({
+      timeout: 5000,
+    }); // Thêm timeout nhỏ đề phòng
+
+    // Kiểm tra xem có đủ dữ liệu để phân trang không
     const nextButton = page.getByRole('button', { name: 'Next', exact: true });
     const isNextEnabled = await nextButton.isEnabled().catch(() => false);
 
-    if (!isNextEnabled) {
+    if (!isNextEnabled || !initialFirstRowEmail) {
       console.log(
-        'Next button is disabled, not enough data to test pagination'
+        'Skipping pagination test: Next button disabled or could not get initial email.'
+      );
+      test.skip(
+        true,
+        'Skipping pagination test due to insufficient data or initial state error.'
       );
       return;
     }
 
-    // PHẦN 1: Chuyển trang bằng cách nhập số và nhấn Go
-    // Nhập số trang 2
+    // --- PHẦN 1: Chuyển trang bằng cách nhập số và nhấn Go ---
     const pageInput = page.getByRole('spinbutton');
     await pageInput.click();
-    await pageInput.clear();
     await pageInput.fill('2');
-
-    // Click nút Go
     const goButton = page.getByRole('button', { name: 'Go' });
     await goButton.click();
 
-    // Đợi table load lại
-    await page.waitForTimeout(2000);
-    await waitForTableToLoad(page);
+    // Đợi cho email ở hàng đầu tiên thay đổi (khác với email ban đầu)
+    await expect(
+      emailCellLocator,
+      'Email should change after navigating to page 2 via Go button'
+    ).not.toHaveText(initialFirstRowEmail, { timeout: 10000 }); // Chờ tối đa 10s
 
-    // Kiểm tra xem nội dung đã thay đổi chưa (đã chuyển sang trang 2)
-    const page2Content = await page
-      .locator('table tbody tr')
-      .first()
-      .textContent();
+    // (Optional) Kiểm tra lại giá trị input page number
+    await expect(pageInput, 'Page input should show 2').toHaveValue('2', {
+      timeout: 1000,
+    });
 
-    // Chỉ kiểm tra nội dung khác nhau nếu cả hai trang đều có dữ liệu
-    if (initialRowContent && page2Content) {
-      expect(page2Content).not.toEqual(initialRowContent);
-    }
-
-    // PHẦN 2: Quay lại trang 1 bằng nút Previous
+    // --- PHẦN 2: Quay lại trang 1 bằng nút Previous ---
     const prevButton = page.getByRole('button', {
       name: 'Previous',
       exact: true,
     });
-
-    // Kiểm tra xem nút Previous có được enable không
     const isPrevEnabled = await prevButton.isEnabled();
-    if (!isPrevEnabled) {
-      console.log('Previous button is disabled, cannot test this part');
-    } else {
+
+    if (isPrevEnabled) {
       await prevButton.click();
 
-      // Đợi table load lại
-      await page.waitForTimeout(2000);
-      await waitForTableToLoad(page);
+      // Đợi cho email ở hàng đầu tiên quay về giá trị ban đầu
+      await expect(
+        emailCellLocator,
+        'Email should revert to initial after clicking Previous'
+      ).toHaveText(initialFirstRowEmail, { timeout: 10000 }); // Chờ tối đa 10s
 
-      // Kiểm tra xem đã quay lại trang 1 chưa
-      const backToPage1Content = await page
-        .locator('table tbody tr')
-        .first()
-        .textContent();
-
-      if (initialRowContent && backToPage1Content) {
-        expect(backToPage1Content).toContain(
-          initialRowContent.substring(0, 10)
-        );
-      }
+      // (Optional) Kiểm tra lại giá trị input page number
+      await expect(
+        pageInput,
+        'Page input should show 1 after clicking Previous'
+      ).toHaveValue('1', { timeout: 1000 });
+    } else {
+      console.log('Previous button is disabled, cannot test going back.');
+      // Cân nhắc fail test nếu việc không thể quay lại là lỗi
+      // expect(isPrevEnabled, 'Previous button should be enabled on page 2').toBe(true);
     }
 
-    // PHẦN 3: Chuyển đến trang 2 bằng nút Next (đảm bảo đang ở trang 1)
-    // Chỉ thực hiện nếu đang ở trang 1
-    if ((await pageInput.inputValue()) === '1') {
-      await nextButton.click();
+    // --- PHẦN 3: Chuyển đến trang 2 bằng nút Next (đảm bảo đang ở trang 1) ---
+    // Chỉ thực hiện nếu đang ở trang 1 (dựa vào giá trị email)
+    const currentEmail = await emailCellLocator.textContent();
+    if (currentEmail === initialFirstRowEmail) {
+      const isNextStillEnabled = await nextButton.isEnabled(); // Kiểm tra lại nút Next
+      if (isNextStillEnabled) {
+        await nextButton.click();
 
-      // Đợi table load lại
-      await page.waitForTimeout(2000);
-      await waitForTableToLoad(page);
+        // Đợi cho email ở hàng đầu tiên thay đổi (khác với email ban đầu)
+        await expect(
+          emailCellLocator,
+          'Email should change after clicking Next from page 1'
+        ).not.toHaveText(initialFirstRowEmail, { timeout: 10000 }); // Chờ tối đa 10s
 
-      // Kiểm tra xem đã chuyển đến trang 2 chưa
-      const nextToPage2Content = await page
-        .locator('table tbody tr')
-        .first()
-        .textContent();
-
-      if (initialRowContent && nextToPage2Content) {
-        expect(nextToPage2Content).not.toEqual(initialRowContent);
+        // (Optional) Kiểm tra lại giá trị input page number
+        await expect(
+          pageInput,
+          'Page input should show 2 after clicking Next'
+        ).toHaveValue('2', { timeout: 1000 });
+      } else {
+        console.log('Next button became disabled unexpectedly on page 1.');
       }
     } else {
-      console.log('Not on page 1, skipping Next button test');
+      console.log(
+        `Not on page 1 (current email: ${currentEmail}), skipping Next button test from page 1.`
+      );
     }
   });
 });

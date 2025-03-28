@@ -184,12 +184,16 @@ export const api = {
         token
       ),
 
-    rejectArtistRequest: async (requestId: string, token: string) =>
+    rejectArtistRequest: async (
+      requestId: string,
+      reason: string = '',
+      token: string
+    ) =>
       fetchWithAuth(
         '/api/admin/artist-requests/reject',
         {
           method: 'POST',
-          body: JSON.stringify({ requestId }),
+          body: JSON.stringify({ requestId, reason }),
         },
         token
       ),

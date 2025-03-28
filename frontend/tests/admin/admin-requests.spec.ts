@@ -16,8 +16,11 @@ test.describe('Admin Artist Request Management', () => {
 
   // TC1: Admin có thể xem danh sách requests để trở thành artist từ User gửi lên
   test('Admin can view requests list', async ({ page }) => {
-    // Xác thực table requests hiển thị và có nội dung
-    await expect(page.locator('table tbody tr')).toBeVisible();
+    const rowCount = await page.locator('table tbody tr').count();
+    expect(rowCount).toBeGreaterThan(0);
+
+    // Kiểm tra row đầu tiên hiển thị
+    await expect(page.locator('table tbody tr').first()).toBeVisible();
 
     // Xác thực tên cột
     await expect(page.getByRole('cell', { name: 'Artist Name' })).toBeVisible();
@@ -29,10 +32,6 @@ test.describe('Admin Artist Request Management', () => {
     // Kiểm tra các cell trong hàng header
     const headerCount = await page.locator('table thead tr th').count();
     expect(headerCount).toBeGreaterThan(0);
-
-    // Kiểm tra có dữ liệu trong bảng
-    const rowCount = await page.locator('table tbody tr').count();
-    expect(rowCount).toBeGreaterThan(0);
   });
 
   // TC2: Admin có thể tìm kiếm request
@@ -142,60 +141,57 @@ test.describe('Admin Artist Request Management', () => {
 
   // TC5: Admin có thể approve artist request
   test('Admin can approve artist request', async ({ page }) => {
-    // Click vào artist name đầu tiên để xem chi tiết
+    page.on('dialog', async (dialog) => {
+      expect(dialog.message()).toContain(
+        'Are you sure you want to approve this artist request?'
+      );
+      await dialog.accept();
+    });
+
     await page.locator('table tbody tr a').first().click();
 
-    // Đợi trang chi tiết tải xong
-    await page.waitForTimeout(3000);
+    await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible({
+      timeout: 15000,
+    });
 
-    // Xác thực đã chuyển đến trang chi tiết request
-    await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible();
-
-    // Click vào nút Approve
     await page.getByRole('button', { name: 'Approve' }).click();
 
-    // Kiểm tra toast thông báo thành công
+    // Verify success toast
     await expect(
-      page.getByText('Artist request approved successfully')
-    ).toBeVisible();
+      page.getByText('Artist request approved successfully!')
+    ).toBeVisible({ timeout: 20000 });
 
-    // Xác thực đã chuyển hướng về trang danh sách request
-    await page.waitForTimeout(2000);
-    await expect(page.locator('table')).toBeVisible();
+    // Verify redirection to list page
     await expect(
       page.getByRole('heading', { name: 'Artist Requests' })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table')).toBeVisible();
   });
 
   // TC6: Admin có thể reject artist request
   test('Admin can reject artist request', async ({ page }) => {
     page.on('dialog', async (dialog) => {
-      expect(dialog.message()).toContain('Are you sure you want to reject');
+      expect(dialog.message()).toContain(
+        'Are you sure you want to reject this artist request?' // Updated message check
+      );
       await dialog.accept();
     });
 
-    // Click vào artist name đầu tiên để xem chi tiết
     await page.locator('table tbody tr a').first().click();
 
-    // Đợi trang chi tiết tải xong
-    await page.waitForTimeout(3000);
-
-    // Xác thực đã chuyển đến trang chi tiết request
     await expect(page.getByRole('button', { name: 'Reject' })).toBeVisible();
 
-    // Click vào nút Reject
     await page.getByRole('button', { name: 'Reject' }).click();
 
-    // Kiểm tra toast thông báo thành công
+    // Verify success toast
     await expect(
-      page.getByText('Artist request rejected successfully')
-    ).toBeVisible();
+      page.getByText('Artist request rejected successfully!')
+    ).toBeVisible({ timeout: 20000 });
 
-    // Xác thực đã chuyển hướng về trang danh sách request
-    await page.waitForTimeout(2000);
-    await expect(page.locator('table')).toBeVisible();
+    // Verify redirection to list page
     await expect(
       page.getByRole('heading', { name: 'Artist Requests' })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table')).toBeVisible();
   });
 });

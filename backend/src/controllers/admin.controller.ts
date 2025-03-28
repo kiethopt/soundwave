@@ -345,18 +345,26 @@ export const rejectArtistRequest = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { requestId } = req.body;
+    const { requestId, reason } = req.body;
     const result = await adminService.rejectArtistRequest(requestId);
-    // tao thong bao cho nguoi dung
+
+    let notificationMessage =
+      'Your request to become an Artist has been rejected.';
+    if (reason && reason.trim() !== '') {
+      notificationMessage += ` Reason: ${reason.trim()}`;
+    }
+
+    // Create notification for the user
     await prisma.notification.create({
       data: {
-        type: 'ARTIST_REQUEST_REJECT', // Sử dụng giá trị từ enum
-        message: 'Your request to become an Artist has been rejected.',
+        type: 'ARTIST_REQUEST_REJECT',
+        message: notificationMessage,
         recipientType: 'USER',
         userId: result.user.id,
         isRead: false,
       },
     });
+
     res.json({
       message: 'Artist role request rejected successfully',
       user: result.user,
