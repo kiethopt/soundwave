@@ -13,6 +13,7 @@ import {
   ProfileIcon,
   ArrowRight,
 } from '@/components/ui/Icons';
+import { Calendar } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -366,6 +367,23 @@ export default function Header({
               <span className="hidden lg:inline">Discover</span>
             </Link>
 
+            {/* Link Sự Kiện */}
+            <Link
+              href="/events"
+              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${
+                isActive('/events')
+                  ? theme === 'light'
+                    ? 'text-gray-900 bg-gray-200'
+                    : 'text-white bg-[#282828]'
+                  : theme === 'light'
+                  ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                  : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
+              }`}
+            >
+              <Calendar className="w-5 h-5" />
+              <span className="hidden lg:inline">Event</span>
+            </Link>
+
             <form onSubmit={handleSearch} className="relative w-[400px]">
               <Search
                 className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
@@ -393,7 +411,7 @@ export default function Header({
         {isAuthenticated ? (
           <>
             <div className="relative" ref={notificationRef}>
-              {/* Nút thông báo với hiệu ứng phát sáng dựa trên unreadCount */}
+              {/* Nút thông báo */}
               <button
                 className={`p-2 rounded-full relative cursor-pointer transition-all duration-300 ${
                   theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
@@ -516,9 +534,7 @@ export default function Header({
                       <div className="relative shrink-0">
                         <div className="w-12 h-12 rounded-full overflow-hidden">
                           <Image
-                            src={
-                              userData?.avatar || '/images/default-avatar.jpg'
-                            }
+                            src={userData?.avatar || '/images/default-avatar.jpg'}
                             alt={userData?.name || 'User'}
                             width={48}
                             height={48}
