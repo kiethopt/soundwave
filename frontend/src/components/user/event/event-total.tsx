@@ -27,7 +27,6 @@ export default function EventTotal() {
   const fetchEvents = async () => {
     setIsLoading(true);
     try {
-      // For users, fetch all events (no artistId filter)
       const data = await api.events.getAllEvents({}, token);
       setEvents(data);
     } catch (error) {
@@ -63,7 +62,6 @@ export default function EventTotal() {
   const handleViewDetails = async (eventId: string) => {
     try {
       const eventDetail = await api.events.getEventById(eventId, token);
-      // You can open a modal or navigate to a detail page with eventDetail
       console.log('Event Detail:', eventDetail);
       toast.success('Event detail fetched successfully');
     } catch (error) {
