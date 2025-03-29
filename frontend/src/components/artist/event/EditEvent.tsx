@@ -2,15 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'react-toastify';
+import { api } from '@/utils/api';
 
 interface EventData {
   id: string;
@@ -22,13 +18,14 @@ interface EventData {
   artistId: string;
 }
 
-interface EditEventModalProps {
+interface EditEventProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export default function EditEvent({ open, onOpenChange }: EditEventModalProps) {
+export default function EditEvent({ open, onOpenChange }: EditEventProps) {
   const { id } = useParams<{ id: string }>();
+  const token = localStorage.getItem('userToken') || '';
 
   const [eventData, setEventData] = useState<EventData | null>(null);
   const [formData, setFormData] = useState({
@@ -42,9 +39,7 @@ export default function EditEvent({ open, onOpenChange }: EditEventModalProps) {
 
   const fetchEvent = async () => {
     try {
-      const res = await fetch(`/api/events/${id}`);
-      if (!res.ok) throw new Error('Error fetching event');
-      const data: EventData = await res.json();
+      const data = await api.events.getEventById(id, token);
       setEventData(data);
       setFormData({
         title: data.title,
@@ -65,19 +60,14 @@ export default function EditEvent({ open, onOpenChange }: EditEventModalProps) {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/events/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-      if (!res.ok) throw new Error('Failed to update event');
+      await api.events.updateEvent(id, formData, token);
       toast.success('Event updated successfully');
       onOpenChange(false);
     } catch (error) {
@@ -99,59 +89,26 @@ export default function EditEvent({ open, onOpenChange }: EditEventModalProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Title</label>
-            <Input
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              required
-            />
+            <Input name="title" value={formData.title} onChange={handleInputChange} required />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Description
-            </label>
-            <Input
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-            />
+            <label className="block text-sm font-medium mb-1">Description</label>
+            <Input name="description" value={formData.description} onChange={handleInputChange} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Location</label>
-            <Input
-              name="location"
-              value={formData.location}
-              onChange={handleInputChange}
-              required
-            />
+            <Input name="location" value={formData.location} onChange={handleInputChange} required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Start Date</label>
-            <Input
-              name="startDate"
-              type="datetime-local"
-              value={formData.startDate}
-              onChange={handleInputChange}
-              required
-            />
+            <Input name="startDate" type="datetime-local" value={formData.startDate} onChange={handleInputChange} required />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">End Date</label>
-            <Input
-              name="endDate"
-              type="datetime-local"
-              value={formData.endDate}
-              onChange={handleInputChange}
-              required
-            />
+            <Input name="endDate" type="datetime-local" value={formData.endDate} onChange={handleInputChange} required />
           </div>
           <div className="flex justify-end space-x-2">
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-            >
+            <Button type="button" variant="destructive" onClick={() => onOpenChange(false)} disabled={isLoading}>
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>

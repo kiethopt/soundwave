@@ -1,33 +1,26 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-toastify';
+import { api } from '@/utils/api';
 
-interface DeleteEventModalProps {
+interface DeleteEventProps {
   eventId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDeleteSuccess: () => void;
 }
 
-export default function DeleteEvent({ eventId, open, onOpenChange, onDeleteSuccess }: DeleteEventModalProps) {
+export default function DeleteEvent({ eventId, open, onOpenChange, onDeleteSuccess }: DeleteEventProps) {
+  const token = localStorage.getItem('userToken') || '';
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDelete = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/events/${eventId}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error('Failed to delete event');
+      await api.events.deleteEvent(eventId, token);
       toast.success('Event deleted successfully');
       onOpenChange(false);
       onDeleteSuccess();
