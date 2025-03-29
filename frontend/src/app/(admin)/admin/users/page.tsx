@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
 import type { User } from '@/types';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -79,10 +78,7 @@ export default function UserManagement() {
   const [isBulkDeactivating, setIsBulkDeactivating] = useState(false);
 
   // Action handlers
-  const handleUpdateUser = async (
-    userId: string,
-    data: FormData | { isActive: boolean; reason?: string }
-  ) => {
+  const handleUpdateUser = async (userId: string, data: FormData) => {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) {
@@ -92,10 +88,16 @@ export default function UserManagement() {
 
       setActionLoading(userId);
       const response = await api.admin.updateUser(userId, data, token);
+      const updatedUser = response.user;
+
       setUsers(
-        users.map((user) => (user.id === userId ? response.user : user))
+        users.map((user) =>
+          user.id === userId ? { ...user, ...updatedUser } : user
+        )
       );
+
       toast.success('User updated successfully');
+      setUpdatingUser(null);
     } catch (error) {
       console.error('Error updating user:', error);
       toast.error('Failed to update user');
@@ -164,26 +166,40 @@ export default function UserManagement() {
   // Update handleStatusChange to include token initialization
   const handleStatusChange = async (userId: string, isActive: boolean) => {
     if (!isActive) {
-      // If deactivating, show the modal
       setUserIdToDeactivate(userId);
       setIsDeactivateModalOpen(true);
       return;
     }
 
-    // If activating, proceed directly
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
       setActionLoading(userId);
-      await api.admin.updateUser(userId, { isActive }, token);
-      setUsers(
-        users.map((user) => (user.id === userId ? { ...user, isActive } : user))
-      );
+      // Gọi API để thay đổi trạng thái
+      const response = await api.admin.updateUser(userId, { isActive }, token);
+
+      // Cập nhật state với đối tượng trả về từ API
+      if (response && response.user) {
+        setUsers(
+          users.map((user) =>
+            user.id === userId ? { ...user, ...response.user } : user
+          )
+        );
+      } else {
+        // Fallback nếu response không như mong đợi
+        setUsers(
+          users.map((user) =>
+            user.id === userId ? { ...user, isActive } : user
+          )
+        );
+      }
+
       toast.success(
         `User ${isActive ? 'activated' : 'deactivated'} successfully`
       );
     } catch (err) {
+      console.error('Status change error:', err);
       toast.error(
         err instanceof Error
           ? err.message
@@ -203,62 +219,69 @@ export default function UserManagement() {
       setIsDeactivateModalOpen(false);
 
       if (isBulkDeactivating && selectedRows.length > 0) {
-        // Bulk deactivation
+        // Xử lý deactivate hàng loạt
         setActionLoading('bulk');
-        await Promise.all(
+        const responses = await Promise.all(
           selectedRows.map((user) =>
             api.admin.updateUser(user.id, { isActive: false, reason }, token)
           )
         );
 
+        // Cập nhật state dựa trên responses
+        const updatedUserIds = selectedRows.map((user) => user.id);
         setUsers(
-          users.map((user) =>
-            selectedRows.some((selected) => selected.id === user.id)
-              ? { ...user, isActive: false }
-              : user
-          )
+          users.map((user) => {
+            if (updatedUserIds.includes(user.id)) {
+              return { ...user, isActive: false };
+            }
+            return user;
+          })
         );
 
-        toast.success(`${selectedRows.length} users deactivated successfully`);
+        toast.success(`Deactivated ${selectedRows.length} users successfully`);
         setSelectedRows([]);
+        setRowSelection({});
       } else if (userIdToDeactivate) {
-        // Single user deactivation
+        // Xử lý deactivate một người dùng
         setActionLoading(userIdToDeactivate);
-        await api.admin.updateUser(
+        const response = await api.admin.updateUser(
           userIdToDeactivate,
           { isActive: false, reason },
           token
         );
 
-        setUsers(
-          users.map((user) =>
-            user.id === userIdToDeactivate ? { ...user, isActive: false } : user
-          )
-        );
+        // Cập nhật state với response từ API
+        if (response && response.user) {
+          setUsers(
+            users.map((user) =>
+              user.id === userIdToDeactivate
+                ? { ...user, ...response.user }
+                : user
+            )
+          );
+        } else {
+          // Fallback nếu response không như mong đợi
+          setUsers(
+            users.map((user) =>
+              user.id === userIdToDeactivate
+                ? { ...user, isActive: false }
+                : user
+            )
+          );
+        }
 
         toast.success('User deactivated successfully');
       }
-    } catch (err) {
+    } catch (error) {
+      console.error('Deactivation error:', error);
       toast.error(
-        err instanceof Error ? err.message : 'Failed to deactivate user(s)'
+        error instanceof Error ? error.message : 'Failed to deactivate user(s)'
       );
     } finally {
-      setActionLoading(null);
-      setUserIdToDeactivate(null);
       setIsBulkDeactivating(false);
+      setUserIdToDeactivate(null);
+      setActionLoading(null);
     }
-  };
-
-  // Modify handleBulkDeactivate to use modal
-  const handleBulkDeactivate = async () => {
-    if (
-      !selectedRows.length ||
-      !confirm(`Deactivate ${selectedRows.length} selected users?`)
-    )
-      return;
-
-    setIsBulkDeactivating(true);
-    setIsDeactivateModalOpen(true);
   };
 
   // Table configuration

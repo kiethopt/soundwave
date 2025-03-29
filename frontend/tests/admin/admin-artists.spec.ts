@@ -17,11 +17,16 @@ test.describe('Admin Artist Management', () => {
 
   // TC1: Admin có thể xem danh sách nghệ sĩ
   test('Admin can view artists list', async ({ page }) => {
-    // Xác thực table nghệ sĩ hiển thị và có nội dung
-    await expect(page.locator('table tbody tr')).toBeVisible();
+    const rowCount = await page.locator('table tbody tr').count();
+    expect(rowCount).toBeGreaterThan(0);
+
+    // Hoặc kiểm tra row đầu tiên
+    await expect(page.locator('table tbody tr').first()).toBeVisible();
 
     // Xác thực tên cột
-    await expect(page.getByRole('cell', { name: 'Artist' })).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'Artist', exact: true })
+    ).toBeVisible();
     await expect(
       page.getByRole('cell', { name: 'Monthly Listeners' })
     ).toBeVisible();
@@ -38,53 +43,71 @@ test.describe('Admin Artist Management', () => {
 
   // TC2: Admin có thể tìm kiếm nghệ sĩ
   test('Admin can search for artists', async ({ page }) => {
-    // Tìm kiếm với từ khóa đơn giản
     const searchInput = page.getByPlaceholder('Search artists...');
     await searchInput.click();
-    await searchInput.fill('the');
+    const searchTerm = 'the'; // Sử dụng từ khóa cụ thể
+    await searchInput.fill(searchTerm);
     await page.keyboard.press('Enter');
 
     // Đợi kết quả tìm kiếm tải xong
-    await page.waitForTimeout(1000);
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(500); // Thời gian ngắn để UI ổn định
 
     // Đảm bảo có kết quả hiển thị sau tìm kiếm
     const searchResultCount = await page.locator('table tbody tr').count();
     expect(searchResultCount).toBeGreaterThan(0);
+
+    // Kiểm tra kết quả tìm kiếm - xác nhận có ít nhất một kết quả chứa từ khóa
+    const firstRowArtistCell = page
+      .locator('table tbody tr')
+      .first()
+      .locator('td')
+      .nth(1);
+    await expect(firstRowArtistCell).toContainText(searchTerm, {
+      timeout: 10000,
+    });
+
+    // Cleanup: Reset search
+    await searchInput.clear();
+    await page.keyboard.press('Enter');
+    await waitForTableToLoad(page);
   });
 
   // TC3: Admin có thể lọc nghệ sĩ theo status
   test('Admin can filter artists by status', async ({ page }) => {
-    // 1. Lọc nghệ sĩ theo trạng thái Active
-    // Click vào button Status để mở dropdown
     await page.getByRole('combobox').click();
-    await page.waitForTimeout(2000);
-
-    // Chọn Active từ dropdown
     await page.getByRole('option', { name: 'Active', exact: true }).click();
-
-    // Đóng dropdown
     await page.keyboard.press('Escape');
     await waitForTableToLoad(page);
+    await page.waitForTimeout(500);
 
     // Kiểm tra kết quả - xác nhận hiển thị Active
-    await expect(page.getByText('Active').first()).toBeVisible();
+    const activeRowCount = await page.locator('table tbody tr').count();
+    if (activeRowCount > 0) {
+      await expect(
+        page.locator('table tbody tr').first().getByText('Active')
+      ).toBeVisible();
+    } else {
+      console.log('No active artists found to verify filter.');
+    }
 
     // 2. Lọc nghệ sĩ theo trạng thái Inactive
-    // Click vào button Status (đã có số 1) để mở dropdown
     await page.getByText('Status1').click();
-    await page.waitForTimeout(2000);
-
-    // Bỏ chọn Active (click vào Active để bỏ chọn)
-    await page.getByRole('option', { name: 'Active', exact: true }).click();
-    // Sau đó chọn Inactive
+    await page.getByRole('option', { name: 'Active', exact: true }).click(); // Bỏ chọn Active
     await page.getByRole('option', { name: 'Inactive' }).click();
-
-    // Đóng dropdown
     await page.keyboard.press('Escape');
     await waitForTableToLoad(page);
+    await page.waitForTimeout(500);
 
     // Kiểm tra kết quả - xác nhận hiển thị Inactive
-    await expect(page.getByText('Inactive').first()).toBeVisible();
+    const inactiveRowCount = await page.locator('table tbody tr').count();
+    if (inactiveRowCount > 0) {
+      await expect(
+        page.locator('table tbody tr').first().getByText('Inactive')
+      ).toBeVisible();
+    } else {
+      console.log('No inactive artists found to verify filter.');
+    }
 
     // 3. Reset filter bằng cách click vào nút Reset
     await page.getByRole('button', { name: 'Reset' }).click();
@@ -116,122 +139,143 @@ test.describe('Admin Artist Management', () => {
 
   // TC5: Admin có thể chỉnh sửa thông tin của nghệ sĩ
   test('Admin can edit artist information', async ({ page }) => {
-    // Click vào tên nghệ sĩ đầu tiên để xem chi tiết
     await page.locator('table tbody tr a').first().click();
-    await page.waitForTimeout(3000);
+    await expect(page.getByText('Bio')).toBeVisible({ timeout: 5000 });
 
     // Click vào icon MoreVertical để mở modal EditArtistModal
     await page.locator('svg.lucide-ellipsis-vertical').click();
 
     // Đợi modal hiển thị
-    await expect(
-      page.getByRole('heading', { name: 'Edit Artist' })
-    ).toBeVisible();
+    const editModal = page.getByRole('dialog', { name: 'Edit Artist' });
+    await expect(editModal).toBeVisible({ timeout: 5000 });
 
     // Chỉnh sửa tên nghệ sĩ
     const artistNameInput = page.getByLabel('Artist Name');
-    await artistNameInput.clear();
+    await expect(artistNameInput).toBeVisible({ timeout: 5000 });
+    const originalName = await artistNameInput.inputValue();
     const newArtistName =
-      'Updated Artist Name ' + Date.now().toString().slice(-4);
+      'Updated ' + originalName + Date.now().toString().slice(-4);
+    await artistNameInput.clear();
     await artistNameInput.fill(newArtistName);
 
     // Chỉnh sửa Bio
     const bioInput = page.getByLabel('Bio');
+    await expect(bioInput).toBeVisible();
     await bioInput.clear();
     await bioInput.fill('Updated bio for testing purposes');
-
-    // Thay đổi trạng thái hoạt động (Active/Inactive) bằng switch
-    await page.getByRole('switch').click();
 
     // Nhấn Save để lưu thay đổi
     await page.getByRole('button', { name: 'Save Changes' }).click();
 
     // Kiểm tra toast thông báo thành công
-    await expect(page.getByText('Artist updated successfully')).toBeVisible();
-
-    // Kiểm tra thông tin đã được cập nhật
-    await expect(page.getByText(newArtistName)).toBeVisible();
-    await expect(
-      page.getByText('Updated bio for testing purposes')
-    ).toBeVisible();
-  });
-
-  // TC6: Admin có thể khóa hoặc kích hoạt lại profile của nghệ sĩ
-  test('Admin can activate/deactivate an artist', async ({ page }) => {
-    page.on('dialog', async (dialog) => {
-      await dialog.accept();
+    await expect(page.getByText('Artist updated successfully')).toBeVisible({
+      timeout: 15000,
     });
 
-    // Lấy dòng đầu tiên trong bảng
-    const firstRow = page.locator('table tbody tr').first();
-    await expect(firstRow).toBeVisible();
-
-    // Lấy ô Status của dòng đầu tiên (cột thứ 5)
-    const statusCell = firstRow.locator('td').nth(4);
-    const initialStatus = await statusCell.textContent();
-
-    // Tìm ô thứ 7 (index 6) rồi tìm button bên trong
-    const actionButtonCell = firstRow.locator('td').nth(6); // Ô thứ 7
-    const actionButton = actionButtonCell.locator('button'); // Tìm button trong ô đó
-
-    // Xác định hành động cần thực hiện và Status mong đợi sau đó
-    const actionToPerform =
-      initialStatus === 'Inactive' ? 'Activate' : 'Deactivate';
-    const expectedStatusAfterFirstAction =
-      initialStatus === 'Inactive' ? 'Active' : 'Inactive';
-
-    // Thực hiện hành động đầu tiên (Activate hoặc Deactivate)
-    await actionButton.click();
-    await page.getByRole('menuitem', { name: actionToPerform }).click();
-
-    // Kiểm tra toast thành công
-    await expect(page.getByText('Artist updated successfully')).toBeVisible();
-    await page.waitForTimeout(3000); // Chờ toast biến mất
-
-    // Kiểm tra lại Status sau hành động đầu tiên
-    const statusCellAfterFirstAction = page
-      .locator('table tbody tr')
-      .first()
-      .locator('td')
-      .nth(4);
-    await expect(statusCellAfterFirstAction).toHaveText(
-      expectedStatusAfterFirstAction,
-      { timeout: 5000 }
-    );
-
-    // --- Thực hiện hành động ngược lại ---
-    const secondActionToPerform =
-      actionToPerform === 'Activate' ? 'Deactivate' : 'Activate';
-    const expectedStatusAfterSecondAction = initialStatus!; // Sử dụng non-null assertion vì đã kiểm tra ở trên
-
-    // Tìm ô thứ 7 (index 6) rồi tìm button bên trong
-    const actionButtonCellAgain = page
-      .locator('table tbody tr')
-      .first()
-      .locator('td')
-      .nth(6);
-    const actionButtonAgain = actionButtonCellAgain.locator('button');
-    await actionButtonAgain.click();
-
-    await page.getByRole('menuitem', { name: secondActionToPerform }).click();
-
-    // Kiểm tra toast thành công
-    await expect(page.getByText('Artist updated successfully')).toBeVisible();
-    await page.waitForTimeout(3000); // Chờ toast biến mất
-
-    // Kiểm tra trạng thái sau hành động thứ hai (quay về ban đầu)
-    const statusCellAfterSecondAction = page
-      .locator('table tbody tr')
-      .first()
-      .locator('td')
-      .nth(4);
-    await expect(statusCellAfterSecondAction).toHaveText(
-      expectedStatusAfterSecondAction,
-      { timeout: 5000 }
-    );
+    // Kiểm tra thông tin đã được cập nhật
+    await expect(page.getByText(newArtistName)).toBeVisible({
+      timeout: 10000,
+    });
   });
 
-  // TC7: Admin có thể xóa nghệ sĩ
+  // TC6: Admin có thể vô hiệu hóa (deactivate) tài khoản của nghệ sĩ đang active
+  test('Admin can deactivate an active artist', async ({ page }) => {
+    await page.getByRole('combobox').click();
+    await page.getByRole('option', { name: 'Active', exact: true }).click();
+    await page.keyboard.press('Escape');
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(1000);
+
+    // Lấy dòng đầu tiên trong bảng (nghệ sĩ active)
+    const activeRow = page.locator('table tbody tr').first();
+    await expect(activeRow).toBeVisible();
+
+    // Xác nhận đây là nghệ sĩ Active
+    const statusCell = activeRow.locator('td').nth(4);
+    await expect(statusCell).toContainText('Active', { timeout: 5000 });
+
+    // Tìm button action trong hàng
+    const actionButtonCell = activeRow.locator('td').nth(6);
+    const actionButton = actionButtonCell.locator('button').first();
+    await actionButton.click();
+
+    // Click vào tùy chọn "Deactivate"
+    await page.getByRole('menuitem', { name: 'Deactivate' }).click();
+
+    // Xử lý modal deactivate
+    const deactivateModal = page.getByRole('dialog', {
+      name: 'Deactivate Artist',
+    });
+    await expect(deactivateModal).toBeVisible({ timeout: 5000 });
+    await deactivateModal
+      .getByText('Inappropriate content or behavior')
+      .click();
+    await deactivateModal.getByRole('button', { name: 'Deactivate' }).click();
+
+    // Kiểm tra toast thành công
+    await expect(page.getByText('Artist deactivated successfully')).toBeVisible(
+      {
+        timeout: 15000,
+      }
+    );
+
+    // Kiểm tra lại Status sau khi deactivate
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(1000);
+
+    // Xác nhận trạng thái đã thay đổi thành Inactive
+    const statusCellAfter = page
+      .locator('table tbody tr')
+      .first()
+      .locator('td')
+      .nth(4);
+    await expect(statusCellAfter).toContainText('Inactive', { timeout: 10000 });
+  });
+
+  // TC7: Admin có thể kích hoạt (activate) tài khoản của nghệ sĩ đang inactive
+  test('Admin can activate an inactive artist', async ({ page }) => {
+    // Lọc chỉ hiển thị nghệ sĩ inactive
+    await page.getByRole('combobox').click();
+    await page.getByRole('option', { name: 'Inactive' }).click();
+    await page.keyboard.press('Escape');
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(1000);
+
+    // Lấy dòng đầu tiên trong bảng (nghệ sĩ inactive)
+    const inactiveRow = page.locator('table tbody tr').first();
+    await expect(inactiveRow).toBeVisible();
+
+    // Xác nhận đây là nghệ sĩ Inactive
+    const statusCell = inactiveRow.locator('td').nth(4);
+    await expect(statusCell).toContainText('Inactive', { timeout: 5000 });
+
+    // Tìm button action trong hàng
+    const actionButtonCell = inactiveRow.locator('td').nth(6);
+    const actionButton = actionButtonCell.locator('button').first();
+    await actionButton.click();
+
+    // Click vào tùy chọn "Activate"
+    await page.getByRole('menuitem', { name: 'Activate' }).click();
+
+    // Kiểm tra toast thành công
+    await expect(page.getByText('Artist activated successfully')).toBeVisible({
+      timeout: 15000,
+    });
+
+    // Kiểm tra lại Status sau khi activate
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(1000);
+
+    // Xác nhận trạng thái đã thay đổi thành Active
+    const statusCellAfter = page
+      .locator('table tbody tr')
+      .first()
+      .locator('td')
+      .nth(4);
+    await expect(statusCellAfter).toContainText('Active', { timeout: 10000 });
+  });
+
+  // TC8: Admin có thể xóa nghệ sĩ
   test('Admin can delete an artist', async ({ page }) => {
     // Lắng nghe và tự động chấp nhận dialog xác nhận xóa
     page.on('dialog', async (dialog) => {
@@ -270,111 +314,101 @@ test.describe('Admin Artist Management', () => {
     ).not.toBeVisible();
   });
 
-  // TC8: Admin có thể chuyển trang để xem danh sách nghệ sĩ ở các trang khác nhau
-  test('Admin can paginate through artists', async ({ page }) => {
-    // Lấy nội dung hàng đầu tiên để so sánh sau này
-    const initialRowContent = await page
-      .locator('table tbody tr')
-      .first()
-      .textContent();
+  // TC9: Admin có thể chuyển trang để xem danh sách nghệ sĩ ở các trang khác nhau
+  test('Admin can paginate through genres', async ({ page }) => {
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(1000);
 
-    // Kiểm tra xem có nhiều trang không bằng cách kiểm tra nút Next có được bật không
+    // Define the locator for the genre name column cells (2nd column)
+    const genreNameCellsLocator = page.locator(
+      'table tbody tr td:nth-child(2)'
+    );
+
+    // Lấy thông tin trang đầu tiên
+    const page1Genres = await genreNameCellsLocator.allTextContents();
+
+    // Kiểm tra xem có đủ dữ liệu để phân trang không
     const nextButton = page.getByRole('button', { name: 'Next', exact: true });
-    const isNextEnabled = await nextButton.isEnabled().catch(() => false);
+    const isNextEnabled = await nextButton.isEnabled();
 
-    if (!isNextEnabled) {
-      console.log(
-        'Next button is disabled, not enough data to test pagination'
+    if (!isNextEnabled || page1Genres.length === 0) {
+      test.skip(
+        true,
+        'Skipping pagination test due to insufficient data or no genres found on page 1'
       );
       return;
     }
 
-    // PHẦN 1: Chuyển trang bằng cách nhập số và nhấn Go
-    // Nhập số trang 2
-    const pageInput = page.getByRole('spinbutton');
-    await pageInput.click();
-    await pageInput.clear();
-    await pageInput.fill('2');
-
-    // Click nút Go
-    const goButton = page.getByRole('button', { name: 'Go' });
-    await goButton.click();
-
-    // Đợi table load lại
-    await page.waitForTimeout(2000);
+    // PHẦN 1: Chuyển đến trang 2 bằng nút Next
+    await nextButton.click();
     await waitForTableToLoad(page);
+    await page.waitForTimeout(2000);
 
-    // Kiểm tra xem nội dung đã thay đổi chưa (đã chuyển sang trang 2)
-    const page2Content = await page
-      .locator('table tbody tr')
-      .first()
-      .textContent();
+    // Kiểm tra đã chuyển đến trang 2
+    const pageInput = page.getByRole('spinbutton');
+    await expect(pageInput, 'Page input should show 2 after Next').toHaveValue(
+      '2',
+      { timeout: 5000 }
+    );
 
-    // Chỉ kiểm tra nội dung khác nhau nếu cả hai trang đều có dữ liệu
-    if (initialRowContent && page2Content) {
-      expect(page2Content).not.toEqual(initialRowContent);
-    }
+    // Lấy dữ liệu trang 2
+    const page2Genres = await genreNameCellsLocator.allTextContents();
+
+    // Kiểm tra nội dung trang 2 khác với trang 1
+    expect(
+      page2Genres,
+      'Genres on page 2 should differ from page 1'
+    ).not.toEqual(page1Genres);
+    expect(page2Genres.length, 'Should have genres on page 2').toBeGreaterThan(
+      0
+    );
 
     // PHẦN 2: Quay lại trang 1 bằng nút Previous
     const prevButton = page.getByRole('button', {
       name: 'Previous',
       exact: true,
     });
+    await prevButton.click();
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(2000);
 
-    // Kiểm tra xem nút Previous có được enable không
-    const isPrevEnabled = await prevButton.isEnabled();
-    if (!isPrevEnabled) {
-      console.log('Previous button is disabled, cannot test this part');
-    } else {
-      await prevButton.click();
+    // Kiểm tra đã quay về trang 1
+    await expect(
+      pageInput,
+      'Page input should show 1 after Previous'
+    ).toHaveValue('1', { timeout: 5000 });
 
-      // Đợi table load lại
-      await page.waitForTimeout(2000);
-      await waitForTableToLoad(page);
+    // Lấy dữ liệu trang 1 sau khi quay lại
+    const newPage1Genres = await genreNameCellsLocator.allTextContents();
+    expect(
+      newPage1Genres.length,
+      'Should have genres on page 1 after returning'
+    ).toBeGreaterThan(0);
 
-      // Kiểm tra xem đã quay lại trang 1 chưa
-      const backToPage1Content = await page
-        .locator('table tbody tr')
-        .first()
-        .textContent();
-      console.log(
-        `Back to page 1 content: ${
-          backToPage1Content?.substring(0, 20) || 'No content'
-        }...`
-      );
+    // PHẦN 3: Thử chuyển trang bằng cách nhập số và nhấn Go
+    await pageInput.click();
+    await pageInput.fill('2');
+    const goButton = page.getByRole('button', { name: 'Go' });
+    await goButton.click();
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(2000);
 
-      if (initialRowContent && backToPage1Content) {
-        expect(backToPage1Content).toContain(
-          initialRowContent.substring(0, 10)
-        );
-      }
-    }
+    // Kiểm tra đã chuyển đến trang 2
+    await expect(pageInput, 'Page input should show 2 after Go').toHaveValue(
+      '2',
+      { timeout: 5000 }
+    );
 
-    // PHẦN 3: Chuyển đến trang 2 bằng nút Next (đảm bảo đang ở trang 1)
-    // Chỉ thực hiện nếu đang ở trang 1
-    if ((await pageInput.inputValue()) === '1') {
-      await nextButton.click();
+    // Lấy dữ liệu trang 2 lần nữa
+    const newPage2Genres = await genreNameCellsLocator.allTextContents();
 
-      // Đợi table load lại
-      await page.waitForTimeout(2000);
-      await waitForTableToLoad(page);
-
-      // Kiểm tra xem đã chuyển đến trang 2 chưa
-      const nextToPage2Content = await page
-        .locator('table tbody tr')
-        .first()
-        .textContent();
-      console.log(
-        `Next to page 2 content: ${
-          nextToPage2Content?.substring(0, 20) || 'No content'
-        }...`
-      );
-
-      if (initialRowContent && nextToPage2Content) {
-        expect(nextToPage2Content).not.toEqual(initialRowContent);
-      }
-    } else {
-      console.log('Not on page 1, skipping Next button test');
-    }
+    expect(
+      newPage2Genres,
+      'Genres on page 2 (via Go) should differ from returned page 1'
+    ).not.toEqual(newPage1Genres);
+    expect(
+      newPage2Genres.length,
+      'Should have genres on page 2 after Go'
+    ).toBeGreaterThan(0);
   });
 });

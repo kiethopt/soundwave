@@ -951,11 +951,11 @@ export function EditUserModal({
 
   if (!user) return null;
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     formData.append('role', role);
-    onSubmit(user.id, formData);
+    await onSubmit(user.id, formData);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1169,10 +1169,10 @@ export function EditGenreModal({
           </DialogTitle>
         </DialogHeader>
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             const formData = new FormData(e.currentTarget);
-            onSubmit(genre.id, formData);
+            await onSubmit(genre.id, formData);
           }}
           className="space-y-4 mt-4"
         >

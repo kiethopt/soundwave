@@ -90,7 +90,7 @@ export const updateUser = async (
     const { isActive, reason, ...userData } = req.body;
 
     // Check if we're updating isActive status (activating/deactivating)
-    const isStatusUpdate = req.body.hasOwnProperty('isActive');
+    const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
 
     // Handle user activation/deactivation with reason
     if (isStatusUpdate) {
@@ -194,7 +194,7 @@ export const updateArtist = async (
     const { isActive, reason, ...artistData } = req.body;
 
     // Check if we're updating isActive status (activating/deactivating)
-    const isStatusUpdate = req.body.hasOwnProperty('isActive');
+    const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
 
     // Handle artist activation/deactivation with reason
     if (isStatusUpdate) {

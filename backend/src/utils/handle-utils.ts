@@ -88,14 +88,19 @@ export const runValidations = (validations: (string | null)[]) => {
 
 // Convert string value to boolean
 export const toBooleanValue = (value: any): boolean | undefined => {
-  if (value === undefined) return undefined;
+  if (value === undefined || value === null) return undefined;
 
   // If it's already a boolean, return it directly
   if (typeof value === 'boolean') return value;
 
   // Convert strings to boolean
   if (typeof value === 'string') {
-    return value.toLowerCase() === 'true';
+    const lowercaseValue = value.toLowerCase();
+    if (lowercaseValue === 'true') return true;
+    if (lowercaseValue === 'false') return false;
+    // Try to convert to number first, then to boolean
+    const num = Number(value);
+    if (!isNaN(num)) return Boolean(num);
   }
 
   // For other types, try to convert to boolean

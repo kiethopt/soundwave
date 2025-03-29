@@ -170,28 +170,69 @@ test.describe('Admin Artist Request Management', () => {
 
   // TC6: Admin có thể reject artist request
   test('Admin can reject artist request', async ({ page }) => {
-    page.on('dialog', async (dialog) => {
-      expect(dialog.message()).toContain(
-        'Are you sure you want to reject this artist request?' // Updated message check
-      );
-      await dialog.accept();
+    // Lấy tên artist từ hàng đầu tiên để xác minh sau khi reject
+    const firstRowLink = page.locator('table tbody tr a').first();
+    const artistNameToReject = await firstRowLink.textContent();
+
+    // Kiểm tra xem có lấy được tên artist không
+    expect(
+      artistNameToReject,
+      'Should be able to get artist name from the first row'
+    ).toBeTruthy();
+
+    // Click vào link để đi đến trang chi tiết
+    await firstRowLink.click();
+
+    // Đợi trang chi tiết tải và nút Reject hiển thị
+    const rejectButtonOnDetailsPage = page.getByRole('button', {
+      name: 'Reject',
     });
+    await expect(rejectButtonOnDetailsPage).toBeVisible({ timeout: 10000 });
 
-    await page.locator('table tbody tr a').first().click();
+    // Click nút Reject để mở modal
+    await rejectButtonOnDetailsPage.click();
 
-    await expect(page.getByRole('button', { name: 'Reject' })).toBeVisible();
+    // --- Tương tác với Modal ---
+    const rejectModal = page.getByRole('dialog', {
+      name: 'Reject Artist Request',
+    });
+    await expect(rejectModal).toBeVisible();
 
-    await page.getByRole('button', { name: 'Reject' }).click();
+    // Chọn lý do đầu tiên
+    const firstReason = rejectModal
+      .getByText('Incomplete or insufficient artist information')
+      .first();
+    await expect(firstReason).toBeVisible();
+    await firstReason.click();
 
-    // Verify success toast
+    // Click nút "Reject" bên trong modal
+    const confirmRejectButtonInModal = rejectModal.getByRole('button', {
+      name: 'Reject',
+    });
+    await confirmRejectButtonInModal.click();
+
+    // --- Xác thực kết quả ---
+    // Kiểm tra toast thành công
     await expect(
       page.getByText('Artist request rejected successfully!')
     ).toBeVisible({ timeout: 20000 });
 
-    // Verify redirection to list page
+    // Kiểm tra đã quay lại trang danh sách
     await expect(
       page.getByRole('heading', { name: 'Artist Requests' })
     ).toBeVisible({ timeout: 10000 });
     await expect(page.locator('table')).toBeVisible();
+
+    // Đợi bảng tải lại dữ liệu sau khi quay về trang list
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(1000);
+
+    // Kiểm tra xem request với tên artist đó đã biến mất khỏi danh sách chưa
+    await expect(
+      page
+        .locator('table tbody')
+        .getByText(artistNameToReject!, { exact: true }),
+      `Artist request "${artistNameToReject}" should not be visible in the table after rejection`
+    ).not.toBeVisible();
   });
 });

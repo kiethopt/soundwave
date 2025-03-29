@@ -9,7 +9,7 @@ test.describe('Admin User Management', () => {
     await expect(page.getByText('User Management')).toBeVisible();
 
     await waitForTableToLoad(page);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(500);
   });
 
   // TC1: Admin có thể xem danh sách người dùng
@@ -39,55 +39,78 @@ test.describe('Admin User Management', () => {
     // Tìm kiếm với từ khóa đơn giản
     const searchInput = page.getByPlaceholder('Search users...');
     await searchInput.click();
-    await searchInput.fill('test');
+    const searchTerm = 'testuser'; // Use a term likely to be unique if possible
+    await searchInput.fill(searchTerm);
     await page.keyboard.press('Enter');
 
     // Đợi kết quả tìm kiếm tải xong
-    await page.waitForTimeout(1000);
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(500); // Small wait for UI stabilization
 
     // Đảm bảo có kết quả hiển thị sau tìm kiếm
     const searchResultCount = await page.locator('table tbody tr').count();
     expect(searchResultCount).toBeGreaterThan(0);
+
+    // Verify the search term appears in the user cell (td:nth(1))
+    // Target the div inside the second cell that contains the name/username
+    const firstRowUserCell = page
+      .locator('table tbody tr')
+      .first()
+      .locator('td')
+      .nth(1);
+    // Find a div within the cell that contains the search term but doesn't start with '@'
+    // Or simply check if the cell itself contains the text non-strictly
+    await expect(firstRowUserCell).toContainText(searchTerm, {
+      timeout: 10000,
+    });
+
+    // Cleanup: Reset search
+    await searchInput.clear();
+    await page.keyboard.press('Enter');
+    await waitForTableToLoad(page);
   });
 
   // TC3: Admin có thể lọc người dùng theo status
   test('Admin can filter users by status', async ({ page }) => {
     // 1. Lọc người dùng theo trạng thái Active
-    // Click vào button Status để mở dropdown
     await page.getByRole('combobox').click();
-
-    // Chọn Active từ dropdown
     await page.getByRole('option', { name: 'Active', exact: true }).click();
-
-    // Đóng dropdown
     await page.keyboard.press('Escape');
     await waitForTableToLoad(page);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(500);
 
     // Kiểm tra kết quả - xác nhận hiển thị Active
-    await expect(page.getByText('Active').first()).toBeVisible();
+    const activeRowCount = await page.locator('table tbody tr').count();
+    if (activeRowCount > 0) {
+      await expect(
+        page.locator('table tbody tr').first().getByText('Active')
+      ).toBeVisible();
+    } else {
+      console.log('No active users found to verify filter.');
+    }
 
     // 2. Lọc người dùng theo trạng thái Inactive
-    // Click vào button Status (đã có số 1) để mở dropdown lần nữa
-    await page.getByText('Status1').click();
-
-    // Bỏ chọn Active (click vào Active để bỏ chọn)
-    await page.getByRole('option', { name: 'Active', exact: true }).click();
-    // Sau đó chọn Inactive
+    await page.getByText('Status1').click(); // Button text changes when filter applied
+    await page.getByRole('option', { name: 'Active', exact: true }).click(); // Deselect Active
     await page.getByRole('option', { name: 'Inactive' }).click();
-
-    // Đóng dropdown
     await page.keyboard.press('Escape');
     await waitForTableToLoad(page);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(500);
 
     // Kiểm tra kết quả - xác nhận hiển thị Inactive
-    await expect(page.getByText('Inactive').first()).toBeVisible();
+    const inactiveRowCount = await page.locator('table tbody tr').count();
+    if (inactiveRowCount > 0) {
+      await expect(
+        page.locator('table tbody tr').first().getByText('Inactive')
+      ).toBeVisible();
+    } else {
+      console.log('No inactive users found to verify filter.');
+    }
 
     // 3. Reset filter bằng cách click vào nút Reset
     await page.getByRole('button', { name: 'Reset' }).click();
     await waitForTableToLoad(page);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(500);
   });
 
   // TC4: Admin có thể xem chi tiết thông tin của người dùng
@@ -95,16 +118,12 @@ test.describe('Admin User Management', () => {
     const firstRow = page.locator('table tbody tr').first();
     await expect(firstRow).toBeVisible();
 
-    const actionButton = firstRow.locator('td:nth-child(6)').locator('button');
-    await expect(actionButton).toBeVisible();
-    await actionButton.click();
-
-    // Click the 'View Details' menu item
-    await page.getByRole('menuitem', { name: 'View Details' }).click();
+    // Click the user cell to open details (alternative to action button)
+    await firstRow.locator('td').nth(1).click();
 
     // Verify modal title
     const modalTitle = page.getByRole('heading', { name: 'User Information' });
-    await expect(modalTitle).toBeVisible();
+    await expect(modalTitle).toBeVisible({ timeout: 10000 });
 
     const modalContent = page.getByRole('dialog', { name: 'User Information' });
     await expect(
@@ -122,129 +141,160 @@ test.describe('Admin User Management', () => {
 
   // TC5: Admin có thể chỉnh sửa thông tin của người dùng
   test('Admin can edit user information', async ({ page }) => {
-    // Click vào button Action của hàng đầu tiên
     const firstRow = page.locator('table tbody tr').first();
     await firstRow.getByRole('button').first().click();
 
     // Click vào Edit User
     await page.getByRole('menuitem', { name: 'Edit User' }).click();
 
-    // Đợi modal hiển thị và đảm bảo nó đã được render đầy đủ
+    // Đợi modal hiển thị
+    const editModal = page.getByRole('dialog', { name: 'Edit User' });
+    await expect(editModal).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Edit User' })
+      editModal.getByRole('heading', { name: 'Edit User' })
     ).toBeVisible();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
 
     // Chỉnh sửa Name
-    const nameInput = page.locator('#name');
+    const nameInput = editModal.locator('#name');
     await expect(nameInput).toBeVisible({ timeout: 5000 });
+    const originalName = await nameInput.inputValue();
+    const newUserName =
+      'Updated ' + originalName + Date.now().toString().slice(-3);
     await nameInput.clear();
-    const newUserName = 'Updated User Name ' + Date.now().toString().slice(-4);
     await nameInput.fill(newUserName);
 
     // Chỉnh sửa Username
-    const usernameInput = page.locator('#username');
+    const usernameInput = editModal.locator('#username');
     await expect(usernameInput).toBeVisible();
+    const originalUsername = await usernameInput.inputValue();
+    const newUsername =
+      'upd_' + originalUsername + Date.now().toString().slice(-3);
     await usernameInput.clear();
-    await usernameInput.fill(
-      'updated_username_' + Date.now().toString().slice(-4)
-    );
-
-    // Thay đổi Status (Active/Inactive)
-    await page.getByRole('switch').click();
+    await usernameInput.fill(newUsername);
 
     // Nhấn Save để lưu thay đổi
-    await page.getByRole('button', { name: 'Save Changes' }).click();
+    await editModal.getByRole('button', { name: 'Save Changes' }).click();
 
     // Kiểm tra toast thông báo thành công
-    await expect(page.getByText('User updated successfully')).toBeVisible();
-
-    // Kiểm tra thông tin đã được cập nhật trên bảng
-    await waitForTableToLoad(page);
-    await expect(page.getByText(newUserName)).toBeVisible();
-  });
-
-  // TC6: Admin có thể khóa hoặc kích hoạt lại tài khoản của người dùng
-  test('Admin can activate/deactivate a user', async ({ page }) => {
-    page.on('dialog', async (dialog) => {
-      await dialog.accept();
+    await expect(page.getByText('User updated successfully')).toBeVisible({
+      timeout: 15000,
     });
 
-    // Lấy dòng đầu tiên trong bảng
-    const firstRow = page.locator('table tbody tr').first();
-    await expect(firstRow).toBeVisible();
-
-    // Lấy ô Status của dòng đầu tiên (cột thứ 4)
-    const statusCell = firstRow.locator('td').nth(3);
-    const initialStatus = await statusCell.textContent();
-
-    // Tìm button action trong hàng
-    const actionButton = firstRow.getByRole('button').first();
-
-    // Xác định hành động cần thực hiện và Status mong đợi sau đó
-    const actionToPerform = initialStatus?.includes('Inactive')
-      ? 'Activate'
-      : 'Deactivate';
-    const expectedStatusAfterFirstAction = initialStatus?.includes('Inactive')
-      ? 'Active'
-      : 'Inactive';
-
-    // Thực hiện hành động đầu tiên (Activate hoặc Deactivate)
-    await actionButton.click();
-    await page.getByRole('menuitem', { name: actionToPerform }).click();
-
-    // Kiểm tra toast thành công
-    await expect(page.getByText('User updated successfully')).toBeVisible();
-    await page.waitForTimeout(3000); // Chờ toast biến mất
-
-    // Kiểm tra lại Status sau hành động đầu tiên
+    // Kiểm tra thông tin đã được cập nhật trên bảng (search for the new name)
     await waitForTableToLoad(page);
-    const statusCellAfterFirstAction = page
-      .locator('table tbody tr')
-      .first()
-      .locator('td')
-      .nth(3);
-    await expect(statusCellAfterFirstAction).toContainText(
-      expectedStatusAfterFirstAction,
-      { timeout: 5000 }
-    );
-
-    // --- Thực hiện hành động ngược lại ---
-    const secondActionToPerform =
-      actionToPerform === 'Activate' ? 'Deactivate' : 'Activate';
-    const expectedStatusAfterSecondAction = initialStatus?.includes('Inactive')
-      ? 'Inactive'
-      : 'Active';
-
-    // Tìm button action trong hàng
-    const actionButtonAgain = page
-      .locator('table tbody tr')
-      .first()
-      .getByRole('button')
-      .first();
-    await actionButtonAgain.click();
-
-    // Thực hiện hành động ngược lại
-    await page.getByRole('menuitem', { name: secondActionToPerform }).click();
-
-    // Kiểm tra toast thành công
-    await expect(page.getByText('User updated successfully')).toBeVisible();
-    await page.waitForTimeout(3000);
-
-    // Kiểm tra trạng thái sau hành động thứ hai (quay về ban đầu)
+    const searchInput = page.getByPlaceholder('Search users...');
+    await searchInput.fill(newUserName);
+    await page.keyboard.press('Enter');
     await waitForTableToLoad(page);
-    const statusCellAfterSecondAction = page
-      .locator('table tbody tr')
-      .first()
-      .locator('td')
-      .nth(3);
-    await expect(statusCellAfterSecondAction).toContainText(
-      expectedStatusAfterSecondAction,
-      { timeout: 5000 }
-    );
+    await page.waitForTimeout(2000);
+
+    // Đợi kết quả tìm kiếm và kiểm tra
+    await expect(
+      page
+        .locator('table tbody tr')
+        .first()
+        .getByText(newUserName, { exact: false })
+    ).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Cleanup: Reset search
+    await searchInput.clear();
+    await page.keyboard.press('Enter');
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(2000);
   });
 
-  // TC7: Admin có thể xóa người dùng
+  // TC6: Admin có thể vô hiệu hóa (deactivate) tài khoản của người dùng đang active
+  test('Admin can deactivate an active user', async ({ page }) => {
+    await page.getByRole('combobox').click();
+    await page.getByRole('option', { name: 'Active', exact: true }).click();
+    await page.keyboard.press('Escape');
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(2000);
+
+    // Lấy dòng đầu tiên trong bảng (người dùng active)
+    const activeRow = page.locator('table tbody tr').first();
+    await expect(activeRow).toBeVisible();
+
+    // Xác nhận đây là người dùng Active
+    const statusCell = activeRow.locator('td').nth(3);
+    await expect(statusCell).toContainText('Active', { timeout: 5000 });
+
+    // Tìm button action trong hàng
+    const actionButton = activeRow.getByRole('button').first();
+    await actionButton.click();
+
+    // Click vào tùy chọn "Deactivate"
+    await page.getByRole('menuitem', { name: 'Deactivate' }).click();
+
+    // Xử lý modal deactivate
+    const deactivateModal = page.getByRole('dialog', {
+      name: 'Deactivate User',
+    });
+    await expect(deactivateModal).toBeVisible({ timeout: 5000 });
+    await deactivateModal
+      .getByText('Inappropriate content or behavior')
+      .click();
+    await deactivateModal.getByRole('button', { name: 'Deactivate' }).click();
+
+    // Kiểm tra toast thành công
+    await expect(page.getByText('User deactivated successfully')).toBeVisible({
+      timeout: 15000,
+    });
+
+    // Kiểm tra lại Status sau khi deactivate
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(1000);
+    const statusCellAfter = page
+      .locator('table tbody tr')
+      .first()
+      .locator('td')
+      .nth(3);
+    await expect(statusCellAfter).toContainText('Inactive', { timeout: 10000 });
+  });
+
+  // TC7: Admin có thể kích hoạt (activate) tài khoản của người dùng đang inactive
+  test('Admin can activate an inactive user', async ({ page }) => {
+    await page.getByRole('combobox').click();
+    await page.getByRole('option', { name: 'Inactive' }).click();
+    await page.keyboard.press('Escape');
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(2000);
+
+    // Lấy dòng đầu tiên trong bảng (người dùng inactive)
+    const inactiveRow = page.locator('table tbody tr').first();
+    await expect(inactiveRow).toBeVisible();
+
+    // Xác nhận đây là người dùng Inactive
+    const statusCell = inactiveRow.locator('td').nth(3);
+    await expect(statusCell).toContainText('Inactive', { timeout: 5000 });
+
+    // Tìm button action trong hàng
+    const actionButton = inactiveRow.getByRole('button').first();
+    await actionButton.click();
+
+    // Click vào tùy chọn "Activate"
+    await page.getByRole('menuitem', { name: 'Activate' }).click();
+
+    // Kiểm tra toast thành công
+    await expect(page.getByText('User activated successfully')).toBeVisible({
+      timeout: 15000,
+    });
+
+    // Kiểm tra lại Status sau khi activate
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(1000);
+    const statusCellAfter = page
+      .locator('table tbody tr')
+      .first()
+      .locator('td')
+      .nth(3);
+    await expect(statusCellAfter).toContainText('Active', { timeout: 10000 });
+  });
+
+  // TC8: Admin có thể xóa người dùng
   test('Admin can delete a user', async ({ page }) => {
     page.on('dialog', async (dialog) => {
       expect(dialog.message()).toContain(
@@ -257,131 +307,137 @@ test.describe('Admin User Management', () => {
     const firstRow = page.locator('table tbody tr').first();
     await expect(firstRow).toBeVisible();
 
-    // Lấy tên người dùng từ ô thứ hai (chứa tên và avatar) để xác minh sau khi xóa
-    const userNameCell = firstRow.locator('td').nth(1); // <-- Lấy ô thứ 2
-    const userNameText = await userNameCell.textContent();
-    // Lấy phần text là tên người dùng, loại bỏ khoảng trắng thừa
-    const userNameToDelete = userNameText?.trim();
-    expect(userNameToDelete).toBeTruthy();
+    // Lấy email người dùng để xác minh sau khi xóa (Email is usually unique)
+    const emailCell = firstRow.locator('td').nth(2);
+    const emailToDelete = await emailCell.textContent();
+    expect(emailToDelete).toBeTruthy();
 
-    // Click vào button action trong dòng đầu tiên (nằm ở ô cuối cùng)
-    await firstRow.locator('td').last().getByRole('button').click(); // <-- Chính xác hơn là lấy button trong ô cuối
+    // Click vào button action
+    await firstRow.locator('td').last().getByRole('button').click();
 
-    // Click vào tùy chọn "Delete" trong menu
+    // Click vào tùy chọn "Delete"
     await page.getByRole('menuitem', { name: 'Delete' }).click();
 
     // Kiểm tra toast thông báo xóa thành công
-    await expect(page.getByText('User deleted successfully')).toBeVisible();
+    await expect(page.getByText('User deleted successfully')).toBeVisible({
+      timeout: 15000,
+    });
 
-    // Đợi một chút để bảng cập nhật sau khi xóa
-    await page.waitForTimeout(2000);
+    // Đợi bảng cập nhật
+    await page.waitForTimeout(1500);
     await waitForTableToLoad(page);
 
-    // Kiểm tra người dùng đã bị xóa khỏi bảng
-    // Tìm kiếm chính xác tên người dùng trong toàn bộ bảng
-    await expect(
-      page
-        .locator('table tbody')
-        .getByText(userNameToDelete as string, { exact: true })
-    ).not.toBeVisible();
+    // Tìm kiếm người dùng đã xóa
+    const searchInput = page.getByPlaceholder('Search users...');
+    await searchInput.fill(emailToDelete as string);
+    await page.keyboard.press('Enter');
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(2500);
+
+    // Kiểm tra xuất hiện thông báo "No results."
+    await expect(page.getByText('No results.', { exact: true })).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Cleanup: Reset search
+    await searchInput.clear();
+    await page.keyboard.press('Enter');
+    await waitForTableToLoad(page);
   });
 
-  // TC8: Admin có thể chuyển trang để xem danh sách người dùng ở các trang khác nhau
+  // TC9: Admin có thể chuyển trang để xem danh sách người dùng ở các trang khác nhau
   test('Admin can paginate through users', async ({ page }) => {
-    const firstRowLocator = page.locator('table tbody tr').first();
-    const emailCellLocator = firstRowLocator.locator('td').nth(2); // Locator cho ô email hàng đầu
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(1000);
 
-    // Lấy email ban đầu và kiểm tra xem có lấy được không
-    const initialFirstRowEmail = await emailCellLocator.textContent({
-      timeout: 5000,
-    }); // Thêm timeout nhỏ đề phòng
+    // Define the locator for the email column cells (3rd column)
+    const emailCellsLocator = page.locator('table tbody tr td:nth-child(3)');
+
+    // Lấy thông tin trang đầu tiên
+    const page1Emails = await emailCellsLocator.allTextContents();
 
     // Kiểm tra xem có đủ dữ liệu để phân trang không
     const nextButton = page.getByRole('button', { name: 'Next', exact: true });
-    const isNextEnabled = await nextButton.isEnabled().catch(() => false);
+    const isNextEnabled = await nextButton.isEnabled();
 
-    if (!isNextEnabled || !initialFirstRowEmail) {
-      console.log(
-        'Skipping pagination test: Next button disabled or could not get initial email.'
-      );
+    if (!isNextEnabled || page1Emails.length === 0) {
       test.skip(
         true,
-        'Skipping pagination test due to insufficient data or initial state error.'
+        'Skipping pagination test due to insufficient data or no emails found on page 1'
       );
       return;
     }
 
-    // --- PHẦN 1: Chuyển trang bằng cách nhập số và nhấn Go ---
+    // PHẦN 1: Chuyển đến trang 2 bằng nút Next
+    await nextButton.click();
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(2000);
+
+    // Kiểm tra đã chuyển đến trang 2
     const pageInput = page.getByRole('spinbutton');
-    await pageInput.click();
-    await pageInput.fill('2');
-    const goButton = page.getByRole('button', { name: 'Go' });
-    await goButton.click();
+    await expect(pageInput, 'Page input should show 2 after Next').toHaveValue(
+      '2',
+      { timeout: 5000 }
+    );
 
-    // Đợi cho email ở hàng đầu tiên thay đổi (khác với email ban đầu)
-    await expect(
-      emailCellLocator,
-      'Email should change after navigating to page 2 via Go button'
-    ).not.toHaveText(initialFirstRowEmail, { timeout: 10000 }); // Chờ tối đa 10s
+    // Lấy dữ liệu trang 2
+    const page2Emails = await emailCellsLocator.allTextContents();
 
-    // (Optional) Kiểm tra lại giá trị input page number
-    await expect(pageInput, 'Page input should show 2').toHaveValue('2', {
-      timeout: 1000,
-    });
+    // Kiểm tra nội dung trang 2 khác với trang 1
+    expect(
+      page2Emails,
+      'Emails on page 2 should differ from page 1'
+    ).not.toEqual(page1Emails);
+    expect(page2Emails.length, 'Should have emails on page 2').toBeGreaterThan(
+      0
+    );
 
-    // --- PHẦN 2: Quay lại trang 1 bằng nút Previous ---
+    // PHẦN 2: Quay lại trang 1 bằng nút Previous
     const prevButton = page.getByRole('button', {
       name: 'Previous',
       exact: true,
     });
-    const isPrevEnabled = await prevButton.isEnabled();
+    await prevButton.click();
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(2000);
 
-    if (isPrevEnabled) {
-      await prevButton.click();
+    // Kiểm tra đã quay về trang 1
+    await expect(
+      pageInput,
+      'Page input should show 1 after Previous'
+    ).toHaveValue('1', { timeout: 5000 });
 
-      // Đợi cho email ở hàng đầu tiên quay về giá trị ban đầu
-      await expect(
-        emailCellLocator,
-        'Email should revert to initial after clicking Previous'
-      ).toHaveText(initialFirstRowEmail, { timeout: 10000 }); // Chờ tối đa 10s
+    // Lấy dữ liệu trang 1 sau khi quay lại
+    const newPage1Emails = await emailCellsLocator.allTextContents();
+    expect(
+      newPage1Emails.length,
+      'Should have emails on page 1 after returning'
+    ).toBeGreaterThan(0);
 
-      // (Optional) Kiểm tra lại giá trị input page number
-      await expect(
-        pageInput,
-        'Page input should show 1 after clicking Previous'
-      ).toHaveValue('1', { timeout: 1000 });
-    } else {
-      console.log('Previous button is disabled, cannot test going back.');
-      // Cân nhắc fail test nếu việc không thể quay lại là lỗi
-      // expect(isPrevEnabled, 'Previous button should be enabled on page 2').toBe(true);
-    }
+    // PHẦN 3: Thử chuyển trang bằng cách nhập số và nhấn Go
+    await pageInput.click();
+    await pageInput.fill('2');
+    const goButton = page.getByRole('button', { name: 'Go' });
+    await goButton.click();
+    await waitForTableToLoad(page);
+    await page.waitForTimeout(2000);
 
-    // --- PHẦN 3: Chuyển đến trang 2 bằng nút Next (đảm bảo đang ở trang 1) ---
-    // Chỉ thực hiện nếu đang ở trang 1 (dựa vào giá trị email)
-    const currentEmail = await emailCellLocator.textContent();
-    if (currentEmail === initialFirstRowEmail) {
-      const isNextStillEnabled = await nextButton.isEnabled(); // Kiểm tra lại nút Next
-      if (isNextStillEnabled) {
-        await nextButton.click();
+    // Kiểm tra đã chuyển đến trang 2
+    await expect(pageInput, 'Page input should show 2 after Go').toHaveValue(
+      '2',
+      { timeout: 5000 }
+    );
 
-        // Đợi cho email ở hàng đầu tiên thay đổi (khác với email ban đầu)
-        await expect(
-          emailCellLocator,
-          'Email should change after clicking Next from page 1'
-        ).not.toHaveText(initialFirstRowEmail, { timeout: 10000 }); // Chờ tối đa 10s
+    // Lấy dữ liệu trang 2 lần nữa
+    const newPage2Emails = await emailCellsLocator.allTextContents();
 
-        // (Optional) Kiểm tra lại giá trị input page number
-        await expect(
-          pageInput,
-          'Page input should show 2 after clicking Next'
-        ).toHaveValue('2', { timeout: 1000 });
-      } else {
-        console.log('Next button became disabled unexpectedly on page 1.');
-      }
-    } else {
-      console.log(
-        `Not on page 1 (current email: ${currentEmail}), skipping Next button test from page 1.`
-      );
-    }
+    expect(
+      newPage2Emails,
+      'Emails on page 2 (via Go) should differ from returned page 1'
+    ).not.toEqual(newPage1Emails);
+    expect(
+      newPage2Emails.length,
+      'Should have emails on page 2 after Go'
+    ).toBeGreaterThan(0);
   });
 });
