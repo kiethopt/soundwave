@@ -368,21 +368,39 @@ export default function Header({
             </Link>
 
             {/* Link Sự Kiện */}
-            <Link
-              href="/event/event-total"
-              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${
-                isActive('/event/event-total')
-                  ? theme === 'light'
-                    ? 'text-gray-900 bg-gray-200'
-                    : 'text-white bg-[#282828]'
-                  : theme === 'light'
-                  ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-                  : 'text-white/70 hover:text-white hover:bg-[#282828]/50'
-              }`}
-            >
-              <Calendar className="w-5 h-5" />
-              <span className="hidden lg:inline">Event</span>
-            </Link>
+           {isAdminOrArtist ? (
+              <Link
+                href="/EditEvent"
+                className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${
+                  isActive("/EditEvent")
+                    ? theme === "light"
+                      ? "text-gray-900 bg-gray-200"
+                      : "text-white bg-[#282828]"
+                    : theme === "light"
+                    ? "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
+                    : "text-white/70 hover:text-white hover:bg-[#282828]/50"
+                }`}
+              >
+                <Calendar className="w-5 h-5" />
+                <span className="hidden lg:inline">Event Management</span>
+              </Link>
+            ) : (
+              <Link
+                href="/event-total"
+                className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${
+                  isActive("/event-total")
+                    ? theme === "light"
+                      ? "text-gray-900 bg-gray-200"
+                      : "text-white bg-[#282828]"
+                    : theme === "light"
+                    ? "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
+                    : "text-white/70 hover:text-white hover:bg-[#282828]/50"
+                }`}
+              >
+                <Calendar className="w-5 h-5" />
+                <span className="hidden lg:inline">Event</span>
+              </Link>
+            )}
 
             <form onSubmit={handleSearch} className="relative w-[400px]">
               <Search
