@@ -16,7 +16,6 @@ const canManageEvent = (user: any, eventArtistId: string): boolean => {
   );
 };
 
-
 export const createEvent = async (req: Request, res: Response): Promise<void> => {
   try {
     const user = req.user; 
@@ -71,7 +70,7 @@ export const createEvent = async (req: Request, res: Response): Promise<void> =>
 
     const notificationsData = followers.map((follower) => ({
       type: NotificationType.NEW_EVENT,
-      message: `Nghệ sĩ vừa tạo event mới: ${title}`,
+      message: `The artist just created a new event: ${title}`,
       recipientType: RecipientType.USER,
       userId: follower.followerId,
       artistId: targetArtistId,
@@ -83,7 +82,7 @@ export const createEvent = async (req: Request, res: Response): Promise<void> =>
       for (const follower of followers) {
         await pusher.trigger(`user-${follower.followerId}`, 'notification', {
           type: NotificationType.NEW_EVENT,
-          message: `Nghệ sĩ vừa tạo event mới: ${title}`,
+          message: `The artist just created a new event: ${title}`,
         });
       }
     }
@@ -266,7 +265,6 @@ export const getAllEvents = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
 
 export const joinEvent = async (req: Request, res: Response): Promise<void> => {
   try {
