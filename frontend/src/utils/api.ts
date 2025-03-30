@@ -1045,7 +1045,7 @@ export const api = {
       ),
   },
 
-  events: {
+ events: {
     createEvent: async (data: any, token: string) => {
       try {
         const res = await fetchWithAuth(
@@ -1054,11 +1054,9 @@ export const api = {
           token
         );
         if (!res.ok) throw new Error('Failed to create event');
-        toast.success('Event created successfully');
         return await res.json();
       } catch (error) {
         console.error('Error creating event:', error);
-        toast.error('Error creating event');
         throw error;
       }
     },
@@ -1071,7 +1069,6 @@ export const api = {
         return await res.json();
       } catch (error) {
         console.error('Error fetching events:', error);
-        toast.error('Error fetching events');
         throw error;
       }
     },
@@ -1083,7 +1080,6 @@ export const api = {
         return await res.json();
       } catch (error) {
         console.error('Error fetching event detail:', error);
-        toast.error('Error fetching event detail');
         throw error;
       }
     },
@@ -1096,11 +1092,9 @@ export const api = {
           token
         );
         if (!res.ok) throw new Error('Failed to update event');
-        toast.success('Event updated successfully');
         return await res.json();
       } catch (error) {
         console.error('Error updating event:', error);
-        toast.error('Error updating event');
         throw error;
       }
     },
@@ -1109,11 +1103,9 @@ export const api = {
       try {
         const res = await fetchWithAuth(`/api/events/${id}`, { method: 'DELETE' }, token);
         if (!res.ok) throw new Error('Failed to delete event');
-        toast.success('Event deleted successfully');
         return await res.json();
       } catch (error) {
         console.error('Error deleting event:', error);
-        toast.error('Error deleting event');
         throw error;
       }
     },
@@ -1126,11 +1118,9 @@ export const api = {
           token
         );
         if (!res.ok) throw new Error('Failed to join event');
-        toast.success('Joined event successfully');
         return await res.json();
       } catch (error) {
         console.error('Error joining event:', error);
-        toast.error('Error joining event');
         throw error;
       }
     },
@@ -1143,11 +1133,9 @@ export const api = {
           token
         );
         if (!res.ok) throw new Error('Failed to cancel event join');
-        toast.success('Cancelled join successfully');
         return await res.json();
       } catch (error) {
         console.error('Error cancelling event join:', error);
-        toast.error('Error cancelling join');
         throw error;
       }
     },
