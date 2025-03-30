@@ -3,8 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { api } from '@/utils/api';
+import { Edit, Trash } from 'lucide-react';
 
 interface Event {
   id: string;
@@ -14,6 +15,7 @@ interface Event {
   startDate: string;
   endDate: string;
   artistId: string;
+  artistName?: string;
 }
 
 export default function ViewEvent() {
@@ -57,22 +59,23 @@ export default function ViewEvent() {
                 Starts: {new Date(event.startDate).toLocaleString()} | Ends:{' '}
                 {new Date(event.endDate).toLocaleString()}
               </p>
-              <div className="flex space-x-2 mt-2">
+              <div className="flex items-center space-x-2 mt-2">
                 <Button
                   variant="outline"
                   onClick={() =>
-                    (window.location.href = `/artist/events/edit/${event.id}`)
+                    (window.location.href = `/artist/event/EditEvent/${event.id}`)
                   }
                 >
-                  Edit
+                  <Edit className="w-4 h-4" />
                 </Button>
+                <div className="border-l h-6"></div>
                 <Button
                   variant="destructive"
                   onClick={() =>
-                    (window.location.href = `/artist/events/delete/${event.id}`)
+                    (window.location.href = `/artist/event/DeleteEvent/${event.id}`)
                   }
                 >
-                  Delete
+                  <Trash className="w-4 h-4" />
                 </Button>
               </div>
             </CardContent>
@@ -81,7 +84,7 @@ export default function ViewEvent() {
       )}
       <div className="mt-4">
         <Button
-          onClick={() => (window.location.href = '/artist/events/create')}
+          onClick={() => (window.location.href = '/artist/event/CreateEvent')}
         >
           Create New Event
         </Button>

@@ -108,7 +108,7 @@ const createEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         });
         const notificationsData = followers.map((follower) => ({
             type: client_1.NotificationType.NEW_EVENT,
-            message: `Nghệ sĩ vừa tạo event mới: ${title}`,
+            message: `The artist just created a new event: ${title}`,
             recipientType: client_1.RecipientType.USER,
             userId: follower.followerId,
             artistId: targetArtistId,
@@ -119,7 +119,7 @@ const createEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             for (const follower of followers) {
                 yield pusher_1.default.trigger(`user-${follower.followerId}`, 'notification', {
                     type: client_1.NotificationType.NEW_EVENT,
-                    message: `Nghệ sĩ vừa tạo event mới: ${title}`,
+                    message: `The artist just created a new event: ${title}`,
                 });
             }
         }

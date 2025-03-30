@@ -1042,7 +1042,7 @@ export const api = {
       ),
   },
 
-  events: {
+ events: {
     createEvent: async (data: any, token: string) => {
       try {
         const res = await fetchWithAuth(

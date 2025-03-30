@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,7 @@ interface EditEventProps {
 
 export default function EditEvent({ open, onOpenChange }: EditEventProps) {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const token = localStorage.getItem('userToken') || '';
 
   const [eventData, setEventData] = useState<EventData | null>(null);
@@ -40,26 +41,27 @@ export default function EditEvent({ open, onOpenChange }: EditEventProps) {
     startDate: '',
     endDate: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fetchEvent = async () => {
-    try {
-      const data = await api.events.getEventById(id, token);
-      setEventData(data);
-      setFormData({
-        title: data.title,
-        description: data.description || '',
-        location: data.location,
-        startDate: new Date(data.startDate).toISOString().slice(0, 16),
-        endDate: new Date(data.endDate).toISOString().slice(0, 16),
-      });
-    } catch (error) {
-      console.error('Error fetching event:', error);
-      toast.error('Error fetching event');
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    const fetchEvent = async () => {
+      try {
+        const data = await api.events.getEventById(id, token);
+        setEventData(data);
+        setFormData({
+          title: data.title,
+          description: data.description || '',
+          location: data.location,
+          startDate: new Date(data.startDate).toISOString().slice(0, 16),
+          endDate: new Date(data.endDate).toISOString().slice(0, 16),
+        });
+      } catch (error) {
+        console.error('Error fetching event:', error);
+        toast.error('Error fetching event');
+      }
+    };
+
     if (id) fetchEvent();
   }, [id]);
 
@@ -70,16 +72,18 @@ export default function EditEvent({ open, onOpenChange }: EditEventProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
       await api.events.updateEvent(id, formData, token);
       toast.success('Event updated successfully');
       onOpenChange(false);
+      router.push('/artist/events');
     } catch (error) {
       console.error('Error updating event:', error);
       toast.error('Error updating event');
+      setError('An error occurred while updating the event.');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -145,15 +149,16 @@ export default function EditEvent({ open, onOpenChange }: EditEventProps) {
               type="button"
               variant="destructive"
               onClick={() => onOpenChange(false)}
-              disabled={isLoading}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Saving...' : 'Update'}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Update'}
             </Button>
           </div>
         </form>
+        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
       </DialogContent>
     </Dialog>
   );

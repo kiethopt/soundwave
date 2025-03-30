@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,7 @@ export default function CreateEvent({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const router = useRouter();
   const artistId = localStorage.getItem('artistId') || 'artist_id_placeholder';
   const token = localStorage.getItem('userToken') || '';
 
@@ -29,7 +31,8 @@ export default function CreateEvent({
     startDate: '',
     endDate: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -38,17 +41,19 @@ export default function CreateEvent({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
       const eventData = { ...formData, artistId };
       await api.events.createEvent(eventData, token);
       toast.success('Event created successfully');
       onOpenChange(false);
+      router.push('/artist/events');
     } catch (error) {
       console.error('Error creating event:', error);
       toast.error('Error creating event');
+      setError('An error occurred while creating the event.');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -112,15 +117,16 @@ export default function CreateEvent({
               type="button"
               variant="destructive"
               onClick={() => onOpenChange(false)}
-              disabled={isLoading}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Saving...' : 'Create'}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Create'}
             </Button>
           </div>
         </form>
+        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
       </DialogContent>
     </Dialog>
   );
