@@ -31,7 +31,7 @@ export default function EventPage() {
           toast.error('You need to log in to see events!');
           return;
         }
-        const params = {}; // Adjust params as needed
+        const params = {};
         const data = await api.events.getAllEvents(params, token);
         setEvents(data);
       } catch (error) {
