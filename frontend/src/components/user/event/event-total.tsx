@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-toastify';
 import { api } from '@/utils/api';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Event {
   id: string;
@@ -15,6 +16,7 @@ interface Event {
   endDate: string;
   artistId: string;
   isJoined?: boolean;
+  artistName?: string;
 }
 
 export default function EventTotal() {
@@ -23,6 +25,7 @@ export default function EventTotal() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [joinStatus, setJoinStatus] = useState<Record<string, boolean>>({});
+  const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
 
   const fetchEvents = async () => {
     setIsLoading(true);
@@ -59,15 +62,16 @@ export default function EventTotal() {
     }
   };
 
-  const handleViewDetails = async (eventId: string) => {
-    try {
-      const eventDetail = await api.events.getEventById(eventId, token);
-      console.log('Event Detail:', eventDetail);
-      toast.success('Event detail fetched successfully');
-    } catch (error) {
-      console.error('Error fetching event detail:', error);
-      toast.error('Error fetching event detail');
+  const handleToggleExpand = (eventId: string) => {
+    setExpandedEvent(expandedEvent === eventId ? null : eventId);
+  };
+
+  const getShortDescription = (description: string) => {
+    const lines = description.split('\n');
+    if (lines.length > 2) {
+      return `${lines.slice(0, 2).join('\n')}....`;
     }
+    return description;
   };
 
   useEffect(() => {
@@ -75,39 +79,49 @@ export default function EventTotal() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold">All Events</h2>
+    <div className="p-4">
+      <h2 className="text-2xl font-bold mb-4">All Events</h2>
       {isLoading ? (
         <p>Loading...</p>
       ) : (
-        events.map(event => (
-          <Card key={event.id} className="border p-4">
-            <CardHeader>
-              <CardTitle>{event.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>{event.description}</p>
-              <p>Location: {event.location}</p>
-              <p>
-                Starts: {new Date(event.startDate).toLocaleString()} | Ends: {new Date(event.endDate).toLocaleString()}
-              </p>
-              <div className="flex space-x-2 mt-2">
-                <Button variant="outline" onClick={() => handleViewDetails(event.id)}>
-                  View Details
-                </Button>
-                {joinStatus[event.id] ? (
-                  <Button variant="destructive" onClick={() => handleCancelEvent(event.id)}>
-                    Cancel Join
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {events.map(event => (
+            <Card key={event.id} className="border p-4">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>{event.title}</CardTitle>
+                  <Button variant="ghost" size="icon" onClick={() => handleToggleExpand(event.id)}>
+                    {expandedEvent === event.id ? <ChevronUp /> : <ChevronDown />}
                   </Button>
-                ) : (
-                  <Button onClick={() => handleJoinEvent(event.id)}>
-                    Join
-                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p>{getShortDescription(event.description || '')}</p>
+                <p>Location: {event.location}</p>
+                <p>
+                  Starts: {new Date(event.startDate).toLocaleString()} | Ends: {new Date(event.endDate).toLocaleString()}
+                </p>
+                <p><strong>Artist:</strong> {event.artistName || 'Default Artist'}</p>
+                <div className="flex space-x-2 mt-2">
+                  {joinStatus[event.id] ? (
+                    <Button variant="destructive" onClick={() => handleCancelEvent(event.id)}>
+                      Cancel Join
+                    </Button>
+                  ) : (
+                    <Button onClick={() => handleJoinEvent(event.id)}>
+                      Join
+                    </Button>
+                  )}
+                </div>
+                {expandedEvent === event.id && (
+                  <div className="mt-4 space-y-2">
+                    <p>{event.description}</p>
+                  </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        ))
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );
