@@ -1,10 +1,11 @@
-"use client";
+'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { toast } from 'react-toastify';
 import { api } from '@/utils/api';
+import { toast } from 'react-toastify';
+import { ChevronRight } from 'lucide-react';
 
 export type EventType = {
   id: string;
@@ -17,6 +18,7 @@ export type EventType = {
 };
 
 export default function EventPage() {
+  const router = useRouter();
   const [events, setEvents] = useState<EventType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [hoveredEvent, setHoveredEvent] = useState<string | null>(null);
@@ -46,69 +48,68 @@ export default function EventPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#111111]">
-        <p className="text-secondary animate-pulse">Loading events...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#111111] py-8 px-6 pt-[72px]">
-      <div className="max-w-4xl mx-auto pb-8">
-        <div className="mb-6 flex justify-between items-center animate-fade-in">
-          <div>
-            <h1 className="text-2xl font-bold text-primary inline-block">Upcoming Events</h1>
-            <span className="ml-2 text-sm text-secondary">
-              ({events.length})
-            </span>
-          </div>
-        </div>
-
-        {events.length === 0 ? (
-          <div className="text-center py-12 animate-fade-in">
-            <p className="text-lg text-secondary">No events available.</p>
-            <Link href="/">
-              <button className="btn-primary mt-4 animate-slide-up">Back to Home</button>
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {events.map((event, index) => (
-              <div key={event.id} className="animate-slide-up">
-                <Link href={`/event/${event.id}`}>
-                  <div
-                    className={`dashboard-card flex items-center p-4 transition-all duration-300 ${hoveredEvent === event.id
-                      ? 'scale-102 shadow-lg'
-                      : 'scale-100 shadow-md'
-                    } ${index !== events.length - 1 ? 'border-b border-white/20' : ''}`}
-                    onMouseEnter={() => setHoveredEvent(event.id)}
-                    onMouseLeave={() => setHoveredEvent(null)}
-                  >
-                    <div className="w-14 h-14 relative rounded-md overflow-hidden mr-4 flex-shrink-0">
-                      <Image
-                        src={event.coverUrl || '/images/default-event.jpg'}
-                        alt={event.title}
-                        fill
-                        style={{ objectFit: 'cover' }}
-                        className="transition-transform duration-300 hover:scale-110"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <h2 className="text-lg font-semibold transition-colors duration-200 text-primary">
-                        {event.title}
-                      </h2>
-                      <p className="text-sm text-secondary">
-                        {new Date(event.startDate).toLocaleString()} - {new Date(event.endDate).toLocaleString()}
-                      </p>
-                      <p className="text-xs mt-1">
-                        {event.location}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
+  const Section = ({
+    title,
+    viewAllLink,
+    children,
+  }: {
+    title: string;
+    viewAllLink?: string;
+    children: React.ReactNode;
+  }) => (
+    <div className="mb-10">
+      <div className="flex justify-between items-center mb-5">
+        <h2 className="text-2xl font-bold">{title}</h2>
+        {viewAllLink && (
+          <button
+            onClick={() => router.push(viewAllLink)}
+            className="text-sm text-primary flex items-center hover:underline"
+          >
+            See All <ChevronRight size={16} />
+          </button>
         )}
+      </div>
+      {children}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen w-full px-6 py-8">
+      <h1 className="text-4xl font-bold mb-6">Upcoming Events</h1>
+      <div className="h-px bg-white/20 w-full mb-8"></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        {events.map(event => (
+          <div
+            key={event.id}
+            className="cursor-pointer bg-white p-4 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300"
+            onMouseEnter={() => setHoveredEvent(event.id)}
+            onMouseLeave={() => setHoveredEvent(null)}
+            onClick={() => router.push(`/event/${event.id}`)}
+          >
+            <div className="relative">
+              <div className="w-full h-48 relative overflow-hidden rounded-lg mb-4">
+                <Image
+                  src={event.coverUrl || '/images/default-event.jpg'}
+                  alt={event.title}
+                  layout="fill"
+                  objectFit="cover"
+                  className="transition-transform duration-300 hover:scale-105"
+                />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">{event.title}</h3>
+              <p className="text-sm text-gray-700 mb-2">{event.description}</p>
+              <p className="text-sm text-gray-500">
+                {new Date(event.startDate).toLocaleString()} - {new Date(event.endDate).toLocaleString()}
+              </p>
+              <p className="text-sm text-gray-500">{event.location}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
