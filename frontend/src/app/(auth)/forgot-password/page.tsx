@@ -5,10 +5,79 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { api } from '@/utils/api';
 
+function SuccessMessage({ email }: { email: string }) {
+  const [resent, setResent] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(true);
+
+  const handleResend = async () => {
+    try {
+      await api.auth.requestPasswordReset(email);
+      setResent(true);
+      setShowSuccessMessage(false); // Hide the success message
+    } catch (err: any) {
+      console.error('Error resending verification code:', err.message);
+    }
+  };
+
+  return (
+    <div className="text-left space-y-4 p-6 bg-[#121212] rounded-md">
+      {showSuccessMessage && (
+        <div className="flex items-center gap-2">
+          <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-10 w-10 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+          <p className="text-lg font-bold text-green-500">
+            Password recovery email sent successfully
+          </p>
+        </div>
+      )}
+      {resent && (
+        <p className="text-lg font-bold border border-white text-white p-3">
+          We have resent the verification code to {email}
+        </p>
+      )}
+      <p className="text-sm text-white/60 font-bold">
+        An account verification link was sent to {email}.
+      </p>
+      <p className="text-sm text-white/60 ">
+        You can close this page and resume your account recovery from this link.
+      </p>
+      <p className="text-sm text-white/60 font-bold">
+        Having trouble receiving an account verification code?
+      </p>
+      <p className="text-sm text-white/60">
+        An account verification code is only sent if the destination is
+        associated with a Steam account. <br />
+        It could take up to 5 minutes to be delivered.
+      </p>
+      <button
+        onClick={handleResend}
+        className="mt-4 py-2 px-4 rounded-md bg-white text-black font-medium hover:bg-white/90"
+      >
+        Resend account verification code
+      </button>
+    </div>
+  );
+}
+
 function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -20,19 +89,25 @@ function ForgotPasswordForm() {
         if (response.message) {
           setMessage(response.message);
           setError('');
+          setSuccess(true);
         } else {
           setError(response.message || 'An error occurred');
           setMessage('');
+          setSuccess(false);
         }
       } catch (err: any) {
-        // Hiển thị thông báo lỗi từ backend
         setError(
           err.message || 'An error occurred while requesting password reset'
         );
+        setSuccess(false);
       }
     },
     [email]
   );
+
+  if (success) {
+    return <SuccessMessage email={email} />;
+  }
 
   return (
     <form className="flex flex-col gap-6" onSubmit={handleSubmit}>

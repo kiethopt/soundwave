@@ -413,7 +413,7 @@ export const requestPasswordReset = async (
     await sendEmail(
       user.email,
       'Password Reset',
-      `Click here to reset your password: ${resetLink}`
+      resetLink
     );
 
     res.json({ message: 'Password reset email sent successfully' });
@@ -468,7 +468,7 @@ export const resetPassword = async (
 const sendEmail = async (
   to: string,
   subject: string,
-  text: string
+  resetLink: string
 ): Promise<void> => {
   // Thiết lập API Key của SendGrid
   sgMail.setApiKey(process.env.SENDGRID_API_KEY as string);
@@ -478,8 +478,21 @@ const sendEmail = async (
     to, // Email nhận
     from: process.env.EMAIL_USER as string, // Email gửi đi
     subject, // Tiêu đề email
-    text, // Nội dung email (dạng plain text)
-    html: `<p>${text}</p>`, // Nội dung email (dạng HTML, tùy chọn)
+    text: `Click here to reset your password: ${resetLink}`, // Nội dung email (dạng plain text)
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; text-align: center; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+        <h2 style="color: #444; font-size: 20px;">RESET PASSWORD</h2>
+        <p style="text-align: left; font-size: 16px;">Hi, ${to}</p>
+        <p style="text-align: left; font-size: 16px;">You have just submitted a password reset request. Below is a dedicated link for you:</p>
+        <div style="margin: 20px 0;">
+          <a href="${resetLink}" style="display: inline-block; padding: 15px 30px; background-color: #00bcd4; color: #fff; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">RESET PASSWORD</a>
+        </div>
+        <p style="text-align: left; font-size: 16px; color: #666;">If you are not the one making the request, please ignore this email.</p>
+        <p style="text-align: left; font-size: 16px; color: #666;">This notification has been sent to the email address associated with your SoundWave account.</p>
+        <p style="text-align: left; font-size: 16px; color: #666;">This email is automatically generated. Please do not reply. If you have any questions, please contact us via social channels for the fastest response.</p>
+        <p style="text-align: left; font-size: 14px;">	Have fun,<br>The SoundWave Team.</p>
+      </div>
+    `, // Nội dung email (dạng HTML)
   };
 
   // Gửi email

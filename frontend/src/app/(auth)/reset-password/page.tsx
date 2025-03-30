@@ -5,16 +5,22 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { api } from '@/utils/api';
+import { Eye, EyeOff } from 'react-feather'; // Import icons for visibility toggle
 
 function ResetPasswordForm() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token');
+
+  const togglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
+  };
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -44,12 +50,13 @@ function ResetPasswordForm() {
           setMessage('');
         }
       } catch (err: any) {
-        // Hiển thị thông báo lỗi từ backend
         setError(err.message || 'An error occurred while resetting password');
       }
     },
     [newPassword, confirmPassword, token, router]
   );
+
+  const passwordMatch = newPassword === confirmPassword;
 
   return (
     <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
@@ -78,14 +85,23 @@ function ResetPasswordForm() {
           >
             New Password
           </label>
-          <input
-            id="newPassword"
-            type="password"
-            required
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
-          />
+          <div className="relative">
+            <input
+              id="newPassword"
+              type={showPassword ? 'text' : 'password'}
+              required
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white pr-10"
+            />
+            <button
+              type="button"
+              onClick={togglePasswordVisibility}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-2">
@@ -95,14 +111,35 @@ function ResetPasswordForm() {
           >
             Confirm Password
           </label>
-          <input
-            id="confirmPassword"
-            type="password"
-            required
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
-          />
+          <div className="relative">
+            <input
+              id="confirmPassword"
+              type={showPassword ? 'text' : 'password'}
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white pr-10"
+            />
+            <button
+              type="button"
+              onClick={togglePasswordVisibility}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+
+          {newPassword && confirmPassword && (
+            <p
+              className={`text-sm ${
+                passwordMatch ? 'text-green-400' : 'text-red-400'
+              }`}
+            >
+              {passwordMatch
+                ? '✅ Passwords match'
+                : '❌ Passwords do not match'}
+            </p>
+          )}
         </div>
 
         <button
