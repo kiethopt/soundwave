@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Heart, ListMusic, MoreHorizontal, Share2 } from 'lucide-react';
 import pusher from '@/utils/pusher';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { useTrack } from '@/contexts/TrackContext';
 
 type FilterType = 'all' | 'albums' | 'tracks' | 'artists' | 'users';

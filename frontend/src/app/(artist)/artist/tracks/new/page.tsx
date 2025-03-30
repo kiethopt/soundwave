@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import Link from 'next/link';
 import { ArrowLeft } from '@/components/ui/Icons';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { ArtistProfile } from '@/types';
@@ -123,7 +123,7 @@ export default function NewTrack() {
       if (coverFile) {
         formData.append('coverFile', coverFile);
       } else {
-        toast.warning('No cover image selected. You can update it later.');
+        toast('No cover image selected. You can update it later.');
       }
 
       featuredArtists.forEach((artistId) => {

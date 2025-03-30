@@ -1,9 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { api } from '@/utils/api';
 
 interface DeleteEventProps {
@@ -13,7 +19,12 @@ interface DeleteEventProps {
   onDeleteSuccess: () => void;
 }
 
-export default function DeleteEvent({ eventId, open, onOpenChange, onDeleteSuccess }: DeleteEventProps) {
+export default function DeleteEvent({
+  eventId,
+  open,
+  onOpenChange,
+  onDeleteSuccess,
+}: DeleteEventProps) {
   const token = localStorage.getItem('userToken') || '';
   const [isLoading, setIsLoading] = useState(false);
 
@@ -41,10 +52,20 @@ export default function DeleteEvent({ eventId, open, onOpenChange, onDeleteSucce
         <p className="my-4">Are you sure you want to delete this event?</p>
         <DialogFooter>
           <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={handleDelete} disabled={isLoading}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isLoading}
+            >
               {isLoading ? 'Deleting...' : 'Delete'}
             </Button>
           </div>

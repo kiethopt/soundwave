@@ -2,7 +2,7 @@
 
 import { Album, ArtistProfile, Track } from '@/types';
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Calendar, Music, Disc } from 'lucide-react';
+import { ArrowLeft, Calendar, Music } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/utils/api';
 import { useParams } from 'next/navigation';

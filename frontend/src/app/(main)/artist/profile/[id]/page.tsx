@@ -6,29 +6,20 @@ import { api } from '@/utils/api';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Album, ArtistProfile, Track } from '@/types';
 import { Button } from '@/components/ui/button';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { useDominantColor } from '@/hooks/useDominantColor';
-import {
-  Verified,
-  Play,
-  Pause,
-  AddSimple,
-  Edit,
-  Music,
-} from '@/components/ui/Icons';
-import { ArrowLeft, Heart, MoreHorizontal, Share2 } from 'lucide-react';
+import { Verified, Play, Pause, Edit, Music } from '@/components/ui/Icons';
+import { ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
 import { EditArtistProfileModal } from '@/components/artist/EditArtistProfileModal';
 import Image from 'next/image';
-// import { EditArtistBannerModal } from '@/components/artist/EditArtistBannerModal';
 
 export default function ArtistProfilePage({
   params,
@@ -41,7 +32,6 @@ export default function ArtistProfilePage({
   const [artist, setArtist] = useState<ArtistProfile | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
-  // Track mapping for related artists - key is artist ID, value is array of tracks
   const [artistTracksMap, setArtistTracksMap] = useState<
     Record<string, Track[]>
   >({});
@@ -59,18 +49,8 @@ export default function ArtistProfilePage({
   const {
     currentTrack,
     isPlaying,
-    volume,
-    progress,
-    loop,
-    shuffle,
     playTrack,
     pauseTrack,
-    setVolume,
-    seekTrack,
-    toggleLoop,
-    toggleShuffle,
-    skipNext,
-    skipPrevious,
     queueType,
     setQueueType,
     trackQueue,
@@ -291,49 +271,6 @@ export default function ArtistProfilePage({
       isPlaying &&
       queueType === 'artist'
     );
-  };
-
-  const fetchArtistData = async () => {
-    const token = localStorage.getItem('userToken');
-    if (!token) return;
-
-    try {
-      const artistResponse = await api.artists.getArtistById(id, token);
-      setArtist(artistResponse.data);
-
-      // Check if current user is the owner
-      const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-      setIsOwner(userData?.id === artistResponse.data.userId);
-
-      // Fetch albums
-      const albumsResponse = await api.artists.getAlbumByArtistId(id, token);
-      setAlbums(albumsResponse.data);
-
-      // Fetch tracks
-      const tracksResponse = await api.artists.getTrackByArtistId(id, token);
-      setTracks(tracksResponse.data);
-
-      // Fetch related artists
-      const relatedResponse = await api.artists.getRelatedArtists(id, token);
-      setRelatedArtists(relatedResponse.data);
-
-      // Check if user follows this artist
-      if (userData?.id) {
-        try {
-          const followResponse = await api.follows.checkFollow(
-            userData.id,
-            id,
-            'ARTIST',
-            token
-          );
-          setFollow(followResponse.data.isFollowing);
-        } catch (error) {
-          console.error('Error checking follow status:', error);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching artist data:', error);
-    }
   };
 
   return (

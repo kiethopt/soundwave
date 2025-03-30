@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArtistProfile } from '@/types';
 import { api } from '@/utils/api';
 import Image from 'next/image';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 
 interface EditArtistProfileModalProps {
   artistProfile: ArtistProfile;

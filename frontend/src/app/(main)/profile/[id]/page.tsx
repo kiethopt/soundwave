@@ -4,25 +4,17 @@ import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Album, ArtistProfile, Track, User } from '@/types';
+import { ArtistProfile, Track, User } from '@/types';
 import { Button } from '@/components/ui/button';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { useDominantColor } from '@/hooks/useDominantColor';
-import {
-  Verified,
-  Play,
-  Pause,
-  AddSimple,
-  Edit,
-  Music,
-} from '@/components/ui/Icons';
-import { ArrowLeft, Heart, MoreHorizontal, Share2 } from 'lucide-react';
+import { Play, Pause, Edit } from '@/components/ui/Icons';
+import { ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
@@ -57,18 +49,8 @@ export default function UserProfilePage({
   const {
     currentTrack,
     isPlaying,
-    volume,
-    progress,
-    loop,
-    shuffle,
     playTrack,
     pauseTrack,
-    setVolume,
-    seekTrack,
-    toggleLoop,
-    toggleShuffle,
-    skipNext,
-    skipPrevious,
     queueType,
     setQueueType,
     trackQueue,

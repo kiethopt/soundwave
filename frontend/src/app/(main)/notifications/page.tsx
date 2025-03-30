@@ -1,14 +1,20 @@
-"use client";
+'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { api } from '@/utils/api';
 
 export type NotificationType = {
   id: string;
-  type: 'NEW_TRACK' | 'NEW_ALBUM' | 'EVENT_REMINDER' | 'NEW_FOLLOW' | 'ARTIST_REQUEST_APPROVE' | 'ARTIST_REQUEST_REJECT';
+  type:
+    | 'NEW_TRACK'
+    | 'NEW_ALBUM'
+    | 'EVENT_REMINDER'
+    | 'NEW_FOLLOW'
+    | 'ARTIST_REQUEST_APPROVE'
+    | 'ARTIST_REQUEST_REJECT';
   message: string;
   isRead: boolean;
   coverUrl?: string;
@@ -19,7 +25,9 @@ export type NotificationType = {
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [hoveredNotification, setHoveredNotification] = useState<string | null>(null);
+  const [hoveredNotification, setHoveredNotification] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -73,7 +81,7 @@ export default function NotificationsPage() {
       const hasRead = notifications.some((n) => n.isRead);
 
       if (!hasRead) {
-        toast.info('Không có thông báo đã đọc để xóa!');
+        toast.error('Không có thông báo đã đọc để xóa!');
         return;
       }
 
@@ -125,17 +133,20 @@ export default function NotificationsPage() {
       <div className="max-w-4xl mx-auto pb-8">
         <div className="mb-6 flex justify-between items-center animate-fade-in">
           <div>
-            <h1 className="text-2xl font-bold text-primary inline-block">Thông báo</h1>
+            <h1 className="text-2xl font-bold text-primary inline-block">
+              Thông báo
+            </h1>
             <span className="ml-2 text-sm text-secondary">
               ({notifications.length})
             </span>
           </div>
           <div className="space-x-2">
-            {notifications.length > 0 && notifications.some((n) => !n.isRead) && (
-              <button onClick={handleMarkAllAsRead} className="btn-secondary">
-                Đánh dấu tất cả đã đọc
-              </button>
-            )}
+            {notifications.length > 0 &&
+              notifications.some((n) => !n.isRead) && (
+                <button onClick={handleMarkAllAsRead} className="btn-secondary">
+                  Đánh dấu tất cả đã đọc
+                </button>
+              )}
             {notifications.length > 0 && (
               <button
                 onClick={handleDeleteNotifications}
@@ -151,7 +162,9 @@ export default function NotificationsPage() {
           <div className="text-center py-12 animate-fade-in">
             <p className="text-lg text-secondary">Không có thông báo nào.</p>
             <Link href="/">
-              <button className="btn-primary mt-4 animate-slide-up">Quay về trang chủ</button>
+              <button className="btn-primary mt-4 animate-slide-up">
+                Quay về trang chủ
+              </button>
             </Link>
           </div>
         ) : (
@@ -160,12 +173,19 @@ export default function NotificationsPage() {
               <div key={notification.id} className="animate-slide-up">
                 <Link href={`/notification/${notification.id}`}>
                   <div
-                    className={`dashboard-card flex items-center p-4 transition-all duration-300 ${notification.isRead ? 'opacity-80' : 'border-l-4 border-blue-500'
-                      } ${index !== notifications.length - 1 ? 'border-b border-white/20' : ''
-                      } ${hoveredNotification === notification.id
+                    className={`dashboard-card flex items-center p-4 transition-all duration-300 ${
+                      notification.isRead
+                        ? 'opacity-80'
+                        : 'border-l-4 border-blue-500'
+                    } ${
+                      index !== notifications.length - 1
+                        ? 'border-b border-white/20'
+                        : ''
+                    } ${
+                      hoveredNotification === notification.id
                         ? 'scale-102 shadow-lg'
                         : 'scale-100 shadow-md'
-                      }`}
+                    }`}
                     onMouseEnter={() => setHoveredNotification(notification.id)}
                     onMouseLeave={() => setHoveredNotification(null)}
                   >
@@ -185,8 +205,11 @@ export default function NotificationsPage() {
                     </div>
                     <div className="flex-1">
                       <h2
-                        className={`text-lg font-semibold transition-colors duration-200 ${notification.isRead ? 'text-secondary' : 'text-blue-400'
-                          }`}
+                        className={`text-lg font-semibold transition-colors duration-200 ${
+                          notification.isRead
+                            ? 'text-secondary'
+                            : 'text-blue-400'
+                        }`}
                       >
                         {notification.title || notification.message}
                       </h2>
@@ -197,7 +220,9 @@ export default function NotificationsPage() {
                         {notification.isRead ? (
                           <span className="text-green-400">Đã đọc</span>
                         ) : (
-                          <span className="text-red-400 font-medium animate-pulse">Chưa đọc</span>
+                          <span className="text-red-400 font-medium animate-pulse">
+                            Chưa đọc
+                          </span>
                         )}
                       </p>
                     </div>

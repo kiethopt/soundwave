@@ -60,12 +60,19 @@ const runValidations = (validations) => {
 };
 exports.runValidations = runValidations;
 const toBooleanValue = (value) => {
-    if (value === undefined)
+    if (value === undefined || value === null)
         return undefined;
     if (typeof value === 'boolean')
         return value;
     if (typeof value === 'string') {
-        return value.toLowerCase() === 'true';
+        const lowercaseValue = value.toLowerCase();
+        if (lowercaseValue === 'true')
+            return true;
+        if (lowercaseValue === 'false')
+            return false;
+        const num = Number(value);
+        if (!isNaN(num))
+            return Boolean(num);
     }
     return Boolean(value);
 };

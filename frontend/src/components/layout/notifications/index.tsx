@@ -1,15 +1,22 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { api } from '@/utils/api';
 
 export type NotificationType = {
   id: string;
-  type: 'NEW_TRACK' | 'NEW_ALBUM' | 'EVENT_REMINDER' | 'NEW_FOLLOW' | 'ARTIST_REQUEST_APPROVE' | 'ARTIST_REQUEST_REJECT'; message: string;
+  type:
+    | 'NEW_TRACK'
+    | 'NEW_ALBUM'
+    | 'EVENT_REMINDER'
+    | 'NEW_FOLLOW'
+    | 'ARTIST_REQUEST_APPROVE'
+    | 'ARTIST_REQUEST_REJECT';
+  message: string;
   isRead: boolean;
   coverUrl?: string; // Nếu có ảnh track/album, nếu không dùng ảnh mặc định
-  title?: string;    // Tiêu đề của track hoặc album (nếu có)
+  title?: string; // Tiêu đề của track hoặc album (nếu có)
   createdAt: string;
 };
 
@@ -56,7 +63,10 @@ export default function NotificationsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {notifications.map((notification) => (
-              <Link key={notification.id} href={`/notification/${notification.id}`}>
+              <Link
+                key={notification.id}
+                href={`/notification/${notification.id}`}
+              >
                 <a className="flex items-center bg-white rounded-lg shadow p-4 hover:shadow-md transition">
                   <div className="w-16 h-16 relative rounded-md overflow-hidden mr-4 flex-shrink-0">
                     <Image
@@ -73,10 +83,11 @@ export default function NotificationsPage() {
                   </div>
                   <div className="flex-1">
                     <h2
-                      className={`text-lg ${notification.isRead
-                        ? 'font-normal text-gray-700'
-                        : 'font-semibold text-blue-600'
-                        }`}
+                      className={`text-lg ${
+                        notification.isRead
+                          ? 'font-normal text-gray-700'
+                          : 'font-semibold text-blue-600'
+                      }`}
                     >
                       {notification.title || notification.message}
                     </h2>
@@ -87,7 +98,9 @@ export default function NotificationsPage() {
                       {notification.isRead ? (
                         <span className="text-green-600">Đã đọc</span>
                       ) : (
-                        <span className="text-red-600 font-medium">Chưa đọc</span>
+                        <span className="text-red-600 font-medium">
+                          Chưa đọc
+                        </span>
                       )}
                     </p>
                   </div>

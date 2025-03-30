@@ -2,7 +2,7 @@
 
 import { useTheme } from '@/contexts/ThemeContext';
 import { useEffect, useState } from 'react';
-import 'react-toastify/dist/ReactToastify.css';
+import { Toaster } from 'react-hot-toast';
 
 export default function ArtistLayout({
   children,
@@ -55,6 +55,7 @@ export default function ArtistLayout({
       }`}
       suppressHydrationWarning
     >
+      <Toaster position="top-center" reverseOrder={false} />
       {children}
     </div>
   );

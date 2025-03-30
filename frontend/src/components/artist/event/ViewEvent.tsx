@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { api } from '@/utils/api';
 
 interface Event {
@@ -45,7 +45,7 @@ export default function ViewEvent() {
       {isLoading ? (
         <p>Loading...</p>
       ) : (
-        events.map(event => (
+        events.map((event) => (
           <Card key={event.id} className="border p-4">
             <CardHeader>
               <CardTitle>{event.title}</CardTitle>
@@ -54,13 +54,24 @@ export default function ViewEvent() {
               <p>{event.description}</p>
               <p>Location: {event.location}</p>
               <p>
-                Starts: {new Date(event.startDate).toLocaleString()} | Ends: {new Date(event.endDate).toLocaleString()}
+                Starts: {new Date(event.startDate).toLocaleString()} | Ends:{' '}
+                {new Date(event.endDate).toLocaleString()}
               </p>
               <div className="flex space-x-2 mt-2">
-                <Button variant="outline" onClick={() => window.location.href = `/artist/events/edit/${event.id}`}>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    (window.location.href = `/artist/events/edit/${event.id}`)
+                  }
+                >
                   Edit
                 </Button>
-                <Button variant="destructive" onClick={() => window.location.href = `/artist/events/delete/${event.id}`}>
+                <Button
+                  variant="destructive"
+                  onClick={() =>
+                    (window.location.href = `/artist/events/delete/${event.id}`)
+                  }
+                >
                   Delete
                 </Button>
               </div>
@@ -69,7 +80,9 @@ export default function ViewEvent() {
         ))
       )}
       <div className="mt-4">
-        <Button onClick={() => window.location.href = '/artist/events/create'}>
+        <Button
+          onClick={() => (window.location.href = '/artist/events/create')}
+        >
           Create New Event
         </Button>
       </div>

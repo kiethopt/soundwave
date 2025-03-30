@@ -1,9 +1,9 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { api } from "@/utils/api";
+import { api } from '@/utils/api';
 
 function LoadingUI() {
   return (
@@ -19,7 +19,7 @@ function EditProfileContent() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [avatar, setAvatar] = useState('');
-  const [avatarFile, setAvatarFile] = useState<File | null>(null); // File object for the new avatar
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const router = useRouter();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,13 +42,13 @@ function EditProfileContent() {
       if (!token) {
         throw new Error('No authentication token found');
       }
-  
+
       const formDataObj = new FormData();
       formDataObj.append('email', email);
       formDataObj.append('username', username);
       formDataObj.append('name', name);
       formDataObj.append('password', password);
-  
+
       // Append avatar file if selected
       if (avatarFile) {
         formDataObj.append('avatar', avatarFile);
@@ -66,7 +66,7 @@ function EditProfileContent() {
       alert('Failed to update profile');
     }
   };
-  
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('userToken');
@@ -116,10 +116,16 @@ function EditProfileContent() {
           />
         </div>
 
-        <form onSubmit={(e) => e.preventDefault()} className=" w-full flex-1 space-y-6">
+        <form
+          onSubmit={(e) => e.preventDefault()}
+          className=" w-full flex-1 space-y-6"
+        >
           {/* Username */}
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-white/70 mb-2">
+            <label
+              htmlFor="username"
+              className="block text-sm font-medium text-white/70 mb-2"
+            >
               Username
             </label>
             <input
@@ -134,7 +140,10 @@ function EditProfileContent() {
 
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-white/70 mb-2">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-white/70 mb-2"
+            >
               Email
             </label>
             <input
@@ -142,7 +151,7 @@ function EditProfileContent() {
               id="email"
               name="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)} 
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
               required
             />
@@ -150,7 +159,10 @@ function EditProfileContent() {
 
           {/* Name */}
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-white/70 mb-2">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-white/70 mb-2"
+            >
               Name
             </label>
             <input
@@ -179,10 +191,9 @@ function EditProfileContent() {
   );
 }
 
-
 export default function EditProfilePage() {
   return (
-    <Suspense fallback={<LoadingUI />}>      
+    <Suspense fallback={<LoadingUI />}>
       <EditProfileContent />
     </Suspense>
   );

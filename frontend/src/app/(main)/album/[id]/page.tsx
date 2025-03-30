@@ -3,14 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/utils/api';
 import { useParams, useRouter } from 'next/navigation';
-import {
-  ArrowLeft,
-  Calendar,
-  Music,
-  Play,
-  Pause,
-  AddSimple,
-} from '@/components/ui/Icons';
+import { ArrowLeft, Calendar, Music, AddSimple } from '@/components/ui/Icons';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Album, Track } from '@/types';

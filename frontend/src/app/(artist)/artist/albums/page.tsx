@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Album } from '@/types';
 import { api } from '@/utils/api';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   ColumnFiltersState,

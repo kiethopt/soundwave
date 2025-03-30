@@ -120,7 +120,7 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         const { id } = req.params;
         const avatarFile = req.file;
         const _a = req.body, { isActive, reason } = _a, userData = __rest(_a, ["isActive", "reason"]);
-        const isStatusUpdate = req.body.hasOwnProperty('isActive');
+        const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
         if (isStatusUpdate) {
             const isActiveBool = isActive === 'true' || isActive === true ? true : false;
             const currentUser = yield db_1.default.user.findUnique({
@@ -199,7 +199,7 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         const { id } = req.params;
         const avatarFile = req.file;
         const _a = req.body, { isActive, reason } = _a, artistData = __rest(_a, ["isActive", "reason"]);
-        const isStatusUpdate = req.body.hasOwnProperty('isActive');
+        const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
         if (isStatusUpdate) {
             const isActiveBool = isActive === 'true' || isActive === true ? true : false;
             const currentArtist = yield db_1.default.artistProfile.findUnique({

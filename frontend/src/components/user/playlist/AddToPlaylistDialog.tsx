@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { api } from '@/utils/api';
 import { Playlist } from '@/types';
 import Image from 'next/image';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 
 interface AddToPlaylistDialogProps {
   trackId: string;

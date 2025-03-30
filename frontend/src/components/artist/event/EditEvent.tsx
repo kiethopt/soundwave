@@ -2,10 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { api } from '@/utils/api';
 
 interface EventData {
@@ -60,7 +65,7 @@ export default function EditEvent({ open, onOpenChange }: EditEventProps) {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,26 +94,59 @@ export default function EditEvent({ open, onOpenChange }: EditEventProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Title</label>
-            <Input name="title" value={formData.title} onChange={handleInputChange} required />
+            <Input
+              name="title"
+              value={formData.title}
+              onChange={handleInputChange}
+              required
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
-            <Input name="description" value={formData.description} onChange={handleInputChange} />
+            <label className="block text-sm font-medium mb-1">
+              Description
+            </label>
+            <Input
+              name="description"
+              value={formData.description}
+              onChange={handleInputChange}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Location</label>
-            <Input name="location" value={formData.location} onChange={handleInputChange} required />
+            <Input
+              name="location"
+              value={formData.location}
+              onChange={handleInputChange}
+              required
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Start Date</label>
-            <Input name="startDate" type="datetime-local" value={formData.startDate} onChange={handleInputChange} required />
+            <Input
+              name="startDate"
+              type="datetime-local"
+              value={formData.startDate}
+              onChange={handleInputChange}
+              required
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">End Date</label>
-            <Input name="endDate" type="datetime-local" value={formData.endDate} onChange={handleInputChange} required />
+            <Input
+              name="endDate"
+              type="datetime-local"
+              value={formData.endDate}
+              onChange={handleInputChange}
+              required
+            />
           </div>
           <div className="flex justify-end space-x-2">
-            <Button type="button" variant="destructive" onClick={() => onOpenChange(false)} disabled={isLoading}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>

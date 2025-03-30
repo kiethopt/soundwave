@@ -5,7 +5,7 @@ import type React from 'react';
 import { useState, useRef, use, useEffect } from 'react';
 import { api } from '@/utils/api';
 import type { User } from '@/types';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';

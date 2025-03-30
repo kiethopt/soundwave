@@ -20,7 +20,7 @@ import Link from 'next/link';
 import type { User } from '@/types';
 import pusher from '@/utils/pusher';
 import { api } from '@/utils/api';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ArrowLeft, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -534,7 +534,9 @@ export default function Header({
                       <div className="relative shrink-0">
                         <div className="w-12 h-12 rounded-full overflow-hidden">
                           <Image
-                            src={userData?.avatar || '/images/default-avatar.jpg'}
+                            src={
+                              userData?.avatar || '/images/default-avatar.jpg'
+                            }
                             alt={userData?.name || 'User'}
                             width={48}
                             height={48}

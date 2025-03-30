@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import {
   Settings,
   RefreshCw,

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { api } from '@/utils/api';
 
 interface Event {
@@ -41,7 +41,7 @@ export default function EventTotal() {
     try {
       await api.events.joinEvent(eventId, userId, token);
       toast.success('Joined event successfully');
-      setJoinStatus(prev => ({ ...prev, [eventId]: true }));
+      setJoinStatus((prev) => ({ ...prev, [eventId]: true }));
     } catch (error) {
       console.error('Error joining event:', error);
       toast.error('Error joining event');
@@ -52,7 +52,7 @@ export default function EventTotal() {
     try {
       await api.events.cancelJoinEvent(eventId, userId, token);
       toast.success('Cancelled join successfully');
-      setJoinStatus(prev => ({ ...prev, [eventId]: false }));
+      setJoinStatus((prev) => ({ ...prev, [eventId]: false }));
     } catch (error) {
       console.error('Error cancelling event join:', error);
       toast.error('Error cancelling join');
@@ -80,7 +80,7 @@ export default function EventTotal() {
       {isLoading ? (
         <p>Loading...</p>
       ) : (
-        events.map(event => (
+        events.map((event) => (
           <Card key={event.id} className="border p-4">
             <CardHeader>
               <CardTitle>{event.title}</CardTitle>
@@ -89,14 +89,21 @@ export default function EventTotal() {
               <p>{event.description}</p>
               <p>Location: {event.location}</p>
               <p>
-                Starts: {new Date(event.startDate).toLocaleString()} | Ends: {new Date(event.endDate).toLocaleString()}
+                Starts: {new Date(event.startDate).toLocaleString()} | Ends:{' '}
+                {new Date(event.endDate).toLocaleString()}
               </p>
               <div className="flex space-x-2 mt-2">
-                <Button variant="outline" onClick={() => handleViewDetails(event.id)}>
+                <Button
+                  variant="outline"
+                  onClick={() => handleViewDetails(event.id)}
+                >
                   View Details
                 </Button>
                 {joinStatus[event.id] ? (
-                  <Button variant="destructive" onClick={() => handleCancelEvent(event.id)}>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleCancelEvent(event.id)}
+                  >
                     Cancel Join
                   </Button>
                 ) : (

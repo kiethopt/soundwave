@@ -6,7 +6,7 @@ import { api } from '@/utils/api';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import pusher from '@/utils/pusher';
 
 export default function RequestArtistPage() {
@@ -26,7 +26,6 @@ export default function RequestArtistPage() {
   >([]);
   const [hasPendingRequest, setHasPendingRequest] = useState<boolean>(false);
 
-  // Sử dụng useEffect để đảm bảo localStorage chỉ được truy cập trên client-side
   useEffect(() => {
     const storedValue = localStorage.getItem('hasPendingRequest');
     setHasPendingRequest(storedValue ? JSON.parse(storedValue) : false);
@@ -61,7 +60,7 @@ export default function RequestArtistPage() {
           );
           localStorage.setItem('notificationCount', String(currentCount + 1));
 
-          toast.info(data.message);
+          toast(data.message);
         }
       }
     );
@@ -172,7 +171,7 @@ export default function RequestArtistPage() {
 
       // Hiển thị thông báo thành công
       toast.success('Your request has been submitted successfully!', {
-        autoClose: 2000,
+        duration: 2000,
       });
 
       // Trì hoãn chuyển trang sau khi thông báo được hiển thị

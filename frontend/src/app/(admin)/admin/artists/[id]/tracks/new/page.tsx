@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import { ArrowLeft } from '@/components/ui/Icons';
 import Link from 'next/link';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 
 export default function NewTrack({
   params,

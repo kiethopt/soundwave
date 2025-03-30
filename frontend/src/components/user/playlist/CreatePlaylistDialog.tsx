@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { api } from '@/utils/api';
 import { useRouter } from 'next/navigation';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 
 interface CreatePlaylistDialogProps {
   open: boolean;
