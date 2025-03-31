@@ -42,6 +42,7 @@
     "@prisma/extension-accelerate": "^1.2.1",
     "@sendgrid/mail": "^8.1.4",
     "@types/fs-extra": "^11.0.4",
+    "acr-cloud": "^0.1.4",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.5.1",
     "cors": "^2.8.5",

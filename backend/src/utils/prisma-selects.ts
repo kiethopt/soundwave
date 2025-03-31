@@ -179,6 +179,32 @@ export const artistProfileSelect = {
           title: true,
           duration: true,
           playCount: true,
+          trackNumber: true,
+          artist: {
+            select: {
+              id: true,
+              artistName: true,
+              isVerified: true,
+            },
+          },
+          featuredArtists: {
+            select: {
+              artistProfile: {
+                select: {
+                  id: true,
+                  artistName: true,
+                  isVerified: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      artist: {
+        select: {
+          id: true,
+          artistName: true,
+          isVerified: true,
         },
       },
     },
@@ -193,10 +219,29 @@ export const artistProfileSelect = {
       audioUrl: true,
       playCount: true,
       type: true,
+      trackNumber: true,
+      artist: {
+        select: {
+          id: true,
+          artistName: true,
+          isVerified: true,
+        },
+      },
       album: {
         select: {
           id: true,
           title: true,
+        },
+      },
+      featuredArtists: {
+        select: {
+          artistProfile: {
+            select: {
+              id: true,
+              artistName: true,
+              isVerified: true,
+            },
+          },
         },
       },
     },

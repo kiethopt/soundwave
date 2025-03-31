@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,6 @@ import Image from 'next/image';
 import { Facebook, Instagram, Verified } from '@/components/ui/Icons';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
-import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -26,6 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Calendar, Music } from 'lucide-react';
+import { useDominantColor } from '@/hooks/useDominantColor';
 
 interface EditTrackModalProps {
   track: Track | null;
@@ -1807,5 +1809,586 @@ export function DeactivateModal({
       theme={theme}
       predefinedReasons={predefinedReasons}
     />
+  );
+}
+
+interface AlbumDetailModalProps {
+  album: Album | null;
+  isOpen: boolean;
+  onClose: () => void;
+  theme?: 'light' | 'dark';
+}
+
+export function AlbumDetailModal({
+  album,
+  isOpen,
+  onClose,
+  theme = 'light',
+}: AlbumDetailModalProps) {
+  const { dominantColor } = useDominantColor(album?.coverUrl);
+
+  if (!album) return null;
+
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`${
+          theme === 'dark' ? 'bg-[#1e1e1e] border-[#404040]' : 'bg-white'
+        } p-0 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-hidden`}
+      >
+        <DialogTitle className="sr-only">{album.title}</DialogTitle>
+        <div
+          className="relative overflow-y-auto max-h-[90vh]"
+          style={{
+            background: dominantColor
+              ? `linear-gradient(180deg, 
+                  ${dominantColor} 0%, 
+                  ${dominantColor}99 15%,
+                  ${dominantColor}40 30%,
+                  ${theme === 'light' ? '#ffffff' : '#1e1e1e'} 100%)`
+              : theme === 'light'
+              ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
+              : 'linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)',
+          }}
+        >
+          <div className="p-6 pb-2">
+            {/* Album header */}
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+              {/* Album Cover */}
+              {album.coverUrl && (
+                <div className="w-[200px] flex-shrink-0">
+                  <img
+                    src={album.coverUrl}
+                    alt={album.title}
+                    className={`w-full aspect-square object-cover rounded-xl shadow-2xl ${
+                      theme === 'light'
+                        ? 'shadow-gray-200/50'
+                        : 'shadow-black/50'
+                    }`}
+                  />
+                </div>
+              )}
+
+              {/* Album Info */}
+              <div className="flex flex-col gap-3 text-center md:text-left">
+                <h2
+                  className={`text-2xl md:text-3xl font-bold ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
+                  {album.title}
+                </h2>
+
+                <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                  <span
+                    className={
+                      theme === 'light' ? 'text-gray-900' : 'text-white/90'
+                    }
+                  >
+                    {album.artist?.artistName || 'Unknown Artist'}
+                  </span>
+                  {album.artist?.isVerified && <Verified className="w-4 h-4" />}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm">
+                  <div
+                    className={`flex items-center gap-1.5 ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>
+                      {new Date(album.releaseDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                  <div
+                    className={`flex items-center gap-1.5 ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
+                    <Music className="w-4 h-4" />
+                    <span>{album.totalTracks || 0} tracks</span>
+                  </div>
+                </div>
+
+                {album.genres?.length > 0 && (
+                  <div className="flex gap-1.5 flex-wrap justify-center md:justify-start mt-2">
+                    {album.genres.map(({ genre }) => (
+                      <span
+                        key={genre?.id || 'unknown'}
+                        className={`px-2.5 py-0.5 rounded-full text-xs ${
+                          theme === 'light'
+                            ? 'bg-gray-100 text-gray-800'
+                            : 'bg-white/10 text-white/80'
+                        }`}
+                      >
+                        {genre?.name || 'Unknown Genre'}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Track List */}
+          {album.tracks?.length > 0 && (
+            <div className="px-6 pb-6 pt-2">
+              <div
+                className={`w-full rounded-xl overflow-hidden border backdrop-blur-sm ${
+                  theme === 'light'
+                    ? 'bg-gray-50/90 border-gray-200'
+                    : 'bg-black/20 border-white/10'
+                }`}
+              >
+                {/* Header - Desktop only */}
+                <div
+                  className={`hidden md:block px-6 py-3 border-b ${
+                    theme === 'light' ? 'border-gray-200' : 'border-white/10'
+                  }`}
+                >
+                  <div
+                    className={`grid grid-cols-[48px_4fr_2fr_100px] gap-4 text-xs ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
+                    <div className="text-center">#</div>
+                    <div>Title</div>
+                    <div>Artists</div>
+                    <div className="text-right">Duration</div>
+                  </div>
+                </div>
+
+                <div
+                  className={`divide-y ${
+                    theme === 'light' ? 'divide-gray-200' : 'divide-white/10'
+                  }`}
+                >
+                  {album.tracks.map((track) => (
+                    <div
+                      key={track.id}
+                      className={`md:grid md:grid-cols-[48px_4fr_2fr_100px] md:gap-4 px-4 md:px-6 py-2.5 md:py-3 ${
+                        theme === 'light'
+                          ? 'hover:bg-gray-100'
+                          : 'hover:bg-white/5'
+                      }`}
+                    >
+                      {/* Track number */}
+                      <div
+                        className={`hidden md:flex items-center justify-center ${
+                          theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                        }`}
+                      >
+                        {track.trackNumber}
+                      </div>
+
+                      {/* Mobile Layout */}
+                      <div className="md:hidden flex items-center justify-between gap-2">
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <span
+                            className={`font-medium text-sm line-clamp-1 ${
+                              theme === 'light' ? 'text-gray-900' : 'text-white'
+                            }`}
+                          >
+                            {track.title}
+                          </span>
+                          <div
+                            className={`text-xs line-clamp-1 ${
+                              theme === 'light'
+                                ? 'text-gray-600'
+                                : 'text-white/60'
+                            }`}
+                          >
+                            {track.artist?.artistName || 'Unknown Artist'}
+                            {track.featuredArtists?.length > 0 && (
+                              <span
+                                className={
+                                  theme === 'light'
+                                    ? 'text-gray-400'
+                                    : 'text-white/40'
+                                }
+                              >
+                                {' '}
+                                • feat.{' '}
+                                {track.featuredArtists
+                                  .map(
+                                    ({ artistProfile }) =>
+                                      artistProfile?.artistName ||
+                                      'Unknown Artist'
+                                  )
+                                  .join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span
+                          className={`text-sm whitespace-nowrap pl-3 ${
+                            theme === 'light'
+                              ? 'text-gray-600'
+                              : 'text-white/60'
+                          }`}
+                        >
+                          {formatDuration(track.duration)}
+                        </span>
+                      </div>
+                      {/* Desktop Layout */}
+                      <div
+                        className={`hidden md:flex items-center min-w-0 ${
+                          theme === 'light' ? 'text-gray-900' : 'text-white'
+                        }`}
+                      >
+                        <span className="font-medium line-clamp-1">
+                          {track.title}
+                        </span>
+                      </div>
+
+                      <div className="hidden md:flex flex-col justify-center min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`line-clamp-1 ${
+                              theme === 'light'
+                                ? 'text-gray-900'
+                                : 'text-white/90'
+                            }`}
+                          >
+                            {track.artist?.artistName || 'Unknown Artist'}
+                          </span>
+                        </div>
+                        {track.featuredArtists?.length > 0 && (
+                          <div
+                            className={`text-xs line-clamp-1 ${
+                              theme === 'light'
+                                ? 'text-gray-600'
+                                : 'text-white/60'
+                            }`}
+                          >
+                            feat.{' '}
+                            {track.featuredArtists
+                              .map(
+                                ({ artistProfile }) =>
+                                  artistProfile?.artistName || 'Unknown Artist'
+                              )
+                              .join(', ')}
+                          </div>
+                        )}
+                      </div>
+
+                      <div
+                        className={`hidden md:flex items-center justify-end ${
+                          theme === 'light' ? 'text-gray-600' : 'text-white'
+                        }`}
+                      >
+                        {formatDuration(track.duration)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface TrackDetailModalProps {
+  track: Track | null;
+  isOpen: boolean;
+  onClose: () => void;
+  theme?: 'light' | 'dark';
+  currentArtistId?: string;
+}
+
+export function TrackDetailModal({
+  track,
+  isOpen,
+  onClose,
+  theme = 'light',
+  currentArtistId,
+}: TrackDetailModalProps) {
+  const router = useRouter();
+  const { dominantColor } = useDominantColor(track?.coverUrl);
+
+  if (!track) return null;
+
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleArtistClick = (artistId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClose();
+    router.push(`/admin/artists/${artistId}`);
+  };
+
+  const handleAlbumClick = (albumId: string | number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClose();
+    if (track.artist?.id) {
+      router.push(`/admin/artists/${track.artist.id}?album=${albumId}`);
+    } else {
+      router.push(`/admin/albums?selected=${albumId}`);
+    }
+  };
+
+  // Check if the track's main artist is the same as the current viewing artist
+  const isCurrentArtist =
+    currentArtistId && track.artist?.id === currentArtistId;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`${
+          theme === 'dark' ? 'bg-[#1e1e1e] border-[#404040]' : 'bg-white'
+        } p-0 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden`}
+      >
+        <DialogTitle className="sr-only">{track.title}</DialogTitle>
+        <div
+          className="relative overflow-y-auto max-h-[90vh]"
+          style={{
+            background: dominantColor
+              ? `linear-gradient(180deg, 
+                  ${dominantColor} 0%, 
+                  ${dominantColor}99 15%,
+                  ${dominantColor}40 30%,
+                  ${theme === 'light' ? '#ffffff' : '#1e1e1e'} 100%)`
+              : theme === 'light'
+              ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
+              : 'linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)',
+          }}
+        >
+          <div className="p-6">
+            {/* Track header */}
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+              {/* Track Cover */}
+              <div className="w-[200px] flex-shrink-0">
+                <img
+                  src={
+                    track.coverUrl ||
+                    track.album?.coverUrl ||
+                    'https://placehold.co/200x200?text=No+Cover'
+                  }
+                  alt={track.title}
+                  className={`w-full aspect-square object-cover rounded-xl shadow-2xl ${
+                    theme === 'light' ? 'shadow-gray-200/50' : 'shadow-black/50'
+                  }`}
+                />
+              </div>
+
+              {/* Track Info */}
+              <div className="flex flex-col gap-3 text-center md:text-left">
+                <h2
+                  className={`text-2xl md:text-3xl font-bold ${
+                    theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
+                >
+                  {track.title}
+                </h2>
+
+                {/* Main Artist - Not clickable if it's the current artist */}
+                <div className="flex items-center justify-center md:justify-start gap-2">
+                  <span
+                    className={`font-medium ${
+                      !isCurrentArtist ? `cursor-pointer hover:underline` : ``
+                    } ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}
+                    onClick={(e) =>
+                      !isCurrentArtist &&
+                      track.artist?.id &&
+                      handleArtistClick(track.artist.id, e)
+                    }
+                  >
+                    {track.artist?.artistName || 'Unknown Artist'}
+                  </span>
+                  {track.artist?.isVerified && <Verified className="w-4 h-4" />}
+                </div>
+
+                {/* Featured Artists Section with improved styling */}
+                {track.featuredArtists?.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-1">
+                    <div
+                      className={`inline-flex items-center ${
+                        theme === 'light'
+                          ? 'bg-gray-100 text-gray-700'
+                          : 'bg-gray-800/40 text-gray-300'
+                      } px-2.5 py-1 rounded-full text-sm`}
+                    >
+                      <span
+                        className={
+                          theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                        }
+                      >
+                        feat.
+                      </span>
+                      <div className="flex flex-wrap items-center ml-1">
+                        {track.featuredArtists.map(
+                          ({ artistProfile }, index) => (
+                            <div
+                              key={artistProfile?.id || index}
+                              className="flex items-center"
+                            >
+                              {index > 0 && (
+                                <span className="mx-1 opacity-60">•</span>
+                              )}
+                              <button
+                                className="hover:underline font-medium inline-flex items-center"
+                                onClick={(e) =>
+                                  artistProfile?.id &&
+                                  handleArtistClick(artistProfile.id, e)
+                                }
+                              >
+                                {artistProfile?.artistName || 'Unknown Artist'}
+                                {artistProfile?.isVerified && (
+                                  <Verified className="w-3 h-3 inline-block ml-0.5 mb-0.5" />
+                                )}
+                              </button>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm">
+                  <div
+                    className={`flex items-center gap-1.5 ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>
+                      {new Date(track.releaseDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                  <div
+                    className={`flex items-center gap-1.5 ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
+                    <Music className="w-4 h-4" />
+                    <span>{formatDuration(track.duration)}</span>
+                  </div>
+                </div>
+
+                {track.album && (
+                  <div className="mt-4">
+                    <span
+                      className={`text-sm font-medium ${
+                        theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                      }`}
+                    >
+                      From the album:
+                    </span>
+                    <div
+                      className="flex items-center gap-2 mt-1 cursor-pointer hover:opacity-80"
+                      onClick={(e) =>
+                        track.album?.id && handleAlbumClick(track.album.id, e)
+                      }
+                    >
+                      <img
+                        src={
+                          track.album.coverUrl ||
+                          'https://placehold.co/50x50?text=No+Cover'
+                        }
+                        alt={track.album.title}
+                        className="w-12 h-12 object-cover rounded"
+                      />
+                      <div>
+                        <div
+                          className={`text-sm font-medium ${
+                            theme === 'light' ? 'text-gray-900' : 'text-white'
+                          }`}
+                        >
+                          {track.album.title}
+                        </div>
+                        <div
+                          className={`text-xs ${
+                            theme === 'light'
+                              ? 'text-gray-600'
+                              : 'text-gray-400'
+                          }`}
+                        >
+                          {track.album.type}
+                          {'releaseDate' in track.album &&
+                            ` • ${new Date(
+                              track.album.releaseDate as string
+                            ).getFullYear()}`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {track.genres?.length > 0 && (
+                  <div className="flex gap-1.5 flex-wrap justify-center md:justify-start mt-2">
+                    {track.genres.map(({ genre }) => (
+                      <span
+                        key={genre?.id || 'unknown'}
+                        className={`px-2.5 py-0.5 rounded-full text-xs ${
+                          theme === 'light'
+                            ? 'bg-gray-100 text-gray-800'
+                            : 'bg-white/10 text-white/80'
+                        }`}
+                      >
+                        {genre?.name || 'Unknown Genre'}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-2">
+                  <div
+                    className={`flex items-center gap-2 ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
+                    <span>Track #:</span>
+                    <span
+                      className={
+                        theme === 'light' ? 'text-gray-900' : 'text-white'
+                      }
+                    >
+                      {track.trackNumber}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`flex items-center gap-2 mt-1 ${
+                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
+                  >
+                    <span>Play count:</span>
+                    <span
+                      className={
+                        theme === 'light' ? 'text-gray-900' : 'text-white'
+                      }
+                    >
+                      {track.playCount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

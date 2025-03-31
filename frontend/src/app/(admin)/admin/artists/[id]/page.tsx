@@ -1,15 +1,18 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/utils/api';
-import type { ArtistProfile } from '@/types';
+import type { ArtistProfile, Album, Track } from '@/types';
 import Image from 'next/image';
 import { Star, Search, MoreVertical } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ArrowLeft, Trash2 } from '@/components/ui/Icons';
-import Link from 'next/link';
-import { EditArtistModal } from '@/components/ui/data-table/data-table-modals';
+import {
+  EditArtistModal,
+  AlbumDetailModal,
+  TrackDetailModal,
+} from '@/components/ui/data-table/data-table-modals';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +31,25 @@ export default function ArtistDetail() {
   const [filterText, setFilterText] = useState('');
   const [showAll, setShowAll] = useState({ albums: false, tracks: false });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
+
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const albumId = searchParams.get('album');
+    if (albumId && artist && artist.albums) {
+      const album = artist.albums.find((a) => {
+        return a.id.toString() === albumId;
+      });
+      if (album) {
+        setSelectedAlbum(album);
+        setIsAlbumModalOpen(true);
+      }
+    }
+  }, [searchParams, artist]);
 
   useEffect(() => {
     const fetchArtist = async () => {
@@ -525,13 +547,14 @@ export default function ArtistDetail() {
                       theme === 'light'
                         ? 'hover:bg-gray-100'
                         : 'hover:bg-gray-700'
-                    }`}
+                    } cursor-pointer`}
+                    onClick={() => {
+                      setSelectedAlbum(album);
+                      setIsAlbumModalOpen(true);
+                    }}
                   >
                     <div className="col-span-6 flex items-center gap-3">
-                      <Link
-                        href={`/admin/artists/${id}/albums/${album.id}`}
-                        className="flex items-center gap-3"
-                      >
+                      <div className="flex items-center gap-3">
                         <img
                           src={album.coverUrl}
                           alt={album.title}
@@ -557,7 +580,7 @@ export default function ArtistDetail() {
                             {album.type}
                           </div>
                         </div>
-                      </Link>
+                      </div>
                     </div>
                     <div
                       className={`col-span-2 text-center ${
@@ -644,35 +667,41 @@ export default function ArtistDetail() {
                       theme === 'light'
                         ? 'hover:bg-gray-50'
                         : 'hover:bg-gray-700'
-                    }`}
+                    } cursor-pointer`}
+                    onClick={() => {
+                      setSelectedTrack(track);
+                      setIsTrackModalOpen(true);
+                    }}
                   >
                     <div className="col-span-6 flex items-center gap-3">
-                      <img
-                        src={
-                          track.coverUrl ||
-                          'https://placehold.co/150x150?text=No+Cover'
-                        }
-                        alt={track.title}
-                        className="w-10 h-10 object-cover rounded"
-                      />
-                      <div>
-                        <div
-                          className={`font-medium ${
-                            theme === 'light'
-                              ? 'text-gray-900'
-                              : 'text-gray-100'
-                          }`}
-                        >
-                          {track.title}
-                        </div>
-                        <div
-                          className={`text-xs ${
-                            theme === 'light'
-                              ? 'text-gray-500'
-                              : 'text-gray-400'
-                          }`}
-                        >
-                          Single
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={
+                            track.coverUrl ||
+                            'https://placehold.co/150x150?text=No+Cover'
+                          }
+                          alt={track.title}
+                          className="w-10 h-10 object-cover rounded"
+                        />
+                        <div>
+                          <div
+                            className={`font-medium ${
+                              theme === 'light'
+                                ? 'text-gray-900'
+                                : 'text-gray-100'
+                            }`}
+                          >
+                            {track.title}
+                          </div>
+                          <div
+                            className={`text-xs ${
+                              theme === 'light'
+                                ? 'text-gray-500'
+                                : 'text-gray-400'
+                            }`}
+                          >
+                            Single
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -739,6 +768,23 @@ export default function ArtistDetail() {
             setArtist((prev) => (prev ? { ...prev, ...updatedArtist } : prev))
           }
           theme={theme}
+        />
+      )}
+
+      <AlbumDetailModal
+        album={selectedAlbum}
+        isOpen={isAlbumModalOpen}
+        onClose={() => setIsAlbumModalOpen(false)}
+        theme={theme}
+      />
+
+      {isTrackModalOpen && selectedTrack && (
+        <TrackDetailModal
+          track={selectedTrack}
+          isOpen={isTrackModalOpen}
+          onClose={() => setIsTrackModalOpen(false)}
+          theme={theme}
+          currentArtistId={id as string}
         />
       )}
     </div>
