@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { api } from '@/utils/api';
-import { Eye, EyeOff } from 'react-feather'; // Import icons for visibility toggle
+import { Eye, EyeOff } from '@/components/ui/Icons';
 
 function ResetPasswordForm() {
   const [newPassword, setNewPassword] = useState('');
@@ -99,7 +99,11 @@ function ResetPasswordForm() {
               onClick={togglePasswordVisibility}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
             >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
             </button>
           </div>
         </div>
@@ -125,7 +129,11 @@ function ResetPasswordForm() {
               onClick={togglePasswordVisibility}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"
             >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
             </button>
           </div>
 

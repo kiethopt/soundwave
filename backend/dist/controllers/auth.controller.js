@@ -52,14 +52,6 @@ const validateRegisterData = (data) => {
         return 'Username cannot contain spaces';
     return null;
 };
-const validateLoginData = (data) => {
-    const { email, password } = data;
-    if (!(email === null || email === void 0 ? void 0 : email.trim()))
-        return 'Email is required';
-    if (!(password === null || password === void 0 ? void 0 : password.trim()))
-        return 'Password is required';
-    return null;
-};
 const generateToken = (userId, role, artistProfile) => {
     return jsonwebtoken_1.default.sign({
         id: userId,
@@ -283,7 +275,7 @@ const requestPasswordReset = (req, res) => __awaiter(void 0, void 0, void 0, fun
             },
         });
         const resetLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/reset-password?token=${resetToken}`;
-        yield sendEmail(user.email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
+        yield sendEmail(user.email, 'Password Reset', resetLink);
         res.json({ message: 'Password reset email sent successfully' });
     }
     catch (error) {
@@ -322,14 +314,106 @@ const resetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.resetPassword = resetPassword;
-const sendEmail = (to, subject, text) => __awaiter(void 0, void 0, void 0, function* () {
+const sendEmail = (to, subject, resetLink) => __awaiter(void 0, void 0, void 0, function* () {
     mail_1.default.setApiKey(process.env.SENDGRID_API_KEY);
     const msg = {
         to,
         from: process.env.EMAIL_USER,
         subject,
-        text,
-        html: `<p>${text}</p>`,
+        text: `Click here to reset your password: ${resetLink}`,
+        html: `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Reset Your SoundWave Password</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; color: #333333;">
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-spacing: 0; border-collapse: collapse;">
+          <!-- Header with logo -->
+          <tr>
+            <td style="padding: 0;">
+              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
+                <tr>
+                  <td style="background-color: #1a1a1a; padding: 20px 0; text-align: center;">
+                    <img src="https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743396192/fcazc9wdyqvaz1c3xwg7.png" alt="SoundWave" width="200" style="display: block; margin: 0 auto;">
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Rest of the email template remains the same -->
+          <tr>
+            <td style="padding: 0;">
+              <div style="background: linear-gradient(135deg, #A57865 0%, #3a3a3a 100%); padding: 40px 30px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">Reset Your Password</h1>
+                <p style="color: #ffffff; opacity: 0.9; margin: 15px 0 0; font-size: 16px;">We've received a request to reset your password</p>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Main content -->
+          <tr>
+            <td style="padding: 40px 30px; background-color: #ffffff;">
+              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #333333;">Hi ${to.split('@')[0]},</p>
+                    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #333333;">We received a request to reset your SoundWave password. Use the button below to set up a new password for your account. This link is only valid for the next hour.</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="${resetLink}" style="display: inline-block; background-color: #000000; color: #ffffff; text-decoration: none; padding: 15px 35px; border-radius: 6px; font-weight: 600; font-size: 16px; border: 2px solid #000000; transition: all 0.3s ease;">RESET PASSWORD</a>
+                    </div>
+                    
+                    <p style="margin: 30px 0 0; font-size: 16px; line-height: 1.6; color: #333333;">If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Security note section -->
+          <tr>
+            <td style="padding: 0;">
+              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
+                <tr>
+                  <td style="background-color: #f5f5f5; padding: 25px 30px; border-top: 1px solid #eeeeee;">
+                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #666666;">For security, this request was received from your SoundWave account. This link will expire in 60 minutes.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Footer with music note decoration -->
+          <tr>
+            <td style="padding: 0;">
+              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
+                <tr>
+                  <td style="background-color: #1a1a1a; padding: 30px; text-align: center;">
+                    <div style="margin-bottom: 20px; font-size: 0;">
+                      <!-- Music notes decoration -->
+                      <span style="display: inline-block; width: 8px; height: 8px; background-color: #A57865; margin: 0 5px; border-radius: 50%;"></span>
+                      <span style="display: inline-block; width: 8px; height: 15px; background-color: #A57865; margin: 0 5px; border-radius: 4px;"></span>
+                      <span style="display: inline-block; width: 8px; height: 12px; background-color: #A57865; margin: 0 5px; border-radius: 4px;"></span>
+                      <span style="display: inline-block; width: 8px; height: 18px; background-color: #A57865; margin: 0 5px; border-radius: 4px;"></span>
+                      <span style="display: inline-block; width: 8px; height: 8px; background-color: #A57865; margin: 0 5px; border-radius: 50%;"></span>
+                    </div>
+                    
+                    <p style="margin: 0 0 10px; font-size: 14px; line-height: 1.6; color: #ffffff;">This email was sent to ${to}</p>
+                    <p style="margin: 0 0 15px; font-size: 14px; line-height: 1.6; color: #cccccc;">This is an automated message. Please do not reply.</p>
+                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #cccccc;">© ${new Date().getFullYear()} SoundWave. All rights reserved.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `,
     };
     try {
         yield mail_1.default.send(msg);

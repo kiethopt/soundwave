@@ -41,16 +41,6 @@ const validateRegisterData = (data: any): string | null => {
   return null;
 };
 
-// Validation functions (Login)
-const validateLoginData = (data: any): string | null => {
-  const { email, password } = data;
-
-  if (!email?.trim()) return 'Email is required';
-  if (!password?.trim()) return 'Password is required';
-
-  return null;
-};
-
 // Helper function để tạo JWT token
 const generateToken = (userId: string, role: Role, artistProfile?: any) => {
   return jwt.sign(
@@ -153,63 +143,6 @@ export const registerAdmin = async (
 };
 
 // Đăng ký (Register)
-// export const register = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     const { email, password, confirmPassword, name, username } = req.body;
-
-//     // Kiểm tra password và confirmPassword có khớp không
-//     if (password !== confirmPassword) {
-//       res.status(400).json({ message: 'Passwords do not match' });
-//       return;
-//     }
-
-//     // Validate dữ liệu đăng ký
-//     const validationError = validateRegisterData({ email, password, username });
-//     if (validationError) {
-//       res.status(400).json({ message: validationError });
-//       return;
-//     }
-
-//     // Kiểm tra email đã tồn tại chưa
-//     const existingUser = await prisma.user.findUnique({ where: { email } });
-//     if (existingUser) {
-//       res.status(400).json({ message: 'Email already exists' });
-//       return;
-//     }
-
-//     // Kiểm tra username đã tồn tại chưa
-//     if (username) {
-//       const existingUsername = await prisma.user.findUnique({
-//         where: { username },
-//       });
-//       if (existingUsername) {
-//         res.status(400).json({ message: 'Username already exists' });
-//         return;
-//       }
-//     }
-
-//     // Mã hóa mật khẩu
-//     const hashedPassword = await bcrypt.hash(password, 10);
-
-//     // Tạo người dùng mới với role mặc định là USER
-//     const user = await prisma.user.create({
-//       data: {
-//         email,
-//         password: hashedPassword,
-//         name,
-//         username,
-//         role: Role.USER, // Mặc định là USER
-//       },
-//       select: userSelect,
-//     });
-
-//     res.status(201).json({ message: 'User registered successfully', user });
-//   } catch (error) {
-//     console.error('Register error:', error);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// };
-
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password, confirmPassword, name, username } = req.body;
@@ -410,11 +343,7 @@ export const requestPasswordReset = async (
 
     // Gửi email chứa link đặt lại mật khẩu
     const resetLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/reset-password?token=${resetToken}`;
-    await sendEmail(
-      user.email,
-      'Password Reset',
-      resetLink
-    );
+    await sendEmail(user.email, 'Password Reset', resetLink);
 
     res.json({ message: 'Password reset email sent successfully' });
   } catch (error) {
@@ -480,18 +409,99 @@ const sendEmail = async (
     subject, // Tiêu đề email
     text: `Click here to reset your password: ${resetLink}`, // Nội dung email (dạng plain text)
     html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; text-align: center; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
-        <h2 style="color: #444; font-size: 20px;">RESET PASSWORD</h2>
-        <p style="text-align: left; font-size: 16px;">Hi, ${to}</p>
-        <p style="text-align: left; font-size: 16px;">You have just submitted a password reset request. Below is a dedicated link for you:</p>
-        <div style="margin: 20px 0;">
-          <a href="${resetLink}" style="display: inline-block; padding: 15px 30px; background-color: #00bcd4; color: #fff; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">RESET PASSWORD</a>
-        </div>
-        <p style="text-align: left; font-size: 16px; color: #666;">If you are not the one making the request, please ignore this email.</p>
-        <p style="text-align: left; font-size: 16px; color: #666;">This notification has been sent to the email address associated with your SoundWave account.</p>
-        <p style="text-align: left; font-size: 16px; color: #666;">This email is automatically generated. Please do not reply. If you have any questions, please contact us via social channels for the fastest response.</p>
-        <p style="text-align: left; font-size: 14px;">	Have fun,<br>The SoundWave Team.</p>
-      </div>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Reset Your SoundWave Password</title>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; color: #333333;">
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-spacing: 0; border-collapse: collapse;">
+          <!-- Header with logo -->
+          <tr>
+            <td style="padding: 0;">
+              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
+                <tr>
+                  <td style="background-color: #1a1a1a; padding: 20px 0; text-align: center;">
+                    <img src="https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743396192/fcazc9wdyqvaz1c3xwg7.png" alt="SoundWave" width="200" style="display: block; margin: 0 auto;">
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Rest of the email template remains the same -->
+          <tr>
+            <td style="padding: 0;">
+              <div style="background: linear-gradient(135deg, #A57865 0%, #3a3a3a 100%); padding: 40px 30px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">Reset Your Password</h1>
+                <p style="color: #ffffff; opacity: 0.9; margin: 15px 0 0; font-size: 16px;">We've received a request to reset your password</p>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Main content -->
+          <tr>
+            <td style="padding: 40px 30px; background-color: #ffffff;">
+              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
+                <tr>
+                  <td>
+                    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #333333;">Hi ${
+                      to.split('@')[0]
+                    },</p>
+                    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #333333;">We received a request to reset your SoundWave password. Use the button below to set up a new password for your account. This link is only valid for the next hour.</p>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                      <a href="${resetLink}" style="display: inline-block; background-color: #000000; color: #ffffff; text-decoration: none; padding: 15px 35px; border-radius: 6px; font-weight: 600; font-size: 16px; border: 2px solid #000000; transition: all 0.3s ease;">RESET PASSWORD</a>
+                    </div>
+                    
+                    <p style="margin: 30px 0 0; font-size: 16px; line-height: 1.6; color: #333333;">If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Security note section -->
+          <tr>
+            <td style="padding: 0;">
+              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
+                <tr>
+                  <td style="background-color: #f5f5f5; padding: 25px 30px; border-top: 1px solid #eeeeee;">
+                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #666666;">For security, this request was received from your SoundWave account. This link will expire in 60 minutes.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          
+          <!-- Footer with music note decoration -->
+          <tr>
+            <td style="padding: 0;">
+              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
+                <tr>
+                  <td style="background-color: #1a1a1a; padding: 30px; text-align: center;">
+                    <div style="margin-bottom: 20px; font-size: 0;">
+                      <!-- Music notes decoration -->
+                      <span style="display: inline-block; width: 8px; height: 8px; background-color: #A57865; margin: 0 5px; border-radius: 50%;"></span>
+                      <span style="display: inline-block; width: 8px; height: 15px; background-color: #A57865; margin: 0 5px; border-radius: 4px;"></span>
+                      <span style="display: inline-block; width: 8px; height: 12px; background-color: #A57865; margin: 0 5px; border-radius: 4px;"></span>
+                      <span style="display: inline-block; width: 8px; height: 18px; background-color: #A57865; margin: 0 5px; border-radius: 4px;"></span>
+                      <span style="display: inline-block; width: 8px; height: 8px; background-color: #A57865; margin: 0 5px; border-radius: 50%;"></span>
+                    </div>
+                    
+                    <p style="margin: 0 0 10px; font-size: 14px; line-height: 1.6; color: #ffffff;">This email was sent to ${to}</p>
+                    <p style="margin: 0 0 15px; font-size: 14px; line-height: 1.6; color: #cccccc;">This is an automated message. Please do not reply.</p>
+                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #cccccc;">© ${new Date().getFullYear()} SoundWave. All rights reserved.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
     `, // Nội dung email (dạng HTML)
   };
 
