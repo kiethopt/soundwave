@@ -42,6 +42,14 @@ const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
             });
             return;
         }
+        const maintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+        if (maintenanceMode && user.role !== client_1.Role.ADMIN) {
+            res.status(503).json({
+                message: 'The system is currently under maintenance. Please try again later.',
+                code: 'MAINTENANCE_MODE',
+            });
+            return;
+        }
         req.user = user;
         next();
     }
@@ -55,6 +63,14 @@ const optionalAuthenticate = (req, res, next) => __awaiter(void 0, void 0, void 
     try {
         const token = (_a = req.header('Authorization')) === null || _a === void 0 ? void 0 : _a.replace('Bearer ', '');
         if (!token) {
+            const maintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+            if (maintenanceMode && !req.path.includes('/auth/')) {
+                res.status(503).json({
+                    message: 'The system is currently under maintenance. Please try again later.',
+                    code: 'MAINTENANCE_MODE',
+                });
+                return;
+            }
             next();
             return;
         }

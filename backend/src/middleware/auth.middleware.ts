@@ -39,6 +39,17 @@ export const authenticate = async (
       return;
     }
 
+    // Check maintenance mode - allow only admins when maintenance mode is active
+    const maintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+    if (maintenanceMode && user.role !== Role.ADMIN) {
+      res.status(503).json({
+        message:
+          'The system is currently under maintenance. Please try again later.',
+        code: 'MAINTENANCE_MODE',
+      });
+      return;
+    }
+
     req.user = user;
     next();
   } catch (error) {
@@ -56,6 +67,17 @@ export const optionalAuthenticate = async (
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
+      // Check maintenance mode for unauthenticated requests
+      const maintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+      if (maintenanceMode && !req.path.includes('/auth/')) {
+        res.status(503).json({
+          message:
+            'The system is currently under maintenance. Please try again later.',
+          code: 'MAINTENANCE_MODE',
+        });
+        return;
+      }
+
       // Continue without authentication
       next();
       return;

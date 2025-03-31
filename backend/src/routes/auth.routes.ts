@@ -8,6 +8,7 @@ import {
   resetPassword,
   switchProfile,
   logout,
+  getMaintenanceStatus,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth.middleware';
 
@@ -19,6 +20,7 @@ router.post('/login', login);
 router.post('/logout', authenticate, logout);
 router.post('/request-password-reset', requestPasswordReset);
 router.post('/reset-password', resetPassword);
+router.get('/maintenance-status', getMaintenanceStatus);
 
 // Route đăng ký admin (chỉ dành cho development)
 router.post('/register-admin', registerAdmin);

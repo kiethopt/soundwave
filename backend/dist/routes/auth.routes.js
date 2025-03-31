@@ -12,6 +12,7 @@ router.post('/login', auth_controller_1.login);
 router.post('/logout', auth_middleware_1.authenticate, auth_controller_1.logout);
 router.post('/request-password-reset', auth_controller_1.requestPasswordReset);
 router.post('/reset-password', auth_controller_1.resetPassword);
+router.get('/maintenance-status', auth_controller_1.getMaintenanceStatus);
 router.post('/register-admin', auth_controller_1.registerAdmin);
 router.get('/validate-token', auth_middleware_1.authenticate, auth_controller_1.validateToken);
 router.post('/switch-profile', auth_middleware_1.authenticate, auth_controller_1.switchProfile);

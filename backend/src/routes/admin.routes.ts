@@ -20,7 +20,7 @@ import {
   handleAIModelStatus,
   getRecommendationMatrix,
   updateSystemPlaylists,
-  debugActiveTracks,
+  handleMaintenanceMode,
 } from '../controllers/admin.controller';
 import * as genreController from '../controllers/genre.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
@@ -44,6 +44,12 @@ router
   .route('/system/cache')
   .get(authenticate, authorize([Role.ADMIN]), handleCacheStatus)
   .post(authenticate, authorize([Role.ADMIN]), handleCacheStatus);
+
+// Cập nhật trạng thái bảo trì
+router
+  .route('/system/maintenance')
+  .get(authenticate, authorize([Role.ADMIN]), handleMaintenanceMode)
+  .post(authenticate, authorize([Role.ADMIN]), handleMaintenanceMode);
 
 // Quản lý người dùng
 router.get('/users', authenticate, authorize([Role.ADMIN]), getAllUsers);
@@ -157,14 +163,6 @@ router.post(
   authenticate,
   authorize([Role.ADMIN]),
   updateSystemPlaylists
-);
-
-// Debug routes
-router.get(
-  '/debug/active-tracks',
-  authenticate,
-  authorize([Role.ADMIN]),
-  debugActiveTracks
 );
 
 export default router;

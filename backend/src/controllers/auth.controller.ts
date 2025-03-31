@@ -236,6 +236,17 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Kiểm tra maintenance mode - chỉ cho phép ADMIN đăng nhập
+    const maintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+    if (maintenanceMode && user.role !== Role.ADMIN) {
+      res.status(503).json({
+        message:
+          'The system is currently under maintenance. Please try again later.',
+        code: 'MAINTENANCE_MODE',
+      });
+      return;
+    }
+
     if (!user.isActive) {
       res.status(403).json({
         message:
@@ -272,7 +283,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     res.json({
       message: 'Login successful',
       token,
-      // sessionId,
       user: userResponse,
     });
   } catch (error) {
@@ -570,5 +580,19 @@ export const switchProfile = async (
   } catch (error) {
     console.error('Switch profile error:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const getMaintenanceStatus = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const maintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+    res.json({ enabled: maintenanceMode });
+  } catch (error) {
+    console.error('Error getting maintenance status:', error);
+    // Avoid exposing internal errors publicly
+    res.status(500).json({ message: 'Could not retrieve maintenance status' });
   }
 };

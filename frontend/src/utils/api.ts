@@ -105,6 +105,17 @@ export const api = {
 
     logout: async (token: string) =>
       fetchWithAuth('/api/auth/logout', { method: 'POST' }, token),
+
+    getMaintenanceStatus: async (): Promise<{ enabled: boolean }> => {
+      try {
+        return await fetchWithAuth('/api/auth/maintenance-status', {
+          method: 'GET',
+        });
+      } catch (error) {
+        console.error('Failed to fetch maintenance status:', error);
+        return { enabled: false };
+      }
+    },
   },
 
   session: {
@@ -339,6 +350,19 @@ export const api = {
     updateCacheStatus: async (enabled: boolean, token: string) =>
       fetchWithAuth(
         '/api/admin/system/cache',
+        {
+          method: 'POST',
+          body: JSON.stringify({ enabled }),
+        },
+        token
+      ),
+
+    getMaintenanceStatus: async (token: string) =>
+      fetchWithAuth('/api/admin/system/maintenance', { method: 'GET' }, token),
+
+    updateMaintenanceStatus: async (enabled: boolean, token: string) =>
+      fetchWithAuth(
+        '/api/admin/system/maintenance',
         {
           method: 'POST',
           body: JSON.stringify({ enabled }),
@@ -1042,7 +1066,7 @@ export const api = {
       ),
   },
 
- events: {
+  events: {
     createEvent: async (data: any, token: string) => {
       try {
         const res = await fetchWithAuth(

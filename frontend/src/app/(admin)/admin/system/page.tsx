@@ -60,11 +60,15 @@ export default function SystemPage() {
         // Lấy trạng thái AI model
         const aiModelResponse = await api.admin.getAIModelStatus(token);
 
+        // Lấy trạng thái bảo trì
+        const maintenanceResponse = await api.admin.getMaintenanceStatus(token);
+
         setSettings((prev) => ({
           ...prev,
           cacheEnabled: cacheResponse.enabled,
           aiModel: aiModelResponse.model,
           supportedAIModels: aiModelResponse.supportedModels || [],
+          maintenanceMode: maintenanceResponse.enabled || false,
         }));
       } catch (error) {
         console.error('Failed to get system settings:', error);
@@ -92,6 +96,9 @@ export default function SystemPage() {
       } else if (key === 'aiModel') {
         await api.admin.updateAIModelStatus(value, token);
         toast.success('AI model updated successfully');
+      } else if (key === 'maintenanceMode') {
+        await api.admin.updateMaintenanceStatus(value, token);
+        toast.success('Maintenance mode updated successfully');
       }
 
       setSettings((prev) => ({ ...prev, [key]: value }));
@@ -259,16 +266,12 @@ export default function SystemPage() {
             </CardContent>
           </Card>
 
-          {/* System Mode Card - Disabled */}
+          {/* System Mode Card */}
           <Card
-            className={`${
+            className={
               theme === 'light' ? 'bg-white' : 'bg-zinc-900 border-zinc-700'
-            } opacity-60 relative md:col-span-2`}
+            }
           >
-            <div className="absolute inset-0 flex items-center justify-center z-10">
-              <Shield className="h-10 w-10 text-gray-500 opacity-80" />
-            </div>
-            <div className="absolute inset-0 bg-gray-200 dark:bg-gray-800 opacity-30 z-0"></div>
             <CardHeader className="relative z-1">
               <CardTitle className="flex items-center gap-2">
                 <Server className="h-5 w-5 text-purple-500" />
@@ -290,25 +293,33 @@ export default function SystemPage() {
                     Temporarily disable user access for maintenance
                   </p>
                 </div>
-                <Switch disabled checked={settings.maintenanceMode} />
+                <Switch
+                  checked={settings.maintenanceMode}
+                  onCheckedChange={(checked) =>
+                    updateSetting('maintenanceMode', checked)
+                  }
+                />
               </div>
 
               <Separator
                 className={theme === 'light' ? 'bg-gray-200' : 'bg-gray-700'}
               />
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Debug Mode</Label>
-                  <p
-                    className={`text-sm ${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
-                    }`}
-                  >
-                    Enable detailed error messages and logging
-                  </p>
-                </div>
-                <Switch disabled checked={settings.debugMode} />
+              <div
+                className={`
+                  flex items-center gap-2 mt-3 p-3 rounded-md
+                  ${
+                    theme === 'light'
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-amber-950/30 text-amber-400 border border-amber-900'
+                  }
+                `}
+              >
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span className="text-xs font-medium">
+                  When enabled, only administrators can access the system. All
+                  other users will see a maintenance message.
+                </span>
               </div>
             </CardContent>
           </Card>

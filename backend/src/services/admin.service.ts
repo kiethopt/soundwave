@@ -857,3 +857,39 @@ const cosineSimilarity = (vectorA: number[], vectorB: number[]): number => {
 
   return dotProduct / (magnitudeA * magnitudeB);
 };
+
+// Cập nhật trạng thái bảo trì
+export const updateMaintenanceMode = async (enabled?: boolean) => {
+  try {
+    const envPath = path.resolve(__dirname, '../../.env');
+    const envContent = fs.readFileSync(envPath, 'utf8');
+
+    if (enabled === undefined) {
+      const currentStatus = process.env.MAINTENANCE_MODE === 'true';
+      return { enabled: currentStatus };
+    }
+
+    // Update MAINTENANCE_MODE trong file .env
+    if (envContent.includes('MAINTENANCE_MODE=')) {
+      const updatedContent = envContent.replace(
+        /MAINTENANCE_MODE=.*/,
+        `MAINTENANCE_MODE=${enabled}`
+      );
+      fs.writeFileSync(envPath, updatedContent);
+    } else {
+      // Nếu env không có thì thêm vào
+      fs.writeFileSync(envPath, `${envContent}\nMAINTENANCE_MODE=${enabled}`);
+    }
+
+    process.env.MAINTENANCE_MODE = String(enabled);
+
+    console.log(
+      `[System] Maintenance mode ${enabled ? 'enabled' : 'disabled'}`
+    );
+
+    return { enabled };
+  } catch (error) {
+    console.error('Error updating maintenance mode', error);
+    throw new Error('Failed to update maintenance mode');
+  }
+};

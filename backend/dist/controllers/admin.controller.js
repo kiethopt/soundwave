@@ -56,7 +56,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.debugActiveTracks = exports.updateSystemPlaylists = exports.getRecommendationMatrix = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.updateSystemPlaylists = exports.getRecommendationMatrix = exports.handleAIModelStatus = exports.handleMaintenanceMode = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
 const playlistService = __importStar(require("../services/playlist.service"));
@@ -481,6 +481,17 @@ const handleCacheStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.handleCacheStatus = handleCacheStatus;
+const handleMaintenanceMode = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { enabled } = req.method === 'POST' ? req.body : {};
+        const result = yield adminService.updateMaintenanceMode(enabled);
+        res.json(result);
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Manage maintenance mode');
+    }
+});
+exports.handleMaintenanceMode = handleMaintenanceMode;
 const handleAIModelStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { model } = req.method === 'POST' ? req.body : {};
@@ -562,56 +573,4 @@ const updateSystemPlaylists = (req, res) => __awaiter(void 0, void 0, void 0, fu
     }
 });
 exports.updateSystemPlaylists = updateSystemPlaylists;
-const debugActiveTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const activeTracks = yield db_1.default.track.findMany({
-            where: { isActive: true },
-            select: {
-                id: true,
-                title: true,
-                artistId: true,
-                artist: {
-                    select: {
-                        artistName: true,
-                    },
-                },
-                playCount: true,
-                _count: {
-                    select: {
-                        likedBy: true,
-                    },
-                },
-            },
-            take: 20,
-        });
-        const historyCount = yield db_1.default.history.count({
-            where: {
-                type: 'PLAY',
-                trackId: { not: null },
-                playCount: { gt: 0 },
-            },
-        });
-        const likesCount = yield db_1.default.userLikeTrack.count();
-        res.json({
-            message: 'Debug active tracks',
-            activeTracks: activeTracks,
-            trackCount: activeTracks.length,
-            historyCount,
-            likesCount,
-            qualityThresholds: {
-                requiredPlayCount: 5,
-                requiredLikeCount: 2,
-                minCompletionRate: 0.3,
-            },
-        });
-    }
-    catch (error) {
-        console.error('Error getting debug tracks:', error);
-        res.status(500).json({
-            message: 'Failed to get debug tracks',
-            error: error instanceof Error ? error.message : String(error),
-        });
-    }
-});
-exports.debugActiveTracks = debugActiveTracks;
 //# sourceMappingURL=admin.controller.js.map

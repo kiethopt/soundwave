@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRecommendationMatrix = exports.updateAIModel = exports.updateCacheStatus = exports.getSystemStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.updateMaintenanceMode = exports.getRecommendationMatrix = exports.updateAIModel = exports.updateCacheStatus = exports.getSystemStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
@@ -686,4 +686,29 @@ const cosineSimilarity = (vectorA, vectorB) => {
     }
     return dotProduct / (magnitudeA * magnitudeB);
 };
+const updateMaintenanceMode = (enabled) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const envPath = path.resolve(__dirname, '../../.env');
+        const envContent = fs.readFileSync(envPath, 'utf8');
+        if (enabled === undefined) {
+            const currentStatus = process.env.MAINTENANCE_MODE === 'true';
+            return { enabled: currentStatus };
+        }
+        if (envContent.includes('MAINTENANCE_MODE=')) {
+            const updatedContent = envContent.replace(/MAINTENANCE_MODE=.*/, `MAINTENANCE_MODE=${enabled}`);
+            fs.writeFileSync(envPath, updatedContent);
+        }
+        else {
+            fs.writeFileSync(envPath, `${envContent}\nMAINTENANCE_MODE=${enabled}`);
+        }
+        process.env.MAINTENANCE_MODE = String(enabled);
+        console.log(`[System] Maintenance mode ${enabled ? 'enabled' : 'disabled'}`);
+        return { enabled };
+    }
+    catch (error) {
+        console.error('Error updating maintenance mode', error);
+        throw new Error('Failed to update maintenance mode');
+    }
+});
+exports.updateMaintenanceMode = updateMaintenanceMode;
 //# sourceMappingURL=admin.service.js.map

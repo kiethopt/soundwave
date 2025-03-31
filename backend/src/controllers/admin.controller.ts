@@ -547,6 +547,20 @@ export const handleCacheStatus = async (
   }
 };
 
+// Lấy hoặc cập nhật trạng thái bảo trì - ADMIN only
+export const handleMaintenanceMode = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { enabled } = req.method === 'POST' ? req.body : {};
+    const result = await adminService.updateMaintenanceMode(enabled);
+    res.json(result);
+  } catch (error) {
+    handleError(res, error, 'Manage maintenance mode');
+  }
+};
+
 // Lấy và cập nhật trạng thái model AI - ADMIN only
 export const handleAIModelStatus = async (
   req: Request,
@@ -645,65 +659,6 @@ export const updateSystemPlaylists = async (
     res.status(500).json({
       success: false,
       message: 'Failed to update playlists',
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-};
-
-// Debug hàm update global playlist
-export const debugActiveTracks = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const activeTracks = await prisma.track.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        title: true,
-        artistId: true,
-        artist: {
-          select: {
-            artistName: true,
-          },
-        },
-        playCount: true,
-        _count: {
-          select: {
-            likedBy: true,
-          },
-        },
-      },
-      take: 20,
-    });
-
-    // Also get counts for histories and likes
-    const historyCount = await prisma.history.count({
-      where: {
-        type: 'PLAY',
-        trackId: { not: null },
-        playCount: { gt: 0 },
-      },
-    });
-
-    const likesCount = await prisma.userLikeTrack.count();
-
-    res.json({
-      message: 'Debug active tracks',
-      activeTracks: activeTracks,
-      trackCount: activeTracks.length,
-      historyCount,
-      likesCount,
-      qualityThresholds: {
-        requiredPlayCount: 5,
-        requiredLikeCount: 2,
-        minCompletionRate: 0.3,
-      },
-    });
-  } catch (error) {
-    console.error('Error getting debug tracks:', error);
-    res.status(500).json({
-      message: 'Failed to get debug tracks',
       error: error instanceof Error ? error.message : String(error),
     });
   }

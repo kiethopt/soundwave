@@ -10,6 +10,9 @@ import type React from 'react';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { TrackProvider, useTrack } from '@/contexts/TrackContext';
 import PlayerBar from '@/components/layout/PlayerBar/PlayerBar';
+import { MaintenanceProvider } from '@/contexts/MaintenanceContext';
+import { MaintenanceBanner } from '@/components/ui/MaintenanceBanner';
+import { useMaintenance } from '@/contexts/MaintenanceContext';
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,6 +20,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { currentTrack } = useTrack();
+  const { isMaintenanceMode, isLoading } = useMaintenance();
 
   const isAuthPage = useMemo(
     () =>
@@ -46,6 +50,10 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             theme === 'light' ? 'text-gray-900' : 'text-white'
           }`}
         >
+          {isMaintenanceMode && !isLoading && (
+            <div className="h-8" aria-hidden="true"></div>
+          )}
+
           <div className="md:hidden" suppressHydrationWarning>
             <Header
               isSidebarOpen={isSidebarOpen}
@@ -103,12 +111,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <ThemeProvider>
-        <TrackProvider>
-          <body className="bg-[#111]" suppressHydrationWarning>
-            <LayoutContent>{children}</LayoutContent>
-            <Toaster position="top-center" />
-          </body>
-        </TrackProvider>
+        <MaintenanceProvider>
+          <TrackProvider>
+            <body className="bg-[#111]" suppressHydrationWarning>
+              <MaintenanceBanner />
+              <LayoutContent>{children}</LayoutContent>
+              <Toaster position="top-center" />
+            </body>
+          </TrackProvider>
+        </MaintenanceProvider>
       </ThemeProvider>
     </html>
   );
