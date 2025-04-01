@@ -1,4 +1,3 @@
-// Form Data Types
 export interface FormData {
   title: string;
   trackNumber: number;
@@ -393,4 +392,10 @@ export interface RecommendationMatrix {
     };
   };
   message?: string;
+}
+
+export enum AlbumType {
+  ALBUM = 'ALBUM',
+  EP = 'EP',
+  SINGLE = 'SINGLE',
 }

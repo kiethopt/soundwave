@@ -319,7 +319,7 @@ export const getArtistTracks = async (
   res: Response
 ): Promise<void> => {
   const { id } = req.params;
-  const { page = 1, limit = 10 } = req.query;
+  const { page = 1, limit = 10, type } = req.query;
   const offset = (Number(page) - 1) * Number(limit);
   const user = req.user;
 
@@ -330,7 +330,9 @@ export const getArtistTracks = async (
 
   try {
     // Tạo cache key dựa trên params
-    const cacheKey = `/api/artists/${id}/tracks?page=${page}&limit=${limit}`;
+    const cacheKey = `/api/artists/${id}/tracks?page=${page}&limit=${limit}${
+      type ? `&type=${type}` : ''
+    }`;
 
     // Kiểm tra cache
     if (process.env.USE_REDIS_CACHE === 'true') {
@@ -353,6 +355,11 @@ export const getArtistTracks = async (
     }
 
     let whereCondition: any = { artistId: id };
+
+    // Add type filter if specified
+    if (type) {
+      whereCondition.type = type;
+    }
 
     if (user.role !== Role.ADMIN && user.id !== artistProfile.userId) {
       whereCondition.isActive = true;

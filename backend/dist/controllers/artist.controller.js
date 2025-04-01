@@ -233,7 +233,7 @@ const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function
 exports.getArtistAlbums = getArtistAlbums;
 const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, type } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
     const user = req.user;
     if (!user) {
@@ -241,7 +241,7 @@ const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function
         return;
     }
     try {
-        const cacheKey = `/api/artists/${id}/tracks?page=${page}&limit=${limit}`;
+        const cacheKey = `/api/artists/${id}/tracks?page=${page}&limit=${limit}${type ? `&type=${type}` : ''}`;
         if (process.env.USE_REDIS_CACHE === 'true') {
             const cachedData = yield cache_middleware_1.client.get(cacheKey);
             if (cachedData) {
@@ -259,6 +259,9 @@ const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function
             return;
         }
         let whereCondition = { artistId: id };
+        if (type) {
+            whereCondition.type = type;
+        }
         if (user.role !== client_1.Role.ADMIN && user.id !== artistProfile.userId) {
             whereCondition.isActive = true;
             if (!artistProfile.isVerified) {

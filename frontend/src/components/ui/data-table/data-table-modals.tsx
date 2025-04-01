@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { Calendar, Music } from 'lucide-react';
 import { useDominantColor } from '@/hooks/useDominantColor';
+import { Textarea } from '@/components/ui/textarea';
 
 interface EditTrackModalProps {
   track: Track | null;
@@ -2388,6 +2389,294 @@ export function TrackDetailModal({
             </div>
           </div>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface EditArtistProfileModalProps {
+  artistProfile: ArtistProfile | null; // Allow null
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUpdateSuccess?: () => void; // Optional success callback
+  theme?: 'light' | 'dark';
+}
+
+export function EditArtistProfileModal({
+  artistProfile,
+  open,
+  onOpenChange,
+  onUpdateSuccess,
+  theme = 'light',
+}: EditArtistProfileModalProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    artistName: '',
+    bio: '',
+    avatar: undefined as File | string | undefined,
+  });
+  const [avatarPreview, setAvatarPreview] = useState<string>(
+    '/images/default-avatar.jpg'
+  );
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null); // State for banner preview
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null); // Ref for banner input
+
+  // Effect to update form data when artistProfile changes
+  useEffect(() => {
+    if (artistProfile) {
+      setFormData({
+        artistName: artistProfile.artistName,
+        bio: artistProfile.bio || '',
+        avatar: artistProfile.avatar || '', // Keep track of the original avatar URL
+        // Don't store banner file here, just use preview state
+      });
+      setAvatarPreview(artistProfile.avatar || '/images/default-avatar.jpg');
+      setBannerPreview(artistProfile.artistBanner || null); // Set initial banner preview
+    } else {
+      // Reset form if artistProfile is null (e.g., when modal closes)
+      setFormData({ artistName: '', bio: '', avatar: undefined });
+      setAvatarPreview('/images/default-avatar.jpg');
+      setBannerPreview(null);
+    }
+  }, [artistProfile]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormData((prev) => ({
+        ...prev,
+        avatar: file,
+      }));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Store the file itself in a separate state if needed, or directly in FormData on submit
+      // For simplicity, we'll handle it during submit. Just update preview here.
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBannerPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      // Add the file to formData state if you want to track it explicitly
+      setFormData((prev) => ({ ...prev, artistBannerFile: file } as any)); // Use 'any' temporarily if type not defined
+    }
+  };
+
+  const handleCoverClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleBannerClick = () => {
+    bannerInputRef.current?.click();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!artistProfile) return; // Ensure artistProfile exists
+
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        toast.error('Please login again');
+        setIsLoading(false);
+        return;
+      }
+      const apiFormData = new FormData();
+      apiFormData.append('artistName', formData.artistName);
+      apiFormData.append('bio', formData.bio);
+      if (formData.avatar instanceof File) {
+        apiFormData.append('avatar', formData.avatar);
+      }
+      // Append banner file if it exists in the temporary state
+      const bannerFile = (formData as any).artistBannerFile;
+      if (bannerFile instanceof File) {
+        apiFormData.append('artistBanner', bannerFile);
+      }
+
+      await api.artists.updateProfile(artistProfile.id, apiFormData, token);
+
+      toast.success('Updated Artist Profile');
+      onOpenChange(false);
+      if (onUpdateSuccess) {
+        onUpdateSuccess(); // Call success callback
+      }
+    } catch (error: any) {
+      console.error('Error updating artist profile:', error);
+      toast.error(`Failed to update profile: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Determine text and background colors based on theme
+  const textColor = theme === 'dark' ? 'text-white' : 'text-gray-900';
+  const secondaryTextColor =
+    theme === 'dark' ? 'text-white/70' : 'text-gray-500';
+  const inputBgColor = theme === 'dark' ? 'bg-[#3a3a3a]' : 'bg-white';
+  const inputBorderColor =
+    theme === 'dark' ? 'border-[#505050]' : 'border-gray-300';
+  const inputFocusBorderColor =
+    theme === 'dark' ? 'focus:border-white/50' : 'focus:border-gray-400';
+  const inputPlaceholderColor = theme === 'dark' ? 'placeholder-gray-400' : '';
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className={`${
+          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+        } p-6 rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto`}
+      >
+        <DialogHeader>
+          <DialogTitle className={`text-xl font-semibold ${textColor}`}>
+            Edit Artist Profile
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col space-y-6 mt-4">
+          {/* Avatar Preview and Upload */}
+          <div className="flex justify-center">
+            <div
+              className="relative w-40 h-40 flex justify-center group cursor-pointer"
+              onClick={handleCoverClick}
+            >
+              <Image
+                src={avatarPreview}
+                alt="Avatar Preview"
+                width={160}
+                height={160}
+                className="rounded-full w-full h-full object-cover border-2 border-gray-300 dark:border-gray-600"
+              />
+              <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full text-white font-semibold">
+                Change Avatar
+              </div>
+              <input
+                ref={fileInputRef}
+                id="avatarInput"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            </div>
+          </div>
+
+          {/* Banner Preview and Upload */}
+          <div className="space-y-2">
+            <label
+              className={`block text-sm font-medium ${secondaryTextColor}`}
+            >
+              Banner Image
+            </label>
+            <div
+              className="relative w-full h-32 flex justify-center items-center group cursor-pointer border-2 border-dashed rounded-md border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
+              onClick={handleBannerClick}
+            >
+              {bannerPreview ? (
+                <Image
+                  src={bannerPreview}
+                  alt="Banner Preview"
+                  layout="fill"
+                  objectFit="cover"
+                  className="rounded-md"
+                />
+              ) : (
+                <span className={`${secondaryTextColor} text-center`}>
+                  Click to upload banner
+                </span>
+              )}
+              <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-md text-white font-semibold">
+                {bannerPreview ? 'Change Banner' : 'Upload Banner'}
+              </div>
+              <input
+                ref={bannerInputRef}
+                id="bannerInput"
+                name="artistBannerFile" // Give it a name
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleBannerFileChange}
+              />
+            </div>
+          </div>
+
+          {/* Artist Name Input */}
+          <div className="space-y-2">
+            <label
+              htmlFor="artistName"
+              className={`block text-sm font-medium ${secondaryTextColor}`}
+            >
+              Artist Name
+            </label>
+            <Input
+              id="artistName"
+              name="artistName"
+              placeholder="Enter artist name"
+              value={formData.artistName}
+              onChange={handleInputChange}
+              className={`w-full px-3 py-2 rounded-md border ${inputBgColor} ${inputBorderColor} ${textColor} ${inputPlaceholderColor} ${inputFocusBorderColor} transition-colors focus:outline-none`}
+              required
+            />
+          </div>
+
+          {/* Bio Textarea */}
+          <div className="space-y-2">
+            <label
+              htmlFor="bio"
+              className={`block text-sm font-medium ${secondaryTextColor}`}
+            >
+              Bio
+            </label>
+            <Textarea
+              id="bio"
+              name="bio"
+              placeholder="Enter artist bio"
+              value={formData.bio}
+              onChange={handleInputChange}
+              rows={4}
+              className={`w-full px-3 py-2 rounded-md border ${inputBgColor} ${inputBorderColor} ${textColor} ${inputPlaceholderColor} ${inputFocusBorderColor} transition-colors focus:outline-none resize-none`}
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              type="button"
+              variant="outline" // Adjusted variant for consistency
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="default" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span> Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

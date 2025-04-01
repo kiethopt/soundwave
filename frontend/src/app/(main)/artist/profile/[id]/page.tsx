@@ -1,24 +1,18 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Album, ArtistProfile, Track } from '@/types';
+import { Album, AlbumType, ArtistProfile, Track } from '@/types';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
 import { useDominantColor } from '@/hooks/useDominantColor';
-import { Verified, Play, Pause, Edit, Music } from '@/components/ui/Icons';
-import { ArrowLeft, MoreHorizontal } from 'lucide-react';
+import { Verified, Play, Pause, Edit } from '@/components/ui/Icons';
+import { ArrowLeft } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
-import { EditArtistProfileModal } from '@/components/artist/EditArtistProfileModal';
+import { EditArtistProfileModal } from '@/components/ui/data-table/data-table-modals';
 import Image from 'next/image';
 
 function getBrightness(hexColor: string) {
@@ -39,6 +33,7 @@ export default function ArtistProfilePage({
   const [artist, setArtist] = useState<ArtistProfile | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [standaloneReleases, setStandaloneReleases] = useState<Track[]>([]);
   const [artistTracksMap, setArtistTracksMap] = useState<
     Record<string, Track[]>
   >({});
@@ -51,7 +46,9 @@ export default function ArtistProfilePage({
   );
   const [showAllTracks, setShowAllTracks] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isBannerOpen, setIsBannerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'popular' | 'albums' | 'singles'>(
+    'popular'
+  );
 
   const {
     currentTrack,
@@ -67,8 +64,73 @@ export default function ArtistProfilePage({
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
   const displayedTracks = showAllTracks ? tracks : tracks.slice(0, 5);
 
+  const fetchData = useCallback(async () => {
+    if (!token || !id) return;
+
+    setLoading(true);
+    try {
+      const [
+        artistData,
+        followingResponse,
+        albumsResponse,
+        tracksResponse,
+        singlesResponse,
+        relatedArtistsResponse,
+      ] = await Promise.all([
+        api.artists.getProfile(id, token),
+        api.user.getFollowing(token),
+        api.artists.getAlbumByArtistId(id, token),
+        api.artists.getTrackByArtistId(id, token),
+        api.artists.getTrackByArtistId(id, token, 'SINGLE'),
+        api.artists.getRelatedArtists(id, token),
+      ]);
+
+      setArtist(artistData);
+
+      if (followingResponse) {
+        const isFollowing = followingResponse.some(
+          (artistProfile: ArtistProfile) => artistProfile.id === id
+        );
+        const isOwner = userData.artistProfile?.id === id;
+        setFollow(isFollowing);
+        setIsOwner(isOwner);
+      }
+
+      setAlbums(albumsResponse.albums);
+
+      // Sort tracks by play count
+      const sortedTracks = tracksResponse.tracks.sort(
+        (a: any, b: any) => b.playCount - a.playCount
+      );
+      setTracks(sortedTracks);
+
+      // Find standalone tracks (singles or EPs not in albums)
+      const singleAndEPs = singlesResponse.tracks.filter(
+        (track: Track) => !track.album
+      );
+      setStandaloneReleases(singleAndEPs);
+
+      setRelatedArtists(relatedArtistsResponse);
+
+      if (relatedArtistsResponse?.length > 0) {
+        const tracksMap = await fetchRelatedArtistTracks(
+          relatedArtistsResponse
+        );
+        setArtistTracksMap(tracksMap);
+      }
+    } catch (error) {
+      console.error('Error fetching artist data:', error);
+      toast.error('Failed to load artist data');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, token, userData.artistProfile?.id]);
+
   const fetchRelatedArtistTracks = async (artists: ArtistProfile[]) => {
     const tracksMap: Record<string, Track[]> = {};
+    if (!token) {
+      return tracksMap;
+    }
 
     await Promise.all(
       artists.map(async (artist) => {
@@ -96,58 +158,8 @@ export default function ArtistProfilePage({
       return;
     }
 
-    const fetchData = async () => {
-      try {
-        const [
-          artistData,
-          followingResponse,
-          albumsResponse,
-          tracksResponse,
-          relatedArtistsResponse,
-        ] = await Promise.all([
-          api.artists.getProfile(id, token),
-          api.user.getFollowing(token),
-          api.artists.getAlbumByArtistId(id, token),
-          api.artists.getTrackByArtistId(id, token),
-          api.artists.getRelatedArtists(id, token),
-        ]);
-
-        setArtist(artistData);
-
-        if (followingResponse) {
-          const isFollowing = followingResponse.some(
-            (artistProfile: ArtistProfile) => artistProfile.id === id
-          );
-          const isOwner = userData.artistProfile?.id === id;
-          setFollow(isFollowing);
-          setIsOwner(isOwner);
-        }
-
-        setAlbums(albumsResponse.albums);
-        setTracks(
-          tracksResponse.tracks.sort(
-            (a: any, b: any) => b.playCount - a.playCount
-          )
-        );
-        setRelatedArtists(relatedArtistsResponse);
-
-        // Fetch tracks cho related artists chỉ khi có related artists
-        if (relatedArtistsResponse?.length > 0) {
-          const tracksMap = await fetchRelatedArtistTracks(
-            relatedArtistsResponse
-          );
-          setArtistTracksMap(tracksMap);
-        }
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching artist data:', error);
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [id, token, router, userData.artistProfile?.id]);
+    fetchData(); // Call the fetchData function
+  }, [token, router, fetchData]);
 
   const handleFollow = async () => {
     if (!token) {
@@ -283,6 +295,141 @@ export default function ArtistProfilePage({
   const textColor =
     dominantColor && getBrightness(dominantColor) > 200 ? '#3c3c3c' : '#fff';
 
+  // Filter albums based on the active tab
+  const filteredReleases = albums.filter((item) => {
+    if (activeTab === 'albums') {
+      return item.type === AlbumType.ALBUM;
+    } else if (activeTab === 'singles') {
+      return item.type === AlbumType.SINGLE || item.type === AlbumType.EP;
+    }
+    return true; // 'popular' shows all
+  });
+
+  // Get content based on active tab
+  const displayTabContent = () => {
+    if (activeTab === 'singles' && standaloneReleases.length > 0) {
+      return (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+          {standaloneReleases.map((track) => (
+            <div
+              key={track.id}
+              className="bg-white/5 p-4 rounded-lg group relative w-full"
+              onClick={() => router.push(`/track/${track.id}`)}
+            >
+              <div className="relative">
+                <img
+                  src={track.coverUrl || '/images/default-track.png'}
+                  alt={track.title}
+                  className="w-full aspect-square object-cover rounded-md mb-4"
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTopTrackPlay(track);
+                  }}
+                  className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  {currentTrack?.id === track.id && isPlaying ? (
+                    <Pause className="w-6 h-6 text-white" />
+                  ) : (
+                    <Play className="w-6 h-6 text-white" />
+                  )}
+                </button>
+              </div>
+              <h3
+                className={`font-medium truncate ${
+                  theme === 'light' ? 'text-neutral-800' : 'text-white'
+                } ${
+                  currentTrack?.id === track.id
+                    ? 'text-[#A57865]'
+                    : theme === 'light'
+                    ? 'text-neutral-800'
+                    : 'text-white'
+                }`}
+              >
+                {track.title}
+              </h3>
+              <p
+                className={`text-sm truncate ${
+                  theme === 'light' ? 'text-neutral-600' : 'text-white/60'
+                }`}
+              >
+                {track.releaseDate.substring(0, 4)} •{' '}
+                {track.type.charAt(0).toUpperCase() +
+                  track.type.slice(1).toLowerCase()}
+              </p>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+        {filteredReleases.map((item) => (
+          <div
+            key={item.id}
+            className="bg-white/5 p-4 rounded-lg group relative w-full"
+            onClick={() => router.push(`/album/${item.id}`)}
+          >
+            <div className="relative">
+              <img
+                src={item.coverUrl || '/images/default-album.png'}
+                alt={item.title}
+                className="w-full aspect-square object-cover rounded-md mb-4"
+              />
+              <button
+                onClick={(e) => {
+                  handleAlbumPlay(item, e);
+                }}
+                className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                {item.tracks &&
+                item.tracks.some(
+                  (track) =>
+                    track.id === currentTrack?.id &&
+                    isPlaying &&
+                    queueType === 'album'
+                ) ? (
+                  <Pause className="w-6 h-6 text-white" />
+                ) : (
+                  <Play className="w-6 h-6 text-white" />
+                )}
+              </button>
+            </div>
+            <h3
+              className={`font-medium truncate ${
+                theme === 'light' ? 'text-neutral-800' : 'text-white'
+              } ${
+                currentTrack &&
+                item.tracks &&
+                item.tracks.some(
+                  (track) =>
+                    track.id === currentTrack.id && queueType === 'album'
+                )
+                  ? 'text-[#A57865]'
+                  : theme === 'light'
+                  ? 'text-neutral-800'
+                  : 'text-white'
+              }`}
+            >
+              {item.title}
+            </h3>
+            <p
+              className={`text-sm truncate ${
+                theme === 'light' ? 'text-neutral-600' : 'text-white/60'
+              }`}
+            >
+              {item.releaseDate.substring(0, 4)} •{' '}
+              {item.type.charAt(0).toUpperCase() +
+                item.type.slice(1).toLowerCase()}
+            </p>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div
       className="min-h-screen w-full rounded-lg"
@@ -333,18 +480,25 @@ export default function ArtistProfilePage({
                 </button>
 
                 {isOwner && (
-                  <button onClick={() => setIsBannerOpen(true)}>
-                    <Edit className="w-5 h-5 mr-2 text-white hover:text-gray-300" />
+                  <button
+                    onClick={() => setIsEditOpen(true)}
+                    className={`p-2 rounded-lg transition-all ${
+                      theme === 'light'
+                        ? 'bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow'
+                        : 'bg-black/20 hover:bg-black/30 text-white/80 hover:text-white'
+                    }`}
+                  >
+                    <Edit className="w-5 h-5" />
                   </button>
                 )}
               </div>
 
               <div>
                 <div className="flex items-center space-x-2">
-                  <Verified className="w-6 h-6" />
+                  {artist.isVerified && <Verified className="w-6 h-6" />}
                   {artist.isVerified && (
                     <span
-                      className="text-sm font-semibold text-white/80"
+                      className="text-sm font-semibold"
                       style={{ lineHeight: '1.1', color: textColor }}
                     >
                       Verified Artist
@@ -412,39 +566,6 @@ export default function ArtistProfilePage({
                   {follow ? 'Unfollow' : 'Follow'}
                 </Button>
               )}
-
-              {/* Option */}
-              {isOwner && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="w-5 h-5" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56">
-                    <DropdownMenuItem
-                      className="cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsEditOpen(true);
-                      }}
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit Profile
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Music className="w-4 h-4 mr-2" />
-                      View Stats
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
             </div>
           </div>
 
@@ -491,69 +612,53 @@ export default function ArtistProfilePage({
               <div className="flex items-center gap-4">
                 <h2 className="text-2xl font-bold">About</h2>
               </div>
-              <p className="text-dark/60 mt-2 dark:text-white/60">
+              <p
+                className={`mt-2 ${
+                  theme === 'light' ? 'text-neutral-700' : 'text-white/60'
+                }`}
+              >
                 {artist.bio || 'No biography available'}
               </p>
             </div>
           </div>
 
-          {/* Album Section */}
-          {albums.length > 0 && (
+          {/* Discography Section */}
+          {(albums.length > 0 || standaloneReleases.length > 0) && (
             <div className="px-4 md:px-6 py-6">
-              <h2 className="text-2xl font-bold">Albums</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
-                {albums.map((album) => (
-                  <div
-                    key={album.id}
-                    className="bg-white/5 p-4 rounded-lg group relative w-full"
-                    onClick={() => router.push(`/album/${album.id}`)}
-                  >
-                    <div className="relative">
-                      <img
-                        src={album.coverUrl || '/images/default-album.png'}
-                        alt={album.title}
-                        className="w-full aspect-square object-cover rounded-md mb-4"
-                      />
-                      <button
-                        onClick={(e) => {
-                          handleAlbumPlay(album, e);
-                        }}
-                        className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        {album.tracks.some(
-                          (track) =>
-                            track.id === currentTrack?.id &&
-                            isPlaying &&
-                            queueType === 'album'
-                        ) ? (
-                          <Pause className="w-6 h-6 text-white" />
-                        ) : (
-                          <Play className="w-6 h-6 text-white" />
-                        )}
-                      </button>
-                    </div>
-                    <h3
-                      className={`font-medium truncate text-black/60 dark:text-white ${
-                        currentTrack &&
-                        album.tracks.some(
-                          (track) =>
-                            track.id === currentTrack.id &&
-                            queueType === 'album'
-                        )
-                          ? 'text-[#A57865]'
-                          : 'text-white'
-                      }`}
-                    >
-                      {album.title}
-                    </h3>
-                    <p className="text-white/60 text-sm truncate">
-                      {typeof album.artist === 'string'
-                        ? album.artist
-                        : album.artist?.artistName || 'Unknown Artist'}
-                    </p>
-                  </div>
-                ))}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Discography</h2>
+                {/* Add "Show all" text - no functionality for now */}
+                <span className="text-sm font-medium text-neutral-500 dark:text-neutral-400 cursor-pointer hover:underline">
+                  Show all
+                </span>
               </div>
+
+              {/* Tab Buttons */}
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant={activeTab === 'popular' ? 'default' : 'secondary'}
+                  size="sm"
+                  onClick={() => setActiveTab('popular')}
+                >
+                  Popular releases
+                </Button>
+                <Button
+                  variant={activeTab === 'albums' ? 'default' : 'secondary'}
+                  size="sm"
+                  onClick={() => setActiveTab('albums')}
+                >
+                  Albums
+                </Button>
+                <Button
+                  variant={activeTab === 'singles' ? 'default' : 'secondary'}
+                  size="sm"
+                  onClick={() => setActiveTab('singles')}
+                >
+                  Singles and EPs
+                </Button>
+              </div>
+
+              {displayTabContent()}
             </div>
           )}
 
@@ -619,6 +724,11 @@ export default function ArtistProfilePage({
             artistProfile={artist}
             open={isEditOpen}
             onOpenChange={setIsEditOpen}
+            theme={theme}
+            onUpdateSuccess={() => {
+              toast.success('Profile updated! Refreshing data...');
+              fetchData(); // Refetch data on successful update
+            }}
           />
         </div>
       )}
