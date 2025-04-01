@@ -108,7 +108,7 @@ async function main() {
         name: 'Warner Music Vietnam',
         description: 'Chi nhánh của Warner Music Group tại Việt Nam...',
         logoUrl:
-          'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743431554/labels/odz4yauhezy6jm9nwtq7.webp',
+          'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743512738/Warner_Music_VN_qqwch0.png',
       },
       {
         name: 'Sony Music Vietnam',
@@ -317,7 +317,7 @@ async function main() {
         },
         profile: {
           artistName: 'Shiki',
-          bio: 'Shiki tên thật là Trần Duy Tùng, là một nghệ sĩ trẻ đa tài trong cộng đồng nhạc Indie/Lo-fi Việt Nam.',
+          bio: 'Shiki (tên thật: Huỳnh Nhật Hào) là một trong những gương mặt mới xứng đáng được tỏa sáng hơn.',
           avatar:
             'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743439433/testAlbum/Shiki/L%E1%BA%B7ng/hkbmzyo4vngqrrdmb0az.webp',
           socialMediaLinks: {
@@ -413,7 +413,7 @@ async function main() {
         },
         profile: {
           artistName: 'Low G',
-          bio: 'Low G tên thật là Nguyễn Hoàng Long, là một rapper người Việt Nam. Anh được biết đến với phong cách rap độc đáo và kỹ thuật tốt.',
+          bio: 'Low G là 1 rapper nổi tiếng Việt Nam. Anh có giọng rap đặc trưng cũng như khả năng rap mượt vượt trội so với nhiều rapper trẻ thế hệ mới.',
           avatar:
             'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743439236/testAlbum/tlinh%2C%20Low%20G/FLVR/fwt1lfhfrzqq6dchl8nw.jpg',
           socialMediaLinks: {
@@ -496,16 +496,16 @@ async function main() {
         },
         // No album, singles will be seeded separately
       },
-      // --- Phan Đình Tùng ---
+      // --- Phan Đinh Tùng ---
       {
         user: {
           email: 'phandinhtung@soundwave.com',
           username: 'phandinhtung_artist',
-          name: 'Phan Đình Tùng',
+          name: 'Phan Đinh Tùng',
         },
         profile: {
-          artistName: 'Phan Đình Tùng',
-          bio: 'Phan Đình Tùng là một ca sĩ, nhạc sĩ nổi tiếng người Việt Nam, cựu thành viên nhóm nhạc MTV.',
+          artistName: 'Phan Đinh Tùng',
+          bio: 'Phan Đinh Tùng là một ca sĩ, nhạc sĩ nổi tiếng người Việt Nam, cựu thành viên nhóm nhạc MTV.',
           avatar:
             'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743442756/testAlbum/Phan%20%C4%90inh%20T%C3%B9ng/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/tomj0zyas6grk3zft230.jpg',
           socialMediaLinks: { facebook: 'phandinhtung.singer' },

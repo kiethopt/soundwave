@@ -1348,13 +1348,14 @@ export function getLabelColumns({
               )}
             </div>
             <div>
-              <span
-                className={`font-medium ${
+              <Link
+                href={`/admin/labels/${label.id}`}
+                className={`font-medium hover:underline ${
                   theme === 'dark' ? 'text-white' : ''
                 }`}
               >
                 {label.name}
-              </span>
+              </Link>
               {label.description && (
                 <div
                   className={

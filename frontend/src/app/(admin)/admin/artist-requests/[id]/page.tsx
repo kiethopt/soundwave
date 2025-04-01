@@ -155,8 +155,8 @@ export default function ArtistRequestDetail({
           <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
             {/* Back Button */}
             <div className="w-fit">
-              <Link
-                href="/admin/artist-requests"
+              <button
+                onClick={() => router.back()}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   theme === 'light'
                     ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
@@ -165,7 +165,7 @@ export default function ArtistRequestDetail({
               >
                 <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
                 <span>Back</span>
-              </Link>
+              </button>
             </div>
 
             {/* Action Buttons */}

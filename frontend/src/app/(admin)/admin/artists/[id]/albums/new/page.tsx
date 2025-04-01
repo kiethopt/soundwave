@@ -93,13 +93,13 @@ export default function NewAlbum({
   return (
     <div className="container mx-auto p-6 space-y-8">
       <div className="flex items-center justify-between mb-6">
-        <Link
-          href={`/admin/artists/${id}`}
+        <button
+          onClick={() => router.back()}
           className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
           <span>Back to Albums</span>
-        </Link>
+        </button>
         <h1 className="text-3xl font-bold tracking-tight">Create New Album</h1>
       </div>
       <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] p-6">

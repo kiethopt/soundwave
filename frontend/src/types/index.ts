@@ -168,6 +168,46 @@ export interface Label {
     tracks: number;
     albums: number;
   };
+  albums?: Array<{
+    id: string;
+    title: string;
+    coverUrl?: string | null;
+    releaseDate: string;
+    type: 'ALBUM' | 'EP' | 'SINGLE';
+    totalTracks: number;
+    artist: {
+      id: string;
+      artistName: string;
+      avatar?: string | null;
+      isVerified?: boolean;
+    };
+  }>;
+  tracks?: Array<{
+    id: string;
+    title: string;
+    coverUrl?: string | null;
+    releaseDate: string;
+    duration: number;
+    playCount: number;
+    artist: {
+      id: string;
+      artistName: string;
+      avatar?: string | null;
+      isVerified?: boolean;
+    };
+    album?: {
+      id: string;
+      title: string;
+    } | null;
+  }>;
+  artists?: Array<{
+    id: string;
+    artistName: string;
+    avatar?: string | null;
+    isVerified?: boolean;
+    albumCount: number;
+    trackCount: number;
+  }>;
 }
 
 export interface Album {

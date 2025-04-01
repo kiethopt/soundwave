@@ -218,7 +218,7 @@ export default function ArtistDetail() {
     <div className="p-4 max-w-7xl mx-auto">
       <div className="w-fit mb-6">
         <button
-          onClick={() => router.push('/admin/artists')}
+          onClick={() => router.back()}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
             theme === 'light'
               ? 'bg-gray-100 hover:bg-gray-200 text-black'
@@ -538,7 +538,8 @@ export default function ArtistDetail() {
                   <div className="col-span-6">Title</div>
                   <div className="col-span-2 text-center">Release Date</div>
                   <div className="col-span-2 text-center">Duration</div>
-                  <div className="col-span-2 text-center">Plays</div>
+                  <div className="col-span-1 text-center">Plays</div>
+                  <div className="col-span-1"></div>
                 </div>
                 {displayedAlbums.map((album) => (
                   <div
@@ -658,7 +659,8 @@ export default function ArtistDetail() {
                   <div className="col-span-6">Title</div>
                   <div className="col-span-2 text-center">Release Date</div>
                   <div className="col-span-2 text-center">Duration</div>
-                  <div className="col-span-2 text-center">Plays</div>
+                  <div className="col-span-1 text-center">Plays</div>
+                  <div className="col-span-1"></div>
                 </div>
                 {displayedSingles.map((track) => (
                   <div
