@@ -462,3 +462,25 @@ export enum AlbumType {
   EP = 'EP',
   SINGLE = 'SINGLE',
 }
+
+export interface LabelTabsProps {
+  theme: 'light' | 'dark';
+  activeTab: 'artists' | 'albums' | 'tracks';
+  setActiveTab: (tab: 'artists' | 'albums' | 'tracks') => void;
+  displayedArtists: Label['artists'];
+  displayedAlbums: Label['albums'];
+  displayedTracks: Label['tracks'];
+  filteredArtists: Label['artists'];
+  filteredAlbums: Label['albums'];
+  filteredTracks: Label['tracks'];
+  handleAlbumClick: (albumId: string) => void;
+  handleTrackClick: (trackId: string) => void;
+  formatDate: (dateString: string) => string;
+  formatDuration: (seconds: number) => string;
+}
+
+export interface LabelInfoCardProps {
+  label: Label;
+  theme: 'light' | 'dark';
+  formatDate: (dateString: string) => string;
+}

@@ -351,7 +351,9 @@ const approveArtistRequest = (requestId) => __awaiter(void 0, void 0, void 0, fu
             verifiedAt: new Date(),
             verificationRequestedAt: null,
         },
-        include: { user: { select: prisma_selects_1.userSelect } },
+        include: {
+            user: { select: prisma_selects_1.userSelect }
+        },
     });
 });
 exports.approveArtistRequest = approveArtistRequest;
@@ -363,7 +365,7 @@ const rejectArtistRequest = (requestId) => __awaiter(void 0, void 0, void 0, fun
             isVerified: false,
         },
         include: {
-            user: { select: { id: true, email: true, name: true, role: true } },
+            user: { select: prisma_selects_1.userSelect },
         },
     });
     if (!artistProfile) {

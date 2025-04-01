@@ -49,6 +49,29 @@ export default function ArtistDetail() {
         setIsAlbumModalOpen(true);
       }
     }
+
+    // Handle track parameter
+    const trackId = searchParams.get('track');
+    if (trackId && artist) {
+      const track = artist.tracks?.find((t) => t.id.toString() === trackId);
+
+      // If not found in direct tracks, check albums
+      if (!track && artist.albums) {
+        for (const album of artist.albums) {
+          const foundTrack = album.tracks?.find(
+            (t) => t.id.toString() === trackId
+          );
+          if (foundTrack) {
+            setSelectedTrack(foundTrack);
+            setIsTrackModalOpen(true);
+            break;
+          }
+        }
+      } else if (track) {
+        setSelectedTrack(track);
+        setIsTrackModalOpen(true);
+      }
+    }
   }, [searchParams, artist]);
 
   useEffect(() => {

@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -31,6 +64,7 @@ const prisma_selects_1 = require("../utils/prisma-selects");
 const handle_utils_1 = require("../utils/handle-utils");
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const pusher_1 = __importDefault(require("../config/pusher"));
+const emailService = __importStar(require("./email.service"));
 const getMonthStartDate = () => {
     const date = new Date();
     return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -129,7 +163,7 @@ const search = (user, query) => __awaiter(void 0, void 0, void 0, function* () {
                     },
                 },
             },
-            take: 5,
+            take: 15,
         }),
         db_1.default.album.findMany({
             where: {
@@ -153,7 +187,7 @@ const search = (user, query) => __awaiter(void 0, void 0, void 0, function* () {
                 ],
             },
             select: prisma_selects_1.searchAlbumSelect,
-            take: 5,
+            take: 15,
         }),
         db_1.default.track.findMany({
             where: {
@@ -187,7 +221,7 @@ const search = (user, query) => __awaiter(void 0, void 0, void 0, function* () {
             },
             select: prisma_selects_1.searchTrackSelect,
             orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
-            take: 5,
+            take: 15,
         }),
         db_1.default.user.findMany({
             where: {
@@ -200,7 +234,7 @@ const search = (user, query) => __awaiter(void 0, void 0, void 0, function* () {
                 ],
             },
             select: prisma_selects_1.userSelect,
-            take: 5,
+            take: 15,
         }),
     ]);
     const searchResult = { artists, albums, tracks, users };
@@ -242,100 +276,110 @@ const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0
     if (!follower) {
         throw new Error('Unauthorized');
     }
-    console.log('=== DEBUG: followUser => route called');
-    console.log('=== DEBUG: user =', follower.id);
-    console.log('=== DEBUG: followingId =', followingId);
-    const [userExists, artistExists] = yield Promise.all([
-        db_1.default.user.findUnique({ where: { id: followingId } }),
-        db_1.default.artistProfile.findUnique({
-            where: { id: followingId },
-            select: { id: true },
-        }),
-    ]);
+    const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
     let followingType;
-    const followData = {
-        followerId: follower.id,
-        followingType: 'USER',
-    };
+    let followedUserEmail = null;
+    let followedEntityName = 'Người dùng';
+    let followedUserIdForPusher = null;
+    let isFollowingArtistOwner = false;
+    const userExists = yield db_1.default.user.findUnique({
+        where: { id: followingId },
+    });
+    const artistExists = yield db_1.default.artistProfile.findUnique({
+        where: { id: followingId },
+        select: { id: true, artistName: true, userId: true },
+    });
     if (userExists) {
         followingType = client_1.FollowingType.USER;
-        followData.followingUserId = followingId;
+        followedUserEmail = userExists.email;
+        followedEntityName = userExists.name || userExists.username || 'Người dùng';
+        followedUserIdForPusher = userExists.id;
     }
     else if (artistExists) {
         followingType = client_1.FollowingType.ARTIST;
-        followData.followingArtistId = followingId;
-        followData.followingType = client_1.FollowingType.ARTIST;
+        const artistOwner = yield db_1.default.user.findUnique({
+            where: { id: artistExists.userId },
+            select: { email: true, name: true, username: true },
+        });
+        followedUserEmail = (artistOwner === null || artistOwner === void 0 ? void 0 : artistOwner.email) || null;
+        followedEntityName = artistExists.artistName || 'Nghệ sĩ';
+        followedUserIdForPusher = artistExists.userId;
+        isFollowingArtistOwner = artistExists.userId === follower.id;
     }
     else {
         throw new Error('Target not found');
     }
-    if (((followingType === 'USER' || followingType === 'ARTIST') &&
-        followingId === follower.id) ||
-        followingId === ((_a = follower.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+    if ((followingType === client_1.FollowingType.USER && followingId === follower.id) ||
+        (followingType === client_1.FollowingType.ARTIST &&
+            followingId === ((_a = follower.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) ||
+        (followingType === client_1.FollowingType.ARTIST && isFollowingArtistOwner)) {
         throw new Error('Cannot follow yourself');
     }
     const existingFollow = yield db_1.default.userFollow.findFirst({
-        where: {
-            followerId: follower.id,
-            OR: [
-                {
-                    followingUserId: followingId,
-                    followingType: client_1.FollowingType.USER,
-                },
-                {
-                    followingArtistId: followingId,
-                    followingType: client_1.FollowingType.ARTIST,
-                },
-            ],
-        },
+        where: Object.assign(Object.assign({ followerId: follower.id, followingType: followingType }, (followingType === 'USER' && { followingUserId: followingId })), (followingType === 'ARTIST' && { followingArtistId: followingId })),
     });
     if (existingFollow) {
         throw new Error('Already following');
     }
+    const followData = Object.assign(Object.assign({ followerId: follower.id, followingType: followingType }, (followingType === 'USER' && { followingUserId: followingId })), (followingType === 'ARTIST' && { followingArtistId: followingId }));
     return db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
         yield tx.userFollow.create({ data: followData });
-        const currentUser = yield tx.user.findUnique({
-            where: { id: follower.id },
-            select: { username: true, email: true },
-        });
-        const followerName = (currentUser === null || currentUser === void 0 ? void 0 : currentUser.username) || (currentUser === null || currentUser === void 0 ? void 0 : currentUser.email) || 'Unknown';
-        if (followingType === 'ARTIST') {
-            console.log('=== DEBUG: followUser => about to create notification for ARTIST');
-            const notification = yield tx.notification.create({
-                data: {
+        const followerName = follower.name || follower.username || 'Một người dùng';
+        const followerProfileLink = `${FRONTEND_URL}/user/${follower.id}`;
+        let notificationMessage = `Người dùng ${followerName} đã bắt đầu theo dõi bạn.`;
+        if (!isFollowingArtistOwner) {
+            if (followedUserEmail) {
+                try {
+                    const emailOptions = emailService.createNewFollowerEmail(followedUserEmail, followerName, followedEntityName, followerProfileLink);
+                    yield emailService.sendEmail(emailOptions);
+                    console.log(`Follow notification email sent to ${followedUserEmail}`);
+                }
+                catch (emailError) {
+                    console.error(`Failed to send follow notification email to ${followedUserEmail}:`, emailError);
+                }
+            }
+            else {
+                console.warn(`Could not send follow email: No email found for target ${followingId} (type: ${followingType})`);
+            }
+            if (followingType === 'ARTIST') {
+                const notification = yield tx.notification.create({
+                    data: {
+                        type: 'NEW_FOLLOW',
+                        message: notificationMessage,
+                        recipientType: 'ARTIST',
+                        artistId: followingId,
+                        senderId: follower.id,
+                    },
+                });
+                if (followedUserIdForPusher) {
+                    yield pusher_1.default.trigger(`user-${followedUserIdForPusher}`, 'notification', {
+                        type: 'NEW_FOLLOW',
+                        message: notificationMessage,
+                        notificationId: notification.id,
+                    });
+                }
+            }
+            else {
+                const notification = yield tx.notification.create({
+                    data: {
+                        type: 'NEW_FOLLOW',
+                        message: notificationMessage,
+                        recipientType: 'USER',
+                        userId: followingId,
+                        senderId: follower.id,
+                    },
+                });
+                yield pusher_1.default.trigger(`user-${followingId}`, 'notification', {
                     type: 'NEW_FOLLOW',
-                    message: `New follower: ${followerName}`,
-                    recipientType: 'ARTIST',
-                    artistId: followingId,
-                    senderId: follower.id,
-                },
-            });
+                    message: notificationMessage,
+                    notificationId: notification.id,
+                });
+            }
+        }
+        if (followingType === client_1.FollowingType.ARTIST) {
             yield tx.artistProfile.update({
                 where: { id: followingId },
                 data: { monthlyListeners: { increment: 1 } },
-            });
-            yield pusher_1.default.trigger(`user-${followingId}`, 'notification', {
-                type: 'NEW_FOLLOW',
-                message: `New follower: ${followerName}`,
-                notificationId: notification.id,
-            });
-        }
-        else {
-            console.log('=== DEBUG: followUser => about to create notification for USER->USER follow');
-            const notification = yield tx.notification.create({
-                data: {
-                    type: 'NEW_FOLLOW',
-                    message: `New follower: ${followerName}`,
-                    recipientType: 'USER',
-                    userId: followingId,
-                    senderId: follower.id,
-                },
-            });
-            console.log('=== DEBUG: followUser => notification for followed USER created!');
-            yield pusher_1.default.trigger(`user-${followingId}`, 'notification', {
-                type: 'NEW_FOLLOW',
-                message: `New follower: ${followerName}`,
-                notificationId: notification.id,
             });
         }
         return { message: 'Followed successfully' };

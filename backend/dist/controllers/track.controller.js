@@ -54,6 +54,7 @@ const trackService = __importStar(require("../services/track.service"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_2 = require("@prisma/client");
 const pusher_1 = __importDefault(require("../config/pusher"));
+const emailService = __importStar(require("../services/email.service"));
 const canManageTrack = (user, trackArtistId) => {
     var _a, _b, _c, _d;
     if (!user)
@@ -74,7 +75,7 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             return;
         }
         const { title, releaseDate, trackNumber, albumId, featuredArtists, artistId, genreIds, } = req.body;
-        const finalArtistId = user.role === 'ADMIN' ? artistId : (_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id;
+        const finalArtistId = user.role === 'ADMIN' && artistId ? artistId : (_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id;
         if (!finalArtistId) {
             res.status(400).json({
                 message: user.role === 'ADMIN'
@@ -83,6 +84,11 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             });
             return;
         }
+        const artistProfile = yield db_1.default.artistProfile.findUnique({
+            where: { id: finalArtistId },
+            select: { artistName: true },
+        });
+        const artistName = (artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.artistName) || 'Nghệ sĩ';
         if (!req.files) {
             res.status(400).json({ message: 'No files uploaded' });
             return;
@@ -102,33 +108,32 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const metadata = yield mm.parseBuffer(audioFile.buffer);
         const duration = Math.floor(metadata.format.duration || 0);
         let isActive = false;
-        let trackReleaseDate = new Date(releaseDate);
+        let trackReleaseDate = releaseDate ? new Date(releaseDate) : new Date();
         if (albumId) {
             const album = yield db_1.default.album.findUnique({
                 where: { id: albumId },
-                select: { isActive: true, releaseDate: true },
+                select: { isActive: true, releaseDate: true, coverUrl: true },
             });
             if (album) {
                 isActive = album.isActive;
                 trackReleaseDate = album.releaseDate;
+                if (!coverUrl && album.coverUrl) {
+                }
             }
         }
         else {
             const now = new Date();
             isActive = trackReleaseDate <= now;
-            console.log('Release date:', trackReleaseDate);
-            console.log('Current time:', now);
-            console.log('Is active:', isActive);
         }
         const featuredArtistsArray = Array.isArray(featuredArtists)
             ? featuredArtists
             : featuredArtists
-                ? [featuredArtists]
+                ? featuredArtists.split(',').map((id) => id.trim())
                 : [];
         const genreIdsArray = Array.isArray(genreIds)
             ? genreIds
             : genreIds
-                ? [genreIds]
+                ? genreIds.split(',').map((id) => id.trim())
                 : [];
         const track = yield db_1.default.track.create({
             data: {
@@ -144,8 +149,8 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 isActive,
                 featuredArtists: featuredArtistsArray.length > 0
                     ? {
-                        create: featuredArtistsArray.map((artistId) => ({
-                            artistId: artistId.trim(),
+                        create: featuredArtistsArray.map((featArtistId) => ({
+                            artistId: featArtistId,
                         })),
                     }
                     : undefined,
@@ -153,17 +158,13 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                     ? {
                         create: genreIdsArray.map((genreId) => ({
                             genre: {
-                                connect: { id: genreId.trim() },
+                                connect: { id: genreId },
                             },
                         })),
                     }
                     : undefined,
             },
             select: prisma_selects_1.trackSelect,
-        });
-        const artistProfile = yield db_1.default.artistProfile.findUnique({
-            where: { id: finalArtistId },
-            select: { artistName: true },
         });
         const followers = yield db_1.default.userFollow.findMany({
             where: {
@@ -172,24 +173,45 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: { followerId: true },
         });
-        const notificationsData = followers.map((follower) => ({
-            type: client_2.NotificationType.NEW_TRACK,
-            message: `${(artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.artistName) || 'Unknown'} vừa ra track mới: ${title}`,
-            recipientType: client_2.RecipientType.USER,
-            userId: follower.followerId,
-            artistId: finalArtistId,
-            senderId: finalArtistId,
-        }));
-        yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-            if (notificationsData.length > 0) {
-                yield tx.notification.createMany({ data: notificationsData });
-            }
-        }));
-        for (const follower of followers) {
-            yield pusher_1.default.trigger(`user-${follower.followerId}`, 'notification', {
-                type: client_2.NotificationType.NEW_TRACK,
-                message: `${artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.artistName} vừa ra track mới: ${title}`,
+        const followerIds = followers.map(f => f.followerId);
+        if (followerIds.length > 0) {
+            const followerUsers = yield db_1.default.user.findMany({
+                where: { id: { in: followerIds } },
+                select: { id: true, email: true }
             });
+            const notificationsData = followers.map((follower) => ({
+                type: client_2.NotificationType.NEW_TRACK,
+                message: `${artistName} vừa ra track mới: ${title}`,
+                recipientType: client_2.RecipientType.USER,
+                userId: follower.followerId,
+                artistId: finalArtistId,
+                senderId: finalArtistId,
+            }));
+            try {
+                yield db_1.default.notification.createMany({ data: notificationsData });
+            }
+            catch (notiError) {
+                console.error("Failed to create in-app notifications for new track:", notiError);
+            }
+            const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${track.id}`;
+            for (const user of followerUsers) {
+                pusher_1.default.trigger(`user-${user.id}`, 'notification', {
+                    type: client_2.NotificationType.NEW_TRACK,
+                    message: `${artistName} vừa ra track mới: ${track.title}`,
+                }).catch((err) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
+                if (user.email) {
+                    try {
+                        const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'track', track.title, releaseLink, track.coverUrl);
+                        yield emailService.sendEmail(emailOptions);
+                    }
+                    catch (err) {
+                        console.error(`Failed to send new track email to ${user.email}:`, err);
+                    }
+                }
+                else {
+                    console.warn(`Follower ${user.id} has no email for new track notification.`);
+                }
+            }
         }
         res.status(201).json({
             message: 'Track created successfully',
