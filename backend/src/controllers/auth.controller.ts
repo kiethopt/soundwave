@@ -8,6 +8,7 @@ import { addHours } from 'date-fns';
 import sgMail from '@sendgrid/mail';
 import { userSelect } from '../utils/prisma-selects';
 import { systemPlaylistService } from '../services/playlist.service';
+import * as emailService from '../services/email.service';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -329,18 +330,23 @@ export const requestPasswordReset = async (
 ): Promise<void> => {
   try {
     const { email } = req.body;
+    console.log(`[Reset Password] Request received for email: ${email}`);
 
-    // Tìm người dùng theo email
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, name: true, username: true }
+    });
 
     if (!user) {
+      console.log(`[Reset Password] User not found for email: ${email}`);
       res.status(404).json({ message: 'User not found' });
       return;
     }
+    console.log(`[Reset Password] User found: ${user.id}`);
 
     // Tạo token và thời gian hết hạn
     const resetToken = uuidv4();
-    const resetTokenExpiry = addHours(new Date(), 1); // Token hết hạn sau 1 giờ
+    const resetTokenExpiry = addHours(new Date(), 1);
 
     // Lưu token và thời gian hết hạn vào database
     await prisma.user.update({
@@ -350,15 +356,34 @@ export const requestPasswordReset = async (
         passwordResetExpires: resetTokenExpiry,
       },
     });
+    console.log(`[Reset Password] Reset token generated and saved for user: ${user.id}`);
+
+    // **Định nghĩa resetLink Ở ĐÂY, trước khi sử dụng**
+    const resetLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/reset-password?token=${resetToken}`;
 
     // Gửi email chứa link đặt lại mật khẩu
-    const resetLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/reset-password?token=${resetToken}`;
-    await sendEmail(user.email, 'Password Reset', resetLink);
+    try {
+      const userName = user.name || user.username || 'bạn';
+      // Tạo email options bằng hàm mới, resetLink đã được định nghĩa
+      const emailOptions = emailService.createPasswordResetEmail(user.email, userName, resetLink);
+      console.log(`[Reset Password] Attempting to send reset email to: ${user.email}`);
+      // Gửi email bằng hàm chung
+      await emailService.sendEmail(emailOptions);
+      console.log(`[Reset Password] Email send attempt finished for: ${user.email}`);
 
-    res.json({ message: 'Password reset email sent successfully' });
+      res.json({ message: 'Password reset email sent successfully' });
+      return;
+
+    } catch (emailError) {
+      console.error('[Reset Password] Failed to send email:', emailError);
+      res.status(500).json({ message: 'Failed to send password reset email' });
+      return;
+    }
+
   } catch (error) {
-    console.error('Request password reset error:', error);
+    console.error('[Reset Password] General error:', error);
     res.status(500).json({ message: 'Internal server error' });
+    return;
   }
 };
 
@@ -414,127 +439,6 @@ export const resetPassword = async (
   }
 };
 
-// Hàm gửi email với SendGrid
-const sendEmail = async (
-  to: string,
-  subject: string,
-  resetLink: string
-): Promise<void> => {
-  // Thiết lập API Key của SendGrid
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY as string);
-
-  // Cấu hình email
-  const msg = {
-    to, // Email nhận
-    from: process.env.EMAIL_USER as string, // Email gửi đi
-    subject, // Tiêu đề email
-    text: `Click here to reset your password: ${resetLink}`, // Nội dung email (dạng plain text)
-    html: `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Reset Your SoundWave Password</title>
-      </head>
-      <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; color: #333333;">
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-spacing: 0; border-collapse: collapse;">
-          <!-- Header with logo -->
-          <tr>
-            <td style="padding: 0;">
-              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
-                <tr>
-                  <td style="background-color: #1a1a1a; padding: 20px 0; text-align: center;">
-                    <img src="https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743396192/fcazc9wdyqvaz1c3xwg7.png" alt="SoundWave" width="200" style="display: block; margin: 0 auto;">
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-          <!-- Rest of the email template remains the same -->
-          <tr>
-            <td style="padding: 0;">
-              <div style="background: linear-gradient(135deg, #A57865 0%, #3a3a3a 100%); padding: 40px 30px; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">Reset Your Password</h1>
-                <p style="color: #ffffff; opacity: 0.9; margin: 15px 0 0; font-size: 16px;">We've received a request to reset your password</p>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Main content -->
-          <tr>
-            <td style="padding: 40px 30px; background-color: #ffffff;">
-              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
-                <tr>
-                  <td>
-                    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #333333;">Hi ${
-                      to.split('@')[0]
-                    },</p>
-                    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #333333;">We received a request to reset your SoundWave password. Use the button below to set up a new password for your account. This link is only valid for the next hour.</p>
-                    
-                    <div style="text-align: center; margin: 30px 0;">
-                      <a href="${resetLink}" style="display: inline-block; background-color: #000000; color: #ffffff; text-decoration: none; padding: 15px 35px; border-radius: 6px; font-weight: 600; font-size: 16px; border: 2px solid #000000; transition: all 0.3s ease;">RESET PASSWORD</a>
-                    </div>
-                    
-                    <p style="margin: 30px 0 0; font-size: 16px; line-height: 1.6; color: #333333;">If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-          <!-- Security note section -->
-          <tr>
-            <td style="padding: 0;">
-              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
-                <tr>
-                  <td style="background-color: #f5f5f5; padding: 25px 30px; border-top: 1px solid #eeeeee;">
-                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #666666;">For security, this request was received from your SoundWave account. This link will expire in 60 minutes.</p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-          <!-- Footer with music note decoration -->
-          <tr>
-            <td style="padding: 0;">
-              <table width="100%" style="border-spacing: 0; border-collapse: collapse;">
-                <tr>
-                  <td style="background-color: #1a1a1a; padding: 30px; text-align: center;">
-                    <div style="margin-bottom: 20px; font-size: 0;">
-                      <!-- Music notes decoration -->
-                      <span style="display: inline-block; width: 8px; height: 8px; background-color: #A57865; margin: 0 5px; border-radius: 50%;"></span>
-                      <span style="display: inline-block; width: 8px; height: 15px; background-color: #A57865; margin: 0 5px; border-radius: 4px;"></span>
-                      <span style="display: inline-block; width: 8px; height: 12px; background-color: #A57865; margin: 0 5px; border-radius: 4px;"></span>
-                      <span style="display: inline-block; width: 8px; height: 18px; background-color: #A57865; margin: 0 5px; border-radius: 4px;"></span>
-                      <span style="display: inline-block; width: 8px; height: 8px; background-color: #A57865; margin: 0 5px; border-radius: 50%;"></span>
-                    </div>
-                    
-                    <p style="margin: 0 0 10px; font-size: 14px; line-height: 1.6; color: #ffffff;">This email was sent to ${to}</p>
-                    <p style="margin: 0 0 15px; font-size: 14px; line-height: 1.6; color: #cccccc;">This is an automated message. Please do not reply.</p>
-                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #cccccc;">© ${new Date().getFullYear()} SoundWave. All rights reserved.</p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `, // Nội dung email (dạng HTML)
-  };
-
-  // Gửi email
-  try {
-    await sgMail.send(msg);
-    console.log('Email sent successfully to:', to);
-  } catch (error) {
-    console.error('Error sending email:', error);
-    throw new Error('Failed to send email');
-  }
-};
 
 // Hàm để switch profile sang Artist
 export const switchProfile = async (

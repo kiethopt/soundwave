@@ -197,7 +197,7 @@ async function main() {
     // === 3. Seed Admin Account ===
     console.log('🔄 Seeding admin account...');
     await prisma.user.upsert({
-      where: { email: 'admin@soundwave.com' },
+      where: { email: ' ' },
       update: { isActive: true, role: Role.ADMIN },
       create: {
         email: 'admin@soundwave.com',

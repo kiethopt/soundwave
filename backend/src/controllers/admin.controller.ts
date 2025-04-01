@@ -7,6 +7,7 @@ import {
 import * as adminService from '../services/admin.service';
 import * as playlistService from '../services/playlist.service';
 import prisma from '../config/db';
+import * as emailService from '../services/email.service';
 
 // Lấy danh sách tất cả người dùng - ADMIN only
 export const getAllUsers = async (
@@ -100,7 +101,7 @@ export const updateUser = async (
 
       const currentUser = await prisma.user.findUnique({
         where: { id },
-        select: { isActive: true },
+        select: { isActive: true, email: true, name: true, username: true }, // Lấy thêm email, name, username
       });
 
       if (currentUser && currentUser.isActive && !isActiveBool) {
@@ -121,12 +122,24 @@ export const updateUser = async (
             },
           });
         }
+        // **Gửi email thông báo Deactivation**
+        if (currentUser.email) {
+          const userName = currentUser.name || currentUser.username || 'User';
+          try {
+            const emailOptions = emailService.createAccountDeactivatedEmail(
+              currentUser.email,
+              userName,
+              'user', // Loại tài khoản
+              reason
+            );
+            await emailService.sendEmail(emailOptions);
+          } catch (emailError) {
+            console.error(`Failed to send user deactivation email to ${currentUser.email}:`, emailError);
+          }
+        }
 
-        res.json({
-          message: 'User deactivated successfully',
-          user: updatedUser,
-        });
-        return;
+        res.json({ message: 'User deactivated successfully', user: updatedUser });
+        return; // Kết thúc hàm sau khi xử lý xong
       } else if (currentUser && !currentUser.isActive && isActiveBool) {
         // User is being activated
         const updatedUser = await adminService.updateUserInfo(id, {
@@ -143,12 +156,23 @@ export const updateUser = async (
             isRead: false,
           },
         });
+        // **Gửi email thông báo Activation**
+        if (currentUser.email) {
+          const userName = currentUser.name || currentUser.username || 'User';
+          try {
+            const emailOptions = emailService.createAccountActivatedEmail(
+              currentUser.email,
+              userName,
+              'user' // Loại tài khoản
+            );
+            await emailService.sendEmail(emailOptions);
+          } catch (emailError) {
+            console.error(`Failed to send user activation email to ${currentUser.email}:`, emailError);
+          }
+        }
 
-        res.json({
-          message: 'User activated successfully',
-          user: updatedUser,
-        });
-        return;
+        res.json({ message: 'User activated successfully', user: updatedUser });
+        return; // Kết thúc hàm sau khi xử lý xong
       }
     }
 
@@ -158,6 +182,7 @@ export const updateUser = async (
       userData,
       avatarFile
     );
+
 
     res.json({
       message: 'User updated successfully',
@@ -204,12 +229,17 @@ export const updateArtist = async (
 
       const currentArtist = await prisma.artistProfile.findUnique({
         where: { id },
-        select: {
-          isActive: true,
-          userId: true,
-        },
+        select: { isActive: true, userId: true, artistName: true }, // Lấy thêm artistName
       });
-
+      // **Lấy thông tin user (chủ sở hữu artist profile) để gửi email**
+      let ownerUser: { email: string | null, name: string | null, username: string | null } | null = null;
+      if (currentArtist?.userId) {
+        ownerUser = await prisma.user.findUnique({
+          where: { id: currentArtist.userId },
+          select: { email: true, name: true, username: true }
+        });
+      }
+      const ownerUserName = ownerUser?.name || ownerUser?.username || 'Artist';
       if (currentArtist && currentArtist.isActive && !isActiveBool) {
         // Artist is being deactivated
         const updatedArtist = await adminService.updateArtistInfo(id, {
@@ -228,7 +258,20 @@ export const updateArtist = async (
             },
           });
         }
-
+        // **Gửi email thông báo Deactivation Artist**
+        if (ownerUser?.email) {
+          try {
+            const emailOptions = emailService.createAccountDeactivatedEmail(
+              ownerUser.email,
+              ownerUserName,
+              'artist', // Loại tài khoản
+              reason
+            );
+            await emailService.sendEmail(emailOptions);
+          } catch (emailError) {
+            console.error(`Failed to send artist deactivation email to ${ownerUser.email}:`, emailError);
+          }
+        }
         res.json({
           message: 'Artist deactivated successfully',
           artist: updatedArtist,
@@ -251,6 +294,19 @@ export const updateArtist = async (
               isRead: false,
             },
           });
+        }
+        // **Gửi email thông báo Activation Artist**
+        if (ownerUser?.email) {
+          try {
+            const emailOptions = emailService.createAccountActivatedEmail(
+              ownerUser.email,
+              ownerUserName,
+              'artist' // Loại tài khoản
+            );
+            await emailService.sendEmail(emailOptions);
+          } catch (emailError) {
+            console.error(`Failed to send artist activation email to ${ownerUser.email}:`, emailError);
+          }
         }
 
         res.json({
@@ -449,22 +505,54 @@ export const approveArtistRequest = async (
 ): Promise<void> => {
   try {
     const { requestId } = req.body;
+    // Service trả về user trong updatedProfile.user
     const updatedProfile = await adminService.approveArtistRequest(requestId);
-    // tao thong bao cho nguoi dung
+
+    // Tạo thông báo in-app (như cũ)
     await prisma.notification.create({
       data: {
         type: 'ARTIST_REQUEST_APPROVE',
         message: 'Your request to become an Artist has been approved!',
         recipientType: 'USER',
-        userId: updatedProfile.user.id,
+        userId: updatedProfile.user.id, // Lấy ID từ user trong updatedProfile
         isRead: false,
       },
     });
+
+    // Gửi email thông báo duyệt
+    if (updatedProfile.user.email) { // Kiểm tra email tồn tại
+      try {
+        // **Sửa lỗi ở đây: Truyền đủ 2 tham số**
+        const emailOptions = emailService.createArtistRequestApprovedEmail(
+          updatedProfile.user.email, // Tham số 1: to
+          updatedProfile.user.name || updatedProfile.user.username || 'User' // Tham số 2: userName
+        );
+        await emailService.sendEmail(emailOptions); // Gửi email
+        console.log(`Artist approval email sent to ${updatedProfile.user.email}`);
+      } catch (emailError) {
+        console.error('Failed to send artist approval email:', emailError);
+        // Không nên throw lỗi ở đây để tránh ảnh hưởng response chính
+      }
+    } else {
+      console.warn(`Could not send approval email: No email found for user ${updatedProfile.user.id}`);
+    }
+
+    // Trả về response thành công
     res.json({
       message: 'Artist role approved successfully',
-      user: updatedProfile.user,
+      // Trả về user data đã được select cẩn thận từ service hoặc query lại nếu cần
+      user: {
+        id: updatedProfile.user.id,
+        email: updatedProfile.user.email,
+        name: updatedProfile.user.name,
+        username: updatedProfile.user.username,
+        avatar: updatedProfile.user.avatar,
+        role: updatedProfile.user.role, // Role đã được cập nhật
+        // ... các trường khác trong userSelect nếu cần
+      },
     });
   } catch (error) {
+    // Xử lý lỗi như cũ
     if (
       error instanceof Error &&
       error.message.includes('not found or already verified')
@@ -478,22 +566,19 @@ export const approveArtistRequest = async (
   }
 };
 
-// Từ chối yêu cầu trở thành Artist (Reject Artist Request) - ADMIN only
-export const rejectArtistRequest = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+// Từ chối yêu cầu
+export const rejectArtistRequest = async (req: Request, res: Response): Promise<void> => {
   try {
     const { requestId, reason } = req.body;
+    // Service đã trả về user với đủ thông tin (bao gồm email, username, name)
     const result = await adminService.rejectArtistRequest(requestId);
 
-    let notificationMessage =
-      'Your request to become an Artist has been rejected.';
+    let notificationMessage = 'Your request to become an Artist has been rejected.';
     if (reason && reason.trim() !== '') {
       notificationMessage += ` Reason: ${reason.trim()}`;
     }
 
-    // Create notification for the user
+    // Tạo thông báo in-app (như cũ)
     await prisma.notification.create({
       data: {
         type: 'ARTIST_REQUEST_REJECT',
@@ -504,12 +589,37 @@ export const rejectArtistRequest = async (
       },
     });
 
+    // Gửi email thông báo từ chối
+    if (result.user.email) { // Kiểm tra email có tồn tại không
+      try {
+        // **Sửa lại lời gọi hàm ở đây:**
+        const emailOptions = emailService.createArtistRequestRejectedEmail(
+          result.user.email, // Tham số 1: to (email người nhận)
+          result.user.name || result.user.username || 'User', // Tham số 2: userName
+          reason // Tham số 3: reason (tùy chọn)
+        );
+
+        // Gọi sendEmail trực tiếp với emailOptions đã hoàn chỉnh
+        await emailService.sendEmail(emailOptions);
+        console.log(`Artist rejection email sent to ${result.user.email}`);
+
+      } catch (emailError) {
+        console.error('Failed to send artist rejection email:', emailError);
+        // Cân nhắc log lỗi chi tiết hơn nếu cần
+      }
+    } else {
+      console.warn(`Could not send rejection email: No email found for user ${result.user.id}`);
+    }
+
     res.json({
       message: 'Artist role request rejected successfully',
-      user: result.user,
+      user: result.user, // user đã có đủ thông tin từ service
       hasPendingRequest: result.hasPendingRequest,
     });
+    // Thêm return để đảm bảo hàm kết thúc sau khi gửi response
+    return;
   } catch (error) {
+    // Xử lý lỗi như cũ
     if (
       error instanceof Error &&
       error.message.includes('not found or already verified')
@@ -517,9 +627,11 @@ export const rejectArtistRequest = async (
       res
         .status(404)
         .json({ message: 'Artist request not found or already verified' });
-      return;
+      return; // Thêm return
     }
     handleError(res, error, 'Reject artist request');
+    // Thêm return sau khi xử lý lỗi
+    return;
   }
 };
 

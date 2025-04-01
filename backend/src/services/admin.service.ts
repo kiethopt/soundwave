@@ -22,12 +22,12 @@ export const getUsers = async (req: Request) => {
     role: 'USER',
     ...(search
       ? {
-          OR: [
-            { email: { contains: String(search), mode: 'insensitive' } },
-            { username: { contains: String(search), mode: 'insensitive' } },
-            { name: { contains: String(search), mode: 'insensitive' } },
-          ],
-        }
+        OR: [
+          { email: { contains: String(search), mode: 'insensitive' } },
+          { username: { contains: String(search), mode: 'insensitive' } },
+          { name: { contains: String(search), mode: 'insensitive' } },
+        ],
+      }
       : {}),
     ...(status !== undefined ? { isActive: status === 'true' } : {}),
   };
@@ -70,23 +70,23 @@ export const getArtistRequests = async (req: Request) => {
     ...(status === 'pending' ? { isVerified: false } : {}),
     ...(startDate && endDate
       ? {
-          verificationRequestedAt: {
-            gte: new Date(String(startDate)),
-            lte: new Date(String(endDate)),
-          },
-        }
+        verificationRequestedAt: {
+          gte: new Date(String(startDate)),
+          lte: new Date(String(endDate)),
+        },
+      }
       : {}),
     ...(search
       ? {
-          OR: [
-            { artistName: { contains: String(search), mode: 'insensitive' } },
-            {
-              user: {
-                email: { contains: String(search), mode: 'insensitive' },
-              },
+        OR: [
+          { artistName: { contains: String(search), mode: 'insensitive' } },
+          {
+            user: {
+              email: { contains: String(search), mode: 'insensitive' },
             },
-          ],
-        }
+          },
+        ],
+      }
       : {}),
   };
 
@@ -281,15 +281,15 @@ export const getArtists = async (req: Request) => {
     isVerified: true,
     ...(search
       ? {
-          OR: [
-            { artistName: { contains: String(search), mode: 'insensitive' } },
-            {
-              user: {
-                email: { contains: String(search), mode: 'insensitive' },
-              },
+        OR: [
+          { artistName: { contains: String(search), mode: 'insensitive' } },
+          {
+            user: {
+              email: { contains: String(search), mode: 'insensitive' },
             },
-          ],
-        }
+          },
+        ],
+      }
       : {}),
     ...(status !== undefined ? { isActive: status === 'true' } : {}),
   };
@@ -341,11 +341,11 @@ export const getGenres = async (req: Request) => {
 
   const where = search
     ? {
-        name: {
-          contains: String(search),
-          mode: 'insensitive',
-        },
-      }
+      name: {
+        contains: String(search),
+        mode: 'insensitive',
+      },
+    }
     : {};
 
   const options = {
@@ -410,7 +410,6 @@ export const deleteGenreById = async (id: string) => {
 
 // Artist request approval services
 export const approveArtistRequest = async (requestId: string) => {
-  // Kiểm tra request có tồn tại, đang chờ duyệt và artist chưa đc xác minh
   const artistProfile = await prisma.artistProfile.findFirst({
     where: {
       id: requestId,
@@ -423,21 +422,22 @@ export const approveArtistRequest = async (requestId: string) => {
     throw new Error('Artist request not found or already verified');
   }
 
-  // Cập nhật trạng thái
   return prisma.artistProfile.update({
     where: { id: requestId },
     data: {
       role: Role.ARTIST,
       isVerified: true,
       verifiedAt: new Date(),
-      verificationRequestedAt: null,
+      verificationRequestedAt: null, // Reset request time
     },
-    include: { user: { select: userSelect } },
+    include: {
+      // **Sửa ở đây: Sử dụng userSelect**
+      user: { select: userSelect }
+    },
   });
 };
 
 export const rejectArtistRequest = async (requestId: string) => {
-  // Kiểm tra hồ sơ dựa vào id, có thời gian xác minh khác null, và artist chưa được xác minh
   const artistProfile = await prisma.artistProfile.findFirst({
     where: {
       id: requestId,
@@ -445,8 +445,8 @@ export const rejectArtistRequest = async (requestId: string) => {
       isVerified: false,
     },
     include: {
-      // lấy thêm thông tin User đã gửi request
-      user: { select: { id: true, email: true, name: true, role: true } },
+      // **Sửa ở đây: Sử dụng userSelect thay vì select thủ công**
+      user: { select: userSelect },
     },
   });
 
@@ -454,16 +454,18 @@ export const rejectArtistRequest = async (requestId: string) => {
     throw new Error('Artist request not found or already verified');
   }
 
-  // Xóa artist profile
+  // Xóa artist profile khi từ chối
   await prisma.artistProfile.delete({
     where: { id: requestId },
   });
 
+  // Trả về thông tin user đã được select bởi userSelect (bao gồm cả username)
   return {
     user: artistProfile.user,
-    hasPendingRequest: false,
+    hasPendingRequest: false, // Không còn request nào sau khi xóa profile
   };
 };
+
 
 // Stats services
 export const getSystemStats = async () => {

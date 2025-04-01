@@ -7,6 +7,8 @@ import * as trackService from '../services/track.service';
 import { trackSelect } from '../utils/prisma-selects';
 import { NotificationType, RecipientType } from '@prisma/client';
 import pusher from '../config/pusher';
+import * as emailService from '../services/email.service';
+
 
 // Function để kiểm tra quyền
 const canManageTrack = (user: any, trackArtistId: string): boolean => {
@@ -42,12 +44,14 @@ export const createTrack = async (
       trackNumber,
       albumId,
       featuredArtists,
-      artistId,
+      artistId, // Chỉ dùng khi ADMIN tạo
       genreIds,
     } = req.body;
 
+    // Xác định artistId cuối cùng sẽ sở hữu track này
     const finalArtistId =
-      user.role === 'ADMIN' ? artistId : user.artistProfile?.id;
+      user.role === 'ADMIN' && artistId ? artistId : user.artistProfile?.id;
+
     if (!finalArtistId) {
       res.status(400).json({
         message:
@@ -57,6 +61,15 @@ export const createTrack = async (
       });
       return;
     }
+
+    // **Lấy thông tin artist profile để lấy tên**
+    const artistProfile = await prisma.artistProfile.findUnique({
+      where: { id: finalArtistId },
+      select: { artistName: true },
+    });
+    // **Xác định artistName ở đây**
+    const artistName = artistProfile?.artistName || 'Nghệ sĩ';
+
 
     if (!req.files) {
       res.status(400).json({ message: 'No files uploaded' });
@@ -85,37 +98,38 @@ export const createTrack = async (
     const duration = Math.floor(metadata.format.duration || 0);
 
     let isActive = false;
-    let trackReleaseDate = new Date(releaseDate);
+    let trackReleaseDate = releaseDate ? new Date(releaseDate) : new Date(); // Mặc định ngày hiện tại nếu không có
 
     if (albumId) {
       const album = await prisma.album.findUnique({
         where: { id: albumId },
-        select: { isActive: true, releaseDate: true },
+        select: { isActive: true, releaseDate: true, coverUrl: true }, // Lấy cả coverUrl từ album
       });
       if (album) {
         isActive = album.isActive;
         trackReleaseDate = album.releaseDate;
+        // Nếu không upload cover riêng cho track, lấy cover của album
+        if (!coverUrl && album.coverUrl) {
+          // Gán lại coverUrl ở đây nếu cần thiết
+          // coverUrl = album.coverUrl; // Bỏ comment nếu muốn lấy cover album làm mặc định
+        }
       }
     } else {
       const now = new Date();
       isActive = trackReleaseDate <= now;
-      console.log('Release date:', trackReleaseDate);
-      console.log('Current time:', now);
-      console.log('Is active:', isActive);
     }
 
     const featuredArtistsArray = Array.isArray(featuredArtists)
       ? featuredArtists
       : featuredArtists
-      ? [featuredArtists]
-      : [];
+        ? featuredArtists.split(',').map((id: string) => id.trim()) // Xử lý chuỗi ID ngăn cách bởi dấu phẩy
+        : [];
 
-    // Xử lý genres
     const genreIdsArray = Array.isArray(genreIds)
       ? genreIds
       : genreIds
-      ? [genreIds]
-      : [];
+        ? genreIds.split(',').map((id: string) => id.trim()) // Xử lý chuỗi ID ngăn cách bởi dấu phẩy
+        : [];
 
     const track = await prisma.track.create({
       data: {
@@ -123,39 +137,35 @@ export const createTrack = async (
         duration,
         releaseDate: trackReleaseDate,
         trackNumber: trackNumber ? Number(trackNumber) : null,
-        coverUrl,
+        coverUrl, // Sử dụng coverUrl đã xác định (có thể là null hoặc từ file upload)
         audioUrl: audioUpload.secure_url,
         artistId: finalArtistId,
         albumId: albumId || null,
-        type: albumId ? undefined : 'SINGLE',
+        type: albumId ? undefined : 'SINGLE', // Type là SINGLE nếu không thuộc album nào
         isActive,
         featuredArtists:
           featuredArtistsArray.length > 0
             ? {
-                create: featuredArtistsArray.map((artistId: string) => ({
-                  artistId: artistId.trim(),
-                })),
-              }
+              create: featuredArtistsArray.map((featArtistId: string) => ({
+                artistId: featArtistId, // Sửa lại thành artistId
+              })),
+            }
             : undefined,
         genres:
           genreIdsArray.length > 0
             ? {
-                create: genreIdsArray.map((genreId: string) => ({
-                  genre: {
-                    connect: { id: genreId.trim() },
-                  },
-                })),
-              }
+              create: genreIdsArray.map((genreId: string) => ({
+                genre: {
+                  connect: { id: genreId },
+                },
+              })),
+            }
             : undefined,
       },
-      select: trackSelect,
+      select: trackSelect, // Đảm bảo select id
     });
 
-    const artistProfile = await prisma.artistProfile.findUnique({
-      where: { id: finalArtistId },
-      select: { artistName: true },
-    });
-
+    // --- Gửi thông báo cho followers ---
     const followers = await prisma.userFollow.findMany({
       where: {
         followingArtistId: finalArtistId,
@@ -164,29 +174,62 @@ export const createTrack = async (
       select: { followerId: true },
     });
 
-    const notificationsData = followers.map((follower) => ({
-      type: NotificationType.NEW_TRACK,
-      message: `${
-        artistProfile?.artistName || 'Unknown'
-      } vừa ra track mới: ${title}`,
-      recipientType: RecipientType.USER,
-      userId: follower.followerId,
-      artistId: finalArtistId,
-      senderId: finalArtistId,
-    }));
-
-    await prisma.$transaction(async (tx) => {
-      if (notificationsData.length > 0) {
-        await tx.notification.createMany({ data: notificationsData });
-      }
-    });
-
-    for (const follower of followers) {
-      await pusher.trigger(`user-${follower.followerId}`, 'notification', {
-        type: NotificationType.NEW_TRACK,
-        message: `${artistProfile?.artistName} vừa ra track mới: ${title}`,
+    const followerIds = followers.map(f => f.followerId);
+    if (followerIds.length > 0) {
+      const followerUsers = await prisma.user.findMany({
+        where: { id: { in: followerIds } },
+        select: { id: true, email: true }
       });
+
+      // Tạo thông báo in-app
+      const notificationsData = followers.map((follower) => ({
+        type: NotificationType.NEW_TRACK,
+        message: `${artistName} vừa ra track mới: ${title}`, // Sử dụng artistName đã lấy
+        recipientType: RecipientType.USER,
+        userId: follower.followerId,
+        artistId: finalArtistId, // Thêm artistId nếu cần
+        senderId: finalArtistId, // Thêm senderId nếu cần
+        // trackId: track.id // Thêm trackId nếu schema hỗ trợ
+      }));
+
+      try {
+        await prisma.notification.createMany({ data: notificationsData });
+      } catch (notiError) {
+        console.error("Failed to create in-app notifications for new track:", notiError);
+      }
+
+      // Gửi Pusher và Email
+      const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${track.id}`; // Link tới track
+
+      for (const user of followerUsers) {
+        // Gửi Pusher
+        pusher.trigger(`user-${user.id}`, 'notification', {
+          type: NotificationType.NEW_TRACK,
+          message: `${artistName} vừa ra track mới: ${track.title}`, // Sử dụng artistName
+          // trackId: track.id
+        }).catch((err: any) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err)); // **Thêm kiểu 'any'**
+
+        // Gửi Email
+        if (user.email) {
+          try {
+            const emailOptions = emailService.createNewReleaseEmail(
+              user.email,
+              artistName, // Sử dụng artistName
+              'track',
+              track.title,
+              releaseLink,
+              track.coverUrl
+            );
+            await emailService.sendEmail(emailOptions);
+          } catch (err: any) { // **Thêm kiểu 'any'**
+            console.error(`Failed to send new track email to ${user.email}:`, err);
+          }
+        } else {
+          console.warn(`Follower ${user.id} has no email for new track notification.`);
+        }
+      }
     }
+    // --- Kết thúc gửi thông báo ---
 
     res.status(201).json({
       message: 'Track created successfully',
@@ -294,8 +337,8 @@ export const updateTrack = async (
         const artistsArray = !featuredArtists
           ? []
           : Array.isArray(featuredArtists)
-          ? featuredArtists
-          : [featuredArtists];
+            ? featuredArtists
+            : [featuredArtists];
 
         // Thêm mới nếu có
         if (artistsArray.length > 0) {
@@ -320,8 +363,8 @@ export const updateTrack = async (
         const genresArray = !genreIds
           ? []
           : Array.isArray(genreIds)
-          ? genreIds
-          : [genreIds];
+            ? genreIds
+            : [genreIds];
 
         // Thêm mới nếu có
         if (genresArray.length > 0) {
@@ -429,9 +472,8 @@ export const toggleTrackVisibility = async (
     });
 
     res.json({
-      message: `Track ${
-        updatedTrack.isActive ? 'activated' : 'hidden'
-      } successfully`,
+      message: `Track ${updatedTrack.isActive ? 'activated' : 'hidden'
+        } successfully`,
       track: updatedTrack,
     });
   } catch (error) {

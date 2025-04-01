@@ -6,6 +6,7 @@ import * as albumService from '../services/album.service';
 import { albumSelect, trackSelect } from '../utils/prisma-selects';
 import { NotificationType, RecipientType } from '@prisma/client';
 import pusher from '../config/pusher';
+import * as emailService from '../services/email.service';
 
 // Function để kiểm tra quyền
 const canManageAlbum = (user: any, albumArtistId: string): boolean => {
@@ -36,10 +37,7 @@ const validateAlbumData = (data: any): string | null => {
 };
 
 // Tạo album mới (ADMIN & ARTIST only)
-export const createAlbum = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const createAlbum = async (req: Request, res: Response): Promise<void> => {
   try {
     const user = req.user;
     if (!user) {
@@ -52,7 +50,7 @@ export const createAlbum = async (
       releaseDate,
       type = AlbumType.ALBUM,
       genres = [],
-      artistId,
+      artistId, // Chỉ dùng khi ADMIN tạo
     } = req.body;
     const coverFile = req.file;
 
@@ -65,35 +63,34 @@ export const createAlbum = async (
     }
 
     let targetArtistProfileId: string;
-    let targetArtist: any;
+    // Lấy thông tin artist profile để lấy tên artist sau này
+    let fetchedArtistProfile: { artistName: string | null } | null = null;
 
     if (user.role === Role.ADMIN && artistId) {
-      targetArtist = await prisma.artistProfile.findFirst({
-        where: {
-          id: artistId,
-          isVerified: true,
-          role: Role.ARTIST,
-        },
-        include: { user: true },
+      const targetArtist = await prisma.artistProfile.findFirst({
+        where: { id: artistId, isVerified: true, role: Role.ARTIST },
+        select: { id: true, artistName: true } // Select artistName
       });
-
       if (!targetArtist) {
-        res
-          .status(404)
-          .json({ message: 'Artist profile not found or not verified' });
+        res.status(404).json({ message: 'Artist profile not found or not verified' });
         return;
       }
       targetArtistProfileId = targetArtist.id;
-    } else if (
-      user.artistProfile?.isVerified &&
-      user.artistProfile.role === Role.ARTIST
-    ) {
+      fetchedArtistProfile = targetArtist; // Gán profile đã fetch
+    } else if (user.artistProfile?.isVerified && user.artistProfile.role === Role.ARTIST) {
       targetArtistProfileId = user.artistProfile.id;
-      targetArtist = { user };
+      // Fetch lại artist profile để lấy tên nếu cần (hoặc lấy từ req.user nếu có)
+      fetchedArtistProfile = await prisma.artistProfile.findUnique({
+        where: { id: targetArtistProfileId },
+        select: { artistName: true }
+      });
     } else {
       res.status(403).json({ message: 'Not authorized to create albums' });
       return;
     }
+
+    // **Xác định artistName ở đây, trước vòng lặp**
+    const artistName = fetchedArtistProfile?.artistName || 'Nghệ sĩ';
 
     let coverUrl: string | null = null;
     if (coverFile) {
@@ -120,15 +117,10 @@ export const createAlbum = async (
           })),
         },
       },
-      select: albumSelect,
+      select: albumSelect, // Đảm bảo select id
     });
 
     // Thông báo cho followers
-    const artistProfile = await prisma.artistProfile.findUnique({
-      where: { id: targetArtistProfileId },
-      select: { artistName: true },
-    });
-
     const followers = await prisma.userFollow.findMany({
       where: {
         followingArtistId: targetArtistProfileId,
@@ -137,28 +129,57 @@ export const createAlbum = async (
       select: { followerId: true },
     });
 
+    const followerIds = followers.map(f => f.followerId);
+    const followerUsers = await prisma.user.findMany({
+      where: { id: { in: followerIds } },
+      select: { id: true, email: true }
+    });
+
+    // Tạo thông báo in-app
     const notificationsData = followers.map((follower) => ({
       type: NotificationType.NEW_ALBUM,
-      message: `${
-        artistProfile?.artistName || 'Unknown'
-      } vừa ra album mới: ${title}`,
+      message: `${artistName} vừa ra album mới: ${title}`, // Sử dụng biến artistName đã định nghĩa
       recipientType: RecipientType.USER,
       userId: follower.followerId,
       artistId: targetArtistProfileId,
       senderId: targetArtistProfileId,
     }));
 
-    await prisma.$transaction(async (tx) => {
-      if (notificationsData.length > 0) {
-        await tx.notification.createMany({ data: notificationsData });
+    if (notificationsData.length > 0) {
+      try {
+        await prisma.notification.createMany({ data: notificationsData });
+      } catch (notiError) {
+        console.error("Failed to create in-app notifications:", notiError);
       }
-    });
+    }
 
-    for (const follower of followers) {
-      await pusher.trigger(`user-${follower.followerId}`, 'notification', {
+    // Gửi Pusher và Email
+    const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
+
+    for (const user of followerUsers) {
+      // Gửi Pusher
+      pusher.trigger(`user-${user.id}`, 'notification', {
         type: NotificationType.NEW_ALBUM,
-        message: `${artistProfile?.artistName} vừa ra album mới: ${title}`,
-      });
+        message: `${artistName} vừa ra album mới: ${album.title}`, // Sử dụng biến artistName
+      }).catch((err: any) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
+
+      // Gửi Email
+      if (user.email) {
+        try {
+          const emailOptions = emailService.createNewReleaseEmail(
+            user.email,
+            artistName, // Sử dụng biến artistName
+            'album',
+            album.title,
+            releaseLink
+          );
+          await emailService.sendEmail(emailOptions);
+        } catch (err: any) {
+          console.error(`Failed to send new album email to ${user.email}:`, err);
+        }
+      } else {
+        console.warn(`Follower ${user.id} has no email for new album notification.`);
+      }
     }
 
     res.status(201).json({
@@ -248,8 +269,8 @@ export const addTracksToAlbum = async (
     const featuredArtists = Array.isArray(req.body.featuredArtists)
       ? req.body.featuredArtists.map((artists: string) => artists.split(','))
       : req.body.featuredArtists
-      ? [req.body.featuredArtists.split(',')]
-      : [];
+        ? [req.body.featuredArtists.split(',')]
+        : [];
 
     const mm = await import('music-metadata');
 
@@ -404,8 +425,8 @@ export const updateAlbum = async (
       const genresArray = !genres
         ? []
         : Array.isArray(genres)
-        ? genres
-        : [genres];
+          ? genres
+          : [genres];
 
       if (genresArray.length > 0) {
         updateData.genres = {
@@ -510,9 +531,8 @@ export const toggleAlbumVisibility = async (
     });
 
     res.json({
-      message: `Album ${
-        updatedAlbum.isActive ? 'activated' : 'hidden'
-      } successfully`,
+      message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'
+        } successfully`,
       album: updatedAlbum,
     });
   } catch (error) {

@@ -1,67 +1,17 @@
 import { Request, Response } from 'express';
-import prisma from '../config/db';
 import { Role } from '@prisma/client';
-import { uploadFile } from '../services/upload.service';
-import { client, setCache } from '../middleware/cache.middleware';
-import {
-  albumSelect,
-  artistProfileSelect,
-  trackSelect,
-} from '../utils/prisma-selects';
+import { ArtistService } from 'src/services/artist.service';
 
-// Cho phép tất cả các Artist xem thông tin của nhau
-const canViewArtistData = async (
-  user: any,
-  artistProfileId: string
-): Promise<boolean> => {
-  if (!user) return false;
-  if (user.role === Role.ADMIN) return true;
-  // Kiểm tra nếu user có artistProfile và đã được verify
-  if (user.artistProfile?.isVerified) return true;
-  return false;
-};
-
-// Chỉ cho phép Admin hoặc chính Artist đó chỉnh sửa thông tin
-const canEditArtistData = async (
-  user: any,
-  artistProfileId: string
-): Promise<{ canEdit: boolean; message?: string }> => {
-  if (!user) {
-    return { canEdit: false, message: 'Unauthorized' };
-  }
-
-  if (user.role === Role.ADMIN) {
-    return { canEdit: true };
-  }
-
-  const artistProfile = await prisma.artistProfile.findUnique({
-    where: { id: artistProfileId },
-    select: { userId: true, isVerified: true },
-  });
-
-  if (!artistProfile) {
-    return { canEdit: false, message: 'Artist profile not found' };
-  }
-
-  // Chỉ cho phép chính artist đó chỉnh sửa và phải đã được verify
-  if (artistProfile.userId === user.id && artistProfile.isVerified) {
-    return { canEdit: true };
-  }
-
-  return {
-    canEdit: false,
-    message: 'You do not have permission to edit this profile',
-  };
-};
-
+// Validation function for updating artist profile
 const validateUpdateArtistProfile = (data: any): string | null => {
   const { bio, socialMediaLinks, genreIds } = data;
 
-  // Validate bio và socialMediaLinks như cũ
+  // Validate bio
   if (bio && bio.length > 500) {
     return 'Bio must be less than 500 characters';
   }
 
+  // Validate socialMediaLinks
   if (socialMediaLinks) {
     if (typeof socialMediaLinks !== 'object') {
       return 'Social media links must be an object';
@@ -91,24 +41,19 @@ const validateUpdateArtistProfile = (data: any): string | null => {
   return null;
 };
 
-// Lấy danh sách tất cả profile của các Artist (ADMIN & ARTIST only)
 export const getAllArtistsProfile = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    const pageNumber = parseInt(page as string, 10);
-    const limitNumber = parseInt(limit as string, 10);
-    const offset = (pageNumber - 1) * limitNumber;
-
     const user = req.user;
+
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    // Kiểm tra quyền truy cập, cần là ADMIN hoặc artist đã được verify hoặc đã switch sang profile Artist
     if (
       user.role !== Role.ADMIN &&
       (!user.artistProfile?.isVerified || user.currentProfile !== 'ARTIST')
@@ -120,38 +65,12 @@ export const getAllArtistsProfile = async (
       return;
     }
 
-    // Tạo biến lấy ID của artist hiện tại để loại bỏ khỏi danh sách
-    const currentArtistId = user.artistProfile?.id;
-
-    // Chỉ lấy các artist đã được verify
-    const whereCondition = {
-      isVerified: true,
-      role: Role.ARTIST,
-      id: { not: currentArtistId }, // Không lấy artist hiện tại
-    };
-
-    const [artists, total] = await Promise.all([
-      prisma.artistProfile.findMany({
-        where: whereCondition,
-        skip: offset,
-        take: limitNumber,
-        select: artistProfileSelect,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.artistProfile.count({
-        where: whereCondition,
-      }),
-    ]);
-
-    res.json({
-      artists,
-      pagination: {
-        total,
-        page: pageNumber,
-        limit: limitNumber,
-        totalPages: Math.ceil(total / limitNumber),
-      },
-    });
+    const result = await ArtistService.getAllArtistsProfile(
+      user,
+      Number(page),
+      Number(limit)
+    );
+    res.json(result);
   } catch (error) {
     console.error('Get all artists profile error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -162,31 +81,14 @@ export const getArtistProfile = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { id } = req.params;
-  const cacheKey = `/api/artist/profile/${id}`;
-
   try {
-    // Kiểm tra cache trước
-    const cachedData = await client.get(cacheKey);
-    if (cachedData) {
-      console.log(`[Redis] Serving artist profile from cache: ${id}`);
-      res.json(JSON.parse(cachedData));
-      return;
-    }
-
-    const artist = await prisma.artistProfile.findUnique({
-      where: { id },
-      select: artistProfileSelect,
-    });
+    const { id } = req.params;
+    const artist = await ArtistService.getArtistProfile(id);
 
     if (!artist) {
       res.status(404).json({ message: 'Artist not found' });
       return;
     }
-
-    // Lưu vào cache với thời gian sống 10 phút (600 giây)
-    await client.set(cacheKey, JSON.stringify(artist), { EX: 600 });
-    console.log(`[Redis] Cached artist profile: ${id}`);
 
     res.json(artist);
   } catch (error) {
@@ -195,121 +97,39 @@ export const getArtistProfile = async (
   }
 };
 
-// Lấy danh sách tất cả thể loại nhạc (chỉ đọc)
-// export const getAllGenres = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   try {
-//     const { page = 1, limit = 100 } = req.query;
-
-//     const genres = await prisma.genre.findMany({
-//       select: { id: true, name: true },
-//       orderBy: { name: 'asc' },
-//       skip: (Number(page) - 1) * Number(limit),
-//       take: Number(limit),
-//     });
-
-//     // Thêm cấu trúc response có pagination
-//     res.json({
-//       data: genres,
-//       total: await prisma.genre.count(),
-//       page: Number(page),
-//       limit: Number(limit),
-//     });
-//   } catch (error) {
-//     console.error('Get all genres error:', error);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// };
-
 export const getArtistAlbums = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { id } = req.params;
-  const { page = 1, limit = 10 } = req.query;
-  const offset = (Number(page) - 1) * Number(limit);
-  const user = req.user;
-
-  if (!user) {
-    res.status(401).json({ message: 'Unauthorized' });
-    return;
-  }
-
   try {
-    // Tạo cache key dựa trên params
-    const cacheKey = `/api/artists/${id}/albums?page=${page}&limit=${limit}`;
+    const { id } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    const user = req.user;
 
-    // Kiểm tra cache
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log('Serving artist albums from cache:', cacheKey);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
     }
 
-    const artistProfile = await prisma.artistProfile.findUnique({
-      where: { id },
-      select: { id: true, isVerified: true, userId: true },
-    });
+    const result = await ArtistService.getArtistAlbums(
+      user,
+      id,
+      Number(page),
+      Number(limit)
+    );
 
-    if (!artistProfile) {
+    if (!result) {
       res.status(404).json({ message: 'Artist not found' });
       return;
     }
 
-    let whereCondition: any = { artistId: id };
-
-    // Nếu là user thường: chỉ xem album active
-    if (user.role !== Role.ADMIN && user.id !== artistProfile.userId) {
-      whereCondition.isActive = true;
-
-      // Kiểm tra artist đã verify chưa
-      if (!artistProfile.isVerified) {
-        res.status(403).json({ message: 'Artist is not verified' });
-        return;
-      }
-    }
-
-    // Nếu là chính artist: xem cả active và inactive
-    if (user.id === artistProfile.userId) {
-      whereCondition = { artistId: id };
-    }
-
-    const [albums, total] = await Promise.all([
-      prisma.album.findMany({
-        where: whereCondition,
-        skip: offset,
-        take: Number(limit),
-        select: albumSelect,
-        orderBy: { releaseDate: 'desc' },
-      }),
-      prisma.album.count({
-        where: whereCondition,
-      }),
-    ]);
-
-    const response = {
-      albums,
-      pagination: {
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / Number(limit)),
-      },
-    };
-
-    // Cache kết quả
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await setCache(cacheKey, response, 1800); // Cache trong 30 phút
-    }
-
-    res.json(response);
-  } catch (error) {
+    res.json(result);
+  } catch (error: any) {
     console.error('Error fetching artist albums:', error);
+    if (error.message === 'Artist is not verified') {
+      res.status(403).json({ message: 'Artist is not verified' });
+      return;
+    }
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -318,88 +138,35 @@ export const getArtistTracks = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { id } = req.params;
-  const { page = 1, limit = 10, type } = req.query;
-  const offset = (Number(page) - 1) * Number(limit);
-  const user = req.user;
-
-  if (!user) {
-    res.status(401).json({ message: 'Unauthorized' });
-    return;
-  }
-
   try {
-    // Tạo cache key dựa trên params
-    const cacheKey = `/api/artists/${id}/tracks?page=${page}&limit=${limit}${
-      type ? `&type=${type}` : ''
-    }`;
+    const { id } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    const user = req.user;
 
-    // Kiểm tra cache
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      const cachedData = await client.get(cacheKey);
-      if (cachedData) {
-        console.log('Serving artist tracks from cache:', cacheKey);
-        res.json(JSON.parse(cachedData));
-        return;
-      }
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
     }
 
-    const artistProfile = await prisma.artistProfile.findUnique({
-      where: { id },
-      select: { id: true, isVerified: true, userId: true },
-    });
+    const result = await ArtistService.getArtistTracks(
+      user,
+      id,
+      Number(page),
+      Number(limit)
+    );
 
-    if (!artistProfile) {
+    if (!result) {
       res.status(404).json({ message: 'Artist not found' });
       return;
     }
 
-    let whereCondition: any = { artistId: id };
-
-    // Add type filter if specified
-    if (type) {
-      whereCondition.type = type;
-    }
-
-    if (user.role !== Role.ADMIN && user.id !== artistProfile.userId) {
-      whereCondition.isActive = true;
-      if (!artistProfile.isVerified) {
-        res.status(403).json({ message: 'Artist is not verified' });
-        return;
-      }
-    }
-
-    const [tracks, total] = await Promise.all([
-      prisma.track.findMany({
-        where: whereCondition,
-        skip: offset,
-        take: Number(limit),
-        select: trackSelect,
-        orderBy: { releaseDate: 'desc' },
-      }),
-      prisma.track.count({
-        where: whereCondition,
-      }),
-    ]);
-
-    const response = {
-      tracks,
-      pagination: {
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / Number(limit)),
-      },
-    };
-
-    // Cache kết quả
-    if (process.env.USE_REDIS_CACHE === 'true') {
-      await setCache(cacheKey, response, 1800); // Cache trong 30 phút
-    }
-
-    res.json(response);
-  } catch (error) {
+    res.json(result);
+  } catch (error: any) {
     console.error('Error fetching artist tracks:', error);
+    if (error.message === 'Artist is not verified') {
+      res.status(403).json({ message: 'Artist is not verified' });
+      return;
+    }
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -408,27 +175,18 @@ export const updateArtistProfile = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { id } = req.params;
-  const { bio, socialMediaLinks, genreIds, isVerified, artistName } = req.body;
-  const user = req.user;
-
   try {
-    const { canEdit, message } = await canEditArtistData(user, id);
-    if (!canEdit) {
-      res.status(403).json({ success: false, message });
+    const { id } = req.params;
+    const { bio, socialMediaLinks, genreIds, isVerified, artistName } = req.body;
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const user = req.user;
+
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    // Kiểm tra nếu user không phải ADMIN mà cố gắng thay đổi trạng thái verify
-    if (isVerified !== undefined && user?.role !== Role.ADMIN) {
-      res.status(403).json({
-        success: false,
-        message: 'Only admin can change verification status',
-      });
-      return;
-    }
-
-    // Parse socialMediaLinks nếu là string
+    // Parse socialMediaLinks if it's a string
     let parsedSocialMediaLinks = socialMediaLinks;
     if (typeof socialMediaLinks === 'string') {
       try {
@@ -442,7 +200,7 @@ export const updateArtistProfile = async (
       }
     }
 
-    // Parse genreIds nếu là string
+    // Parse genreIds if it's a string
     let parsedGenreIds = genreIds;
     if (typeof genreIds === 'string') {
       try {
@@ -456,6 +214,7 @@ export const updateArtistProfile = async (
       }
     }
 
+    // Validate data
     const error = validateUpdateArtistProfile({
       bio,
       socialMediaLinks: parsedSocialMediaLinks,
@@ -469,149 +228,52 @@ export const updateArtistProfile = async (
       return;
     }
 
-    // Trong controller
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-
-    // Upload avatar nếu có
-    let avatarUrl = undefined;
-    if (files && files.avatar && files.avatar[0]) {
-      const result = await uploadFile(
-        files.avatar[0].buffer,
-        'avatar',
-        'image'
-      );
-      avatarUrl = result.secure_url;
-    }
-
-    // Upload banner nếu có
-    let bannerUrl = undefined;
-    if (files && files.artistBanner && files.artistBanner[0]) {
-      const result = await uploadFile(
-        files.artistBanner[0].buffer,
-        'artistBanner',
-        'image'
-      );
-      bannerUrl = result.secure_url;
-    }
-
-    // Kiểm tra genres nếu có
-    if (parsedGenreIds?.length > 0) {
-      const existingGenres = await prisma.genre.findMany({
-        where: { id: { in: parsedGenreIds } },
-      });
-
-      if (existingGenres.length !== parsedGenreIds.length) {
-        res.status(400).json({
-          success: false,
-          message: 'One or more genres do not exist',
-        });
-        return;
-      }
-    }
-
-    // Cập nhật ArtistProfile
-    const updatedArtistProfile = await prisma.artistProfile.update({
-      where: { id },
-      data: {
-        artistName,
+    const updatedArtistProfile = await ArtistService.updateArtistProfile(
+      user,
+      id,
+      {
         bio,
-        ...(avatarUrl && { avatar: avatarUrl }),
-        ...(bannerUrl && { artistBanner: bannerUrl }),
-        ...(parsedSocialMediaLinks && {
-          socialMediaLinks: parsedSocialMediaLinks,
-        }),
-        ...(isVerified !== undefined && {
-          isVerified,
-          verifiedAt: isVerified ? new Date() : null,
-        }),
-        ...(parsedGenreIds && {
-          genres: {
-            deleteMany: {},
-            create: parsedGenreIds.map((genreId: string) => ({
-              genreId,
-            })),
-          },
-        }),
+        socialMediaLinks: parsedSocialMediaLinks,
+        genreIds: parsedGenreIds,
+        isVerified,
+        artistName,
       },
-      select: artistProfileSelect,
-    });
-
-    // Xóa cache liên quan đến artist
-    await client.del(`/api/artists/profile/${id}`);
-    await client.del(`/api/artists/tracks/${id}`);
-    await client.del(`/api/artists/albums/${id}`);
-    await client.del(`/api/artists/stats/${id}`);
+      files
+    );
 
     res.status(200).json({
       success: true,
       message: 'Artist profile updated successfully',
       data: updatedArtistProfile,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Update artist profile error:', error);
-    res.status(500).json({
+    res.status(403).json({
       success: false,
-      message: 'Internal server error',
+      message: error.message || 'Internal server error',
     });
   }
 };
 
-/**
- * getArtistStats – Lấy thống kê cho Artist
- *  - monthlyListeners: Số người nghe hàng tháng
- *  - albumCount: Số album mà artist có
- *  - trackCount: Số track của artist
- *  - topTracks: 5 track có playCount cao nhất của artist
- */
 export const getArtistStats = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
     const user = req.user;
-    // Kiểm tra người dùng có profile artist hay không
-    if (!user || !user.artistProfile) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
-    }
-    const artistProfileId = user.artistProfile.id;
 
-    // Lấy thông tin: monthlyListeners, số album và số track của artist
-    const artistStats = await prisma.artistProfile.findUnique({
-      where: { id: artistProfileId },
-      select: {
-        monthlyListeners: true,
-        _count: {
-          select: {
-            albums: true,
-            tracks: true,
-          },
-        },
-      },
-    });
-
-    if (!artistStats) {
-      res.status(404).json({ message: 'Artist profile not found' });
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
       return;
     }
 
-    // Truy vấn danh sách Top Tracks: lấy 5 track có playCount cao nhất của artist
-    const topTracks = await prisma.track.findMany({
-      where: { artistId: artistProfileId },
-      select: trackSelect,
-      orderBy: { playCount: 'desc' },
-      take: 5,
-    });
-
-    res.json({
-      monthlyListeners: artistStats.monthlyListeners,
-      albumCount: artistStats._count.albums,
-      trackCount: artistStats._count.tracks,
-      topTracks,
-    });
-  } catch (error) {
+    const stats = await ArtistService.getArtistStats(user);
+    res.json(stats);
+  } catch (error: any) {
     console.error('Get artist stats error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(error.message === 'Forbidden' ? 403 : 500).json({
+      message: error.message || 'Internal server error',
+    });
   }
 };
 
@@ -621,37 +283,12 @@ export const getRelatedArtists = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const artistProfile = await prisma.artistProfile.findUnique({
-      where: { id },
-      select: { genres: { select: { genreId: true } } },
+    const relatedArtists = await ArtistService.getRelatedArtists(id);
+    res.json(relatedArtists);
+  } catch (error: any) {
+    console.error('Get related artists error:', error);
+    res.status(error.message === 'Artist not found' ? 404 : 500).json({
+      message: error.message || 'Internal server error',
     });
-
-    if (!artistProfile) {
-      res.status(404).json({ message: 'Artist not found' });
-      return;
-    }
-
-    const genreIds = artistProfile.genres.map((genre) => genre.genreId);
-
-    const relatedArtist = await prisma.artistProfile.findMany({
-      where: {
-        genres: {
-          some: {
-            genreId: {
-              in: genreIds,
-            },
-          },
-        },
-        isVerified: true,
-        id: { not: id },
-      },
-      select: artistProfileSelect,
-      take: 10,
-    });
-
-    res.json(relatedArtist);
-  } catch (error) {
-    console.error('Get similar artists error:', error);
-    res.status(500).json({ message: 'Internal server error' });
   }
 };
