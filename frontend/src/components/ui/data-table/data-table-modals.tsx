@@ -8,15 +8,16 @@ import {
   DialogOverlay,
   DialogPortal,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import type { Track, Album, ArtistProfile, User, Genre } from '@/types';
+import type { Track, Album, ArtistProfile, User, Genre, Label } from '@/types';
 import Image from 'next/image';
-import { Facebook, Instagram, Verified } from '@/components/ui/Icons';
+import { Facebook, Instagram, Verified, Spinner } from '@/components/ui/Icons';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import {
@@ -29,6 +30,8 @@ import {
 import { Calendar, Music } from 'lucide-react';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { Textarea } from '@/components/ui/textarea';
+import { Label as InputLabel } from '@/components/ui/label';
+import { Tags } from 'lucide-react';
 
 interface EditTrackModalProps {
   track: Track | null;
@@ -2094,6 +2097,17 @@ export function AlbumDetailModal({
                     </div>
                   ))}
                 </div>
+
+                {/* Copyright Label Footer */}
+                {album.label && (
+                  <div
+                    className={`px-6 py-3 text-xs ${
+                      theme === 'light' ? 'text-gray-500' : 'text-white/40'
+                    }`}
+                  >
+                    © {album.label.name || 'Unknown Label'}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -2124,8 +2138,11 @@ export function TrackDetailModal({
   if (!track) return null;
 
   const formatDuration = (seconds: number) => {
+    if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+      return '0:00';
+    }
     const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
+    const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
@@ -2388,6 +2405,17 @@ export function TrackDetailModal({
               </div>
             </div>
           </div>
+
+          {/* Track Label */}
+          <div
+            className={`px-6 pb-4 pt-2 text-xs ${
+              theme === 'dark' ? 'text-white/40' : 'text-gray-500'
+            }`}
+          >
+            {track.label && (
+              <span>© {track.label.name || 'Unknown Label'}</span>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -2395,10 +2423,10 @@ export function TrackDetailModal({
 }
 
 interface EditArtistProfileModalProps {
-  artistProfile: ArtistProfile | null; // Allow null
+  artistProfile: ArtistProfile | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdateSuccess?: () => void; // Optional success callback
+  onUpdateSuccess?: () => void;
   theme?: 'light' | 'dark';
 }
 
@@ -2676,6 +2704,376 @@ export function EditArtistProfileModal({
               )}
             </Button>
           </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface EditLabelModalProps {
+  label: Label | null;
+  onClose: () => void;
+  onSubmit: (labelId: string, formData: FormData) => Promise<void>;
+  theme?: 'light' | 'dark';
+}
+
+export function EditLabelModal({
+  label,
+  onClose,
+  onSubmit,
+  theme = 'light',
+}: EditLabelModalProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [previewLogo, setPreviewLogo] = useState<string>(label?.logoUrl || '');
+
+  useEffect(() => {
+    const resetState = () => {
+      setLogoFile(null);
+      setPreviewLogo(label?.logoUrl || '');
+    };
+
+    resetState();
+  }, [label]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setLogoFile(e.target.files[0]);
+      setPreviewLogo(URL.createObjectURL(e.target.files[0]));
+    }
+  };
+
+  const handleLogoClick = () => {
+    document.getElementById('logoFile')?.click();
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!label) return;
+
+    try {
+      setIsSubmitting(true);
+      const formData = new FormData(e.currentTarget);
+
+      // Only add the file if a new one was selected
+      if (logoFile) {
+        formData.set('logoFile', logoFile);
+      }
+
+      await onSubmit(label.id, formData);
+      onClose();
+    } catch (error) {
+      toast.error('Failed to update label');
+      console.error(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!label) return null;
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent
+        className={`sm:max-w-md ${
+          theme === 'dark' ? 'bg-[#1e1e1e] text-white border-none' : ''
+        }`}
+      >
+        <form ref={formRef} onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle className={theme === 'dark' ? 'text-white' : ''}>
+              Edit Label
+            </DialogTitle>
+            <DialogDescription
+              className={theme === 'dark' ? 'text-white/60' : ''}
+            >
+              Update label information
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div
+              className="w-32 h-32 mx-auto rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center"
+              onClick={handleLogoClick}
+            >
+              {previewLogo ? (
+                <Image
+                  src={previewLogo}
+                  alt="Label Logo"
+                  width={128}
+                  height={128}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Tags
+                  className={`w-16 h-16 ${
+                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                  }`}
+                />
+              )}
+            </div>
+
+            <input
+              type="file"
+              id="logoFile"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            <div className="space-y-2">
+              <InputLabel
+                htmlFor="name"
+                className={theme === 'dark' ? 'text-white' : ''}
+              >
+                Label Name
+              </InputLabel>
+              <Input
+                id="name"
+                name="name"
+                defaultValue={label.name}
+                required
+                className={
+                  theme === 'dark'
+                    ? 'bg-white/[0.07] text-white border-white/[0.1]'
+                    : ''
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <InputLabel
+                htmlFor="description"
+                className={theme === 'dark' ? 'text-white' : ''}
+              >
+                Description
+              </InputLabel>
+              <Textarea
+                id="description"
+                name="description"
+                defaultValue={label.description || ''}
+                className={
+                  theme === 'dark'
+                    ? 'bg-white/[0.07] text-white border-white/[0.1]'
+                    : ''
+                }
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className={
+                theme === 'dark'
+                  ? 'bg-transparent text-white border-white/20 hover:bg-white/10'
+                  : ''
+              }
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className={
+                theme === 'dark' ? 'bg-white text-black hover:bg-white/90' : ''
+              }
+            >
+              {isSubmitting ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface AddLabelModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (formData: FormData) => Promise<void>;
+  theme?: 'light' | 'dark';
+}
+
+export function AddLabelModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = 'light',
+}: AddLabelModalProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [previewLogo, setPreviewLogo] = useState<string>('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setLogoFile(null);
+      setPreviewLogo('');
+      formRef.current?.reset();
+    }
+  }, [isOpen]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setLogoFile(e.target.files[0]);
+      setPreviewLogo(URL.createObjectURL(e.target.files[0]));
+    }
+  };
+
+  const handleLogoClick = () => {
+    document.getElementById('newLogoFile')?.click();
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    try {
+      setIsSubmitting(true);
+      const formData = new FormData(e.currentTarget);
+
+      if (logoFile) {
+        formData.set('logoFile', logoFile);
+      }
+
+      await onSubmit(formData);
+      onClose();
+      formRef.current?.reset();
+    } catch (error) {
+      toast.error('Failed to create label');
+      console.error(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`sm:max-w-md ${
+          theme === 'dark' ? 'bg-[#1e1e1e] text-white border-none' : ''
+        }`}
+      >
+        <form ref={formRef} onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle className={theme === 'dark' ? 'text-white' : ''}>
+              Add New Label
+            </DialogTitle>
+            <DialogDescription
+              className={theme === 'dark' ? 'text-white/60' : ''}
+            >
+              Create a new record label
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div
+              className="w-32 h-32 mx-auto rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center"
+              onClick={handleLogoClick}
+            >
+              {previewLogo ? (
+                <Image
+                  src={previewLogo}
+                  alt="Label Logo"
+                  width={128}
+                  height={128}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Tags
+                  className={`w-16 h-16 ${
+                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                  }`}
+                />
+              )}
+            </div>
+
+            <input
+              type="file"
+              id="newLogoFile"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            <div className="space-y-2">
+              <InputLabel
+                htmlFor="newName"
+                className={theme === 'dark' ? 'text-white' : ''}
+              >
+                Label Name
+              </InputLabel>
+              <Input
+                id="newName"
+                name="name"
+                required
+                className={
+                  theme === 'dark'
+                    ? 'bg-white/[0.07] text-white border-white/[0.1]'
+                    : ''
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <InputLabel
+                htmlFor="newDescription"
+                className={theme === 'dark' ? 'text-white' : ''}
+              >
+                Description
+              </InputLabel>
+              <Textarea
+                id="newDescription"
+                name="description"
+                className={
+                  theme === 'dark'
+                    ? 'bg-white/[0.07] text-white border-white/[0.1]'
+                    : ''
+                }
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className={
+                theme === 'dark'
+                  ? 'bg-transparent text-white border-white/20 hover:bg-white/10'
+                  : ''
+              }
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className={
+                theme === 'dark' ? 'bg-white text-black hover:bg-white/90' : ''
+              }
+            >
+              {isSubmitting ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Label'
+              )}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

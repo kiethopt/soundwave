@@ -59,6 +59,13 @@ export const albumSelect = {
       updatedAt: true,
       artistId: true,
       albumId: true,
+      label: {
+        select: {
+          id: true,
+          name: true,
+          logoUrl: true,
+        },
+      },
       artist: {
         select: {
           id: true,
@@ -262,6 +269,13 @@ export const artistProfileSelect = {
       playCount: true,
       type: true,
       trackNumber: true,
+      label: {
+        select: {
+          id: true,
+          name: true,
+          logoUrl: true,
+        },
+      },
       artist: {
         select: {
           id: true,

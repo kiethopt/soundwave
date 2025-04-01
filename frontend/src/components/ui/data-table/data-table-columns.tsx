@@ -6,6 +6,7 @@ import {
   ArtistProfile,
   User,
   ArtistRequest,
+  Label,
 } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -21,6 +22,7 @@ import {
   Ban,
   CheckCircle,
   Trash,
+  Tags,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -74,6 +76,12 @@ interface GetArtistColumnsOptions {
   onDelete?: (id: string | string[]) => Promise<void>;
   loading?: boolean;
   actionLoading?: string | null;
+}
+
+interface GetLabelColumnsOptions {
+  theme?: 'light' | 'dark';
+  onDelete?: (id: string | string[]) => Promise<void>;
+  onEdit?: (label: Label) => void;
 }
 
 export function getTrackColumns({
@@ -1278,6 +1286,163 @@ export function getArtistRequestColumns({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        );
+      },
+    },
+  ];
+}
+
+export function getLabelColumns({
+  theme = 'light',
+  onDelete,
+  onEdit,
+}: GetLabelColumnsOptions): ColumnDef<Label>[] {
+  return [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => {
+        const label = row.original;
+        return (
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-8 h-8 rounded-full overflow-hidden ${
+                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+              }`}
+            >
+              {label.logoUrl ? (
+                <Image
+                  src={label.logoUrl}
+                  alt={label.name}
+                  width={32}
+                  height={32}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <Tags
+                  className={`w-8 h-8 p-1.5 ${
+                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                  }`}
+                />
+              )}
+            </div>
+            <div>
+              <span
+                className={`font-medium ${
+                  theme === 'dark' ? 'text-white' : ''
+                }`}
+              >
+                {label.name}
+              </span>
+              {label.description && (
+                <div
+                  className={
+                    theme === 'dark' ? 'text-white/60' : 'text-gray-500'
+                  }
+                >
+                  {label.description.length > 50
+                    ? `${label.description.substring(0, 50)}...`
+                    : label.description}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: 'tracks',
+      header: 'Tracks',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {row.original._count.tracks}
+        </span>
+      ),
+    },
+    {
+      id: 'albums',
+      header: 'Albums',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {row.original._count.albums}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Created',
+      cell: ({ row }) => (
+        <span className={theme === 'dark' ? 'text-white' : ''}>
+          {new Date(row.original.createdAt).toLocaleDateString('vi-VN')}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => (
+        <div className="flex items-center justify-center">
+          <button
+            onClick={() => {
+              window.dispatchEvent(new Event('openAddLabelModal'));
+            }}
+            className={`h-8 w-8 p-0 rounded-full flex items-center justify-center ${
+              theme === 'dark'
+                ? 'text-white hover:bg-white/10'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Add New Label"
+          >
+            <AddSimple className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const label = row.original;
+        return (
+          <div className="flex justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEdit?.(label)}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Label
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onDelete?.(label.id)}
+                  className="text-red-600"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Label
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },

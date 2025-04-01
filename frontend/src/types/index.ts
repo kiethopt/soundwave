@@ -157,6 +157,19 @@ export interface ArtistRequest {
   isVerified: boolean;
 }
 
+export interface Label {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  _count: {
+    tracks: number;
+    albums: number;
+  };
+}
+
 export interface Album {
   id: string;
   title: string;
@@ -181,6 +194,11 @@ export interface Album {
       name: string;
     };
   }[];
+  label?: {
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+  };
 }
 
 export interface Track {
@@ -224,6 +242,11 @@ export interface Track {
       name: string;
     };
   }[];
+  label?: {
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+  };
 }
 
 export interface Genre {

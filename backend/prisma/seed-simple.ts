@@ -221,7 +221,7 @@ async function main() {
           artistName: 'Vũ.',
           bio: 'Hoàng Thái Vũ, thường được biết đến với nghệ danh Vũ., là một ca sĩ, nhạc sĩ sáng tác ca khúc người Việt Nam.',
           avatar:
-            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743439401/testAlbum/V%C5%A9/B%E1%BA%A3o%20T%C3%A0ng%20C%E1%BB%A7a%20Nu%E1%BB%91i%20Ti%E1%BA%BFc/btcckb2ct6jkeyzn5q9s.png',
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743497776/testAlbum/V%C5%A9/ed4krbq1pbqzepsv6l7e.jpg',
           socialMediaLinks: {
             facebook: 'vumusic',
             instagram: 'vumusic.official',
@@ -471,7 +471,8 @@ async function main() {
         profile: {
           artistName: 'itsnk',
           bio: 'itsnk là một nghệ sĩ/producer âm nhạc trẻ tài năng.',
-          avatar: null, // Add avatar URL if available
+          avatar:
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743498099/testAlbum/itsnk/e1m4ffov0faqob52fhqp.avif',
           socialMediaLinks: {},
         },
         // No album
@@ -487,7 +488,7 @@ async function main() {
           artistName: 'Wren Evans',
           bio: 'Wren Evans tên thật là Lê Phan, là một ca sĩ, nhạc sĩ, nhà sản xuất âm nhạc người Việt Nam.',
           avatar:
-            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743442570/testAlbum/Wren%20Evans/T%E1%BB%ABng%20Quen/wzrdd9fi2qihaqihoiro.jpg', // Use one of the single covers or a dedicated avatar
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743497966/testAlbum/Wren%20Evans/eyaniumxu7fui8ygdvsl.jpg',
           socialMediaLinks: {
             instagram: 'wrenevansmusic',
             facebook: 'wrenevansmusic',
@@ -506,7 +507,7 @@ async function main() {
           artistName: 'Phan Đình Tùng',
           bio: 'Phan Đình Tùng là một ca sĩ, nhạc sĩ nổi tiếng người Việt Nam, cựu thành viên nhóm nhạc MTV.',
           avatar:
-            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743442756/testAlbum/Phan%20%C4%90inh%20T%C3%B9ng/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/tomj0zyas6grk3zft230.jpg', // Use single cover or dedicated avatar
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743442756/testAlbum/Phan%20%C4%90inh%20T%C3%B9ng/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/tomj0zyas6grk3zft230.jpg',
           socialMediaLinks: { facebook: 'phandinhtung.singer' },
         },
         // No album, single will be seeded separately
@@ -627,7 +628,7 @@ async function main() {
             duration: trackData.duration,
             isActive: true,
             type: album.type,
-            labelId: albumLabelId,
+            labelId: null, // Explicitly null for tracks within albums
             genres: {
               deleteMany: {},
               create: albumGenreIds.map((genreId) => ({ genreId })), // Inherit genres from album
@@ -645,7 +646,7 @@ async function main() {
             isActive: true,
             artistId: artistId, // Main artist
             albumId: album.id, // Link to the album
-            labelId: albumLabelId,
+            labelId: null, // Explicitly null for tracks within albums
             createdAt: now,
             updatedAt: now,
             genres: { create: albumGenreIds.map((genreId) => ({ genreId })) }, // Inherit genres from album

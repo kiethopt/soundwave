@@ -832,6 +832,46 @@ export const api = {
       ),
   },
 
+  labels: {
+    getAll: async (
+      token: string,
+      page: number,
+      limit: number,
+      queryParams?: string
+    ) =>
+      fetchWithAuth(
+        `/api/labels?${queryParams || `page=${page}&limit=${limit}`}`,
+        { method: 'GET' },
+        token
+      ),
+
+    getById: async (id: string, token: string) =>
+      fetchWithAuth(`/api/labels/${id}`, { method: 'GET' }, token),
+
+    create: async (data: FormData, token: string) =>
+      fetchWithAuth(
+        '/api/labels',
+        {
+          method: 'POST',
+          body: data,
+        },
+        token
+      ),
+
+    update: async (id: string, data: FormData, token: string) =>
+      fetchWithAuth(
+        `/api/labels/${id}`,
+        {
+          method: 'PUT',
+          body: data,
+        },
+        token
+      ),
+
+    delete: async (id: string, token: string) =>
+      fetchWithAuth(`/api/labels/${id}`, { method: 'DELETE' }, token),
+  },
+
   dashboard: {
     getStats: async (token: string) =>
       fetchWithAuth('/api/admin/stats', { method: 'GET' }, token),
