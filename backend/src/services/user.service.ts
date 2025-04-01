@@ -10,6 +10,8 @@ import {
 import { paginate } from '../utils/handle-utils';
 import { client, setCache } from '../middleware/cache.middleware';
 import pusher from '../config/pusher';
+import * as emailService from './email.service'; // Import service email
+
 
 // Hàm helper để lấy ngày đầu tháng hiện tại
 const getMonthStartDate = (): Date => {
@@ -129,7 +131,7 @@ export const search = async (user: any, query: string) => {
           },
         },
       },
-      take: 5,
+      take: 15,
     }),
 
     // Album
@@ -155,7 +157,7 @@ export const search = async (user: any, query: string) => {
         ],
       },
       select: searchAlbumSelect,
-      take: 5,
+      take: 15,
     }),
 
     // Track
@@ -191,7 +193,7 @@ export const search = async (user: any, query: string) => {
       },
       select: searchTrackSelect,
       orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
-      take: 5,
+      take: 15,
     }),
 
     // User
@@ -206,7 +208,7 @@ export const search = async (user: any, query: string) => {
         ],
       },
       select: userSelect,
-      take: 5,
+      take: 15,
     }),
   ]);
 
@@ -255,136 +257,151 @@ export const followTarget = async (follower: any, followingId: string) => {
     throw new Error('Unauthorized');
   }
 
-  console.log('=== DEBUG: followUser => route called');
-  console.log('=== DEBUG: user =', follower.id);
-  console.log('=== DEBUG: followingId =', followingId);
+  const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
 
-  // Kiểm tra xem đang follow User hay Artist
-  const [userExists, artistExists] = await Promise.all([
-    prisma.user.findUnique({ where: { id: followingId } }),
-    prisma.artistProfile.findUnique({
-      where: { id: followingId },
-      select: { id: true },
-    }),
-  ]);
+  // ... (kiểm tra userExists, artistExists, self-follow, existingFollow như cũ) ...
 
   let followingType: FollowingType;
-  const followData: any = {
-    followerId: follower.id,
-    followingType: 'USER' as FollowingType, // mặc định
-  };
+  let followedUserEmail: string | null = null;
+  let followedEntityName: string = 'Người dùng';
+  let followedUserIdForPusher: string | null = null; // ID để trigger Pusher
+  let isFollowingArtistOwner = false; // Cờ để xác định có đang follow user chủ của artist không
+
+  const userExists = await prisma.user.findUnique({ where: { id: followingId } });
+  const artistExists = await prisma.artistProfile.findUnique({
+    where: { id: followingId },
+    select: { id: true, artistName: true, userId: true }, // Lấy thêm userId
+  });
+
 
   if (userExists) {
-    // follow user
     followingType = FollowingType.USER;
-    followData.followingUserId = followingId;
+    followedUserEmail = userExists.email;
+    followedEntityName = userExists.name || userExists.username || 'Người dùng';
+    followedUserIdForPusher = userExists.id;
   } else if (artistExists) {
-    // follow artist
     followingType = FollowingType.ARTIST;
-    followData.followingArtistId = followingId;
-    followData.followingType = FollowingType.ARTIST;
+    const artistOwner = await prisma.user.findUnique({
+      where: { id: artistExists.userId },
+      select: { email: true, name: true, username: true }
+    });
+    followedUserEmail = artistOwner?.email || null; // Email của user sở hữu artist profile
+    followedEntityName = artistExists.artistName || 'Nghệ sĩ';
+    followedUserIdForPusher = artistExists.userId; // ID của user sở hữu artist profile để gửi Pusher notification
+    isFollowingArtistOwner = artistExists.userId === follower.id; // Kiểm tra xem follower có phải là chủ sở hữu artist không
   } else {
     throw new Error('Target not found');
   }
 
-  // Validate self-follow
+  // Validate self-follow (cập nhật để kiểm tra cả user ID và artist ID của follower)
   if (
-    ((followingType === 'USER' || followingType === 'ARTIST') &&
-      followingId === follower.id) ||
-    followingId === follower.artistProfile?.id
+    (followingType === FollowingType.USER && followingId === follower.id) ||
+    (followingType === FollowingType.ARTIST && followingId === follower.artistProfile?.id) ||
+    (followingType === FollowingType.ARTIST && isFollowingArtistOwner) // Ngăn chặn user follow chính artist profile của mình
   ) {
     throw new Error('Cannot follow yourself');
   }
+
 
   // Check existing follow
   const existingFollow = await prisma.userFollow.findFirst({
     where: {
       followerId: follower.id,
-      OR: [
-        {
-          followingUserId: followingId,
-          followingType: FollowingType.USER,
-        },
-        {
-          followingArtistId: followingId,
-          followingType: FollowingType.ARTIST,
-        },
-      ],
+      followingType: followingType,
+      ...(followingType === 'USER' && { followingUserId: followingId }),
+      ...(followingType === 'ARTIST' && { followingArtistId: followingId }),
     },
   });
   if (existingFollow) {
     throw new Error('Already following');
   }
 
+
+  const followData: any = {
+    followerId: follower.id,
+    followingType: followingType,
+    ...(followingType === 'USER' && { followingUserId: followingId }),
+    ...(followingType === 'ARTIST' && { followingArtistId: followingId }),
+  };
+
   // Transaction
   return prisma.$transaction(async (tx) => {
-    // 1) Tạo record follow
     await tx.userFollow.create({ data: followData });
 
-    // 2) Lấy info user (follower) để hiển thị
-    const currentUser = await tx.user.findUnique({
-      where: { id: follower.id },
-      select: { username: true, email: true },
-    });
-    const followerName =
-      currentUser?.username || currentUser?.email || 'Unknown';
+    const followerName = follower.name || follower.username || 'Một người dùng';
+    // **Sửa lỗi ở đây: Thêm biến followerProfileLink**
+    const followerProfileLink = `${FRONTEND_URL}/user/${follower.id}`;
 
-    // 3) Tạo NOTIFICATION cho người được theo dõi
-    if (followingType === 'ARTIST') {
-      console.log(
-        '=== DEBUG: followUser => about to create notification for ARTIST'
-      );
-      const notification = await tx.notification.create({
-        data: {
+    let notificationMessage = `Người dùng ${followerName} đã bắt đầu theo dõi bạn.`;
+
+    // Chỉ gửi email và tạo notification nếu người được follow không phải là chính người follow (trong trường hợp artist)
+    if (!isFollowingArtistOwner) {
+      if (followedUserEmail) {
+        try {
+          // **Sửa lỗi ở đây: Truyền đủ 4 tham số**
+          const emailOptions = emailService.createNewFollowerEmail(
+            followedUserEmail,
+            followerName,
+            followedEntityName,
+            followerProfileLink // Tham số thứ 4 bị thiếu trước đó
+          );
+          await emailService.sendEmail(emailOptions);
+          console.log(`Follow notification email sent to ${followedUserEmail}`);
+        } catch (emailError) {
+          console.error(`Failed to send follow notification email to ${followedUserEmail}:`, emailError);
+        }
+      } else {
+        console.warn(`Could not send follow email: No email found for target ${followingId} (type: ${followingType})`);
+      }
+
+      // Tạo in-app notification và Pusher
+      if (followingType === 'ARTIST') {
+        const notification = await tx.notification.create({
+          data: {
+            type: 'NEW_FOLLOW',
+            message: notificationMessage,
+            recipientType: 'ARTIST',
+            artistId: followingId, // ID của ArtistProfile
+            senderId: follower.id,
+          },
+        });
+        if (followedUserIdForPusher) {
+          await pusher.trigger(`user-${followedUserIdForPusher}`, 'notification', {
+            type: 'NEW_FOLLOW',
+            message: notificationMessage,
+            notificationId: notification.id,
+          });
+        }
+      } else { // followingType === 'USER'
+        const notification = await tx.notification.create({
+          data: {
+            type: 'NEW_FOLLOW',
+            message: notificationMessage,
+            recipientType: 'USER',
+            userId: followingId, // ID của User được follow
+            senderId: follower.id,
+          },
+        });
+        await pusher.trigger(`user-${followingId}`, 'notification', {
           type: 'NEW_FOLLOW',
-          message: `New follower: ${followerName}`,
-          recipientType: 'ARTIST',
-          artistId: followingId,
-          senderId: follower.id,
-        },
-      });
+          message: notificationMessage,
+          notificationId: notification.id,
+        });
+      }
+    } // Kết thúc kiểm tra isFollowingArtistOwner
 
-      // Update artist stats
+    // Cập nhật monthlyListeners nếu follow artist (luôn thực hiện)
+    if (followingType === FollowingType.ARTIST) {
       await tx.artistProfile.update({
         where: { id: followingId },
         data: { monthlyListeners: { increment: 1 } },
-      });
-
-      // Phát sự kiện realtime qua Pusher cho artist
-      await pusher.trigger(`user-${followingId}`, 'notification', {
-        type: 'NEW_FOLLOW',
-        message: `New follower: ${followerName}`,
-        notificationId: notification.id, // Nếu cần gửi ID
-      });
-    } else {
-      // follow user => Tạo noti cho user bị follow
-      console.log(
-        '=== DEBUG: followUser => about to create notification for USER->USER follow'
-      );
-      const notification = await tx.notification.create({
-        data: {
-          type: 'NEW_FOLLOW',
-          message: `New follower: ${followerName}`,
-          recipientType: 'USER',
-          userId: followingId,
-          senderId: follower.id,
-        },
-      });
-      console.log(
-        '=== DEBUG: followUser => notification for followed USER created!'
-      );
-
-      // Phát sự kiện realtime qua Pusher cho user được follow
-      await pusher.trigger(`user-${followingId}`, 'notification', {
-        type: 'NEW_FOLLOW',
-        message: `New follower: ${followerName}`,
-        notificationId: notification.id,
       });
     }
 
     return { message: 'Followed successfully' };
   });
 };
+
 
 // Hủy theo dõi người dùng
 export const unfollowTarget = async (follower: any, followingId: string) => {
