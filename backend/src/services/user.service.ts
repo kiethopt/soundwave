@@ -1144,13 +1144,11 @@ export const getUserTopTracks = async (user: any) => {
   });
 
   // Create a map for sorting by user's play count
-  const trackOrder = new Map(
-    sortedTrackIds.map((id, index) => [id, index])
-  );
+  const trackOrder = new Map(sortedTrackIds.map((id, index) => [id, index]));
 
   // Sort tracks according to user's play count order
-  return tracks.sort((a, b) => 
-    (trackOrder.get(a.id) || 0) - (trackOrder.get(b.id) || 0)
+  return tracks.sort(
+    (a, b) => (trackOrder.get(a.id) || 0) - (trackOrder.get(b.id) || 0)
   );
 };
 
@@ -1210,6 +1208,7 @@ export const getUserTopArtists = async (user: any) => {
       id: true,
       artistName: true,
       avatar: true,
+      monthlyListeners: true,
       genres: {
         select: {
           genre: {
@@ -1224,15 +1223,13 @@ export const getUserTopArtists = async (user: any) => {
   });
 
   // Create a map for sorting by user's play count
-  const artistOrder = new Map(
-    sortedArtistIds.map((id, index) => [id, index])
-  );
+  const artistOrder = new Map(sortedArtistIds.map((id, index) => [id, index]));
 
   // Sort artists according to user's play count order
-  return artists.sort((a, b) => 
-    (artistOrder.get(a.id) || 0) - (artistOrder.get(b.id) || 0)
+  return artists.sort(
+    (a, b) => (artistOrder.get(a.id) || 0) - (artistOrder.get(b.id) || 0)
   );
-}
+};
 
 export const getUserTopAlbums = async (user: any) => {
   if (!user) {
@@ -1262,7 +1259,7 @@ export const getUserTopAlbums = async (user: any) => {
       },
     },
   });
-  
+
   const albumPlayCounts = history.reduce((acc, curr) => {
     if (!curr.track?.albumId) return acc;
     acc[curr.track.albumId] = (acc[curr.track.albumId] || 0) + 1;
@@ -1289,14 +1286,10 @@ export const getUserTopAlbums = async (user: any) => {
   });
 
   // Create a map for sorting by user's play count
-  const albumOrder = new Map(
-    sortedAlbumIds.map((id, index) => [id, index])
-  );
+  const albumOrder = new Map(sortedAlbumIds.map((id, index) => [id, index]));
 
   // Sort albums according to user's play count order
-  return albums.sort((a, b) => 
-    (albumOrder.get(a.id) || 0) - (albumOrder.get(b.id) || 0)
+  return albums.sort(
+    (a, b) => (albumOrder.get(a.id) || 0) - (albumOrder.get(b.id) || 0)
   );
-}
-
-
+};

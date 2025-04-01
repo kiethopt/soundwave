@@ -21,6 +21,13 @@ import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackList
 import { EditArtistProfileModal } from '@/components/artist/EditArtistProfileModal';
 import Image from 'next/image';
 
+function getBrightness(hexColor: string) {
+  const r = parseInt(hexColor.substr(1, 2), 16);
+  const g = parseInt(hexColor.substr(3, 2), 16);
+  const b = parseInt(hexColor.substr(5, 2), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
+
 export default function ArtistProfilePage({
   params,
 }: {
@@ -273,6 +280,9 @@ export default function ArtistProfilePage({
     );
   };
 
+  const textColor =
+    dominantColor && getBrightness(dominantColor) > 200 ? '#3c3c3c' : '#fff';
+
   return (
     <div
       className="min-h-screen w-full rounded-lg"
@@ -332,15 +342,25 @@ export default function ArtistProfilePage({
               <div>
                 <div className="flex items-center space-x-2">
                   <Verified className="w-6 h-6" />
-                  <span className="text-sm font-medium">Verified Artist</span>
+                  {artist.isVerified && (
+                    <span
+                      className="text-sm font-semibold text-white/80"
+                      style={{ lineHeight: '1.1', color: textColor }}
+                    >
+                      Verified Artist
+                    </span>
+                  )}
                 </div>
                 <h1
                   className="text-6xl font-bold uppercase py-4"
-                  style={{ lineHeight: '1.1' }}
+                  style={{ lineHeight: '1.1', color: textColor }}
                 >
                   {artist.artistName}
                 </h1>
-                <span className="text-base font-semibold py-6">
+                <span
+                  className="text-base font-semibold py-6"
+                  style={{ lineHeight: '1.1', color: textColor }}
+                >
                   {new Intl.NumberFormat('en-US').format(
                     artist.monthlyListeners
                   )}{' '}
@@ -573,17 +593,17 @@ export default function ArtistProfilePage({
                       </button>
                     </div>
                     <h3
-                      className={`font-medium truncate dark:text-black/60 ${
+                      className={`font-medium truncate dark:text-white ${
                         artistTracksMap[relatedArtist.id]?.some(
                           (track) => track.id === currentTrack?.id
                         ) && queueType === 'artist'
                           ? 'text-[#A57865]'
-                          : 'text-white'
+                          : 'text-black/60'
                       }`}
                     >
                       {relatedArtist.artistName}
                     </h3>
-                    <p className="text-white/60 text-sm truncate dark:text-black/60">
+                    <p className="text-black/60 text-sm truncate dark:text-white/60">
                       {new Intl.NumberFormat('en-US').format(
                         relatedArtist.monthlyListeners
                       )}{' '}
@@ -600,16 +620,6 @@ export default function ArtistProfilePage({
             open={isEditOpen}
             onOpenChange={setIsEditOpen}
           />
-
-          {/* Add Banner Modal */}
-          {/* {artist && (
-            <EditArtistBannerModal
-              artistProfile={artist}
-              open={isBannerOpen}
-              onOpenChange={setIsBannerOpen}
-              onBannerUpdate={fetchArtistData}
-            />
-          )} */}
         </div>
       )}
     </div>

@@ -1025,6 +1025,7 @@ const getUserTopArtists = (user) => __awaiter(void 0, void 0, void 0, function* 
             id: true,
             artistName: true,
             avatar: true,
+            monthlyListeners: true,
             genres: {
                 select: {
                     genre: {

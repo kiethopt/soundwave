@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { api } from '@/utils/api';
@@ -8,16 +8,31 @@ import { api } from '@/utils/api';
 function SuccessMessage({ email }: { email: string }) {
   const [resent, setResent] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(true);
+  const [cooldown, setCooldown] = useState(0);
 
   const handleResend = async () => {
     try {
       await api.auth.requestPasswordReset(email);
       setResent(true);
       setShowSuccessMessage(false); // Hide the success message
+      setCooldown(60); // Start cooldown for 60 seconds
+
+      // Automatically hide the resent message after 5 seconds
+      setTimeout(() => setResent(false), 3000);
     } catch (err: any) {
       console.error('Error resending verification code:', err.message);
     }
   };
+
+  // Countdown effect
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setInterval(() => {
+        setCooldown((prev) => prev - 1);
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [cooldown]);
 
   return (
     <div className="text-left space-y-4 p-6 bg-[#121212] rounded-md">
@@ -65,9 +80,16 @@ function SuccessMessage({ email }: { email: string }) {
       </p>
       <button
         onClick={handleResend}
-        className="mt-4 py-2 px-4 rounded-md bg-white text-black font-medium hover:bg-white/90"
+        disabled={cooldown > 0}
+        className={`mt-4 py-2 px-4 rounded-md font-medium ${
+          cooldown > 0
+            ? 'bg-gray-500 text-white cursor-not-allowed'
+            : 'bg-white text-black hover:bg-white/90'
+        }`}
       >
-        Resend account verification code
+        {cooldown > 0
+          ? `Resend available in ${cooldown}s`
+          : 'Resend account verification code'}
       </button>
     </div>
   );

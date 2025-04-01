@@ -1,5 +1,20 @@
 import { Prisma } from '@prisma/client';
 
+export const labelSelect = {
+  id: true,
+  name: true,
+  logoUrl: true,
+  description: true,
+  createdAt: true,
+  updatedAt: true,
+  _count: {
+    select: {
+      tracks: true,
+      albums: true,
+    },
+  },
+};
+
 export const albumSelect = {
   id: true,
   title: true,
@@ -11,6 +26,13 @@ export const albumSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  label: {
+    select: {
+      id: true,
+      name: true,
+      logoUrl: true,
+    },
+  },
   artist: {
     select: {
       id: true,
@@ -85,6 +107,13 @@ export const trackSelect = {
   createdAt: true,
   updatedAt: true,
   artistId: true,
+  label: {
+    select: {
+      id: true,
+      name: true,
+      logoUrl: true,
+    },
+  },
   artist: {
     select: {
       id: true,
@@ -173,6 +202,13 @@ export const artistProfileSelect = {
       totalTracks: true,
       type: true,
       isActive: true,
+      label: {
+        select: {
+          id: true,
+          name: true,
+          logoUrl: true,
+        },
+      },
       tracks: {
         select: {
           id: true,
@@ -180,6 +216,12 @@ export const artistProfileSelect = {
           duration: true,
           playCount: true,
           trackNumber: true,
+          label: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           artist: {
             select: {
               id: true,

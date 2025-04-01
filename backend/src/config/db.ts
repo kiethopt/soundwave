@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client';
-// import { withAccelerate } from '@prisma/extension-accelerate';
 import { authExtension } from '../prisma/extensions/auth.extension';
 import { adminExtension } from '../prisma/extensions/admin.extension';
 import { artistExtension } from '../prisma/extensions/artist.extension';
@@ -9,6 +8,7 @@ import { trackExtension } from '../prisma/extensions/track.extension';
 import { playlistExtension } from '../prisma/extensions/playlist.extension';
 import { eventExtension } from '../prisma/extensions/event.extension';
 import { historyExtension } from '../prisma/extensions/history.extension';
+import { labelExtension } from '../prisma/extensions/label.extension';
 
 // Tạo Prisma Client và áp dụng extension
 const prisma = new PrismaClient({
@@ -25,7 +25,7 @@ const extendedPrisma = prisma
   .$extends(albumExtension)
   .$extends(playlistExtension)
   .$extends(eventExtension)
-  .$extends(historyExtension);
-// .$extends(withAccelerate());
+  .$extends(historyExtension)
+  .$extends(labelExtension);
 
 export default extendedPrisma;

@@ -305,6 +305,15 @@ const resetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             res.status(400).json({ message: 'Invalid or expired token' });
             return;
         }
+        const isSamePassword = yield bcrypt_1.default.compare(newPassword, user.password);
+        if (isSamePassword) {
+            res
+                .status(400)
+                .json({
+                message: 'New password cannot be the same as the old password',
+            });
+            return;
+        }
         const hashedPassword = yield bcrypt_1.default.hash(newPassword, 10);
         yield db_1.default.user.update({
             where: { id: user.id },

@@ -383,6 +383,17 @@ export const resetPassword = async (
       return;
     }
 
+    // Kiểm tra nếu mật khẩu mới trùng với mật khẩu cũ
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      res
+        .status(400)
+        .json({
+          message: 'New password cannot be the same as the old password',
+        });
+      return;
+    }
+
     // Mã hóa mật khẩu mới
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 

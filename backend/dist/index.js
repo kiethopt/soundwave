@@ -28,6 +28,7 @@ const user_routes_1 = __importDefault(require("./routes/user.routes"));
 const notification_routes_1 = __importDefault(require("./routes/notification.routes"));
 const playlist_routes_1 = __importDefault(require("./routes/playlist.routes"));
 const event_routes_1 = __importDefault(require("./routes/event.routes"));
+const label_routes_1 = __importDefault(require("./routes/label.routes"));
 const db_1 = __importDefault(require("./config/db"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -46,6 +47,7 @@ app.use('/api/user', user_routes_1.default);
 app.use('/api/notifications', notification_routes_1.default);
 app.use('/api/playlists', playlist_routes_1.default);
 app.use('/api/events', event_routes_1.default);
+app.use('/api/labels', label_routes_1.default);
 const initializeApp = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield db_1.default.$queryRaw `SELECT 1`;

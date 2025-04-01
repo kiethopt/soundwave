@@ -1067,108 +1067,71 @@ export const api = {
   },
 
   events: {
-    createEvent: async (data: any, token: string) => {
-      try {
-        const res = await fetchWithAuth(
-          '/api/events',
-          { method: 'POST', body: JSON.stringify(data) },
-          token
-        );
-        if (!res.ok) throw new Error('Failed to create event');
-        return await res.json();
-      } catch (error) {
-        console.error('Error creating event:', error);
-        throw error;
-      }
-    },
+    createEvent: async (data: any, token: string) =>
+      fetchWithAuth(
+        '/api/events',
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        },
+        token
+      ),
 
-    getAllEvents: async (params: { artistId?: string }, token: string) => {
-      try {
-        const url = `/api/events${
-          params.artistId ? `?artistId=${params.artistId}` : ''
-        }`;
-        const res = await fetchWithAuth(url, { method: 'GET' }, token);
-        if (!res.ok) throw new Error('Failed to fetch events');
-        return await res.json();
-      } catch (error) {
-        console.error('Error fetching events:', error);
-        throw error;
-      }
-    },
+    getAllEvents: async (params: { artistId?: string }, token: string) =>
+      fetchWithAuth(
+        `/api/events${params.artistId ? `?artistId=${params.artistId}` : ''}`,
+        {
+          method: 'GET',
+        },
+        token
+      ),
 
-    getEventById: async (id: string, token: string) => {
-      try {
-        const res = await fetchWithAuth(
-          `/api/events/${id}`,
-          { method: 'GET' },
-          token
-        );
-        if (!res.ok) throw new Error('Failed to fetch event detail');
-        return await res.json();
-      } catch (error) {
-        console.error('Error fetching event detail:', error);
-        throw error;
-      }
-    },
+    getEventById: async (id: string, token: string) =>
+      fetchWithAuth(
+        `/api/events/${id}`,
+        {
+          method: 'GET',
+        },
+        token
+      ),
 
-    updateEvent: async (id: string, data: any, token: string) => {
-      try {
-        const res = await fetchWithAuth(
-          `/api/events/${id}`,
-          { method: 'PUT', body: JSON.stringify(data) },
-          token
-        );
-        if (!res.ok) throw new Error('Failed to update event');
-        return await res.json();
-      } catch (error) {
-        console.error('Error updating event:', error);
-        throw error;
-      }
-    },
+    updateEvent: async (id: string, data: any, token: string) =>
+      fetchWithAuth(
+        `/api/events/${id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        },
+        token
+      ),
 
-    deleteEvent: async (id: string, token: string) => {
-      try {
-        const res = await fetchWithAuth(
-          `/api/events/${id}`,
-          { method: 'DELETE' },
-          token
-        );
-        if (!res.ok) throw new Error('Failed to delete event');
-        return await res.json();
-      } catch (error) {
-        console.error('Error deleting event:', error);
-        throw error;
-      }
-    },
+    deleteEvent: async (id: string, token: string) =>
+      fetchWithAuth(
+        `/api/events/${id}`,
+        {
+          method: 'DELETE',
+        },
+        token
+      ),
 
-    joinEvent: async (eventId: string, userId: string, token: string) => {
-      try {
-        const res = await fetchWithAuth(
-          `/api/events/${eventId}/join`,
-          { method: 'POST', body: JSON.stringify({ userId }) },
-          token
-        );
-        if (!res.ok) throw new Error('Failed to join event');
-        return await res.json();
-      } catch (error) {
-        console.error('Error joining event:', error);
-        throw error;
-      }
-    },
+    joinEvent: async (eventId: string, userId: string, token: string) =>
+      fetchWithAuth(
+        `/api/events/${eventId}/join`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ userId }),
+        },
+        token
+      ),
 
-    cancelJoinEvent: async (eventId: string, userId: string, token: string) => {
-      try {
-        const res = await fetchWithAuth(
-          `/api/events/${eventId}/join`,
-          { method: 'DELETE', body: JSON.stringify({ userId }) },
-          token
-        );
-        if (!res.ok) throw new Error('Failed to cancel event join');
-        return await res.json();
-      } catch (error) {
-        console.error('Error cancelling event join:', error);
-        throw error;
-      }
-    },
+    cancelJoinEvent: async (eventId: string, userId: string, token: string) =>
+      fetchWithAuth(
+        `/api/events/${eventId}/join`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify({ userId }),
+        },
+        token
+      ),
   },
 };

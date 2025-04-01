@@ -83,6 +83,19 @@ model ArtistGenre {
   @@map("artist_genre")
 }
 
+model Label {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  logoUrl     String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tracks      Track[]
+  albums      Album[]
+
+  @@map("labels")
+}
+
 model Album {
   id          String        @id @default(cuid())
   title       String
@@ -98,6 +111,8 @@ model Album {
   genres      AlbumGenre[]
   artist      ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
   tracks      Track[]
+  labelId     String?
+  label       Label?        @relation(fields: [labelId], references: [id], onDelete: SetNull)
 
   @@unique([title, artistId])
   @@index([title])
@@ -105,6 +120,7 @@ model Album {
   @@index([releaseDate])
   @@index([isActive])
   @@index([createdAt])
+  @@index([labelId])
   @@map("albums")
 }
 
@@ -130,6 +146,8 @@ model Track {
   album           Album?          @relation(fields: [albumId], references: [id], onDelete: Cascade)
   artist          ArtistProfile   @relation(fields: [artistId], references: [id], onDelete: Cascade)
   likedBy         UserLikeTrack[]
+  labelId         String?
+  label           Label?          @relation(fields: [labelId], references: [id], onDelete: SetNull)
 
   @@unique([title, artistId])
   @@index([title])
@@ -139,6 +157,7 @@ model Track {
   @@index([releaseDate])
   @@index([isActive])
   @@index([createdAt])
+  @@index([labelId])
   @@map("tracks")
 }
 
@@ -223,17 +242,17 @@ model Notification {
 }
 
 model Event {
-  id          String        @id @default(cuid())
-  title       String
-  description String?
-  location    String
-  startDate   DateTime
-  endDate     DateTime
-  isActive    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  artistId    String
-  artist      ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  id           String        @id @default(cuid())
+  title        String
+  description  String?
+  location     String
+  startDate    DateTime
+  endDate      DateTime
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  artistId     String
+  artist       ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
   participants EventJoin[]
 
   @@unique([title, artistId])

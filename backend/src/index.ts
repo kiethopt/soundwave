@@ -14,6 +14,7 @@ import userRoutes from './routes/user.routes';
 import notificationRoutes from './routes/notification.routes';
 import playlistRoutes from './routes/playlist.routes';
 import eventRoutes from './routes/event.routes';
+import labelRoutes from './routes/label.routes';
 // Import the extended Prisma client to ensure extensions are loaded
 import prisma from './config/db';
 
@@ -39,11 +40,11 @@ app.use('/api/user', userRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/labels', labelRoutes);
 
 // Initialize database connection and extensions
 const initializeApp = async () => {
   try {
-    // Simple query to ensure DB connection and initialize extensions
     await prisma.$queryRaw`SELECT 1`;
     console.log('✅ Database connection established');
   } catch (error) {

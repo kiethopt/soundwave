@@ -1,6 +1,20 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.artistRequestDetailsSelect = exports.artistRequestSelect = exports.searchTrackSelect = exports.searchAlbumSelect = exports.genreSelect = exports.historySelect = exports.userSelect = exports.artistProfileForUserSelect = exports.artistProfileSelect = exports.trackSelect = exports.albumSelect = void 0;
+exports.artistRequestDetailsSelect = exports.artistRequestSelect = exports.searchTrackSelect = exports.searchAlbumSelect = exports.genreSelect = exports.historySelect = exports.userSelect = exports.artistProfileForUserSelect = exports.artistProfileSelect = exports.trackSelect = exports.albumSelect = exports.labelSelect = void 0;
+exports.labelSelect = {
+    id: true,
+    name: true,
+    logoUrl: true,
+    description: true,
+    createdAt: true,
+    updatedAt: true,
+    _count: {
+        select: {
+            tracks: true,
+            albums: true,
+        },
+    },
+};
 exports.albumSelect = {
     id: true,
     title: true,
@@ -12,6 +26,13 @@ exports.albumSelect = {
     isActive: true,
     createdAt: true,
     updatedAt: true,
+    label: {
+        select: {
+            id: true,
+            name: true,
+            logoUrl: true,
+        },
+    },
     artist: {
         select: {
             id: true,
@@ -85,6 +106,13 @@ exports.trackSelect = {
     createdAt: true,
     updatedAt: true,
     artistId: true,
+    label: {
+        select: {
+            id: true,
+            name: true,
+            logoUrl: true,
+        },
+    },
     artist: {
         select: {
             id: true,
@@ -172,6 +200,13 @@ exports.artistProfileSelect = {
             totalTracks: true,
             type: true,
             isActive: true,
+            label: {
+                select: {
+                    id: true,
+                    name: true,
+                    logoUrl: true,
+                },
+            },
             tracks: {
                 select: {
                     id: true,
@@ -179,6 +214,12 @@ exports.artistProfileSelect = {
                     duration: true,
                     playCount: true,
                     trackNumber: true,
+                    label: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
                     artist: {
                         select: {
                             id: true,
