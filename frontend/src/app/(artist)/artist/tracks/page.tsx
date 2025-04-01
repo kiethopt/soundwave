@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { Track } from '@/types';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -13,18 +12,19 @@ import {
   SortingState,
   useReactTable,
   VisibilityState,
+  RowSelectionState,
 } from '@tanstack/react-table';
 import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import Link from 'next/link';
 import { EditTrackModal } from '@/components/ui/data-table/data-table-modals';
 import { getTrackColumns } from '@/components/ui/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
+import type { Track, ArtistProfile, Genre, Label } from '@/types';
 
 export default function TrackManagement() {
   const { theme } = useTheme();
   const limit = 10;
 
-  // Dùng custom hook để xử lý logic của data table
   const {
     data: tracks,
     setData: setTracks,
@@ -41,18 +41,12 @@ export default function TrackManagement() {
     selectedRows,
     setSelectedRows,
     updateQueryParam,
+    refreshData,
   } = useDataTable<Track>({
     fetchData: async (page, params) => {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
-
-      const response = await api.tracks.getAll(
-        token,
-        page,
-        limit,
-        params.toString()
-      );
-
+      const response = await api.tracks.getAll(token, page, limit, params.toString());
       return {
         data: response.tracks,
         pagination: response.pagination,
@@ -61,210 +55,151 @@ export default function TrackManagement() {
     limit,
   });
 
-  // Table state
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = useState({});
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
-  // Edit modal state
   const [editingTrack, setEditingTrack] = useState<Track | null>(null);
-  const [availableArtists, setAvailableArtists] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [availableGenres, setAvailableGenres] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<
-    string[]
-  >([]);
+  const [availableArtists, setAvailableArtists] = useState<Array<{ id: string; name: string }>>([]);
+  const [availableGenres, setAvailableGenres] = useState<Array<{ id: string; name: string }>>([]);
+  const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<string[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
 
-  // Fetch metadata for edit modal
   const fetchMetadata = useCallback(async () => {
+    setSelectedFeaturedArtists([]);
+    setSelectedGenres([]);
+    setSelectedLabelId(null);
+
     try {
       const token = localStorage.getItem('userToken');
       if (!token) return;
 
-      const [artistsResponse, genresResponse] = await Promise.all([
-        api.artists.getAllArtistsProfile(token, 1, 100),
-        api.genres.getAll(token),
+      const [artistsResponse, genresResponse, labelsResponse] = await Promise.all([
+        api.artists.getAllArtistsProfile(token, 1, 500),
+        api.genres.getAll(token, 1, 100),
+        api.labels.getAll(token, 1, 500),
       ]);
 
       setAvailableArtists(
-        artistsResponse.artists.map((artist: any) => ({
+        artistsResponse.artists.map((artist: ArtistProfile) => ({
           id: artist.id,
           name: artist.artistName,
         }))
       );
-
       setAvailableGenres(
-        genresResponse.genres.map((genre: { id: string; name: string }) => ({
+        genresResponse.genres.map((genre: Genre) => ({
           id: genre.id,
           name: genre.name,
         }))
       );
+      setAvailableLabels(
+        labelsResponse.labels.map((label: Label) => ({
+          id: label.id,
+          name: label.name,
+        }))
+      );
 
-      // Set selected values if editing a track
       if (editingTrack) {
-        setSelectedFeaturedArtists(
-          editingTrack.featuredArtists.map((fa) => fa.artistProfile.id)
-        );
-        setSelectedGenres(editingTrack.genres.map((g) => g.genre.id));
+        setSelectedFeaturedArtists(editingTrack.featuredArtists?.map((fa) => fa.artistProfile.id) || []);
+        setSelectedGenres(editingTrack.genres?.map((g) => g.genre.id) || []);
+        setSelectedLabelId(editingTrack.label?.id || null);
       }
     } catch (error) {
       console.error('Failed to fetch metadata:', error);
-      toast.error('Failed to load required data');
+      toast.error('Failed to load required select options');
     }
   }, [editingTrack]);
 
-  // Fetch metadata when needed
   useEffect(() => {
-    fetchMetadata();
-  }, [fetchMetadata]);
+    if (editingTrack) {
+      fetchMetadata();
+    }
+  }, [editingTrack, fetchMetadata]);
 
-  // Action handlers
   const handleTrackVisibility = async (trackId: string, isActive: boolean) => {
+    setActionLoading(trackId);
     try {
-      setActionLoading(trackId);
       const token = localStorage.getItem('userToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        return;
-      }
-
+      if (!token) throw new Error('No authentication token found');
       await api.tracks.toggleVisibility(trackId, token);
       setTracks((prev) =>
         prev.map((track) =>
           track.id === trackId ? { ...track, isActive: !isActive } : track
         )
       );
-      toast.success(
-        `Track ${isActive ? 'hidden' : 'made visible'} successfully`
-      );
+      toast.success(`Track ${isActive ? 'hidden' : 'made visible'} successfully`);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to update track'
+      setTracks((prev) =>
+        prev.map((track) =>
+          track.id === trackId ? { ...track, isActive: isActive } : track
+        )
       );
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update track visibility';
+      toast.error(errorMessage);
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleDeleteTracks = async (trackIds: string | string[]) => {
-    const ids = Array.isArray(trackIds) ? trackIds : [trackIds];
-    const confirmMessage =
-      ids.length === 1
-        ? 'Are you sure you want to delete this track?'
-        : `Delete ${ids.length} selected tracks?`;
+    const idsToDelete = Array.isArray(trackIds) ? trackIds : [trackIds];
+    if (idsToDelete.length === 0) return;
 
+    const confirmMessage = idsToDelete.length === 1
+      ? 'Are you sure you want to delete this track?'
+      : `Delete ${idsToDelete.length} selected tracks?`;
     if (!confirm(confirmMessage)) return;
 
+    idsToDelete.forEach(id => setActionLoading(id));
     try {
       const token = localStorage.getItem('userToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        return;
-      }
-
-      // Set loading state for single track delete
-      if (!Array.isArray(trackIds)) {
-        setActionLoading(trackIds);
-      }
-
-      await Promise.all(ids.map((id) => api.tracks.delete(id, token)));
-
-      // Update UI based on delete type
-      if (!Array.isArray(trackIds)) {
-        setTracks((prev) => prev.filter((track) => track.id !== trackIds));
-      } else {
-        // Refresh the current page
-        const params = new URLSearchParams();
-        params.set('page', currentPage.toString());
-        params.set('limit', limit.toString());
-
-        if (searchInput) params.append('q', searchInput);
-        if (statusFilter.length === 1) params.append('status', statusFilter[0]);
-        if (genreFilter.length > 0) {
-          genreFilter.forEach((genre) => params.append('genres', genre));
-        }
-
-        const token = localStorage.getItem('userToken');
-        if (token) {
-          const response = await api.tracks.getAll(
-            token,
-            currentPage,
-            limit,
-            params.toString()
-          );
-          setTracks(response.tracks);
-        }
-      }
-
-      toast.success(
-        ids.length === 1
-          ? 'Track deleted successfully'
-          : `Deleted ${ids.length} tracks successfully`
-      );
+      if (!token) throw new Error('No authentication token found');
+      await Promise.all(idsToDelete.map((id) => api.tracks.delete(id, token)));
+      await refreshData();
+      setRowSelection({});
+      setSelectedRows([]);
+      toast.success(idsToDelete.length === 1 ? 'Track deleted successfully' : `Deleted ${idsToDelete.length} tracks successfully`);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to delete track(s)'
-      );
-    } finally {
-      if (!Array.isArray(trackIds)) {
-        setActionLoading(null);
-      }
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete track(s)';
+      toast.error(errorMessage);
+      idsToDelete.forEach(id => setActionLoading(null));
     }
   };
 
   const handleUpdateTrack = async (trackId: string, formData: FormData) => {
+    setActionLoading(trackId);
     try {
-      setActionLoading(trackId);
       const token = localStorage.getItem('userToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        return;
+      if (!token) throw new Error('No authentication token found');
+
+      if (formData.has('labelId')) formData.delete('labelId');
+      if (selectedLabelId) {
+        formData.append('labelId', selectedLabelId);
       }
 
       await api.tracks.update(trackId, formData, token);
-
-      // Refresh the current page
-      const params = new URLSearchParams();
-      params.set('page', currentPage.toString());
-      params.set('limit', limit.toString());
-
-      if (searchInput) params.append('q', searchInput);
-      if (statusFilter.length === 1) params.append('status', statusFilter[0]);
-      if (genreFilter.length > 0) {
-        genreFilter.forEach((genre) => params.append('genres', genre));
-      }
-
-      const response = await api.tracks.getAll(
-        token,
-        currentPage,
-        limit,
-        params.toString()
-      );
-      setTracks(response.tracks);
-
+      await refreshData();
       setEditingTrack(null);
       toast.success('Track updated successfully');
     } catch (error) {
       console.error('Update track error:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to update track'
-      );
+      const errorMessage = (error as any)?.response?.data?.message || 'Failed to update track';
+      toast.error(errorMessage);
     } finally {
       setActionLoading(null);
     }
   };
 
-  // Table configuration
   const columns = getTrackColumns({
     theme,
     onVisibilityChange: handleTrackVisibility,
     onDelete: handleDeleteTracks,
-    onEdit: (track: Track) => setEditingTrack(track),
+    onEdit: (track: Track) => {
+      setEditingTrack(track);
+    },
   });
 
   const table = useReactTable({
@@ -276,61 +211,37 @@ export default function TrackManagement() {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: (updatedSelection) => {
-      setRowSelection(updatedSelection);
-      const selectedRowData = tracks.filter(
-        (track, index) =>
-          typeof updatedSelection === 'object' &&
-          updatedSelection[index.toString()]
-      );
-      setSelectedRows(selectedRowData);
+    onRowSelectionChange: (updater) => {
+      const newRowSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
+      setRowSelection(newRowSelection);
+      const selectedIndexes = Object.keys(newRowSelection).filter((key) => newRowSelection[key]);
+      const newlySelectedRows = selectedIndexes.map(index => tracks[parseInt(index, 10)]).filter(Boolean);
+      setSelectedRows(newlySelectedRows);
     },
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
-      pagination: {
-        pageIndex: currentPage - 1,
-        pageSize: limit,
-      },
+      pagination: { pageIndex: currentPage - 1, pageSize: limit },
     },
     pageCount: totalPages,
     manualPagination: true,
+    debugTable: process.env.NODE_ENV === 'development',
   });
 
   return (
-    <div
-      className={`container mx-auto space-y-4 p-4 pb-20 ${
-        theme === 'dark' ? 'text-white' : ''
-      }`}
-    >
+    <div className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''}`}>
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
         <div>
-          <h1
-            className={`text-2xl md:text-3xl font-bold tracking-tight ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
-          >
+          <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
             Track Management
           </h1>
-          <p
-            className={`text-muted-foreground ${
-              theme === 'dark' ? 'text-white/60' : ''
-            }`}
-          >
+          <p className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : ''}`}>
             Manage and monitor your tracks
           </p>
         </div>
-
-        <Link
-          href="/artist/tracks/new"
-          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${
-            theme === 'light'
-              ? 'bg-gray-900 text-white hover:bg-gray-800'
-              : 'bg-white text-[#121212] hover:bg-white/90'
-          }`}
-        >
+        <Link href="/artist/tracks/new" className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit shadow-sm hover:shadow-md ${theme === 'light' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
           New Track
         </Link>
       </div>
@@ -343,11 +254,10 @@ export default function TrackManagement() {
         pageIndex={currentPage - 1}
         loading={loading}
         onPageChange={(page) => updateQueryParam('page', page + 1)}
-        onRowSelection={setSelectedRows}
         theme={theme}
         toolbar={{
           searchValue: searchInput,
-          onSearchChange: setSearchInput,
+          onSearchChange: (value) => { setSearchInput(value); updateQueryParam('q', value); },
           selectedRowsCount: selectedRows.length,
           onDelete: () => handleDeleteTracks(selectedRows.map((row) => row.id)),
           showExport: true,
@@ -356,46 +266,53 @@ export default function TrackManagement() {
             columns: [
               { key: 'title', header: 'Track Title' },
               { key: 'album.title', header: 'Album' },
-              { key: 'featuredArtists', header: 'Featured Artists' },
-              { key: 'genres', header: 'Genres' },
+              { key: 'featuredArtists', header: 'Featured Artists', format: (val: any[]) => val?.map(a => a.artistProfile.artistName).join(', ') },
+              { key: 'genres', header: 'Genres', format: (val: any[]) => val?.map(g => g.genre.name).join(', ') },
+              { key: 'label.name', header: 'Label' },
               { key: 'duration', header: 'Duration' },
               { key: 'playCount', header: 'Plays' },
-              { key: 'isActive', header: 'Status' },
-              { key: 'releaseDate', header: 'Release Date' },
-              { key: 'createdAt', header: 'Created At' },
-              { key: 'updatedAt', header: 'Updated At' },
+              { key: 'isActive', header: 'Status', format: (val: boolean) => val ? 'Visible' : 'Hidden' },
+              { key: 'releaseDate', header: 'Release Date', format: (val: string) => val ? new Date(val).toLocaleString() : '' },
+              { key: 'createdAt', header: 'Created At', format: (val: string) => val ? new Date(val).toLocaleString() : '' },
+              { key: 'updatedAt', header: 'Updated At', format: (val: string) => val ? new Date(val).toLocaleString() : '' },
             ],
             filename: 'tracks-export',
           },
-          searchPlaceholder: 'Search tracks...',
-          statusFilter: {
-            value: statusFilter,
-            onChange: setStatusFilter,
-          },
+          searchPlaceholder: 'Search tracks by title...',
+          statusFilter: { value: statusFilter, onChange: (value) => { setStatusFilter(value); updateQueryParam('status', value.length === 1 ? value[0] : ''); } },
           genreFilter: {
             value: genreFilter,
-            onChange: setGenreFilter,
-            options: availableGenres.map((genre) => ({
-              value: genre.id,
-              label: genre.name,
-            })),
+            onChange: (value) => {
+              setGenreFilter(value);
+              updateQueryParam('genres', value.join(','));
+            },
+            options: availableGenres.map((genre) => ({ value: genre.id, label: genre.name })),
           },
         }}
       />
 
-      {/* Edit Track Modal */}
-      <EditTrackModal
-        track={editingTrack}
-        onClose={() => setEditingTrack(null)}
-        onSubmit={handleUpdateTrack}
-        availableArtists={availableArtists}
-        selectedFeaturedArtists={selectedFeaturedArtists}
-        setSelectedFeaturedArtists={setSelectedFeaturedArtists}
-        availableGenres={availableGenres}
-        selectedGenres={selectedGenres}
-        setSelectedGenres={setSelectedGenres}
-        theme={theme}
-      />
+      {editingTrack && (
+        <EditTrackModal
+          track={editingTrack}
+          onClose={() => {
+            setEditingTrack(null);
+            setSelectedFeaturedArtists([]);
+            setSelectedGenres([]);
+            setSelectedLabelId(null);
+          }}
+          onSubmit={handleUpdateTrack} // Truyền trực tiếp hàm với chữ ký đúng
+          availableArtists={availableArtists}
+          availableGenres={availableGenres}
+          availableLabels={availableLabels}
+          selectedLabelId={selectedLabelId}
+          setSelectedLabelId={setSelectedLabelId}
+          selectedFeaturedArtists={selectedFeaturedArtists}
+          setSelectedFeaturedArtists={setSelectedFeaturedArtists}
+          selectedGenres={selectedGenres}
+          setSelectedGenres={setSelectedGenres}
+          theme={theme}
+        />
+      )}
     </div>
   );
 }

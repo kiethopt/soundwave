@@ -74,29 +74,39 @@ export function useDataTable<T>({
   const fetchDataWithFilters = useCallback(
     (page: number) => {
       const params = new URLSearchParams(searchParams.toString());
-
-      // Only update params that aren't already in the URL
       if (!params.has('page')) params.set('page', page.toString());
       if (!params.has('limit')) params.set('limit', limit.toString());
-
-      // Apply other filters
       if (searchInput) params.set('search', searchInput);
       if (statusFilter.length === 1) params.set('status', statusFilter[0]);
       if (genreFilter.length > 0) {
         genreFilter.forEach((genre) => params.append('genres', genre));
       }
-
       debouncedFetchData(page, params);
     },
-    [
-      searchInput,
-      statusFilter,
-      genreFilter,
-      limit,
-      searchParams,
-      debouncedFetchData,
-    ]
+    [searchInput, statusFilter, genreFilter, limit, searchParams, debouncedFetchData]
   );
+
+  // Refresh data function
+  const refreshData = useCallback(async () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', currentPage.toString());
+    params.set('limit', limit.toString());
+    if (searchInput) params.set('search', searchInput);
+    if (statusFilter.length === 1) params.set('status', statusFilter[0]);
+    if (genreFilter.length > 0) {
+      genreFilter.forEach((genre) => params.append('genres', genre));
+    }
+    try {
+      setLoading(true);
+      const response = await fetchData(currentPage, params);
+      setData(response.data);
+      setTotalPages(response.pagination.totalPages);
+    } catch (error) {
+      toast.error((error as Error)?.message ?? 'Failed to refresh data');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, fetchData, searchInput, statusFilter, genreFilter, limit, searchParams]);
 
   // Handle filter and page changes
   useEffect(() => {
@@ -106,13 +116,7 @@ export function useDataTable<T>({
       return;
     }
     fetchDataWithFilters(currentPage);
-  }, [
-    currentPage,
-    searchInput,
-    statusFilter,
-    genreFilter,
-    fetchDataWithFilters,
-  ]);
+  }, [currentPage, searchInput, statusFilter, genreFilter, fetchDataWithFilters]);
 
   return {
     data,
@@ -131,5 +135,6 @@ export function useDataTable<T>({
     selectedRows,
     setSelectedRows,
     updateQueryParam,
+    refreshData, // Thêm vào return
   };
 }
