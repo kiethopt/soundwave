@@ -8,7 +8,7 @@ import { trackSelect } from '../utils/prisma-selects';
 import { NotificationType, RecipientType } from '@prisma/client';
 import pusher from '../config/pusher';
 import * as emailService from '../services/email.service';
-import { RequestHandler } from 'express';
+
 
 // Function để kiểm tra quyền
 const canManageTrack = (user: any, trackArtistId: string): boolean => {
@@ -70,6 +70,7 @@ export const createTrack = async (
     // **Xác định artistName ở đây**
     const artistName = artistProfile?.artistName || 'Nghệ sĩ';
 
+
     if (!req.files) {
       res.status(400).json({ message: 'No files uploaded' });
       return;
@@ -121,14 +122,14 @@ export const createTrack = async (
     const featuredArtistsArray = Array.isArray(featuredArtists)
       ? featuredArtists
       : featuredArtists
-      ? featuredArtists.split(',').map((id: string) => id.trim()) // Xử lý chuỗi ID ngăn cách bởi dấu phẩy
-      : [];
+        ? featuredArtists.split(',').map((id: string) => id.trim()) // Xử lý chuỗi ID ngăn cách bởi dấu phẩy
+        : [];
 
     const genreIdsArray = Array.isArray(genreIds)
       ? genreIds
       : genreIds
-      ? genreIds.split(',').map((id: string) => id.trim()) // Xử lý chuỗi ID ngăn cách bởi dấu phẩy
-      : [];
+        ? genreIds.split(',').map((id: string) => id.trim()) // Xử lý chuỗi ID ngăn cách bởi dấu phẩy
+        : [];
 
     const track = await prisma.track.create({
       data: {
@@ -145,20 +146,20 @@ export const createTrack = async (
         featuredArtists:
           featuredArtistsArray.length > 0
             ? {
-                create: featuredArtistsArray.map((featArtistId: string) => ({
-                  artistId: featArtistId, // Sửa lại thành artistId
-                })),
-              }
+              create: featuredArtistsArray.map((featArtistId: string) => ({
+                artistId: featArtistId, // Sửa lại thành artistId
+              })),
+            }
             : undefined,
         genres:
           genreIdsArray.length > 0
             ? {
-                create: genreIdsArray.map((genreId: string) => ({
-                  genre: {
-                    connect: { id: genreId },
-                  },
-                })),
-              }
+              create: genreIdsArray.map((genreId: string) => ({
+                genre: {
+                  connect: { id: genreId },
+                },
+              })),
+            }
             : undefined,
       },
       select: trackSelect, // Đảm bảo select id
@@ -173,11 +174,11 @@ export const createTrack = async (
       select: { followerId: true },
     });
 
-    const followerIds = followers.map((f) => f.followerId);
+    const followerIds = followers.map(f => f.followerId);
     if (followerIds.length > 0) {
       const followerUsers = await prisma.user.findMany({
         where: { id: { in: followerIds } },
-        select: { id: true, email: true },
+        select: { id: true, email: true }
       });
 
       // Tạo thông báo in-app
@@ -194,10 +195,7 @@ export const createTrack = async (
       try {
         await prisma.notification.createMany({ data: notificationsData });
       } catch (notiError) {
-        console.error(
-          'Failed to create in-app notifications for new track:',
-          notiError
-        );
+        console.error("Failed to create in-app notifications for new track:", notiError);
       }
 
       // Gửi Pusher và Email
@@ -205,15 +203,11 @@ export const createTrack = async (
 
       for (const user of followerUsers) {
         // Gửi Pusher
-        pusher
-          .trigger(`user-${user.id}`, 'notification', {
-            type: NotificationType.NEW_TRACK,
-            message: `${artistName} vừa ra track mới: ${track.title}`, // Sử dụng artistName
-            // trackId: track.id
-          })
-          .catch((err: any) =>
-            console.error(`Failed to trigger Pusher for user ${user.id}:`, err)
-          ); // **Thêm kiểu 'any'**
+        pusher.trigger(`user-${user.id}`, 'notification', {
+          type: NotificationType.NEW_TRACK,
+          message: `${artistName} vừa ra track mới: ${track.title}`, // Sử dụng artistName
+          // trackId: track.id
+        }).catch((err: any) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err)); // **Thêm kiểu 'any'**
 
         // Gửi Email
         if (user.email) {
@@ -227,17 +221,11 @@ export const createTrack = async (
               track.coverUrl
             );
             await emailService.sendEmail(emailOptions);
-          } catch (err: any) {
-            // **Thêm kiểu 'any'**
-            console.error(
-              `Failed to send new track email to ${user.email}:`,
-              err
-            );
+          } catch (err: any) { // **Thêm kiểu 'any'**
+            console.error(`Failed to send new track email to ${user.email}:`, err);
           }
         } else {
-          console.warn(
-            `Follower ${user.id} has no email for new track notification.`
-          );
+          console.warn(`Follower ${user.id} has no email for new track notification.`);
         }
       }
     }
@@ -260,7 +248,6 @@ export const updateTrack = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { labelId, ...otherFields } = req.body;
     const {
       title,
       releaseDate,
@@ -283,7 +270,6 @@ export const updateTrack = async (
         featuredArtists: true,
         genres: true,
         coverUrl: true,
-        labelId: true,
       },
     });
 
@@ -304,12 +290,10 @@ export const updateTrack = async (
     const updateData: any = {};
 
     // Cập nhật các trường cơ bản
-    if (otherFields.title) updateData.title = otherFields.title;
     if (title) updateData.title = title;
     if (type) updateData.type = type;
     if (trackNumber) updateData.trackNumber = Number(trackNumber);
     if (albumId !== undefined) updateData.albumId = albumId || null;
-
 
     // Xử lý upload ảnh cover mới nếu có
     if (req.files && (req.files as any).coverFile) {
@@ -332,10 +316,7 @@ export const updateTrack = async (
 
       updateData.releaseDate = newReleaseDate;
     }
-    // Xử lý labelId
-    if (labelId !== undefined) {
-      updateData.labelId = labelId || null; // Nếu labelId rỗng, đặt thành null
-    }
+
     // Tạo transaction để xử lý cập nhật và quan hệ
     const updatedTrack = await prisma.$transaction(async (tx) => {
       // 1. Cập nhật thông tin cơ bản của track
@@ -356,8 +337,8 @@ export const updateTrack = async (
         const artistsArray = !featuredArtists
           ? []
           : Array.isArray(featuredArtists)
-          ? featuredArtists
-          : [featuredArtists];
+            ? featuredArtists
+            : [featuredArtists];
 
         // Thêm mới nếu có
         if (artistsArray.length > 0) {
@@ -382,8 +363,8 @@ export const updateTrack = async (
         const genresArray = !genreIds
           ? []
           : Array.isArray(genreIds)
-          ? genreIds
-          : [genreIds];
+            ? genreIds
+            : [genreIds];
 
         // Thêm mới nếu có
         if (genresArray.length > 0) {
@@ -491,9 +472,8 @@ export const toggleTrackVisibility = async (
     });
 
     res.json({
-      message: `Track ${
-        updatedTrack.isActive ? 'activated' : 'hidden'
-      } successfully`,
+      message: `Track ${updatedTrack.isActive ? 'activated' : 'hidden'
+        } successfully`,
       track: updatedTrack,
     });
   } catch (error) {
@@ -685,25 +665,93 @@ export const getTracksByType = async (
   }
 };
 
-// Lấy tất cả tracks cho Admin
-export const getAllTracks: RequestHandler = async (req, res, next) => {
+// Lấy danh sách tất cả các tracks (ADMIN & ARTIST only)
+export const getAllTracks = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    // Gọi service function mới, truyền req để lấy params
-    const result = await trackService.getAllTracks(req);
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const { page = 1, limit = 10, q: search, status, genres } = req.query;
+    const offset = (Number(page) - 1) * Number(limit);
+
+    // Xây dựng điều kiện where
+    const whereClause: Prisma.TrackWhereInput = {};
+
+    // Thêm điều kiện search nếu có
+    if (search) {
+      whereClause.OR = [
+        { title: { contains: String(search), mode: 'insensitive' } },
+        {
+          artist: {
+            artistName: { contains: String(search), mode: 'insensitive' },
+          },
+        },
+      ];
+    }
+
+    // Thêm điều kiện status nếu có
+    if (status) {
+      whereClause.isActive = status === 'true';
+    }
+
+    // Thêm điều kiện genre nếu có
+    if (genres) {
+      // Chuyển đổi sang mảng string
+      const genreIds: string[] = Array.isArray(genres)
+        ? genres.map((g) => String(g))
+        : [String(genres)];
+
+      whereClause.genres = {
+        some: {
+          genreId: {
+            in: genreIds,
+          },
+        },
+      };
+    }
+
+    // Thêm điều kiện artist nếu user là artist
+    if (user.role !== Role.ADMIN && user.artistProfile?.id) {
+      whereClause.artistId = user.artistProfile.id;
+    }
+
+    const [tracks, total] = await Promise.all([
+      prisma.track.findMany({
+        where: whereClause,
+        skip: offset,
+        take: Number(limit),
+        select: trackSelect,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.track.count({ where: whereClause }),
+    ]);
 
     res.json({
-      success: true,
-      data: result.data,
-      pagination: result.pagination,
+      tracks,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
     });
   } catch (error) {
-    console.error('Error in getAllTracks:', error);
-    next(error);
+    console.error('Get tracks error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// Lấy track theo ID (Public/Authenticated)
-export const getTrackById: RequestHandler = async (req, res, next) => {
+// Lấy track theo ID
+export const getTrackById = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { id } = req.params;
     const user = req.user;
