@@ -53,6 +53,7 @@ const albumService = __importStar(require("../services/album.service"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_2 = require("@prisma/client");
 const pusher_1 = __importDefault(require("../config/pusher"));
+const emailService = __importStar(require("../services/email.service"));
 const canManageAlbum = (user, albumArtistId) => {
     var _a, _b, _c;
     if (!user)
@@ -90,33 +91,31 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             return;
         }
         let targetArtistProfileId;
-        let targetArtist;
+        let fetchedArtistProfile = null;
         if (user.role === client_1.Role.ADMIN && artistId) {
-            targetArtist = yield db_1.default.artistProfile.findFirst({
-                where: {
-                    id: artistId,
-                    isVerified: true,
-                    role: client_1.Role.ARTIST,
-                },
-                include: { user: true },
+            const targetArtist = yield db_1.default.artistProfile.findFirst({
+                where: { id: artistId, isVerified: true, role: client_1.Role.ARTIST },
+                select: { id: true, artistName: true }
             });
             if (!targetArtist) {
-                res
-                    .status(404)
-                    .json({ message: 'Artist profile not found or not verified' });
+                res.status(404).json({ message: 'Artist profile not found or not verified' });
                 return;
             }
             targetArtistProfileId = targetArtist.id;
+            fetchedArtistProfile = targetArtist;
         }
-        else if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
-            user.artistProfile.role === client_1.Role.ARTIST) {
+        else if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) && user.artistProfile.role === client_1.Role.ARTIST) {
             targetArtistProfileId = user.artistProfile.id;
-            targetArtist = { user };
+            fetchedArtistProfile = yield db_1.default.artistProfile.findUnique({
+                where: { id: targetArtistProfileId },
+                select: { artistName: true }
+            });
         }
         else {
             res.status(403).json({ message: 'Not authorized to create albums' });
             return;
         }
+        const artistName = (fetchedArtistProfile === null || fetchedArtistProfile === void 0 ? void 0 : fetchedArtistProfile.artistName) || 'Nghệ sĩ';
         let coverUrl = null;
         if (coverFile) {
             const coverUpload = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
@@ -142,10 +141,6 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: prisma_selects_1.albumSelect,
         });
-        const artistProfile = yield db_1.default.artistProfile.findUnique({
-            where: { id: targetArtistProfileId },
-            select: { artistName: true },
-        });
         const followers = yield db_1.default.userFollow.findMany({
             where: {
                 followingArtistId: targetArtistProfileId,
@@ -153,24 +148,45 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: { followerId: true },
         });
+        const followerIds = followers.map(f => f.followerId);
+        const followerUsers = yield db_1.default.user.findMany({
+            where: { id: { in: followerIds } },
+            select: { id: true, email: true }
+        });
         const notificationsData = followers.map((follower) => ({
             type: client_2.NotificationType.NEW_ALBUM,
-            message: `${(artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.artistName) || 'Unknown'} vừa ra album mới: ${title}`,
+            message: `${artistName} vừa ra album mới: ${title}`,
             recipientType: client_2.RecipientType.USER,
             userId: follower.followerId,
             artistId: targetArtistProfileId,
             senderId: targetArtistProfileId,
         }));
-        yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-            if (notificationsData.length > 0) {
-                yield tx.notification.createMany({ data: notificationsData });
+        if (notificationsData.length > 0) {
+            try {
+                yield db_1.default.notification.createMany({ data: notificationsData });
             }
-        }));
-        for (const follower of followers) {
-            yield pusher_1.default.trigger(`user-${follower.followerId}`, 'notification', {
+            catch (notiError) {
+                console.error("Failed to create in-app notifications:", notiError);
+            }
+        }
+        const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
+        for (const user of followerUsers) {
+            pusher_1.default.trigger(`user-${user.id}`, 'notification', {
                 type: client_2.NotificationType.NEW_ALBUM,
-                message: `${artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.artistName} vừa ra album mới: ${title}`,
-            });
+                message: `${artistName} vừa ra album mới: ${album.title}`,
+            }).catch((err) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
+            if (user.email) {
+                try {
+                    const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'album', album.title, releaseLink);
+                    yield emailService.sendEmail(emailOptions);
+                }
+                catch (err) {
+                    console.error(`Failed to send new album email to ${user.email}:`, err);
+                }
+            }
+            else {
+                console.warn(`Follower ${user.id} has no email for new album notification.`);
+            }
         }
         res.status(201).json({
             message: 'Album created successfully',

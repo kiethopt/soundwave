@@ -1,4 +1,3 @@
-// dist/artist.controller.js
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -9,269 +8,303 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function (o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRelatedArtists = exports.getArtistStats = exports.updateArtistProfile = exports.getArtistTracks = exports.getArtistAlbums = exports.getArtistProfile = exports.getAllArtistsProfile = void 0;
+exports.ArtistService = void 0;
 const client_1 = require("@prisma/client");
-const artistService = __importStar(require("../services/artist.service"));
-
-const validateUpdateArtistProfile = (data) => {
-    const { bio, socialMediaLinks, genreIds } = data;
-    if (bio && bio.length > 500) {
-        return 'Bio must be less than 500 characters';
+const prisma_selects_1 = require("../utils/prisma-selects");
+const cache_middleware_1 = require("../middleware/cache.middleware");
+const upload_service_1 = require("./upload.service");
+const prisma = new client_1.PrismaClient();
+class ArtistService {
+    static canViewArtistData(user, artistProfileId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a;
+            if (!user)
+                return false;
+            if (user.role === client_1.Role.ADMIN)
+                return true;
+            if ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified)
+                return true;
+            return false;
+        });
     }
-    if (socialMediaLinks) {
-        if (typeof socialMediaLinks !== 'object') {
-            return 'Social media links must be an object';
-        }
-        const validKeys = ['facebook', 'instagram', 'twitter', 'youtube'];
-        for (const key of Object.keys(socialMediaLinks)) {
-            if (!validKeys.includes(key)) {
-                return `Invalid social media key: ${key}`;
+    static canEditArtistData(user, artistProfileId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!user) {
+                return { canEdit: false, message: 'Unauthorized' };
             }
-            if (typeof socialMediaLinks[key] !== 'string') {
-                return `Social media link for ${key} must be a string`;
+            if (user.role === client_1.Role.ADMIN) {
+                return { canEdit: true };
             }
-        }
-    }
-    if (genreIds) {
-        if (!Array.isArray(genreIds)) {
-            return 'Genre IDs must be an array';
-        }
-        if (genreIds.some((id) => typeof id !== 'string')) {
-            return 'All genre IDs must be strings';
-        }
-    }
-    return null;
-};
-
-const getAllArtistsProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { page = 1, limit = 10 } = req.query;
-        const user = req.user;
-        if (!user) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        if (
-            user.role !== client_1.Role.ADMIN &&
-            (!user.artistProfile?.isVerified || user.currentProfile !== 'ARTIST')
-        ) {
-            res.status(403).json({
-                message: 'You do not have permission to perform this action',
-                code: 'SWITCH_TO_ARTIST_PROFILE',
+            const artistProfile = yield prisma.artistProfile.findUnique({
+                where: { id: artistProfileId },
+                select: { userId: true, isVerified: true },
             });
-            return;
-        }
-        const result = yield artistService.ArtistService.getAllArtistsProfile(
-            user,
-            Number(page),
-            Number(limit)
-        );
-        res.json(result);
-    } catch (error) {
-        console.error('Get all artists profile error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getAllArtistsProfile = getAllArtistsProfile;
-
-const getArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const artist = yield artistService.ArtistService.getArtistProfile(id);
-        if (!artist) {
-            res.status(404).json({ message: 'Artist not found' });
-            return;
-        }
-        res.json(artist);
-    } catch (error) {
-        console.error('Error fetching artist profile:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getArtistProfile = getArtistProfile;
-
-const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const { page = 1, limit = 10 } = req.query;
-        const user = req.user;
-        if (!user) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const result = yield artistService.ArtistService.getArtistAlbums(
-            user,
-            id,
-            Number(page),
-            Number(limit)
-        );
-        if (!result) {
-            res.status(404).json({ message: 'Artist not found' });
-            return;
-        }
-        res.json(result);
-    } catch (error) {
-        console.error('Error fetching artist albums:', error);
-        if (error.message === 'Artist is not verified') {
-            res.status(403).json({ message: 'Artist is not verified' });
-            return;
-        }
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getArtistAlbums = getArtistAlbums;
-
-const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const { page = 1, limit = 10 } = req.query;
-        const user = req.user;
-        if (!user) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const result = yield artistService.ArtistService.getArtistTracks(
-            user,
-            id,
-            Number(page),
-            Number(limit)
-        );
-        if (!result) {
-            res.status(404).json({ message: 'Artist not found' });
-            return;
-        }
-        res.json(result);
-    } catch (error) {
-        console.error('Error fetching artist tracks:', error);
-        if (error.message === 'Artist is not verified') {
-            res.status(403).json({ message: 'Artist is not verified' });
-            return;
-        }
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-exports.getArtistTracks = getArtistTracks;
-
-const updateArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const { bio, socialMediaLinks, genreIds, isVerified, artistName } = req.body;
-        const files = req.files;
-        const user = req.user;
-        if (!user) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        let parsedSocialMediaLinks = socialMediaLinks;
-        if (typeof socialMediaLinks === 'string') {
-            try {
-                parsedSocialMediaLinks = JSON.parse(socialMediaLinks);
-            } catch (error) {
-                res.status(400).json({
-                    success: false,
-                    message: 'Invalid socialMediaLinks format',
-                });
-                return;
+            if (!artistProfile) {
+                return { canEdit: false, message: 'Artist profile not found' };
             }
-        }
-        let parsedGenreIds = genreIds;
-        if (typeof genreIds === 'string') {
-            try {
-                parsedGenreIds = genreIds.split(',');
-            } catch (error) {
-                res.status(400).json({
-                    success: false,
-                    message: 'Invalid genreIds format',
-                });
-                return;
+            if (artistProfile.userId === user.id && artistProfile.isVerified) {
+                return { canEdit: true };
             }
-        }
-        const error = validateUpdateArtistProfile({
-            bio,
-            socialMediaLinks: parsedSocialMediaLinks,
-            genreIds: parsedGenreIds,
+            return {
+                canEdit: false,
+                message: 'You do not have permission to edit this profile',
+            };
         });
-        if (error) {
-            res.status(400).json({
-                success: false,
-                message: error,
+    }
+    static getAllArtistsProfile(user, page, limit) {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a;
+            const offset = (page - 1) * limit;
+            const currentArtistId = (_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id;
+            const whereCondition = {
+                isVerified: true,
+                role: client_1.Role.ARTIST,
+                id: { not: currentArtistId },
+            };
+            const [artists, total] = yield Promise.all([
+                prisma.artistProfile.findMany({
+                    where: whereCondition,
+                    skip: offset,
+                    take: limit,
+                    select: prisma_selects_1.artistProfileSelect,
+                    orderBy: { createdAt: 'desc' },
+                }),
+                prisma.artistProfile.count({ where: whereCondition }),
+            ]);
+            return {
+                artists,
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit),
+                },
+            };
+        });
+    }
+    static getArtistProfile(id) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const cacheKey = `/api/artist/profile/${id}`;
+            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            if (cachedData) {
+                console.log(`[Redis] Serving artist profile from cache: ${id}`);
+                return JSON.parse(cachedData);
+            }
+            const artist = yield prisma.artistProfile.findUnique({
+                where: { id },
+                select: prisma_selects_1.artistProfileSelect,
             });
-            return;
-        }
-        const updatedArtistProfile = yield artistService.ArtistService.updateArtistProfile(
-            user,
-            id,
-            {
-                bio,
-                socialMediaLinks: parsedSocialMediaLinks,
-                genreIds: parsedGenreIds,
-                isVerified,
-                artistName,
-            },
-            files
-        );
-        res.status(200).json({
-            success: true,
-            message: 'Artist profile updated successfully',
-            data: updatedArtistProfile,
-        });
-    } catch (error) {
-        console.error('Update artist profile error:', error);
-        res.status(403).json({
-            success: false,
-            message: error.message || 'Internal server error',
+            if (artist) {
+                yield cache_middleware_1.client.set(cacheKey, JSON.stringify(artist), { EX: 600 });
+                console.log(`[Redis] Cached artist profile: ${id}`);
+            }
+            return artist;
         });
     }
-});
-exports.updateArtistProfile = updateArtistProfile;
-
-const getArtistStats = (req, res) => __awaiter(void 0, void 0, function* () {
-    try {
-        const user = req.user;
-        if (!user) {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
-        }
-        const stats = yield artistService.ArtistService.getArtistStats(user);
-        res.json(stats);
-    } catch (error) {
-        console.error('Get artist stats error:', error);
-        res.status(error.message === 'Forbidden' ? 403 : 500).json({
-            message: error.message || 'Internal server error',
+    static getArtistAlbums(user, id, page, limit) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const offset = (page - 1) * limit;
+            const cacheKey = `/api/artists/${id}/albums?page=${page}&limit=${limit}`;
+            if (process.env.USE_REDIS_CACHE === 'true') {
+                const cachedData = yield cache_middleware_1.client.get(cacheKey);
+                if (cachedData) {
+                    console.log('Serving artist albums from cache:', cacheKey);
+                    return JSON.parse(cachedData);
+                }
+            }
+            const artistProfile = yield prisma.artistProfile.findUnique({
+                where: { id },
+                select: { id: true, isVerified: true, userId: true },
+            });
+            if (!artistProfile) {
+                return null;
+            }
+            let whereCondition = { artistId: id };
+            if (user.role !== client_1.Role.ADMIN && user.id !== artistProfile.userId) {
+                whereCondition.isActive = true;
+                if (!artistProfile.isVerified) {
+                    throw new Error('Artist is not verified');
+                }
+            }
+            const [albums, total] = yield Promise.all([
+                prisma.album.findMany({
+                    where: whereCondition,
+                    skip: offset,
+                    take: limit,
+                    select: prisma_selects_1.albumSelect,
+                    orderBy: { releaseDate: 'desc' },
+                }),
+                prisma.album.count({ where: whereCondition }),
+            ]);
+            const response = {
+                albums,
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit),
+                },
+            };
+            if (process.env.USE_REDIS_CACHE === 'true') {
+                yield (0, cache_middleware_1.setCache)(cacheKey, response, 1800);
+            }
+            return response;
         });
     }
-});
-exports.getArtistStats = getArtistStats;
-
-const getRelatedArtists = (req, res) => __awaiter(void 0, void 0, function* () {
-    try {
-        const { id } = req.params;
-        const relatedArtists = yield artistService.ArtistService.getRelatedArtists(id);
-        res.json(relatedArtists);
-    } catch (error) {
-        console.error('Get related artists error:', error);
-        res.status(error.message === 'Artist not found' ? 404 : 500).json({
-            message: error.message || 'Internal server error',
+    static getArtistTracks(user, id, page, limit) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const offset = (page - 1) * limit;
+            const cacheKey = `/api/artists/${id}/tracks?page=${page}&limit=${limit}`;
+            if (process.env.USE_REDIS_CACHE === 'true') {
+                const cachedData = yield cache_middleware_1.client.get(cacheKey);
+                if (cachedData) {
+                    console.log('Serving artist tracks from cache:', cacheKey);
+                    return JSON.parse(cachedData);
+                }
+            }
+            const artistProfile = yield prisma.artistProfile.findUnique({
+                where: { id },
+                select: { id: true, isVerified: true, userId: true },
+            });
+            if (!artistProfile) {
+                return null;
+            }
+            let whereCondition = { artistId: id };
+            if (user.role !== client_1.Role.ADMIN && user.id !== artistProfile.userId) {
+                whereCondition.isActive = true;
+                if (!artistProfile.isVerified) {
+                    throw new Error('Artist is not verified');
+                }
+            }
+            const [tracks, total] = yield Promise.all([
+                prisma.track.findMany({
+                    where: whereCondition,
+                    skip: offset,
+                    take: limit,
+                    select: prisma_selects_1.trackSelect,
+                    orderBy: { releaseDate: 'desc' },
+                }),
+                prisma.track.count({ where: whereCondition }),
+            ]);
+            const response = {
+                tracks,
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit),
+                },
+            };
+            if (process.env.USE_REDIS_CACHE === 'true') {
+                yield (0, cache_middleware_1.setCache)(cacheKey, response, 1800);
+            }
+            return response;
         });
     }
-});
-exports.getRelatedArtists = getRelatedArtists;
-//# sourceMappingURL=artist.controller.js.map
+    static updateArtistProfile(user, id, data, files) {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a, _b, _c;
+            const { canEdit, message } = yield this.canEditArtistData(user, id);
+            if (!canEdit) {
+                throw new Error(message);
+            }
+            if (data.isVerified !== undefined && (user === null || user === void 0 ? void 0 : user.role) !== client_1.Role.ADMIN) {
+                throw new Error('Only admin can change verification status');
+            }
+            let avatarUrl;
+            if ((_a = files === null || files === void 0 ? void 0 : files.avatar) === null || _a === void 0 ? void 0 : _a[0]) {
+                const result = yield (0, upload_service_1.uploadFile)(files.avatar[0].buffer, 'avatar', 'image');
+                avatarUrl = result.secure_url;
+            }
+            let bannerUrl;
+            if ((_b = files === null || files === void 0 ? void 0 : files.artistBanner) === null || _b === void 0 ? void 0 : _b[0]) {
+                const result = yield (0, upload_service_1.uploadFile)(files.artistBanner[0].buffer, 'artistBanner', 'image');
+                bannerUrl = result.secure_url;
+            }
+            if ((_c = data.genreIds) === null || _c === void 0 ? void 0 : _c.length) {
+                const existingGenres = yield prisma.genre.findMany({
+                    where: { id: { in: data.genreIds } },
+                });
+                if (existingGenres.length !== data.genreIds.length) {
+                    throw new Error('One or more genres do not exist');
+                }
+            }
+            const updatedArtistProfile = yield prisma.artistProfile.update({
+                where: { id },
+                data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({ artistName: data.artistName, bio: data.bio }, (avatarUrl && { avatar: avatarUrl })), (bannerUrl && { artistBanner: bannerUrl })), (data.socialMediaLinks && {
+                    socialMediaLinks: data.socialMediaLinks,
+                })), (data.isVerified !== undefined && {
+                    isVerified: data.isVerified,
+                    verifiedAt: data.isVerified ? new Date() : null,
+                })), (data.genreIds && {
+                    genres: {
+                        deleteMany: {},
+                        create: data.genreIds.map((genreId) => ({ genreId })),
+                    },
+                })),
+                select: prisma_selects_1.artistProfileSelect,
+            });
+            yield Promise.all([
+                cache_middleware_1.client.del(`/api/artists/profile/${id}`),
+                cache_middleware_1.client.del(`/api/artists/tracks/${id}`),
+                cache_middleware_1.client.del(`/api/artists/albums/${id}`),
+                cache_middleware_1.client.del(`/api/artists/stats/${id}`),
+            ]);
+            return updatedArtistProfile;
+        });
+    }
+    static getArtistStats(user) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!user || !user.artistProfile) {
+                throw new Error('Forbidden');
+            }
+            const artistProfileId = user.artistProfile.id;
+            const artistStats = yield prisma.artistProfile.findUnique({
+                where: { id: artistProfileId },
+                select: {
+                    monthlyListeners: true,
+                    _count: { select: { albums: true, tracks: true } },
+                },
+            });
+            if (!artistStats) {
+                throw new Error('Artist profile not found');
+            }
+            const topTracks = yield prisma.track.findMany({
+                where: { artistId: artistProfileId },
+                select: prisma_selects_1.trackSelect,
+                orderBy: { playCount: 'desc' },
+                take: 5,
+            });
+            return {
+                monthlyListeners: artistStats.monthlyListeners,
+                albumCount: artistStats._count.albums,
+                trackCount: artistStats._count.tracks,
+                topTracks,
+            };
+        });
+    }
+    static getRelatedArtists(id) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const artistProfile = yield prisma.artistProfile.findUnique({
+                where: { id },
+                select: { genres: { select: { genreId: true } } },
+            });
+            if (!artistProfile) {
+                throw new Error('Artist not found');
+            }
+            const genreIds = artistProfile.genres.map((genre) => genre.genreId);
+            return prisma.artistProfile.findMany({
+                where: {
+                    genres: { some: { genreId: { in: genreIds } } },
+                    isVerified: true,
+                    id: { not: id },
+                },
+                select: prisma_selects_1.artistProfileSelect,
+                take: 10,
+            });
+        });
+    }
+}
+exports.ArtistService = ArtistService;
+//# sourceMappingURL=artist.service.js.map

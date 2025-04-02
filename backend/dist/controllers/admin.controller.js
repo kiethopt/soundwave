@@ -61,6 +61,7 @@ const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
 const playlistService = __importStar(require("../services/playlist.service"));
 const db_1 = __importDefault(require("../config/db"));
+const emailService = __importStar(require("../services/email.service"));
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { users, pagination } = yield adminService.getUsers(req);
@@ -125,7 +126,7 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             const isActiveBool = isActive === 'true' || isActive === true ? true : false;
             const currentUser = yield db_1.default.user.findUnique({
                 where: { id },
-                select: { isActive: true },
+                select: { isActive: true, email: true, name: true, username: true },
             });
             if (currentUser && currentUser.isActive && !isActiveBool) {
                 const updatedUser = yield adminService.updateUserInfo(id, {
@@ -142,10 +143,17 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                         },
                     });
                 }
-                res.json({
-                    message: 'User deactivated successfully',
-                    user: updatedUser,
-                });
+                if (currentUser.email) {
+                    const userName = currentUser.name || currentUser.username || 'User';
+                    try {
+                        const emailOptions = emailService.createAccountDeactivatedEmail(currentUser.email, userName, 'user', reason);
+                        yield emailService.sendEmail(emailOptions);
+                    }
+                    catch (emailError) {
+                        console.error(`Failed to send user deactivation email to ${currentUser.email}:`, emailError);
+                    }
+                }
+                res.json({ message: 'User deactivated successfully', user: updatedUser });
                 return;
             }
             else if (currentUser && !currentUser.isActive && isActiveBool) {
@@ -161,10 +169,17 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                         isRead: false,
                     },
                 });
-                res.json({
-                    message: 'User activated successfully',
-                    user: updatedUser,
-                });
+                if (currentUser.email) {
+                    const userName = currentUser.name || currentUser.username || 'User';
+                    try {
+                        const emailOptions = emailService.createAccountActivatedEmail(currentUser.email, userName, 'user');
+                        yield emailService.sendEmail(emailOptions);
+                    }
+                    catch (emailError) {
+                        console.error(`Failed to send user activation email to ${currentUser.email}:`, emailError);
+                    }
+                }
+                res.json({ message: 'User activated successfully', user: updatedUser });
                 return;
             }
         }
@@ -204,11 +219,16 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             const isActiveBool = isActive === 'true' || isActive === true ? true : false;
             const currentArtist = yield db_1.default.artistProfile.findUnique({
                 where: { id },
-                select: {
-                    isActive: true,
-                    userId: true,
-                },
+                select: { isActive: true, userId: true, artistName: true },
             });
+            let ownerUser = null;
+            if (currentArtist === null || currentArtist === void 0 ? void 0 : currentArtist.userId) {
+                ownerUser = yield db_1.default.user.findUnique({
+                    where: { id: currentArtist.userId },
+                    select: { email: true, name: true, username: true }
+                });
+            }
+            const ownerUserName = (ownerUser === null || ownerUser === void 0 ? void 0 : ownerUser.name) || (ownerUser === null || ownerUser === void 0 ? void 0 : ownerUser.username) || 'Artist';
             if (currentArtist && currentArtist.isActive && !isActiveBool) {
                 const updatedArtist = yield adminService.updateArtistInfo(id, {
                     isActive: false,
@@ -223,6 +243,15 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                             isRead: false,
                         },
                     });
+                }
+                if (ownerUser === null || ownerUser === void 0 ? void 0 : ownerUser.email) {
+                    try {
+                        const emailOptions = emailService.createAccountDeactivatedEmail(ownerUser.email, ownerUserName, 'artist', reason);
+                        yield emailService.sendEmail(emailOptions);
+                    }
+                    catch (emailError) {
+                        console.error(`Failed to send artist deactivation email to ${ownerUser.email}:`, emailError);
+                    }
                 }
                 res.json({
                     message: 'Artist deactivated successfully',
@@ -244,6 +273,15 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                             isRead: false,
                         },
                     });
+                }
+                if (ownerUser === null || ownerUser === void 0 ? void 0 : ownerUser.email) {
+                    try {
+                        const emailOptions = emailService.createAccountActivatedEmail(ownerUser.email, ownerUserName, 'artist');
+                        yield emailService.sendEmail(emailOptions);
+                    }
+                    catch (emailError) {
+                        console.error(`Failed to send artist activation email to ${ownerUser.email}:`, emailError);
+                    }
                 }
                 res.json({
                     message: 'Artist activated successfully',
@@ -408,9 +446,29 @@ const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, fun
                 isRead: false,
             },
         });
+        if (updatedProfile.user.email) {
+            try {
+                const emailOptions = emailService.createArtistRequestApprovedEmail(updatedProfile.user.email, updatedProfile.user.name || updatedProfile.user.username || 'User');
+                yield emailService.sendEmail(emailOptions);
+                console.log(`Artist approval email sent to ${updatedProfile.user.email}`);
+            }
+            catch (emailError) {
+                console.error('Failed to send artist approval email:', emailError);
+            }
+        }
+        else {
+            console.warn(`Could not send approval email: No email found for user ${updatedProfile.user.id}`);
+        }
         res.json({
             message: 'Artist role approved successfully',
-            user: updatedProfile.user,
+            user: {
+                id: updatedProfile.user.id,
+                email: updatedProfile.user.email,
+                name: updatedProfile.user.name,
+                username: updatedProfile.user.username,
+                avatar: updatedProfile.user.avatar,
+                role: updatedProfile.user.role,
+            },
         });
     }
     catch (error) {
@@ -442,11 +500,25 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
                 isRead: false,
             },
         });
+        if (result.user.email) {
+            try {
+                const emailOptions = emailService.createArtistRequestRejectedEmail(result.user.email, result.user.name || result.user.username || 'User', reason);
+                yield emailService.sendEmail(emailOptions);
+                console.log(`Artist rejection email sent to ${result.user.email}`);
+            }
+            catch (emailError) {
+                console.error('Failed to send artist rejection email:', emailError);
+            }
+        }
+        else {
+            console.warn(`Could not send rejection email: No email found for user ${result.user.id}`);
+        }
         res.json({
             message: 'Artist role request rejected successfully',
             user: result.user,
             hasPendingRequest: result.hasPendingRequest,
         });
+        return;
     }
     catch (error) {
         if (error instanceof Error &&
@@ -457,6 +529,7 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
             return;
         }
         (0, handle_utils_1.handleError)(res, error, 'Reject artist request');
+        return;
     }
 });
 exports.rejectArtistRequest = rejectArtistRequest;

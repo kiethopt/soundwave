@@ -1769,6 +1769,20 @@ export function AlbumDetailModal({
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  // Sắp xếp bài hát theo trackNumber (nếu có) và sau đó theo title
+  const sortedTracks = [...(album.tracks || [])].sort((a, b) => {
+    const trackNumberA = a.trackNumber ?? Infinity;
+    const trackNumberB = b.trackNumber ?? Infinity;
+
+    if (trackNumberA !== trackNumberB) {
+      // Nếu trackNumber khác nhau, sắp xếp theo trackNumber
+      return trackNumberA - trackNumberB;
+    } else {
+      // Nếu trackNumber giống nhau, sắp xếp theo title
+      return a.title.localeCompare(b.title);
+    }
+  });
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
@@ -1824,7 +1838,6 @@ export function AlbumDetailModal({
                   >
                     {album.artist?.artistName || 'Unknown Artist'}
                   </span>
-                  {album.artist?.isVerified && <Verified className="w-4 h-4" />}
                 </div>
 
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm">
@@ -1870,7 +1883,7 @@ export function AlbumDetailModal({
           </div>
 
           {/* Track List */}
-          {album.tracks?.length > 0 && (
+          {sortedTracks.length > 0 && (
             <div className="px-6 pb-6 pt-2">
               <div
                 className={`w-full rounded-xl overflow-hidden border backdrop-blur-sm ${theme === 'light'
@@ -1898,7 +1911,7 @@ export function AlbumDetailModal({
                   className={`divide-y ${theme === 'light' ? 'divide-gray-200' : 'divide-white/10'
                     }`}
                 >
-                  {album.tracks.map((track) => (
+                  {sortedTracks.map((track) => (
                     <div
                       key={track.id}
                       className={`md:grid md:grid-cols-[48px_4fr_2fr_100px] md:gap-4 px-4 md:px-6 py-2.5 md:py-3 ${theme === 'light'
@@ -2136,7 +2149,6 @@ export function TrackDetailModal({
                   >
                     {track.artist?.artistName || 'Unknown Artist'}
                   </span>
-                  {track.artist?.isVerified && <Verified className="w-4 h-4" />}
                 </div>
 
                 {/* Featured Artists Section with improved styling */}
@@ -2173,9 +2185,6 @@ export function TrackDetailModal({
                                 }
                               >
                                 {artistProfile?.artistName || 'Unknown Artist'}
-                                {artistProfile?.isVerified && (
-                                  <Verified className="w-3 h-3 inline-block ml-0.5 mb-0.5" />
-                                )}
                               </button>
                             </div>
                           )
