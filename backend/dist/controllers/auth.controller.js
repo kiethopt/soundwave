@@ -53,8 +53,8 @@ const client_1 = require("@prisma/client");
 const uuid_1 = require("uuid");
 const date_fns_1 = require("date-fns");
 const prisma_selects_1 = require("../utils/prisma-selects");
-const playlist_service_1 = require("../services/playlist.service");
 const emailService = __importStar(require("../services/email.service"));
+const aiService = __importStar(require("../services/ai.service"));
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('Missing JWT_SECRET in environment variables');
@@ -197,11 +197,43 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             select: prisma_selects_1.userSelect,
         });
         try {
-            yield playlist_service_1.systemPlaylistService.initializeForNewUser(user.id);
-            console.log(`System playlists initialized for new user: ${user.id}`);
+            const defaultTrackIds = yield aiService.generateDefaultPlaylistForNewUser(user.id);
+            if (defaultTrackIds.length > 0) {
+                const tracksInfo = yield db_1.default.track.findMany({
+                    where: { id: { in: defaultTrackIds } },
+                    select: { id: true, duration: true },
+                });
+                const totalDuration = tracksInfo.reduce((sum, track) => sum + track.duration, 0);
+                const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
+                const orderedTrackIds = defaultTrackIds.filter((id) => trackIdMap.has(id));
+                yield db_1.default.playlist.create({
+                    data: {
+                        name: 'Welcome Mix',
+                        description: 'A selection of popular tracks to start your journey on Soundwave.',
+                        privacy: 'PRIVATE',
+                        type: 'NORMAL',
+                        isAIGenerated: false,
+                        userId: user.id,
+                        totalTracks: orderedTrackIds.length,
+                        totalDuration: totalDuration,
+                        tracks: {
+                            createMany: {
+                                data: orderedTrackIds.map((trackId, index) => ({
+                                    trackId,
+                                    trackOrder: index,
+                                })),
+                            },
+                        },
+                    },
+                });
+                console.log(`[Register] Created Welcome Mix for new user ${user.id} with ${orderedTrackIds.length} popular tracks.`);
+            }
+            else {
+                console.log(`[Register] No popular tracks found to create Welcome Mix for user ${user.id}.`);
+            }
         }
-        catch (error) {
-            console.error('Failed to initialize system playlists for new user:', error);
+        catch (playlistError) {
+            console.error(`[Register] Error creating initial playlists for user ${user.id}:`, playlistError);
         }
         res.status(201).json({ message: 'User registered successfully', user });
     }
@@ -304,7 +336,7 @@ const requestPasswordReset = (req, res) => __awaiter(void 0, void 0, void 0, fun
         console.log(`[Reset Password] Request received for email: ${email}`);
         const user = yield db_1.default.user.findUnique({
             where: { email },
-            select: { id: true, email: true, name: true, username: true }
+            select: { id: true, email: true, name: true, username: true },
         });
         if (!user) {
             console.log(`[Reset Password] User not found for email: ${email}`);
@@ -360,9 +392,7 @@ const resetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         }
         const isSamePassword = yield bcrypt_1.default.compare(newPassword, user.password);
         if (isSamePassword) {
-            res
-                .status(400)
-                .json({
+            res.status(400).json({
                 message: 'New password cannot be the same as the old password',
             });
             return;

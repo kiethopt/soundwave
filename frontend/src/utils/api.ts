@@ -625,31 +625,94 @@ export const api = {
   tracks: {
     getAll: async (
       token: string,
-      page: number,
-      limit: number,
+      page: number = 1,
+      limit: number = 10,
       queryParams?: string
-    ) =>
-      fetchWithAuth(
-        `/api/tracks?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
-        token
-      ),
+    ) => {
+      try {
+        return await fetchWithAuth(
+          `/api/tracks?${queryParams || `page=${page}&limit=${limit}`}`,
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error('Error fetching tracks:', error);
+        return { success: false, data: [], pagination: { totalPages: 1 } };
+      }
+    },
 
-    getById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/tracks/${id}`, { method: 'GET' }, token),
+    getById: async (trackId: string, token?: string) => {
+      try {
+        return await fetchWithAuth(
+          `/api/tracks/${trackId}`,
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error(`Error fetching track ${trackId}:`, error);
+        return { success: false, message: 'Failed to fetch track' };
+      }
+    },
 
-    getByType: async (type: string, token: string) =>
-      fetchWithAuth(`/api/tracks/type/${type}`, { method: 'GET' }, token),
+    getByType: async (type: string, token?: string) => {
+      try {
+        return await fetchWithAuth(
+          `/api/tracks/type/${type}`,
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error(`Error fetching tracks by type ${type}:`, error);
+        return { success: false, data: [], message: 'Failed to fetch tracks' };
+      }
+    },
 
-    getByGenre: async (genreId: string, token: string) =>
-      fetchWithAuth(`/api/tracks/genre/${genreId}`, { method: 'GET' }, token),
+    getByGenre: async (genreId: string, token?: string) => {
+      try {
+        return await fetchWithAuth(
+          `/api/tracks/genre/${genreId}`,
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error(`Error fetching tracks by genre ${genreId}:`, error);
+        return { success: false, data: [], message: 'Failed to fetch tracks' };
+      }
+    },
 
-    getByTypeAndGenre: async (type: string, genreId: string, token: string) =>
-      fetchWithAuth(
-        `/api/tracks/type/${type}/genre/${genreId}`,
-        { method: 'GET' },
-        token
-      ),
+    getByTypeAndGenre: async (
+      type: string,
+      genreId: string,
+      token?: string
+    ) => {
+      try {
+        return await fetchWithAuth(
+          `/api/tracks/type/${type}/genre/${genreId}`,
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error(
+          `Error fetching tracks by type ${type} and genre ${genreId}:`,
+          error
+        );
+        return { success: false, data: [], message: 'Failed to fetch tracks' };
+      }
+    },
+
+    playTrack: async (trackId: string, token: string) => {
+      try {
+        return await fetchWithAuth(
+          `/api/tracks/${trackId}/play`,
+          { method: 'POST' },
+          token
+        );
+      } catch (error) {
+        console.error(`Error playing track ${trackId}:`, error);
+        // Don't return an error response since this is a background operation
+        return { success: false };
+      }
+    },
 
     create: async (formData: FormData, token: string) =>
       fetchWithAuth('/api/tracks', { method: 'POST', body: formData }, token),
@@ -740,28 +803,69 @@ export const api = {
   },
 
   albums: {
-    getAll: async (
-      token: string,
-      page: number,
-      limit: number,
-      queryParams?: string
-    ) =>
-      fetchWithAuth(
-        `/api/albums?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
-        token
-      ),
-
-    getById: async (id: string, token?: string) => {
+    // Get newest albums - works for both authenticated and non-authenticated users
+    getNewestAlbums: async (token?: string) => {
       try {
         return await fetchWithAuth(
-          `/api/albums/${id}`,
+          '/api/albums/newest',
           { method: 'GET' },
           token
         );
       } catch (error) {
-        console.error('API Error:', error);
-        throw error;
+        console.error('Error fetching newest albums:', error);
+        return {
+          success: false,
+          albums: [],
+          message: 'Failed to fetch albums',
+        };
+      }
+    },
+
+    // Get hot albums - works for both authenticated and non-authenticated users
+    getHotAlbums: async (token?: string) => {
+      try {
+        return await fetchWithAuth('/api/albums/hot', { method: 'GET' }, token);
+      } catch (error) {
+        console.error('Error fetching hot albums:', error);
+        return {
+          success: false,
+          albums: [],
+          message: 'Failed to fetch albums',
+        };
+      }
+    },
+
+    // Get album by ID - works for both authenticated and non-authenticated users
+    getById: async (albumId: string, token?: string) => {
+      try {
+        const response = await fetchWithAuth(
+          `/api/albums/${albumId}`,
+          { method: 'GET' },
+          token
+        );
+        return response;
+      } catch (error) {
+        console.error(`Error fetching album ${albumId}:`, error);
+        return { success: false, message: 'Failed to fetch album details' };
+      }
+    },
+
+    // Get all albums - requires authentication
+    getAll: async (
+      token: string,
+      page: number = 1,
+      limit: number = 10,
+      queryParams?: string
+    ) => {
+      try {
+        return await fetchWithAuth(
+          `/api/albums?${queryParams || `page=${page}&limit=${limit}`}`,
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error('Error fetching albums:', error);
+        return { success: false, data: [], pagination: { totalPages: 1 } };
       }
     },
 
@@ -810,12 +914,6 @@ export const api = {
 
     playAlbum: async (albumId: string, token: string) =>
       fetchWithAuth(`/api/albums/${albumId}/play`, { method: 'POST' }, token),
-
-    getNewestAlbums: async (token?: string) =>
-      fetchWithAuth('/api/albums/newest', { method: 'GET' }, token),
-
-    getHotAlbums: async (token?: string) =>
-      fetchWithAuth('/api/albums/hot', { method: 'GET' }, token),
   },
 
   genres: {
@@ -933,34 +1031,50 @@ export const api = {
     getAll: async (token: string) =>
       fetchWithAuth('/api/playlists', { method: 'GET' }, token),
 
-    getById: async (id: string, token?: string) => {
+    getUserPlaylists: async (token: string) => {
+      try {
+        return await fetchWithAuth('/api/playlists', { method: 'GET' }, token);
+      } catch (error) {
+        console.error('Error fetching user playlists:', error);
+        return {
+          success: false,
+          data: [],
+          message: 'Failed to fetch playlists',
+        };
+      }
+    },
+
+    getById: async (playlistId: string, token?: string) => {
       try {
         return await fetchWithAuth(
-          `/api/playlists/${id}`,
+          `/api/playlists/${playlistId}`,
           { method: 'GET' },
           token
         );
       } catch (error) {
-        console.error('API Error:', error);
-        throw error;
+        console.error(`Error fetching playlist ${playlistId}:`, error);
+        return {
+          success: false,
+          data: null,
+          message: 'Failed to fetch playlist',
+        };
       }
     },
 
-    update: async (id: string, data: any, token: string) => {
-      const response = await fetch(`${API_BASE}/api/playlists/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('Không thể cập nhật playlist');
+    update: async (playlistId: string, data: any, token: string) => {
+      try {
+        return await fetchWithAuth(
+          `/api/playlists/${playlistId}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+          },
+          token
+        );
+      } catch (error) {
+        console.error(`Error updating playlist ${playlistId}:`, error);
+        throw error;
       }
-
-      return response.json();
     },
 
     removeTrack: async (playlistId: string, trackId: string, token: string) => {
@@ -971,7 +1085,10 @@ export const api = {
           token
         );
       } catch (error) {
-        console.error('API Error:', error);
+        console.error(
+          `Error removing track ${trackId} from playlist ${playlistId}:`,
+          error
+        );
         throw error;
       }
     },
@@ -1015,28 +1132,26 @@ export const api = {
 
     getSystemPlaylists: async (token?: string) => {
       try {
-        // If we have a token and user is authenticated, make an authenticated request
-        if (token) {
-          // For authenticated users - use a dedicated endpoint with authentication
-          return await fetchWithAuth(
-            '/api/playlists',
-            {
-              method: 'GET',
-              headers: {
-                'X-Filter-Type': 'system',
-              },
-            },
-            token
-          );
-        } else {
-          // For unauthenticated users - use the public endpoint
-          return await fetchWithAuth('/api/playlists/system-all', {
-            method: 'GET',
-          });
-        }
+        // Choose endpoint based on authentication state
+        const endpoint = token
+          ? '/api/playlists' // For authenticated users
+          : '/api/playlists/system-all'; // For non-authenticated users
+
+        // Set headers for authenticated users to filter system playlists
+        const options: RequestInit = {
+          method: 'GET',
+          headers: token ? { 'X-Filter-Type': 'system' } : undefined,
+        };
+
+        return await fetchWithAuth(endpoint, options, token);
       } catch (error) {
-        console.error('API Error:', error);
-        throw error;
+        console.error('Error fetching system playlists:', error);
+        // Return empty data on error to prevent app from crashing
+        return {
+          success: false,
+          data: [],
+          message: 'Failed to fetch playlists',
+        };
       }
     },
 
@@ -1055,6 +1170,29 @@ export const api = {
       } catch (error) {
         console.error('API Error:', error);
         throw error;
+      }
+    },
+
+    getHomePageData: async (token?: string) => {
+      try {
+        return await fetchWithAuth(
+          '/api/playlists/home',
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error('Error fetching homepage data:', error);
+        // Return empty data on error to prevent app from crashing
+        return {
+          success: false,
+          data: {
+            systemPlaylists: [],
+            newestAlbums: [],
+            hotAlbums: [],
+            userPlaylists: [],
+          },
+          message: 'Failed to fetch homepage data',
+        };
       }
     },
 

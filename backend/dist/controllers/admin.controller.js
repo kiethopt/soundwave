@@ -56,10 +56,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateSystemPlaylists = exports.getRecommendationMatrix = exports.handleAIModelStatus = exports.handleMaintenanceMode = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.handleAIModelStatus = exports.handleMaintenanceMode = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const adminService = __importStar(require("../services/admin.service"));
-const playlistService = __importStar(require("../services/playlist.service"));
 const db_1 = __importDefault(require("../config/db"));
 const emailService = __importStar(require("../services/email.service"));
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -153,7 +152,10 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                         console.error(`Failed to send user deactivation email to ${currentUser.email}:`, emailError);
                     }
                 }
-                res.json({ message: 'User deactivated successfully', user: updatedUser });
+                res.json({
+                    message: 'User deactivated successfully',
+                    user: updatedUser,
+                });
                 return;
             }
             else if (currentUser && !currentUser.isActive && isActiveBool) {
@@ -225,7 +227,7 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             if (currentArtist === null || currentArtist === void 0 ? void 0 : currentArtist.userId) {
                 ownerUser = yield db_1.default.user.findUnique({
                     where: { id: currentArtist.userId },
-                    select: { email: true, name: true, username: true }
+                    select: { email: true, name: true, username: true },
                 });
             }
             const ownerUserName = (ownerUser === null || ownerUser === void 0 ? void 0 : ownerUser.name) || (ownerUser === null || ownerUser === void 0 ? void 0 : ownerUser.username) || 'Artist';
@@ -567,83 +569,34 @@ const handleMaintenanceMode = (req, res) => __awaiter(void 0, void 0, void 0, fu
 exports.handleMaintenanceMode = handleMaintenanceMode;
 const handleAIModelStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { model } = req.method === 'POST' ? req.body : {};
-        const result = yield adminService.updateAIModel(model);
-        res.json(result);
-    }
-    catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Manage AI model');
-    }
-});
-exports.handleAIModelStatus = handleAIModelStatus;
-const getRecommendationMatrix = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const limit = req.query.limit ? parseInt(req.query.limit) : 100;
-        const matrix = yield adminService.getRecommendationMatrix(limit);
-        if (!matrix.success) {
-            res.status(400).json({
-                message: matrix.message || 'Failed to retrieve recommendation matrix',
-            });
-            return;
-        }
-        res.json(matrix);
-    }
-    catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Get recommendation matrix');
-    }
-});
-exports.getRecommendationMatrix = getRecommendationMatrix;
-const updateSystemPlaylists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { type } = req.query;
-        console.log(`[Admin Controller] Starting playlist update. Type: ${type || 'all'}`);
-        if (!type || type === 'all') {
-            yield playlistService.systemPlaylistService.updateAllSystemPlaylists();
-            res.json({
+        const { model } = req.body;
+        if (req.method === 'GET') {
+            const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+            const isEnabled = !!process.env.GEMINI_API_KEY;
+            res.status(200).json({
                 success: true,
-                message: 'All system playlists have been updated successfully',
+                data: {
+                    model: currentModel,
+                    enabled: isEnabled,
+                },
             });
             return;
         }
-        switch (type) {
-            case 'global':
-            case 'trending':
-            case 'top-hits':
-                yield db_1.default.playlist.updateGlobalPlaylist();
-                res.json({
-                    success: true,
-                    message: 'Trending Now playlists have been updated successfully',
-                });
-                break;
-            case 'discover-weekly':
-                yield db_1.default.playlist.updateDiscoverWeeklyPlaylists();
-                res.json({
-                    success: true,
-                    message: 'Discover Weekly playlists have been updated successfully',
-                });
-                break;
-            case 'new-releases':
-                yield db_1.default.playlist.updateNewReleasesPlaylists();
-                res.json({
-                    success: true,
-                    message: 'New Releases playlists have been updated successfully',
-                });
-                break;
-            default:
-                res.status(400).json({
-                    success: false,
-                    message: `Invalid playlist type: ${type}. Valid types are: all, global, trending, top-hits, discover-weekly, new-releases`,
-                });
-        }
+        const result = yield adminService.updateAIModel(model);
+        res.status(200).json({
+            success: true,
+            message: 'AI model settings updated successfully',
+            data: result,
+        });
     }
     catch (error) {
-        console.error('Error updating playlists:', error);
+        console.error('Error updating AI model settings:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update playlists',
+            message: 'Failed to update AI model settings',
             error: error instanceof Error ? error.message : String(error),
         });
     }
 });
-exports.updateSystemPlaylists = updateSystemPlaylists;
+exports.handleAIModelStatus = handleAIModelStatus;
 //# sourceMappingURL=admin.controller.js.map

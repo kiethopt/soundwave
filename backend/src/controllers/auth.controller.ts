@@ -5,10 +5,9 @@ import prisma from '../config/db';
 import { Role } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { addHours } from 'date-fns';
-import sgMail from '@sendgrid/mail';
 import { userSelect } from '../utils/prisma-selects';
-import { systemPlaylistService } from '../services/playlist.service';
 import * as emailService from '../services/email.service';
+import * as aiService from '../services/ai.service';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -194,14 +193,65 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       select: userSelect,
     });
 
-    // Khởi tạo các playlist hệ thống cho người dùng mới
+    // Tạo playlist mặc định cho người dùng mới
     try {
-      await systemPlaylistService.initializeForNewUser(user.id);
-      console.log(`System playlists initialized for new user: ${user.id}`);
-    } catch (error) {
+      // Tạo "Welcome Mix" bằng các bài hát phổ biến
+      const defaultTrackIds = await aiService.generateDefaultPlaylistForNewUser(
+        user.id
+      ); // Lấy danh sách track IDs phổ biến
+
+      if (defaultTrackIds.length > 0) {
+        // Lấy thông tin tracks để tính duration (tùy chọn, có thể bỏ qua nếu không cần chính xác ngay)
+        const tracksInfo = await prisma.track.findMany({
+          where: { id: { in: defaultTrackIds } },
+          select: { id: true, duration: true },
+        });
+        const totalDuration = tracksInfo.reduce(
+          (sum, track) => sum + track.duration,
+          0
+        );
+        const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
+
+        // Sắp xếp lại trackIds theo thứ tự trả về từ generateDefaultPlaylistForNewUser
+        const orderedTrackIds = defaultTrackIds.filter((id) =>
+          trackIdMap.has(id)
+        );
+
+        await prisma.playlist.create({
+          data: {
+            name: 'Welcome Mix',
+            description:
+              'A selection of popular tracks to start your journey on Soundwave.',
+            privacy: 'PRIVATE',
+            type: 'NORMAL',
+            isAIGenerated: false,
+            userId: user.id, // Playlist này thuộc về người dùng
+            totalTracks: orderedTrackIds.length,
+            totalDuration: totalDuration,
+            tracks: {
+              createMany: {
+                data: orderedTrackIds.map((trackId, index) => ({
+                  trackId,
+                  trackOrder: index,
+                })),
+              },
+            },
+          },
+        });
+        // Log này để test, sau khi ổn thì xóa đi
+        console.log(
+          `[Register] Created Welcome Mix for new user ${user.id} with ${orderedTrackIds.length} popular tracks.`
+        );
+      } else {
+        console.log(
+          `[Register] No popular tracks found to create Welcome Mix for user ${user.id}.`
+        );
+      }
+    } catch (playlistError) {
+      // Log lỗi nhưng không làm gián đoạn quá trình đăng ký
       console.error(
-        'Failed to initialize system playlists for new user:',
-        error
+        `[Register] Error creating initial playlists for user ${user.id}:`,
+        playlistError
       );
     }
 
@@ -334,7 +384,7 @@ export const requestPasswordReset = async (
 
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, name: true, username: true }
+      select: { id: true, email: true, name: true, username: true },
     });
 
     if (!user) {
@@ -356,7 +406,9 @@ export const requestPasswordReset = async (
         passwordResetExpires: resetTokenExpiry,
       },
     });
-    console.log(`[Reset Password] Reset token generated and saved for user: ${user.id}`);
+    console.log(
+      `[Reset Password] Reset token generated and saved for user: ${user.id}`
+    );
 
     // **Định nghĩa resetLink Ở ĐÂY, trước khi sử dụng**
     const resetLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/reset-password?token=${resetToken}`;
@@ -365,21 +417,27 @@ export const requestPasswordReset = async (
     try {
       const userName = user.name || user.username || 'bạn';
       // Tạo email options bằng hàm mới, resetLink đã được định nghĩa
-      const emailOptions = emailService.createPasswordResetEmail(user.email, userName, resetLink);
-      console.log(`[Reset Password] Attempting to send reset email to: ${user.email}`);
+      const emailOptions = emailService.createPasswordResetEmail(
+        user.email,
+        userName,
+        resetLink
+      );
+      console.log(
+        `[Reset Password] Attempting to send reset email to: ${user.email}`
+      );
       // Gửi email bằng hàm chung
       await emailService.sendEmail(emailOptions);
-      console.log(`[Reset Password] Email send attempt finished for: ${user.email}`);
+      console.log(
+        `[Reset Password] Email send attempt finished for: ${user.email}`
+      );
 
       res.json({ message: 'Password reset email sent successfully' });
       return;
-
     } catch (emailError) {
       console.error('[Reset Password] Failed to send email:', emailError);
       res.status(500).json({ message: 'Failed to send password reset email' });
       return;
     }
-
   } catch (error) {
     console.error('[Reset Password] General error:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -411,11 +469,9 @@ export const resetPassword = async (
     // Kiểm tra nếu mật khẩu mới trùng với mật khẩu cũ
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
-      res
-        .status(400)
-        .json({
-          message: 'New password cannot be the same as the old password',
-        });
+      res.status(400).json({
+        message: 'New password cannot be the same as the old password',
+      });
       return;
     }
 
@@ -438,7 +494,6 @@ export const resetPassword = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
 
 // Hàm để switch profile sang Artist
 export const switchProfile = async (
@@ -498,6 +553,7 @@ export const switchProfile = async (
   }
 };
 
+// Lấy trạng thái maintenance
 export const getMaintenanceStatus = async (
   req: Request,
   res: Response

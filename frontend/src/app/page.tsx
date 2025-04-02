@@ -8,7 +8,7 @@ import { Album, Track, Playlist } from '@/types';
 import { useTrack } from '@/contexts/TrackContext';
 import { ChevronRight, Play, MoreHorizontal, Pause } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { MusicAuthDialog } from '@/components/ui/music-auth-dialog';
+import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 
 export default function Home() {
   const router = useRouter();
@@ -20,6 +20,9 @@ export default function Home() {
   const [personalizedPlaylists, setPersonalizedPlaylists] = useState<
     Playlist[]
   >([]);
+  const [aiGeneratedPlaylists, setAIGeneratedPlaylists] = useState<Playlist[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const {
     playTrack,
@@ -42,43 +45,52 @@ export default function Home() {
       try {
         setLoading(true);
 
-        // Basic API calls that work for both authenticated and unauthenticated users
-        const apiCalls = [
-          api.playlists.getSystemPlaylists(token || undefined),
-          api.albums.getNewestAlbums(token || undefined),
-          api.albums.getHotAlbums(token || undefined),
-        ];
+        // Use the new consolidated API endpoint for home page data
+        const response = await api.playlists.getHomePageData(
+          token || undefined
+        );
 
-        const responses = await Promise.all(apiCalls);
+        if (response.success) {
+          const { systemPlaylists, newestAlbums, hotAlbums, userPlaylists } =
+            response.data;
 
-        const systemPlaylistsRes = responses[0];
-        const newestAlbumsRes = responses[1];
-        const hotAlbumsRes = responses[2];
+          // Set albums data
+          setNewestAlbums(newestAlbums || []);
+          setHotAlbums(hotAlbums || []);
 
-        // Handle data regardless of authentication status
-        setNewestAlbums(newestAlbumsRes.albums || []);
-        setHotAlbums(hotAlbumsRes.albums || []);
+          // Process system playlists
+          if (systemPlaylists && systemPlaylists.length > 0) {
+            // Identify trending playlist
+            const trendingPlaylist = systemPlaylists.find(
+              (playlist: Playlist) =>
+                playlist.name === 'Soundwave Hits: Trending Right Now'
+            );
 
-        // Process system playlists
-        if (systemPlaylistsRes.success) {
-          // Identify playlists by type
-          const trendingPlaylist = systemPlaylistsRes.data.find(
-            (playlist: Playlist) =>
-              playlist.name === 'Soundwave Hits: Trending Right Now'
-          );
+            // Set trending playlist (for the featured content and tracks section)
+            setTrendingPlaylist(trendingPlaylist || null);
 
-          // Set trending playlist (for the featured content and tracks section)
-          setTrendingPlaylist(trendingPlaylist || null);
-
-          // For authenticated users, show all system playlists including personalized ones
-          // For unauthenticated users, only show global playlists
-          if (token) {
             // Filter out the trending playlist to avoid duplication
-            const userSpecificPlaylists = systemPlaylistsRes.data.filter(
+            const userSpecificPlaylists = systemPlaylists.filter(
               (playlist: Playlist) =>
                 playlist.name !== 'Soundwave Hits: Trending Right Now'
             );
-            setPersonalizedPlaylists(userSpecificPlaylists);
+
+            // Set personalized playlists for authenticated users
+            if (isAuthenticated) {
+              setPersonalizedPlaylists(userSpecificPlaylists);
+            }
+          }
+
+          // Process user's private playlists if authenticated
+          if (isAuthenticated && userPlaylists && userPlaylists.length > 0) {
+            // Filter AI-generated playlists that are NOT system playlists
+            // (to avoid duplicating system playlists in both sections)
+            const aiPlaylists = userPlaylists.filter(
+              (playlist: Playlist) =>
+                playlist.isAIGenerated && playlist.type !== 'SYSTEM'
+            );
+
+            setAIGeneratedPlaylists(aiPlaylists);
           }
         }
       } catch (error) {
@@ -89,7 +101,7 @@ export default function Home() {
     };
 
     fetchHomeData();
-  }, [token]);
+  }, [token, isAuthenticated]);
 
   // Update playingAlbumId based on currentTrack
   useEffect(() => {
@@ -117,27 +129,13 @@ export default function Home() {
         return;
       }
 
-      // Nếu track không có audioUrl, cần tải đầy đủ thông tin track
-      if (!track.audioUrl) {
-        // Lấy thông tin đầy đủ của track trước khi phát
-        const token = localStorage.getItem('userToken');
-        const trackDetailResponse = await api.tracks.getById(
-          track.id,
-          token as string
-        );
-        if (trackDetailResponse) {
-          playTrack(trackDetailResponse);
-        }
-      } else {
-        // Nếu đã có audioUrl, phát ngay
-        playTrack(track);
-      }
+      playTrack(track);
     } catch (error) {
       console.error('Error playing track:', error);
     }
   };
 
-  const handlePlayAlbum = (album: Album, e?: React.MouseEvent) => {
+  const handlePlayAlbum = async (album: Album, e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -147,18 +145,46 @@ export default function Home() {
     const canProceed = handleProtectedAction();
     if (!canProceed) return;
 
-    if (album.tracks && album.tracks.length > 0) {
-      if (playingAlbumId === album.id && isPlaying) {
-        pauseTrack();
-      } else {
-        trackQueue(album.tracks);
-        playTrack(album.tracks[0]);
-        setPlayingAlbumId(album.id);
+    try {
+      // If album already has tracks with audioUrl, play directly
+      if (album.tracks && album.tracks.length > 0 && album.tracks[0].audioUrl) {
+        if (playingAlbumId === album.id && isPlaying) {
+          pauseTrack();
+        } else {
+          trackQueue(album.tracks);
+          playTrack(album.tracks[0]);
+          setPlayingAlbumId(album.id);
+        }
+        return;
       }
+
+      // Otherwise, fetch the complete album data
+      const token = localStorage.getItem('userToken');
+      if (!token) return;
+
+      // Fetch the complete album with track details
+      const albumData = await api.albums.getById(album.id, token);
+
+      if (albumData && albumData.tracks && albumData.tracks.length > 0) {
+        if (playingAlbumId === album.id && isPlaying) {
+          pauseTrack();
+        } else {
+          trackQueue(albumData.tracks);
+          playTrack(albumData.tracks[0]);
+          setPlayingAlbumId(album.id);
+        }
+      } else {
+        console.error('Album has no tracks or failed to load');
+      }
+    } catch (error) {
+      console.error('Error playing album:', error);
     }
   };
 
-  const handlePlayPlaylist = (playlist: Playlist, e?: React.MouseEvent) => {
+  const handlePlayPlaylist = async (
+    playlist: Playlist,
+    e?: React.MouseEvent
+  ) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -168,9 +194,29 @@ export default function Home() {
     const canProceed = handleProtectedAction();
     if (!canProceed) return;
 
-    if (playlist.tracks && playlist.tracks.length > 0) {
-      trackQueue(playlist.tracks);
-      playTrack(playlist.tracks[0]);
+    try {
+      // Fetch the complete playlist with all track details before playing
+      const token = localStorage.getItem('userToken');
+      if (!token) return;
+
+      // Show some loading indicator if needed
+
+      // Fetch the complete playlist data with full track details
+      const response = await api.playlists.getById(playlist.id, token);
+
+      if (
+        response.success &&
+        response.data.tracks &&
+        response.data.tracks.length > 0
+      ) {
+        // Now we have the complete tracks with audioUrl
+        trackQueue(response.data.tracks);
+        playTrack(response.data.tracks[0]);
+      } else {
+        console.error('Playlist has no tracks or failed to load');
+      }
+    } catch (error) {
+      console.error('Error playing playlist:', error);
     }
   };
 
@@ -216,14 +262,16 @@ export default function Home() {
     <div className="mb-10">
       <div className="flex justify-between items-center mb-5">
         <h2 className="text-2xl font-bold">{title}</h2>
-        {viewAllLink && (
-          <button
-            onClick={() => router.push(viewAllLink)}
-            className="text-sm text-primary flex items-center hover:underline"
-          >
-            See All <ChevronRight size={16} />
-          </button>
-        )}
+        <div className="flex items-center gap-4">
+          {viewAllLink && (
+            <button
+              onClick={() => router.push(viewAllLink)}
+              className="text-sm text-primary flex items-center hover:underline"
+            >
+              See All <ChevronRight size={16} />
+            </button>
+          )}
+        </div>
       </div>
       {children}
     </div>
@@ -257,9 +305,7 @@ export default function Home() {
             <div className="editorial-card group">
               <div className="relative aspect-[16/9] overflow-hidden rounded-lg">
                 <Image
-                  src={
-                    trendingPlaylist.coverUrl || '/images/default-playlist.jpg'
-                  }
+                  src={trendingPlaylist.coverUrl || ''}
                   alt={trendingPlaylist.name}
                   fill
                   className="object-cover"
@@ -333,7 +379,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* Personalized Playlists Section - Only for authenticated users */}
+      {/* AI Generated Playlists Section - Only for authenticated users */}
       {isAuthenticated && personalizedPlaylists.length > 0 && (
         <Section title="Your Personalized Playlists">
           <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
@@ -348,7 +394,7 @@ export default function Home() {
                 <div className="flex flex-col space-y-2">
                   <div className="relative aspect-square overflow-hidden rounded-lg">
                     <Image
-                      src={playlist.coverUrl || '/images/default-playlist.jpg'}
+                      src={playlist.coverUrl || ''}
                       alt={playlist.name}
                       fill
                       className="object-cover"
@@ -360,6 +406,17 @@ export default function Home() {
                           : 'bg-black/0'
                       }`}
                     ></div>
+
+                    {/* Gemini Icon for system playlists */}
+                    <div className="absolute top-2 right-2 bg-black/40 rounded-full p-0.5">
+                      <Image
+                        src="/images/googleGemini_icon.png"
+                        width={28}
+                        height={28}
+                        alt="Gemini"
+                        className="rounded-full"
+                      />
+                    </div>
 
                     {hoveredAlbum === `playlist-${playlist.id}` && (
                       <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
@@ -383,6 +440,73 @@ export default function Home() {
                         : playlist.name.includes('New Releases')
                         ? 'Updated on Fridays'
                         : 'For you'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* User-Created AI Playlists - Only for authenticated users */}
+      {isAuthenticated && aiGeneratedPlaylists.length > 0 && (
+        <Section title="Your AI-Generated Playlists">
+          <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
+            {aiGeneratedPlaylists.map((playlist) => (
+              <div
+                key={playlist.id}
+                className="cursor-pointer flex-shrink-0 w-40"
+                onClick={() => router.push(`/playlists/${playlist.id}`)}
+                onMouseEnter={() =>
+                  setHoveredAlbum(`aiplaylist-${playlist.id}`)
+                }
+                onMouseLeave={() => setHoveredAlbum(null)}
+              >
+                <div className="flex flex-col space-y-2">
+                  <div className="relative aspect-square overflow-hidden rounded-lg">
+                    <Image
+                      src={playlist.coverUrl || ''}
+                      alt={playlist.name}
+                      fill
+                      className="object-cover"
+                    />
+                    <div
+                      className={`absolute inset-0 transition-all duration-150 ${
+                        hoveredAlbum === `aiplaylist-${playlist.id}`
+                          ? 'bg-black/30'
+                          : 'bg-black/0'
+                      }`}
+                    ></div>
+
+                    {/* Gemini Icon for AI playlists */}
+                    <div className="absolute top-2 right-2 bg-black/40 rounded-full p-0.5">
+                      <Image
+                        src="/images/googleGemini_icon.png"
+                        width={28}
+                        height={28}
+                        alt="Gemini"
+                        className="rounded-full"
+                      />
+                    </div>
+
+                    {hoveredAlbum === `aiplaylist-${playlist.id}` && (
+                      <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+                        <button
+                          className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
+                          onClick={(e) => handlePlayPlaylist(playlist, e)}
+                        >
+                          <Play size={18} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium line-clamp-1">
+                      {playlist.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground line-clamp-1">
+                      {playlist.totalTracks} tracks • Personalized
                     </p>
                   </div>
                 </div>
@@ -466,7 +590,9 @@ export default function Home() {
             <div
               key={album.id}
               className="cursor-pointer flex-shrink-0 w-40"
-              onClick={() => router.push(`/album/${album.id}`)}
+              onClick={() => {
+                router.push(`/album/${album.id}`);
+              }}
               onMouseEnter={() => setHoveredAlbum(album.id)}
               onMouseLeave={() => setHoveredAlbum(null)}
             >
@@ -529,7 +655,9 @@ export default function Home() {
             <div
               key={album.id}
               className="cursor-pointer flex-shrink-0 w-40"
-              onClick={() => router.push(`/album/${album.id}`)}
+              onClick={() => {
+                router.push(`/album/${album.id}`);
+              }}
               onMouseEnter={() => setHoveredAlbum(`hot-${album.id}`)}
               onMouseLeave={() => setHoveredAlbum(null)}
             >

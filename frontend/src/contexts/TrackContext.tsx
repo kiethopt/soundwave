@@ -11,7 +11,6 @@ import {
 } from 'react';
 import { Track } from '@/types';
 import { api } from '@/utils/api';
-import { Loop } from '../components/ui/Icons';
 
 interface TrackContextType {
   currentTrack: Track | null;
@@ -122,37 +121,64 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
   const saveHistory = useCallback(
     async (trackId: string, duration: number, completed: boolean) => {
-      if (!token) return;
+      const currentToken = localStorage.getItem('userToken');
+      if (!currentToken) return;
 
       try {
         await api.history.savePlayHistory(
           { trackId, duration, completed },
-          token
+          currentToken
         );
       } catch (error) {
         console.error('Failed to save play history:', error);
       }
     },
-    [token]
+    []
   );
 
   const playTrack = useCallback(
     async (track: Track) => {
-      if (!track.audioUrl) {
-        console.error('Audio URL is missing for this track.');
-        return;
+      if (currentPlayRequestRef.current) {
+        currentPlayRequestRef.current.abort();
       }
+      currentPlayRequestRef.current = new AbortController();
+      const signal = currentPlayRequestRef.current.signal;
 
       if (!audioRef.current) return;
 
       try {
-        // Hủy request cũ nếu có
-        if (currentPlayRequestRef.current) {
-          currentPlayRequestRef.current.abort();
-        }
+        let trackToPlay = track;
 
-        // Tạo AbortController mới cho request hiện tại
-        currentPlayRequestRef.current = new AbortController();
+        if (!trackToPlay.audioUrl) {
+          console.log(
+            `Audio URL missing for ${track.title}, fetching details...`
+          );
+          const currentToken = localStorage.getItem('userToken');
+          if (!currentToken) {
+            console.error(
+              'Authentication token not found, cannot fetch track details.'
+            );
+            setIsPlaying(false);
+            return;
+          }
+          const trackDetailResponse = await api.tracks.getById(
+            track.id,
+            currentToken
+          );
+          if (signal.aborted) {
+            console.log('Track fetch aborted.');
+            return;
+          }
+          if (trackDetailResponse && trackDetailResponse.audioUrl) {
+            trackToPlay = trackDetailResponse;
+          } else {
+            console.error(
+              `Failed to fetch track details or audioUrl still missing for ${track.id}`
+            );
+            setIsPlaying(false);
+            return;
+          }
+        }
 
         if (broadcastChannel.current) {
           broadcastChannel.current.postMessage({ type: 'play', tabId });
@@ -160,71 +186,116 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
         setShowPlayer(true);
 
-        // Nếu đang phát cùng một track
-        if (currentTrack?.id === track.id) {
-          try {
-            await audioRef.current.play();
-            setIsPlaying(true);
-          } catch (error) {
-            if (error instanceof Error && error.name !== 'AbortError') {
-              console.error('Playback error:', error);
-              setIsPlaying(false);
+        if (currentTrack?.id === trackToPlay.id) {
+          if (isPlaying) {
+            return;
+          } else {
+            try {
+              await audioRef.current.play();
+              setIsPlaying(true);
+            } catch (error) {
+              if (error instanceof Error && error.name !== 'AbortError') {
+                console.error('Resume playback error:', error);
+                setIsPlaying(false);
+              }
             }
+            return;
           }
-          return;
         }
 
-        // Reset các state khi chuyển bài
         setPlayStartTime(Date.now());
         setLastSavedTime(0);
         setProgress(0);
 
-        // Tạm dừng audio hiện tại trước khi load bài mới
         audioRef.current.pause();
-
-        // Load source mới
-        audioRef.current.src = track.audioUrl;
+        audioRef.current.src = trackToPlay.audioUrl;
         audioRef.current.currentTime = 0;
+        setDuration(0);
 
         const newIndex = trackQueueRef.current.findIndex(
-          (t) => t.id === track.id
+          (t) => t.id === trackToPlay.id
         );
         if (newIndex !== -1) {
           setCurrentIndex(newIndex);
         }
 
-        setCurrentTrack(track);
-        setIsPlaying(true);
+        setCurrentTrack(trackToPlay);
 
-        // Đợi audio load xong và phát
-        await new Promise((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
           const handleCanPlay = () => {
             audioRef.current?.removeEventListener('canplay', handleCanPlay);
-            resolve(null);
+            audioRef.current?.removeEventListener('error', handleError);
+            const audioDuration = audioRef.current?.duration;
+            if (audioDuration && !isNaN(audioDuration)) {
+              setDuration(audioDuration);
+            } else {
+              setDuration(0);
+            }
+            resolve();
           };
 
-          const handleError = (error: Event) => {
+          const handleError = (e: Event) => {
+            audioRef.current?.removeEventListener('canplay', handleCanPlay);
             audioRef.current?.removeEventListener('error', handleError);
-            reject(error);
+            console.error('Audio playback error:', audioRef.current?.error);
+            reject(
+              new Error(
+                `Failed to load audio: ${
+                  audioRef.current?.error?.message || 'Unknown error'
+                }`
+              )
+            );
           };
 
           audioRef.current?.addEventListener('canplay', handleCanPlay);
           audioRef.current?.addEventListener('error', handleError);
+
+          if (
+            audioRef.current?.readyState &&
+            audioRef.current.readyState >= 3
+          ) {
+            handleCanPlay();
+          }
+
+          const timeoutId = setTimeout(() => {
+            audioRef.current?.removeEventListener('canplay', handleCanPlay);
+            audioRef.current?.removeEventListener('error', handleError);
+            reject(new Error('Audio load timed out after 15 seconds'));
+          }, 15000);
+
+          const clearAudioTimeout = () => clearTimeout(timeoutId);
+          audioRef.current?.addEventListener('canplay', clearAudioTimeout, {
+            once: true,
+          });
+          audioRef.current?.addEventListener('error', clearAudioTimeout, {
+            once: true,
+          });
         });
 
-        // Kiểm tra xem có bị abort không trước khi play
-        if (!currentPlayRequestRef.current?.signal.aborted) {
-          await audioRef.current.play();
-          saveHistory(track.id, 0, false);
+        if (signal.aborted) {
+          console.log('Playback aborted while waiting for audio to load.');
+          setIsPlaying(false);
+          return;
         }
+
+        await audioRef.current.play();
+        setIsPlaying(true);
+        saveHistory(trackToPlay.id, 0, false);
       } catch (error) {
         if (error instanceof Error && error.name !== 'AbortError') {
-          console.error('Playback error:', error);
+          console.error('Error in playTrack:', error);
           setIsPlaying(false);
+          setCurrentTrack(null);
+        } else if (error instanceof Error && error.name === 'AbortError') {
+          console.log('playTrack aborted.');
+        }
+      } finally {
+        if (currentPlayRequestRef.current?.signal === signal) {
+          currentPlayRequestRef.current = null;
         }
       }
     },
-    [currentTrack, saveHistory, tabId]
+    [currentTrack, isPlaying, saveHistory, tabId, trackQueueRef]
   );
 
   const pauseTrack = useCallback(() => {
@@ -255,14 +326,13 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     setVolume(newVolume);
   }, []);
 
-  const loopTrack = useCallback(async() => {
+  const loopTrack = useCallback(async () => {
     if (trackQueueRef.current.length === 0) return;
 
     const currentTrack = trackQueueRef.current[currentIndex];
     if (currentTrack) {
       playTrack(currentTrack);
     }
-
   }, [currentIndex, playTrack]);
 
   const skipRandom = useCallback(() => {
@@ -328,7 +398,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
     const audio = audioRef.current;
     audio.volume = volume;
-    audio.loop = false; 
+    audio.loop = false;
 
     const handleTimeUpdate = () => {
       if (audio.duration && !isNaN(audio.duration)) {

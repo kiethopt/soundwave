@@ -23,13 +23,14 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { CreatePlaylistDialog } from '@/components/user/playlist/CreatePlaylistDialog';
 import { api } from '@/utils/api';
 import { useAuth } from '@/hooks/useAuth';
-import { MusicAuthDialog } from '@/components/ui/music-auth-dialog';
+import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 
 interface Playlist {
   id: string;
   name: string;
   privacy: 'PUBLIC' | 'PRIVATE';
   type: 'FAVORITE' | 'NORMAL';
+  isAIGenerated?: boolean;
 }
 
 export default function Sidebar({
@@ -344,13 +345,14 @@ export default function Sidebar({
                         <Music className="w-5 h-5" />
                       ) : (
                         <>
-                          <Music className="w-5 h-5 mr-3" />
-                          <span className="truncate">{playlist.name}</span>
-                          {playlist.privacy === 'PRIVATE' && (
-                            <span className="ml-2 text-xs opacity-60">
-                              • Private
-                            </span>
+                          {playlist.isAIGenerated ? (
+                            <div className="relative w-5 h-5 mr-3">
+                              <Music className="w-5 h-5" />
+                            </div>
+                          ) : (
+                            <Music className="w-5 h-5 mr-3" />
                           )}
+                          <span className="truncate">{playlist.name}</span>
                         </>
                       )}
                     </Link>

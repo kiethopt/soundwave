@@ -1,7 +1,7 @@
 import { Track } from '@/types';
 import { useTrack } from '@/contexts/TrackContext';
 import { useAuth } from '@/hooks/useAuth';
-import { MusicAuthDialog } from '@/components/ui/music-auth-dialog';
+import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 
 interface TrackListProps {
   tracks: Track[];
