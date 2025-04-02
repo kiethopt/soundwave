@@ -82,11 +82,14 @@ export default function TrackManagement() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
 
-  const fetchMetadata = useCallback(async () => {
+  // Tách logic đặt lại trạng thái và fetch metadata
+  const resetSelectionState = useCallback(() => {
     setSelectedFeaturedArtists([]);
     setSelectedGenres([]);
     setSelectedLabelId(null);
+  }, []);
 
+  const fetchMetadata = useCallback(async () => {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) return;
@@ -128,13 +131,35 @@ export default function TrackManagement() {
       console.error('Failed to fetch metadata:', error);
       toast.error('Failed to load required select options');
     }
-  }, [editingTrack]);
+  }, []);
 
+  // Cập nhật selectedLabelId, selectedFeaturedArtists, selectedGenres khi editingTrack thay đổi
   useEffect(() => {
     if (editingTrack) {
+      console.log('Editing track:', editingTrack);
+      console.log('Editing track label:', editingTrack.label);
+
+      // Cập nhật trạng thái dựa trên editingTrack
+      setSelectedFeaturedArtists(
+        editingTrack.featuredArtists?.map((fa) => fa.artistProfile.id) || []
+      );
+      setSelectedGenres(editingTrack.genres?.map((g) => g.genre.id) || []);
+      const labelId = editingTrack.label?.id || null; // Đảm bảo lấy đúng labelId
+      setSelectedLabelId(labelId);
+      console.log('Set selectedLabelId to:', labelId);
+
+      // Fetch metadata (availableArtists, availableGenres, availableLabels)
       fetchMetadata();
+    } else {
+      // Reset trạng thái khi đóng modal
+      resetSelectionState();
     }
-  }, [editingTrack, fetchMetadata]);
+  }, [editingTrack, fetchMetadata, resetSelectionState]);
+
+  // Debug giá trị selectedLabelId
+  useEffect(() => {
+    console.log('Current selectedLabelId:', selectedLabelId);
+  }, [selectedLabelId]);
 
   const handleTrackVisibility = async (trackId: string, isActive: boolean) => {
     setActionLoading(trackId);
@@ -203,15 +228,17 @@ export default function TrackManagement() {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
+      // Xóa labelId cũ nếu có và thêm giá trị mới từ selectedLabelId
       if (formData.has('labelId')) formData.delete('labelId');
       if (selectedLabelId) {
         formData.append('labelId', selectedLabelId);
+      } else {
+        formData.append('labelId', ''); // Gửi giá trị rỗng để xóa label nếu không chọn
       }
 
       await api.tracks.update(trackId, formData, token);
       await refreshData();
       setEditingTrack(null);
-      toast.success('Track updated successfully');
     } catch (error) {
       console.error('Update track error:', error);
       const errorMessage =
@@ -227,6 +254,8 @@ export default function TrackManagement() {
     onVisibilityChange: handleTrackVisibility,
     onDelete: handleDeleteTracks,
     onEdit: (track: Track) => {
+      console.log('Track object passed TO onEdit:', track);
+      console.log('Label in track passed TO onEdit:', track.label);
       setEditingTrack(track);
     },
   });
@@ -390,9 +419,7 @@ export default function TrackManagement() {
           track={editingTrack}
           onClose={() => {
             setEditingTrack(null);
-            setSelectedFeaturedArtists([]);
-            setSelectedGenres([]);
-            setSelectedLabelId(null);
+            resetSelectionState();
           }}
           onSubmit={handleUpdateTrack}
           availableArtists={availableArtists}

@@ -260,6 +260,7 @@ export const updateTrack = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
+    const { labelId, ...otherFields } = req.body;
     const {
       title,
       releaseDate,
@@ -282,6 +283,7 @@ export const updateTrack = async (
         featuredArtists: true,
         genres: true,
         coverUrl: true,
+        labelId: true,
       },
     });
 
@@ -302,10 +304,12 @@ export const updateTrack = async (
     const updateData: any = {};
 
     // Cập nhật các trường cơ bản
+    if (otherFields.title) updateData.title = otherFields.title;
     if (title) updateData.title = title;
     if (type) updateData.type = type;
     if (trackNumber) updateData.trackNumber = Number(trackNumber);
     if (albumId !== undefined) updateData.albumId = albumId || null;
+
 
     // Xử lý upload ảnh cover mới nếu có
     if (req.files && (req.files as any).coverFile) {
@@ -328,7 +332,10 @@ export const updateTrack = async (
 
       updateData.releaseDate = newReleaseDate;
     }
-
+    // Xử lý labelId
+    if (labelId !== undefined) {
+      updateData.labelId = labelId || null; // Nếu labelId rỗng, đặt thành null
+    }
     // Tạo transaction để xử lý cập nhật và quan hệ
     const updatedTrack = await prisma.$transaction(async (tx) => {
       // 1. Cập nhật thông tin cơ bản của track

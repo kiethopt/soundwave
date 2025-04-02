@@ -394,7 +394,7 @@ export const updateAlbum = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, releaseDate, type, genres, updateGenres } = req.body;
+    const { title, releaseDate, type, genres, updateGenres, labelId, } = req.body;
     const coverFile = req.file;
     const user = req.user;
 
@@ -405,7 +405,7 @@ export const updateAlbum = async (
 
     const album = await prisma.album.findUnique({
       where: { id },
-      select: { artistId: true, coverUrl: true },
+      select: { artistId: true, coverUrl: true, labelId: true },
     });
 
     if (!album) {
@@ -433,6 +433,9 @@ export const updateAlbum = async (
     }
     if (type) updateData.type = type;
     if (coverUrl) updateData.coverUrl = coverUrl;
+    if (labelId !== undefined) {
+      updateData.labelId = labelId || null; // Nếu labelId rỗng, đặt thành null
+    }
 
     // Xử lý genres
     if (updateGenres === 'true') {
