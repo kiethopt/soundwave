@@ -24,7 +24,6 @@ export default function AlbumManagement() {
   const { theme } = useTheme();
   const limit = 10;
 
-  // Dùng custom hook để xử lý logic của data table
   const {
     data: albums,
     setData: setAlbums,
@@ -61,28 +60,27 @@ export default function AlbumManagement() {
     limit,
   });
 
-  // Table state
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
 
-  // Edit modal state
   const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
   const [availableGenres, setAvailableGenres] = useState<
     Array<{ id: string; name: string }>
   >([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [availableLabels, setAvailableLabels] = useState<
+    Array<{ id: string; name: string }>
+  >([]); // Thêm state cho labels
+  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null); // Thêm state cho labelId
 
-  // Fetch metadata for edit modal
   const fetchMetadata = useCallback(async () => {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) return;
 
       const genresResponse = await api.artists.getAllGenres(token);
-      console.log('Genres response:', genresResponse);
-
       setAvailableGenres(
         genresResponse.genres.map((genre: { id: string; name: string }) => ({
           id: genre.id,
@@ -90,22 +88,34 @@ export default function AlbumManagement() {
         }))
       );
 
-      // Set selected values if editing an album
-      if (editingAlbum) {
-        setSelectedGenres(editingAlbum.genres.map((g) => g.genre.id));
-      }
+      // Fetch labels
+      const labelsResponse = await api.labels.getAll(token, 1, 100);
+      setAvailableLabels(
+        labelsResponse.labels.map((label: { id: string; name: string }) => ({
+          id: label.id,
+          name: label.name,
+        }))
+      );
     } catch (error) {
       console.error('Failed to fetch metadata:', error);
       toast.error('Failed to load required data');
     }
-  }, [editingAlbum]);
+  }, []);
 
-  // Fetch metadata when needed
   useEffect(() => {
     fetchMetadata();
   }, [fetchMetadata]);
 
-  // Action handlers
+  useEffect(() => {
+    if (editingAlbum) {
+      setSelectedGenres(editingAlbum.genres.map((g) => g.genre.id));
+      setSelectedLabelId(editingAlbum.label?.id || null); // Cập nhật selectedLabelId từ label của album
+    } else {
+      setSelectedGenres([]);
+      setSelectedLabelId(null);
+    }
+  }, [editingAlbum])
+
   const handleAlbumVisibility = async (albumId: string, isActive: boolean) => {
     try {
       setActionLoading(albumId);
@@ -149,18 +159,15 @@ export default function AlbumManagement() {
         return;
       }
 
-      // Set loading state for single album delete
       if (!Array.isArray(albumIds)) {
         setActionLoading(albumIds);
       }
 
       await Promise.all(ids.map((id) => api.albums.delete(id, token)));
 
-      // Update UI based on delete type
       if (!Array.isArray(albumIds)) {
         setAlbums((prev) => prev.filter((album) => album.id !== albumIds));
       } else {
-        // Refresh the current page
         const params = new URLSearchParams();
         params.set('page', currentPage.toString());
         params.set('limit', limit.toString());
@@ -168,16 +175,13 @@ export default function AlbumManagement() {
         if (searchInput) params.append('q', searchInput);
         if (statusFilter.length === 1) params.append('status', statusFilter[0]);
 
-        const token = localStorage.getItem('userToken');
-        if (token) {
-          const response = await api.albums.getAll(
-            token,
-            currentPage,
-            limit,
-            params.toString()
-          );
-          setAlbums(response.albums);
-        }
+        const response = await api.albums.getAll(
+          token,
+          currentPage,
+          limit,
+          params.toString()
+        );
+        setAlbums(response.albums);
       }
 
       toast.success(
@@ -197,17 +201,17 @@ export default function AlbumManagement() {
   };
 
   const handleUpdateAlbum = async (albumId: string, formData: FormData) => {
+    setActionLoading(albumId);
+    let toastShown = false; // Thêm biến kiểm soát toast
     try {
-      setActionLoading(albumId);
       const token = localStorage.getItem('userToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        return;
-      }
+      if (!token) throw new Error('No authentication token found');
 
+      console.log('Sending update request for albumId:', albumId);
       await api.albums.update(albumId, formData, token);
+      console.log('Update request completed for albumId:', albumId);
 
-      // Refresh the current page
+      console.log('Calling refreshData for albumId:', albumId);
       const params = new URLSearchParams();
       params.set('page', currentPage.toString());
       params.set('limit', limit.toString());
@@ -222,9 +226,12 @@ export default function AlbumManagement() {
         params.toString()
       );
       setAlbums(response.albums);
+      console.log('refreshData completed for albumId:', albumId);
 
       setEditingAlbum(null);
-      toast.success('Album updated successfully');
+      if (!toastShown) {
+        toastShown = true;
+      }
     } catch (error) {
       console.error('Update album error:', error);
       toast.error(
@@ -235,7 +242,6 @@ export default function AlbumManagement() {
     }
   };
 
-  // Table configuration
   const columns = getAlbumColumns({
     theme,
     onVisibilityChange: handleAlbumVisibility,
@@ -277,23 +283,20 @@ export default function AlbumManagement() {
 
   return (
     <div
-      className={`container mx-auto space-y-4 p-4 pb-20 ${
-        theme === 'dark' ? 'text-white' : ''
-      }`}
+      className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''
+        }`}
     >
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
         <div>
           <h1
-            className={`text-2xl md:text-3xl font-bold tracking-tight ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
+            className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
           >
             Album Management
           </h1>
           <p
-            className={`text-muted-foreground ${
-              theme === 'dark' ? 'text-white/60' : ''
-            }`}
+            className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : ''
+              }`}
           >
             Manage and monitor your albums
           </p>
@@ -301,11 +304,10 @@ export default function AlbumManagement() {
 
         <Link
           href="/artist/albums/new"
-          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${
-            theme === 'light'
-              ? 'bg-gray-900 text-white hover:bg-gray-800'
-              : 'bg-white text-[#121212] hover:bg-white/90'
-          }`}
+          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${theme === 'light'
+            ? 'bg-gray-900 text-white hover:bg-gray-800'
+            : 'bg-white text-[#121212] hover:bg-white/90'
+            }`}
         >
           New Album
         </Link>
@@ -366,6 +368,9 @@ export default function AlbumManagement() {
         availableGenres={availableGenres}
         selectedGenres={selectedGenres}
         setSelectedGenres={setSelectedGenres}
+        availableLabels={availableLabels} // Truyền availableLabels
+        selectedLabelId={selectedLabelId} // Truyền selectedLabelId
+        setSelectedLabelId={setSelectedLabelId} // Truyền setter
         theme={theme}
       />
     </div>

@@ -2,15 +2,14 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/utils/api'; // Đảm bảo api.labels đã được định nghĩa ở đây
+import { api } from '@/utils/api';
 import Link from 'next/link';
 import { ArrowLeft } from '@/components/ui/Icons';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
-import { SearchableSelect } from '@/components/ui/SearchableSelect'; // Component chọn có tìm kiếm
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { ArtistProfile } from '@/types';
 
-// Định nghĩa kiểu dữ liệu cho Label (nếu chưa có)
 interface Label {
   id: string;
   name: string;
@@ -32,12 +31,8 @@ export default function NewTrack() {
   const [featuredArtists, setFeaturedArtists] = useState<string[]>([]);
   const [availableGenres, setAvailableGenres] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-
-  // --- Thêm State cho Label ---
   const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null); // Lưu ID label được chọn (null nếu không chọn)
-  // --- Kết thúc thêm State cho Label ---
-
+  const [selectedLabelId, setSelectedLabelId] = useState<string>(''); // Thay đổi từ null sang '' để khớp với select
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -46,13 +41,11 @@ export default function NewTrack() {
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        // --- Fetch thêm danh sách Labels ---
         const [artistsResponse, genresResponse, labelsResponse] = await Promise.all([
           api.artists.getAllArtistsProfile(token, 1, 100),
           api.genres.getAll(token, 1, 100),
-          api.labels.getAll(token, 1, 100), // Giả sử API này tồn tại và trả về { labels: [...] }
+          api.labels.getAll(token, 1, 100),
         ]);
-        // --- Kết thúc Fetch thêm danh sách Labels ---
 
         setAvailableArtists(
           artistsResponse.artists.map((artist: ArtistProfile) => ({
@@ -68,15 +61,12 @@ export default function NewTrack() {
           }))
         );
 
-        // --- Cập nhật State cho Labels ---
         setAvailableLabels(
-          labelsResponse.labels.map((label: Label) => ({ // Sử dụng interface Label đã định nghĩa
+          labelsResponse.labels.map((label: Label) => ({
             id: label.id,
             name: label.name,
           }))
         );
-        // --- Kết thúc Cập nhật State cho Labels ---
-
       } catch (error) {
         console.error('Failed to fetch data:', error);
         toast.error('Failed to load required data (artists, genres, or labels)');
@@ -90,7 +80,11 @@ export default function NewTrack() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setTrackData((prev) => ({ ...prev, [name]: value }));
+    if (name === 'labelId') {
+      setSelectedLabelId(value); // Cập nhật selectedLabelId khi chọn label
+    } else {
+      setTrackData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,7 +99,6 @@ export default function NewTrack() {
           setPreviewImage(reader.result as string);
         };
         reader.readAsDataURL(file);
-        // Clean up previous object URL if exists to prevent memory leaks
         if (previewImage && previewImage.startsWith('blob:')) {
           URL.revokeObjectURL(previewImage);
         }
@@ -113,8 +106,6 @@ export default function NewTrack() {
     }
   };
 
-
-  // Hàm xử lý khi nhấn vào ảnh bìa để mở input file
   const handleCoverClick = () => {
     coverFileInputRef.current?.click();
   };
@@ -140,9 +131,9 @@ export default function NewTrack() {
 
       const formData = new FormData();
       formData.append('title', trackData.title);
-      formData.append('type', 'SINGLE'); // Type vẫn đang là SINGLE
+      formData.append('type', 'SINGLE');
       formData.append('releaseDate', trackData.releaseDate);
-      formData.append('audioFile', audioFile); // Đã kiểm tra nên audioFile không null
+      formData.append('audioFile', audioFile);
 
       if (coverFile) {
         formData.append('coverFile', coverFile);
@@ -158,18 +149,15 @@ export default function NewTrack() {
         formData.append('genreIds[]', genreId);
       });
 
-      // --- Thêm labelId vào FormData nếu đã chọn ---
       if (selectedLabelId) {
         formData.append('labelId', selectedLabelId);
       }
-      // --- Kết thúc thêm labelId ---
 
-      await api.tracks.create(formData, token); // Gọi API tạo track
+      await api.tracks.create(formData, token);
       toast.success('Track created successfully');
-      router.push('/artist/tracks'); // Điều hướng sau khi tạo thành công
+      router.push('/artist/tracks');
     } catch (error) {
       console.error('Error creating track:', error);
-      // Cung cấp thông báo lỗi cụ thể hơn nếu có thể
       const errorMessage = (error as any)?.response?.data?.message || 'Failed to create track';
       toast.error(errorMessage);
     } finally {
@@ -185,7 +173,6 @@ export default function NewTrack() {
       <div className="flex flex-col space-y-6">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
-          {/* Back Button */}
           <div className="w-fit">
             <Link
               href="/artist/tracks"
@@ -244,22 +231,56 @@ export default function NewTrack() {
                 <select
                   id="type"
                   name="type"
-                  value="SINGLE" // Chỉ cho phép chọn Single trong form này
-                  disabled // Vô hiệu hóa không cho thay đổi
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 appearance-none ${ // Thêm appearance-none để tùy chỉnh giao diện dễ hơn nếu muốn
-                    theme === 'light'
-                      ? 'bg-gray-100 border-gray-300 focus:ring-blue-500/20 text-gray-500' // Đổi màu nền và chữ khi disabled
-                      : 'bg-white/[0.05] border-white/[0.1] focus:ring-white/20 text-white/50' // Đổi màu nền và chữ khi disabled
+                  value="SINGLE"
+                  disabled
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 appearance-none ${theme === 'light'
+                      ? 'bg-gray-100 border-gray-300 focus:ring-blue-500/20 text-gray-500'
+                      : 'bg-white/[0.05] border-white/[0.1] focus:ring-white/20 text-white/50'
                     }`}
                 >
                   <option
                     value="SINGLE"
-                    className={
-                      theme === 'dark' ? 'bg-[#121212] text-white' : ''
-                    }
+                    className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
                   >
                     Single
                   </option>
+                </select>
+              </div>
+
+              {/* Label */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="labelId"
+                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                    }`}
+                >
+                  Label
+                </label>
+                <select
+                  id="labelId"
+                  name="labelId"
+                  value={selectedLabelId}
+                  onChange={handleInputChange}
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
+                      ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
+                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
+                    }`}
+                >
+                  <option
+                    value=""
+                    className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
+                  >
+                    Select a label (optional)
+                  </option>
+                  {availableLabels.map((label) => (
+                    <option
+                      key={label.id}
+                      value={label.id}
+                      className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
+                    >
+                      {label.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -281,7 +302,7 @@ export default function NewTrack() {
                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
                       ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
                       : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
-                    } ${theme === 'dark' ? 'date-input-dark' : ''}`} // Thêm class để style riêng cho dark mode nếu cần
+                    } ${theme === 'dark' ? 'date-input-dark' : ''}`}
                   required
                 />
               </div>
@@ -319,59 +340,9 @@ export default function NewTrack() {
                   onChange={setSelectedGenres}
                   placeholder="Select genres..."
                   multiple={true}
-                  required={true} // Đánh dấu là bắt buộc
+                  required={true}
                 />
               </div>
-
-              {/* --- Thêm trường chọn Label --- */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="label"
-                  className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                    }`}
-                >
-                  Label
-                </label>
-                {/* Sử dụng SearchableSelect cho nhất quán, nhưng đặt multiple={false} */}
-                <SearchableSelect
-                  options={availableLabels}
-                  // SearchableSelect có thể trả về mảng kể cả khi multiple=false,
-                  // nên cần xử lý lấy phần tử đầu tiên hoặc null.
-                  // value cần là mảng chứa ID hoặc mảng rỗng.
-                  value={selectedLabelId ? [selectedLabelId] : []}
-                  onChange={(selectedIds) => {
-                    // Giả sử onChange luôn trả về mảng ID. Lấy phần tử đầu tiên.
-                    // Kiểm tra lại cách component SearchableSelect hoạt động với single select.
-                    setSelectedLabelId(selectedIds.length > 0 ? selectedIds[0] : null);
-                  }}
-                  placeholder="Select a label..."
-                  multiple={false} // Chỉ cho phép chọn một label
-                />
-                {/* Hoặc dùng select HTML tiêu chuẩn nếu đơn giản hơn */}
-                {/*
-                 <select
-                   id="label"
-                   name="label"
-                   value={selectedLabelId || ''} // Giá trị là ID hoặc chuỗi rỗng
-                   onChange={(e) => setSelectedLabelId(e.target.value || null)} // Cập nhật state, đặt null nếu chọn giá trị rỗng
-                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 appearance-none ${
-                     theme === 'light'
-                       ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                       : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
-                   }`}
-                 >
-                   <option value="" className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}>
-                     -- Select a Label (Optional) --
-                   </option>
-                   {availableLabels.map((label) => (
-                     <option key={label.id} value={label.id} className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}>
-                       {label.name}
-                     </option>
-                   ))}
-                 </select>
-                 */}
-              </div>
-              {/* --- Kết thúc thêm trường chọn Label --- */}
 
               {/* Audio File */}
               <div className="space-y-2">
@@ -390,13 +361,21 @@ export default function NewTrack() {
                   onChange={handleFileChange}
                   className={`w-full text-sm rounded-lg border cursor-pointer focus:outline-none ${theme === 'light'
                       ? 'text-gray-900 border-gray-300 bg-gray-50 focus:border-blue-500'
-                      : 'text-gray-400 border-gray-600 bg-gray-700 placeholder-gray-400 focus:border-blue-500' // Style cho input file
-                    } file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold ${ // Style phần button của input file
-                    theme === 'light' ? 'file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200' : 'file:bg-white/10 file:text-white/80 hover:file:bg-white/20'
+                      : 'text-gray-400 border-gray-600 bg-gray-700 placeholder-gray-400 focus:border-blue-500'
+                    } file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold ${theme === 'light'
+                      ? 'file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200'
+                      : 'file:bg-white/10 file:text-white/80 hover:file:bg-white/20'
                     }`}
                   required
                 />
-                {audioFile && <span className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{audioFile.name}</span>}
+                {audioFile && (
+                  <span
+                    className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                      }`}
+                  >
+                    {audioFile.name}
+                  </span>
+                )}
               </div>
 
               {/* Cover Image */}
@@ -410,11 +389,13 @@ export default function NewTrack() {
                 </label>
                 <div
                   className="w-full flex flex-col items-center mb-4 cursor-pointer"
-                  onClick={handleCoverClick} // Cho phép click vào khu vực này để chọn file
+                  onClick={handleCoverClick}
                 >
                   <div
-                    className={`w-40 h-40 rounded-md overflow-hidden border-2 flex items-center justify-center ${theme === 'dark' ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-100'
-                      } hover:opacity-90 transition-opacity relative group`} // Thêm group cho hover effect
+                    className={`w-40 h-40 rounded-md overflow-hidden border-2 flex items-center justify-center ${theme === 'dark'
+                        ? 'border-gray-600 bg-gray-800'
+                        : 'border-gray-300 bg-gray-100'
+                      } hover:opacity-90 transition-opacity relative group`}
                   >
                     {previewImage ? (
                       <img
@@ -423,11 +404,13 @@ export default function NewTrack() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'} text-xs text-center p-2`}>
+                      <span
+                        className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
+                          } text-xs text-center p-2`}
+                      >
                         Click to upload cover
                       </span>
                     )}
-                    {/* Lớp phủ hiển thị khi hover */}
                     <div
                       className={`absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-sm`}
                     >
@@ -441,35 +424,30 @@ export default function NewTrack() {
                     name="cover"
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="hidden" // Ẩn input gốc
+                    className="hidden"
                   />
-                  {/* Hiển thị tên file đã chọn nếu có */}
-                  {coverFile && <span className={`mt-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{coverFile.name}</span>}
+                  {coverFile && (
+                    <span
+                      className={`mt-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                        }`}
+                    >
+                      {coverFile.name}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Submit Button */}
-              <div className="flex justify-end pt-4"> {/* Thêm padding top */}
+              <div className="flex justify-end pt-4">
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className={`px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors shadow-md ${ // Tăng kích thước nút, thêm shadow
-                    theme === 'light'
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
-                    } disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center`}
+                  className={`px-4 py-2 rounded-md font-medium transition-colors ${theme === 'light'
+                      ? 'bg-gray-900 text-white hover:bg-gray-800'
+                      : 'bg-white text-[#121212] hover:bg-white/90'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                  {isLoading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Track'
-                  )}
+                  {isLoading ? 'Creating...' : 'Create Track'}
                 </button>
               </div>
             </div>
@@ -479,10 +457,3 @@ export default function NewTrack() {
     </div>
   );
 }
-
-// Optional: Add specific styles for dark mode date input if needed in your global CSS
-/*
-.date-input-dark::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-}
-*/

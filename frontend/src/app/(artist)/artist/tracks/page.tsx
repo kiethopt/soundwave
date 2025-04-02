@@ -68,11 +68,14 @@ export default function TrackManagement() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
 
-  const fetchMetadata = useCallback(async () => {
+  // Tách logic đặt lại trạng thái và fetch metadata
+  const resetSelectionState = useCallback(() => {
     setSelectedFeaturedArtists([]);
     setSelectedGenres([]);
     setSelectedLabelId(null);
+  }, []);
 
+  const fetchMetadata = useCallback(async () => {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) return;
@@ -101,23 +104,37 @@ export default function TrackManagement() {
           name: label.name,
         }))
       );
-
-      if (editingTrack) {
-        setSelectedFeaturedArtists(editingTrack.featuredArtists?.map((fa) => fa.artistProfile.id) || []);
-        setSelectedGenres(editingTrack.genres?.map((g) => g.genre.id) || []);
-        setSelectedLabelId(editingTrack.label?.id || null);
-      }
     } catch (error) {
       console.error('Failed to fetch metadata:', error);
       toast.error('Failed to load required select options');
     }
-  }, [editingTrack]);
+  }, []);
 
+  // Cập nhật selectedLabelId, selectedFeaturedArtists, selectedGenres khi editingTrack thay đổi
   useEffect(() => {
     if (editingTrack) {
+      console.log('Editing track:', editingTrack);
+      console.log('Editing track label:', editingTrack.label);
+
+      // Cập nhật trạng thái dựa trên editingTrack
+      setSelectedFeaturedArtists(editingTrack.featuredArtists?.map((fa) => fa.artistProfile.id) || []);
+      setSelectedGenres(editingTrack.genres?.map((g) => g.genre.id) || []);
+      const labelId = editingTrack.label?.id || null; // Đảm bảo lấy đúng labelId
+      setSelectedLabelId(labelId);
+      console.log('Set selectedLabelId to:', labelId);
+
+      // Fetch metadata (availableArtists, availableGenres, availableLabels)
       fetchMetadata();
+    } else {
+      // Reset trạng thái khi đóng modal
+      resetSelectionState();
     }
-  }, [editingTrack, fetchMetadata]);
+  }, [editingTrack, fetchMetadata, resetSelectionState]);
+
+  // Debug giá trị selectedLabelId
+  useEffect(() => {
+    console.log('Current selectedLabelId:', selectedLabelId);
+  }, [selectedLabelId]);
 
   const handleTrackVisibility = async (trackId: string, isActive: boolean) => {
     setActionLoading(trackId);
@@ -153,7 +170,7 @@ export default function TrackManagement() {
       : `Delete ${idsToDelete.length} selected tracks?`;
     if (!confirm(confirmMessage)) return;
 
-    idsToDelete.forEach(id => setActionLoading(id));
+    idsToDelete.forEach((id) => setActionLoading(id));
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
@@ -161,11 +178,15 @@ export default function TrackManagement() {
       await refreshData();
       setRowSelection({});
       setSelectedRows([]);
-      toast.success(idsToDelete.length === 1 ? 'Track deleted successfully' : `Deleted ${idsToDelete.length} tracks successfully`);
+      toast.success(
+        idsToDelete.length === 1
+          ? 'Track deleted successfully'
+          : `Deleted ${idsToDelete.length} tracks successfully`
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete track(s)';
       toast.error(errorMessage);
-      idsToDelete.forEach(id => setActionLoading(null));
+      idsToDelete.forEach((id) => setActionLoading(null));
     }
   };
 
@@ -175,15 +196,17 @@ export default function TrackManagement() {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
+      // Xóa labelId cũ nếu có và thêm giá trị mới từ selectedLabelId
       if (formData.has('labelId')) formData.delete('labelId');
       if (selectedLabelId) {
         formData.append('labelId', selectedLabelId);
+      } else {
+        formData.append('labelId', ''); // Gửi giá trị rỗng để xóa label nếu không chọn
       }
 
       await api.tracks.update(trackId, formData, token);
       await refreshData();
       setEditingTrack(null);
-      toast.success('Track updated successfully');
     } catch (error) {
       console.error('Update track error:', error);
       const errorMessage = (error as any)?.response?.data?.message || 'Failed to update track';
@@ -198,6 +221,8 @@ export default function TrackManagement() {
     onVisibilityChange: handleTrackVisibility,
     onDelete: handleDeleteTracks,
     onEdit: (track: Track) => {
+      console.log('Track object passed TO onEdit:', track);
+      console.log('Label in track passed TO onEdit:', track.label);
       setEditingTrack(track);
     },
   });
@@ -215,7 +240,9 @@ export default function TrackManagement() {
       const newRowSelection = typeof updater === 'function' ? updater(rowSelection) : updater;
       setRowSelection(newRowSelection);
       const selectedIndexes = Object.keys(newRowSelection).filter((key) => newRowSelection[key]);
-      const newlySelectedRows = selectedIndexes.map(index => tracks[parseInt(index, 10)]).filter(Boolean);
+      const newlySelectedRows = selectedIndexes
+        .map((index) => tracks[parseInt(index, 10)])
+        .filter(Boolean);
       setSelectedRows(newlySelectedRows);
     },
     state: {
@@ -234,14 +261,23 @@ export default function TrackManagement() {
     <div className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''}`}>
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          <h1
+            className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
+          >
             Track Management
           </h1>
           <p className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : ''}`}>
             Manage and monitor your tracks
           </p>
         </div>
-        <Link href="/artist/tracks/new" className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit shadow-sm hover:shadow-md ${theme === 'light' ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+        <Link
+          href="/artist/tracks/new"
+          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${theme === 'light'
+            ? 'bg-gray-900 text-white hover:bg-gray-800'
+            : 'bg-white text-[#121212] hover:bg-white/90'
+            }`}
+        >
           New Track
         </Link>
       </div>
@@ -257,7 +293,10 @@ export default function TrackManagement() {
         theme={theme}
         toolbar={{
           searchValue: searchInput,
-          onSearchChange: (value) => { setSearchInput(value); updateQueryParam('q', value); },
+          onSearchChange: (value) => {
+            setSearchInput(value);
+            updateQueryParam('q', value);
+          },
           selectedRowsCount: selectedRows.length,
           onDelete: () => handleDeleteTracks(selectedRows.map((row) => row.id)),
           showExport: true,
@@ -266,20 +305,46 @@ export default function TrackManagement() {
             columns: [
               { key: 'title', header: 'Track Title' },
               { key: 'album.title', header: 'Album' },
-              { key: 'featuredArtists', header: 'Featured Artists', format: (val: any[]) => val?.map(a => a.artistProfile.artistName).join(', ') },
-              { key: 'genres', header: 'Genres', format: (val: any[]) => val?.map(g => g.genre.name).join(', ') },
+              {
+                key: 'featuredArtists',
+                header: 'Featured Artists',
+                format: (val: any[]) => val?.map((a) => a.artistProfile.artistName).join(', ') || '',
+              },
+              {
+                key: 'genres',
+                header: 'Genres',
+                format: (val: any[]) => val?.map((g) => g.genre.name).join(', ') || '',
+              },
               { key: 'label.name', header: 'Label' },
               { key: 'duration', header: 'Duration' },
               { key: 'playCount', header: 'Plays' },
-              { key: 'isActive', header: 'Status', format: (val: boolean) => val ? 'Visible' : 'Hidden' },
-              { key: 'releaseDate', header: 'Release Date', format: (val: string) => val ? new Date(val).toLocaleString() : '' },
-              { key: 'createdAt', header: 'Created At', format: (val: string) => val ? new Date(val).toLocaleString() : '' },
-              { key: 'updatedAt', header: 'Updated At', format: (val: string) => val ? new Date(val).toLocaleString() : '' },
+              { key: 'isActive', header: 'Status', format: (val: boolean) => (val ? 'Visible' : 'Hidden') },
+              {
+                key: 'releaseDate',
+                header: 'Release Date',
+                format: (val: string) => (val ? new Date(val).toLocaleString() : ''),
+              },
+              {
+                key: 'createdAt',
+                header: 'Created At',
+                format: (val: string) => (val ? new Date(val).toLocaleString() : ''),
+              },
+              {
+                key: 'updatedAt',
+                header: 'Updated At',
+                format: (val: string) => (val ? new Date(val).toLocaleString() : ''),
+              },
             ],
             filename: 'tracks-export',
           },
           searchPlaceholder: 'Search tracks by title...',
-          statusFilter: { value: statusFilter, onChange: (value) => { setStatusFilter(value); updateQueryParam('status', value.length === 1 ? value[0] : ''); } },
+          statusFilter: {
+            value: statusFilter,
+            onChange: (value) => {
+              setStatusFilter(value);
+              updateQueryParam('status', value.length === 1 ? value[0] : '');
+            },
+          },
           genreFilter: {
             value: genreFilter,
             onChange: (value) => {
@@ -296,11 +361,9 @@ export default function TrackManagement() {
           track={editingTrack}
           onClose={() => {
             setEditingTrack(null);
-            setSelectedFeaturedArtists([]);
-            setSelectedGenres([]);
-            setSelectedLabelId(null);
+            resetSelectionState();
           }}
-          onSubmit={handleUpdateTrack} // Truyền trực tiếp hàm với chữ ký đúng
+          onSubmit={handleUpdateTrack}
           availableArtists={availableArtists}
           availableGenres={availableGenres}
           availableLabels={availableLabels}
