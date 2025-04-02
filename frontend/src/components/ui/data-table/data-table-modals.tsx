@@ -63,33 +63,25 @@ export function EditTrackModal({
   availableGenres,
   selectedGenres,
   setSelectedGenres,
+  // Destructure các props mới cho Label
   availableLabels,
   selectedLabelId,
   setSelectedLabelId,
   theme = 'light',
 }: EditTrackModalProps) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Không cần state nội bộ cho selectedLabelId vì component cha đang quản lý nó
 
-  // Cập nhật previewImage và selectedLabelId khi track thay đổi
+  // Cập nhật preview khi track thay đổi (chỉ khi component được mount hoặc track prop thay đổi)
   useEffect(() => {
-    if (track) {
-      // Cập nhật preview image
-      if (track.coverUrl) {
-        setPreviewImage(track.coverUrl);
-      } else {
-        setPreviewImage(null);
-      }
-
-      // Cập nhật selectedLabelId dựa trên track.label
-      if (track.label?.id) {
-        setSelectedLabelId(track.label.id);
-      } else {
-        setSelectedLabelId(null); // Đặt về null nếu track không có label
-      }
+    if (track?.coverUrl) {
+      setPreviewImage(track.coverUrl);
+    } else {
+      setPreviewImage(null); // Reset nếu track mới không có ảnh
     }
-  }, [track, setSelectedLabelId]);
+  }, [track?.coverUrl]);
+
 
   if (!track) return null;
 
@@ -98,6 +90,7 @@ export function EditTrackModal({
     if (file) {
       const imageUrl = URL.createObjectURL(file);
       setPreviewImage(imageUrl);
+      // Không cần return URL.revokeObjectURL vì component sẽ unmount khi đóng modal
     }
   };
 
@@ -105,17 +98,20 @@ export function EditTrackModal({
     fileInputRef.current?.click();
   };
 
-  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  // Xử lý submit form
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!track) return;
+    if (!track) return; // Đảm bảo track tồn tại
 
-    setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
 
+    // Xóa các trường mảng cũ nếu chúng được thêm tự động bởi input ẩn (không nên)
+    // Thay vào đó, chúng ta sẽ chỉ append các giá trị từ state / props
     formData.delete('featuredArtists');
     formData.delete('genreIds');
-    formData.delete('labelId');
+    formData.delete('labelId'); // Xóa labelId cũ nếu có
 
+    // Thêm các ID từ state/props vào FormData
     selectedFeaturedArtists.forEach((artistId) => {
       formData.append('featuredArtists', artistId);
     });
@@ -124,21 +120,21 @@ export function EditTrackModal({
       formData.append('genreIds', genreId);
     });
 
+    // --- Thêm Label ID vào FormData ---
     if (selectedLabelId) {
       formData.append('labelId', selectedLabelId);
+    } else {
+      // Nếu muốn xóa label khi không chọn gì, gửi giá trị rỗng hoặc theo yêu cầu backend
+      // Ví dụ: formData.append('labelId', '');
+      // Nếu không làm gì thì sẽ không gửi trường labelId khi không chọn
     }
+    // --- Kết thúc thêm Label ID ---
 
-    try {
-      await onSubmit(track.id, formData);
-      toast.success('Track updated successfully');
-      onClose();
-    } catch (error) {
-      console.error('Error updating track:', error);
-      toast.error('Failed to update track');
-    } finally {
-      setIsSubmitting(false);
-    }
+
+    // Gọi hàm onSubmit từ component cha với FormData đã chuẩn bị
+    onSubmit(track.id, formData);
   };
+
 
   return (
     <Dialog open={!!track} onOpenChange={onClose}>
@@ -148,7 +144,8 @@ export function EditTrackModal({
       >
         <DialogHeader>
           <DialogTitle
-            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
+            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
           >
             Edit Track
           </DialogTitle>
@@ -158,6 +155,7 @@ export function EditTrackModal({
             Make changes to your track information here.
           </DialogDescription>
         </DialogHeader>
+        {/* Sử dụng hàm xử lý submit mới */}
         <form onSubmit={handleFormSubmit} className="space-y-6 mt-4">
           {/* Cover Image */}
           <div className="space-y-2">
@@ -175,13 +173,14 @@ export function EditTrackModal({
                   }}
                 />
                 <div className={`absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 hover:opacity-100 transition-opacity text-white`}>
-                  Change Cover
+                  <span>Change Cover</span>
                 </div>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
                 id="coverFile"
+                // *** QUAN TRỌNG: Đặt tên cho input file để FormData có thể lấy được nó ***
                 name="coverFile"
                 accept="image/*"
                 onChange={handleFileChange}
@@ -200,7 +199,7 @@ export function EditTrackModal({
             </span>
             <Input
               id="title"
-              name="title"
+              name="title" // Cần có name để FormData lấy được giá trị
               defaultValue={track.title}
               required
               className={`w-full px-3 py-2 rounded-md border ${theme === 'dark' ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50' : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'} transition-colors focus:outline-none`}
@@ -208,48 +207,19 @@ export function EditTrackModal({
             />
           </div>
 
-          {/* Type */}
+          {/* Type (disabled SINGLE) */}
           <div className="space-y-2">
             <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
               Type
             </span>
             <Input
-              id="type_display"
+              id="type_display" // Đổi id để không trùng với input ẩn
               value="SINGLE"
               disabled
               className={`w-full px-3 py-2 rounded-md border ${theme === 'dark' ? 'bg-[#3a3a3a] border-[#505050] text-white/70' : 'bg-gray-100 border-gray-300 text-gray-600'} transition-colors focus:outline-none cursor-not-allowed`}
             />
+            {/* Input ẩn để gửi giá trị type */}
             <input type="hidden" name="type" value="SINGLE" />
-          </div>
-
-          {/* Label */}
-          <div className="space-y-2">
-            <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
-              Label (Optional)
-            </span>
-            <select
-              id="labelId"
-              name="labelId"
-              value={selectedLabelId ?? ''} // Sử dụng ?? để xử lý null/undefined
-              onChange={(e) => setSelectedLabelId(e.target.value || null)}
-              className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
-                }`}
-            >
-              <option value="" className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}>
-                Select a label (optional)
-              </option>
-              {availableLabels.map((label) => (
-                <option
-                  key={label.id}
-                  value={label.id}
-                  className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
-                >
-                  {label.name}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* Release Date */}
@@ -259,17 +229,29 @@ export function EditTrackModal({
             </span>
             <Input
               id="releaseDate"
-              name="releaseDate"
+              name="releaseDate" // Cần có name
               type="datetime-local"
               defaultValue={(() => {
-                const date = new Date(track.releaseDate);
-                if (isNaN(date.getTime())) return '';
-                const year = date.getFullYear();
-                const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                const day = date.getDate().toString().padStart(2, '0');
-                const hours = date.getHours().toString().padStart(2, '0');
-                const minutes = date.getMinutes().toString().padStart(2, '0');
-                return `${year}-${month}-${day}T${hours}:${minutes}`;
+                try {
+                  // Chuyển đổi sang Date object, đảm bảo múi giờ đúng nếu cần
+                  const date = new Date(track.releaseDate);
+                  // Kiểm tra xem Date có hợp lệ không
+                  if (isNaN(date.getTime())) {
+                    // Nếu không hợp lệ, trả về chuỗi rỗng hoặc giá trị mặc định khác
+                    console.warn("Invalid release date:", track.releaseDate);
+                    return "";
+                  }
+                  // Định dạng sang 'YYYY-MM-DDTHH:mm'
+                  const year = date.getFullYear();
+                  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                  const day = date.getDate().toString().padStart(2, '0');
+                  const hours = date.getHours().toString().padStart(2, '0');
+                  const minutes = date.getMinutes().toString().padStart(2, '0');
+                  return `${year}-${month}-${day}T${hours}:${minutes}`;
+                } catch (error) {
+                  console.error("Error formatting release date:", error);
+                  return ""; // Fallback an toàn
+                }
               })()}
               required
               className={`w-full px-3 py-2 rounded-md border ${theme === 'dark' ? 'bg-[#3a3a3a] border-[#505050] text-white focus:border-white/50' : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'} transition-colors focus:outline-none ${theme === 'dark' ? 'date-input-dark' : ''}`}
@@ -287,7 +269,9 @@ export function EditTrackModal({
               onChange={setSelectedFeaturedArtists}
               placeholder="Select featured artists..."
               multiple={true}
+            // Không cần required nếu là optional
             />
+            {/* Input ẩn không còn cần thiết vì ta tự append vào FormData */}
           </div>
 
           {/* Genres */}
@@ -301,8 +285,30 @@ export function EditTrackModal({
               onChange={setSelectedGenres}
               placeholder="Select genres..."
               multiple={true}
+            // Không cần required nếu là optional
             />
+            {/* Input ẩn không còn cần thiết */}
           </div>
+
+          {/* --- Thêm trường chọn Label --- */}
+          <div className="space-y-2">
+            <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+              Label (Optional)
+            </span>
+            <SearchableSelect
+              options={availableLabels}
+              // Giá trị là mảng chứa ID hoặc rỗng
+              value={selectedLabelId ? [selectedLabelId] : []}
+              // Cập nhật state ở component cha khi thay đổi
+              onChange={(ids) => setSelectedLabelId(ids.length > 0 ? ids[0] : null)}
+              placeholder="Select a label..."
+              multiple={false} // Chỉ cho chọn 1
+            // Không cần required nếu là optional
+            />
+            {/* Input ẩn không còn cần thiết */}
+          </div>
+          {/* --- Kết thúc thêm trường chọn Label --- */}
+
 
           {/* Buttons */}
           <div className="flex justify-end gap-3 pt-4">
@@ -316,17 +322,12 @@ export function EditTrackModal({
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
-              className={theme === 'dark' ? 'bg-white text-black hover:bg-white/90' : 'bg-gray-900 text-white hover:bg-gray-800'}
+              className={theme === 'dark' ? 'bg-white text-black hover:bg-white/90' : ''}
+            // Thêm trạng thái loading nếu cần
+            // disabled={isLoading}
             >
-              {isSubmitting ? (
-                <>
-                  <Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Changes'
-              )}
+              {/* {isLoading ? 'Saving...' : 'Save Changes'} */}
+              Save Changes
             </Button>
           </div>
         </form>
@@ -342,9 +343,6 @@ interface EditAlbumModalProps {
   availableGenres: Array<{ id: string; name: string }>;
   selectedGenres: string[];
   setSelectedGenres: (genres: string[]) => void;
-  availableLabels: Array<{ id: string; name: string }>; // Thêm prop cho labels
-  selectedLabelId: string | null; // Thêm state cho labelId
-  setSelectedLabelId: Dispatch<SetStateAction<string | null>>; // Thêm setter
   theme?: 'light' | 'dark';
 }
 
@@ -355,71 +353,25 @@ export function EditAlbumModal({
   availableGenres,
   selectedGenres,
   setSelectedGenres,
-  availableLabels,
-  selectedLabelId,
-  setSelectedLabelId,
   theme = 'light',
 }: EditAlbumModalProps) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Cập nhật previewImage và selectedLabelId khi album thay đổi
-  useEffect(() => {
-    if (album) {
-      if (album.coverUrl) {
-        setPreviewImage(album.coverUrl);
-      } else {
-        setPreviewImage(null);
-      }
-      // Cập nhật selectedLabelId dựa trên album.label
-      setSelectedLabelId(album.label?.id || null);
-      setSelectedGenres(album.genres.map((g) => g.genre.id));
-    }
-  }, [album, setSelectedLabelId]);
 
   if (!album) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Tạo URL tạm thời để xem trước ảnh
       const imageUrl = URL.createObjectURL(file);
       setPreviewImage(imageUrl);
     }
   };
 
+  // Hàm xử lý khi click vào ảnh cover
   const handleCoverClick = () => {
     fileInputRef.current?.click();
-  };
-
-  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    const formData = new FormData(e.currentTarget);
-
-    // Xóa genres cũ và thêm genres mới từ selectedGenres
-    formData.delete('genres');
-    formData.append('updateGenres', 'true');
-    selectedGenres.forEach((genreId) => {
-      formData.append('genres', genreId);
-    });
-
-    // Xử lý labelId
-    formData.delete('labelId');
-    if (selectedLabelId) {
-      formData.append('labelId', selectedLabelId);
-    }
-
-    try {
-      await onSubmit(album.id, formData);
-      toast.success('Album updated successfully');
-      onClose();
-    } catch (error) {
-      console.error('Error updating album:', error);
-      toast.error('Failed to update album');
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   return (
@@ -430,7 +382,8 @@ export function EditAlbumModal({
       >
         <DialogHeader>
           <DialogTitle
-            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
+            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
           >
             Edit Album
           </DialogTitle>
@@ -440,24 +393,60 @@ export function EditAlbumModal({
             Make changes to your album information here.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleFormSubmit} className="space-y-6 mt-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+
+            // Xóa các trường hiện có để tránh trùng lặp
+            formData.delete('genres');
+
+            // Luôn thêm một trường đánh dấu để backend biết mình đang cố gắng cập nhật
+            formData.append('updateGenres', 'true');
+
+            // Thêm từng genre vào formDataType
+            selectedGenres.forEach((genreId) => {
+              formData.append('genres', genreId);
+            });
+
+            onSubmit(album.id, formData);
+          }}
+          className="space-y-6 mt-4"
+        >
           {/* Cover Image */}
           <div className="space-y-2">
-            <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+            <span
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
+            >
               Cover Image
             </span>
-            <div className="w-full flex flex-col items-center mb-4" onClick={handleCoverClick}>
-              <div className={`w-40 h-40 rounded-md overflow-hidden cursor-pointer border-2 ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'} hover:opacity-90 transition-opacity relative`}>
+            <div
+              className="w-full flex flex-col items-center mb-4"
+              onClick={handleCoverClick}
+            >
+              <div
+                className={`w-40 h-40 rounded-md overflow-hidden cursor-pointer border-2 ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
+                  } hover:opacity-90 transition-opacity relative`}
+              >
                 <img
-                  src={previewImage || album.coverUrl || 'https://placehold.co/150x150?text=No+Cover'}
+                  src={
+                    previewImage ||
+                    album.coverUrl ||
+                    'https://placehold.co/150x150?text=No+Cover'
+                  }
                   alt="Album cover"
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    e.currentTarget.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22150%22%20height%3D%22150%22%20viewBox%3D%220%200%20150%20150%22%3E%3Crect%20fill%3D%22%23ccc%22%20width%3D%22150%22%20height%3D%22150%22%2F%3E%3Ctext%20fill%3D%22%23666%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%20dy%3D%22.5em%22%20text-anchor%3D%22middle%22%20x%3D%2275%22%20y%3D%2275%22%3ENo%20Image%3C%2Ftext%3E%3C%2Fsvg%3E';
+                    // Fallback nếu hình ảnh không load được
+                    e.currentTarget.src =
+                      'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22150%22%20height%3D%22150%22%20viewBox%3D%220%200%20150%20150%22%3E%3Crect%20fill%3D%22%23ccc%22%20width%3D%22150%22%20height%3D%22150%22%2F%3E%3Ctext%20fill%3D%22%23666%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%20dy%3D%22.5em%22%20text-anchor%3D%22middle%22%20x%3D%2275%22%20y%3D%2275%22%3ENo%20Image%3C%2Ftext%3E%3C%2Fsvg%3E';
                   }}
                 />
-                <div className={`absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 hover:opacity-100 transition-opacity text-white`}>
-                  Change Cover
+                <div
+                  className={`absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 hover:opacity-100 transition-opacity text-white`}
+                >
+                  <span>Change Cover</span>
                 </div>
               </div>
               <input
@@ -469,7 +458,10 @@ export function EditAlbumModal({
                 onChange={handleFileChange}
                 className="hidden"
               />
-              <span className={`mt-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              <span
+                className={`mt-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  }`}
+              >
                 Click to upload new cover image
               </span>
             </div>
@@ -477,7 +469,10 @@ export function EditAlbumModal({
 
           {/* Title */}
           <div className="space-y-2">
-            <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+            <span
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
+            >
               Title
             </span>
             <Input
@@ -485,60 +480,42 @@ export function EditAlbumModal({
               name="title"
               defaultValue={album.title}
               required
-              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark' ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50' : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'} transition-colors focus:outline-none`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50'
+                : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'
+                } transition-colors focus:outline-none`}
               placeholder="Enter album title"
             />
           </div>
 
           {/* Type */}
           <div className="space-y-2">
-            <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+            <span
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
+            >
               Type
             </span>
             <select
               id="type"
               name="type"
               defaultValue={album.type}
-              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark' ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50' : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'} transition-colors focus:outline-none`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50'
+                : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'
+                } transition-colors focus:outline-none`}
             >
               <option value="ALBUM">Album</option>
               <option value="EP">EP</option>
             </select>
           </div>
 
-          {/* Label */}
-          <div className="space-y-2">
-            <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
-              Label (Optional)
-            </span>
-            <select
-              id="labelId"
-              name="labelId"
-              value={selectedLabelId ?? ''} // Sử dụng ?? để xử lý null/undefined
-              onChange={(e) => setSelectedLabelId(e.target.value || null)}
-              className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
-                }`}
-            >
-              <option value="" className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}>
-                Select a label (optional)
-              </option>
-              {availableLabels.map((label) => (
-                <option
-                  key={label.id}
-                  value={label.id}
-                  className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
-                >
-                  {label.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Release Date */}
           <div className="space-y-2">
-            <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+            <span
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
+            >
               Release Date
             </span>
             <Input
@@ -547,16 +524,31 @@ export function EditAlbumModal({
               type="datetime-local"
               defaultValue={(() => {
                 const date = new Date(album.releaseDate);
-                return date.toLocaleString('sv', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(' ', 'T');
+                return date
+                  .toLocaleString('sv', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: undefined,
+                  })
+                  .replace(' ', 'T');
               })()}
               required
-              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark' ? 'bg-[#3a3a3a] border-[#505050] text-white focus:border-white/50' : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'} transition-colors focus:outline-none ${theme === 'dark' ? 'date-input-dark' : ''}`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white focus:border-white/50'
+                : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'
+                } transition-colors focus:outline-none`}
             />
           </div>
 
           {/* Genres */}
           <div className="space-y-2">
-            <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+            <span
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
+            >
               Genres
             </span>
             <SearchableSelect
@@ -575,23 +567,21 @@ export function EditAlbumModal({
               type="button"
               variant="outline"
               onClick={onClose}
-              className={theme === 'dark' ? 'border-white/50 text-white hover:bg-white/10' : ''}
+              className={
+                theme === 'dark'
+                  ? 'border-white/50 text-white hover:bg-white/10'
+                  : ''
+              }
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
-              className={theme === 'dark' ? 'bg-white text-black hover:bg-white/90' : 'bg-gray-900 text-white hover:bg-gray-800'}
+              className={
+                theme === 'dark' ? 'bg-white text-black hover:bg-white/90' : ''
+              }
             >
-              {isSubmitting ? (
-                <>
-                  <Spinner className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Changes'
-              )}
+              Save Changes
             </Button>
           </div>
         </form>
@@ -1807,10 +1797,10 @@ export function AlbumDetailModal({
           style={{
             background: dominantColor
               ? `linear-gradient(180deg, 
-                    ${dominantColor} 0%, 
-                    ${dominantColor}99 15%,
-                    ${dominantColor}40 30%,
-                    ${theme === 'light' ? '#ffffff' : '#1e1e1e'} 100%)`
+                  ${dominantColor} 0%, 
+                  ${dominantColor}99 15%,
+                  ${dominantColor}40 30%,
+                  ${theme === 'light' ? '#ffffff' : '#1e1e1e'} 100%)`
               : theme === 'light'
                 ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
                 : 'linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)',
@@ -2113,10 +2103,10 @@ export function TrackDetailModal({
           style={{
             background: dominantColor
               ? `linear-gradient(180deg, 
-                    ${dominantColor} 0%, 
-                    ${dominantColor}99 15%,
-                    ${dominantColor}40 30%,
-                    ${theme === 'light' ? '#ffffff' : '#1e1e1e'} 100%)`
+                  ${dominantColor} 0%, 
+                  ${dominantColor}99 15%,
+                  ${dominantColor}40 30%,
+                  ${theme === 'light' ? '#ffffff' : '#1e1e1e'} 100%)`
               : theme === 'light'
                 ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
                 : 'linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)',

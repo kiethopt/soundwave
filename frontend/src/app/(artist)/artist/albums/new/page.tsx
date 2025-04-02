@@ -16,7 +16,6 @@ export default function NewAlbum() {
     title: '',
     type: 'ALBUM',
     releaseDate: '',
-    labelId: '', // Thêm labelId vào albumData
   });
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -25,9 +24,6 @@ export default function NewAlbum() {
     Array<{ id: string; name: string }>
   >([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [availableLabels, setAvailableLabels] = useState<
-    Array<{ id: string; name: string }>
-  >([]); // Thêm state cho labels
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -41,15 +37,6 @@ export default function NewAlbum() {
           genresResponse.genres.map((genre: { id: string; name: string }) => ({
             id: genre.id,
             name: genre.name,
-          }))
-        );
-
-        // Fetch labels với page=1 và limit=100
-        const labelsResponse = await api.labels.getAll(token, 1, 100);
-        setAvailableLabels(
-          labelsResponse.labels.map((label: { id: string; name: string }) => ({
-            id: label.id,
-            name: label.name,
           }))
         );
       } catch (error) {
@@ -99,9 +86,6 @@ export default function NewAlbum() {
       formData.append('title', albumData.title);
       formData.append('type', albumData.type);
       formData.append('releaseDate', albumData.releaseDate);
-      if (albumData.labelId) {
-        formData.append('labelId', albumData.labelId); // Thêm labelId vào formData
-      }
 
       if (coverFile) {
         formData.append('coverFile', coverFile);
@@ -135,10 +119,11 @@ export default function NewAlbum() {
           <div className="w-fit">
             <Link
               href="/artist/albums"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${theme === 'light'
-                ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
-                : 'bg-white/10 hover:bg-white/15 text-white/80 hover:text-white'
-                }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                theme === 'light'
+                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
+                  : 'bg-white/10 hover:bg-white/15 text-white/80 hover:text-white'
+              }`}
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back</span>
@@ -148,10 +133,11 @@ export default function NewAlbum() {
 
         {/* Main Form Card */}
         <div
-          className={`rounded-xl p-6 border ${theme === 'light'
-            ? 'bg-white border-gray-200'
-            : 'bg-[#121212] border-gray-800'
-            }`}
+          className={`rounded-xl p-6 border ${
+            theme === 'light'
+              ? 'bg-white border-gray-200'
+              : 'bg-[#121212] border-gray-800'
+          }`}
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
@@ -159,8 +145,9 @@ export default function NewAlbum() {
               <div className="space-y-2">
                 <label
                   htmlFor="title"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
+                  className={`block text-sm font-medium ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  }`}
                 >
                   Title
                 </label>
@@ -170,10 +157,11 @@ export default function NewAlbum() {
                   name="title"
                   value={albumData.title}
                   onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                    ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-                    }`}
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${
+                    theme === 'light'
+                      ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+                  }`}
                   required
                 />
               </div>
@@ -182,8 +170,9 @@ export default function NewAlbum() {
               <div className="space-y-2">
                 <label
                   htmlFor="type"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
+                  className={`block text-sm font-medium ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  }`}
                 >
                   Type
                 </label>
@@ -192,10 +181,11 @@ export default function NewAlbum() {
                   name="type"
                   value={albumData.type}
                   onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                    ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
-                    }`}
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${
+                    theme === 'light'
+                      ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
+                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
+                  }`}
                 >
                   <option
                     value="ALBUM"
@@ -216,49 +206,13 @@ export default function NewAlbum() {
                 </select>
               </div>
 
-              {/* Label */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="labelId"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
-                >
-                  Label
-                </label>
-                <select
-                  id="labelId"
-                  name="labelId"
-                  value={albumData.labelId}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                    ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
-                    }`}
-                >
-                  <option
-                    value=""
-                    className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
-                  >
-                    Select a label (optional)
-                  </option>
-                  {availableLabels.map((label) => (
-                    <option
-                      key={label.id}
-                      value={label.id}
-                      className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
-                    >
-                      {label.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* Release Date & Time */}
               <div className="space-y-2">
                 <label
                   htmlFor="releaseDate"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
+                  className={`block text-sm font-medium ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  }`}
                 >
                   Release Date & Time
                 </label>
@@ -268,10 +222,11 @@ export default function NewAlbum() {
                   name="releaseDate"
                   value={albumData.releaseDate}
                   onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                    ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-                    }`}
+                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${
+                    theme === 'light'
+                      ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+                  }`}
                   required
                 />
               </div>
@@ -280,8 +235,9 @@ export default function NewAlbum() {
               <div className="space-y-2">
                 <label
                   htmlFor="genres"
-                  className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                    }`}
+                  className={`block text-sm font-medium ${
+                    theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                  }`}
                 >
                   Genres
                 </label>
@@ -299,8 +255,9 @@ export default function NewAlbum() {
               <div className="space-y-2">
                 <label
                   htmlFor="cover"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
+                  className={`block text-sm font-medium ${
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  }`}
                 >
                   Cover Image
                 </label>
@@ -309,8 +266,9 @@ export default function NewAlbum() {
                   onClick={handleCoverClick}
                 >
                   <div
-                    className={`w-40 h-40 rounded-md overflow-hidden cursor-pointer border-2 ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
-                      } hover:opacity-90 transition-opacity relative`}
+                    className={`w-40 h-40 rounded-md overflow-hidden cursor-pointer border-2 ${
+                      theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
+                    } hover:opacity-90 transition-opacity relative`}
                   >
                     <img
                       src={
@@ -336,8 +294,9 @@ export default function NewAlbum() {
                     className="hidden"
                   />
                   <span
-                    className={`mt-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                      }`}
+                    className={`mt-2 text-sm ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                    }`}
                   >
                     Click to upload cover image
                   </span>
@@ -349,10 +308,11 @@ export default function NewAlbum() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className={`px-4 py-2 rounded-md font-medium transition-colors ${theme === 'light'
-                    ? 'bg-gray-900 text-white hover:bg-gray-800'
-                    : 'bg-white text-[#121212] hover:bg-white/90'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                    theme === 'light'
+                      ? 'bg-gray-900 text-white hover:bg-gray-800'
+                      : 'bg-white text-[#121212] hover:bg-white/90'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {isLoading ? 'Creating...' : 'Create Album'}
                 </button>
