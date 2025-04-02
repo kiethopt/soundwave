@@ -17,6 +17,8 @@ import eventRoutes from './routes/event.routes';
 import labelRoutes from './routes/label.routes';
 // Import the extended Prisma client to ensure extensions are loaded
 import prisma from './config/db';
+import { createDefaultSystemPlaylists } from './services/playlist.service';
+import { registerPlaylistCronJobs } from './prisma/extensions/playlist.extension';
 
 dotenv.config();
 
@@ -47,6 +49,10 @@ const initializeApp = async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     console.log('✅ Database connection established');
+
+    // Register cron jobs
+    registerPlaylistCronJobs();
+    console.log('✅ Cron jobs registered via extension system');
   } catch (error) {
     console.error('❌ Database connection error:', error);
     process.exit(1);
@@ -54,7 +60,24 @@ const initializeApp = async () => {
 };
 
 const PORT = process.env.PORT || 10000;
+
+// Initialize app and system playlists
+const initApp = async () => {
+  try {
+    // First initialize the application
+    await initializeApp();
+
+    // Then initialize system playlists
+    await createDefaultSystemPlaylists();
+    console.log('[Init] System playlists initialized');
+  } catch (error) {
+    console.error('[Init] Error during initialization:', error);
+  }
+};
+
+// Start the server
 server.listen(PORT, async () => {
   console.log(`🚀 Server is running on port ${PORT}`);
-  await initializeApp();
+  // Initialize app and system playlists after server starts
+  await initApp();
 });

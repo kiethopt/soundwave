@@ -45,7 +45,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateMaintenanceMode = exports.getRecommendationMatrix = exports.updateAIModel = exports.updateCacheStatus = exports.getSystemStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.updateMaintenanceMode = exports.updateAIModel = exports.updateCacheStatus = exports.getSystemStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
@@ -53,7 +53,6 @@ const upload_service_1 = require("./upload.service");
 const handle_utils_1 = require("../utils/handle-utils");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-const ml_matrix_1 = __importDefault(require("ml-matrix"));
 const getUsers = (req) => __awaiter(void 0, void 0, void 0, function* () {
     const { search = '', status } = req.query;
     const where = Object.assign(Object.assign({ role: 'USER' }, (search
@@ -352,7 +351,7 @@ const approveArtistRequest = (requestId) => __awaiter(void 0, void 0, void 0, fu
             verificationRequestedAt: null,
         },
         include: {
-            user: { select: prisma_selects_1.userSelect }
+            user: { select: prisma_selects_1.userSelect },
         },
     });
 });
@@ -457,237 +456,64 @@ const updateCacheStatus = (enabled) => __awaiter(void 0, void 0, void 0, functio
 exports.updateCacheStatus = updateCacheStatus;
 const updateAIModel = (model) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const envPath = path.resolve(__dirname, '../../.env');
-        const envContent = fs.readFileSync(envPath, 'utf8');
-        const supportedModels = [
+        const validModels = [
+            'gemini-2.5-pro-exp-03-25',
             'gemini-2.0-flash',
-            'gemini-2.0-flash-thinking-exp-01-21',
             'gemini-2.0-flash-lite',
-            'gemini-2.0-pro-exp-02-05',
             'gemini-1.5-flash',
+            'gemini-1.5-flash-8b',
+            'gemini-1.5-pro',
         ];
-        if (model === undefined) {
-            const currentModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+        if (!model) {
             return {
-                model: currentModel,
-                supportedModels,
+                success: true,
+                message: 'Current AI model settings retrieved',
+                data: {
+                    model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+                    enabled: !!process.env.GEMINI_API_KEY,
+                    validModels,
+                },
             };
         }
-        if (!supportedModels.includes(model)) {
-            throw new Error('Unsupported AI model');
+        if (!validModels.includes(model)) {
+            throw new Error(`Invalid model name. Valid models are: ${validModels.join(', ')}`);
         }
-        if (envContent.includes('GEMINI_MODEL=')) {
-            const updatedContent = envContent.replace(/GEMINI_MODEL=.*/, `GEMINI_MODEL=${model}`);
-            fs.writeFileSync(envPath, updatedContent);
+        let envPath;
+        if (process.env.NODE_ENV === 'development') {
+            envPath = path.join(process.cwd(), '.env');
         }
         else {
-            fs.writeFileSync(envPath, `${envContent}\nGEMINI_MODEL=${model}`);
+            envPath = path.join(process.cwd(), '..', '.env');
         }
+        if (!fs.existsSync(envPath)) {
+            throw new Error(`.env file not found at ${envPath}`);
+        }
+        let envContent = fs.readFileSync(envPath, 'utf8');
+        if (envContent.includes('GEMINI_MODEL=')) {
+            envContent = envContent.replace(/GEMINI_MODEL=.*/, `GEMINI_MODEL=${model}`);
+        }
+        else {
+            envContent += `\nGEMINI_MODEL=${model}`;
+        }
+        fs.writeFileSync(envPath, envContent);
         process.env.GEMINI_MODEL = model;
-        console.log(`[AI] Model set to: ${model}`);
+        console.log(`[Admin] AI model changed to: ${model}`);
         return {
-            model,
-            supportedModels,
+            success: true,
+            message: `AI model settings updated to ${model}`,
+            data: {
+                model,
+                enabled: true,
+                validModels,
+            },
         };
     }
     catch (error) {
-        console.error('Error updating AI model', error);
-        throw new Error('Failed to update AI model');
+        console.error('[Admin] Error updating AI model:', error);
+        throw error;
     }
 });
 exports.updateAIModel = updateAIModel;
-const getRecommendationMatrix = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (limit = 100) {
-    try {
-        const activeUsers = yield db_1.default.user.findMany({
-            where: {
-                history: {
-                    some: {
-                        type: 'PLAY',
-                        playCount: { gt: 2 },
-                    },
-                },
-            },
-            select: {
-                id: true,
-                name: true,
-                username: true,
-                email: true,
-                avatar: true,
-            },
-            take: limit,
-        });
-        if (activeUsers.length < 2) {
-            return {
-                success: false,
-                message: 'Not enough user data for matrix analysis',
-                data: null,
-            };
-        }
-        const userIds = activeUsers.map((u) => u.id);
-        const popularTracks = yield db_1.default.track.findMany({
-            where: {
-                history: {
-                    some: {
-                        userId: { in: userIds },
-                    },
-                },
-            },
-            orderBy: { playCount: 'desc' },
-            select: {
-                id: true,
-                title: true,
-                artistId: true,
-                artist: {
-                    select: {
-                        artistName: true,
-                    },
-                },
-                playCount: true,
-                coverUrl: true,
-            },
-            take: limit,
-        });
-        const trackIds = popularTracks.map((t) => t.id);
-        const userHistory = yield db_1.default.history.findMany({
-            where: {
-                userId: { in: userIds },
-                trackId: { in: trackIds },
-                type: 'PLAY',
-            },
-            select: {
-                userId: true,
-                trackId: true,
-                playCount: true,
-            },
-        });
-        const userLikes = yield db_1.default.userLikeTrack.findMany({
-            where: {
-                userId: { in: userIds },
-                trackId: { in: trackIds },
-            },
-            select: {
-                userId: true,
-                trackId: true,
-            },
-        });
-        const userIdToIndex = new Map();
-        const trackIdToIndex = new Map();
-        activeUsers.forEach((user, index) => {
-            userIdToIndex.set(user.id, index);
-        });
-        popularTracks.forEach((track, index) => {
-            trackIdToIndex.set(track.id, index);
-        });
-        const matrix = new ml_matrix_1.default(userIds.length, trackIds.length);
-        userHistory.forEach((history) => {
-            const userIndex = userIdToIndex.get(history.userId);
-            const trackIndex = trackIdToIndex.get(history.trackId);
-            if (userIndex !== undefined && trackIndex !== undefined) {
-                matrix.set(userIndex, trackIndex, history.playCount || 1);
-            }
-        });
-        userLikes.forEach((like) => {
-            const userIndex = userIdToIndex.get(like.userId);
-            const trackIndex = trackIdToIndex.get(like.trackId);
-            if (userIndex !== undefined && trackIndex !== undefined) {
-                const currentValue = matrix.get(userIndex, trackIndex);
-                matrix.set(userIndex, trackIndex, currentValue + 3);
-            }
-        });
-        const normalizedMatrix = normalizeMatrix(matrix);
-        const itemSimilarityMatrix = calculateItemSimilarity(normalizedMatrix);
-        return {
-            success: true,
-            data: {
-                users: activeUsers,
-                tracks: popularTracks,
-                matrix: matrix.to2DArray(),
-                normalizedMatrix: normalizedMatrix.to2DArray(),
-                itemSimilarityMatrix: itemSimilarityMatrix.to2DArray(),
-                stats: {
-                    userCount: activeUsers.length,
-                    trackCount: popularTracks.length,
-                    totalInteractions: userHistory.length + userLikes.length,
-                    sparsity: calculateSparsity(matrix),
-                },
-            },
-        };
-    }
-    catch (error) {
-        console.error('Error fetching recommendation matrix:', error);
-        return {
-            success: false,
-            message: 'Failed to retrieve recommendation matrix',
-            error: error instanceof Error ? error.message : 'Unknown error',
-        };
-    }
-});
-exports.getRecommendationMatrix = getRecommendationMatrix;
-const calculateSparsity = (matrix) => {
-    const rows = matrix.rows;
-    const cols = matrix.columns;
-    let nonZeroCount = 0;
-    for (let i = 0; i < rows; i++) {
-        for (let j = 0; j < cols; j++) {
-            if (matrix.get(i, j) !== 0) {
-                nonZeroCount++;
-            }
-        }
-    }
-    return 1 - nonZeroCount / (rows * cols);
-};
-const normalizeMatrix = (matrix) => {
-    const normalizedMatrix = matrix.clone();
-    const rows = normalizedMatrix.rows;
-    const columns = normalizedMatrix.columns;
-    for (let i = 0; i < rows; i++) {
-        const rowValues = normalizedMatrix.getRow(i);
-        const sum = rowValues.reduce((acc, val) => acc + val, 0);
-        if (sum > 0) {
-            for (let j = 0; j < columns; j++) {
-                const currentValue = normalizedMatrix.get(i, j);
-                const normalizedValue = currentValue / sum;
-                normalizedMatrix.set(i, j, normalizedValue);
-            }
-        }
-    }
-    return normalizedMatrix;
-};
-const calculateItemSimilarity = (matrix) => {
-    const transposedMatrix = matrix.transpose();
-    const itemCount = transposedMatrix.rows;
-    const similarityMatrix = new ml_matrix_1.default(itemCount, itemCount);
-    for (let i = 0; i < itemCount; i++) {
-        for (let j = 0; j < itemCount; j++) {
-            if (i === j) {
-                similarityMatrix.set(i, j, 1);
-            }
-            else {
-                const itemVectorI = transposedMatrix.getRow(i);
-                const itemVectorJ = transposedMatrix.getRow(j);
-                const similarity = cosineSimilarity(itemVectorI, itemVectorJ);
-                similarityMatrix.set(i, j, similarity);
-            }
-        }
-    }
-    return similarityMatrix;
-};
-const cosineSimilarity = (vectorA, vectorB) => {
-    let dotProduct = 0;
-    let magnitudeA = 0;
-    let magnitudeB = 0;
-    for (let i = 0; i < vectorA.length; i++) {
-        dotProduct += vectorA[i] * vectorB[i];
-        magnitudeA += vectorA[i] * vectorA[i];
-        magnitudeB += vectorB[i] * vectorB[i];
-    }
-    magnitudeA = Math.sqrt(magnitudeA);
-    magnitudeB = Math.sqrt(magnitudeB);
-    if (magnitudeA === 0 || magnitudeB === 0) {
-        return 0;
-    }
-    return dotProduct / (magnitudeA * magnitudeB);
-};
 const updateMaintenanceMode = (enabled) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const envPath = path.resolve(__dirname, '../../.env');

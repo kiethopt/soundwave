@@ -11,47 +11,51 @@ import {
   updatePlaylist,
   removeTrackFromPlaylist,
   addTrackToPlaylist,
-  createPersonalizedPlaylist,
-  getSystemPlaylist,
-  updateAllSystemPlaylists,
   getSystemPlaylists,
   updateVibeRewindPlaylist,
+  generateAIPlaylist,
+  // System playlist controllers
+  createSystemPlaylists,
+  getSystemPlaylist,
+  updateSystemPlaylistForUser,
+  updateAllSystemPlaylists,
+  getHomePageData,
 } from '../controllers/playlist.controller';
 import { cacheMiddleware } from '../middleware/cache.middleware';
+import { Role } from '@prisma/client';
 
 const router = express.Router();
 
-// Public routes (no authentication required)
+// == Public routes (no authentication required) ==
 router.get('/system-all', cacheMiddleware, getSystemPlaylists);
-
-// Route that works with or without authentication
+router.get('/home', optionalAuthenticate, getHomePageData);
 router.get('/:id', optionalAuthenticate, getPlaylistById);
 
-// Đảm bảo tất cả routes đều có authenticate middleware (except public ones above)
+// == Authenticated user routes ==
 router.use(authenticate);
 
-// Route AI-generated playlist
-router.post('/personalized', createPersonalizedPlaylist);
-
-// Route for Vibe Rewind playlist
-router.post('/vibe-rewind', updateVibeRewindPlaylist);
-
-// Route to get the system playlist
-router.get('/system', getSystemPlaylist);
-router.post(
-  '/system/update-all',
-  authenticate,
-  authorize(['ADMIN']),
-  updateAllSystemPlaylists
-);
-
-// Các routes khác
-router.post('/', createPlaylist);
+// Standard playlist management routes
 router.get('/', getPlaylists);
+router.post('/', createPlaylist);
 router.patch('/:id', updatePlaylist);
 router.delete('/:playlistId/tracks/:trackId', removeTrackFromPlaylist);
-
-// Sửa lại route thêm track vào playlist
 router.post('/:id/tracks', addTrackToPlaylist);
+
+// AI playlist routes
+router.post('/ai-generate', generateAIPlaylist);
+router.post('/ai-generate/artist/:artistName', (req, res, next) => {
+  req.body.basedOnArtist = req.params.artistName;
+  generateAIPlaylist(req, res, next);
+});
+
+// User-specific system playlist routes
+router.post('/vibe-rewind', updateVibeRewindPlaylist);
+router.get('/system/:playlistName', getSystemPlaylist);
+router.post('/system/:playlistName/user/:userId', updateSystemPlaylistForUser);
+
+// == Admin-only routes ==
+router.use('/admin', authorize([Role.ADMIN]));
+router.post('/admin/system/create', createSystemPlaylists);
+router.post('/admin/system/update-all', updateAllSystemPlaylists);
 
 export default router;

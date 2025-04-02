@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
-import { MusicAuthDialog } from '@/components/ui/music-auth-dialog';
+import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 
 interface AlbumTracksProps {
   tracks: Track[];

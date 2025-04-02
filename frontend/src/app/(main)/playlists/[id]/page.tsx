@@ -9,13 +9,7 @@ import { api } from '@/utils/api';
 import { Playlist } from '@/types';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
-import { MusicAuthDialog } from '@/components/ui/music-auth-dialog';
-
-interface UpdatePlaylistData {
-  name: string;
-  description: string;
-  privacy: 'PUBLIC' | 'PRIVATE';
-}
+import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 
 export default function PlaylistPage() {
   const { id } = useParams();
@@ -82,26 +76,6 @@ export default function PlaylistPage() {
     });
   };
 
-  const handleUpdatePlaylist = async (data: UpdatePlaylistData) => {
-    handleProtectedAction(async () => {
-      try {
-        const token = localStorage.getItem('userToken');
-        if (!token || !playlist) return;
-
-        // For special playlists, always keep them private
-        const updatedData = isSpecialPlaylist
-          ? { ...data, privacy: 'PRIVATE' as 'PRIVATE' }
-          : data;
-
-        await api.playlists.update(id as string, updatedData, token);
-        setPlaylist({ ...playlist, ...updatedData });
-        setIsEditOpen(false);
-      } catch (error) {
-        console.error('Error updating playlist:', error);
-      }
-    });
-  };
-
   if (loading) return <div>Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
   if (!playlist) return <div>Playlist not found</div>;
@@ -110,15 +84,28 @@ export default function PlaylistPage() {
     <div className="flex flex-col">
       {/* Header */}
       <div className="flex items-end gap-6 p-6 bg-gradient-to-b from-[#A57865]/30">
-        <div className="w-[232px] h-[232px] flex-shrink-0">
+        <div className="w-[232px] h-[232px] flex-shrink-0 relative">
           {playlist.coverUrl ? (
-            <Image
-              src={playlist.coverUrl}
-              alt={playlist.name}
-              width={232}
-              height={232}
-              className="w-full h-full object-cover shadow-lg rounded-md"
-            />
+            <>
+              <Image
+                src={playlist.coverUrl}
+                alt={playlist.name}
+                width={232}
+                height={232}
+                className="w-full h-full object-cover shadow-lg rounded-md"
+              />
+              {playlist.isAIGenerated && (
+                <div className="absolute top-3 right-3 bg-black/40 rounded-full p-1">
+                  <Image
+                    src="/images/googleGemini_icon.png"
+                    width={36}
+                    height={36}
+                    alt="AI Generated"
+                    className="rounded-full"
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <div className="w-full h-full bg-white/10 flex items-center justify-center rounded-md">
               <div className="text-white/70">
@@ -135,7 +122,11 @@ export default function PlaylistPage() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="text-sm font-medium text-white/70">Playlist</div>
+          <div className="text-sm font-medium text-white/70">
+            {playlist.privacy === 'PRIVATE'
+              ? 'Private Playlist'
+              : 'Public Playlist'}
+          </div>
           <div className="flex items-center gap-2">
             <h1 className="text-[2rem] font-bold leading-tight">
               {playlist.name}
@@ -150,18 +141,20 @@ export default function PlaylistPage() {
                 Favorites
               </span>
             )}
+            {playlist.isAIGenerated && (
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-500/20 text-purple-400 flex items-center gap-1">
+                <span>Personalized</span>
+              </span>
+            )}
           </div>
           {playlist.description && (
             <p className="text-sm text-white/70">{playlist.description}</p>
           )}
           <div className="flex items-center gap-1 text-sm text-white/70">
             <span>{playlist.tracks.length} songs</span>
-            {isSpecialPlaylist && (
-              <span className="ml-2 text-xs opacity-60">• Private</span>
-            )}
           </div>
           <div className="mt-4">
-            {playlist.canEdit && (
+            {playlist.canEdit && !playlist.isAIGenerated && (
               <Button
                 onClick={() => handleProtectedAction(() => setIsEditOpen(true))}
                 disabled={false}

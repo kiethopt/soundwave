@@ -185,23 +185,26 @@ model History {
 }
 
 model Playlist {
-  id            String          @id @default(cuid())
-  name          String
-  description   String?
-  coverUrl      String?
-  privacy       PlaylistPrivacy @default(PRIVATE)
-  type          PlaylistType    @default(NORMAL)
-  isAIGenerated Boolean         @default(false)
-  totalTracks   Int             @default(0)
-  totalDuration Int             @default(0)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  userId        String
-  tracks        PlaylistTrack[]
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String          @id @default(cuid())
+  name            String
+  description     String?
+  coverUrl        String?
+  privacy         PlaylistPrivacy @default(PRIVATE)
+  type            PlaylistType    @default(NORMAL)
+  isAIGenerated   Boolean         @default(false)
+  totalTracks     Int             @default(0)
+  totalDuration   Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  userId          String? // Cho phép null để lưu playlist hệ thống
+  user            User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks          PlaylistTrack[]
+  lastGeneratedAt DateTime? // Theo dõi lần tạo AI gần nhất
 
   @@index([userId])
   @@index([privacy])
+  @@index([type])
+  @@index([isAIGenerated])
   @@map("playlists")
 }
 

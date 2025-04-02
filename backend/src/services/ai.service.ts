@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import prisma from '../config/db';
 import { trackSelect } from '../utils/prisma-selects';
+import { Playlist } from '@prisma/client';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
@@ -14,7 +15,7 @@ const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 const model = genAI.getGenerativeModel({
   model: modelName,
   systemInstruction:
-    "You are an expert music curator who creates personalized playlists. Analyze user's music preferences and suggest tracks that match their taste.",
+    "You are an expert music curator specializing in personalization. Your primary goal is to create highly personalized playlists that closely match each user's demonstrated preferences. PRIORITIZE tracks from artists the user has already listened to or liked. Only include tracks from other artists if they are extremely similar in style and genre to the user's favorites. Analyze the provided listening history and liked tracks carefully, identifying patterns in genres, artists, and moods. Return ONLY a valid JSON array of track IDs, without any duplicates or explanations. The tracks should strongly reflect the user's taste, with at least 70% being from artists they've shown interest in.",
 });
 console.log(`[AI] Using Gemini model: ${modelName}`);
 
@@ -25,430 +26,783 @@ interface PlaylistGenerationOptions {
   basedOnMood?: string;
   basedOnGenre?: string;
   basedOnArtist?: string;
-  includeTopTracks?: boolean;
-  includeNewReleases?: boolean;
 }
 
-export const generatePersonalizedPlaylist = async (
+/**
+ * Generates a personalized playlist for a user using the Gemini AI model
+ * @param userId - The user ID to generate the playlist for
+ * @param options - Options for playlist generation
+ * @returns A Promise resolving to an array of track IDs
+ */
+export const generateAIPlaylist = async (
   userId: string,
   options: PlaylistGenerationOptions = {}
-) => {
+): Promise<string[]> => {
   try {
-    // 1. Thu thập dữ liệu người dùng
-    const userListeningData = await getUserListeningData(userId);
-
-    // 2. Xác định các thể loại, nghệ sĩ yêu thích
-    const favoriteGenres = extractFavoriteGenres(userListeningData);
-    const favoriteArtists = extractFavoriteArtists(userListeningData);
-
-    // 3. Lấy các bài hát đề xuất từ Gemini AI
-    const recommendedTrackIds = await getAIRecommendations(
-      userListeningData,
-      favoriteGenres,
-      favoriteArtists,
+    console.log(
+      `[AI] Generating playlist for user ${userId} with options:`,
       options
     );
 
-    // 4. Tạo playlist mới
-    const playlistName =
-      options.name ||
-      `Mix dành riêng cho bạn ${new Date().toLocaleDateString('vi-VN')}`;
-    const playlistDescription =
-      options.description ||
-      `Playlist được tạo tự động dựa trên sở thích nghe nhạc của bạn`;
+    // Giá trị mặc định
+    const trackCount = options.trackCount || 10;
 
-    // 5. Lưu playlist vào database
-    const newPlaylist = await createPlaylistWithTracks(
-      userId,
-      playlistName,
-      playlistDescription,
-      recommendedTrackIds
+    // Lấy lịch sử nghe nhạc của người dùng
+    const userHistory = await prisma.history.findMany({
+      where: {
+        userId,
+        type: 'PLAY',
+      },
+      include: {
+        track: {
+          select: trackSelect,
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+      take: 30, // Tăng từ 20 lên 30 để có lịch sử đầy đủ hơn
+    });
+
+    // Check if the user has listening history
+    if (userHistory.length === 0) {
+      console.log(
+        `[AI] User ${userId} has no listening history. Using default playlist.`
+      );
+      return generateDefaultPlaylistForNewUser(userId);
+    }
+
+    // Lấy danh sách bài hát mà người dùng đã thích
+    const userLikedTracks = await prisma.userLikeTrack.findMany({
+      where: { userId },
+      include: {
+        track: {
+          select: trackSelect,
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 30, // Tăng từ 20 lên 30 để có danh sách thích đầy đủ hơn
+    });
+
+    // Trích xuất nghệ sĩ và thể loại mà người dùng đã thể hiện sự quan tâm
+    const preferredArtistIds = new Set<string>();
+    const preferredGenreIds = new Set<string>();
+
+    // Đếm số lần xuất hiện của từng nghệ sĩ trong lịch sử để xác định mức độ ưa thích
+    const artistPlayCounts: Record<string, number> = {};
+    const artistLikeCounts: Record<string, number> = {};
+
+    // Xử lý lịch sử để tìm nghệ sĩ và thể loại được ưa thích
+    userHistory.forEach((history) => {
+      if (history.track?.artistId) {
+        preferredArtistIds.add(history.track.artistId);
+
+        // Đếm số lần nghe mỗi nghệ sĩ
+        const artistId = history.track.artistId;
+        artistPlayCounts[artistId] =
+          (artistPlayCounts[artistId] || 0) + (history.playCount || 1);
+      }
+
+      history.track?.genres.forEach((genreRel) => {
+        preferredGenreIds.add(genreRel.genre.id);
+      });
+    });
+
+    // Xử lý bài hát đã thích để tìm nghệ sĩ và thể loại được ưa thích
+    userLikedTracks.forEach((like) => {
+      if (like.track?.artistId) {
+        preferredArtistIds.add(like.track.artistId);
+
+        // Đếm số lần thích mỗi nghệ sĩ
+        const artistId = like.track.artistId;
+        artistLikeCounts[artistId] = (artistLikeCounts[artistId] || 0) + 1;
+      }
+
+      like.track?.genres.forEach((genreRel) => {
+        preferredGenreIds.add(genreRel.genre.id);
+      });
+    });
+
+    // Tính tổng điểm ưa thích cho mỗi nghệ sĩ (nghe + thích)
+    const artistPreferenceScore: Record<string, number> = {};
+
+    // Kết hợp lịch sử nghe và thích để tính điểm ưa thích
+    Array.from(preferredArtistIds).forEach((artistId) => {
+      // Nghe = 1 điểm, thích = 2 điểm
+      artistPreferenceScore[artistId] =
+        (artistPlayCounts[artistId] || 0) +
+        (artistLikeCounts[artistId] || 0) * 2;
+    });
+
+    // Sắp xếp nghệ sĩ theo điểm ưa thích giảm dần
+    const sortedPreferredArtists = Array.from(preferredArtistIds).sort(
+      (a, b) =>
+        (artistPreferenceScore[b] || 0) - (artistPreferenceScore[a] || 0)
     );
 
-    return newPlaylist;
+    console.log(
+      `[AI] User has shown interest in ${preferredArtistIds.size} artists and ${preferredGenreIds.size} genres`
+    );
+
+    // Nếu có chỉ định tùy chọn basedOnArtist, ưu tiên nghệ sĩ đó
+    if (options.basedOnArtist) {
+      const artistByName = await prisma.artistProfile.findFirst({
+        where: {
+          artistName: {
+            contains: options.basedOnArtist,
+            mode: 'insensitive',
+          },
+        },
+        select: { id: true },
+      });
+
+      if (artistByName) {
+        // Đảm bảo nghệ sĩ được chỉ định luôn ở đầu danh sách ưu tiên
+        preferredArtistIds.add(artistByName.id);
+        sortedPreferredArtists.unshift(artistByName.id);
+
+        console.log(
+          `[AI] Adding specified artist to preferences: ${options.basedOnArtist}`
+        );
+      }
+    }
+
+    // Nếu có chỉ định tùy chọn basedOnGenre, ưu tiên thể loại đó
+    if (options.basedOnGenre) {
+      const genreByName = await prisma.genre.findFirst({
+        where: {
+          name: {
+            contains: options.basedOnGenre,
+            mode: 'insensitive',
+          },
+        },
+        select: { id: true },
+      });
+
+      if (genreByName) {
+        preferredGenreIds.add(genreByName.id);
+        console.log(
+          `[AI] Adding specified genre to preferences: ${options.basedOnGenre}`
+        );
+      }
+    }
+
+    // Tạo một truy vấn mục tiêu hơn cho các bài hát có sẵn
+    const whereClause: any = { isActive: true };
+
+    // Chỉ lọc theo các điều kiện này nếu chúng ta có tùy chọn (nếu không, trở lại hành vi ban đầu)
+    if (preferredArtistIds.size > 0 || preferredGenreIds.size > 0) {
+      whereClause.OR = [];
+
+      // Ưu tiên bài hát từ nghệ sĩ ưa thích
+      if (preferredArtistIds.size > 0) {
+        whereClause.OR.push({
+          artistId: { in: Array.from(preferredArtistIds) },
+        });
+      }
+
+      // Cũng bao gồm bài hát với thể loại ưa thích
+      if (preferredGenreIds.size > 0) {
+        whereClause.OR.push({
+          genres: {
+            some: {
+              genreId: { in: Array.from(preferredGenreIds) },
+            },
+          },
+        });
+      }
+    }
+
+    // Áp dụng bộ lọc thể loại và nghệ sĩ từ tùy chọn nếu được cung cấp
+    if (options.basedOnGenre && !preferredGenreIds.size) {
+      whereClause.genres = {
+        some: {
+          genre: {
+            name: {
+              contains: options.basedOnGenre,
+              mode: 'insensitive',
+            },
+          },
+        },
+      };
+    }
+
+    if (options.basedOnArtist && !preferredArtistIds.size) {
+      whereClause.artist = {
+        artistName: {
+          contains: options.basedOnArtist,
+          mode: 'insensitive',
+        },
+      };
+    }
+
+    // Truy vấn tất cả bài hát, ưu tiên những bài hát khớp với sở thích của người dùng
+    const availableTracks = await prisma.track.findMany({
+      where: whereClause,
+      select: trackSelect,
+      orderBy: [
+        // Ưu tiên bài hát từ nghệ sĩ người dùng đã nghe
+        {
+          artist: {
+            artistName: preferredArtistIds.size > 0 ? 'asc' : undefined,
+          },
+        },
+        // Sau đó là theo độ phổ biến
+        { playCount: 'desc' },
+      ],
+      take: 150, // Tăng số lượng bài hát tiềm năng nhưng sẽ ưu tiên nghệ sĩ ưa thích
+    });
+
+    console.log(
+      `[AI] Found ${availableTracks.length} potential tracks for recommendation`
+    );
+
+    // Trích xuất tên nghệ sĩ để tạo ngữ cảnh tốt hơn
+    const preferredArtistNames = new Set<string>();
+    userHistory.forEach((h) => {
+      if (h.track?.artist?.artistName) {
+        preferredArtistNames.add(h.track.artist.artistName);
+      }
+    });
+    userLikedTracks.forEach((l) => {
+      if (l.track?.artist?.artistName) {
+        preferredArtistNames.add(l.track.artist.artistName);
+      }
+    });
+
+    // Chuẩn bị ngữ cảnh cho Gemini AI với nhấn mạnh rõ ràng hơn vào sở thích của người dùng
+    const context = {
+      user: {
+        id: userId,
+        preferredArtists: Array.from(preferredArtistNames),
+        listeningHistory: userHistory.map((h) => ({
+          trackId: h.track?.id,
+          trackName: h.track?.title,
+          artistName: h.track?.artist?.artistName,
+          playCount: h.playCount || 1,
+          genres: h.track?.genres.map((g) => g.genre.name),
+        })),
+        likedTracks: userLikedTracks.map((lt) => ({
+          trackId: lt.track?.id,
+          trackName: lt.track?.title,
+          artistName: lt.track?.artist?.artistName,
+          genres: lt.track?.genres.map((g) => g.genre.name),
+        })),
+      },
+      availableTracks: availableTracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist?.artistName,
+        album: track.album?.title,
+        duration: track.duration,
+        genres: track.genres.map((g) => g.genre.name),
+        playCount: track.playCount,
+        releaseDate: track.releaseDate,
+      })),
+      preferences: {
+        trackCount,
+        mood: options.basedOnMood,
+        genre: options.basedOnGenre,
+        artist: options.basedOnArtist,
+      },
+    };
+
+    // Tạo một lời nhắc cụ thể hơn nhấn mạnh việc duy trì trong sở thích của người dùng
+    const promptText = `Tạo một danh sách phát cá nhân hóa cho người dùng này tập trung chủ yếu vào sở thích đã thể hiện của họ.
+
+Thông tin người dùng:
+- Nghệ sĩ ưa thích: ${
+      Array.from(preferredArtistNames).join(', ') || 'Không có chỉ định'
+    }
+- Lịch sử nghe gần đây: ${userHistory
+      .map((h) => h.track?.title || '')
+      .filter(Boolean)
+      .join(', ')}
+- Bài hát đã thích: ${userLikedTracks
+      .map((l) => l.track?.title || '')
+      .filter(Boolean)
+      .join(', ')}
+
+Dữ liệu ngữ cảnh đầy đủ:
+${JSON.stringify(context, null, 2)}
+
+Hướng dẫn quan trọng:
+1. PHẢI ưu tiên mạnh mẽ các bài hát từ nghệ sĩ mà người dùng đã nghe hoặc thích (${Array.from(
+      preferredArtistNames
+    ).join(', ')}).
+2. Ít nhất 70% bài hát phải đến từ các nghệ sĩ mà người dùng đã thể hiện sự quan tâm.
+3. Chỉ bao gồm bài hát từ nghệ sĩ mà người dùng chưa thể hiện sự quan tâm nếu chúng rất giống với sở thích của người dùng.
+4. Xem xét sở thích của người dùng về tâm trạng (${
+      options.basedOnMood || 'bất kỳ'
+    }), thể loại (${options.basedOnGenre || 'bất kỳ'}), và nghệ sĩ (${
+      options.basedOnArtist || 'dựa trên lịch sử'
+    }).
+5. Chọn chính xác ${trackCount} bài hát và chỉ trả về mảng ID bài hát JSON hợp lệ.`;
+
+    console.log(`[AI] Gửi lời nhắc cải tiến đến model Gemini ${modelName}`);
+
+    // Gọi Gemini AI với lời nhắc đã chuẩn bị
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: promptText }] }],
+      generationConfig: {
+        temperature: 0.3, // Giảm từ 0.2 để có kết quả xác định hơn một chút
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 1024,
+      },
+    });
+
+    // Xử lý phản hồi
+    const response = result.response;
+    const responseText = response.text();
+
+    // Phân tích phản hồi JSON để lấy ID bài hát
+    let trackIds: string[] = [];
+    try {
+      // Làm sạch phản hồi để đảm bảo nó là JSON hợp lệ
+      const cleanedResponse = responseText.replace(/```json|```/g, '').trim();
+      trackIds = JSON.parse(cleanedResponse);
+
+      // Xác minh ID bài hát tồn tại trong cơ sở dữ liệu
+      const validTrackIds = await prisma.track.findMany({
+        where: {
+          id: { in: trackIds },
+          isActive: true,
+        },
+        select: { id: true, artistId: true },
+      });
+
+      trackIds = validTrackIds.map((t) => t.id);
+
+      // Kiểm tra xem đã đạt được tỷ lệ nghệ sĩ ưa thích mong muốn chưa
+      if (preferredArtistIds.size > 0) {
+        const tracksFromPreferredArtists = validTrackIds.filter((t) =>
+          preferredArtistIds.has(t.artistId)
+        ).length;
+
+        const preferredArtistPercentage =
+          (tracksFromPreferredArtists / trackIds.length) * 100;
+
+        console.log(
+          `[AI] Initial tracks from preferred artists: ${preferredArtistPercentage.toFixed(
+            1
+          )}%`
+        );
+
+        // Nếu chưa đạt được tỷ lệ 70%, cần điều chỉnh
+        if (preferredArtistPercentage < 70 && trackIds.length > 0) {
+          // Chúng ta sẽ điều chỉnh danh sách trong bước dự phòng
+          console.log(
+            `[AI] Need to increase preferred artist percentage (currently ${preferredArtistPercentage.toFixed(
+              1
+            )}%)`
+          );
+        }
+      }
+    } catch (error) {
+      console.error('[AI] Error parsing Gemini response:', error);
+      console.error('[AI] Raw response:', responseText);
+      throw new Error('Failed to parse AI-generated playlist recommendations');
+    }
+
+    // Nếu không có đủ bài hát hoặc không có bài hát nào, hãy chuyển sang cách tiếp cận có mục tiêu hơn
+    if (trackIds.length < trackCount || preferredArtistIds.size > 0) {
+      console.log(
+        `[AI] Adjusting playlist to ensure at least 70% from preferred artists`
+      );
+
+      // Trước hết, hãy lấy danh sách hiện tại của các bài hát và nghệ sĩ của chúng
+      const currentTracks = await prisma.track.findMany({
+        where: {
+          id: { in: trackIds },
+          isActive: true,
+        },
+        select: {
+          id: true,
+          artistId: true,
+          title: true,
+          artist: {
+            select: { artistName: true },
+          },
+        },
+      });
+
+      // Tách thành bài hát từ nghệ sĩ ưa thích và không ưa thích
+      const tracksFromPreferredArtists = currentTracks.filter((t) =>
+        preferredArtistIds.has(t.artistId)
+      );
+
+      const tracksFromOtherArtists = currentTracks.filter(
+        (t) => !preferredArtistIds.has(t.artistId)
+      );
+
+      const preferredArtistPercentage =
+        (tracksFromPreferredArtists.length / (currentTracks.length || 1)) * 100;
+
+      // Nếu chưa đạt được tỷ lệ 70% và chúng ta có nghệ sĩ ưa thích, điều chỉnh danh sách
+      if (preferredArtistPercentage < 70 && preferredArtistIds.size > 0) {
+        // Tính số lượng bài hát cần thêm từ nghệ sĩ ưa thích
+        const desiredPreferredTracks = Math.ceil(trackCount * 0.7);
+        const additionalPreferredTracksNeeded = Math.max(
+          0,
+          desiredPreferredTracks - tracksFromPreferredArtists.length
+        );
+
+        console.log(
+          `[AI] Need ${additionalPreferredTracksNeeded} more tracks from preferred artists to reach 70%`
+        );
+
+        // Ưu tiên lấy bài hát từ nghệ sĩ được nghe nhiều nhất trước (dựa trên sortedPreferredArtists)
+        if (additionalPreferredTracksNeeded > 0) {
+          const additionalPreferredTracks = await prisma.track.findMany({
+            where: {
+              artistId: { in: sortedPreferredArtists },
+              isActive: true,
+              id: { notIn: trackIds }, // Tránh trùng lặp
+            },
+            orderBy: { playCount: 'desc' },
+            take: additionalPreferredTracksNeeded * 2, // Lấy nhiều hơn để có thể lọc
+            select: { id: true, artistId: true },
+          });
+
+          // Lọc để có được đúng số lượng cần thiết, ưu tiên các nghệ sĩ theo thứ tự ưa thích
+          const additionalTrackIds = additionalPreferredTracks
+            .sort((a, b) => {
+              const aIndex = sortedPreferredArtists.indexOf(a.artistId);
+              const bIndex = sortedPreferredArtists.indexOf(b.artistId);
+              return aIndex - bIndex;
+            })
+            .slice(0, additionalPreferredTracksNeeded)
+            .map((t) => t.id);
+
+          // Nếu chúng ta vẫn chưa đạt được tổng số bài hát yêu cầu
+          const remainingTracksNeeded = Math.max(
+            0,
+            trackCount - (trackIds.length + additionalTrackIds.length)
+          );
+
+          // Kết hợp tất cả các bài hát, ưu tiên nghệ sĩ ưa thích
+          const finalTrackIds = [
+            ...tracksFromPreferredArtists.map((t) => t.id), // Bài hát từ nghệ sĩ ưa thích (đã chọn)
+            ...additionalTrackIds, // Bài hát bổ sung từ nghệ sĩ ưa thích
+            ...tracksFromOtherArtists.map((t) => t.id), // Bài hát từ nghệ sĩ khác (đã chọn)
+          ];
+
+          trackIds = finalTrackIds;
+
+          // Thêm bài hát phổ biến nếu cần
+          if (remainingTracksNeeded > 0) {
+            const fallbackTracks = await prisma.track.findMany({
+              where: {
+                isActive: true,
+                id: { notIn: trackIds }, // Tránh trùng lặp
+              },
+              orderBy: { playCount: 'desc' },
+              take: remainingTracksNeeded,
+              select: { id: true },
+            });
+
+            trackIds = [...trackIds, ...fallbackTracks.map((t) => t.id)];
+          }
+
+          // Tính tỷ lệ cuối cùng để ghi lại
+          const finalPreferredTracks = await prisma.track.findMany({
+            where: {
+              id: { in: trackIds },
+              artistId: { in: Array.from(preferredArtistIds) },
+            },
+            select: { id: true },
+          });
+
+          const finalPercentage =
+            (finalPreferredTracks.length / trackIds.length) * 100;
+          console.log(
+            `[AI] Final preferred artist percentage: ${finalPercentage.toFixed(
+              1
+            )}%`
+          );
+        }
+      }
+    }
+
+    // Đảm bảo chúng ta có số lượng bài hát yêu cầu nếu có thể
+    if (trackIds.length > trackCount) {
+      trackIds = trackIds.slice(0, trackCount);
+    } else if (trackIds.length < trackCount) {
+      // Nếu vẫn thiếu, lấy thêm các bài hát phổ biến
+      const additionalTracks = await prisma.track.findMany({
+        where: {
+          isActive: true,
+          id: { notIn: trackIds },
+        },
+        orderBy: { playCount: 'desc' },
+        take: trackCount - trackIds.length,
+        select: { id: true },
+      });
+
+      trackIds = [...trackIds, ...additionalTracks.map((t) => t.id)];
+    }
+
+    console.log(
+      `[AI] Successfully generated playlist with ${trackIds.length} tracks`
+    );
+    return trackIds;
   } catch (error) {
-    console.error('Error generating personalized playlist:', error);
-    throw new Error('Failed to generate personalized playlist');
+    console.error('[AI] Error generating playlist:', error);
+    throw error;
   }
 };
 
-// Lấy dữ liệu nghe nhạc của người dùng
-const getUserListeningData = async (userId: string) => {
-  // Lấy lịch sử nghe nhạc
-  const playHistory = await prisma.history.findMany({
-    where: {
-      userId,
-      type: 'PLAY',
-      trackId: { not: null },
-    },
-    orderBy: { updatedAt: 'desc' },
-    take: 100, // Lấy 100 bản ghi gần nhất
-    select: {
-      trackId: true,
-      playCount: true,
-      duration: true,
-      createdAt: true,
-      track: {
-        select: trackSelect,
-      },
-    },
-  });
+/**
+ * Creates or updates an AI-generated playlist for a user
+ * @param userId - The user ID to create the playlist for
+ * @param options - Options for playlist generation
+ * @returns The created or updated playlist
+ */
+export const createAIGeneratedPlaylist = async (
+  userId: string,
+  options: PlaylistGenerationOptions = {}
+): Promise<Playlist> => {
+  try {
+    // Create a more appealing playlist name without AI mention
+    const playlistName =
+      options.name ||
+      (options.basedOnMood
+        ? `${options.basedOnMood} Mood Mix`
+        : options.basedOnGenre
+        ? `${options.basedOnGenre} Essentials`
+        : options.basedOnArtist
+        ? `${options.basedOnArtist} Flow`
+        : 'Soundwave Discoveries');
 
-  // Lấy bài hát đã thích
-  const likedTracks = await prisma.userLikeTrack.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      trackId: true,
-      createdAt: true,
-      track: {
-        select: trackSelect,
-      },
-    },
-  });
+    // Generate track recommendations
+    const trackIds = await generateAIPlaylist(userId, options);
 
-  // Lấy danh sách playlist của người dùng và các bài hát
-  const playlists = await prisma.playlist.findMany({
-    where: { userId },
-    select: {
-      id: true,
-      name: true,
-      tracks: {
-        select: {
-          trackId: true,
-          track: {
-            select: trackSelect,
+    // Lấy thông tin bài hát để cải thiện mô tả
+    const tracks = await prisma.track.findMany({
+      where: { id: { in: trackIds } },
+      select: {
+        id: true,
+        duration: true,
+        artist: {
+          select: {
+            id: true,
+            artistName: true,
           },
         },
       },
-    },
-  });
-
-  return { playHistory, likedTracks, playlists };
-};
-
-// Trích xuất các thể loại yêu thích
-const extractFavoriteGenres = (userListeningData: any) => {
-  // Logic để phân tích thể loại nghe nhiều nhất
-  const genreCounts: Record<string, number> = {};
-
-  // Đếm từ lịch sử phát
-  userListeningData.playHistory.forEach((history: any) => {
-    if (history.track && history.track.genres) {
-      history.track.genres.forEach((genreItem: any) => {
-        const genreName = genreItem.genre.name;
-        genreCounts[genreName] =
-          (genreCounts[genreName] || 0) + (history.playCount || 1);
-      });
-    }
-  });
-
-  // Đếm từ bài hát đã thích (gán trọng số cao hơn)
-  userListeningData.likedTracks.forEach((likedTrack: any) => {
-    if (likedTrack.track && likedTrack.track.genres) {
-      likedTrack.track.genres.forEach((genreItem: any) => {
-        const genreName = genreItem.genre.name;
-        genreCounts[genreName] = (genreCounts[genreName] || 0) + 3; // Trọng số cao hơn
-      });
-    }
-  });
-
-  // Sắp xếp và trả về các thể loại hàng đầu
-  return Object.entries(genreCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map((entry) => entry[0]);
-};
-
-// Trích xuất các nghệ sĩ yêu thích
-const extractFavoriteArtists = (userListeningData: any) => {
-  // Logic tương tự như trích xuất thể loại nhưng cho nghệ sĩ
-  const artistCounts: Record<
-    string,
-    { count: number; id: string; name: string }
-  > = {};
-
-  // Từ lịch sử phát
-  userListeningData.playHistory.forEach((history: any) => {
-    if (history.track && history.track.artist) {
-      const artistId = history.track.artist.id;
-      const artistName = history.track.artist.artistName;
-
-      if (!artistCounts[artistId]) {
-        artistCounts[artistId] = { count: 0, id: artistId, name: artistName };
-      }
-
-      artistCounts[artistId].count += history.playCount || 1;
-    }
-  });
-
-  // Từ bài hát đã thích (trọng số cao hơn)
-  userListeningData.likedTracks.forEach((likedTrack: any) => {
-    if (likedTrack.track && likedTrack.track.artist) {
-      const artistId = likedTrack.track.artist.id;
-      const artistName = likedTrack.track.artist.artistName;
-
-      if (!artistCounts[artistId]) {
-        artistCounts[artistId] = { count: 0, id: artistId, name: artistName };
-      }
-
-      artistCounts[artistId].count += 3; // Trọng số cao hơn cho bài hát đã thích
-    }
-  });
-
-  // Sắp xếp và trả về top nghệ sĩ
-  return Object.values(artistCounts)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-};
-
-// Lấy các bài hát đề xuất từ Gemini AI
-const getAIRecommendations = async (
-  userListeningData: any,
-  favoriteGenres: string[],
-  favoriteArtists: Array<{ id: string; name: string; count: number }>,
-  options: PlaylistGenerationOptions
-) => {
-  // Khai báo biến ở ngoài try để có thể truy cập từ catch block
-  let availableTracks: Array<any> = [];
-
-  try {
-    // 1. Chuẩn bị prompt cho Gemini dựa trên dữ liệu người dùng
-    const recentTracks = userListeningData.playHistory
-      .slice(0, 20)
-      .map((history: any) => ({
-        id: history.track.id,
-        title: history.track.title,
-        artist: history.track.artist.artistName,
-        genre:
-          history.track.genres?.map((g: any) => g.genre.name).join(', ') ||
-          'Unknown',
-      }));
-
-    const likedTracks = userListeningData.likedTracks
-      .slice(0, 20)
-      .map((liked: any) => ({
-        id: liked.track.id,
-        title: liked.track.title,
-        artist: liked.track.artist.artistName,
-        genre:
-          liked.track.genres?.map((g: any) => g.genre.name).join(', ') ||
-          'Unknown',
-      }));
-
-    // 2. Tạo dataset để tìm kiếm các bài hát phù hợp
-    availableTracks = await prisma.track.findMany({
-      where: {
-        isActive: true,
-        // Lọc theo thể loại nếu được chỉ định
-        ...(options.basedOnGenre
-          ? {
-              genres: {
-                some: {
-                  genre: {
-                    name: {
-                      equals: options.basedOnGenre,
-                      mode: 'insensitive',
-                    },
-                  },
-                },
-              },
-            }
-          : {}),
-        // Lọc theo nghệ sĩ nếu được chỉ định
-        ...(options.basedOnArtist
-          ? {
-              OR: [
-                { artist: { artistName: options.basedOnArtist } },
-                {
-                  featuredArtists: {
-                    some: {
-                      artistProfile: { artistName: options.basedOnArtist },
-                    },
-                  },
-                },
-              ],
-            }
-          : {}),
-      },
-      select: trackSelect,
-      take: 200, // Tăng lên để có nhiều lựa chọn hơn
     });
 
-    // 3. Tạo prompt để gửi cho Gemini
-    const prompt = `
-          Tôi cần tạo một playlist được cá nhân hóa cho người dùng dựa trên dữ liệu nghe nhạc của họ.
-          
-          Thông tin người dùng:
-          - Thể loại yêu thích: ${favoriteGenres.join(', ')}
-          - Nghệ sĩ yêu thích: ${favoriteArtists.map((a) => a.name).join(', ')}
-          ${options.basedOnMood ? `- Tâm trạng: ${options.basedOnMood}` : ''}
-          
-          Bài hát đã nghe gần đây:
-          ${JSON.stringify(recentTracks, null, 2)}
-          
-          Bài hát đã thích:
-          ${JSON.stringify(likedTracks, null, 2)}
-          
-          Danh sách bài hát có sẵn để chọn (${availableTracks.length} bài):
-          ${JSON.stringify(
-            availableTracks.map((track: any) => ({
-              id: track.id,
-              title: track.title,
-              artist: track.artist.artistName,
-              album: track.album?.title || 'Single',
-              genres: track.genres.map((g: any) => g.genre.name),
-              duration: track.duration,
-              releaseDate: track.releaseDate,
-            })),
-            null,
-            2
-          )}
-          
-          Hãy chọn ${
-            options.trackCount || 20
-          } bài hát phù hợp nhất cho người dùng này để tạo một playlist hấp dẫn.
-          ĐẢM BẢO KHÔNG TRÙNG LẶP ID BÀI HÁT trong danh sách trả về.
-          Chỉ trả về danh sách ID của các bài hát được đề xuất dưới dạng mảng JSON, không có thông tin khác.
-          `;
-
-    // 4. Gửi yêu cầu đến Gemini và phân tích kết quả
-    let trackIds = [];
-
-    try {
-      console.log('Sending request to Gemini AI...');
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
-      console.log('Received response from Gemini AI');
-
-      // Tìm mảng JSON trong kết quả
-      const trackIdsMatch = responseText.match(/\[(.|\n|\r)*\]/);
-      if (trackIdsMatch) {
-        try {
-          // Parse JSON array và loại bỏ duplicates
-          const parsedIds = JSON.parse(trackIdsMatch[0]);
-
-          // Đảm bảo ID hợp lệ và không trùng lặp
-          const uniqueIds = [...new Set(parsedIds)].filter(
-            (id) =>
-              typeof id === 'string' &&
-              availableTracks.some((track: any) => track.id === id)
-          );
-
-          console.log(`Found ${uniqueIds.length} unique track IDs`);
-
-          if (uniqueIds.length > 0) {
-            trackIds = uniqueIds.slice(0, options.trackCount || 20);
-          } else {
-            throw new Error('No valid track IDs found in AI response');
-          }
-        } catch (parseError) {
-          console.error('Error parsing Gemini response:', parseError);
-          throw parseError;
-        }
-      } else {
-        throw new Error('No JSON array found in AI response');
-      }
-    } catch (error) {
-      console.error('Error getting AI recommendations:', error);
-      console.log('Using fallback random tracks selection');
-
-      // Fallback: chọn tracks ngẫu nhiên từ availableTracks
-      trackIds = availableTracks
-        .sort(() => 0.5 - Math.random())
-        .slice(0, options.trackCount || 20)
-        .map((track: any) => track.id);
-    }
-
-    return trackIds;
-  } catch (mainError) {
-    console.error('Main error in getAIRecommendations:', mainError);
-
-    // Fallback an toàn nhất - nếu availableTracks rỗng, lấy một số bài hát
-    if (availableTracks.length === 0) {
-      console.log('No available tracks found, fetching random tracks');
-      try {
-        availableTracks = await prisma.track.findMany({
-          where: { isActive: true },
-          select: trackSelect,
-          take: 50,
-        });
-      } catch (fetchError) {
-        console.error('Error fetching fallback tracks:', fetchError);
-        return []; // Trả về mảng rỗng trong trường hợp xấu nhất
-      }
-    }
-
-    return availableTracks
-      .sort(() => 0.5 - Math.random())
-      .slice(0, options.trackCount || 20)
-      .map((track: any) => track.id);
-  }
-};
-
-// Tạo playlist mới và lưu bài hát đề xuất
-const createPlaylistWithTracks = async (
-  userId: string,
-  name: string,
-  description: string,
-  trackIds: string[]
-) => {
-  try {
-    // Loại bỏ duplicates một lần nữa để đảm bảo
-    const uniqueTrackIds = [...new Set(trackIds)];
-    console.log(
-      `Creating playlist with ${uniqueTrackIds.length} unique tracks`
-    );
-
-    // Tính tổng thời lượng của tất cả bài hát
-    const tracks = await prisma.track.findMany({
-      where: { id: { in: uniqueTrackIds } },
-      select: { id: true, duration: true },
-    });
-
-    // Kiểm tra xem tracks có tồn tại không
-    if (tracks.length === 0) {
-      throw new Error('No valid tracks found with the provided IDs');
-    }
-
+    // Tính tổng thời lượng
     const totalDuration = tracks.reduce(
       (sum, track) => sum + track.duration,
       0
     );
 
-    // Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu
-    const playlist = await prisma.$transaction(async (tx) => {
-      // Tạo playlist trước
-      const newPlaylist = await tx.playlist.create({
+    // Trích xuất nghệ sĩ duy nhất để có mô tả tốt hơn
+    const artistsInPlaylist = new Map<string, string>();
+    tracks.forEach((track) => {
+      if (track.artist?.artistName) {
+        artistsInPlaylist.set(track.artist.id, track.artist.artistName);
+      }
+    });
+
+    // Phân tích để hiển thị nghệ sĩ hàng đầu trước trong mô tả
+    const artistsCount: Record<string, number> = {};
+    tracks.forEach((track) => {
+      if (track.artist?.id) {
+        artistsCount[track.artist.id] =
+          (artistsCount[track.artist.id] || 0) + 1;
+      }
+    });
+
+    // Sắp xếp nghệ sĩ theo số lần xuất hiện trong danh sách phát
+    const sortedArtistIds = Object.keys(artistsCount).sort(
+      (a, b) => artistsCount[b] - artistsCount[a]
+    );
+
+    // Lấy tên nghệ sĩ đã sắp xếp theo mức độ phổ biến
+    const sortedArtistNames = sortedArtistIds
+      .map((id) => artistsInPlaylist.get(id))
+      .filter(Boolean) as string[];
+
+    // Create a more professional description without mentioning AI directly
+    const playlistDescription =
+      options.description ||
+      `Curated selection featuring ${sortedArtistNames.slice(0, 3).join(', ')}${
+        sortedArtistNames.length > 3 ? ' and more' : ''
+      }${
+        options.basedOnMood ? `, perfect for a ${options.basedOnMood} mood` : ''
+      }${
+        options.basedOnGenre
+          ? `, focusing on ${options.basedOnGenre} music`
+          : ''
+      }${
+        options.basedOnArtist ? `, inspired by ${options.basedOnArtist}` : ''
+      }. Refreshed regularly based on your listening patterns.`;
+
+    // Default cover URL for AI-generated playlists
+    const defaultCoverUrl =
+      'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
+
+    // Find if the user already has a playlist with this name
+    let playlist = await prisma.playlist.findFirst({
+      where: {
+        userId,
+        name: playlistName,
+        isAIGenerated: true,
+      },
+    });
+
+    if (playlist) {
+      // Update existing playlist
+      console.log(`[AI] Đang cập nhật danh sách phát AI đã tạo ${playlist.id}`);
+
+      // Remove existing tracks
+      await prisma.playlistTrack.deleteMany({
+        where: { playlistId: playlist.id },
+      });
+
+      // Update playlist
+      playlist = await prisma.playlist.update({
+        where: { id: playlist.id },
         data: {
-          name,
-          description,
-          privacy: 'PRIVATE',
-          type: 'NORMAL',
-          isAIGenerated: true,
-          totalTracks: uniqueTrackIds.length,
+          description: playlistDescription,
+          coverUrl: playlist.coverUrl || defaultCoverUrl, // Keep existing cover or use default
+          totalTracks: trackIds.length,
           totalDuration,
-          userId,
+          updatedAt: new Date(),
+          lastGeneratedAt: new Date(),
+          tracks: {
+            createMany: {
+              data: trackIds.map((trackId, index) => ({
+                trackId,
+                trackOrder: index,
+              })),
+            },
+          },
         },
       });
 
-      // Sau đó thêm từng track vào playlist
-      for (let i = 0; i < uniqueTrackIds.length; i++) {
-        await tx.playlistTrack.create({
-          data: {
-            playlistId: newPlaylist.id,
-            trackId: uniqueTrackIds[i],
-            trackOrder: i + 1,
-          },
-        });
-      }
+      console.log(
+        `[AI] Đã cập nhật danh sách phát với ${trackIds.length} bài hát từ ${artistsInPlaylist.size} nghệ sĩ`
+      );
+    } else {
+      // Create new playlist
+      console.log(
+        `[AI] Đang tạo danh sách phát AI mới cho người dùng ${userId}`
+      );
 
-      return newPlaylist;
-    });
+      // Create playlist
+      playlist = await prisma.playlist.create({
+        data: {
+          name: playlistName,
+          description: playlistDescription,
+          coverUrl: defaultCoverUrl, // Use the default cover URL
+          privacy: 'PRIVATE',
+          type: 'NORMAL',
+          isAIGenerated: true,
+          totalTracks: trackIds.length,
+          totalDuration,
+          lastGeneratedAt: new Date(),
+          userId,
+          tracks: {
+            createMany: {
+              data: trackIds.map((trackId, index) => ({
+                trackId,
+                trackOrder: index,
+              })),
+            },
+          },
+        },
+      });
+
+      console.log(
+        `[AI] Đã tạo danh sách phát với ${trackIds.length} bài hát từ ${artistsInPlaylist.size} nghệ sĩ`
+      );
+    }
 
     return playlist;
   } catch (error) {
-    console.error('Error creating playlist with tracks:', error);
+    console.error('[AI] Error creating AI-generated playlist:', error);
     throw error;
+  }
+};
+
+/**
+ * Generates a default playlist with popular tracks for new users
+ * @param userId - The user ID to generate the playlist for
+ * @returns A Promise resolving to an array of track IDs
+ */
+export const generateDefaultPlaylistForNewUser = async (
+  userId: string
+): Promise<string[]> => {
+  try {
+    console.log(`[AI] Generating default playlist for new user ${userId}`);
+
+    // Find popular tracks based on play count
+    const popularTracks = await prisma.track.findMany({
+      where: {
+        isActive: true,
+      },
+      orderBy: {
+        playCount: 'desc',
+      },
+      select: {
+        id: true,
+        title: true,
+        artist: {
+          select: {
+            artistName: true,
+          },
+        },
+      },
+      take: 15,
+    });
+
+    console.log(
+      `[AI] Found ${popularTracks.length} popular tracks for new user playlist`
+    );
+
+    // Log some track names for debugging
+    if (popularTracks.length > 0) {
+      const trackSample = popularTracks
+        .slice(0, 3)
+        .map((t) => `${t.title} by ${t.artist?.artistName || 'Unknown'}`);
+      console.log(`[AI] Sample tracks: ${trackSample.join(', ')}`);
+    }
+
+    // Extract track IDs
+    const trackIds = popularTracks.map((track) => track.id);
+
+    if (trackIds.length === 0) {
+      console.log(
+        `[AI] No popular tracks found, falling back to random tracks`
+      );
+
+      // Fallback to random tracks if no popular tracks found
+      const randomTracks = await prisma.track.findMany({
+        where: {
+          isActive: true,
+        },
+        select: {
+          id: true,
+        },
+        take: 15,
+      });
+
+      return randomTracks.map((track) => track.id);
+    }
+
+    console.log(
+      `[AI] Generated default playlist with ${trackIds.length} popular tracks`
+    );
+    return trackIds;
+  } catch (error) {
+    console.error('[AI] Error generating default playlist:', error);
+    // Return empty array as fallback
+    return [];
   }
 };

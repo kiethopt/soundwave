@@ -9,6 +9,7 @@ import {
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import { faker } from '@faker-js/faker';
+import { createDefaultSystemPlaylists } from '../src/services/playlist.service';
 
 dotenv.config();
 
@@ -784,6 +785,11 @@ async function main() {
         '⚠️ No active tracks or normal users found to seed interactions.'
       );
     }
+
+    // Create system playlists
+    console.log('Creating system playlists...');
+    await createDefaultSystemPlaylists();
+    console.log('System playlists created.');
 
     console.log('\n🎉 Database seeding completed successfully!');
   } catch (error) {

@@ -73,7 +73,5 @@ router
     .route('/system/ai-model')
     .get(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleAIModelStatus)
     .post(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleAIModelStatus);
-router.get('/analytics/matrix', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getRecommendationMatrix);
-router.post('/playlists/update', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.updateSystemPlaylists);
 exports.default = router;
 //# sourceMappingURL=admin.routes.js.map

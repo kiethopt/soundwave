@@ -30,6 +30,8 @@ const playlist_routes_1 = __importDefault(require("./routes/playlist.routes"));
 const event_routes_1 = __importDefault(require("./routes/event.routes"));
 const label_routes_1 = __importDefault(require("./routes/label.routes"));
 const db_1 = __importDefault(require("./config/db"));
+const playlist_service_1 = require("./services/playlist.service");
+const playlist_extension_1 = require("./prisma/extensions/playlist.extension");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
@@ -52,6 +54,8 @@ const initializeApp = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield db_1.default.$queryRaw `SELECT 1`;
         console.log('✅ Database connection established');
+        (0, playlist_extension_1.registerPlaylistCronJobs)();
+        console.log('✅ Cron jobs registered via extension system');
     }
     catch (error) {
         console.error('❌ Database connection error:', error);
@@ -59,8 +63,18 @@ const initializeApp = () => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 const PORT = process.env.PORT || 10000;
+const initApp = () => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        yield initializeApp();
+        yield (0, playlist_service_1.createDefaultSystemPlaylists)();
+        console.log('[Init] System playlists initialized');
+    }
+    catch (error) {
+        console.error('[Init] Error during initialization:', error);
+    }
+});
 server.listen(PORT, () => __awaiter(void 0, void 0, void 0, function* () {
     console.log(`🚀 Server is running on port ${PORT}`);
-    yield initializeApp();
+    yield initApp();
 }));
 //# sourceMappingURL=index.js.map

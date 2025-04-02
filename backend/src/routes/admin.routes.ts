@@ -18,8 +18,6 @@ import {
   updateArtist,
   handleCacheStatus,
   handleAIModelStatus,
-  getRecommendationMatrix,
-  updateSystemPlaylists,
   handleMaintenanceMode,
 } from '../controllers/admin.controller';
 import * as genreController from '../controllers/genre.controller';
@@ -148,21 +146,5 @@ router
   .route('/system/ai-model')
   .get(authenticate, authorize([Role.ADMIN]), handleAIModelStatus)
   .post(authenticate, authorize([Role.ADMIN]), handleAIModelStatus);
-
-// Analytics routes
-router.get(
-  '/analytics/matrix',
-  authenticate,
-  authorize([Role.ADMIN]),
-  getRecommendationMatrix
-);
-
-// Unified playlist management route
-router.post(
-  '/playlists/update',
-  authenticate,
-  authorize([Role.ADMIN]),
-  updateSystemPlaylists
-);
 
 export default router;

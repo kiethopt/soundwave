@@ -134,11 +134,17 @@ export const updateUser = async (
             );
             await emailService.sendEmail(emailOptions);
           } catch (emailError) {
-            console.error(`Failed to send user deactivation email to ${currentUser.email}:`, emailError);
+            console.error(
+              `Failed to send user deactivation email to ${currentUser.email}:`,
+              emailError
+            );
           }
         }
 
-        res.json({ message: 'User deactivated successfully', user: updatedUser });
+        res.json({
+          message: 'User deactivated successfully',
+          user: updatedUser,
+        });
         return; // Kết thúc hàm sau khi xử lý xong
       } else if (currentUser && !currentUser.isActive && isActiveBool) {
         // User is being activated
@@ -167,7 +173,10 @@ export const updateUser = async (
             );
             await emailService.sendEmail(emailOptions);
           } catch (emailError) {
-            console.error(`Failed to send user activation email to ${currentUser.email}:`, emailError);
+            console.error(
+              `Failed to send user activation email to ${currentUser.email}:`,
+              emailError
+            );
           }
         }
 
@@ -182,7 +191,6 @@ export const updateUser = async (
       userData,
       avatarFile
     );
-
 
     res.json({
       message: 'User updated successfully',
@@ -232,11 +240,15 @@ export const updateArtist = async (
         select: { isActive: true, userId: true, artistName: true }, // Lấy thêm artistName
       });
       // **Lấy thông tin user (chủ sở hữu artist profile) để gửi email**
-      let ownerUser: { email: string | null, name: string | null, username: string | null } | null = null;
+      let ownerUser: {
+        email: string | null;
+        name: string | null;
+        username: string | null;
+      } | null = null;
       if (currentArtist?.userId) {
         ownerUser = await prisma.user.findUnique({
           where: { id: currentArtist.userId },
-          select: { email: true, name: true, username: true }
+          select: { email: true, name: true, username: true },
         });
       }
       const ownerUserName = ownerUser?.name || ownerUser?.username || 'Artist';
@@ -269,7 +281,10 @@ export const updateArtist = async (
             );
             await emailService.sendEmail(emailOptions);
           } catch (emailError) {
-            console.error(`Failed to send artist deactivation email to ${ownerUser.email}:`, emailError);
+            console.error(
+              `Failed to send artist deactivation email to ${ownerUser.email}:`,
+              emailError
+            );
           }
         }
         res.json({
@@ -305,7 +320,10 @@ export const updateArtist = async (
             );
             await emailService.sendEmail(emailOptions);
           } catch (emailError) {
-            console.error(`Failed to send artist activation email to ${ownerUser.email}:`, emailError);
+            console.error(
+              `Failed to send artist activation email to ${ownerUser.email}:`,
+              emailError
+            );
           }
         }
 
@@ -520,7 +538,8 @@ export const approveArtistRequest = async (
     });
 
     // Gửi email thông báo duyệt
-    if (updatedProfile.user.email) { // Kiểm tra email tồn tại
+    if (updatedProfile.user.email) {
+      // Kiểm tra email tồn tại
       try {
         // **Sửa lỗi ở đây: Truyền đủ 2 tham số**
         const emailOptions = emailService.createArtistRequestApprovedEmail(
@@ -528,13 +547,17 @@ export const approveArtistRequest = async (
           updatedProfile.user.name || updatedProfile.user.username || 'User' // Tham số 2: userName
         );
         await emailService.sendEmail(emailOptions); // Gửi email
-        console.log(`Artist approval email sent to ${updatedProfile.user.email}`);
+        console.log(
+          `Artist approval email sent to ${updatedProfile.user.email}`
+        );
       } catch (emailError) {
         console.error('Failed to send artist approval email:', emailError);
         // Không nên throw lỗi ở đây để tránh ảnh hưởng response chính
       }
     } else {
-      console.warn(`Could not send approval email: No email found for user ${updatedProfile.user.id}`);
+      console.warn(
+        `Could not send approval email: No email found for user ${updatedProfile.user.id}`
+      );
     }
 
     // Trả về response thành công
@@ -567,13 +590,17 @@ export const approveArtistRequest = async (
 };
 
 // Từ chối yêu cầu
-export const rejectArtistRequest = async (req: Request, res: Response): Promise<void> => {
+export const rejectArtistRequest = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { requestId, reason } = req.body;
     // Service đã trả về user với đủ thông tin (bao gồm email, username, name)
     const result = await adminService.rejectArtistRequest(requestId);
 
-    let notificationMessage = 'Your request to become an Artist has been rejected.';
+    let notificationMessage =
+      'Your request to become an Artist has been rejected.';
     if (reason && reason.trim() !== '') {
       notificationMessage += ` Reason: ${reason.trim()}`;
     }
@@ -590,7 +617,8 @@ export const rejectArtistRequest = async (req: Request, res: Response): Promise<
     });
 
     // Gửi email thông báo từ chối
-    if (result.user.email) { // Kiểm tra email có tồn tại không
+    if (result.user.email) {
+      // Kiểm tra email có tồn tại không
       try {
         // **Sửa lại lời gọi hàm ở đây:**
         const emailOptions = emailService.createArtistRequestRejectedEmail(
@@ -602,13 +630,14 @@ export const rejectArtistRequest = async (req: Request, res: Response): Promise<
         // Gọi sendEmail trực tiếp với emailOptions đã hoàn chỉnh
         await emailService.sendEmail(emailOptions);
         console.log(`Artist rejection email sent to ${result.user.email}`);
-
       } catch (emailError) {
         console.error('Failed to send artist rejection email:', emailError);
         // Cân nhắc log lỗi chi tiết hơn nếu cần
       }
     } else {
-      console.warn(`Could not send rejection email: No email found for user ${result.user.id}`);
+      console.warn(
+        `Could not send rejection email: No email found for user ${result.user.id}`
+      );
     }
 
     res.json({
@@ -679,98 +708,36 @@ export const handleAIModelStatus = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { model } = req.method === 'POST' ? req.body : {};
-    const result = await adminService.updateAIModel(model);
-    res.json(result);
-  } catch (error) {
-    handleError(res, error, 'Manage AI model');
-  }
-};
+    const { model } = req.body;
 
-// Lấy ma trận đề xuất - ADMIN only
-export const getRecommendationMatrix = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
-    const matrix = await adminService.getRecommendationMatrix(limit);
+    // If this is a GET request, just return current status
+    if (req.method === 'GET') {
+      const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+      const isEnabled = !!process.env.GEMINI_API_KEY;
 
-    if (!matrix.success) {
-      res.status(400).json({
-        message: matrix.message || 'Failed to retrieve recommendation matrix',
-      });
-      return;
-    }
-
-    res.json(matrix);
-  } catch (error) {
-    handleError(res, error, 'Get recommendation matrix');
-  }
-};
-
-// Update playlists - unified endpoint for all playlist types
-export const updateSystemPlaylists = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { type } = req.query;
-
-    console.log(
-      `[Admin Controller] Starting playlist update. Type: ${type || 'all'}`
-    );
-
-    if (!type || type === 'all') {
-      // Update all system playlists
-      await playlistService.systemPlaylistService.updateAllSystemPlaylists();
-
-      res.json({
+      res.status(200).json({
         success: true,
-        message: 'All system playlists have been updated successfully',
+        data: {
+          model: currentModel,
+          enabled: isEnabled,
+        },
       });
       return;
     }
 
-    // Update specific playlist type
-    switch (type) {
-      case 'global':
-      case 'trending':
-      case 'top-hits':
-        await prisma.playlist.updateGlobalPlaylist();
-        res.json({
-          success: true,
-          message: 'Trending Now playlists have been updated successfully',
-        });
-        break;
+    // Update the AI model
+    const result = await adminService.updateAIModel(model);
 
-      case 'discover-weekly':
-        await prisma.playlist.updateDiscoverWeeklyPlaylists();
-        res.json({
-          success: true,
-          message: 'Discover Weekly playlists have been updated successfully',
-        });
-        break;
-
-      case 'new-releases':
-        await prisma.playlist.updateNewReleasesPlaylists();
-        res.json({
-          success: true,
-          message: 'New Releases playlists have been updated successfully',
-        });
-        break;
-
-      default:
-        res.status(400).json({
-          success: false,
-          message: `Invalid playlist type: ${type}. Valid types are: all, global, trending, top-hits, discover-weekly, new-releases`,
-        });
-    }
+    res.status(200).json({
+      success: true,
+      message: 'AI model settings updated successfully',
+      data: result,
+    });
   } catch (error) {
-    console.error('Error updating playlists:', error);
+    console.error('Error updating AI model settings:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update playlists',
+      message: 'Failed to update AI model settings',
       error: error instanceof Error ? error.message : String(error),
     });
   }
