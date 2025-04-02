@@ -12,8 +12,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAllSystemPlaylists = exports.getPersonalizedSystemPlaylist = exports.updateSystemPlaylistForUser = exports.createDefaultSystemPlaylists = exports.updateVibeRewindPlaylist = void 0;
+exports.getHomePageData = exports.updateAllSystemPlaylists = exports.getPersonalizedSystemPlaylist = exports.updateSystemPlaylistForUser = exports.createDefaultSystemPlaylists = exports.generateAIPlaylist = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = void 0;
 const db_1 = __importDefault(require("../config/db"));
+const handle_utils_1 = require("../utils/handle-utils");
+const ai_service_1 = require("./ai.service");
 const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let vibeRewindPlaylist = yield db_1.default.playlist.findFirst({
@@ -153,13 +155,128 @@ const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, f
     }
 });
 exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
+const getSystemPlaylists = (req) => __awaiter(void 0, void 0, void 0, function* () {
+    const { search, sortBy, sortOrder } = req.query;
+    const whereClause = {
+        type: 'SYSTEM',
+    };
+    if (search && typeof search === 'string') {
+        whereClause.OR = [
+            { name: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+        ];
+    }
+    const orderByClause = {};
+    if (sortBy &&
+        typeof sortBy === 'string' &&
+        (sortOrder === 'asc' || sortOrder === 'desc')) {
+        if (sortBy === 'name' ||
+            sortBy === 'type' ||
+            sortBy === 'createdAt' ||
+            sortBy === 'updatedAt' ||
+            sortBy === 'totalTracks') {
+            orderByClause[sortBy] = sortOrder;
+        }
+        else {
+            orderByClause.createdAt = 'desc';
+        }
+    }
+    else {
+        orderByClause.createdAt = 'desc';
+    }
+    const result = yield (0, handle_utils_1.paginate)(db_1.default.playlist, req, {
+        where: whereClause,
+        include: {
+            tracks: {
+                include: {
+                    track: {
+                        include: {
+                            artist: true,
+                            album: true,
+                        },
+                    },
+                },
+                orderBy: {
+                    trackOrder: 'asc',
+                },
+            },
+            user: {
+                select: { id: true, name: true, email: true },
+            },
+        },
+        orderBy: orderByClause,
+    });
+    const formattedPlaylists = result.data.map((playlist) => {
+        const formattedTracks = playlist.tracks.map((pt) => ({
+            id: pt.track.id,
+            title: pt.track.title,
+            audioUrl: pt.track.audioUrl,
+            duration: pt.track.duration,
+            coverUrl: pt.track.coverUrl,
+            artist: pt.track.artist,
+            album: pt.track.album,
+            createdAt: pt.track.createdAt.toISOString(),
+        }));
+        return Object.assign(Object.assign({}, playlist), { tracks: formattedTracks });
+    });
+    return {
+        data: formattedPlaylists,
+        pagination: result.pagination,
+    };
+});
+exports.getSystemPlaylists = getSystemPlaylists;
+const generateAIPlaylist = (userId, options) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log(`[PlaylistService] Generating AI playlist for user ${userId} with options:`, options);
+    const playlist = yield (0, ai_service_1.createAIGeneratedPlaylist)(userId, options);
+    const playlistWithTracks = yield db_1.default.playlist.findUnique({
+        where: { id: playlist.id },
+        include: {
+            tracks: {
+                include: {
+                    track: {
+                        include: {
+                            artist: {
+                                select: {
+                                    id: true,
+                                    artistName: true,
+                                    avatar: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                orderBy: {
+                    trackOrder: 'asc',
+                },
+            },
+        },
+    });
+    if (!playlistWithTracks) {
+        throw new Error('Failed to retrieve created playlist details');
+    }
+    const artistsInPlaylist = new Set();
+    playlistWithTracks.tracks.forEach((pt) => {
+        if (pt.track.artist) {
+            artistsInPlaylist.add(pt.track.artist.artistName);
+        }
+    });
+    return Object.assign(Object.assign({}, playlist), { artistCount: artistsInPlaylist.size, previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => {
+            var _a;
+            return ({
+                id: pt.track.id,
+                title: pt.track.title,
+                artist: (_a = pt.track.artist) === null || _a === void 0 ? void 0 : _a.artistName,
+            });
+        }), totalTracks: playlistWithTracks.tracks.length });
+});
+exports.generateAIPlaylist = generateAIPlaylist;
 const DEFAULT_SYSTEM_PLAYLISTS = [
     {
         name: 'Discover Weekly',
         description: "Discover new music we think you'll like based on your listening habits",
         type: 'SYSTEM',
         privacy: 'PUBLIC',
-        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1717339128/system/discover_weekly_pl.jpg',
+        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
         isAIGenerated: true,
     },
     {
@@ -167,7 +284,7 @@ const DEFAULT_SYSTEM_PLAYLISTS = [
         description: 'Catch all the latest releases from artists you follow and more',
         type: 'SYSTEM',
         privacy: 'PUBLIC',
-        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1717339128/system/release_radar_pl.jpg',
+        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
         isAIGenerated: true,
     },
     {
@@ -175,7 +292,7 @@ const DEFAULT_SYSTEM_PLAYLISTS = [
         description: 'A perfect mix of your favorites and new discoveries',
         type: 'SYSTEM',
         privacy: 'PUBLIC',
-        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1717339128/system/daily_mix_pl.jpg',
+        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
         isAIGenerated: true,
     },
 ];
@@ -722,4 +839,79 @@ const updateAllSystemPlaylists = () => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.updateAllSystemPlaylists = updateAllSystemPlaylists;
+const getHomePageData = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    const systemPlaylists = yield db_1.default.playlist.findMany({
+        where: {
+            type: 'SYSTEM',
+            userId: null,
+            privacy: 'PUBLIC',
+        },
+        take: 5,
+        include: {
+            user: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+    const newestAlbums = yield db_1.default.album.findMany({
+        where: {
+            isActive: true,
+        },
+        orderBy: {
+            releaseDate: 'desc',
+        },
+        take: 10,
+        include: {
+            artist: { select: { id: true, artistName: true, avatar: true } },
+        },
+    });
+    const hotAlbums = yield db_1.default.album.findMany({
+        where: {
+            isActive: true,
+        },
+        orderBy: [
+            { createdAt: 'desc' },
+        ],
+        take: 10,
+        include: {
+            artist: { select: { id: true, artistName: true, avatar: true } },
+        },
+    });
+    const responseData = {
+        systemPlaylists,
+        newestAlbums,
+        hotAlbums,
+        userPlaylists: [],
+        personalizedSystemPlaylists: [],
+    };
+    if (userId) {
+        const userPlaylists = yield db_1.default.playlist.findMany({
+            where: {
+                userId,
+                type: 'NORMAL',
+            },
+            include: {
+                _count: { select: { tracks: true } },
+            },
+            take: 5,
+            orderBy: {
+                updatedAt: 'desc',
+            },
+        });
+        responseData.userPlaylists = userPlaylists.map((p) => (Object.assign(Object.assign({}, p), { totalTracks: p._count.tracks })));
+        const personalizedSystemPlaylists = yield db_1.default.playlist.findMany({
+            where: {
+                userId: userId,
+                type: 'SYSTEM',
+            },
+            take: 5,
+            include: {
+                _count: { select: { tracks: true } },
+            },
+            orderBy: { lastGeneratedAt: 'desc' },
+        });
+        responseData.personalizedSystemPlaylists = personalizedSystemPlaylists.map((p) => (Object.assign(Object.assign({}, p), { totalTracks: p._count.tracks })));
+    }
+    return responseData;
+});
+exports.getHomePageData = getHomePageData;
 //# sourceMappingURL=playlist.service.js.map

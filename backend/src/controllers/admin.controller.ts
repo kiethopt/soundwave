@@ -4,9 +4,8 @@ import {
   runValidations,
   validateField,
 } from '../utils/handle-utils';
-import * as adminService from '../services/admin.service';
-import * as playlistService from '../services/playlist.service';
 import prisma from '../config/db';
+import * as adminService from '../services/admin.service';
 import * as emailService from '../services/email.service';
 
 // Lấy danh sách tất cả người dùng - ADMIN only

@@ -800,6 +800,24 @@ export const api = {
         },
         token
       ),
+
+    // Get system playlists specifically for the Admin view
+    getSystemPlaylistsForAdmin: async (token: string) => {
+      try {
+        return await fetchWithAuth(
+          '/api/playlists/system-all',
+          { method: 'GET' },
+          token
+        );
+      } catch (error) {
+        console.error('Error fetching system playlists for admin:', error);
+        return {
+          success: false,
+          data: [],
+          message: 'Failed to fetch system playlists',
+        };
+      }
+    },
   },
 
   albums: {
@@ -1130,27 +1148,26 @@ export const api = {
       return response.json();
     },
 
-    getSystemPlaylists: async (token?: string) => {
+    // This function is used by both regular users and admins (backend handles authorization)
+    getSystemPlaylists: async (
+      token?: string,
+      page: number = 1,
+      limit: number = 10,
+      params: string = '' // Accept URLSearchParams string
+    ) => {
       try {
-        // Choose endpoint based on authentication state
-        const endpoint = token
-          ? '/api/playlists' // For authenticated users
-          : '/api/playlists/system-all'; // For non-authenticated users
-
-        // Set headers for authenticated users to filter system playlists
-        const options: RequestInit = {
-          method: 'GET',
-          headers: token ? { 'X-Filter-Type': 'system' } : undefined,
-        };
-
-        return await fetchWithAuth(endpoint, options, token);
+        const queryParams = new URLSearchParams(params);
+        queryParams.set('page', page.toString());
+        queryParams.set('limit', limit.toString());
+        const url = `/api/playlists/system-all?${queryParams.toString()}`;
+        return await fetchWithAuth(url, { method: 'GET' }, token);
       } catch (error) {
         console.error('Error fetching system playlists:', error);
-        // Return empty data on error to prevent app from crashing
         return {
           success: false,
           data: [],
-          message: 'Failed to fetch playlists',
+          message: 'Failed to fetch system playlists',
+          pagination: { currentPage: 1, totalPages: 1, totalItems: 0 }, // Provide default pagination on error
         };
       }
     },

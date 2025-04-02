@@ -40,6 +40,8 @@ export default function AlbumManagement() {
     setGenreFilter,
     selectedRows,
     setSelectedRows,
+    sorting,
+    setSorting,
     updateQueryParam,
   } = useDataTable<Album>({
     fetchData: async (page, params) => {
@@ -62,7 +64,6 @@ export default function AlbumManagement() {
   });
 
   // Table state
-  const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
@@ -318,7 +319,7 @@ export default function AlbumManagement() {
         pageCount={totalPages}
         pageIndex={currentPage - 1}
         loading={loading}
-        onPageChange={(page) => updateQueryParam('page', page + 1)}
+        onPageChange={(page) => updateQueryParam({ page: page + 1 })}
         onRowSelection={setSelectedRows}
         theme={theme}
         toolbar={{

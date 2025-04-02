@@ -234,7 +234,7 @@ export default function LabelManagement() {
         pageCount={totalPages}
         pageIndex={currentPage - 1}
         loading={loading || !!actionLoading}
-        onPageChange={(page) => updateQueryParam('page', page + 1)}
+        onPageChange={(page) => updateQueryParam({ page: page + 1 })}
         theme={theme}
         toolbar={{
           searchValue: searchInput,

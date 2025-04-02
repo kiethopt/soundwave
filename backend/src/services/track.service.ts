@@ -1,4 +1,8 @@
 import prisma from '../config/db';
+import { trackSelect } from '../utils/prisma-selects';
+import { Prisma } from '@prisma/client';
+import { Request } from 'express';
+import { paginate } from '../utils/handle-utils';
 
 export const deleteTrackById = async (id: string) => {
   // Kiểm tra xem bài hát có tồn tại không
@@ -117,4 +121,93 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
       trackId,
     },
   });
+};
+
+// Lấy TẤT CẢ tracks (cho admin view, với phân trang, tìm kiếm, sắp xếp)
+export const getAllTracks = async (req: Request) => {
+  const { search, sortBy, sortOrder } = req.query;
+
+  // Điều kiện tìm kiếm
+  const whereClause: Prisma.TrackWhereInput = {};
+
+  // Tìm kiếm theo title, artist, album, genres, featuredArtists
+  if (search && typeof search === 'string') {
+    whereClause.OR = [
+      { title: { contains: search, mode: 'insensitive' } },
+      { artist: { artistName: { contains: search, mode: 'insensitive' } } },
+      { album: { title: { contains: search, mode: 'insensitive' } } },
+      {
+        genres: {
+          some: {
+            genre: {
+              name: { contains: search, mode: 'insensitive' },
+            },
+          },
+        },
+      },
+      {
+        featuredArtists: {
+          some: {
+            artistProfile: {
+              artistName: { contains: search, mode: 'insensitive' },
+            },
+          },
+        },
+      },
+    ];
+  }
+
+  // Sắp xếp
+  const orderByClause: Prisma.TrackOrderByWithRelationInput = {};
+  if (
+    sortBy &&
+    typeof sortBy === 'string' &&
+    (sortOrder === 'asc' || sortOrder === 'desc')
+  ) {
+    if (
+      sortBy === 'title' ||
+      sortBy === 'duration' ||
+      sortBy === 'releaseDate' ||
+      sortBy === 'createdAt' ||
+      sortBy === 'isActive'
+    ) {
+      orderByClause[sortBy] = sortOrder;
+    } else if (sortBy === 'album') {
+      orderByClause.album = { title: sortOrder };
+    } else if (sortBy === 'artist') {
+      orderByClause.artist = { artistName: sortOrder };
+    }
+    // Note: Sorting by genres or featuredArtists (many-to-many) is complex and might require different approaches.
+    // We'll stick to direct fields and simple relations for now.
+    else {
+      orderByClause.releaseDate = 'desc';
+    }
+  } else {
+    orderByClause.releaseDate = 'desc';
+  }
+
+  const result = await paginate<any>(prisma.track, req, {
+    where: whereClause,
+    include: {
+      artist: { select: { id: true, artistName: true, avatar: true } },
+      album: { select: { id: true, title: true } },
+      genres: { include: { genre: true } },
+      featuredArtists: {
+        include: { artistProfile: { select: { id: true, artistName: true } } },
+      },
+    },
+    orderBy: orderByClause,
+  });
+
+  // Map data để đảm bảo cấu trúc và thêm trường dẫn đến genre và featuredArtists
+  const formattedTracks = result.data.map((track: any) => ({
+    ...track,
+    genres: track.genres,
+    featuredArtists: track.featuredArtists,
+  }));
+
+  return {
+    data: formattedTracks,
+    pagination: result.pagination,
+  };
 };

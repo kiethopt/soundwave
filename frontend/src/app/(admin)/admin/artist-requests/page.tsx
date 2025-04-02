@@ -259,7 +259,7 @@ export default function ArtistRequestManagement() {
         pageCount={totalPages}
         pageIndex={currentPage - 1}
         loading={loading}
-        onPageChange={(page) => updateQueryParam('page', page + 1)}
+        onPageChange={(page) => updateQueryParam({ page: page + 1 })}
         onRowSelection={setSelectedRows}
         theme={theme}
         toolbar={{

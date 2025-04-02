@@ -15,8 +15,9 @@ import {
   HomeOutline,
   Settings,
   ChartIcon,
+  Tags,
+  LayoutGrid,
 } from '@/components/ui/Icons';
-import { Tags } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -605,6 +606,27 @@ export default function Sidebar({
                         <Tags className="w-5 h-5" />
                       </div>
                       <span className="ml-3 font-medium text-sm">Labels</span>
+                    </>
+                  )}
+                </Link>
+
+                {/* Content Section - NEW */}
+                <Link
+                  href="/admin/content"
+                  className={`flex items-center px-3 py-2.5 ${
+                    pathname.startsWith('/admin/content')
+                      ? 'bg-gray-200 text-gray-900'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {isCollapsed ? (
+                    <LayoutGrid className="w-6 h-6 mx-auto" />
+                  ) : (
+                    <>
+                      <div className="min-w-[32px] flex justify-center">
+                        <LayoutGrid className="w-5 h-5" />
+                      </div>
+                      <span className="ml-3 font-medium text-sm">Content</span>
                     </>
                   )}
                 </Link>

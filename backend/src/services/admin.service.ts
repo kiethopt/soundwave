@@ -12,8 +12,6 @@ import { uploadFile } from './upload.service';
 import { paginate, toBooleanValue } from '../utils/handle-utils';
 import * as fs from 'fs';
 import * as path from 'path';
-import Matrix from 'ml-matrix';
-import { client as redis } from '../middleware/cache.middleware';
 
 // User management services
 export const getUsers = async (req: Request) => {
@@ -364,22 +362,18 @@ export const getGenres = async (req: Request) => {
 };
 
 export const createNewGenre = async (name: string) => {
-  // Kiểm tra trùng lặp tên thể loại
   const existingGenre = await prisma.genre.findFirst({
     where: { name },
   });
   if (existingGenre) {
     throw new Error('Genre name already exists');
   }
-
-  // Tạo thể loại mới
   return prisma.genre.create({
     data: { name },
   });
 };
 
 export const updateGenreInfo = async (id: string, name: string) => {
-  // Kiểm tra genre tồn tại
   const existingGenre = await prisma.genre.findUnique({
     where: { id },
   });
@@ -429,10 +423,9 @@ export const approveArtistRequest = async (requestId: string) => {
       role: Role.ARTIST,
       isVerified: true,
       verifiedAt: new Date(),
-      verificationRequestedAt: null, // Reset request time
+      verificationRequestedAt: null,
     },
     include: {
-      // **Sửa ở đây: Sử dụng userSelect**
       user: { select: userSelect },
     },
   });
@@ -463,7 +456,7 @@ export const rejectArtistRequest = async (requestId: string) => {
   // Trả về thông tin user đã được select bởi userSelect (bao gồm cả username)
   return {
     user: artistProfile.user,
-    hasPendingRequest: false, // Không còn request nào sau khi xóa profile
+    hasPendingRequest: false,
   };
 };
 

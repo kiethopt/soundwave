@@ -1,4 +1,8 @@
 import prisma from '../config/db';
+import { Prisma } from '@prisma/client';
+import { Request } from 'express';
+import { paginate } from '../utils/handle-utils';
+import { createAIGeneratedPlaylist as createAIGeneratedPlaylistFromAIService } from './ai.service'; // Import AI service
 
 // Tạo playlist chứa các bài hát từ lịch sử nghe của người dùng
 export const updateVibeRewindPlaylist = async (
@@ -200,6 +204,166 @@ export const updateVibeRewindPlaylist = async (
     );
     throw error;
   }
+};
+
+// Lấy các system playlist (cho admin view, với phân trang, tìm kiếm, sắp xếp)
+export const getSystemPlaylists = async (req: Request) => {
+  const { search, sortBy, sortOrder } = req.query;
+
+  // Dựa vào type là SYSTEM
+  const whereClause: Prisma.PlaylistWhereInput = {
+    type: 'SYSTEM',
+  };
+
+  // Thêm điều kiện tìm kiếm nếu có từ khóa tìm kiếm
+  if (search && typeof search === 'string') {
+    whereClause.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  // Sắp xếp theo name, type, createdAt, updatedAt, totalTracks
+  const orderByClause: Prisma.PlaylistOrderByWithRelationInput = {};
+  if (
+    sortBy &&
+    typeof sortBy === 'string' &&
+    (sortOrder === 'asc' || sortOrder === 'desc')
+  ) {
+    if (
+      sortBy === 'name' ||
+      sortBy === 'type' ||
+      sortBy === 'createdAt' ||
+      sortBy === 'updatedAt' ||
+      sortBy === 'totalTracks'
+    ) {
+      orderByClause[sortBy] = sortOrder;
+    } else {
+      orderByClause.createdAt = 'desc';
+    }
+  } else {
+    orderByClause.createdAt = 'desc';
+  }
+
+  const result = await paginate<any>(prisma.playlist, req, {
+    where: whereClause,
+    include: {
+      tracks: {
+        include: {
+          track: {
+            include: {
+              artist: true,
+              album: true,
+            },
+          },
+        },
+        orderBy: {
+          trackOrder: 'asc',
+        },
+      },
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: orderByClause,
+  });
+
+  // Transform data structure for consistent formatting within the service
+  const formattedPlaylists = result.data.map((playlist: any) => {
+    const formattedTracks = playlist.tracks.map((pt: any) => ({
+      id: pt.track.id,
+      title: pt.track.title,
+      audioUrl: pt.track.audioUrl,
+      duration: pt.track.duration,
+      coverUrl: pt.track.coverUrl,
+      artist: pt.track.artist,
+      album: pt.track.album,
+      createdAt: pt.track.createdAt.toISOString(),
+    }));
+
+    return {
+      ...playlist,
+      tracks: formattedTracks,
+      // canEdit logic might need adjustment or removal from here
+    };
+  });
+
+  return {
+    data: formattedPlaylists,
+    pagination: result.pagination,
+  };
+};
+
+// Generating AI playlists
+export const generateAIPlaylist = async (
+  userId: string,
+  options: {
+    name?: string;
+    description?: string;
+    trackCount?: number;
+    basedOnMood?: string;
+    basedOnGenre?: string;
+    basedOnArtist?: string;
+  }
+) => {
+  console.log(
+    `[PlaylistService] Generating AI playlist for user ${userId} with options:`,
+    options
+  );
+
+  // Create playlist using AI service
+  const playlist = await createAIGeneratedPlaylistFromAIService(
+    userId,
+    options
+  );
+
+  // Get additional playlist details for the response
+  const playlistWithTracks = await prisma.playlist.findUnique({
+    where: { id: playlist.id },
+    include: {
+      tracks: {
+        include: {
+          track: {
+            include: {
+              artist: {
+                select: {
+                  id: true,
+                  artistName: true,
+                  avatar: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          trackOrder: 'asc',
+        },
+      },
+    },
+  });
+
+  if (!playlistWithTracks) {
+    throw new Error('Failed to retrieve created playlist details');
+  }
+
+  // Count artists in the playlist
+  const artistsInPlaylist = new Set();
+  playlistWithTracks.tracks.forEach((pt) => {
+    if (pt.track.artist) {
+      artistsInPlaylist.add(pt.track.artist.artistName);
+    }
+  });
+
+  return {
+    ...playlist,
+    artistCount: artistsInPlaylist.size,
+    previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => ({
+      id: pt.track.id,
+      title: pt.track.title,
+      artist: pt.track.artist?.artistName,
+    })),
+    totalTracks: playlistWithTracks.tracks.length, // Ensure totalTracks is accurate
+  };
 };
 
 // Danh sách các system playlist mặc định
@@ -919,4 +1083,107 @@ export const updateAllSystemPlaylists = async (): Promise<{
       ],
     };
   }
+};
+
+// Get homepage data (combines multiple endpoints for efficiency)
+export const getHomePageData = async (userId?: string) => {
+  // Get system playlists (global ones for all users)
+  const systemPlaylists = await prisma.playlist.findMany({
+    where: {
+      type: 'SYSTEM',
+      userId: null,
+      privacy: 'PUBLIC', // Ensure only public global playlists
+    },
+    take: 5, // Limit the number of system playlists shown on homepage
+    include: {
+      // Minimal includes for homepage performance
+      user: { select: { name: true } },
+    },
+    orderBy: { createdAt: 'desc' }, // Or some other relevant order
+  });
+
+  // Get newest albums
+  const newestAlbums = await prisma.album.findMany({
+    where: {
+      isActive: true,
+    },
+    orderBy: {
+      releaseDate: 'desc', // Order by release date
+    },
+    take: 10,
+    include: {
+      artist: { select: { id: true, artistName: true, avatar: true } }, // Minimal includes
+    },
+  });
+
+  // Get popular albums (Example: based on recent creation or track plays - simplified here)
+  const hotAlbums = await prisma.album.findMany({
+    where: {
+      isActive: true,
+      // Add logic for "hotness" if needed, e.g., recent track plays
+    },
+    orderBy: [
+      { createdAt: 'desc' }, // Simple ordering for now
+    ],
+    take: 10,
+    include: {
+      artist: { select: { id: true, artistName: true, avatar: true } }, // Minimal includes
+    },
+  });
+
+  // Data to return for all users (authenticated or not)
+  const responseData: {
+    systemPlaylists: any[];
+    newestAlbums: any[];
+    hotAlbums: any[];
+    userPlaylists: any[];
+    personalizedSystemPlaylists: any[]; // Add field for user-specific system playlists
+  } = {
+    systemPlaylists,
+    newestAlbums,
+    hotAlbums,
+    userPlaylists: [],
+    personalizedSystemPlaylists: [],
+  };
+
+  // Additional data for authenticated users
+  if (userId) {
+    // Get user's playlists (non-system, non-favorite, recent)
+    const userPlaylists = await prisma.playlist.findMany({
+      where: {
+        userId,
+        type: 'NORMAL', // Exclude FAVORITE and SYSTEM
+      },
+      include: {
+        _count: { select: { tracks: true } }, // Get track count efficiently
+      },
+      take: 5, // Limit the number shown
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
+    // Add track count to user playlists
+    responseData.userPlaylists = userPlaylists.map((p) => ({
+      ...p,
+      totalTracks: p._count.tracks,
+    }));
+
+    // Get user-specific system playlists (like Discover Weekly, Release Radar, etc.)
+    const personalizedSystemPlaylists = await prisma.playlist.findMany({
+      where: {
+        userId: userId,
+        type: 'SYSTEM',
+      },
+      take: 5, // Limit the number shown
+      include: {
+        _count: { select: { tracks: true } },
+      },
+      orderBy: { lastGeneratedAt: 'desc' }, // Show most recently generated
+    });
+    responseData.personalizedSystemPlaylists = personalizedSystemPlaylists.map(
+      (p) => ({ ...p, totalTracks: p._count.tracks })
+    );
+  }
+
+  return responseData;
 };

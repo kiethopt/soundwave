@@ -58,8 +58,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleAIModelStatus = exports.handleMaintenanceMode = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
-const adminService = __importStar(require("../services/admin.service"));
 const db_1 = __importDefault(require("../config/db"));
+const adminService = __importStar(require("../services/admin.service"));
 const emailService = __importStar(require("../services/email.service"));
 const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {

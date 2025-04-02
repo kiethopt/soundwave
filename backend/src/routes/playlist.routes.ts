@@ -27,7 +27,12 @@ import { Role } from '@prisma/client';
 const router = express.Router();
 
 // == Public routes (no authentication required) ==
-router.get('/system-all', cacheMiddleware, getSystemPlaylists);
+router.get(
+  '/system-all',
+  authenticate,
+  authorize([Role.ADMIN]),
+  getSystemPlaylists
+);
 router.get('/home', optionalAuthenticate, getHomePageData);
 router.get('/:id', optionalAuthenticate, getPlaylistById);
 

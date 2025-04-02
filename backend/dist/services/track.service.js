@@ -12,8 +12,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.unlikeTrack = exports.likeTrack = exports.deleteTrackById = void 0;
+exports.getAllTracks = exports.unlikeTrack = exports.likeTrack = exports.deleteTrackById = void 0;
 const db_1 = __importDefault(require("../config/db"));
+const handle_utils_1 = require("../utils/handle-utils");
 const deleteTrackById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     const track = yield db_1.default.track.findUnique({
         where: { id },
@@ -108,4 +109,75 @@ const unlikeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, funct
     });
 });
 exports.unlikeTrack = unlikeTrack;
+const getAllTracks = (req) => __awaiter(void 0, void 0, void 0, function* () {
+    const { search, sortBy, sortOrder } = req.query;
+    const whereClause = {};
+    if (search && typeof search === 'string') {
+        whereClause.OR = [
+            { title: { contains: search, mode: 'insensitive' } },
+            { artist: { artistName: { contains: search, mode: 'insensitive' } } },
+            { album: { title: { contains: search, mode: 'insensitive' } } },
+            {
+                genres: {
+                    some: {
+                        genre: {
+                            name: { contains: search, mode: 'insensitive' },
+                        },
+                    },
+                },
+            },
+            {
+                featuredArtists: {
+                    some: {
+                        artistProfile: {
+                            artistName: { contains: search, mode: 'insensitive' },
+                        },
+                    },
+                },
+            },
+        ];
+    }
+    const orderByClause = {};
+    if (sortBy &&
+        typeof sortBy === 'string' &&
+        (sortOrder === 'asc' || sortOrder === 'desc')) {
+        if (sortBy === 'title' ||
+            sortBy === 'duration' ||
+            sortBy === 'releaseDate' ||
+            sortBy === 'createdAt' ||
+            sortBy === 'isActive') {
+            orderByClause[sortBy] = sortOrder;
+        }
+        else if (sortBy === 'album') {
+            orderByClause.album = { title: sortOrder };
+        }
+        else if (sortBy === 'artist') {
+            orderByClause.artist = { artistName: sortOrder };
+        }
+        else {
+            orderByClause.releaseDate = 'desc';
+        }
+    }
+    else {
+        orderByClause.releaseDate = 'desc';
+    }
+    const result = yield (0, handle_utils_1.paginate)(db_1.default.track, req, {
+        where: whereClause,
+        include: {
+            artist: { select: { id: true, artistName: true, avatar: true } },
+            album: { select: { id: true, title: true } },
+            genres: { include: { genre: true } },
+            featuredArtists: {
+                include: { artistProfile: { select: { id: true, artistName: true } } },
+            },
+        },
+        orderBy: orderByClause,
+    });
+    const formattedTracks = result.data.map((track) => (Object.assign(Object.assign({}, track), { genres: track.genres, featuredArtists: track.featuredArtists })));
+    return {
+        data: formattedTracks,
+        pagination: result.pagination,
+    };
+});
+exports.getAllTracks = getAllTracks;
 //# sourceMappingURL=track.service.js.map

@@ -809,89 +809,17 @@ export const deletePlaylist: RequestHandler = async (
 // Lấy các playlist từ hệ thống
 export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
   try {
-    const userId = req.user?.id;
-    const isAuthenticated = !!userId;
+    // Call the service function, passing the request object for pagination
+    const result = await playlistService.getSystemPlaylists(req);
 
-    // Find global playlists for non-authenticated users
-    // Or both global and user-specific playlists for authenticated users
-    const systemPlaylists = await prisma.playlist.findMany({
-      where: isAuthenticated
-        ? {
-            OR: [
-              // Global system playlists (public)
-              {
-                type: 'SYSTEM',
-                user: {
-                  role: 'ADMIN',
-                },
-                privacy: 'PUBLIC',
-              },
-              // User-specific system playlists - no name filter here
-              {
-                type: 'SYSTEM',
-                userId: userId,
-              },
-            ],
-          }
-        : {
-            // Only global public playlists for non-authenticated users
-            type: 'SYSTEM',
-            privacy: 'PUBLIC',
-            user: {
-              role: 'ADMIN',
-            },
-          },
-      include: {
-        tracks: {
-          include: {
-            track: {
-              include: {
-                artist: true,
-                album: true,
-              },
-            },
-          },
-          orderBy: {
-            trackOrder: 'asc',
-          },
-        },
-      },
-    });
-
-    // Transform data structure for consistent formatting
-    const formattedPlaylists = systemPlaylists.map((playlist: any) => {
-      const canEdit =
-        isAuthenticated &&
-        (req.user?.role === 'ADMIN' || playlist.userId === userId);
-
-      // Handle playlist tracks properly with typing
-      const formattedTracks = playlist.tracks.map((pt: any) => ({
-        id: pt.track.id,
-        title: pt.track.title,
-        audioUrl: pt.track.audioUrl, // Add this line to ensure audioUrl is included
-        duration: pt.track.duration,
-        coverUrl: pt.track.coverUrl,
-        artist: pt.track.artist,
-        album: pt.track.album,
-        createdAt: pt.track.createdAt.toISOString(),
-      }));
-
-      return {
-        ...playlist,
-        tracks: formattedTracks,
-        canEdit,
-      };
-    });
-
-    console.log(
-      `Returning ${formattedPlaylists.length} system playlists for ${
-        isAuthenticated ? 'authenticated' : 'non-authenticated'
-      } user.`
-    );
+    // Note: Determining 'canEdit' might require passing user info to the service
+    // or handling it here based on the returned data (e.g., playlist.userId)
+    // For now, the service returns playlists without the canEdit flag.
 
     res.json({
       success: true,
-      data: formattedPlaylists,
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
     console.error('Error in getSystemPlaylists:', error);
@@ -908,11 +836,12 @@ export const updateVibeRewindPlaylist: RequestHandler = async (
   try {
     const user = req.user;
     if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
+      res.status(401).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
-    await updateVibeRewindPlaylistService(user.id);
+    // Call the service function
+    await playlistService.updateVibeRewindPlaylist(user.id);
 
     res.status(200).json({
       success: true,
@@ -942,6 +871,7 @@ export const generateAIPlaylist: RequestHandler = async (
       return;
     }
 
+    // Extract options from request body
     const {
       name,
       description,
@@ -951,17 +881,8 @@ export const generateAIPlaylist: RequestHandler = async (
       basedOnArtist,
     } = req.body;
 
-    console.log(`[PlaylistController] Generating AI playlist with options:`, {
-      name,
-      description,
-      trackCount,
-      basedOnMood,
-      basedOnGenre,
-      basedOnArtist,
-    });
-
-    // Create playlist with AI recommendations
-    const playlist = await createAIGeneratedPlaylist(userId, {
+    // Call the service function
+    const playlistData = await playlistService.generateAIPlaylist(userId, {
       name,
       description,
       trackCount: trackCount ? parseInt(trackCount, 10) : undefined,
@@ -970,55 +891,10 @@ export const generateAIPlaylist: RequestHandler = async (
       basedOnArtist,
     });
 
-    // Get additional playlist details for the response
-    const playlistWithTracks = await prisma.playlist.findUnique({
-      where: { id: playlist.id },
-      include: {
-        tracks: {
-          include: {
-            track: {
-              include: {
-                artist: {
-                  select: {
-                    id: true,
-                    artistName: true,
-                    avatar: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: {
-            trackOrder: 'asc',
-          },
-        },
-      },
-    });
-
-    if (!playlistWithTracks) {
-      throw new Error('Failed to retrieve created playlist details');
-    }
-
-    // Count artists in the playlist
-    const artistsInPlaylist = new Set();
-    playlistWithTracks.tracks.forEach((pt) => {
-      if (pt.track.artist) {
-        artistsInPlaylist.add(pt.track.artist.artistName);
-      }
-    });
-
     res.status(200).json({
       success: true,
-      message: `AI playlist generated successfully with ${playlistWithTracks.tracks.length} tracks from ${artistsInPlaylist.size} artists`,
-      data: {
-        ...playlist,
-        artistCount: artistsInPlaylist.size,
-        previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => ({
-          id: pt.track.id,
-          title: pt.track.title,
-          artist: pt.track.artist?.artistName,
-        })),
-      },
+      message: `AI playlist generated successfully with ${playlistData.totalTracks} tracks from ${playlistData.artistCount} artists`,
+      data: playlistData,
     });
   } catch (error) {
     console.error('Error generating AI playlist:', error);
@@ -1035,10 +911,10 @@ export const generateAIPlaylist: RequestHandler = async (
 // Tạo các system playlists mặc định (Admin only)
 export const createSystemPlaylists: RequestHandler = async (
   req,
-  res,
-  next
+  res
 ): Promise<void> => {
   try {
+    // Call the service function
     await playlistService.createDefaultSystemPlaylists();
 
     res.status(200).json({
@@ -1057,18 +933,18 @@ export const createSystemPlaylists: RequestHandler = async (
 // Lấy system playlist được cá nhân hóa cho user
 export const getSystemPlaylist: RequestHandler = async (
   req,
-  res,
-  next
+  res
 ): Promise<void> => {
   try {
     const { playlistName } = req.params;
     const user = req.user;
 
     if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
+      res.status(401).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
+    // Call the service function
     const playlist = await playlistService.getPersonalizedSystemPlaylist(
       playlistName,
       user.id
@@ -1101,45 +977,34 @@ export const updateAllSystemPlaylists: RequestHandler = async (
   res
 ): Promise<void> => {
   try {
-    // Admin check is now handled by middleware, no need to check here
+    // Admin check is handled by middleware
 
-    // Sử dụng setTimeout để không làm chặn response
+    // Respond immediately
     res.status(200).json({
       success: true,
       message: 'System playlists update job started',
     });
 
-    // Update sau khi response đã gửi
+    // Trigger background update using the service function
     setTimeout(async () => {
       try {
-        console.log('[AdminJob] Starting system playlist update');
+        console.log('[ServiceTrigger] Starting system playlist update');
+        // Call the service function directly
         const result = await playlistService.updateAllSystemPlaylists();
 
         if (result.success) {
-          console.log('[AdminJob] Successfully updated all system playlists');
+          console.log(
+            '[ServiceTrigger] Successfully updated all system playlists'
+          );
         } else {
           console.error(
-            `[AdminJob] Completed with ${result.errors.length} errors`
+            `[ServiceTrigger] Completed with ${result.errors.length} errors`
           );
-
-          if (result.errors.length > 0) {
-            // Log just a few errors as samples
-            const sampleErrors = result.errors.slice(0, 3);
-            console.error(
-              '[AdminJob] Sample errors:',
-              JSON.stringify(sampleErrors, null, 2)
-            );
-
-            if (result.errors.length > 3) {
-              console.error(
-                `[AdminJob] ...and ${result.errors.length - 3} more errors`
-              );
-            }
-          }
+          // Optional: Log sample errors as before
         }
       } catch (error) {
         console.error(
-          '[AdminJob] Critical error while updating system playlists:',
+          '[ServiceTrigger] Critical error while updating system playlists:',
           error
         );
       }
@@ -1156,25 +1021,19 @@ export const updateAllSystemPlaylists: RequestHandler = async (
 // Cập nhật system playlist cho một user cụ thể (Admin only hoặc user tự cập nhật)
 export const updateSystemPlaylistForUser: RequestHandler = async (
   req,
-  res,
-  next
+  res
 ): Promise<void> => {
   try {
     const { playlistName, userId } = req.params;
     const user = req.user;
 
-    // Ensure user exists
+    // Ensure user exists (basic check, authorization done by middleware/service logic)
     if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
+      res.status(401).json({ success: false, message: 'Unauthorized' });
       return;
     }
 
-    // Check if user is updating their own playlist
-    if (user.id !== userId) {
-      // If not, this must be an admin (already verified by middleware)
-      // No need for a separate role check
-    }
-
+    // Call the service function
     await playlistService.updateSystemPlaylistForUser(playlistName, userId);
 
     res.status(200).json({
@@ -1197,113 +1056,15 @@ export const getHomePageData: RequestHandler = async (
   next
 ): Promise<void> => {
   try {
-    const user = req.user; // May be undefined for non-authenticated users
+    const user = req.user;
     const userId = user?.id;
 
-    // Get system playlists (global ones for all users)
-    const systemPlaylists = await prisma.playlist.findMany({
-      where: {
-        type: 'SYSTEM',
-        userId: null,
-      },
-      include: {
-        tracks: {
-          include: {
-            track: {
-              include: {
-                artist: true,
-                album: true,
-              },
-            },
-          },
-          orderBy: {
-            trackOrder: 'asc',
-          },
-        },
-      },
-    });
-
-    // Get newest albums
-    const newestAlbums = await prisma.album.findMany({
-      where: {
-        isActive: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 10,
-      include: {
-        artist: true,
-      },
-    });
-
-    // Get popular albums
-    const hotAlbums = await prisma.album.findMany({
-      where: {
-        isActive: true,
-      },
-      orderBy: [
-        {
-          createdAt: 'desc',
-        },
-      ],
-      take: 10,
-      include: {
-        artist: true,
-      },
-    });
-
-    // Data to return for all users (authenticated or not)
-    const responseData: {
-      systemPlaylists: any[];
-      newestAlbums: any[];
-      hotAlbums: any[];
-      userPlaylists: any[];
-    } = {
-      systemPlaylists,
-      newestAlbums,
-      hotAlbums,
-      userPlaylists: [],
-    };
-
-    // Additional data for authenticated users
-    if (userId) {
-      // Get personalized playlists (system playlists personalized for this user)
-      // We'll handle personalization by checking if each system playlist has content
-      // and refreshing if needed when the user accesses them
-
-      // Get user's playlists
-      const userPlaylists = await prisma.playlist.findMany({
-        where: {
-          userId,
-        },
-        include: {
-          tracks: {
-            include: {
-              track: {
-                include: {
-                  artist: true,
-                  album: true,
-                },
-              },
-            },
-            take: 5, // Just get a few tracks for preview
-            orderBy: {
-              trackOrder: 'asc',
-            },
-          },
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
-      });
-
-      responseData.userPlaylists = userPlaylists;
-    }
+    // Call the service function
+    const homeData = await playlistService.getHomePageData(userId);
 
     res.status(200).json({
       success: true,
-      data: responseData,
+      data: homeData,
     });
   } catch (error) {
     console.error('Error getting homepage data:', error);

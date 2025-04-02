@@ -8,7 +8,6 @@ import {
   RefreshCw,
   Database,
   Server,
-  Shield,
   Bot,
   AlertCircle,
 } from 'lucide-react';
@@ -54,20 +53,28 @@ export default function SystemPage() {
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        // Lấy trạng thái cache
-        const cacheResponse = await api.admin.getCacheStatus(token);
+        const [cacheResponse, aiModelResponse, maintenanceResponse] =
+          await Promise.all([
+            api.admin.getCacheStatus(token),
+            api.admin.getAIModelStatus(token),
+            api.admin.getMaintenanceStatus(token),
+          ]);
 
-        // Lấy trạng thái AI model
-        const aiModelResponse = await api.admin.getAIModelStatus(token);
-
-        // Lấy trạng thái bảo trì
-        const maintenanceResponse = await api.admin.getMaintenanceStatus(token);
+        // Debug log
+        console.log('AI Model Response:', aiModelResponse);
 
         setSettings((prev) => ({
           ...prev,
           cacheEnabled: cacheResponse.enabled,
-          aiModel: aiModelResponse.model,
-          supportedAIModels: aiModelResponse.supportedModels || [],
+          aiModel: aiModelResponse.data?.model || 'gemini-2.5-pro-exp-03-25',
+          supportedAIModels: aiModelResponse.data?.validModels || [
+            'gemini-2.5-pro-exp-03-25',
+            'gemini-2.0-flash',
+            'gemini-2.0-flash-lite',
+            'gemini-1.5-flash',
+            'gemini-1.5-flash-8b',
+            'gemini-1.5-pro',
+          ],
           maintenanceMode: maintenanceResponse.enabled || false,
         }));
       } catch (error) {
@@ -235,9 +242,16 @@ export default function SystemPage() {
                   onValueChange={(value) => updateSetting('aiModel', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select AI model" />
+                    <SelectValue
+                      placeholder={settings.aiModel || 'Select AI model'}
+                    />
                   </SelectTrigger>
                   <SelectContent>
+                    {!settings.supportedAIModels?.length && (
+                      <SelectItem value="loading" disabled>
+                        No models available
+                      </SelectItem>
+                    )}
                     {settings.supportedAIModels?.map((model) => (
                       <SelectItem key={model} value={model}>
                         {model}
