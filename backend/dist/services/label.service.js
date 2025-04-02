@@ -13,22 +13,26 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteLabel = exports.updateLabel = exports.createLabel = exports.getLabelById = exports.getAllLabels = void 0;
+
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
+const upload_service_1 = require("../services/upload.service");
+const handle_utils_1 = require("../utils/handle-utils");
+
 const getAllLabels = () => __awaiter(void 0, void 0, void 0, function* () {
     return db_1.default.label.findMany({
-        orderBy: {
-            name: 'asc',
-        },
+        orderBy: { name: 'asc' },
         select: prisma_selects_1.labelSelect,
     });
 });
 exports.getAllLabels = getAllLabels;
+
 const getLabelById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const label = yield db_1.default.label.findUnique({
         where: { id },
-        select: Object.assign(Object.assign({}, prisma_selects_1.labelSelect), { albums: {
+        select: Object.assign(Object.assign({}, prisma_selects_1.labelSelect), {
+            albums: {
                 where: { isActive: true },
                 select: {
                     id: true,
@@ -47,7 +51,8 @@ const getLabelById = (id) => __awaiter(void 0, void 0, void 0, function* () {
                     },
                 },
                 orderBy: { releaseDate: 'desc' },
-            }, tracks: {
+            },
+            tracks: {
                 where: { isActive: true },
                 select: {
                     id: true,
@@ -72,10 +77,11 @@ const getLabelById = (id) => __awaiter(void 0, void 0, void 0, function* () {
                     },
                 },
                 orderBy: { releaseDate: 'desc' },
-            } }),
+            }
+        }),
     });
-    if (!label)
-        return null;
+    if (!label) return null;
+
     const artistMap = new Map();
     (_a = label.albums) === null || _a === void 0 ? void 0 : _a.forEach((album) => {
         if (album.artist) {
@@ -100,28 +106,105 @@ const getLabelById = (id) => __awaiter(void 0, void 0, void 0, function* () {
         }
     });
     const artists = Array.from(artistMap.values()).sort((a, b) => a.artistName.localeCompare(b.artistName));
-    return Object.assign(Object.assign({}, label), { artists: artists });
+    return Object.assign(Object.assign({}, label), { artists });
 });
 exports.getLabelById = getLabelById;
-const createLabel = (data) => __awaiter(void 0, void 0, void 0, function* () {
+
+const createLabel = (req) => __awaiter(void 0, void 0, void 0, function* () {
+    const { name, description } = req.body;
+    const logoFile = req.file;
+
+    const errors = (0, handle_utils_1.runValidations)([
+        (0, handle_utils_1.validateField)(name, 'name', { required: true }),
+    ]);
+    if (errors.length > 0) {
+        throw { status: 400, message: 'Validation failed', errors };
+    }
+
+    const existingLabel = yield db_1.default.label.findUnique({
+        where: { name },
+    });
+    if (existingLabel) {
+        throw { status: 400, message: 'A label with this name already exists' };
+    }
+
+    let logoUrl;
+    if (logoFile) {
+        const uploadResult = yield (0, upload_service_1.uploadFile)(logoFile.buffer, 'labels', 'image');
+        logoUrl = uploadResult.secure_url;
+    }
+
     return db_1.default.label.create({
-        data,
+        data: { name, description, logoUrl },
         select: prisma_selects_1.labelSelect,
     });
 });
 exports.createLabel = createLabel;
-const updateLabel = (id, data) => __awaiter(void 0, void 0, void 0, function* () {
+
+const updateLabel = (req) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const { name, description } = req.body;
+    const logoFile = req.file;
+
+    const existingLabel = yield db_1.default.label.findUnique({
+        where: { id },
+    });
+    if (!existingLabel) {
+        throw { status: 404, message: 'Label not found' };
+    }
+
+    if (name && name !== existingLabel.name) {
+        const nameConflict = yield db_1.default.label.findUnique({
+            where: { name },
+        });
+        if (nameConflict) {
+            throw { status: 400, message: 'A label with this name already exists' };
+        }
+    }
+
+    let updateData = {};
+    if (name) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (logoFile) {
+        const uploadResult = yield (0, upload_service_1.uploadFile)(logoFile.buffer, 'labels', 'image');
+        updateData.logoUrl = uploadResult.secure_url;
+    }
+
     return db_1.default.label.update({
         where: { id },
-        data,
+        data: updateData,
         select: prisma_selects_1.labelSelect,
     });
 });
 exports.updateLabel = updateLabel;
+
 const deleteLabel = (id) => __awaiter(void 0, void 0, void 0, function* () {
+    const existingLabel = yield db_1.default.label.findUnique({
+        where: { id },
+        include: {
+            _count: {
+                select: {
+                    albums: true,
+                    tracks: true,
+                },
+            },
+        },
+    });
+    if (!existingLabel) {
+        throw { status: 404, message: 'Label not found' };
+    }
+
+    if (existingLabel._count.albums > 0 || existingLabel._count.tracks > 0) {
+        throw {
+            status: 400,
+            message: 'Cannot delete label with associated albums or tracks. Remove the associations first.',
+            albums: existingLabel._count.albums,
+            tracks: existingLabel._count.tracks,
+        };
+    }
+
     return db_1.default.label.delete({
         where: { id },
     });
 });
 exports.deleteLabel = deleteLabel;
-//# sourceMappingURL=label.service.js.map

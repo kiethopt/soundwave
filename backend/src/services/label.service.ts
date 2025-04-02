@@ -1,5 +1,8 @@
 import prisma from '../config/db';
 import { labelSelect } from '../utils/prisma-selects';
+import { Request } from 'express';
+import { uploadFile } from './upload.service';
+import { runValidations, validateField } from '../utils/handle-utils';
 
 export const getAllLabels = async () => {
   return prisma.label.findMany({
@@ -11,7 +14,6 @@ export const getAllLabels = async () => {
 };
 
 export const getLabelById = async (id: string) => {
-  // First, fetch the label with its albums and tracks
   const label = await prisma.label.findUnique({
     where: { id },
     select: {
@@ -67,14 +69,10 @@ export const getLabelById = async (id: string) => {
 
   if (!label) return null;
 
-  // Extract and deduplicate artists
   const artistMap = new Map();
-
-  // Add artists from albums
   label.albums?.forEach((album) => {
     if (album.artist) {
       const artistId = album.artist.id;
-
       if (!artistMap.has(artistId)) {
         artistMap.set(artistId, {
           ...album.artist,
@@ -82,18 +80,15 @@ export const getLabelById = async (id: string) => {
           trackCount: 0,
         });
       }
-
       const artist = artistMap.get(artistId);
       artist.albumCount += 1;
       artistMap.set(artistId, artist);
     }
   });
 
-  // Add artists from tracks
   label.tracks?.forEach((track) => {
     if (track.artist) {
       const artistId = track.artist.id;
-
       if (!artistMap.has(artistId)) {
         artistMap.set(artistId, {
           ...track.artist,
@@ -101,41 +96,125 @@ export const getLabelById = async (id: string) => {
           trackCount: 0,
         });
       }
-
       const artist = artistMap.get(artistId);
       artist.trackCount += 1;
       artistMap.set(artistId, artist);
     }
   });
 
-  // Convert map to array and sort by artist name
   const artists = Array.from(artistMap.values()).sort((a, b) =>
     a.artistName.localeCompare(b.artistName)
   );
 
-  // Return structured response
   return {
     ...label,
-    artists: artists,
+    artists,
   };
 };
 
-export const createLabel = async (data: any) => {
+export const createLabel = async (req: Request) => {
+  const { name, description } = req.body;
+  const logoFile = req.file;
+
+  const errors = runValidations([
+    validateField(name, 'name', { required: true }),
+  ]);
+
+  if (errors.length > 0) {
+    throw { status: 400, message: 'Validation failed', errors };
+  }
+
+  const existingLabel = await prisma.label.findUnique({
+    where: { name },
+  });
+
+  if (existingLabel) {
+    throw { status: 400, message: 'A label with this name already exists' };
+  }
+
+  let logoUrl: string | undefined;
+  if (logoFile) {
+    const uploadResult = await uploadFile(logoFile.buffer, 'labels', 'image');
+    logoUrl = uploadResult.secure_url;
+  }
+
   return prisma.label.create({
-    data,
+    data: {
+      name,
+      description,
+      logoUrl,
+    },
     select: labelSelect,
   });
 };
 
-export const updateLabel = async (id: string, data: any) => {
+export const updateLabel = async (req: Request) => {
+  const { id } = req.params;
+  const { name, description } = req.body;
+  const logoFile = req.file;
+
+  const existingLabel = await prisma.label.findUnique({
+    where: { id },
+  });
+
+  if (!existingLabel) {
+    throw { status: 404, message: 'Label not found' };
+  }
+
+  if (name && name !== existingLabel.name) {
+    const nameConflict = await prisma.label.findUnique({
+      where: { name },
+    });
+
+    if (nameConflict) {
+      throw { status: 400, message: 'A label with this name already exists' };
+    }
+  }
+
+  let updateData: any = {};
+  if (name) updateData.name = name;
+  if (description !== undefined) updateData.description = description;
+
+  if (logoFile) {
+    const uploadResult = await uploadFile(logoFile.buffer, 'labels', 'image');
+    updateData.logoUrl = uploadResult.secure_url;
+  }
+
   return prisma.label.update({
     where: { id },
-    data,
+    data: updateData,
     select: labelSelect,
   });
 };
 
 export const deleteLabel = async (id: string) => {
+  const existingLabel = await prisma.label.findUnique({
+    where: { id },
+    include: {
+      _count: {
+        select: {
+          albums: true,
+          tracks: true,
+        },
+      },
+    },
+  });
+
+  if (!existingLabel) {
+    throw { status: 404, message: 'Label not found' };
+  }
+
+  if (existingLabel._count.albums > 0 || existingLabel._count.tracks > 0) {
+    throw {
+      status: 400,
+      message: 'Cannot delete label with associated albums or tracks. Remove the associations first.',
+      data: {
+        albums: existingLabel._count.albums,
+        tracks: existingLabel._count.tracks,
+      },
+    };
+  }
+
   return prisma.label.delete({
     where: { id },
   });
