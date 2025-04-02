@@ -211,7 +211,7 @@ const DEFAULT_SYSTEM_PLAYLISTS = [
     type: 'SYSTEM' as const,
     privacy: 'PUBLIC' as const,
     coverUrl:
-      'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1717339128/system/discover_weekly_pl.jpg',
+      'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
     isAIGenerated: true,
   },
   {
@@ -221,7 +221,7 @@ const DEFAULT_SYSTEM_PLAYLISTS = [
     type: 'SYSTEM' as const,
     privacy: 'PUBLIC' as const,
     coverUrl:
-      'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1717339128/system/release_radar_pl.jpg',
+      'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
     isAIGenerated: true,
   },
   {
@@ -230,7 +230,7 @@ const DEFAULT_SYSTEM_PLAYLISTS = [
     type: 'SYSTEM' as const,
     privacy: 'PUBLIC' as const,
     coverUrl:
-      'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1717339128/system/daily_mix_pl.jpg',
+      'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
     isAIGenerated: true,
   },
 ];
