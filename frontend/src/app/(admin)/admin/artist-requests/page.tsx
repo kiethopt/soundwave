@@ -27,6 +27,16 @@ export default function ArtistRequestManagement() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const limit = 10;
+
+  // Helper functions to safely access searchParams
+  const safeGetParam = (key: string): string => {
+    return searchParams?.get(key) || '';
+  };
+
+  const safeParamsToString = (): string => {
+    return searchParams?.toString() || '';
+  };
+
   const [requestIdToReject, setRequestIdToReject] = useState<string | null>(
     null
   );
@@ -78,12 +88,8 @@ export default function ArtistRequestManagement() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
-  const [startDate, setStartDate] = useState<string>(
-    searchParams.get('startDate') || ''
-  );
-  const [endDate, setEndDate] = useState<string>(
-    searchParams.get('endDate') || ''
-  );
+  const [startDate, setStartDate] = useState<string>(safeGetParam('startDate'));
+  const [endDate, setEndDate] = useState<string>(safeGetParam('endDate'));
 
   // Action handlers
   const handleApprove = async (requestId: string) => {
@@ -163,7 +169,7 @@ export default function ArtistRequestManagement() {
 
   // Cập nhật URL khi thay đổi filters
   const updateFilters = (newStartDate?: string, newEndDate?: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(safeParamsToString());
     if (newStartDate) params.set('startDate', newStartDate);
     else params.delete('startDate');
     if (newEndDate) params.set('endDate', newEndDate);

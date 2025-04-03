@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -49,9 +40,9 @@ app.use('/api/notifications', notification_routes_1.default);
 app.use('/api/playlists', playlist_routes_1.default);
 app.use('/api/events', event_routes_1.default);
 app.use('/api/labels', label_routes_1.default);
-const initializeApp = () => __awaiter(void 0, void 0, void 0, function* () {
+const initializeApp = async () => {
     try {
-        yield db_1.default.$queryRaw `SELECT 1`;
+        await db_1.default.$queryRaw `SELECT 1`;
         console.log('✅ Database connection established');
         (0, playlist_extension_1.registerPlaylistCronJobs)();
         console.log('✅ Cron jobs registered via extension system');
@@ -60,18 +51,18 @@ const initializeApp = () => __awaiter(void 0, void 0, void 0, function* () {
         console.error('❌ Database connection error:', error);
         process.exit(1);
     }
-});
+};
 const PORT = process.env.PORT || 10000;
-const initApp = () => __awaiter(void 0, void 0, void 0, function* () {
+const initApp = async () => {
     try {
-        yield initializeApp();
+        await initializeApp();
     }
     catch (error) {
         console.error('[Init] Error during initialization:', error);
     }
-});
-server.listen(PORT, () => __awaiter(void 0, void 0, void 0, function* () {
+};
+server.listen(PORT, async () => {
     console.log(`🚀 Server is running on port ${PORT}`);
-    yield initApp();
-}));
+    await initApp();
+});
 //# sourceMappingURL=index.js.map

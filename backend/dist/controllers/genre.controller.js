@@ -32,22 +32,13 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllGenres = void 0;
 const genreService = __importStar(require("../services/genre.service"));
 const handle_utils_1 = require("../utils/handle-utils");
-const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllGenres = async (req, res) => {
     try {
-        const { genres, pagination } = yield genreService.getAllGenres(req);
+        const { genres, pagination } = await genreService.getAllGenres(req);
         res.json({
             genres,
             pagination,
@@ -56,6 +47,6 @@ const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Get all genres');
     }
-});
+};
 exports.getAllGenres = getAllGenres;
 //# sourceMappingURL=genre.controller.js.map

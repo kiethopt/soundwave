@@ -32,15 +32,6 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -55,18 +46,17 @@ const client_2 = require("@prisma/client");
 const pusher_1 = __importDefault(require("../config/pusher"));
 const emailService = __importStar(require("../services/email.service"));
 const canManageAlbum = (user, albumArtistId) => {
-    var _a, _b, _c;
     if (!user)
         return false;
     if (user.role === client_1.Role.ADMIN)
         return true;
-    return (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
-        ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) === client_1.Role.ARTIST &&
-        ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id) === albumArtistId);
+    return (user.artistProfile?.isVerified &&
+        user.artistProfile?.role === client_1.Role.ARTIST &&
+        user.artistProfile?.id === albumArtistId);
 };
 const validateAlbumData = (data) => {
     const { title, releaseDate, type } = data;
-    if (!(title === null || title === void 0 ? void 0 : title.trim()))
+    if (!title?.trim())
         return 'Title is required';
     if (!releaseDate || isNaN(Date.parse(releaseDate)))
         return 'Valid release date is required';
@@ -74,8 +64,7 @@ const validateAlbumData = (data) => {
         return 'Invalid album type';
     return null;
 };
-const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const createAlbum = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -93,7 +82,7 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         let targetArtistProfileId;
         let fetchedArtistProfile = null;
         if (user.role === client_1.Role.ADMIN && artistId) {
-            const targetArtist = yield db_1.default.artistProfile.findFirst({
+            const targetArtist = await db_1.default.artistProfile.findFirst({
                 where: { id: artistId, isVerified: true, role: client_1.Role.ARTIST },
                 select: { id: true, artistName: true },
             });
@@ -106,10 +95,10 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             targetArtistProfileId = targetArtist.id;
             fetchedArtistProfile = targetArtist;
         }
-        else if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
+        else if (user.artistProfile?.isVerified &&
             user.artistProfile.role === client_1.Role.ARTIST) {
             targetArtistProfileId = user.artistProfile.id;
-            fetchedArtistProfile = yield db_1.default.artistProfile.findUnique({
+            fetchedArtistProfile = await db_1.default.artistProfile.findUnique({
                 where: { id: targetArtistProfileId },
                 select: { artistName: true },
             });
@@ -118,15 +107,15 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(403).json({ message: 'Not authorized to create albums' });
             return;
         }
-        const artistName = (fetchedArtistProfile === null || fetchedArtistProfile === void 0 ? void 0 : fetchedArtistProfile.artistName) || 'Nghệ sĩ';
+        const artistName = fetchedArtistProfile?.artistName || 'Nghệ sĩ';
         let coverUrl = null;
         if (coverFile) {
-            const coverUpload = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
+            const coverUpload = await (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
             coverUrl = coverUpload.secure_url;
         }
         const releaseDateObj = new Date(releaseDate);
         const isActive = releaseDateObj <= new Date();
-        const album = yield db_1.default.album.create({
+        const album = await db_1.default.album.create({
             data: {
                 title,
                 coverUrl,
@@ -144,7 +133,7 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: prisma_selects_1.albumSelect,
         });
-        const followers = yield db_1.default.userFollow.findMany({
+        const followers = await db_1.default.userFollow.findMany({
             where: {
                 followingArtistId: targetArtistProfileId,
                 followingType: 'ARTIST',
@@ -152,7 +141,7 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             select: { followerId: true },
         });
         const followerIds = followers.map((f) => f.followerId);
-        const followerUsers = yield db_1.default.user.findMany({
+        const followerUsers = await db_1.default.user.findMany({
             where: { id: { in: followerIds } },
             select: { id: true, email: true },
         });
@@ -166,7 +155,7 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }));
         if (notificationsData.length > 0) {
             try {
-                yield db_1.default.notification.createMany({ data: notificationsData });
+                await db_1.default.notification.createMany({ data: notificationsData });
             }
             catch (notiError) {
                 console.error('Failed to create in-app notifications:', notiError);
@@ -183,7 +172,7 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             if (user.email) {
                 try {
                     const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'album', album.title, releaseLink);
-                    yield emailService.sendEmail(emailOptions);
+                    await emailService.sendEmail(emailOptions);
                 }
                 catch (err) {
                     console.error(`Failed to send new album email to ${user.email}:`, err);
@@ -202,10 +191,9 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         console.error('Create album error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.createAlbum = createAlbum;
-const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const addTracksToAlbum = async (req, res) => {
     try {
         const user = req.user;
         const { albumId } = req.params;
@@ -213,7 +201,7 @@ const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, functio
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        const album = yield db_1.default.album.findUnique({
+        const album = await db_1.default.album.findUnique({
             where: { id: albumId },
             select: {
                 artistId: true,
@@ -230,7 +218,7 @@ const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, functio
             return;
         }
         if (user.role !== client_1.Role.ADMIN &&
-            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) ||
+            (!user.artistProfile?.isVerified ||
                 user.artistProfile.role !== client_1.Role.ARTIST ||
                 user.artistProfile.id !== album.artistId)) {
             res.status(403).json({
@@ -247,7 +235,7 @@ const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, functio
             res.status(400).json({ message: 'No files uploaded' });
             return;
         }
-        const existingTracks = yield db_1.default.track.findMany({
+        const existingTracks = await db_1.default.track.findMany({
             where: { albumId },
             select: { trackNumber: true },
         });
@@ -265,14 +253,13 @@ const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, functio
             : req.body.featuredArtists
                 ? [req.body.featuredArtists.split(',')]
                 : [];
-        const mm = yield Promise.resolve().then(() => __importStar(require('music-metadata')));
-        const createdTracks = yield Promise.all(files.map((file, index) => __awaiter(void 0, void 0, void 0, function* () {
-            var _a;
+        const mm = await Promise.resolve().then(() => __importStar(require('music-metadata')));
+        const createdTracks = await Promise.all(files.map(async (file, index) => {
             try {
-                const metadata = yield mm.parseBuffer(file.buffer);
+                const metadata = await mm.parseBuffer(file.buffer);
                 const duration = Math.floor(metadata.format.duration || 0);
-                const uploadResult = yield (0, upload_service_1.uploadFile)(file.buffer, 'tracks', 'auto');
-                const existingTrack = yield db_1.default.track.findFirst({
+                const uploadResult = await (0, upload_service_1.uploadFile)(file.buffer, 'tracks', 'auto');
+                const existingTrack = await db_1.default.track.findFirst({
                     where: {
                         title: titles[index],
                         artistId: album.artistId,
@@ -282,16 +269,28 @@ const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, functio
                     throw new Error(`Track with title "${titles[index]}" already exists for this artist.`);
                 }
                 const newTrackNumber = maxTrackNumber + index + 1;
-                const track = yield db_1.default.track.create({
-                    data: Object.assign({ title: titles[index], duration, releaseDate: new Date(releaseDates[index] || Date.now()), trackNumber: newTrackNumber, coverUrl: album.coverUrl, audioUrl: uploadResult.secure_url, artistId: album.artistId, albumId, type: album.type, isActive: album.isActive }, (((_a = featuredArtists[index]) === null || _a === void 0 ? void 0 : _a.length) && {
-                        featuredArtists: {
-                            create: featuredArtists[index].map((artistProfileId) => ({
-                                artistProfile: {
-                                    connect: { id: artistProfileId.trim() },
-                                },
-                            })),
-                        },
-                    })),
+                const track = await db_1.default.track.create({
+                    data: {
+                        title: titles[index],
+                        duration,
+                        releaseDate: new Date(releaseDates[index] || Date.now()),
+                        trackNumber: newTrackNumber,
+                        coverUrl: album.coverUrl,
+                        audioUrl: uploadResult.secure_url,
+                        artistId: album.artistId,
+                        albumId,
+                        type: album.type,
+                        isActive: album.isActive,
+                        ...(featuredArtists[index]?.length && {
+                            featuredArtists: {
+                                create: featuredArtists[index].map((artistProfileId) => ({
+                                    artistProfile: {
+                                        connect: { id: artistProfileId.trim() },
+                                    },
+                                })),
+                            },
+                        }),
+                    },
                     select: prisma_selects_1.trackSelect,
                 });
                 return track;
@@ -300,13 +299,13 @@ const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 console.error('Error processing track:', err);
                 throw err;
             }
-        })));
-        const tracks = yield db_1.default.track.findMany({
+        }));
+        const tracks = await db_1.default.track.findMany({
             where: { albumId },
             select: { duration: true },
         });
         const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
-        const updatedAlbum = yield db_1.default.album.update({
+        const updatedAlbum = await db_1.default.album.update({
             where: { id: albumId },
             data: {
                 duration: totalDuration,
@@ -329,9 +328,9 @@ const addTracksToAlbum = (req, res) => __awaiter(void 0, void 0, void 0, functio
             res.status(500).json({ message: 'Internal server error' });
         }
     }
-});
+};
 exports.addTracksToAlbum = addTracksToAlbum;
-const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateAlbum = async (req, res) => {
     try {
         const { id } = req.params;
         const { title, releaseDate, type, genres, updateGenres } = req.body;
@@ -341,7 +340,7 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        const album = yield db_1.default.album.findUnique({
+        const album = await db_1.default.album.findUnique({
             where: { id },
             select: { artistId: true, coverUrl: true },
         });
@@ -355,7 +354,7 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         let coverUrl;
         if (coverFile) {
-            const coverUpload = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
+            const coverUpload = await (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
             coverUrl = coverUpload.secure_url;
         }
         const updateData = {};
@@ -371,7 +370,7 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (coverUrl)
             updateData.coverUrl = coverUrl;
         if (updateGenres === 'true') {
-            yield db_1.default.albumGenre.deleteMany({ where: { albumId: id } });
+            await db_1.default.albumGenre.deleteMany({ where: { albumId: id } });
             const genresArray = !genres
                 ? []
                 : Array.isArray(genres)
@@ -385,7 +384,7 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 };
             }
         }
-        const updatedAlbum = yield db_1.default.album.update({
+        const updatedAlbum = await db_1.default.album.update({
             where: { id },
             data: updateData,
             select: prisma_selects_1.albumSelect,
@@ -399,9 +398,9 @@ const updateAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         console.error('Update album error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.updateAlbum = updateAlbum;
-const deleteAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteAlbum = async (req, res) => {
     try {
         const { id } = req.params;
         const user = req.user;
@@ -409,7 +408,7 @@ const deleteAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        const album = yield db_1.default.album.findUnique({
+        const album = await db_1.default.album.findUnique({
             where: { id },
             select: { artistId: true },
         });
@@ -424,16 +423,16 @@ const deleteAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             });
             return;
         }
-        yield albumService.deleteAlbumById(id);
+        await albumService.deleteAlbumById(id);
         res.json({ message: 'Album deleted successfully' });
     }
     catch (error) {
         console.error('Delete album error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.deleteAlbum = deleteAlbum;
-const toggleAlbumVisibility = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const toggleAlbumVisibility = async (req, res) => {
     try {
         const { id } = req.params;
         const user = req.user;
@@ -441,7 +440,7 @@ const toggleAlbumVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        const album = yield db_1.default.album.findUnique({
+        const album = await db_1.default.album.findUnique({
             where: { id },
             select: { artistId: true, isActive: true },
         });
@@ -453,7 +452,7 @@ const toggleAlbumVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
             res.status(403).json({ message: 'You can only toggle your own albums' });
             return;
         }
-        const updatedAlbum = yield db_1.default.album.update({
+        const updatedAlbum = await db_1.default.album.update({
             where: { id },
             data: { isActive: !album.isActive },
             select: prisma_selects_1.albumSelect,
@@ -467,10 +466,9 @@ const toggleAlbumVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
         console.error('Toggle album error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.toggleAlbumVisibility = toggleAlbumVisibility;
-const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+const searchAlbum = async (req, res) => {
     try {
         const { q, page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
@@ -481,7 +479,7 @@ const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         const searchQuery = String(q).trim();
         if (user) {
-            const existingHistory = yield db_1.default.history.findFirst({
+            const existingHistory = await db_1.default.history.findFirst({
                 where: {
                     userId: user.id,
                     type: client_1.HistoryType.SEARCH,
@@ -492,13 +490,13 @@ const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 },
             });
             if (existingHistory) {
-                yield db_1.default.history.update({
+                await db_1.default.history.update({
                     where: { id: existingHistory.id },
                     data: { updatedAt: new Date() },
                 });
             }
             else {
-                yield db_1.default.history.create({
+                await db_1.default.history.create({
                     data: {
                         type: client_1.HistoryType.SEARCH,
                         query: searchQuery,
@@ -517,12 +515,12 @@ const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 },
             ],
         };
-        if ((user === null || user === void 0 ? void 0 : user.currentProfile) === 'ARTIST' && ((_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+        if (user?.currentProfile === 'ARTIST' && user?.artistProfile?.id) {
             whereClause.artistId = user.artistProfile.id;
         }
         if (!user || user.role !== client_1.Role.ADMIN) {
-            if (((_b = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _b === void 0 ? void 0 : _b.isVerified) &&
-                (user === null || user === void 0 ? void 0 : user.currentProfile) === 'ARTIST') {
+            if (user?.artistProfile?.isVerified &&
+                user?.currentProfile === 'ARTIST') {
                 whereClause.OR = [
                     { isActive: true },
                     { AND: [{ isActive: false }, { artistId: user.artistProfile.id }] },
@@ -532,7 +530,7 @@ const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 whereClause.isActive = true;
             }
         }
-        const [albums, total] = yield Promise.all([
+        const [albums, total] = await Promise.all([
             db_1.default.album.findMany({
                 where: whereClause,
                 skip: offset,
@@ -555,10 +553,9 @@ const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         console.error('Search album error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.searchAlbum = searchAlbum;
-const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
+const getAllAlbums = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -566,7 +563,7 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             return;
         }
         if (user.role !== client_1.Role.ADMIN &&
-            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) || ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) !== 'ARTIST')) {
+            (!user.artistProfile?.isVerified || user.artistProfile?.role !== 'ARTIST')) {
             res.status(403).json({
                 message: 'Forbidden: Only admins or verified artists can access this resource',
             });
@@ -602,7 +599,7 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 });
             }
         }
-        if (user.role !== client_1.Role.ADMIN && ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id)) {
+        if (user.role !== client_1.Role.ADMIN && user.artistProfile?.id) {
             conditions.push({
                 artistId: user.artistProfile.id,
             });
@@ -610,7 +607,7 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         if (conditions.length > 0) {
             whereClause.AND = conditions;
         }
-        const result = yield albumService.getAllAlbums(req);
+        const result = await albumService.getAllAlbums(req);
         res.json({
             albums: result.data,
             pagination: result.pagination,
@@ -620,14 +617,14 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         console.error('Get albums error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getAllAlbums = getAllAlbums;
-const getAlbumById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getAlbumById = async (req, res) => {
     try {
         const { id } = req.params;
         const user = req.user;
         const isAuthenticated = !!user;
-        const album = yield db_1.default.album.findUnique({
+        const album = await db_1.default.album.findUnique({
             where: {
                 id,
                 isActive: true,
@@ -638,16 +635,19 @@ const getAlbumById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             res.status(404).json({ message: 'Album not found' });
             return;
         }
-        const response = Object.assign(Object.assign({}, album), { requiresAuth: !isAuthenticated });
+        const response = {
+            ...album,
+            requiresAuth: !isAuthenticated,
+        };
         res.json(response);
     }
     catch (error) {
         console.error('Get album error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getAlbumById = getAlbumById;
-const playAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const playAlbum = async (req, res) => {
     try {
         const { albumId } = req.params;
         const user = req.user;
@@ -655,7 +655,7 @@ const playAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const album = yield db_1.default.album.findFirst({
+        const album = await db_1.default.album.findFirst({
             where: {
                 id: albumId,
                 isActive: true,
@@ -676,7 +676,7 @@ const playAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         const firstTrack = album.tracks[0];
         const lastMonth = new Date();
         lastMonth.setMonth(lastMonth.getMonth() - 1);
-        const existingListen = yield db_1.default.history.findFirst({
+        const existingListen = await db_1.default.history.findFirst({
             where: {
                 userId: user.id,
                 track: { artistId: firstTrack.artistId },
@@ -684,12 +684,12 @@ const playAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             },
         });
         if (!existingListen) {
-            yield db_1.default.artistProfile.update({
+            await db_1.default.artistProfile.update({
                 where: { id: firstTrack.artistId },
                 data: { monthlyListeners: { increment: 1 } },
             });
         }
-        yield db_1.default.history.upsert({
+        await db_1.default.history.upsert({
             where: {
                 userId_trackId_type: {
                     userId: user.id,
@@ -719,30 +719,30 @@ const playAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         console.error('Play album error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.playAlbum = playAlbum;
-const getNewestAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getNewestAlbums = async (req, res) => {
     try {
         const { limit = 10 } = req.query;
-        const albums = yield albumService.getNewestAlbums(Number(limit));
+        const albums = await albumService.getNewestAlbums(Number(limit));
         res.json({ albums });
     }
     catch (error) {
         console.error('Get newest albums error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getNewestAlbums = getNewestAlbums;
-const getHotAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getHotAlbums = async (req, res) => {
     try {
         const { limit = 10 } = req.query;
-        const albums = yield albumService.getHotAlbums(Number(limit));
+        const albums = await albumService.getHotAlbums(Number(limit));
         res.json({ albums });
     }
     catch (error) {
         console.error('Get hot albums error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getHotAlbums = getHotAlbums;
 //# sourceMappingURL=album.controller.js.map

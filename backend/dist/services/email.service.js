@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -37,8 +28,7 @@ else {
 if (!EMAIL_USER) {
     console.warn('EMAIL_USER is not set. Emails might not be sent.');
 }
-const sendEmail = (options) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const sendEmail = async (options) => {
     if (!SENDGRID_API_KEY || !EMAIL_USER) {
         console.error('SendGrid API Key or Sender Email not configured. Cannot send email.');
         return false;
@@ -59,18 +49,18 @@ const sendEmail = (options) => __awaiter(void 0, void 0, void 0, function* () {
         text: plainText,
     };
     try {
-        yield mail_1.default.send(msg);
+        await mail_1.default.send(msg);
         console.log(`Email sent successfully to ${options.to} with subject "${options.subject}"`);
         return true;
     }
     catch (error) {
         console.error(`Error sending email to ${options.to}:`, error);
         if (error.response) {
-            console.error('SendGrid Error Response:', ((_a = error.response.body) === null || _a === void 0 ? void 0 : _a.errors) || error.response.body);
+            console.error('SendGrid Error Response:', error.response.body?.errors || error.response.body);
         }
         return false;
     }
-});
+};
 exports.sendEmail = sendEmail;
 const createRichHtmlTemplate = (title, mainContentHtml, recipientEmail, coverImageUrl, actionLink, actionText) => {
     const currentYear = new Date().getFullYear();

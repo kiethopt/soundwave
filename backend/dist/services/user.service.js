@@ -32,26 +32,6 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
-                t[p[i]] = s[p[i]];
-        }
-    return t;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -71,7 +51,7 @@ const getMonthStartDate = () => {
 };
 const validateArtistData = (data) => {
     const { artistName, bio, socialMediaLinks, genres } = data;
-    if (!(artistName === null || artistName === void 0 ? void 0 : artistName.trim()))
+    if (!artistName?.trim())
         return 'Artist name is required';
     if (artistName.length < 3)
         return 'Artist name must be at least 3 characters';
@@ -98,7 +78,7 @@ const validateArtistData = (data) => {
     return null;
 };
 exports.validateArtistData = validateArtistData;
-const search = (user, query) => __awaiter(void 0, void 0, void 0, function* () {
+const search = async (user, query) => {
     if (!user) {
         throw new Error('Unauthorized');
     }
@@ -106,14 +86,14 @@ const search = (user, query) => __awaiter(void 0, void 0, void 0, function* () {
     const cacheKey = `/search-all?q=${searchQuery}`;
     const useRedisCache = process.env.USE_REDIS_CACHE === 'true';
     if (useRedisCache) {
-        const cachedData = yield cache_middleware_1.client.get(cacheKey);
+        const cachedData = await cache_middleware_1.client.get(cacheKey);
         if (cachedData) {
             console.log('Serving from Redis cache:', cacheKey);
             return JSON.parse(cachedData);
         }
     }
-    yield saveSearchHistory(user.id, searchQuery);
-    const [artists, albums, tracks, users] = yield Promise.all([
+    await saveSearchHistory(user.id, searchQuery);
+    const [artists, albums, tracks, users] = await Promise.all([
         db_1.default.artistProfile.findMany({
             where: {
                 isActive: true,
@@ -239,13 +219,13 @@ const search = (user, query) => __awaiter(void 0, void 0, void 0, function* () {
     ]);
     const searchResult = { artists, albums, tracks, users };
     if (useRedisCache) {
-        yield (0, cache_middleware_1.setCache)(cacheKey, searchResult, 600);
+        await (0, cache_middleware_1.setCache)(cacheKey, searchResult, 600);
     }
     return searchResult;
-});
+};
 exports.search = search;
-const saveSearchHistory = (userId, searchQuery) => __awaiter(void 0, void 0, void 0, function* () {
-    const existingHistory = yield db_1.default.history.findFirst({
+const saveSearchHistory = async (userId, searchQuery) => {
+    const existingHistory = await db_1.default.history.findFirst({
         where: {
             userId,
             type: 'SEARCH',
@@ -256,13 +236,13 @@ const saveSearchHistory = (userId, searchQuery) => __awaiter(void 0, void 0, voi
         },
     });
     if (existingHistory) {
-        yield db_1.default.history.update({
+        await db_1.default.history.update({
             where: { id: existingHistory.id },
             data: { updatedAt: new Date() },
         });
     }
     else {
-        yield db_1.default.history.create({
+        await db_1.default.history.create({
             data: {
                 type: 'SEARCH',
                 query: searchQuery,
@@ -270,9 +250,8 @@ const saveSearchHistory = (userId, searchQuery) => __awaiter(void 0, void 0, voi
             },
         });
     }
-});
-const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+};
+const followTarget = async (follower, followingId) => {
     if (!follower) {
         throw new Error('Unauthorized');
     }
@@ -282,10 +261,10 @@ const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0
     let followedEntityName = 'Người dùng';
     let followedUserIdForPusher = null;
     let isFollowingArtistOwner = false;
-    const userExists = yield db_1.default.user.findUnique({
+    const userExists = await db_1.default.user.findUnique({
         where: { id: followingId },
     });
-    const artistExists = yield db_1.default.artistProfile.findUnique({
+    const artistExists = await db_1.default.artistProfile.findUnique({
         where: { id: followingId },
         select: { id: true, artistName: true, userId: true },
     });
@@ -297,11 +276,11 @@ const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0
     }
     else if (artistExists) {
         followingType = client_1.FollowingType.ARTIST;
-        const artistOwner = yield db_1.default.user.findUnique({
+        const artistOwner = await db_1.default.user.findUnique({
             where: { id: artistExists.userId },
             select: { email: true, name: true, username: true },
         });
-        followedUserEmail = (artistOwner === null || artistOwner === void 0 ? void 0 : artistOwner.email) || null;
+        followedUserEmail = artistOwner?.email || null;
         followedEntityName = artistExists.artistName || 'Nghệ sĩ';
         followedUserIdForPusher = artistExists.userId;
         isFollowingArtistOwner = artistExists.userId === follower.id;
@@ -311,19 +290,29 @@ const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0
     }
     if ((followingType === client_1.FollowingType.USER && followingId === follower.id) ||
         (followingType === client_1.FollowingType.ARTIST &&
-            followingId === ((_a = follower.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) ||
+            followingId === follower.artistProfile?.id) ||
         (followingType === client_1.FollowingType.ARTIST && isFollowingArtistOwner)) {
         throw new Error('Cannot follow yourself');
     }
-    const existingFollow = yield db_1.default.userFollow.findFirst({
-        where: Object.assign(Object.assign({ followerId: follower.id, followingType: followingType }, (followingType === 'USER' && { followingUserId: followingId })), (followingType === 'ARTIST' && { followingArtistId: followingId })),
+    const existingFollow = await db_1.default.userFollow.findFirst({
+        where: {
+            followerId: follower.id,
+            followingType: followingType,
+            ...(followingType === 'USER' && { followingUserId: followingId }),
+            ...(followingType === 'ARTIST' && { followingArtistId: followingId }),
+        },
     });
     if (existingFollow) {
         throw new Error('Already following');
     }
-    const followData = Object.assign(Object.assign({ followerId: follower.id, followingType: followingType }, (followingType === 'USER' && { followingUserId: followingId })), (followingType === 'ARTIST' && { followingArtistId: followingId }));
-    return db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-        yield tx.userFollow.create({ data: followData });
+    const followData = {
+        followerId: follower.id,
+        followingType: followingType,
+        ...(followingType === 'USER' && { followingUserId: followingId }),
+        ...(followingType === 'ARTIST' && { followingArtistId: followingId }),
+    };
+    return db_1.default.$transaction(async (tx) => {
+        await tx.userFollow.create({ data: followData });
         const followerName = follower.name || follower.username || 'Một người dùng';
         const followerProfileLink = `${FRONTEND_URL}/user/${follower.id}`;
         let notificationMessage = `Người dùng ${followerName} đã bắt đầu theo dõi bạn.`;
@@ -331,7 +320,7 @@ const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0
             if (followedUserEmail) {
                 try {
                     const emailOptions = emailService.createNewFollowerEmail(followedUserEmail, followerName, followedEntityName, followerProfileLink);
-                    yield emailService.sendEmail(emailOptions);
+                    await emailService.sendEmail(emailOptions);
                     console.log(`Follow notification email sent to ${followedUserEmail}`);
                 }
                 catch (emailError) {
@@ -342,7 +331,7 @@ const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0
                 console.warn(`Could not send follow email: No email found for target ${followingId} (type: ${followingType})`);
             }
             if (followingType === 'ARTIST') {
-                const notification = yield tx.notification.create({
+                const notification = await tx.notification.create({
                     data: {
                         type: 'NEW_FOLLOW',
                         message: notificationMessage,
@@ -352,7 +341,7 @@ const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0
                     },
                 });
                 if (followedUserIdForPusher) {
-                    yield pusher_1.default.trigger(`user-${followedUserIdForPusher}`, 'notification', {
+                    await pusher_1.default.trigger(`user-${followedUserIdForPusher}`, 'notification', {
                         type: 'NEW_FOLLOW',
                         message: notificationMessage,
                         notificationId: notification.id,
@@ -360,7 +349,7 @@ const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0
                 }
             }
             else {
-                const notification = yield tx.notification.create({
+                const notification = await tx.notification.create({
                     data: {
                         type: 'NEW_FOLLOW',
                         message: notificationMessage,
@@ -369,7 +358,7 @@ const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0
                         senderId: follower.id,
                     },
                 });
-                yield pusher_1.default.trigger(`user-${followingId}`, 'notification', {
+                await pusher_1.default.trigger(`user-${followingId}`, 'notification', {
                     type: 'NEW_FOLLOW',
                     message: notificationMessage,
                     notificationId: notification.id,
@@ -377,20 +366,20 @@ const followTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0
             }
         }
         if (followingType === client_1.FollowingType.ARTIST) {
-            yield tx.artistProfile.update({
+            await tx.artistProfile.update({
                 where: { id: followingId },
                 data: { monthlyListeners: { increment: 1 } },
             });
         }
         return { message: 'Followed successfully' };
-    }));
-});
+    });
+};
 exports.followTarget = followTarget;
-const unfollowTarget = (follower, followingId) => __awaiter(void 0, void 0, void 0, function* () {
+const unfollowTarget = async (follower, followingId) => {
     if (!follower) {
         throw new Error('Unauthorized');
     }
-    const [userExists, artistExists] = yield Promise.all([
+    const [userExists, artistExists] = await Promise.all([
         db_1.default.user.findUnique({ where: { id: followingId } }),
         db_1.default.artistProfile.findUnique({
             where: { id: followingId },
@@ -414,18 +403,18 @@ const unfollowTarget = (follower, followingId) => __awaiter(void 0, void 0, void
     else {
         throw new Error('Target not found');
     }
-    const follow = yield db_1.default.userFollow.findFirst({
+    const follow = await db_1.default.userFollow.findFirst({
         where: whereConditions,
     });
     if (!follow) {
         throw new Error('Not following this target');
     }
-    yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-        yield tx.userFollow.delete({
+    await db_1.default.$transaction(async (tx) => {
+        await tx.userFollow.delete({
             where: { id: follow.id },
         });
         if (followingType === client_1.FollowingType.ARTIST) {
-            yield tx.artistProfile.update({
+            await tx.artistProfile.update({
                 where: { id: followingId },
                 data: {
                     monthlyListeners: {
@@ -434,13 +423,12 @@ const unfollowTarget = (follower, followingId) => __awaiter(void 0, void 0, void
                 },
             });
         }
-    }));
+    });
     return { message: 'Unfollowed successfully' };
-});
+};
 exports.unfollowTarget = unfollowTarget;
-const getUserFollowers = (req) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+const getUserFollowers = async (req) => {
+    const userId = req.user?.id;
     if (!userId) {
         throw new Error('Unauthorized');
     }
@@ -449,7 +437,7 @@ const getUserFollowers = (req) => __awaiter(void 0, void 0, void 0, function* ()
             OR: [
                 { followingUserId: userId, followingType: 'USER' },
                 {
-                    followingArtistId: (_c = (_b = req.user) === null || _b === void 0 ? void 0 : _b.artistProfile) === null || _c === void 0 ? void 0 : _c.id,
+                    followingArtistId: req.user?.artistProfile?.id,
                     followingType: 'ARTIST',
                 },
             ],
@@ -463,16 +451,15 @@ const getUserFollowers = (req) => __awaiter(void 0, void 0, void 0, function* ()
         },
         orderBy: { createdAt: 'desc' },
     };
-    const result = yield (0, handle_utils_1.paginate)(db_1.default.userFollow, req, options);
+    const result = await (0, handle_utils_1.paginate)(db_1.default.userFollow, req, options);
     return {
         followers: result.data.map((follow) => follow.follower),
         pagination: result.pagination,
     };
-});
+};
 exports.getUserFollowers = getUserFollowers;
-const getUserFollowing = (req) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+const getUserFollowing = async (req) => {
+    const userId = req.user?.id;
     if (!userId) {
         throw new Error('Unauthorized');
     }
@@ -517,21 +504,26 @@ const getUserFollowing = (req) => __awaiter(void 0, void 0, void 0, function* ()
         },
         orderBy: { createdAt: 'desc' },
     };
-    const result = yield (0, handle_utils_1.paginate)(db_1.default.userFollow, req, options);
+    const result = await (0, handle_utils_1.paginate)(db_1.default.userFollow, req, options);
     const following = result.data.map((follow) => {
-        var _a;
         if (follow.followingType === 'USER') {
-            return Object.assign({ type: 'USER' }, follow.followingUser);
+            return {
+                type: 'USER',
+                ...follow.followingUser,
+            };
         }
         else {
-            return Object.assign(Object.assign({ type: 'ARTIST' }, follow.followingArtist), { user: (_a = follow.followingArtist) === null || _a === void 0 ? void 0 : _a.user });
+            return {
+                type: 'ARTIST',
+                ...follow.followingArtist,
+                user: follow.followingArtist?.user,
+            };
         }
     });
     return following;
-});
+};
 exports.getUserFollowing = getUserFollowing;
-const requestArtistRole = (user, data, avatarFile) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const requestArtistRole = async (user, data, avatarFile) => {
     const { artistName, bio, socialMediaLinks: socialMediaLinksString, genres: genresString, } = data;
     let socialMediaLinks = {};
     if (socialMediaLinksString) {
@@ -552,19 +544,19 @@ const requestArtistRole = (user, data, avatarFile) => __awaiter(void 0, void 0, 
     }
     if (!user ||
         user.role !== client_1.Role.USER ||
-        ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.role) === client_1.Role.ARTIST) {
+        user.artistProfile?.role === client_1.Role.ARTIST) {
         throw new Error('Forbidden');
     }
-    const existingRequest = yield db_1.default.artistProfile.findUnique({
+    const existingRequest = await db_1.default.artistProfile.findUnique({
         where: { userId: user.id },
         select: { verificationRequestedAt: true },
     });
-    if (existingRequest === null || existingRequest === void 0 ? void 0 : existingRequest.verificationRequestedAt) {
+    if (existingRequest?.verificationRequestedAt) {
         throw new Error('You have already requested to become an artist');
     }
     let avatarUrl = null;
     if (avatarFile) {
-        const uploadResult = yield (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artist-avatars');
+        const uploadResult = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artist-avatars');
         avatarUrl = uploadResult.secure_url;
     }
     return db_1.default.artistProfile.create({
@@ -583,10 +575,10 @@ const requestArtistRole = (user, data, avatarFile) => __awaiter(void 0, void 0, 
             },
         },
     });
-});
+};
 exports.requestArtistRole = requestArtistRole;
-const getArtistRequest = (userId) => __awaiter(void 0, void 0, void 0, function* () {
-    const artistProfile = yield db_1.default.artistProfile.findUnique({
+const getArtistRequest = async (userId) => {
+    const artistProfile = await db_1.default.artistProfile.findUnique({
         where: { userId },
         select: {
             id: true,
@@ -610,29 +602,29 @@ const getArtistRequest = (userId) => __awaiter(void 0, void 0, void 0, function*
     if (!artistProfile) {
         return { hasPendingRequest: false };
     }
-    const { verificationRequestedAt, isVerified } = artistProfile, profileData = __rest(artistProfile, ["verificationRequestedAt", "isVerified"]);
+    const { verificationRequestedAt, isVerified, ...profileData } = artistProfile;
     return {
         hasPendingRequest: !!verificationRequestedAt && !isVerified,
         profileData,
     };
-});
+};
 exports.getArtistRequest = getArtistRequest;
-const getAllGenres = () => __awaiter(void 0, void 0, void 0, function* () {
-    const genres = yield db_1.default.genre.findMany({
+const getAllGenres = async () => {
+    const genres = await db_1.default.genre.findMany({
         orderBy: {
             name: 'asc',
         },
     });
     return genres;
-});
+};
 exports.getAllGenres = getAllGenres;
-const editProfile = (user, profileData, avatarFile) => __awaiter(void 0, void 0, void 0, function* () {
+const editProfile = async (user, profileData, avatarFile) => {
     if (!user) {
         throw new Error('Unauthorized');
     }
     const { email, username, name, avatar } = profileData;
     if (email) {
-        const existingUser = yield db_1.default.user.findUnique({
+        const existingUser = await db_1.default.user.findUnique({
             where: { email },
         });
         if (existingUser && existingUser.id !== user.id) {
@@ -640,7 +632,7 @@ const editProfile = (user, profileData, avatarFile) => __awaiter(void 0, void 0,
         }
     }
     if (username) {
-        const existingUsername = yield db_1.default.user.findUnique({
+        const existingUsername = await db_1.default.user.findUnique({
             where: { username },
         });
         if (existingUsername && existingUsername.id !== user.id) {
@@ -649,7 +641,7 @@ const editProfile = (user, profileData, avatarFile) => __awaiter(void 0, void 0,
     }
     let avatarUrl = null;
     if (avatarFile) {
-        const uploadResult = yield (0, upload_service_1.uploadFile)(avatarFile.buffer, 'user-avatars');
+        const uploadResult = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'user-avatars');
         avatarUrl = uploadResult.secure_url;
     }
     const updateData = {};
@@ -671,10 +663,10 @@ const editProfile = (user, profileData, avatarFile) => __awaiter(void 0, void 0,
         data: updateData,
         select: prisma_selects_1.userSelect,
     });
-});
+};
 exports.editProfile = editProfile;
-const getUserProfile = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = yield db_1.default.user.findUnique({
+const getUserProfile = async (id) => {
+    const user = await db_1.default.user.findUnique({
         where: { id },
         select: {
             id: true,
@@ -690,20 +682,20 @@ const getUserProfile = (id) => __awaiter(void 0, void 0, void 0, function* () {
         throw new Error('User not found');
     }
     return user;
-});
+};
 exports.getUserProfile = getUserProfile;
-const getRecommendedArtists = (user) => __awaiter(void 0, void 0, void 0, function* () {
+const getRecommendedArtists = async (user) => {
     if (!user) {
         throw new Error('Unauthorized');
     }
     const cacheKey = `/api/user/${user.id}/recommended-artists`;
     if (process.env.USE_REDIS_CACHE === 'true') {
-        const cachedData = yield cache_middleware_1.client.get(cacheKey);
+        const cachedData = await cache_middleware_1.client.get(cacheKey);
         if (cachedData) {
             return JSON.parse(cachedData);
         }
     }
-    const history = yield db_1.default.history.findMany({
+    const history = await db_1.default.history.findMany({
         where: {
             userId: user.id,
             type: client_1.HistoryType.PLAY,
@@ -735,9 +727,9 @@ const getRecommendedArtists = (user) => __awaiter(void 0, void 0, void 0, functi
         take: 3,
     });
     const genreIds = history
-        .flatMap((h) => { var _a; return ((_a = h.track) === null || _a === void 0 ? void 0 : _a.artist.genres.map((g) => g.genre.id)) || []; })
+        .flatMap((h) => h.track?.artist.genres.map((g) => g.genre.id) || [])
         .filter((id) => id !== null);
-    const recommendedArtists = yield db_1.default.artistProfile.findMany({
+    const recommendedArtists = await db_1.default.artistProfile.findMany({
         where: {
             isVerified: true,
             genres: {
@@ -773,21 +765,21 @@ const getRecommendedArtists = (user) => __awaiter(void 0, void 0, void 0, functi
         },
     });
     if (process.env.USE_REDIS_CACHE === 'true') {
-        yield (0, cache_middleware_1.setCache)(cacheKey, recommendedArtists, 1800);
+        await (0, cache_middleware_1.setCache)(cacheKey, recommendedArtists, 1800);
     }
     return recommendedArtists;
-});
+};
 exports.getRecommendedArtists = getRecommendedArtists;
-const getTopAlbums = () => __awaiter(void 0, void 0, void 0, function* () {
+const getTopAlbums = async () => {
     const cacheKey = '/api/top-albums';
     const monthStart = getMonthStartDate();
     if (process.env.USE_REDIS_CACHE === 'true') {
-        const cachedData = yield cache_middleware_1.client.get(cacheKey);
+        const cachedData = await cache_middleware_1.client.get(cacheKey);
         if (cachedData) {
             return JSON.parse(cachedData);
         }
     }
-    const albums = yield db_1.default.album.findMany({
+    const albums = await db_1.default.album.findMany({
         where: {
             isActive: true,
             tracks: {
@@ -807,21 +799,21 @@ const getTopAlbums = () => __awaiter(void 0, void 0, void 0, function* () {
         take: 10,
     });
     if (process.env.USE_REDIS_CACHE === 'true') {
-        yield (0, cache_middleware_1.setCache)(cacheKey, albums, 1800);
+        await (0, cache_middleware_1.setCache)(cacheKey, albums, 1800);
     }
     return albums;
-});
+};
 exports.getTopAlbums = getTopAlbums;
-const getTopArtists = () => __awaiter(void 0, void 0, void 0, function* () {
+const getTopArtists = async () => {
     const cacheKey = '/api/top-artists';
     const monthStart = getMonthStartDate();
     if (process.env.USE_REDIS_CACHE === 'true') {
-        const cachedData = yield cache_middleware_1.client.get(cacheKey);
+        const cachedData = await cache_middleware_1.client.get(cacheKey);
         if (cachedData) {
             return JSON.parse(cachedData);
         }
     }
-    const artists = yield db_1.default.artistProfile.findMany({
+    const artists = await db_1.default.artistProfile.findMany({
         where: {
             isVerified: true,
             tracks: {
@@ -877,27 +869,31 @@ const getTopArtists = () => __awaiter(void 0, void 0, void 0, function* () {
                 monthlyPlays += h.playCount || 0;
             });
         });
-        return Object.assign(Object.assign({}, artist), { monthlyListeners: uniqueListeners.size, monthlyPlays });
+        return {
+            ...artist,
+            monthlyListeners: uniqueListeners.size,
+            monthlyPlays,
+        };
     });
     const topArtists = artistsWithMonthlyMetrics
         .sort((a, b) => b.monthlyListeners - a.monthlyListeners)
         .slice(0, 20);
     if (process.env.USE_REDIS_CACHE === 'true') {
-        yield (0, cache_middleware_1.setCache)(cacheKey, topArtists, 1800);
+        await (0, cache_middleware_1.setCache)(cacheKey, topArtists, 1800);
     }
     return topArtists;
-});
+};
 exports.getTopArtists = getTopArtists;
-const getTopTracks = () => __awaiter(void 0, void 0, void 0, function* () {
+const getTopTracks = async () => {
     const cacheKey = '/api/top-tracks';
     const monthStart = getMonthStartDate();
     if (process.env.USE_REDIS_CACHE === 'true') {
-        const cachedData = yield cache_middleware_1.client.get(cacheKey);
+        const cachedData = await cache_middleware_1.client.get(cacheKey);
         if (cachedData) {
             return JSON.parse(cachedData);
         }
     }
-    const tracks = yield db_1.default.track.findMany({
+    const tracks = await db_1.default.track.findMany({
         where: {
             isActive: true,
             history: {
@@ -953,37 +949,40 @@ const getTopTracks = () => __awaiter(void 0, void 0, void 0, function* () {
         },
         take: 20,
     });
-    const tracksWithMonthlyPlays = tracks.map((track) => (Object.assign(Object.assign({}, track), { monthlyPlays: track.history.reduce((sum, h) => sum + (h.playCount || 0), 0) })));
+    const tracksWithMonthlyPlays = tracks.map((track) => ({
+        ...track,
+        monthlyPlays: track.history.reduce((sum, h) => sum + (h.playCount || 0), 0),
+    }));
     if (process.env.USE_REDIS_CACHE === 'true') {
-        yield (0, cache_middleware_1.setCache)(cacheKey, tracksWithMonthlyPlays, 1800);
+        await (0, cache_middleware_1.setCache)(cacheKey, tracksWithMonthlyPlays, 1800);
     }
     return tracksWithMonthlyPlays;
-});
+};
 exports.getTopTracks = getTopTracks;
-const getNewestTracks = () => __awaiter(void 0, void 0, void 0, function* () {
+const getNewestTracks = async () => {
     return db_1.default.track.findMany({
         where: { isActive: true },
         select: prisma_selects_1.searchTrackSelect,
         orderBy: { createdAt: 'desc' },
         take: 20,
     });
-});
+};
 exports.getNewestTracks = getNewestTracks;
-const getNewestAlbums = () => __awaiter(void 0, void 0, void 0, function* () {
+const getNewestAlbums = async () => {
     return db_1.default.album.findMany({
         where: { isActive: true },
         select: prisma_selects_1.searchAlbumSelect,
         orderBy: { createdAt: 'desc' },
         take: 20,
     });
-});
+};
 exports.getNewestAlbums = getNewestAlbums;
-const getUserTopTracks = (user) => __awaiter(void 0, void 0, void 0, function* () {
+const getUserTopTracks = async (user) => {
     if (!user) {
         throw new Error('Unauthorized');
     }
     const monthStart = getMonthStartDate();
-    const history = yield db_1.default.history.findMany({
+    const history = await db_1.default.history.findMany({
         where: {
             userId: user.id,
             type: 'PLAY',
@@ -1010,7 +1009,7 @@ const getUserTopTracks = (user) => __awaiter(void 0, void 0, void 0, function* (
     if (sortedTrackIds.length === 0) {
         return [];
     }
-    const tracks = yield db_1.default.track.findMany({
+    const tracks = await db_1.default.track.findMany({
         where: {
             id: { in: sortedTrackIds },
             isActive: true,
@@ -1019,14 +1018,14 @@ const getUserTopTracks = (user) => __awaiter(void 0, void 0, void 0, function* (
     });
     const trackOrder = new Map(sortedTrackIds.map((id, index) => [id, index]));
     return tracks.sort((a, b) => (trackOrder.get(a.id) || 0) - (trackOrder.get(b.id) || 0));
-});
+};
 exports.getUserTopTracks = getUserTopTracks;
-const getUserTopArtists = (user) => __awaiter(void 0, void 0, void 0, function* () {
+const getUserTopArtists = async (user) => {
     if (!user) {
         throw new Error('Unauthorized');
     }
     const monthStart = getMonthStartDate();
-    const history = yield db_1.default.history.findMany({
+    const history = await db_1.default.history.findMany({
         where: {
             userId: user.id,
             type: 'PLAY',
@@ -1047,8 +1046,7 @@ const getUserTopArtists = (user) => __awaiter(void 0, void 0, void 0, function* 
         },
     });
     const artistPlayCounts = history.reduce((acc, curr) => {
-        var _a;
-        if (!((_a = curr.track) === null || _a === void 0 ? void 0 : _a.artistId))
+        if (!curr.track?.artistId)
             return acc;
         acc[curr.track.artistId] = (acc[curr.track.artistId] || 0) + 1;
         return acc;
@@ -1060,7 +1058,7 @@ const getUserTopArtists = (user) => __awaiter(void 0, void 0, void 0, function* 
     if (sortedArtistIds.length === 0) {
         return [];
     }
-    const artists = yield db_1.default.artistProfile.findMany({
+    const artists = await db_1.default.artistProfile.findMany({
         where: {
             id: { in: sortedArtistIds },
             isActive: true,
@@ -1084,14 +1082,14 @@ const getUserTopArtists = (user) => __awaiter(void 0, void 0, void 0, function* 
     });
     const artistOrder = new Map(sortedArtistIds.map((id, index) => [id, index]));
     return artists.sort((a, b) => (artistOrder.get(a.id) || 0) - (artistOrder.get(b.id) || 0));
-});
+};
 exports.getUserTopArtists = getUserTopArtists;
-const getUserTopAlbums = (user) => __awaiter(void 0, void 0, void 0, function* () {
+const getUserTopAlbums = async (user) => {
     if (!user) {
         throw new Error('Unauthorized');
     }
     const monthStart = getMonthStartDate();
-    const history = yield db_1.default.history.findMany({
+    const history = await db_1.default.history.findMany({
         where: {
             userId: user.id,
             type: 'PLAY',
@@ -1112,8 +1110,7 @@ const getUserTopAlbums = (user) => __awaiter(void 0, void 0, void 0, function* (
         },
     });
     const albumPlayCounts = history.reduce((acc, curr) => {
-        var _a;
-        if (!((_a = curr.track) === null || _a === void 0 ? void 0 : _a.albumId))
+        if (!curr.track?.albumId)
             return acc;
         acc[curr.track.albumId] = (acc[curr.track.albumId] || 0) + 1;
         return acc;
@@ -1125,7 +1122,7 @@ const getUserTopAlbums = (user) => __awaiter(void 0, void 0, void 0, function* (
     if (sortedAlbumIds.length === 0) {
         return [];
     }
-    const albums = yield db_1.default.album.findMany({
+    const albums = await db_1.default.album.findMany({
         where: {
             id: { in: sortedAlbumIds },
             isActive: true,
@@ -1134,6 +1131,6 @@ const getUserTopAlbums = (user) => __awaiter(void 0, void 0, void 0, function* (
     });
     const albumOrder = new Map(sortedAlbumIds.map((id, index) => [id, index]));
     return albums.sort((a, b) => (albumOrder.get(a.id) || 0) - (albumOrder.get(b.id) || 0));
-});
+};
 exports.getUserTopAlbums = getUserTopAlbums;
 //# sourceMappingURL=user.service.js.map

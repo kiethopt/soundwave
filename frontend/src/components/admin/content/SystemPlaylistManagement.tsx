@@ -200,7 +200,7 @@ export const SystemPlaylistManagement: React.FC<
     setIsUpdateLoading(true);
     toast.loading('Updating system playlists...');
     try {
-      await api.admin.updateGlobalPlaylist(token);
+      await api.admin.updateAllSystemPlaylists(token);
       toast.dismiss();
       toast.success('System playlists update started!');
       setTimeout(() => refreshPlaylists(), 3000);
@@ -326,6 +326,10 @@ export const SystemPlaylistManagement: React.FC<
             description: editPlaylist.description,
             coverUrl: editPlaylist.coverUrl,
             privacy: editPlaylist.privacy as 'PUBLIC' | 'PRIVATE',
+            basedOnArtist: (editPlaylist as any).basedOnArtist || '',
+            basedOnMood: (editPlaylist as any).basedOnMood || '',
+            basedOnGenre: (editPlaylist as any).basedOnGenre || '',
+            trackCount: (editPlaylist as any).trackCount || 10,
           }}
           theme={theme}
           mode="edit"

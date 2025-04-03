@@ -59,7 +59,7 @@ function LoadingUI() {
 function SearchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const query = searchParams.get('q');
+  const query = searchParams ? searchParams.get('q') : null;
   const [results, setResults] = useState<{
     artists: Artist[];
     albums: Album[];

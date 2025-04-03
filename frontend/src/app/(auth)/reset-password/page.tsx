@@ -16,7 +16,7 @@ function ResetPasswordForm() {
 
   const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get('token');
+  const token = searchParams ? searchParams.get('token') : null;
 
   const togglePasswordVisibility = () => {
     setShowPassword((prev) => !prev);

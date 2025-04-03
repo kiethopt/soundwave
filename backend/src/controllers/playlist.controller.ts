@@ -958,8 +958,16 @@ export const createBaseSystemPlaylist: RequestHandler = async (
   res
 ): Promise<void> => {
   try {
-    // Data now comes from req.body (text fields) and req.file (cover)
-    const { name, description, privacy } = req.body;
+    // Lấy cả tham số AI từ form data
+    const {
+      name,
+      description,
+      privacy,
+      basedOnMood,
+      basedOnGenre,
+      basedOnArtist,
+      trackCount,
+    } = req.body;
     const coverFile = req.file;
 
     // Basic validation
@@ -970,16 +978,29 @@ export const createBaseSystemPlaylist: RequestHandler = async (
       return;
     }
 
-    // Prepare data for service layer
+    // Tạo metadata AI params
+    let finalDescription = description || '';
+    const aiParams: Record<string, any> = {}; // Use Record for better type safety
+    if (basedOnMood) aiParams.basedOnMood = basedOnMood;
+    if (basedOnGenre) aiParams.basedOnGenre = basedOnGenre;
+    if (basedOnArtist) aiParams.basedOnArtist = basedOnArtist;
+    if (trackCount) aiParams.trackCount = Number(trackCount); // Ensure trackCount is a number
+
+    // Thêm metadata AI nếu có bất kỳ tham số AI nào
+    if (Object.keys(aiParams).length > 0) {
+      finalDescription += `\n\n<!--AI_PARAMS:${JSON.stringify(aiParams)}-->`;
+    }
+
+    // Chuẩn bị dữ liệu để tạo
     const playlistData: any = {
       name,
-      description,
-      privacy: privacy || 'PUBLIC', // Default to PUBLIC if not provided
+      description: finalDescription, // Use the description with metadata
+      privacy: privacy || 'PUBLIC',
     };
 
     const playlist = await playlistService.createBaseSystemPlaylist(
       playlistData,
-      coverFile // Pass the file to the service
+      coverFile
     );
 
     res.status(201).json({ success: true, data: playlist });
@@ -999,14 +1020,40 @@ export const updateBaseSystemPlaylist: RequestHandler = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    // Data now comes from req.body (text fields) and req.file (cover)
-    const { name, description, privacy } = req.body;
-    const coverFile = req.file;
-
-    // Prepare data for service layer
-    const updateData: any = {
+    // Lấy cả tham số AI từ form data
+    const {
       name,
       description,
+      privacy,
+      basedOnMood,
+      basedOnGenre,
+      basedOnArtist,
+      trackCount,
+    } = req.body;
+    const coverFile = req.file;
+
+    // Tạo metadata AI params
+    let finalDescription = description || '';
+    const aiParams: Record<string, any> = {}; // Use Record for better type safety
+    if (basedOnMood) aiParams.basedOnMood = basedOnMood;
+    if (basedOnGenre) aiParams.basedOnGenre = basedOnGenre;
+    if (basedOnArtist) aiParams.basedOnArtist = basedOnArtist;
+    if (trackCount) aiParams.trackCount = Number(trackCount); // Ensure trackCount is a number
+
+    // Xóa metadata cũ nếu có
+    finalDescription = finalDescription
+      .replace(/<!--AI_PARAMS:.*?-->/s, '')
+      .trim();
+
+    // Thêm metadata mới nếu có bất kỳ tham số AI nào
+    if (Object.keys(aiParams).length > 0) {
+      finalDescription += `\n\n<!--AI_PARAMS:${JSON.stringify(aiParams)}-->`;
+    }
+
+    // Chuẩn bị dữ liệu để cập nhật
+    const updateData: any = {
+      name,
+      description: finalDescription, // Use the description with metadata
       privacy,
     };
 

@@ -3245,6 +3245,11 @@ interface SystemPlaylistModalProps {
     description?: string;
     coverUrl?: string;
     privacy?: 'PUBLIC' | 'PRIVATE';
+    // Add AI parameters here as well
+    basedOnMood?: string;
+    basedOnGenre?: string;
+    basedOnArtist?: string;
+    trackCount?: number;
   };
   theme?: 'light' | 'dark';
   mode: 'create' | 'edit';
@@ -3268,12 +3273,16 @@ export function SystemPlaylistModal({
     initialData.coverUrl || null
   );
 
-  // AI generation parameters
+  // AI generation parameters - Initialize from initialData
   const [isAIGenerated, setIsAIGenerated] = useState(true);
-  const [basedOnMood, setBasedOnMood] = useState('');
-  const [basedOnGenre, setBasedOnGenre] = useState('');
-  const [basedOnArtist, setBasedOnArtist] = useState('');
-  const [trackCount, setTrackCount] = useState(10);
+  const [basedOnMood, setBasedOnMood] = useState(initialData.basedOnMood || '');
+  const [basedOnGenre, setBasedOnGenre] = useState(
+    initialData.basedOnGenre || ''
+  );
+  const [basedOnArtist, setBasedOnArtist] = useState(
+    initialData.basedOnArtist || ''
+  );
+  const [trackCount, setTrackCount] = useState(initialData.trackCount || 10);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 

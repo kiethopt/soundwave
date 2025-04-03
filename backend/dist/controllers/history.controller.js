@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -16,7 +7,7 @@ exports.getAllHistory = exports.getSearchHistory = exports.getPlayHistory = expo
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const prisma_selects_1 = require("../utils/prisma-selects");
-const savePlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const savePlayHistory = async (req, res) => {
     try {
         const { trackId, duration, completed } = req.body;
         const user = req.user;
@@ -28,7 +19,7 @@ const savePlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function
             res.status(400).json({ message: 'Track ID is required' });
             return;
         }
-        const track = yield db_1.default.track.findUnique({
+        const track = await db_1.default.track.findUnique({
             where: { id: trackId },
             select: { id: true, artistId: true },
         });
@@ -39,7 +30,7 @@ const savePlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function
         const artistId = track.artistId;
         const lastMonth = new Date();
         lastMonth.setMonth(lastMonth.getMonth() - 1);
-        const existingListen = yield db_1.default.history.findFirst({
+        const existingListen = await db_1.default.history.findFirst({
             where: {
                 userId: user.id,
                 track: { artistId: artistId },
@@ -47,12 +38,12 @@ const savePlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function
             },
         });
         if (!existingListen) {
-            yield db_1.default.artistProfile.update({
+            await db_1.default.artistProfile.update({
                 where: { id: artistId },
                 data: { monthlyListeners: { increment: 1 } },
             });
         }
-        const history = yield db_1.default.history.upsert({
+        const history = await db_1.default.history.upsert({
             where: {
                 userId_trackId_type: {
                     userId: user.id,
@@ -60,7 +51,11 @@ const savePlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function
                     type: 'PLAY',
                 },
             },
-            update: Object.assign({ updatedAt: new Date(), completed }, (completed && { playCount: { increment: 1 } })),
+            update: {
+                updatedAt: new Date(),
+                completed,
+                ...(completed && { playCount: { increment: 1 } }),
+            },
             create: {
                 type: client_1.HistoryType.PLAY,
                 duration,
@@ -72,7 +67,7 @@ const savePlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function
             select: prisma_selects_1.historySelect,
         });
         if (completed) {
-            yield db_1.default.track.update({
+            await db_1.default.track.update({
                 where: { id: trackId },
                 data: {
                     playCount: { increment: 1 },
@@ -88,9 +83,9 @@ const savePlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function
         console.error('Save play history error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.savePlayHistory = savePlayHistory;
-const saveSearchHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const saveSearchHistory = async (req, res) => {
     try {
         const { query } = req.body;
         const user = req.user;
@@ -98,11 +93,11 @@ const saveSearchHistory = (req, res) => __awaiter(void 0, void 0, void 0, functi
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        if (!(query === null || query === void 0 ? void 0 : query.trim())) {
+        if (!query?.trim()) {
             res.status(400).json({ message: 'Search query is required' });
             return;
         }
-        const history = yield db_1.default.history.create({
+        const history = await db_1.default.history.create({
             data: {
                 type: client_1.HistoryType.SEARCH,
                 query,
@@ -122,9 +117,9 @@ const saveSearchHistory = (req, res) => __awaiter(void 0, void 0, void 0, functi
         console.error('Save search history error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.saveSearchHistory = saveSearchHistory;
-const getPlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getPlayHistory = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -133,7 +128,7 @@ const getPlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function*
         }
         const { page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
-        const histories = yield db_1.default.history.findMany({
+        const histories = await db_1.default.history.findMany({
             where: {
                 userId: user.id,
                 type: client_1.HistoryType.PLAY,
@@ -143,7 +138,7 @@ const getPlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function*
             skip: offset,
             take: Number(limit),
         });
-        const totalHistories = yield db_1.default.history.count({
+        const totalHistories = await db_1.default.history.count({
             where: {
                 userId: user.id,
                 type: client_1.HistoryType.PLAY,
@@ -163,9 +158,9 @@ const getPlayHistory = (req, res) => __awaiter(void 0, void 0, void 0, function*
         console.error('Get play history error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getPlayHistory = getPlayHistory;
-const getSearchHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getSearchHistory = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -174,7 +169,7 @@ const getSearchHistory = (req, res) => __awaiter(void 0, void 0, void 0, functio
         }
         const { page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
-        const histories = yield db_1.default.history.findMany({
+        const histories = await db_1.default.history.findMany({
             where: {
                 userId: user.id,
                 type: client_1.HistoryType.SEARCH,
@@ -184,7 +179,7 @@ const getSearchHistory = (req, res) => __awaiter(void 0, void 0, void 0, functio
             skip: offset,
             take: Number(limit),
         });
-        const totalHistories = yield db_1.default.history.count({
+        const totalHistories = await db_1.default.history.count({
             where: {
                 userId: user.id,
                 type: client_1.HistoryType.SEARCH,
@@ -204,9 +199,9 @@ const getSearchHistory = (req, res) => __awaiter(void 0, void 0, void 0, functio
         console.error('Get search history error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getSearchHistory = getSearchHistory;
-const getAllHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllHistory = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -215,7 +210,7 @@ const getAllHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         }
         const { page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
-        const histories = yield db_1.default.history.findMany({
+        const histories = await db_1.default.history.findMany({
             where: {
                 userId: user.id,
             },
@@ -224,7 +219,7 @@ const getAllHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             skip: offset,
             take: Number(limit),
         });
-        const totalHistories = yield db_1.default.history.count({
+        const totalHistories = await db_1.default.history.count({
             where: {
                 userId: user.id,
             },
@@ -243,6 +238,6 @@ const getAllHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         console.error('Get all history error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getAllHistory = getAllHistory;
 //# sourceMappingURL=history.controller.js.map

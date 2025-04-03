@@ -21,7 +21,13 @@ import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { AlbumTracks } from '@/components/user/album/AlbumTracks';
 
 export default function AlbumDetailPage() {
-  const { id: albumId } = useParams();
+  const params = useParams();
+  const albumId = params?.id
+    ? Array.isArray(params.id)
+      ? params.id[0]
+      : params.id
+    : null;
+
   const router = useRouter();
   const [album, setAlbum] = useState<Album | null>(null);
   const [isLoading, setIsLoading] = useState(true);

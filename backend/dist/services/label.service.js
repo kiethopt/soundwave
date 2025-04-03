@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -17,7 +8,7 @@ const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const upload_service_1 = require("./upload.service");
 const handle_utils_1 = require("../utils/handle-utils");
-const getAllLabels = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllLabels = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
     const whereClause = {};
     if (search && typeof search === 'string') {
@@ -40,7 +31,7 @@ const getAllLabels = (req) => __awaiter(void 0, void 0, void 0, function* () {
     else {
         orderByClause.name = 'asc';
     }
-    const result = yield (0, handle_utils_1.paginate)(db_1.default.label, req, {
+    const result = await (0, handle_utils_1.paginate)(db_1.default.label, req, {
         where: whereClause,
         include: {
             _count: {
@@ -56,13 +47,14 @@ const getAllLabels = (req) => __awaiter(void 0, void 0, void 0, function* () {
         data: result.data,
         pagination: result.pagination,
     };
-});
+};
 exports.getAllLabels = getAllLabels;
-const getLabelById = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
-    const label = yield db_1.default.label.findUnique({
+const getLabelById = async (id) => {
+    const label = await db_1.default.label.findUnique({
         where: { id },
-        select: Object.assign(Object.assign({}, prisma_selects_1.labelSelect), { albums: {
+        select: {
+            ...prisma_selects_1.labelSelect,
+            albums: {
                 where: { isActive: true },
                 select: {
                     id: true,
@@ -81,7 +73,8 @@ const getLabelById = (id) => __awaiter(void 0, void 0, void 0, function* () {
                     },
                 },
                 orderBy: { releaseDate: 'desc' },
-            }, tracks: {
+            },
+            tracks: {
                 where: { isActive: true },
                 select: {
                     id: true,
@@ -106,27 +99,36 @@ const getLabelById = (id) => __awaiter(void 0, void 0, void 0, function* () {
                     },
                 },
                 orderBy: { releaseDate: 'desc' },
-            } }),
+            },
+        },
     });
     if (!label)
         return null;
     const artistMap = new Map();
-    (_a = label.albums) === null || _a === void 0 ? void 0 : _a.forEach((album) => {
+    label.albums?.forEach((album) => {
         if (album.artist) {
             const artistId = album.artist.id;
             if (!artistMap.has(artistId)) {
-                artistMap.set(artistId, Object.assign(Object.assign({}, album.artist), { albumCount: 0, trackCount: 0 }));
+                artistMap.set(artistId, {
+                    ...album.artist,
+                    albumCount: 0,
+                    trackCount: 0,
+                });
             }
             const artist = artistMap.get(artistId);
             artist.albumCount += 1;
             artistMap.set(artistId, artist);
         }
     });
-    (_b = label.tracks) === null || _b === void 0 ? void 0 : _b.forEach((track) => {
+    label.tracks?.forEach((track) => {
         if (track.artist) {
             const artistId = track.artist.id;
             if (!artistMap.has(artistId)) {
-                artistMap.set(artistId, Object.assign(Object.assign({}, track.artist), { albumCount: 0, trackCount: 0 }));
+                artistMap.set(artistId, {
+                    ...track.artist,
+                    albumCount: 0,
+                    trackCount: 0,
+                });
             }
             const artist = artistMap.get(artistId);
             artist.trackCount += 1;
@@ -134,10 +136,13 @@ const getLabelById = (id) => __awaiter(void 0, void 0, void 0, function* () {
         }
     });
     const artists = Array.from(artistMap.values()).sort((a, b) => a.artistName.localeCompare(b.artistName));
-    return Object.assign(Object.assign({}, label), { artists });
-});
+    return {
+        ...label,
+        artists,
+    };
+};
 exports.getLabelById = getLabelById;
-const createLabel = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const createLabel = async (req) => {
     const { name, description } = req.body;
     const logoFile = req.file;
     const errors = (0, handle_utils_1.runValidations)([
@@ -146,7 +151,7 @@ const createLabel = (req) => __awaiter(void 0, void 0, void 0, function* () {
     if (errors.length > 0) {
         throw { status: 400, message: 'Validation failed', errors };
     }
-    const existingLabel = yield db_1.default.label.findUnique({
+    const existingLabel = await db_1.default.label.findUnique({
         where: { name },
     });
     if (existingLabel) {
@@ -154,7 +159,7 @@ const createLabel = (req) => __awaiter(void 0, void 0, void 0, function* () {
     }
     let logoUrl;
     if (logoFile) {
-        const uploadResult = yield (0, upload_service_1.uploadFile)(logoFile.buffer, 'labels', 'image');
+        const uploadResult = await (0, upload_service_1.uploadFile)(logoFile.buffer, 'labels', 'image');
         logoUrl = uploadResult.secure_url;
     }
     return db_1.default.label.create({
@@ -165,20 +170,20 @@ const createLabel = (req) => __awaiter(void 0, void 0, void 0, function* () {
         },
         select: prisma_selects_1.labelSelect,
     });
-});
+};
 exports.createLabel = createLabel;
-const updateLabel = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const updateLabel = async (req) => {
     const { id } = req.params;
     const { name, description } = req.body;
     const logoFile = req.file;
-    const existingLabel = yield db_1.default.label.findUnique({
+    const existingLabel = await db_1.default.label.findUnique({
         where: { id },
     });
     if (!existingLabel) {
         throw { status: 404, message: 'Label not found' };
     }
     if (name && name !== existingLabel.name) {
-        const nameConflict = yield db_1.default.label.findUnique({
+        const nameConflict = await db_1.default.label.findUnique({
             where: { name },
         });
         if (nameConflict) {
@@ -191,7 +196,7 @@ const updateLabel = (req) => __awaiter(void 0, void 0, void 0, function* () {
     if (description !== undefined)
         updateData.description = description;
     if (logoFile) {
-        const uploadResult = yield (0, upload_service_1.uploadFile)(logoFile.buffer, 'labels', 'image');
+        const uploadResult = await (0, upload_service_1.uploadFile)(logoFile.buffer, 'labels', 'image');
         updateData.logoUrl = uploadResult.secure_url;
     }
     return db_1.default.label.update({
@@ -199,10 +204,10 @@ const updateLabel = (req) => __awaiter(void 0, void 0, void 0, function* () {
         data: updateData,
         select: prisma_selects_1.labelSelect,
     });
-});
+};
 exports.updateLabel = updateLabel;
-const deleteLabel = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const existingLabel = yield db_1.default.label.findUnique({
+const deleteLabel = async (id) => {
+    const existingLabel = await db_1.default.label.findUnique({
         where: { id },
         include: {
             _count: {
@@ -229,6 +234,6 @@ const deleteLabel = (id) => __awaiter(void 0, void 0, void 0, function* () {
     return db_1.default.label.delete({
         where: { id },
     });
-});
+};
 exports.deleteLabel = deleteLabel;
 //# sourceMappingURL=label.service.js.map

@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -31,8 +22,8 @@ const baseSystemPlaylistSelect = {
     createdAt: true,
     updatedAt: true,
 };
-const createBaseSystemPlaylist = (data, coverFile) => __awaiter(void 0, void 0, void 0, function* () {
-    const existing = yield db_1.default.playlist.findFirst({
+const createBaseSystemPlaylist = async (data, coverFile) => {
+    const existing = await db_1.default.playlist.findFirst({
         where: {
             name: data.name,
             type: client_1.PlaylistType.SYSTEM,
@@ -44,17 +35,23 @@ const createBaseSystemPlaylist = (data, coverFile) => __awaiter(void 0, void 0, 
     }
     let coverUrl = undefined;
     if (coverFile) {
-        const uploadResult = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'playlists/covers');
+        const uploadResult = await (0, upload_service_1.uploadFile)(coverFile.buffer, 'playlists/covers');
         coverUrl = uploadResult.secure_url;
     }
     return db_1.default.playlist.create({
-        data: Object.assign(Object.assign({}, data), { coverUrl, type: client_1.PlaylistType.SYSTEM, isAIGenerated: true, userId: null }),
+        data: {
+            ...data,
+            coverUrl,
+            type: client_1.PlaylistType.SYSTEM,
+            isAIGenerated: true,
+            userId: null,
+        },
         select: baseSystemPlaylistSelect,
     });
-});
+};
 exports.createBaseSystemPlaylist = createBaseSystemPlaylist;
-const updateBaseSystemPlaylist = (playlistId, data, coverFile) => __awaiter(void 0, void 0, void 0, function* () {
-    const playlist = yield db_1.default.playlist.findUnique({
+const updateBaseSystemPlaylist = async (playlistId, data, coverFile) => {
+    const playlist = await db_1.default.playlist.findUnique({
         where: { id: playlistId },
         select: { type: true, userId: true, name: true },
     });
@@ -64,7 +61,7 @@ const updateBaseSystemPlaylist = (playlistId, data, coverFile) => __awaiter(void
         throw new Error('Base system playlist not found.');
     }
     if (data.name && data.name !== playlist.name) {
-        const existing = yield db_1.default.playlist.findFirst({
+        const existing = await db_1.default.playlist.findFirst({
             where: {
                 name: data.name,
                 type: client_1.PlaylistType.SYSTEM,
@@ -78,18 +75,24 @@ const updateBaseSystemPlaylist = (playlistId, data, coverFile) => __awaiter(void
     }
     let coverUrl = undefined;
     if (coverFile) {
-        const uploadResult = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'playlists/covers');
+        const uploadResult = await (0, upload_service_1.uploadFile)(coverFile.buffer, 'playlists/covers');
         coverUrl = uploadResult.secure_url;
     }
     return db_1.default.playlist.update({
         where: { id: playlistId },
-        data: Object.assign(Object.assign(Object.assign({}, data), (coverUrl && { coverUrl })), { type: client_1.PlaylistType.SYSTEM, userId: null, isAIGenerated: true }),
+        data: {
+            ...data,
+            ...(coverUrl && { coverUrl }),
+            type: client_1.PlaylistType.SYSTEM,
+            userId: null,
+            isAIGenerated: true,
+        },
         select: baseSystemPlaylistSelect,
     });
-});
+};
 exports.updateBaseSystemPlaylist = updateBaseSystemPlaylist;
-const deleteBaseSystemPlaylist = (playlistId) => __awaiter(void 0, void 0, void 0, function* () {
-    const playlist = yield db_1.default.playlist.findUnique({
+const deleteBaseSystemPlaylist = async (playlistId) => {
+    const playlist = await db_1.default.playlist.findUnique({
         where: { id: playlistId },
         select: { type: true, userId: true },
     });
@@ -101,9 +104,9 @@ const deleteBaseSystemPlaylist = (playlistId) => __awaiter(void 0, void 0, void 
     return db_1.default.playlist.delete({
         where: { id: playlistId },
     });
-});
+};
 exports.deleteBaseSystemPlaylist = deleteBaseSystemPlaylist;
-const getAllBaseSystemPlaylists = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllBaseSystemPlaylists = async (req) => {
     const { search } = req.query;
     const whereClause = {
         type: client_1.PlaylistType.SYSTEM,
@@ -115,22 +118,42 @@ const getAllBaseSystemPlaylists = (req) => __awaiter(void 0, void 0, void 0, fun
             { description: { contains: search, mode: 'insensitive' } },
         ];
     }
-    const result = yield (0, handle_utils_1.paginate)(db_1.default.playlist, req, {
+    const result = await (0, handle_utils_1.paginate)(db_1.default.playlist, req, {
         where: whereClause,
         select: baseSystemPlaylistSelect,
         orderBy: { createdAt: 'desc' },
     });
+    result.data = result.data.map((playlist) => {
+        const parsedPlaylist = { ...playlist };
+        if (parsedPlaylist.description &&
+            parsedPlaylist.description.includes('<!--AI_PARAMS:')) {
+            const match = parsedPlaylist.description.match(/<!--AI_PARAMS:(.*?)-->/s);
+            if (match && match[1]) {
+                try {
+                    const aiParams = JSON.parse(match[1]);
+                    Object.assign(parsedPlaylist, aiParams);
+                    parsedPlaylist.description = parsedPlaylist.description
+                        .replace(/\n\n<!--AI_PARAMS:.*?-->/s, '')
+                        .trim();
+                }
+                catch (e) {
+                    console.error('Error parsing AI parameters:', e);
+                }
+            }
+        }
+        return parsedPlaylist;
+    });
     return result;
-});
+};
 exports.getAllBaseSystemPlaylists = getAllBaseSystemPlaylists;
-const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+const updateVibeRewindPlaylist = async (userId) => {
     try {
-        let vibeRewindPlaylist = yield db_1.default.playlist.findFirst({
+        let vibeRewindPlaylist = await db_1.default.playlist.findFirst({
             where: { userId, name: 'Vibe Rewind' },
         });
         if (!vibeRewindPlaylist) {
             console.log(`[PlaylistService] Creating new Vibe Rewind playlist for user ${userId}...`);
-            vibeRewindPlaylist = yield db_1.default.playlist.create({
+            vibeRewindPlaylist = await db_1.default.playlist.create({
                 data: {
                     name: 'Vibe Rewind',
                     description: "Your personal time capsule - tracks you've been vibing to lately",
@@ -140,7 +163,7 @@ const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, f
                 },
             });
         }
-        const userHistory = yield db_1.default.history.findMany({
+        const userHistory = await db_1.default.history.findMany({
             where: { userId, type: 'PLAY', playCount: { gt: 2 } },
             include: {
                 track: {
@@ -152,7 +175,7 @@ const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, f
             console.log(`[PlaylistService] No history found for user ${userId}`);
             return;
         }
-        const topPlayedTracks = yield db_1.default.history.findMany({
+        const topPlayedTracks = await db_1.default.history.findMany({
             where: { userId, playCount: { gt: 5 } },
             include: { track: true },
             orderBy: { playCount: 'desc' },
@@ -162,14 +185,13 @@ const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, f
         const genreCounts = new Map();
         const artistCounts = new Map();
         userHistory.forEach((history) => {
-            var _a;
             const track = history.track;
             if (track) {
                 track.genres.forEach((genreRel) => {
                     const genreId = genreRel.genre.id;
                     genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
                 });
-                const artistId = (_a = track.artist) === null || _a === void 0 ? void 0 : _a.id;
+                const artistId = track.artist?.id;
                 if (artistId) {
                     artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
                 }
@@ -185,7 +207,7 @@ const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, f
             .map((entry) => entry[0]);
         console.log(`[PlaylistService] Top genres: ${topGenres}`);
         console.log(`[PlaylistService] Top artists: ${topArtists}`);
-        const recommendedTracks = yield db_1.default.track.findMany({
+        const recommendedTracks = await db_1.default.track.findMany({
             where: {
                 OR: [
                     { genres: { some: { genreId: { in: topGenres } } } },
@@ -198,7 +220,7 @@ const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, f
             take: 10,
         });
         console.log(`[PlaylistService] Found ${recommendedTracks.length} content-based tracks`);
-        const similarUsers = yield db_1.default.history.findMany({
+        const similarUsers = await db_1.default.history.findMany({
             where: {
                 trackId: {
                     in: userHistory
@@ -212,7 +234,7 @@ const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, f
         });
         const similarUserIds = similarUsers.map((u) => u.userId);
         console.log(`[PlaylistService] Found ${similarUserIds.length} similar users`);
-        const collaborativeTracks = yield db_1.default.history.findMany({
+        const collaborativeTracks = await db_1.default.history.findMany({
             where: { userId: { in: similarUserIds } },
             include: { track: true },
             orderBy: { playCount: 'desc' },
@@ -230,19 +252,19 @@ const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, f
             console.log(`[PlaylistService] No tracks found to update in Vibe Rewind for user ${userId}`);
             return;
         }
-        yield db_1.default.playlistTrack.deleteMany({
+        await db_1.default.playlistTrack.deleteMany({
             where: {
                 playlistId: vibeRewindPlaylist.id,
             },
         });
         const playlistTrackData = finalRecommendedTracks
-            .filter((track) => (track === null || track === void 0 ? void 0 : track.id) !== undefined)
+            .filter((track) => track?.id !== undefined)
             .map((track, index) => ({
             playlistId: vibeRewindPlaylist.id,
             trackId: track.id,
             trackOrder: index,
         }));
-        yield db_1.default.$transaction([
+        await db_1.default.$transaction([
             db_1.default.playlistTrack.createMany({
                 data: playlistTrackData.filter((track, index, self) => self.findIndex((t) => t.playlistId === track.playlistId && t.trackId === track.trackId) === index),
             }),
@@ -250,7 +272,7 @@ const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, f
                 where: { id: vibeRewindPlaylist.id },
                 data: {
                     totalTracks: finalRecommendedTracks.length,
-                    totalDuration: finalRecommendedTracks.reduce((sum, track) => sum + ((track === null || track === void 0 ? void 0 : track.duration) || 0), 0),
+                    totalDuration: finalRecommendedTracks.reduce((sum, track) => sum + (track?.duration || 0), 0),
                 },
             }),
         ]);
@@ -260,9 +282,9 @@ const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, f
         console.error(`[PlaylistService] Error updating tracks for Vibe Rewind for user ${userId}:`, error);
         throw error;
     }
-});
+};
 exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
-const getSystemPlaylists = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const getSystemPlaylists = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
     const whereClause = {
         type: 'SYSTEM',
@@ -291,7 +313,7 @@ const getSystemPlaylists = (req) => __awaiter(void 0, void 0, void 0, function* 
     else {
         orderByClause.createdAt = 'desc';
     }
-    const result = yield (0, handle_utils_1.paginate)(db_1.default.playlist, req, {
+    const result = await (0, handle_utils_1.paginate)(db_1.default.playlist, req, {
         where: whereClause,
         include: {
             tracks: {
@@ -324,18 +346,21 @@ const getSystemPlaylists = (req) => __awaiter(void 0, void 0, void 0, function* 
             album: pt.track.album,
             createdAt: pt.track.createdAt.toISOString(),
         }));
-        return Object.assign(Object.assign({}, playlist), { tracks: formattedTracks });
+        return {
+            ...playlist,
+            tracks: formattedTracks,
+        };
     });
     return {
         data: formattedPlaylists,
         pagination: result.pagination,
     };
-});
+};
 exports.getSystemPlaylists = getSystemPlaylists;
-const generateAIPlaylist = (userId, options) => __awaiter(void 0, void 0, void 0, function* () {
+const generateAIPlaylist = async (userId, options) => {
     console.log(`[PlaylistService] Generating AI playlist for user ${userId} with options:`, options);
-    const playlist = yield (0, ai_service_1.createAIGeneratedPlaylist)(userId, options);
-    const playlistWithTracks = yield db_1.default.playlist.findUnique({
+    const playlist = await (0, ai_service_1.createAIGeneratedPlaylist)(userId, options);
+    const playlistWithTracks = await db_1.default.playlist.findUnique({
         where: { id: playlist.id },
         include: {
             tracks: {
@@ -367,23 +392,25 @@ const generateAIPlaylist = (userId, options) => __awaiter(void 0, void 0, void 0
             artistsInPlaylist.add(pt.track.artist.artistName);
         }
     });
-    return Object.assign(Object.assign({}, playlist), { artistCount: artistsInPlaylist.size, previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => {
-            var _a;
-            return ({
-                id: pt.track.id,
-                title: pt.track.title,
-                artist: (_a = pt.track.artist) === null || _a === void 0 ? void 0 : _a.artistName,
-            });
-        }), totalTracks: playlistWithTracks.tracks.length });
-});
+    return {
+        ...playlist,
+        artistCount: artistsInPlaylist.size,
+        previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => ({
+            id: pt.track.id,
+            title: pt.track.title,
+            artist: pt.track.artist?.artistName,
+        })),
+        totalTracks: playlistWithTracks.tracks.length,
+    };
+};
 exports.generateAIPlaylist = generateAIPlaylist;
-const updateAllSystemPlaylists = () => __awaiter(void 0, void 0, void 0, function* () {
+const updateAllSystemPlaylists = async () => {
     try {
-        const users = yield db_1.default.user.findMany({
+        const users = await db_1.default.user.findMany({
             where: { isActive: true },
             select: { id: true },
         });
-        const baseSystemPlaylists = yield db_1.default.playlist.findMany({
+        const baseSystemPlaylists = await db_1.default.playlist.findMany({
             where: { type: 'SYSTEM', userId: null },
             select: { name: true },
         });
@@ -393,9 +420,9 @@ const updateAllSystemPlaylists = () => __awaiter(void 0, void 0, void 0, functio
         }
         console.log(`[PlaylistService] Updating ${baseSystemPlaylists.length} system playlists for ${users.length} users...`);
         const errors = [];
-        const updatePromises = users.flatMap((user) => baseSystemPlaylists.map((playlistTemplate) => (() => __awaiter(void 0, void 0, void 0, function* () {
+        const updatePromises = users.flatMap((user) => baseSystemPlaylists.map((playlistTemplate) => (async () => {
             try {
-                const templatePlaylist = yield db_1.default.playlist.findFirst({
+                const templatePlaylist = await db_1.default.playlist.findFirst({
                     where: {
                         name: playlistTemplate.name,
                         type: 'SYSTEM',
@@ -412,12 +439,29 @@ const updateAllSystemPlaylists = () => __awaiter(void 0, void 0, void 0, functio
                 if (!templatePlaylist) {
                     throw new Error(`Base template "${playlistTemplate.name}" not found.`);
                 }
+                let aiOptions = {};
+                if (templatePlaylist.description &&
+                    templatePlaylist.description.includes('<!--AI_PARAMS:')) {
+                    const match = templatePlaylist.description.match(/<!--AI_PARAMS:(.*?)-->/s);
+                    if (match && match[1]) {
+                        try {
+                            aiOptions = JSON.parse(match[1]);
+                            templatePlaylist.description = templatePlaylist.description
+                                .replace(/\n\n<!--AI_PARAMS:.*?-->/s, '')
+                                .trim();
+                        }
+                        catch (e) {
+                            console.error(`[PlaylistService] Error parsing AI params for template ${templatePlaylist.name}:`, e);
+                        }
+                    }
+                }
                 const coverUrl = templatePlaylist.coverUrl ||
                     'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
-                yield (0, ai_service_1.createAIGeneratedPlaylist)(user.id, {
+                await (0, ai_service_1.createAIGeneratedPlaylist)(user.id, {
                     name: templatePlaylist.name,
                     description: templatePlaylist.description || undefined,
                     coverUrl: coverUrl,
+                    ...aiOptions,
                 });
             }
             catch (error) {
@@ -429,8 +473,8 @@ const updateAllSystemPlaylists = () => __awaiter(void 0, void 0, void 0, functio
                     error: errorMessage,
                 });
             }
-        }))()));
-        yield Promise.allSettled(updatePromises);
+        })()));
+        await Promise.allSettled(updatePromises);
         if (errors.length === 0) {
             console.log(`[PlaylistService] Successfully finished updating all system playlists.`);
             return { success: true, errors: [] };
@@ -449,6 +493,6 @@ const updateAllSystemPlaylists = () => __awaiter(void 0, void 0, void 0, functio
             ],
         };
     }
-});
+};
 exports.updateAllSystemPlaylists = updateAllSystemPlaylists;
 //# sourceMappingURL=playlist.service.js.map

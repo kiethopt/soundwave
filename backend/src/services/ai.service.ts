@@ -20,7 +20,8 @@ const model = genAI.getGenerativeModel({
 });
 console.log(`[AI] Using Gemini model: ${modelName}`);
 
-interface PlaylistGenerationOptions {
+// Export the interface
+export interface PlaylistGenerationOptions {
   name?: string;
   description?: string;
   trackCount?: number;
@@ -360,28 +361,48 @@ Hướng dẫn quan trọng:
     const response = result.response;
     const responseText = response.text();
 
+    // Log the raw response for debugging
+    console.log('[AI] Raw response:', responseText);
+
     // Phân tích phản hồi JSON để lấy ID bài hát
     let trackIds: string[] = [];
     try {
-      // Làm sạch phản hồi để đảm bảo nó là JSON hợp lệ
+      // Trim whitespace and check if response is potentially valid JSON before parsing
       const cleanedResponse = responseText.replace(/```json|```/g, '').trim();
-      trackIds = JSON.parse(cleanedResponse);
+      if (
+        cleanedResponse &&
+        cleanedResponse.startsWith('[') &&
+        cleanedResponse.endsWith(']')
+      ) {
+        trackIds = JSON.parse(cleanedResponse);
+      } else {
+        console.warn(
+          '[AI] Gemini response is empty or not a valid JSON array.'
+        );
+        // Optionally, trigger fallback logic immediately if response is invalid
+        // trackIds = await generateDefaultPlaylistForNewUser(userId);
+        // return trackIds; // If deciding to return default immediately
+      }
 
-      // Xác minh ID bài hát tồn tại trong cơ sở dữ liệu
-      const validTrackIds = await prisma.track.findMany({
-        where: {
-          id: { in: trackIds },
-          isActive: true,
-        },
-        select: { id: true, artistId: true },
-      });
-
-      trackIds = validTrackIds.map((t) => t.id);
+      // Xác minh ID bài hát tồn tại trong cơ sở dữ liệu (nếu trackIds không rỗng)
+      if (trackIds.length > 0) {
+        const validTrackIds = await prisma.track.findMany({
+          where: {
+            id: { in: trackIds },
+            isActive: true,
+          },
+          select: { id: true, artistId: true },
+        });
+        trackIds = validTrackIds.map((t) => t.id);
+      } else {
+        // Handle the case where parsing resulted in an empty array
+        console.log('[AI] No valid track IDs parsed from Gemini response.');
+      }
 
       // Kiểm tra xem đã đạt được tỷ lệ nghệ sĩ ưa thích mong muốn chưa
       if (preferredArtistIds.size > 0) {
-        const tracksFromPreferredArtists = validTrackIds.filter((t) =>
-          preferredArtistIds.has(t.artistId)
+        const tracksFromPreferredArtists = trackIds.filter((t) =>
+          preferredArtistIds.has(t)
         ).length;
 
         const preferredArtistPercentage =

@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -15,14 +6,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.markAllNotificationsAsRead = exports.markNotificationAsRead = exports.getUnreadNotificationsCount = exports.getNotifications = exports.deleteReadNotifications = exports.deleteAllNotifications = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
-const deleteAllNotifications = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteAllNotifications = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        yield db_1.default.notification.deleteMany({
+        await db_1.default.notification.deleteMany({
             where: {
                 userId: user.id,
             },
@@ -33,16 +24,16 @@ const deleteAllNotifications = (req, res) => __awaiter(void 0, void 0, void 0, f
         console.error('Error deleting all notifications:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.deleteAllNotifications = deleteAllNotifications;
-const deleteReadNotifications = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteReadNotifications = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        yield db_1.default.notification.deleteMany({
+        await db_1.default.notification.deleteMany({
             where: {
                 userId: user.id,
                 isRead: true,
@@ -54,9 +45,9 @@ const deleteReadNotifications = (req, res) => __awaiter(void 0, void 0, void 0, 
         console.error('Error deleting read notifications:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.deleteReadNotifications = deleteReadNotifications;
-const getNotifications = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getNotifications = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -79,10 +70,14 @@ const getNotifications = (req, res) => __awaiter(void 0, void 0, void 0, functio
             recipientType = client_1.RecipientType.USER;
             recipientId = user.id;
         }
-        const notifications = yield db_1.default.notification.findMany({
-            where: Object.assign({ recipientType, isRead: readFilter }, (recipientType === client_1.RecipientType.ARTIST
-                ? { artistId: recipientId }
-                : { userId: recipientId })),
+        const notifications = await db_1.default.notification.findMany({
+            where: {
+                recipientType,
+                isRead: readFilter,
+                ...(recipientType === client_1.RecipientType.ARTIST
+                    ? { artistId: recipientId }
+                    : { userId: recipientId }),
+            },
             orderBy: { createdAt: 'desc' },
         });
         res.json(notifications);
@@ -91,9 +86,9 @@ const getNotifications = (req, res) => __awaiter(void 0, void 0, void 0, functio
         console.error('Get notifications error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getNotifications = getNotifications;
-const getUnreadNotificationsCount = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getUnreadNotificationsCount = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -110,10 +105,14 @@ const getUnreadNotificationsCount = (req, res) => __awaiter(void 0, void 0, void
             recipientType = client_1.RecipientType.USER;
             recipientId = user.id;
         }
-        const count = yield db_1.default.notification.count({
-            where: Object.assign({ recipientType, isRead: false }, (recipientType === client_1.RecipientType.ARTIST
-                ? { artistId: recipientId }
-                : { userId: recipientId })),
+        const count = await db_1.default.notification.count({
+            where: {
+                recipientType,
+                isRead: false,
+                ...(recipientType === client_1.RecipientType.ARTIST
+                    ? { artistId: recipientId }
+                    : { userId: recipientId }),
+            },
         });
         res.json({ unreadCount: count });
     }
@@ -121,9 +120,9 @@ const getUnreadNotificationsCount = (req, res) => __awaiter(void 0, void 0, void
         console.error('Get unread notifications count error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getUnreadNotificationsCount = getUnreadNotificationsCount;
-const markNotificationAsRead = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const markNotificationAsRead = async (req, res) => {
     try {
         const user = req.user;
         const { notificationId } = req.params;
@@ -131,7 +130,7 @@ const markNotificationAsRead = (req, res) => __awaiter(void 0, void 0, void 0, f
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const notification = yield db_1.default.notification.findUnique({
+        const notification = await db_1.default.notification.findUnique({
             where: { id: notificationId },
         });
         if (!notification) {
@@ -151,7 +150,7 @@ const markNotificationAsRead = (req, res) => __awaiter(void 0, void 0, void 0, f
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        yield db_1.default.notification.update({
+        await db_1.default.notification.update({
             where: { id: notificationId },
             data: { isRead: true },
         });
@@ -161,9 +160,9 @@ const markNotificationAsRead = (req, res) => __awaiter(void 0, void 0, void 0, f
         console.error('Mark notification as read error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.markNotificationAsRead = markNotificationAsRead;
-const markAllNotificationsAsRead = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const markAllNotificationsAsRead = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -180,10 +179,14 @@ const markAllNotificationsAsRead = (req, res) => __awaiter(void 0, void 0, void 
             recipientType = client_1.RecipientType.USER;
             recipientId = user.id;
         }
-        yield db_1.default.notification.updateMany({
-            where: Object.assign({ recipientType, isRead: false }, (recipientType === client_1.RecipientType.ARTIST
-                ? { artistId: recipientId }
-                : { userId: recipientId })),
+        await db_1.default.notification.updateMany({
+            where: {
+                recipientType,
+                isRead: false,
+                ...(recipientType === client_1.RecipientType.ARTIST
+                    ? { artistId: recipientId }
+                    : { userId: recipientId }),
+            },
             data: { isRead: true },
         });
         res.json({ message: 'All notifications marked as read' });
@@ -192,6 +195,6 @@ const markAllNotificationsAsRead = (req, res) => __awaiter(void 0, void 0, void 
         console.error('Mark all notifications as read error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.markAllNotificationsAsRead = markAllNotificationsAsRead;
 //# sourceMappingURL=notification.controller.js.map

@@ -27,7 +27,7 @@ function LoginForm() {
 
   useEffect(() => {
     setMounted(true);
-    const message = searchParams.get('message');
+    const message = searchParams ? searchParams.get('message') : null;
     if (message === 'account_deactivated') {
       setError('Your account has been deactivated. Please contact Admin.');
     }

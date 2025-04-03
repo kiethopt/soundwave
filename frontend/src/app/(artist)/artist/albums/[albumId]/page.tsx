@@ -29,7 +29,12 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 
 export default function AlbumDetailPage() {
-  const { albumId } = useParams();
+  const params = useParams();
+  const extractedAlbumId = params?.albumId
+    ? Array.isArray(params.albumId)
+      ? params.albumId[0]
+      : params.albumId
+    : null;
   const [album, setAlbum] = useState<Album | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,10 +71,15 @@ export default function AlbumDetailPage() {
   const { theme } = useTheme();
 
   useEffect(() => {
-    if (albumId) {
+    if (extractedAlbumId) {
       fetchAlbumDetails();
+    } else {
+      setError('Album ID not found in URL');
+      setIsLoading(false);
     }
-  }, [albumId]);
+    // fetchAlbumDetails is defined below and has extractedAlbumId in its dependency array implicitly
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extractedAlbumId]);
 
   useEffect(() => {
     if (album) {
@@ -101,6 +111,12 @@ export default function AlbumDetailPage() {
   }, [activeTrackMenu]);
 
   const fetchAlbumDetails = useCallback(async () => {
+    // Guard against missing ID
+    if (!extractedAlbumId) {
+      setError('Album ID is missing, cannot fetch details.');
+      setIsLoading(false);
+      return;
+    }
     try {
       setIsLoading(true);
       setError(null);
@@ -110,7 +126,7 @@ export default function AlbumDetailPage() {
         throw new Error('No authentication token found');
       }
 
-      const data = await api.albums.getById(albumId as string, token);
+      const data = await api.albums.getById(extractedAlbumId, token);
       setAlbum(data);
     } catch (err) {
       console.error('Error fetching album:', err);
@@ -118,7 +134,7 @@ export default function AlbumDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [albumId]);
+  }, [extractedAlbumId]);
 
   useEffect(() => {
     const fetchArtists = async () => {
@@ -145,6 +161,7 @@ export default function AlbumDetailPage() {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
+      if (!extractedAlbumId) throw new Error('Album ID is missing');
 
       const formData = new FormData();
       formData.append('title', editForm.title);
@@ -154,7 +171,7 @@ export default function AlbumDetailPage() {
         formData.append('coverFile', editForm.coverFile);
       }
 
-      await api.albums.update(albumId as string, formData, token);
+      await api.albums.update(extractedAlbumId, formData, token);
       await fetchAlbumDetails();
       setShowEditDialog(false);
       toast.success('Album updated successfully');
@@ -304,6 +321,11 @@ export default function AlbumDetailPage() {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
+      if (!extractedAlbumId) {
+        setError('Album ID is missing, cannot upload tracks.');
+        setIsUploading(false);
+        return;
+      }
 
       const formData = new FormData();
 
@@ -324,7 +346,7 @@ export default function AlbumDetailPage() {
       });
 
       const response = await api.albums.uploadTracks(
-        albumId as string,
+        extractedAlbumId,
         formData,
         token
       );
@@ -413,8 +435,8 @@ export default function AlbumDetailPage() {
             ${dominantColor}40 30%,
             ${theme === 'light' ? '#ffffff' : '#121212'} 100%)`
           : theme === 'light'
-            ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
-            : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
+          ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
+          : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
       }}
     >
       <div className="max-w-8xl mx-auto px-4 md:px-6 py-6 mb-16 md:mb-0">
@@ -422,22 +444,25 @@ export default function AlbumDetailPage() {
         <div className="flex items-center justify-between mb-6">
           <Link
             href="/artist/albums"
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${theme === 'light'
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              theme === 'light'
                 ? 'bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow'
                 : 'bg-black/20 hover:bg-black/30 text-white/80 hover:text-white'
-              }`}
+            }`}
           >
             <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
             <span>Back</span>
           </Link>
           <button
             onClick={() => setShowEditDialog(true)}
-            className={`p-2 rounded-full transition-colors ${theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
-              }`}
+            className={`p-2 rounded-full transition-colors ${
+              theme === 'light' ? 'hover:bg-gray-200' : 'hover:bg-white/10'
+            }`}
           >
             <MoreVertical
-              className={`w-5 h-5 ${theme === 'light' ? 'text-gray-700' : 'text-white'
-                }`}
+              className={`w-5 h-5 ${
+                theme === 'light' ? 'text-gray-700' : 'text-white'
+              }`}
             />
           </button>
         </div>
@@ -459,8 +484,9 @@ export default function AlbumDetailPage() {
           <div className="w-full flex flex-col gap-4">
             <div className="text-center md:text-left">
               <h1
-                className={`text-3xl md:text-4xl font-bold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
+                className={`text-3xl md:text-4xl font-bold mb-2 ${
+                  theme === 'light' ? 'text-gray-900' : 'text-white'
+                }`}
               >
                 {album.title}
               </h1>
@@ -478,8 +504,9 @@ export default function AlbumDetailPage() {
 
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 text-base">
                 <div
-                  className={`flex items-center gap-2 ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
+                  className={`flex items-center gap-2 ${
+                    theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                  }`}
                 >
                   <Calendar className="w-5 h-5" />
                   <span>
@@ -491,8 +518,9 @@ export default function AlbumDetailPage() {
                   </span>
                 </div>
                 <div
-                  className={`flex items-center gap-2 ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
+                  className={`flex items-center gap-2 ${
+                    theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                  }`}
                 >
                   <Music className="w-5 h-5" />
                   <span>{album.totalTracks || 0} tracks</span>
@@ -504,10 +532,11 @@ export default function AlbumDetailPage() {
                   {album.genres.map(({ genre }) => (
                     <span
                       key={genre.id}
-                      className={`px-3 py-1 rounded-full text-sm ${theme === 'light'
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        theme === 'light'
                           ? 'bg-gray-200 text-gray-800'
                           : 'bg-white/10 text-white/80'
-                        }`}
+                      }`}
                     >
                       {genre.name}
                     </span>
@@ -522,19 +551,22 @@ export default function AlbumDetailPage() {
         {album.tracks?.length > 0 && (
           <div className="mt-6">
             <div
-              className={`w-full rounded-xl overflow-hidden border backdrop-blur-sm ${theme === 'light'
+              className={`w-full rounded-xl overflow-hidden border backdrop-blur-sm ${
+                theme === 'light'
                   ? 'bg-white/80 border-gray-200'
                   : 'bg-black/20 border-white/10'
-                }`}
+              }`}
             >
               {/* Header - Desktop only */}
               <div
-                className={`hidden md:block px-6 py-4 border-b ${theme === 'light' ? 'border-gray-200' : 'border-white/10'
-                  }`}
+                className={`hidden md:block px-6 py-4 border-b ${
+                  theme === 'light' ? 'border-gray-200' : 'border-white/10'
+                }`}
               >
                 <div
-                  className={`grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 text-sm ${theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                    }`}
+                  className={`grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 text-sm ${
+                    theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                  }`}
                 >
                   <div className="text-center">#</div>
                   <div>Title</div>
@@ -545,45 +577,51 @@ export default function AlbumDetailPage() {
               </div>
 
               <div
-                className={`divide-y ${theme === 'light' ? 'divide-gray-200' : 'divide-white/10'
-                  }`}
+                className={`divide-y ${
+                  theme === 'light' ? 'divide-gray-200' : 'divide-white/10'
+                }`}
               >
                 {album.tracks.map((track) => (
                   <div key={track.id}>
                     {/* Desktop Layout */}
                     <div
-                      className={`hidden md:grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 px-6 py-4 group ${theme === 'light'
+                      className={`hidden md:grid grid-cols-[48px_4fr_2fr_100px_48px] gap-4 px-6 py-4 group ${
+                        theme === 'light'
                           ? 'hover:bg-gray-50'
                           : 'hover:bg-white/5'
-                        }`}
+                      }`}
                     >
                       <div
-                        className={`flex items-center justify-center ${theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                          }`}
+                        className={`flex items-center justify-center ${
+                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                        }`}
                       >
                         {track.trackNumber}
                       </div>
                       <div className="flex items-center min-w-0">
                         <span
-                          className={`font-medium truncate ${theme === 'light' ? 'text-gray-900' : 'text-white'
-                            }`}
+                          className={`font-medium truncate ${
+                            theme === 'light' ? 'text-gray-900' : 'text-white'
+                          }`}
                         >
                           {track.title}
                         </span>
                       </div>
                       <div className="flex flex-col justify-center min-w-0">
                         <div
-                          className={`truncate ${theme === 'light' ? 'text-gray-900' : 'text-white'
-                            }`}
+                          className={`truncate ${
+                            theme === 'light' ? 'text-gray-900' : 'text-white'
+                          }`}
                         >
                           {track.artist.artistName}
                         </div>
                         {track.featuredArtists?.length > 0 && (
                           <div
-                            className={`text-sm truncate ${theme === 'light'
+                            className={`text-sm truncate ${
+                              theme === 'light'
                                 ? 'text-gray-500'
                                 : 'text-white/60'
-                              }`}
+                            }`}
                           >
                             feat.{' '}
                             {track.featuredArtists
@@ -595,8 +633,9 @@ export default function AlbumDetailPage() {
                         )}
                       </div>
                       <div
-                        className={`flex items-center justify-end ${theme === 'light' ? 'text-gray-500' : 'text-white/60'
-                          }`}
+                        className={`flex items-center justify-end ${
+                          theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                        }`}
                       >
                         {Math.floor(track.duration / 60)}:
                         {(track.duration % 60).toString().padStart(2, '0')}
@@ -604,10 +643,11 @@ export default function AlbumDetailPage() {
                       <div className="flex items-center justify-center">
                         <DropdownMenu>
                           <DropdownMenuTrigger
-                            className={`opacity-0 group-hover:opacity-100 p-2 rounded-full transition-all ${theme === 'light'
+                            className={`opacity-0 group-hover:opacity-100 p-2 rounded-full transition-all ${
+                              theme === 'light'
                                 ? 'hover:bg-gray-200'
                                 : 'hover:bg-white/10'
-                              }`}
+                            }`}
                           >
                             <MoreVertical className="w-4 h-4" />
                           </DropdownMenuTrigger>
@@ -670,10 +710,11 @@ export default function AlbumDetailPage() {
 
                     {/* Mobile Layout */}
                     <div
-                      className={`md:hidden p-4 ${theme === 'light'
+                      className={`md:hidden p-4 ${
+                        theme === 'light'
                           ? 'hover:bg-gray-50'
                           : 'hover:bg-white/5'
-                        }`}
+                      }`}
                     >
                       <div className="flex items-center gap-4">
                         <span
@@ -687,16 +728,18 @@ export default function AlbumDetailPage() {
                         </span>
                         <div className="flex-1 min-w-0">
                           <div
-                            className={`font-medium truncate ${theme === 'light' ? 'text-gray-900' : 'text-white'
-                              }`}
+                            className={`font-medium truncate ${
+                              theme === 'light' ? 'text-gray-900' : 'text-white'
+                            }`}
                           >
                             {track.title}
                           </div>
                           <div
-                            className={`text-sm truncate ${theme === 'light'
+                            className={`text-sm truncate ${
+                              theme === 'light'
                                 ? 'text-gray-500'
                                 : 'text-white/60'
-                              }`}
+                            }`}
                           >
                             {track.artist.artistName}
                             {track.featuredArtists?.length > 0 && (
@@ -721,20 +764,22 @@ export default function AlbumDetailPage() {
                         </div>
                         <div className="flex items-center gap-3">
                           <span
-                            className={`text-sm ${theme === 'light'
+                            className={`text-sm ${
+                              theme === 'light'
                                 ? 'text-gray-500'
                                 : 'text-white/60'
-                              }`}
+                            }`}
                           >
                             {Math.floor(track.duration / 60)}:
                             {(track.duration % 60).toString().padStart(2, '0')}
                           </span>
                           <DropdownMenu>
                             <DropdownMenuTrigger
-                              className={`p-2 rounded-full ${theme === 'light'
+                              className={`p-2 rounded-full ${
+                                theme === 'light'
                                   ? 'hover:bg-gray-200'
                                   : 'hover:bg-white/10'
-                                }`}
+                              }`}
                             >
                               <MoreVertical className="w-4 h-4" />
                             </DropdownMenuTrigger>
@@ -807,16 +852,18 @@ export default function AlbumDetailPage() {
         {/* Upload New Tracks Section */}
         <div className="mt-12">
           <h2
-            className={`text-xl font-semibold mb-6 ${theme === 'light' ? 'text-gray-900' : 'text-white'
-              }`}
+            className={`text-xl font-semibold mb-6 ${
+              theme === 'light' ? 'text-gray-900' : 'text-white'
+            }`}
           >
             Upload New Tracks
           </h2>
           <div
-            className={`rounded-xl p-6 backdrop-blur-sm border ${theme === 'light'
+            className={`rounded-xl p-6 backdrop-blur-sm border ${
+              theme === 'light'
                 ? 'bg-white border-gray-200'
                 : 'bg-white/5 border-white/10'
-              }`}
+            }`}
           >
             <TrackUploadForm
               album={album}
@@ -843,10 +890,11 @@ export default function AlbumDetailPage() {
         {/* Message display */}
         {message.text && (
           <div
-            className={`mt-4 p-4 rounded-lg ${message.type === 'error'
+            className={`mt-4 p-4 rounded-lg ${
+              message.type === 'error'
                 ? 'bg-red-50 text-red-500 border border-red-200'
                 : 'bg-green-50 text-green-500 border border-green-200'
-              }`}
+            }`}
           >
             {message.text}
           </div>
@@ -856,20 +904,23 @@ export default function AlbumDetailPage() {
         {showEditDialog && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div
-              className={`max-w-md w-full p-6 rounded-lg ${theme === 'light' ? 'bg-white' : 'bg-[#121212]'
-                }`}
+              className={`max-w-md w-full p-6 rounded-lg ${
+                theme === 'light' ? 'bg-white' : 'bg-[#121212]'
+              }`}
             >
               <h3
-                className={`text-xl font-bold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
+                className={`text-xl font-bold mb-4 ${
+                  theme === 'light' ? 'text-gray-900' : 'text-white'
+                }`}
               >
                 Edit Album
               </h3>
               <form onSubmit={handleEditSubmit} className="space-y-4">
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                      }`}
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
                   >
                     Title
                   </label>
@@ -879,18 +930,20 @@ export default function AlbumDetailPage() {
                     onChange={(e) =>
                       setEditForm({ ...editForm, title: e.target.value })
                     }
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${theme === 'light'
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
                         ? 'bg-white border-gray-300 focus:ring-blue-500/20'
                         : 'bg-white/5 border-white/10 focus:ring-white/20'
-                      }`}
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                      }`}
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
                   >
                     Release Date
                   </label>
@@ -900,18 +953,20 @@ export default function AlbumDetailPage() {
                     onChange={(e) =>
                       setEditForm({ ...editForm, releaseDate: e.target.value })
                     }
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${theme === 'light'
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
                         ? 'bg-white border-gray-300 focus:ring-blue-500/20'
                         : 'bg-white/5 border-white/10 focus:ring-white/20'
-                      }`}
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                      }`}
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
                   >
                     Type
                   </label>
@@ -921,10 +976,11 @@ export default function AlbumDetailPage() {
                       onChange={(e) =>
                         setEditForm({ ...editForm, type: e.target.value })
                       }
-                      className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 appearance-none ${theme === 'light'
+                      className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 appearance-none ${
+                        theme === 'light'
                           ? 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500/20'
                           : 'bg-white/5 border-white/10 text-white focus:ring-white/20'
-                        }`}
+                      }`}
                       required
                     >
                       <option value="">Select type</option>
@@ -934,8 +990,9 @@ export default function AlbumDetailPage() {
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
                       <svg
-                        className={`w-4 h-4 ${theme === 'light' ? 'text-gray-400' : 'text-white/60'
-                          }`}
+                        className={`w-4 h-4 ${
+                          theme === 'light' ? 'text-gray-400' : 'text-white/60'
+                        }`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -953,8 +1010,9 @@ export default function AlbumDetailPage() {
 
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                      }`}
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
                   >
                     Cover Image
                   </label>
@@ -967,10 +1025,11 @@ export default function AlbumDetailPage() {
                         coverFile: e.target.files?.[0] || null,
                       })
                     }
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${theme === 'light'
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
                         ? 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500/20'
                         : 'bg-white/5 border-white/10 text-white focus:ring-white/20'
-                      }`}
+                    }`}
                   />
                 </div>
 
@@ -978,19 +1037,21 @@ export default function AlbumDetailPage() {
                   <button
                     type="button"
                     onClick={() => setShowEditDialog(false)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg ${theme === 'light'
+                    className={`px-4 py-2 text-sm font-medium rounded-lg ${
+                      theme === 'light'
                         ? 'text-gray-600 hover:text-gray-900'
                         : 'text-white/60 hover:text-white'
-                      }`}
+                    }`}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${theme === 'light'
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      theme === 'light'
                         ? 'bg-gray-900 text-white hover:bg-gray-800'
                         : 'bg-white text-black hover:bg-white/90'
-                      }`}
+                    }`}
                   >
                     Save Changes
                   </button>
@@ -1004,20 +1065,23 @@ export default function AlbumDetailPage() {
         {showEditTrackDialog && editingTrack && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div
-              className={`max-w-md w-full p-6 rounded-lg ${theme === 'light' ? 'bg-white' : 'bg-[#121212]'
-                }`}
+              className={`max-w-md w-full p-6 rounded-lg ${
+                theme === 'light' ? 'bg-white' : 'bg-[#121212]'
+              }`}
             >
               <h3
-                className={`text-xl font-bold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
+                className={`text-xl font-bold mb-4 ${
+                  theme === 'light' ? 'text-gray-900' : 'text-white'
+                }`}
               >
                 Edit Track
               </h3>
               <form onSubmit={handleEditTrackSubmit} className="space-y-4">
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                      }`}
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
                   >
                     Title
                   </label>
@@ -1030,18 +1094,20 @@ export default function AlbumDetailPage() {
                         title: e.target.value,
                       })
                     }
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${theme === 'light'
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
                         ? 'bg-white border-gray-300 focus:ring-blue-500/20'
                         : 'bg-white/5 border-white/10 focus:ring-white/20'
-                      }`}
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                      }`}
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
                   >
                     Release Date
                   </label>
@@ -1054,18 +1120,20 @@ export default function AlbumDetailPage() {
                         releaseDate: e.target.value,
                       })
                     }
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${theme === 'light'
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
                         ? 'bg-white border-gray-300 focus:ring-blue-500/20'
                         : 'bg-white/5 border-white/10 focus:ring-white/20'
-                      }`}
+                    }`}
                     required
                   />
                 </div>
 
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                      }`}
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
                   >
                     Track Number
                   </label>
@@ -1078,10 +1146,11 @@ export default function AlbumDetailPage() {
                         trackNumber: Number.parseInt(e.target.value),
                       })
                     }
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${theme === 'light'
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
                         ? 'bg-white border-gray-300 focus:ring-blue-500/20'
                         : 'bg-white/5 border-white/10 focus:ring-white/20'
-                      }`}
+                    }`}
                     required
                     min="1"
                   />
@@ -1089,8 +1158,9 @@ export default function AlbumDetailPage() {
 
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-1 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                      }`}
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
                   >
                     Featured Artists
                   </label>
@@ -1107,10 +1177,11 @@ export default function AlbumDetailPage() {
                         featuredArtists: selectedArtists,
                       });
                     }}
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${theme === 'light'
+                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
+                      theme === 'light'
                         ? 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500/20'
                         : 'bg-white/5 border-white/10 text-white focus:ring-white/20'
-                      }`}
+                    }`}
                   >
                     {artists.map((artist) => (
                       <option key={artist.id} value={artist.id}>
@@ -1124,19 +1195,21 @@ export default function AlbumDetailPage() {
                   <button
                     type="button"
                     onClick={() => setShowEditTrackDialog(false)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg ${theme === 'light'
+                    className={`px-4 py-2 text-sm font-medium rounded-lg ${
+                      theme === 'light'
                         ? 'text-gray-600 hover:text-gray-900'
                         : 'text-white/60 hover:text-white'
-                      }`}
+                    }`}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${theme === 'light'
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      theme === 'light'
                         ? 'bg-gray-900 text-white hover:bg-gray-800'
                         : 'bg-white text-black hover:bg-white/90'
-                      }`}
+                    }`}
                   >
                     Save Changes
                   </button>

@@ -28,6 +28,19 @@ export function useDataTable<T>({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Helper functions to safely access searchParams
+  const safeGetParam = (key: string): string => {
+    return searchParams?.get(key) || '';
+  };
+
+  const safeGetAllParams = (key: string): string[] => {
+    return searchParams?.getAll(key) || [];
+  };
+
+  const safeParamsToString = (): string => {
+    return searchParams?.toString() || '';
+  };
+
   // Helper to get prefixed param key
   const getKey = (key: string) => `${paramKeyPrefix}${key}`;
 
@@ -39,18 +52,16 @@ export function useDataTable<T>({
   const [selectedRows, setSelectedRows] = useState<T[]>([]);
 
   // Filter states - initialize from URL params using prefixed keys
-  const [searchInput, setSearchInput] = useState(
-    searchParams.get(getKey('q')) || ''
-  );
+  const [searchInput, setSearchInput] = useState(safeGetParam(getKey('q')));
   const [statusFilter, setStatusFilter] = useState<string[]>(
-    searchParams.getAll(getKey('status')) || []
+    safeGetAllParams(getKey('status'))
   );
   const [genreFilter, setGenreFilter] = useState<string[]>(
-    searchParams.getAll(getKey('genres')) || []
+    safeGetAllParams(getKey('genres'))
   );
   const [sorting, setSorting] = useState<SortingState>(() => {
-    const sortBy = searchParams.get(getKey('sortBy'));
-    const sortOrder = searchParams.get(getKey('sortOrder'));
+    const sortBy = safeGetParam(getKey('sortBy'));
+    const sortOrder = safeGetParam(getKey('sortOrder'));
     if (sortBy) {
       return [{ id: sortBy, desc: sortOrder === 'desc' }];
     }
@@ -58,10 +69,7 @@ export function useDataTable<T>({
   });
 
   // Get currentPage from URL, default to 1
-  const currentPage = Math.max(
-    1,
-    Number(searchParams.get(getKey('page'))) || 1
-  );
+  const currentPage = Math.max(1, Number(safeGetParam(getKey('page'))) || 1);
 
   // Ref to track initial load & previous state for change detection
   const initialLoad = useRef(true);
@@ -171,7 +179,7 @@ export function useDataTable<T>({
       let changed = false;
 
       // Get current URL parameters to selectively keep parameters from other tabs
-      const currentParams = new URLSearchParams(searchParams.toString());
+      const currentParams = new URLSearchParams(safeParamsToString());
       currentParams.forEach((value, key) => {
         // Keep parameters that DO NOT start with the current instance's prefix
         if (!key.startsWith(paramKeyPrefix)) {
@@ -255,7 +263,7 @@ export function useDataTable<T>({
       }
     },
     // updateUrlParams depends on searchParams to read other tabs' params
-    [router, searchParams, pathname, getKey, paramKeyPrefix]
+    [router, searchParams, pathname, getKey, paramKeyPrefix, safeParamsToString]
   );
 
   // --- Effects for State and URL Synchronization --- //
@@ -362,12 +370,12 @@ export function useDataTable<T>({
   // Updates *state* based on URL and triggers *immediate* fetch if necessary.
   useEffect(() => {
     // console.log("Effect 2 Triggered (URL Change Check)");
-    const urlPage = Math.max(1, Number(searchParams.get(getKey('page'))) || 1);
-    const urlSearch = searchParams.get(getKey('q')) || '';
-    const urlStatus = searchParams.getAll(getKey('status')) || [];
-    const urlGenres = searchParams.getAll(getKey('genres')) || [];
-    const urlSortBy = searchParams.get(getKey('sortBy'));
-    const urlSortOrder = searchParams.get(getKey('sortOrder'));
+    const urlPage = Math.max(1, Number(safeGetParam(getKey('page'))) || 1);
+    const urlSearch = safeGetParam(getKey('q'));
+    const urlStatus = safeGetAllParams(getKey('status'));
+    const urlGenres = safeGetAllParams(getKey('genres'));
+    const urlSortBy = safeGetParam(getKey('sortBy'));
+    const urlSortOrder = safeGetParam(getKey('sortOrder'));
     const urlSorting = urlSortBy
       ? [{ id: urlSortBy, desc: urlSortOrder === 'desc' }]
       : [];
@@ -397,7 +405,7 @@ export function useDataTable<T>({
 
       // Fetch data immediately based on URL state
       // Pass the current searchParams (representing the URL) to fetchDataInternal
-      const paramsFromUrl = new URLSearchParams(searchParams.toString());
+      const paramsFromUrl = new URLSearchParams(safeParamsToString());
       fetchDataInternal(urlPage, paramsFromUrl, initialLoad.current); // Show loading only on initial load
 
       // Update previous dependencies ref *after* logic
@@ -420,11 +428,11 @@ export function useDataTable<T>({
   // Refresh data function (refetches based on current URL state)
   const refreshData = useCallback(async () => {
     // console.log("Refreshing data based on current URL");
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(safeParamsToString());
     const pageToRefresh = Math.max(1, Number(params.get(getKey('page'))) || 1);
     // Pass the current URL params; fetchDataInternal knows how to map them for the API
     await fetchDataInternal(pageToRefresh, params);
-  }, [searchParams, fetchDataInternal, getKey]);
+  }, [searchParams, fetchDataInternal, getKey, safeParamsToString]);
 
   return {
     data,

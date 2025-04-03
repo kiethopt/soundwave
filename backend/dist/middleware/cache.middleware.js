@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.clearCacheForEntity = exports.setCache = exports.cacheMiddleware = exports.client = void 0;
 const redis_1 = require("redis");
@@ -18,39 +9,27 @@ class MockRedisClient {
     on(event, listener) {
         return this;
     }
-    connect() {
-        return __awaiter(this, void 0, void 0, function* () {
-            console.log('[Redis] Mock client connected');
-            this.isOpen = true;
-            return this;
-        });
+    async connect() {
+        console.log('[Redis] Mock client connected');
+        this.isOpen = true;
+        return this;
     }
-    disconnect() {
-        return __awaiter(this, void 0, void 0, function* () {
-            console.log('[Redis] Mock client disconnected');
-            this.isOpen = false;
-            return this;
-        });
+    async disconnect() {
+        console.log('[Redis] Mock client disconnected');
+        this.isOpen = false;
+        return this;
     }
-    get() {
-        return __awaiter(this, void 0, void 0, function* () {
-            return null;
-        });
+    async get() {
+        return null;
     }
-    set(key, value, options) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return 'OK';
-        });
+    async set(key, value, options) {
+        return 'OK';
     }
-    del() {
-        return __awaiter(this, void 0, void 0, function* () {
-            return 1;
-        });
+    async del() {
+        return 1;
     }
-    keys() {
-        return __awaiter(this, void 0, void 0, function* () {
-            return [];
-        });
+    async keys() {
+        return [];
     }
 }
 exports.client = process.env.USE_REDIS_CACHE === 'true'
@@ -67,17 +46,17 @@ if (process.env.USE_REDIS_CACHE === 'true') {
     exports.client.on('error', (err) => console.error('Redis error:', err));
     exports.client.on('connect', () => console.log('[Redis] Client connected successfully'));
     exports.client.on('ready', () => console.log('[Redis] Client ready to use'));
-    (() => __awaiter(void 0, void 0, void 0, function* () {
+    (async () => {
         try {
             if (!exports.client.isOpen) {
-                yield exports.client.connect();
+                await exports.client.connect();
                 console.log('[Redis] Connection status:', exports.client.isOpen ? 'Connected' : 'Disconnected');
             }
         }
         catch (error) {
             console.error('Redis connection failed:', error);
         }
-    }))();
+    })();
 }
 else {
     console.log('[Redis] Using mock Redis client - cache disabled');
@@ -95,9 +74,9 @@ const cacheMiddleware = (req, res, next) => {
     }
     const key = req.originalUrl;
     let responseSent = false;
-    (() => __awaiter(void 0, void 0, void 0, function* () {
+    (async () => {
         try {
-            const cachedData = yield exports.client.get(key);
+            const cachedData = await exports.client.get(key);
             if (cachedData) {
                 console.log(`[Redis] Cache hit for: ${key}`);
                 const parsedData = JSON.parse(cachedData);
@@ -121,23 +100,23 @@ const cacheMiddleware = (req, res, next) => {
             console.error('Cache middleware error:', error);
             next();
         }
-    }))();
+    })();
 };
 exports.cacheMiddleware = cacheMiddleware;
-const setCache = (key_1, data_1, ...args_1) => __awaiter(void 0, [key_1, data_1, ...args_1], void 0, function* (key, data, ttl = 3600) {
+const setCache = async (key, data, ttl = 3600) => {
     if (process.env.USE_REDIS_CACHE !== 'true' || !exports.client.isOpen)
         return;
     try {
         console.log(`[Redis] Setting cache for ${key} with TTL ${ttl}s`);
-        yield exports.client.set(key, JSON.stringify(data), { EX: ttl });
+        await exports.client.set(key, JSON.stringify(data), { EX: ttl });
         console.log(`[Redis] Cache set successfully for ${key}`);
     }
     catch (error) {
         console.error('Cache set error:', error);
     }
-});
+};
 exports.setCache = setCache;
-const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 0, function* () {
+const clearCacheForEntity = async (entity, options) => {
     if (process.env.USE_REDIS_CACHE !== 'true' || !exports.client.isOpen)
         return;
     try {
@@ -178,21 +157,21 @@ const clearCacheForEntity = (entity, options) => __awaiter(void 0, void 0, void 
             patterns.push('/api/search*', '/api/*/search*', '/search-all*', `/api/${entity}s/search*`, `/api/${entity}/search*`);
         }
         for (const pattern of patterns) {
-            const keys = yield exports.client.keys(pattern);
+            const keys = await exports.client.keys(pattern);
             if (keys.length) {
-                yield Promise.all(keys.map((key) => exports.client.del(key)));
+                await Promise.all(keys.map((key) => exports.client.del(key)));
             }
         }
         if (entity === 'user' || entity === 'stats' || entity === 'history') {
-            const statsKeys = yield exports.client.keys('/api/admin/stats*');
+            const statsKeys = await exports.client.keys('/api/admin/stats*');
             if (statsKeys.length) {
-                yield Promise.all(statsKeys.map((key) => exports.client.del(key)));
+                await Promise.all(statsKeys.map((key) => exports.client.del(key)));
             }
         }
     }
     catch (error) {
         console.error(`Error clearing ${entity} cache:`, error);
     }
-});
+};
 exports.clearCacheForEntity = clearCacheForEntity;
 //# sourceMappingURL=cache.middleware.js.map

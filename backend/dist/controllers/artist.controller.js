@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getRelatedArtists = exports.getArtistStats = exports.updateArtistProfile = exports.getArtistTracks = exports.getArtistAlbums = exports.getArtistProfile = exports.getAllArtistsProfile = void 0;
 const client_1 = require("@prisma/client");
@@ -41,8 +32,7 @@ const validateUpdateArtistProfile = (data) => {
     }
     return null;
 };
-const getAllArtistsProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const getAllArtistsProfile = async (req, res) => {
     try {
         const { page = 1, limit = 10 } = req.query;
         const user = req.user;
@@ -51,26 +41,26 @@ const getAllArtistsProfile = (req, res) => __awaiter(void 0, void 0, void 0, fun
             return;
         }
         if (user.role !== client_1.Role.ADMIN &&
-            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) || user.currentProfile !== 'ARTIST')) {
+            (!user.artistProfile?.isVerified || user.currentProfile !== 'ARTIST')) {
             res.status(403).json({
                 message: 'You do not have permission to perform this action',
                 code: 'SWITCH_TO_ARTIST_PROFILE',
             });
             return;
         }
-        const result = yield artist_service_1.ArtistService.getAllArtistsProfile(user, Number(page), Number(limit));
+        const result = await artist_service_1.ArtistService.getAllArtistsProfile(user, Number(page), Number(limit));
         res.json(result);
     }
     catch (error) {
         console.error('Get all artists profile error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getAllArtistsProfile = getAllArtistsProfile;
-const getArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getArtistProfile = async (req, res) => {
     try {
         const { id } = req.params;
-        const artist = yield artist_service_1.ArtistService.getArtistProfile(id);
+        const artist = await artist_service_1.ArtistService.getArtistProfile(id);
         if (!artist) {
             res.status(404).json({ message: 'Artist not found' });
             return;
@@ -81,9 +71,9 @@ const getArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, functio
         console.error('Error fetching artist profile:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getArtistProfile = getArtistProfile;
-const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getArtistAlbums = async (req, res) => {
     try {
         const { id } = req.params;
         const { page = 1, limit = 10 } = req.query;
@@ -92,7 +82,7 @@ const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const result = yield artist_service_1.ArtistService.getArtistAlbums(user, id, Number(page), Number(limit));
+        const result = await artist_service_1.ArtistService.getArtistAlbums(user, id, Number(page), Number(limit));
         if (!result) {
             res.status(404).json({ message: 'Artist not found' });
             return;
@@ -107,9 +97,9 @@ const getArtistAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function
         }
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getArtistAlbums = getArtistAlbums;
-const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getArtistTracks = async (req, res) => {
     try {
         const { id } = req.params;
         const { page = 1, limit = 10 } = req.query;
@@ -118,7 +108,7 @@ const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const result = yield artist_service_1.ArtistService.getArtistTracks(user, id, Number(page), Number(limit));
+        const result = await artist_service_1.ArtistService.getArtistTracks(user, id, Number(page), Number(limit));
         if (!result) {
             res.status(404).json({ message: 'Artist not found' });
             return;
@@ -133,9 +123,9 @@ const getArtistTracks = (req, res) => __awaiter(void 0, void 0, void 0, function
         }
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getArtistTracks = getArtistTracks;
-const updateArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateArtistProfile = async (req, res) => {
     try {
         const { id } = req.params;
         const { bio, socialMediaLinks, genreIds, isVerified, artistName } = req.body;
@@ -183,7 +173,7 @@ const updateArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, func
             });
             return;
         }
-        const updatedArtistProfile = yield artist_service_1.ArtistService.updateArtistProfile(user, id, {
+        const updatedArtistProfile = await artist_service_1.ArtistService.updateArtistProfile(user, id, {
             bio,
             socialMediaLinks: parsedSocialMediaLinks,
             genreIds: parsedGenreIds,
@@ -203,16 +193,16 @@ const updateArtistProfile = (req, res) => __awaiter(void 0, void 0, void 0, func
             message: error.message || 'Internal server error',
         });
     }
-});
+};
 exports.updateArtistProfile = updateArtistProfile;
-const getArtistStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getArtistStats = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const stats = yield artist_service_1.ArtistService.getArtistStats(user);
+        const stats = await artist_service_1.ArtistService.getArtistStats(user);
         res.json(stats);
     }
     catch (error) {
@@ -221,12 +211,12 @@ const getArtistStats = (req, res) => __awaiter(void 0, void 0, void 0, function*
             message: error.message || 'Internal server error',
         });
     }
-});
+};
 exports.getArtistStats = getArtistStats;
-const getRelatedArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getRelatedArtists = async (req, res) => {
     try {
         const { id } = req.params;
-        const relatedArtists = yield artist_service_1.ArtistService.getRelatedArtists(id);
+        const relatedArtists = await artist_service_1.ArtistService.getRelatedArtists(id);
         res.json(relatedArtists);
     }
     catch (error) {
@@ -235,6 +225,6 @@ const getRelatedArtists = (req, res) => __awaiter(void 0, void 0, void 0, functi
             message: error.message || 'Internal server error',
         });
     }
-});
+};
 exports.getRelatedArtists = getRelatedArtists;
 //# sourceMappingURL=artist.controller.js.map

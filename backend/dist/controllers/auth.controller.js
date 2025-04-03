@@ -32,15 +32,6 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -68,16 +59,16 @@ const validateEmail = (email) => {
 };
 const validateRegisterData = (data) => {
     const { email, password, username } = data;
-    if (!(email === null || email === void 0 ? void 0 : email.trim()))
+    if (!email?.trim())
         return 'Email is required';
     const emailValidationError = validateEmail(email);
     if (emailValidationError)
         return emailValidationError;
-    if (!(password === null || password === void 0 ? void 0 : password.trim()))
+    if (!password?.trim())
         return 'Password is required';
     if (password.length < 6)
         return 'Password must be at least 6 characters';
-    if (!(username === null || username === void 0 ? void 0 : username.trim()))
+    if (!username?.trim())
         return 'Username is required';
     if (username.length < 3)
         return 'Username must be at least 3 characters';
@@ -91,16 +82,15 @@ const generateToken = (userId, role, artistProfile) => {
         role,
     }, JWT_SECRET, { expiresIn: '24h' });
 };
-const validateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const validateToken = async (req, res, next) => {
     try {
-        const token = (_a = req.header('Authorization')) === null || _a === void 0 ? void 0 : _a.replace('Bearer ', '');
+        const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
             res.status(401).json({ message: 'Access denied. No token provided.' });
             return;
         }
         const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-        const user = yield db_1.default.user.findUnique({
+        const user = await db_1.default.user.findUnique({
             where: { id: decoded.id },
             select: prisma_selects_1.userSelect,
         });
@@ -116,9 +106,9 @@ const validateToken = (req, res, next) => __awaiter(void 0, void 0, void 0, func
     catch (error) {
         next(error);
     }
-});
+};
 exports.validateToken = validateToken;
-const registerAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const registerAdmin = async (req, res) => {
     try {
         const { email, password, name, username } = req.body;
         const validationError = validateRegisterData({ email, password, username });
@@ -126,13 +116,13 @@ const registerAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             res.status(400).json({ message: validationError });
             return;
         }
-        const existingUser = yield db_1.default.user.findUnique({ where: { email } });
+        const existingUser = await db_1.default.user.findUnique({ where: { email } });
         if (existingUser) {
             res.status(400).json({ message: 'Email already exists' });
             return;
         }
         if (username) {
-            const existingUsername = yield db_1.default.user.findUnique({
+            const existingUsername = await db_1.default.user.findUnique({
                 where: { username },
             });
             if (existingUsername) {
@@ -140,8 +130,8 @@ const registerAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 return;
             }
         }
-        const hashedPassword = yield bcrypt_1.default.hash(password, 10);
-        const user = yield db_1.default.user.create({
+        const hashedPassword = await bcrypt_1.default.hash(password, 10);
+        const user = await db_1.default.user.create({
             data: {
                 email,
                 password: hashedPassword,
@@ -157,9 +147,9 @@ const registerAdmin = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         console.error('Register admin error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.registerAdmin = registerAdmin;
-const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const register = async (req, res) => {
     try {
         const { email, password, confirmPassword, name, username } = req.body;
         if (password !== confirmPassword) {
@@ -171,13 +161,13 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             res.status(400).json({ message: validationError });
             return;
         }
-        const existingUser = yield db_1.default.user.findUnique({ where: { email } });
+        const existingUser = await db_1.default.user.findUnique({ where: { email } });
         if (existingUser) {
             res.status(400).json({ message: 'Email already exists' });
             return;
         }
         if (username) {
-            const existingUsername = yield db_1.default.user.findUnique({
+            const existingUsername = await db_1.default.user.findUnique({
                 where: { username },
             });
             if (existingUsername) {
@@ -185,8 +175,8 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 return;
             }
         }
-        const hashedPassword = yield bcrypt_1.default.hash(password, 10);
-        const user = yield db_1.default.user.create({
+        const hashedPassword = await bcrypt_1.default.hash(password, 10);
+        const user = await db_1.default.user.create({
             data: {
                 email,
                 password: hashedPassword,
@@ -197,16 +187,16 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             select: prisma_selects_1.userSelect,
         });
         try {
-            const defaultTrackIds = yield aiService.generateDefaultPlaylistForNewUser(user.id);
+            const defaultTrackIds = await aiService.generateDefaultPlaylistForNewUser(user.id);
             if (defaultTrackIds.length > 0) {
-                const tracksInfo = yield db_1.default.track.findMany({
+                const tracksInfo = await db_1.default.track.findMany({
                     where: { id: { in: defaultTrackIds } },
                     select: { id: true, duration: true },
                 });
                 const totalDuration = tracksInfo.reduce((sum, track) => sum + track.duration, 0);
                 const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
                 const orderedTrackIds = defaultTrackIds.filter((id) => trackIdMap.has(id));
-                yield db_1.default.playlist.create({
+                await db_1.default.playlist.create({
                     data: {
                         name: 'Welcome Mix',
                         description: 'A selection of popular tracks to start your journey on Soundwave.',
@@ -241,9 +231,9 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         console.error('Register error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.register = register;
-const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const login = async (req, res) => {
     try {
         const { emailOrUsername, password } = req.body;
         if (!emailOrUsername || !password) {
@@ -252,11 +242,11 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 .json({ message: 'Email/username and password are required' });
             return;
         }
-        const user = yield db_1.default.user.findFirst({
+        const user = await db_1.default.user.findFirst({
             where: {
                 OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
             },
-            select: Object.assign(Object.assign({}, prisma_selects_1.userSelect), { password: true, isActive: true }),
+            select: { ...prisma_selects_1.userSelect, password: true, isActive: true },
         });
         if (!user) {
             res.status(400).json({ message: 'Invalid email/username or password' });
@@ -276,12 +266,12 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             });
             return;
         }
-        const isValidPassword = yield bcrypt_1.default.compare(password, user.password);
+        const isValidPassword = await bcrypt_1.default.compare(password, user.password);
         if (!isValidPassword) {
             res.status(401).json({ message: 'Invalid email/username or password' });
             return;
         }
-        const updatedUser = yield db_1.default.user.update({
+        const updatedUser = await db_1.default.user.update({
             where: { id: user.id },
             data: {
                 lastLoginAt: new Date(),
@@ -290,7 +280,10 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             select: prisma_selects_1.userSelect,
         });
         const token = generateToken(user.id, user.role);
-        const userResponse = Object.assign(Object.assign({}, updatedUser), { password: undefined });
+        const userResponse = {
+            ...updatedUser,
+            password: undefined,
+        };
         res.json({
             message: 'Login successful',
             token,
@@ -301,21 +294,20 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         console.error('Login error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.login = login;
-const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+const logout = async (req, res) => {
     try {
-        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const userId = req.user?.id;
         if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
         try {
-            yield db_1.default.user.update({
+            await db_1.default.user.update({
                 where: { id: userId },
                 data: {
-                    currentProfile: ((_b = req.user) === null || _b === void 0 ? void 0 : _b.role) === client_1.Role.ADMIN ? 'ADMIN' : 'USER',
+                    currentProfile: req.user?.role === client_1.Role.ADMIN ? 'ADMIN' : 'USER',
                 },
             });
         }
@@ -328,13 +320,13 @@ const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         console.error('Logout error:', error);
         res.json({ message: 'Logged out successfully' });
     }
-});
+};
 exports.logout = logout;
-const requestPasswordReset = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const requestPasswordReset = async (req, res) => {
     try {
         const { email } = req.body;
         console.log(`[Reset Password] Request received for email: ${email}`);
-        const user = yield db_1.default.user.findUnique({
+        const user = await db_1.default.user.findUnique({
             where: { email },
             select: { id: true, email: true, name: true, username: true },
         });
@@ -346,7 +338,7 @@ const requestPasswordReset = (req, res) => __awaiter(void 0, void 0, void 0, fun
         console.log(`[Reset Password] User found: ${user.id}`);
         const resetToken = (0, uuid_1.v4)();
         const resetTokenExpiry = (0, date_fns_1.addHours)(new Date(), 1);
-        yield db_1.default.user.update({
+        await db_1.default.user.update({
             where: { id: user.id },
             data: {
                 passwordResetToken: resetToken,
@@ -359,7 +351,7 @@ const requestPasswordReset = (req, res) => __awaiter(void 0, void 0, void 0, fun
             const userName = user.name || user.username || 'bạn';
             const emailOptions = emailService.createPasswordResetEmail(user.email, userName, resetLink);
             console.log(`[Reset Password] Attempting to send reset email to: ${user.email}`);
-            yield emailService.sendEmail(emailOptions);
+            await emailService.sendEmail(emailOptions);
             console.log(`[Reset Password] Email send attempt finished for: ${user.email}`);
             res.json({ message: 'Password reset email sent successfully' });
             return;
@@ -375,12 +367,12 @@ const requestPasswordReset = (req, res) => __awaiter(void 0, void 0, void 0, fun
         res.status(500).json({ message: 'Internal server error' });
         return;
     }
-});
+};
 exports.requestPasswordReset = requestPasswordReset;
-const resetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const resetPassword = async (req, res) => {
     try {
         const { token, newPassword } = req.body;
-        const user = yield db_1.default.user.findFirst({
+        const user = await db_1.default.user.findFirst({
             where: {
                 passwordResetToken: token,
                 passwordResetExpires: { gt: new Date() },
@@ -390,15 +382,15 @@ const resetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             res.status(400).json({ message: 'Invalid or expired token' });
             return;
         }
-        const isSamePassword = yield bcrypt_1.default.compare(newPassword, user.password);
+        const isSamePassword = await bcrypt_1.default.compare(newPassword, user.password);
         if (isSamePassword) {
             res.status(400).json({
                 message: 'New password cannot be the same as the old password',
             });
             return;
         }
-        const hashedPassword = yield bcrypt_1.default.hash(newPassword, 10);
-        yield db_1.default.user.update({
+        const hashedPassword = await bcrypt_1.default.hash(newPassword, 10);
+        await db_1.default.user.update({
             where: { id: user.id },
             data: {
                 password: hashedPassword,
@@ -412,17 +404,16 @@ const resetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         console.error('Reset password error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.resetPassword = resetPassword;
-const switchProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
+const switchProfile = async (req, res) => {
     try {
-        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const userId = req.user?.id;
         if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const user = yield db_1.default.user.findUnique({
+        const user = await db_1.default.user.findUnique({
             where: { id: userId },
             include: { artistProfile: true },
         });
@@ -436,14 +427,14 @@ const switchProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             });
             return;
         }
-        if (!((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isVerified) || !((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.isActive)) {
+        if (!user.artistProfile?.isVerified || !user.artistProfile?.isActive) {
             res.status(403).json({
                 message: 'You do not have a verified and active artist profile',
             });
             return;
         }
         const newProfile = user.currentProfile === 'USER' ? 'ARTIST' : 'USER';
-        const updatedUser = yield db_1.default.user.update({
+        const updatedUser = await db_1.default.user.update({
             where: { id: userId },
             data: { currentProfile: newProfile },
             select: prisma_selects_1.userSelect,
@@ -457,9 +448,9 @@ const switchProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         console.error('Switch profile error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.switchProfile = switchProfile;
-const getMaintenanceStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getMaintenanceStatus = async (req, res) => {
     try {
         const maintenanceMode = process.env.MAINTENANCE_MODE === 'true';
         res.json({ enabled: maintenanceMode });
@@ -468,6 +459,6 @@ const getMaintenanceStatus = (req, res) => __awaiter(void 0, void 0, void 0, fun
         console.error('Error getting maintenance status:', error);
         res.status(500).json({ message: 'Could not retrieve maintenance status' });
     }
-});
+};
 exports.getMaintenanceStatus = getMaintenanceStatus;
 //# sourceMappingURL=auth.controller.js.map

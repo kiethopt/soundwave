@@ -384,6 +384,14 @@ export const api = {
         token
       ),
 
+    // Add the correct endpoint function for updating all system playlists
+    updateAllSystemPlaylists: async (token: string) =>
+      fetchWithAuth(
+        '/api/playlists/admin/system/update-all',
+        { method: 'POST' },
+        token
+      ),
+
     // System playlist management
     createSystemPlaylist: async (formData: FormData, token: string) => {
       // Handle file uploads in FormData

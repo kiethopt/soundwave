@@ -32,22 +32,13 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteLabel = exports.updateLabel = exports.createLabel = exports.getLabelById = exports.getAllLabels = void 0;
 const labelService = __importStar(require("../services/label.service"));
 const handle_utils_1 = require("../utils/handle-utils");
-const getAllLabels = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllLabels = async (req, res) => {
     try {
-        const result = yield labelService.getAllLabels(req);
+        const result = await labelService.getAllLabels(req);
         res.json({
             labels: result.data,
             pagination: result.pagination,
@@ -56,12 +47,12 @@ const getAllLabels = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Get all labels');
     }
-});
+};
 exports.getAllLabels = getAllLabels;
-const getLabelById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getLabelById = async (req, res) => {
     try {
         const { id } = req.params;
-        const label = yield labelService.getLabelById(id);
+        const label = await labelService.getLabelById(id);
         if (!label) {
             res.status(404).json({ message: 'Label not found' });
             return;
@@ -71,11 +62,11 @@ const getLabelById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Get label by ID');
     }
-});
+};
 exports.getLabelById = getLabelById;
-const createLabel = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const createLabel = async (req, res) => {
     try {
-        const label = yield labelService.createLabel(req);
+        const label = await labelService.createLabel(req);
         res.status(201).json({
             message: 'Label created successfully',
             label,
@@ -84,11 +75,11 @@ const createLabel = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Create label');
     }
-});
+};
 exports.createLabel = createLabel;
-const updateLabel = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateLabel = async (req, res) => {
     try {
-        const updatedLabel = yield labelService.updateLabel(req);
+        const updatedLabel = await labelService.updateLabel(req);
         res.json({
             message: 'Label updated successfully',
             label: updatedLabel,
@@ -97,17 +88,17 @@ const updateLabel = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Update label');
     }
-});
+};
 exports.updateLabel = updateLabel;
-const deleteLabel = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteLabel = async (req, res) => {
     try {
         const { id } = req.params;
-        yield labelService.deleteLabel(id);
+        await labelService.deleteLabel(id);
         res.json({ message: 'Label deleted successfully' });
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Delete label');
     }
-});
+};
 exports.deleteLabel = deleteLabel;
 //# sourceMappingURL=label.controller.js.map

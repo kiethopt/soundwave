@@ -32,22 +32,13 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
 const userService = __importStar(require("../services/user.service"));
 const handle_utils_1 = require("../utils/handle-utils");
-const requestToBecomeArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const requestToBecomeArtist = async (req, res) => {
     try {
-        yield userService.requestArtistRole(req.user, req.body, req.file);
+        await userService.requestArtistRole(req.user, req.body, req.file);
         res.json({ message: 'Artist role request submitted successfully' });
     }
     catch (error) {
@@ -67,9 +58,9 @@ const requestToBecomeArtist = (req, res) => __awaiter(void 0, void 0, void 0, fu
         }
         (0, handle_utils_1.handleError)(res, error, 'Request artist role');
     }
-});
+};
 exports.requestToBecomeArtist = requestToBecomeArtist;
-const searchAll = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const searchAll = async (req, res) => {
     try {
         const { q } = req.query;
         if (!q) {
@@ -77,7 +68,7 @@ const searchAll = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             return;
         }
         const searchQuery = String(q).trim();
-        const results = yield userService.search(req.user, searchQuery);
+        const results = await userService.search(req.user, searchQuery);
         res.json(results);
     }
     catch (error) {
@@ -87,22 +78,22 @@ const searchAll = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         (0, handle_utils_1.handleError)(res, error, 'Search');
     }
-});
+};
 exports.searchAll = searchAll;
-const getAllGenres = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllGenres = async (req, res) => {
     try {
-        const genres = yield userService.getAllGenres();
+        const genres = await userService.getAllGenres();
         res.json(genres);
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Get all genres');
     }
-});
+};
 exports.getAllGenres = getAllGenres;
-const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const followUser = async (req, res) => {
     try {
         const { id: followingId } = req.params;
-        const result = yield userService.followTarget(req.user, followingId);
+        const result = await userService.followTarget(req.user, followingId);
         res.json(result);
     }
     catch (error) {
@@ -126,12 +117,12 @@ const followUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         }
         (0, handle_utils_1.handleError)(res, error, 'Follow user');
     }
-});
+};
 exports.followUser = followUser;
-const unfollowUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const unfollowUser = async (req, res) => {
     try {
         const { id: followingId } = req.params;
-        const result = yield userService.unfollowTarget(req.user, followingId);
+        const result = await userService.unfollowTarget(req.user, followingId);
         res.json(result);
     }
     catch (error) {
@@ -151,11 +142,11 @@ const unfollowUser = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         (0, handle_utils_1.handleError)(res, error, 'Unfollow user');
     }
-});
+};
 exports.unfollowUser = unfollowUser;
-const getFollowers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getFollowers = async (req, res) => {
     try {
-        const followers = yield userService.getUserFollowers(req);
+        const followers = await userService.getUserFollowers(req);
         res.json(followers);
     }
     catch (error) {
@@ -165,11 +156,11 @@ const getFollowers = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         (0, handle_utils_1.handleError)(res, error, 'Get followers');
     }
-});
+};
 exports.getFollowers = getFollowers;
-const getFollowing = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getFollowing = async (req, res) => {
     try {
-        const following = yield userService.getUserFollowing(req);
+        const following = await userService.getUserFollowing(req);
         res.json(following);
     }
     catch (error) {
@@ -179,11 +170,11 @@ const getFollowing = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         (0, handle_utils_1.handleError)(res, error, 'Get following');
     }
-});
+};
 exports.getFollowing = getFollowing;
-const editProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const editProfile = async (req, res) => {
     try {
-        const updatedUser = yield userService.editProfile(req.user, req.body, req.file);
+        const updatedUser = await userService.editProfile(req.user, req.body, req.file);
         res.json(updatedUser);
     }
     catch (error) {
@@ -208,26 +199,26 @@ const editProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(500).json({ message: 'Internal server error' });
         }
     }
-});
+};
 exports.editProfile = editProfile;
-const checkArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const checkArtistRequest = async (req, res) => {
     try {
         if (!req.user) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const request = yield userService.getArtistRequest(req.user.id);
+        const request = await userService.getArtistRequest(req.user.id);
         res.json(request);
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Check artist request');
     }
-});
+};
 exports.checkArtistRequest = checkArtistRequest;
-const getUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getUserProfile = async (req, res) => {
     try {
         const { id } = req.params;
-        const user = yield userService.getUserProfile(id);
+        const user = await userService.getUserProfile(id);
         res.json(user);
     }
     catch (error) {
@@ -238,11 +229,11 @@ const getUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, function*
             res.status(500).json({ message: 'Internal server error' });
         }
     }
-});
+};
 exports.getUserProfile = getUserProfile;
-const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getRecommendedArtists = async (req, res) => {
     try {
-        const recommendedArtists = yield userService.getRecommendedArtists(req.user);
+        const recommendedArtists = await userService.getRecommendedArtists(req.user);
         res.json(recommendedArtists);
     }
     catch (error) {
@@ -253,86 +244,86 @@ const getRecommendedArtists = (req, res) => __awaiter(void 0, void 0, void 0, fu
             res.status(500).json({ message: 'Internal server error' });
         }
     }
-});
+};
 exports.getRecommendedArtists = getRecommendedArtists;
-const getTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getTopAlbums = async (req, res) => {
     try {
-        const topAlbums = yield userService.getTopAlbums();
+        const topAlbums = await userService.getTopAlbums();
         res.json(topAlbums);
     }
     catch (error) {
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getTopAlbums = getTopAlbums;
-const getTopArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getTopArtists = async (req, res) => {
     try {
-        const topArtists = yield userService.getTopArtists();
+        const topArtists = await userService.getTopArtists();
         res.json(topArtists);
     }
     catch (error) {
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getTopArtists = getTopArtists;
-const getTopTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getTopTracks = async (req, res) => {
     try {
-        const topTracks = yield userService.getTopTracks();
+        const topTracks = await userService.getTopTracks();
         res.json(topTracks);
     }
     catch (error) {
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getTopTracks = getTopTracks;
-const getNewestTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getNewestTracks = async (req, res) => {
     try {
-        const tracks = yield userService.getNewestTracks();
+        const tracks = await userService.getNewestTracks();
         res.json(tracks);
     }
     catch (error) {
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getNewestTracks = getNewestTracks;
-const getNewestAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getNewestAlbums = async (req, res) => {
     try {
-        const albums = yield userService.getNewestAlbums();
+        const albums = await userService.getNewestAlbums();
         res.json(albums);
     }
     catch (error) {
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getNewestAlbums = getNewestAlbums;
-const getUserTopTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getUserTopTracks = async (req, res) => {
     try {
-        const tracks = yield userService.getUserTopTracks(req.user);
+        const tracks = await userService.getUserTopTracks(req.user);
         res.json(tracks);
     }
     catch (error) {
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getUserTopTracks = getUserTopTracks;
-const getUserTopArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getUserTopArtists = async (req, res) => {
     try {
-        const artists = yield userService.getUserTopArtists(req.user);
+        const artists = await userService.getUserTopArtists(req.user);
         res.json(artists);
     }
     catch (error) {
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getUserTopArtists = getUserTopArtists;
-const getUserTopAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getUserTopAlbums = async (req, res) => {
     try {
-        const albums = yield userService.getUserTopAlbums(req.user);
+        const albums = await userService.getUserTopAlbums(req.user);
         res.json(albums);
     }
     catch (error) {
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getUserTopAlbums = getUserTopAlbums;
 //# sourceMappingURL=user.controller.js.map

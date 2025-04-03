@@ -22,7 +22,12 @@ import {
 import toast from 'react-hot-toast';
 
 export default function ArtistDetail() {
-  const { id } = useParams();
+  const params = useParams();
+  const artistId = params?.id
+    ? Array.isArray(params.id)
+      ? params.id[0]
+      : params.id
+    : null;
   const router = useRouter();
   const { theme } = useTheme();
   const [artist, setArtist] = useState<ArtistProfile | null>(null);
@@ -38,8 +43,13 @@ export default function ArtistDetail() {
 
   const searchParams = useSearchParams();
 
+  // Helper function to safely access searchParams
+  const safeGetParam = (key: string): string | null => {
+    return searchParams?.get(key) || null;
+  };
+
   useEffect(() => {
-    const albumId = searchParams.get('album');
+    const albumId = safeGetParam('album');
     if (albumId && artist && artist.albums) {
       const album = artist.albums.find((a) => {
         return a.id.toString() === albumId;
@@ -51,7 +61,7 @@ export default function ArtistDetail() {
     }
 
     // Handle track parameter
-    const trackId = searchParams.get('track');
+    const trackId = safeGetParam('track');
     if (trackId && artist) {
       const track = artist.tracks?.find((t) => t.id.toString() === trackId);
 
@@ -72,7 +82,7 @@ export default function ArtistDetail() {
         setIsTrackModalOpen(true);
       }
     }
-  }, [searchParams, artist]);
+  }, [searchParams, artist, safeGetParam]);
 
   useEffect(() => {
     const fetchArtist = async () => {
@@ -82,7 +92,10 @@ export default function ArtistDetail() {
         if (!token) {
           throw new Error('Authentication token not found');
         }
-        const data = await api.admin.getArtistById(id as string, token);
+        if (!artistId) {
+          throw new Error('Artist ID is missing');
+        }
+        const data = await api.admin.getArtistById(artistId, token);
         setArtist(data);
       } catch (err) {
         console.error('Error fetching artist:', err);
@@ -92,8 +105,12 @@ export default function ArtistDetail() {
       }
     };
 
-    if (id) fetchArtist();
-  }, [id]);
+    if (artistId) fetchArtist();
+    else {
+      setError('Artist ID not found in URL');
+      setLoading(false);
+    }
+  }, [artistId]);
 
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString('vi-VN', {
@@ -803,13 +820,13 @@ export default function ArtistDetail() {
         theme={theme}
       />
 
-      {isTrackModalOpen && selectedTrack && (
+      {isTrackModalOpen && selectedTrack && artistId && (
         <TrackDetailModal
           track={selectedTrack}
           isOpen={isTrackModalOpen}
           onClose={() => setIsTrackModalOpen(false)}
           theme={theme}
-          currentArtistId={id as string}
+          currentArtistId={artistId}
         />
       )}
     </div>

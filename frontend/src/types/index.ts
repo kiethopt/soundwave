@@ -335,6 +335,10 @@ export interface Playlist {
   updatedAt: string;
   tracks: Track[];
   canEdit?: boolean;
+  basedOnMood?: string;
+  basedOnGenre?: string;
+  basedOnArtist?: string;
+  trackCount?: number;
 }
 
 export interface Notification {

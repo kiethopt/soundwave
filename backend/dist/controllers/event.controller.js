@@ -32,15 +32,6 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -51,16 +42,14 @@ const pusher_1 = __importDefault(require("../config/pusher"));
 const client_1 = require("@prisma/client");
 const eventService = __importStar(require("../services/event.service"));
 const canManageEvent = (user, eventArtistId) => {
-    var _a, _b;
     if (!user)
         return false;
     if (user.role === client_1.Role.ADMIN)
         return true;
-    return (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
-        ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.id) === eventArtistId);
+    return (user.artistProfile?.isVerified &&
+        user.artistProfile?.id === eventArtistId);
 };
-const createEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+const createEvent = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -70,7 +59,7 @@ const createEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const { title, description, location, startDate, endDate, artistId } = req.body;
         let targetArtistId;
         if (user.role === client_1.Role.ADMIN && artistId) {
-            const targetArtist = yield db_1.default.artistProfile.findFirst({
+            const targetArtist = await db_1.default.artistProfile.findFirst({
                 where: {
                     id: artistId,
                     isVerified: true,
@@ -82,8 +71,8 @@ const createEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             }
             targetArtistId = targetArtist.id;
         }
-        else if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
-            ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.id)) {
+        else if (user.artistProfile?.isVerified &&
+            user.artistProfile?.id) {
             targetArtistId = user.artistProfile.id;
         }
         else {
@@ -98,8 +87,8 @@ const createEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             endDate,
             artistId: targetArtistId,
         };
-        const newEvent = yield eventService.createEvent(eventData);
-        const followers = yield db_1.default.userFollow.findMany({
+        const newEvent = await eventService.createEvent(eventData);
+        const followers = await db_1.default.userFollow.findMany({
             where: {
                 followingArtistId: targetArtistId,
                 followingType: 'ARTIST',
@@ -115,9 +104,9 @@ const createEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             senderId: targetArtistId,
         }));
         if (notificationsData.length > 0) {
-            yield db_1.default.notification.createMany({ data: notificationsData });
+            await db_1.default.notification.createMany({ data: notificationsData });
             for (const follower of followers) {
-                yield pusher_1.default.trigger(`user-${follower.followerId}`, 'notification', {
+                await pusher_1.default.trigger(`user-${follower.followerId}`, 'notification', {
                     type: client_1.NotificationType.NEW_EVENT,
                     message: `The artist just created a new event: ${title}`,
                 });
@@ -132,9 +121,9 @@ const createEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         console.error('Create event error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.createEvent = createEvent;
-const updateEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateEvent = async (req, res) => {
     try {
         const user = req.user;
         const { id } = req.params;
@@ -142,7 +131,7 @@ const updateEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        const existingEvent = yield db_1.default.event.findUnique({
+        const existingEvent = await db_1.default.event.findUnique({
             where: { id },
             select: { artistId: true },
         });
@@ -155,7 +144,7 @@ const updateEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             return;
         }
         const { title, description, location, startDate, endDate } = req.body;
-        const updatedEvent = yield eventService.updateEvent(id, {
+        const updatedEvent = await eventService.updateEvent(id, {
             title,
             description,
             location,
@@ -171,9 +160,9 @@ const updateEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         console.error('Update event error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.updateEvent = updateEvent;
-const deleteEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteEvent = async (req, res) => {
     try {
         const user = req.user;
         const { id } = req.params;
@@ -181,7 +170,7 @@ const deleteEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        const existingEvent = yield db_1.default.event.findUnique({
+        const existingEvent = await db_1.default.event.findUnique({
             where: { id },
             select: { artistId: true },
         });
@@ -193,16 +182,16 @@ const deleteEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(403).json({ message: 'You can only delete your own events' });
             return;
         }
-        yield eventService.deleteEvent(id);
+        await eventService.deleteEvent(id);
         res.json({ message: 'Event deleted successfully' });
     }
     catch (error) {
         console.error('Delete event error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.deleteEvent = deleteEvent;
-const toggleEventVisibility = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const toggleEventVisibility = async (req, res) => {
     try {
         const user = req.user;
         const { id } = req.params;
@@ -210,7 +199,7 @@ const toggleEventVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
-        const existingEvent = yield db_1.default.event.findUnique({
+        const existingEvent = await db_1.default.event.findUnique({
             where: { id },
             select: { artistId: true, isActive: true },
         });
@@ -222,7 +211,7 @@ const toggleEventVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
             res.status(403).json({ message: 'You can only toggle your own events' });
             return;
         }
-        const updatedEvent = yield db_1.default.event.update({
+        const updatedEvent = await db_1.default.event.update({
             where: { id },
             data: { isActive: !existingEvent.isActive },
         });
@@ -235,12 +224,12 @@ const toggleEventVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
         console.error('Toggle event error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.toggleEventVisibility = toggleEventVisibility;
-const getEventById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getEventById = async (req, res) => {
     try {
         const { id } = req.params;
-        const event = yield eventService.getEventById(id);
+        const event = await eventService.getEventById(id);
         if (!event) {
             res.status(404).json({ message: 'Event not found' });
             return;
@@ -251,9 +240,9 @@ const getEventById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         console.error('Get event by ID error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getEventById = getEventById;
-const getAllEvents = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllEvents = async (req, res) => {
     try {
         const { artistId, isActive, page = 1, limit = 10 } = req.query;
         const filter = {};
@@ -263,8 +252,10 @@ const getAllEvents = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             filter.isActive = isActive === 'true';
         }
         const skip = (Number(page) - 1) * Number(limit);
-        const [events, total] = yield Promise.all([
-            eventService.getEvents(Object.assign({}, filter)),
+        const [events, total] = await Promise.all([
+            eventService.getEvents({
+                ...filter,
+            }),
             db_1.default.event.count({ where: filter }),
         ]);
         const slicedEvents = events.slice(skip, skip + Number(limit));
@@ -282,9 +273,9 @@ const getAllEvents = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         console.error('Get events error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getAllEvents = getAllEvents;
-const joinEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const joinEvent = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -296,7 +287,7 @@ const joinEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             res.status(400).json({ message: 'Missing eventId' });
             return;
         }
-        const joinRecord = yield eventService.joinEvent(eventId, user.id);
+        const joinRecord = await eventService.joinEvent(eventId, user.id);
         res.json({
             message: 'Joined event successfully',
             joinRecord,
@@ -306,9 +297,9 @@ const joinEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         console.error('Join event error:', error);
         res.status(400).json({ message: error.message || 'Cannot join event' });
     }
-});
+};
 exports.joinEvent = joinEvent;
-const cancelJoinEvent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const cancelJoinEvent = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -320,7 +311,7 @@ const cancelJoinEvent = (req, res) => __awaiter(void 0, void 0, void 0, function
             res.status(400).json({ message: 'Missing eventId' });
             return;
         }
-        const cancelRecord = yield eventService.cancelJoinEvent(eventId, user.id);
+        const cancelRecord = await eventService.cancelJoinEvent(eventId, user.id);
         res.json({
             message: 'Canceled join event successfully',
             cancelRecord,
@@ -330,6 +321,6 @@ const cancelJoinEvent = (req, res) => __awaiter(void 0, void 0, void 0, function
         console.error('Cancel join event error:', error);
         res.status(400).json({ message: error.message || 'Cannot cancel join event' });
     }
-});
+};
 exports.cancelJoinEvent = cancelJoinEvent;
 //# sourceMappingURL=event.controller.js.map

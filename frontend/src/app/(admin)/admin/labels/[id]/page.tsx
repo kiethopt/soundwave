@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
-import type { Label, Album, Track } from '@/types';
+import type { Label } from '@/types';
 import Image from 'next/image';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ArrowLeft, Edit, Search } from 'lucide-react';
@@ -14,7 +14,12 @@ import { LabelTabs } from '@/components/admin/labels/LabelTabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 export default function LabelDetail() {
-  const { id } = useParams();
+  const params = useParams();
+  const labelId = params?.id
+    ? Array.isArray(params.id)
+      ? params.id[0]
+      : params.id
+    : null;
   const router = useRouter();
   const { theme } = useTheme();
   const [label, setLabel] = useState<Label | null>(null);
@@ -34,7 +39,10 @@ export default function LabelDetail() {
         if (!token) {
           throw new Error('Authentication token not found');
         }
-        const data = await api.labels.getById(id as string, token);
+        if (!labelId) {
+          throw new Error('Label ID is missing');
+        }
+        const data = await api.labels.getById(labelId, token);
         setLabel(data.label);
       } catch (err) {
         console.error('Error fetching label:', err);
@@ -44,10 +52,14 @@ export default function LabelDetail() {
       }
     };
 
-    if (id) fetchLabel();
-  }, [id]);
+    if (labelId) fetchLabel();
+    else {
+      setError('Label ID not found in URL');
+      setLoading(false);
+    }
+  }, [labelId]);
 
-  const handleUpdateLabel = async (labelId: string, formData: FormData) => {
+  const handleUpdateLabel = async (updateId: string, formData: FormData) => {
     const token = localStorage.getItem('userToken');
     if (!token) {
       toast.error('Authentication required');
@@ -55,7 +67,7 @@ export default function LabelDetail() {
     }
     try {
       const updatedLabelData = await api.labels.update(
-        labelId,
+        updateId,
         formData,
         token
       );
@@ -505,7 +517,7 @@ export default function LabelDetail() {
         <EditLabelModal
           label={label}
           onClose={() => setIsEditModalOpen(false)}
-          onSubmit={handleUpdateLabel}
+          onSubmit={(id, data) => handleUpdateLabel(id, data)}
           theme={theme}
         />
       )}

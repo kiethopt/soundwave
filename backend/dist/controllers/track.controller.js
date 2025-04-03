@@ -32,15 +32,6 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -56,18 +47,16 @@ const client_2 = require("@prisma/client");
 const pusher_1 = __importDefault(require("../config/pusher"));
 const emailService = __importStar(require("../services/email.service"));
 const canManageTrack = (user, trackArtistId) => {
-    var _a, _b, _c, _d;
     if (!user)
         return false;
     if (user.role === client_1.Role.ADMIN)
         return true;
-    return (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
-        ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isActive) &&
-        ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.role) === client_1.Role.ARTIST &&
-        ((_d = user.artistProfile) === null || _d === void 0 ? void 0 : _d.id) === trackArtistId);
+    return (user.artistProfile?.isVerified &&
+        user.artistProfile?.isActive &&
+        user.artistProfile?.role === client_1.Role.ARTIST &&
+        user.artistProfile?.id === trackArtistId);
 };
-const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
+const createTrack = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -75,7 +64,7 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             return;
         }
         const { title, releaseDate, trackNumber, albumId, featuredArtists, artistId, genreIds, } = req.body;
-        const finalArtistId = user.role === 'ADMIN' && artistId ? artistId : (_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id;
+        const finalArtistId = user.role === 'ADMIN' && artistId ? artistId : user.artistProfile?.id;
         if (!finalArtistId) {
             res.status(400).json({
                 message: user.role === 'ADMIN'
@@ -84,33 +73,33 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             });
             return;
         }
-        const artistProfile = yield db_1.default.artistProfile.findUnique({
+        const artistProfile = await db_1.default.artistProfile.findUnique({
             where: { id: finalArtistId },
             select: { artistName: true },
         });
-        const artistName = (artistProfile === null || artistProfile === void 0 ? void 0 : artistProfile.artistName) || 'Nghệ sĩ';
+        const artistName = artistProfile?.artistName || 'Nghệ sĩ';
         if (!req.files) {
             res.status(400).json({ message: 'No files uploaded' });
             return;
         }
         const files = req.files;
-        const audioFile = (_b = files.audioFile) === null || _b === void 0 ? void 0 : _b[0];
-        const coverFile = (_c = files.coverFile) === null || _c === void 0 ? void 0 : _c[0];
+        const audioFile = files.audioFile?.[0];
+        const coverFile = files.coverFile?.[0];
         if (!audioFile) {
             res.status(400).json({ message: 'Audio file is required' });
             return;
         }
-        const audioUpload = yield (0, upload_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto');
+        const audioUpload = await (0, upload_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto');
         const coverUrl = coverFile
-            ? (yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image')).secure_url
+            ? (await (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image')).secure_url
             : null;
-        const mm = yield Promise.resolve().then(() => __importStar(require('music-metadata')));
-        const metadata = yield mm.parseBuffer(audioFile.buffer);
+        const mm = await Promise.resolve().then(() => __importStar(require('music-metadata')));
+        const metadata = await mm.parseBuffer(audioFile.buffer);
         const duration = Math.floor(metadata.format.duration || 0);
         let isActive = false;
         let trackReleaseDate = releaseDate ? new Date(releaseDate) : new Date();
         if (albumId) {
-            const album = yield db_1.default.album.findUnique({
+            const album = await db_1.default.album.findUnique({
                 where: { id: albumId },
                 select: { isActive: true, releaseDate: true, coverUrl: true },
             });
@@ -135,7 +124,7 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             : genreIds
                 ? genreIds.split(',').map((id) => id.trim())
                 : [];
-        const track = yield db_1.default.track.create({
+        const track = await db_1.default.track.create({
             data: {
                 title,
                 duration,
@@ -166,7 +155,7 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: prisma_selects_1.trackSelect,
         });
-        const followers = yield db_1.default.userFollow.findMany({
+        const followers = await db_1.default.userFollow.findMany({
             where: {
                 followingArtistId: finalArtistId,
                 followingType: 'ARTIST',
@@ -175,7 +164,7 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         });
         const followerIds = followers.map((f) => f.followerId);
         if (followerIds.length > 0) {
-            const followerUsers = yield db_1.default.user.findMany({
+            const followerUsers = await db_1.default.user.findMany({
                 where: { id: { in: followerIds } },
                 select: { id: true, email: true },
             });
@@ -188,7 +177,7 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 senderId: finalArtistId,
             }));
             try {
-                yield db_1.default.notification.createMany({ data: notificationsData });
+                await db_1.default.notification.createMany({ data: notificationsData });
             }
             catch (notiError) {
                 console.error('Failed to create in-app notifications for new track:', notiError);
@@ -204,7 +193,7 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 if (user.email) {
                     try {
                         const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'track', track.title, releaseLink, track.coverUrl);
-                        yield emailService.sendEmail(emailOptions);
+                        await emailService.sendEmail(emailOptions);
                     }
                     catch (err) {
                         console.error(`Failed to send new track email to ${user.email}:`, err);
@@ -224,13 +213,13 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         console.error('Create track error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.createTrack = createTrack;
-const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateTrack = async (req, res) => {
     try {
         const { id } = req.params;
         const { title, releaseDate, type, trackNumber, albumId, featuredArtists, genreIds, updateFeaturedArtists, updateGenres, } = req.body;
-        const currentTrack = yield db_1.default.track.findUnique({
+        const currentTrack = await db_1.default.track.findUnique({
             where: { id },
             select: {
                 releaseDate: true,
@@ -263,7 +252,7 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             updateData.albumId = albumId || null;
         if (req.files && req.files.coverFile) {
             const coverFile = req.files.coverFile[0];
-            const coverUpload = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
+            const coverUpload = await (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
             updateData.coverUrl = coverUpload.secure_url;
         }
         if (releaseDate) {
@@ -277,14 +266,14 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             }
             updateData.releaseDate = newReleaseDate;
         }
-        const updatedTrack = yield db_1.default.$transaction((tx) => __awaiter(void 0, void 0, void 0, function* () {
-            const updated = yield tx.track.update({
+        const updatedTrack = await db_1.default.$transaction(async (tx) => {
+            const updated = await tx.track.update({
                 where: { id },
                 data: updateData,
                 select: prisma_selects_1.trackSelect,
             });
             if (updateFeaturedArtists === 'true') {
-                yield tx.trackArtist.deleteMany({
+                await tx.trackArtist.deleteMany({
                     where: { trackId: id },
                 });
                 const artistsArray = !featuredArtists
@@ -293,7 +282,7 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                         ? featuredArtists
                         : [featuredArtists];
                 if (artistsArray.length > 0) {
-                    yield tx.trackArtist.createMany({
+                    await tx.trackArtist.createMany({
                         data: artistsArray.map((artistId) => ({
                             trackId: id,
                             artistId: artistId.trim(),
@@ -303,7 +292,7 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 }
             }
             if (updateGenres === 'true') {
-                yield tx.trackGenre.deleteMany({
+                await tx.trackGenre.deleteMany({
                     where: { trackId: id },
                 });
                 const genresArray = !genreIds
@@ -312,7 +301,7 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                         ? genreIds
                         : [genreIds];
                 if (genresArray.length > 0) {
-                    yield tx.trackGenre.createMany({
+                    await tx.trackGenre.createMany({
                         data: genresArray.map((genreId) => ({
                             trackId: id,
                             genreId: genreId.trim(),
@@ -322,7 +311,7 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 }
             }
             return updated;
-        }));
+        });
         res.json({
             message: 'Track updated successfully',
             track: updatedTrack,
@@ -332,9 +321,9 @@ const updateTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         console.error('Update track error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.updateTrack = updateTrack;
-const deleteTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteTrack = async (req, res) => {
     try {
         const user = req.user;
         const { id } = req.params;
@@ -342,7 +331,7 @@ const deleteTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             res.status(401).json({ message: 'Unauthorized: User not found' });
             return;
         }
-        const track = yield db_1.default.track.findUnique({
+        const track = await db_1.default.track.findUnique({
             where: { id },
             select: { artistId: true },
         });
@@ -357,16 +346,16 @@ const deleteTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             });
             return;
         }
-        yield trackService.deleteTrackById(id);
+        await trackService.deleteTrackById(id);
         res.json({ message: 'Track deleted successfully' });
     }
     catch (error) {
         console.error('Delete track error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.deleteTrack = deleteTrack;
-const toggleTrackVisibility = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const toggleTrackVisibility = async (req, res) => {
     try {
         const { id } = req.params;
         const user = req.user;
@@ -374,7 +363,7 @@ const toggleTrackVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
             res.status(401).json({ message: 'Unauthorized: User not found' });
             return;
         }
-        const track = yield db_1.default.track.findUnique({
+        const track = await db_1.default.track.findUnique({
             where: { id },
             select: { artistId: true, isActive: true },
         });
@@ -389,7 +378,7 @@ const toggleTrackVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
             });
             return;
         }
-        const updatedTrack = yield db_1.default.track.update({
+        const updatedTrack = await db_1.default.track.update({
             where: { id },
             data: { isActive: !track.isActive },
             select: prisma_selects_1.trackSelect,
@@ -403,10 +392,9 @@ const toggleTrackVisibility = (req, res) => __awaiter(void 0, void 0, void 0, fu
         console.error('Toggle track visibility error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.toggleTrackVisibility = toggleTrackVisibility;
-const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const searchTrack = async (req, res) => {
     try {
         const { q, page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
@@ -417,7 +405,7 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         const searchQuery = String(q).trim();
         if (user) {
-            const existingHistory = yield db_1.default.history.findFirst({
+            const existingHistory = await db_1.default.history.findFirst({
                 where: {
                     userId: user.id,
                     type: 'SEARCH',
@@ -425,13 +413,13 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 },
             });
             if (existingHistory) {
-                yield db_1.default.history.update({
+                await db_1.default.history.update({
                     where: { id: existingHistory.id },
                     data: { updatedAt: new Date() },
                 });
             }
             else {
-                yield db_1.default.history.create({
+                await db_1.default.history.create({
                     data: {
                         type: 'SEARCH',
                         query: searchQuery,
@@ -464,7 +452,7 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
         ];
         let whereClause;
-        if (user && user.currentProfile === 'ARTIST' && ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+        if (user && user.currentProfile === 'ARTIST' && user.artistProfile?.id) {
             whereClause = {
                 artistId: user.artistProfile.id,
                 OR: searchConditions,
@@ -479,7 +467,7 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 ],
             };
         }
-        const [tracks, total] = yield Promise.all([
+        const [tracks, total] = await Promise.all([
             db_1.default.track.findMany({
                 where: whereClause,
                 skip: offset,
@@ -503,14 +491,13 @@ const searchTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         console.error('Search track error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.searchTrack = searchTrack;
-const getTracksByType = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const getTracksByType = async (req, res) => {
     try {
         const cacheKey = req.originalUrl;
         if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            const cachedData = await cache_middleware_1.client.get(cacheKey);
             if (cachedData) {
                 console.log(`[Redis] Cache hit for key: ${cacheKey}`);
                 res.json(JSON.parse(cachedData));
@@ -528,7 +515,7 @@ const getTracksByType = (req, res) => __awaiter(void 0, void 0, void 0, function
             return;
         }
         const whereClause = { type: type };
-        if (!req.user || !((_a = req.user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+        if (!req.user || !req.user.artistProfile?.id) {
             whereClause.isActive = true;
         }
         else {
@@ -537,14 +524,14 @@ const getTracksByType = (req, res) => __awaiter(void 0, void 0, void 0, function
                 { AND: [{ isActive: false }, { artistId: req.user.artistProfile.id }] },
             ];
         }
-        const tracks = yield db_1.default.track.findMany({
+        const tracks = await db_1.default.track.findMany({
             where: whereClause,
             select: prisma_selects_1.trackSelect,
             orderBy: { createdAt: 'desc' },
             skip: offset,
             take: Number(limit),
         });
-        const totalTracks = yield db_1.default.track.count({ where: whereClause });
+        const totalTracks = await db_1.default.track.count({ where: whereClause });
         const result = {
             tracks,
             pagination: {
@@ -554,17 +541,16 @@ const getTracksByType = (req, res) => __awaiter(void 0, void 0, void 0, function
                 totalPages: Math.ceil(totalTracks / Number(limit)),
             },
         };
-        yield (0, cache_middleware_1.setCache)(cacheKey, result);
+        await (0, cache_middleware_1.setCache)(cacheKey, result);
         res.json(result);
     }
     catch (error) {
         console.error('Get tracks by type error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getTracksByType = getTracksByType;
-const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const getAllTracks = async (req, res) => {
     try {
         const user = req.user;
         if (!user) {
@@ -598,10 +584,10 @@ const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 },
             };
         }
-        if (user.role !== client_1.Role.ADMIN && ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+        if (user.role !== client_1.Role.ADMIN && user.artistProfile?.id) {
             whereClause.artistId = user.artistProfile.id;
         }
-        const result = yield trackService.getAllTracks(req);
+        const result = await trackService.getAllTracks(req);
         res.json({
             tracks: result.data,
             pagination: result.pagination,
@@ -611,14 +597,13 @@ const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         console.error('Get tracks error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getAllTracks = getAllTracks;
-const getTrackById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const getTrackById = async (req, res) => {
     try {
         const { id } = req.params;
         const user = req.user;
-        const track = yield db_1.default.track.findUnique({
+        const track = await db_1.default.track.findUnique({
             where: { id },
             select: prisma_selects_1.trackSelect,
         });
@@ -626,12 +611,12 @@ const getTrackById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             res.status(404).json({ message: 'Track not found' });
             return;
         }
-        if ((user === null || user === void 0 ? void 0 : user.role) === client_1.Role.ADMIN) {
+        if (user?.role === client_1.Role.ADMIN) {
             res.json(track);
             return;
         }
         if (!track.isActive) {
-            if (((_a = user === null || user === void 0 ? void 0 : user.artistProfile) === null || _a === void 0 ? void 0 : _a.id) === track.artistId) {
+            if (user?.artistProfile?.id === track.artistId) {
                 if (!user.artistProfile.isVerified || !user.artistProfile.isActive) {
                     res.status(403).json({
                         message: 'Your artist profile is not verified or inactive',
@@ -654,14 +639,13 @@ const getTrackById = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         console.error('Get track by id error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getTrackById = getTrackById;
-const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const getTracksByGenre = async (req, res) => {
     try {
         const cacheKey = req.originalUrl;
         if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            const cachedData = await cache_middleware_1.client.get(cacheKey);
             if (cachedData) {
                 console.log(`[Redis] Cache hit for key: ${cacheKey}`);
                 res.json(JSON.parse(cachedData));
@@ -672,7 +656,7 @@ const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, functio
         const { genreId } = req.params;
         const { page = 1, limit = 10 } = req.query;
         const offset = (Number(page) - 1) * Number(limit);
-        const genre = yield db_1.default.genre.findUnique({
+        const genre = await db_1.default.genre.findUnique({
             where: { id: genreId },
         });
         if (!genre) {
@@ -686,7 +670,7 @@ const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 },
             },
         };
-        if (!req.user || !((_a = req.user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+        if (!req.user || !req.user.artistProfile?.id) {
             whereClause.isActive = true;
         }
         else {
@@ -695,9 +679,11 @@ const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 { AND: [{ isActive: false }, { artistId: req.user.artistProfile.id }] },
             ];
         }
-        const tracks = yield db_1.default.track.findMany({
+        const tracks = await db_1.default.track.findMany({
             where: whereClause,
-            select: Object.assign(Object.assign({}, prisma_selects_1.trackSelect), { genres: {
+            select: {
+                ...prisma_selects_1.trackSelect,
+                genres: {
                     where: {
                         genreId: genreId,
                     },
@@ -709,12 +695,13 @@ const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, functio
                             },
                         },
                     },
-                } }),
+                },
+            },
             orderBy: { createdAt: 'desc' },
             skip: offset,
             take: Number(limit),
         });
-        const totalTracks = yield db_1.default.track.count({
+        const totalTracks = await db_1.default.track.count({
             where: whereClause,
         });
         const result = {
@@ -726,21 +713,20 @@ const getTracksByGenre = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 totalPages: Math.ceil(totalTracks / Number(limit)),
             },
         };
-        yield (0, cache_middleware_1.setCache)(cacheKey, result);
+        await (0, cache_middleware_1.setCache)(cacheKey, result);
         res.json(result);
     }
     catch (error) {
         console.error('Get tracks by genre error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getTracksByGenre = getTracksByGenre;
-const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const getTracksByTypeAndGenre = async (req, res) => {
     try {
         const cacheKey = req.originalUrl;
         if (process.env.USE_REDIS_CACHE === 'true') {
-            const cachedData = yield cache_middleware_1.client.get(cacheKey);
+            const cachedData = await cache_middleware_1.client.get(cacheKey);
             if (cachedData) {
                 console.log(`[Redis] Cache hit for key: ${cacheKey}`);
                 res.json(JSON.parse(cachedData));
@@ -755,7 +741,7 @@ const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, 
             res.status(400).json({ message: 'Invalid track type' });
             return;
         }
-        const genre = yield db_1.default.genre.findUnique({
+        const genre = await db_1.default.genre.findUnique({
             where: { id: genreId },
         });
         if (!genre) {
@@ -770,7 +756,7 @@ const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, 
                 },
             },
         };
-        if (!req.user || !((_a = req.user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
+        if (!req.user || !req.user.artistProfile?.id) {
             whereClause.isActive = true;
         }
         else {
@@ -779,9 +765,11 @@ const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, 
                 { AND: [{ isActive: false }, { artistId: req.user.artistProfile.id }] },
             ];
         }
-        const tracks = yield db_1.default.track.findMany({
+        const tracks = await db_1.default.track.findMany({
             where: whereClause,
-            select: Object.assign(Object.assign({}, prisma_selects_1.trackSelect), { genres: {
+            select: {
+                ...prisma_selects_1.trackSelect,
+                genres: {
                     where: {
                         genreId: genreId,
                     },
@@ -790,12 +778,13 @@ const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, 
                             select: { id: true, name: true },
                         },
                     },
-                } }),
+                },
+            },
             orderBy: { createdAt: 'desc' },
             skip: offset,
             take: Number(limit),
         });
-        const totalTracks = yield db_1.default.track.count({
+        const totalTracks = await db_1.default.track.count({
             where: whereClause,
         });
         const result = {
@@ -807,16 +796,16 @@ const getTracksByTypeAndGenre = (req, res) => __awaiter(void 0, void 0, void 0, 
                 totalPages: Math.ceil(totalTracks / Number(limit)),
             },
         };
-        yield (0, cache_middleware_1.setCache)(cacheKey, result);
+        await (0, cache_middleware_1.setCache)(cacheKey, result);
         res.json(result);
     }
     catch (error) {
         console.error('Get tracks by type and genre error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.getTracksByTypeAndGenre = getTracksByTypeAndGenre;
-const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const playTrack = async (req, res) => {
     try {
         const { trackId } = req.params;
         const user = req.user;
@@ -825,7 +814,7 @@ const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const track = yield db_1.default.track.findFirst({
+        const track = await db_1.default.track.findFirst({
             where: {
                 id: trackId,
                 isActive: true,
@@ -839,7 +828,7 @@ const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         const lastMonth = new Date();
         lastMonth.setMonth(lastMonth.getMonth() - 1);
-        const existingListen = yield db_1.default.history.findFirst({
+        const existingListen = await db_1.default.history.findFirst({
             where: {
                 userId: user.id,
                 track: { artistId: track.artistId },
@@ -847,12 +836,12 @@ const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             },
         });
         if (!existingListen) {
-            yield db_1.default.artistProfile.update({
+            await db_1.default.artistProfile.update({
                 where: { id: track.artistId },
                 data: { monthlyListeners: { increment: 1 } },
             });
         }
-        yield db_1.default.history.upsert({
+        await db_1.default.history.upsert({
             where: {
                 userId_trackId_type: {
                     userId: user.id,
@@ -873,7 +862,7 @@ const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 playCount: 1,
             },
         });
-        yield db_1.default.track.update({
+        await db_1.default.track.update({
             where: { id: track.id },
             data: { playCount: { increment: 1 } },
         });
@@ -886,18 +875,17 @@ const playTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         console.error('Play track error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.playTrack = playTrack;
-const likeTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const likeTrack = async (req, res) => {
     try {
         const { trackId } = req.params;
-        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const userId = req.user?.id;
         if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const result = yield trackService.likeTrack(userId, trackId);
+        const result = await trackService.likeTrack(userId, trackId);
         res.json({
             message: 'Track liked successfully',
             data: result,
@@ -917,18 +905,17 @@ const likeTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         console.error('Like track error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.likeTrack = likeTrack;
-const unlikeTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const unlikeTrack = async (req, res) => {
     try {
         const { trackId } = req.params;
-        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const userId = req.user?.id;
         if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        yield trackService.unlikeTrack(userId, trackId);
+        await trackService.unlikeTrack(userId, trackId);
         res.json({
             message: 'Track unliked successfully',
         });
@@ -943,18 +930,17 @@ const unlikeTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         console.error('Unlike track error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.unlikeTrack = unlikeTrack;
-const checkTrackLiked = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const checkTrackLiked = async (req, res) => {
     try {
         const { trackId } = req.params;
-        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const userId = req.user?.id;
         if (!userId) {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const like = yield db_1.default.userLikeTrack.findUnique({
+        const like = await db_1.default.userLikeTrack.findUnique({
             where: {
                 userId_trackId: {
                     userId,
@@ -970,6 +956,6 @@ const checkTrackLiked = (req, res) => __awaiter(void 0, void 0, void 0, function
         console.error('Check track liked error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
-});
+};
 exports.checkTrackLiked = checkTrackLiked;
 //# sourceMappingURL=track.controller.js.map

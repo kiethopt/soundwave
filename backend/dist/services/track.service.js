@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -15,8 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllTracks = exports.unlikeTrack = exports.likeTrack = exports.deleteTrackById = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const handle_utils_1 = require("../utils/handle-utils");
-const deleteTrackById = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const track = yield db_1.default.track.findUnique({
+const deleteTrackById = async (id) => {
+    const track = await db_1.default.track.findUnique({
         where: { id },
         select: { id: true },
     });
@@ -26,10 +17,10 @@ const deleteTrackById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     return db_1.default.track.delete({
         where: { id },
     });
-});
+};
 exports.deleteTrackById = deleteTrackById;
-const likeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, function* () {
-    const track = yield db_1.default.track.findFirst({
+const likeTrack = async (userId, trackId) => {
+    const track = await db_1.default.track.findFirst({
         where: {
             id: trackId,
             isActive: true,
@@ -38,7 +29,7 @@ const likeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, functio
     if (!track) {
         throw new Error('Track not found or not active');
     }
-    const existingLike = yield db_1.default.userLikeTrack.findUnique({
+    const existingLike = await db_1.default.userLikeTrack.findUnique({
         where: {
             userId_trackId: {
                 userId,
@@ -49,13 +40,13 @@ const likeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, functio
     if (existingLike) {
         throw new Error('Track already liked');
     }
-    yield db_1.default.userLikeTrack.create({
+    await db_1.default.userLikeTrack.create({
         data: {
             userId,
             trackId,
         },
     });
-    const favoritePlaylist = yield db_1.default.playlist.findFirst({
+    const favoritePlaylist = await db_1.default.playlist.findFirst({
         where: {
             userId,
             type: 'FAVORITE',
@@ -64,7 +55,7 @@ const likeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, functio
     if (!favoritePlaylist) {
         throw new Error('Favorite playlist not found');
     }
-    const tracksCount = yield db_1.default.playlistTrack.count({
+    const tracksCount = await db_1.default.playlistTrack.count({
         where: {
             playlistId: favoritePlaylist.id,
         },
@@ -76,10 +67,10 @@ const likeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, functio
             trackOrder: tracksCount + 1,
         },
     });
-});
+};
 exports.likeTrack = likeTrack;
-const unlikeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, function* () {
-    const existingLike = yield db_1.default.userLikeTrack.findUnique({
+const unlikeTrack = async (userId, trackId) => {
+    const existingLike = await db_1.default.userLikeTrack.findUnique({
         where: {
             userId_trackId: {
                 userId,
@@ -90,7 +81,7 @@ const unlikeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, funct
     if (!existingLike) {
         throw new Error('Track not liked');
     }
-    yield db_1.default.userLikeTrack.delete({
+    await db_1.default.userLikeTrack.delete({
         where: {
             userId_trackId: {
                 userId,
@@ -107,9 +98,9 @@ const unlikeTrack = (userId, trackId) => __awaiter(void 0, void 0, void 0, funct
             trackId,
         },
     });
-});
+};
 exports.unlikeTrack = unlikeTrack;
-const getAllTracks = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllTracks = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
     const whereClause = {};
     if (search && typeof search === 'string') {
@@ -161,7 +152,7 @@ const getAllTracks = (req) => __awaiter(void 0, void 0, void 0, function* () {
     else {
         orderByClause.releaseDate = 'desc';
     }
-    const result = yield (0, handle_utils_1.paginate)(db_1.default.track, req, {
+    const result = await (0, handle_utils_1.paginate)(db_1.default.track, req, {
         where: whereClause,
         include: {
             artist: { select: { id: true, artistName: true, avatar: true } },
@@ -173,11 +164,15 @@ const getAllTracks = (req) => __awaiter(void 0, void 0, void 0, function* () {
         },
         orderBy: orderByClause,
     });
-    const formattedTracks = result.data.map((track) => (Object.assign(Object.assign({}, track), { genres: track.genres, featuredArtists: track.featuredArtists })));
+    const formattedTracks = result.data.map((track) => ({
+        ...track,
+        genres: track.genres,
+        featuredArtists: track.featuredArtists,
+    }));
     return {
         data: formattedTracks,
         pagination: result.pagination,
     };
-});
+};
 exports.getAllTracks = getAllTracks;
 //# sourceMappingURL=track.service.js.map

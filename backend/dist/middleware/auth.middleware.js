@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -18,16 +9,15 @@ const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const authenticate = async (req, res, next) => {
     try {
-        const token = (_a = req.header('Authorization')) === null || _a === void 0 ? void 0 : _a.replace('Bearer ', '');
+        const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
             res.status(401).json({ message: 'Access denied. No token provided.' });
             return;
         }
         const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-        const user = yield db_1.default.user.findUnique({
+        const user = await db_1.default.user.findUnique({
             where: { id: decoded.id },
             select: prisma_selects_1.userSelect,
         });
@@ -56,12 +46,11 @@ const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     catch (error) {
         res.status(401).json({ message: 'Invalid token' });
     }
-});
+};
 exports.authenticate = authenticate;
-const optionalAuthenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+const optionalAuthenticate = async (req, res, next) => {
     try {
-        const token = (_a = req.header('Authorization')) === null || _a === void 0 ? void 0 : _a.replace('Bearer ', '');
+        const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
             const maintenanceMode = process.env.MAINTENANCE_MODE === 'true';
             if (maintenanceMode && !req.path.includes('/auth/')) {
@@ -76,7 +65,7 @@ const optionalAuthenticate = (req, res, next) => __awaiter(void 0, void 0, void 
         }
         try {
             const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-            const user = yield db_1.default.user.findUnique({
+            const user = await db_1.default.user.findUnique({
                 where: { id: decoded.id },
                 select: prisma_selects_1.userSelect,
             });
@@ -94,11 +83,10 @@ const optionalAuthenticate = (req, res, next) => __awaiter(void 0, void 0, void 
         console.error('Error in optional authentication:', error);
         next();
     }
-});
+};
 exports.optionalAuthenticate = optionalAuthenticate;
 const authorize = (roles) => {
-    return (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-        var _a, _b;
+    return async (req, res, next) => {
         try {
             const user = req.user;
             if (!user) {
@@ -109,14 +97,14 @@ const authorize = (roles) => {
                 return next();
             }
             if (roles.includes(client_1.Role.ARTIST)) {
-                if (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified)) {
+                if (!user.artistProfile?.isVerified) {
                     res.status(403).json({
                         message: 'Your artist profile is not verified yet',
                         code: 'ARTIST_NOT_VERIFIED',
                     });
                     return;
                 }
-                if (!((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.isActive)) {
+                if (!user.artistProfile?.isActive) {
                     res.status(403).json({
                         message: 'Your artist profile has been deactivated. Please contact admin',
                         code: 'ARTIST_DEACTIVATED',
@@ -143,7 +131,7 @@ const authorize = (roles) => {
             console.error('Authorization error:', error);
             res.status(500).json({ message: 'Internal server error' });
         }
-    });
+    };
 };
 exports.authorize = authorize;
 //# sourceMappingURL=auth.middleware.js.map

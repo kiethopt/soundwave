@@ -32,15 +32,6 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -53,17 +44,21 @@ const upload_service_1 = require("./upload.service");
 const handle_utils_1 = require("../utils/handle-utils");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-const getUsers = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const getUsers = async (req) => {
     const { search = '', status } = req.query;
-    const where = Object.assign(Object.assign({ role: 'USER' }, (search
-        ? {
-            OR: [
-                { email: { contains: String(search), mode: 'insensitive' } },
-                { username: { contains: String(search), mode: 'insensitive' } },
-                { name: { contains: String(search), mode: 'insensitive' } },
-            ],
-        }
-        : {})), (status !== undefined ? { isActive: status === 'true' } : {}));
+    const where = {
+        role: 'USER',
+        ...(search
+            ? {
+                OR: [
+                    { email: { contains: String(search), mode: 'insensitive' } },
+                    { username: { contains: String(search), mode: 'insensitive' } },
+                    { name: { contains: String(search), mode: 'insensitive' } },
+                ],
+            }
+            : {}),
+        ...(status !== undefined ? { isActive: status === 'true' } : {}),
+    };
     const options = {
         where,
         include: {
@@ -71,15 +66,15 @@ const getUsers = (req) => __awaiter(void 0, void 0, void 0, function* () {
         },
         orderBy: { createdAt: 'desc' },
     };
-    const result = yield (0, handle_utils_1.paginate)(db_1.default.user, req, options);
+    const result = await (0, handle_utils_1.paginate)(db_1.default.user, req, options);
     return {
         users: result.data,
         pagination: result.pagination,
     };
-});
+};
 exports.getUsers = getUsers;
-const getUserById = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = yield db_1.default.user.findUnique({
+const getUserById = async (id) => {
+    const user = await db_1.default.user.findUnique({
         where: { id },
         select: prisma_selects_1.userSelect,
     });
@@ -87,43 +82,48 @@ const getUserById = (id) => __awaiter(void 0, void 0, void 0, function* () {
         throw new Error('User not found');
     }
     return user;
-});
+};
 exports.getUserById = getUserById;
-const getArtistRequests = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const getArtistRequests = async (req) => {
     const { startDate, endDate, status, search } = req.query;
-    const where = Object.assign(Object.assign(Object.assign({ verificationRequestedAt: { not: null } }, (status === 'pending' ? { isVerified: false } : {})), (startDate && endDate
-        ? {
-            verificationRequestedAt: {
-                gte: new Date(String(startDate)),
-                lte: new Date(String(endDate)),
-            },
-        }
-        : {})), (search
-        ? {
-            OR: [
-                { artistName: { contains: String(search), mode: 'insensitive' } },
-                {
-                    user: {
-                        email: { contains: String(search), mode: 'insensitive' },
-                    },
+    const where = {
+        verificationRequestedAt: { not: null },
+        ...(status === 'pending' ? { isVerified: false } : {}),
+        ...(startDate && endDate
+            ? {
+                verificationRequestedAt: {
+                    gte: new Date(String(startDate)),
+                    lte: new Date(String(endDate)),
                 },
-            ],
-        }
-        : {}));
+            }
+            : {}),
+        ...(search
+            ? {
+                OR: [
+                    { artistName: { contains: String(search), mode: 'insensitive' } },
+                    {
+                        user: {
+                            email: { contains: String(search), mode: 'insensitive' },
+                        },
+                    },
+                ],
+            }
+            : {}),
+    };
     const options = {
         where,
         select: prisma_selects_1.artistRequestSelect,
         orderBy: { verificationRequestedAt: 'desc' },
     };
-    const result = yield (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, options);
+    const result = await (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, options);
     return {
         requests: result.data,
         pagination: result.pagination,
     };
-});
+};
 exports.getArtistRequests = getArtistRequests;
-const getArtistRequestDetail = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const request = yield db_1.default.artistProfile.findUnique({
+const getArtistRequestDetail = async (id) => {
+    const request = await db_1.default.artistProfile.findUnique({
         where: { id },
         select: prisma_selects_1.artistRequestDetailsSelect,
     });
@@ -131,12 +131,12 @@ const getArtistRequestDetail = (id) => __awaiter(void 0, void 0, void 0, functio
         throw new Error('Request not found');
     }
     return request;
-});
+};
 exports.getArtistRequestDetail = getArtistRequestDetail;
-const updateUserInfo = (id, data, avatarFile) => __awaiter(void 0, void 0, void 0, function* () {
-    const currentUser = yield db_1.default.user.findUnique({
+const updateUserInfo = async (id, data, avatarFile) => {
+    const currentUser = await db_1.default.user.findUnique({
         where: { id },
-        select: Object.assign(Object.assign({}, prisma_selects_1.userSelect), { password: true }),
+        select: { ...prisma_selects_1.userSelect, password: true },
     });
     if (!currentUser) {
         throw new Error('User not found');
@@ -146,15 +146,15 @@ const updateUserInfo = (id, data, avatarFile) => __awaiter(void 0, void 0, void 
     if (password) {
         const bcrypt = require('bcrypt');
         if (currentPassword) {
-            const isPasswordValid = yield bcrypt.compare(currentPassword, currentUser.password);
+            const isPasswordValid = await bcrypt.compare(currentPassword, currentUser.password);
             if (!isPasswordValid) {
                 throw new Error('Current password is incorrect');
             }
-            passwordHash = yield bcrypt.hash(password, 10);
+            passwordHash = await bcrypt.hash(password, 10);
         }
     }
     if (email && email !== currentUser.email) {
-        const existingEmail = yield db_1.default.user.findFirst({
+        const existingEmail = await db_1.default.user.findFirst({
             where: { email, NOT: { id } },
         });
         if (existingEmail) {
@@ -162,7 +162,7 @@ const updateUserInfo = (id, data, avatarFile) => __awaiter(void 0, void 0, void 
         }
     }
     if (username && username !== currentUser.username) {
-        const existingUsername = yield db_1.default.user.findFirst({
+        const existingUsername = await db_1.default.user.findFirst({
             where: { username, NOT: { id } },
         });
         if (existingUsername) {
@@ -171,20 +171,28 @@ const updateUserInfo = (id, data, avatarFile) => __awaiter(void 0, void 0, void 
     }
     let avatarUrl = currentUser.avatar;
     if (avatarFile) {
-        const uploadResult = yield (0, upload_service_1.uploadFile)(avatarFile.buffer, 'users/avatars');
+        const uploadResult = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'users/avatars');
         avatarUrl = uploadResult.secure_url;
     }
     const isActiveBool = isActive !== undefined ? (0, handle_utils_1.toBooleanValue)(isActive) : undefined;
-    const updatedUser = yield db_1.default.user.update({
+    const updatedUser = await db_1.default.user.update({
         where: { id },
-        data: Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({}, (name !== undefined && { name })), (email !== undefined && { email })), (username !== undefined && { username })), (avatarUrl !== currentUser.avatar && { avatar: avatarUrl })), (isActiveBool !== undefined && { isActive: isActiveBool })), (role !== undefined && { role })), (passwordHash && { password: passwordHash })),
+        data: {
+            ...(name !== undefined && { name }),
+            ...(email !== undefined && { email }),
+            ...(username !== undefined && { username }),
+            ...(avatarUrl !== currentUser.avatar && { avatar: avatarUrl }),
+            ...(isActiveBool !== undefined && { isActive: isActiveBool }),
+            ...(role !== undefined && { role }),
+            ...(passwordHash && { password: passwordHash }),
+        },
         select: prisma_selects_1.userSelect,
     });
     return updatedUser;
-});
+};
 exports.updateUserInfo = updateUserInfo;
-const updateArtistInfo = (id, data, avatarFile) => __awaiter(void 0, void 0, void 0, function* () {
-    const existingArtist = yield db_1.default.artistProfile.findUnique({
+const updateArtistInfo = async (id, data, avatarFile) => {
+    const existingArtist = await db_1.default.artistProfile.findUnique({
         where: { id },
     });
     if (!existingArtist) {
@@ -193,7 +201,7 @@ const updateArtistInfo = (id, data, avatarFile) => __awaiter(void 0, void 0, voi
     const { artistName, bio, isActive } = data;
     let validatedArtistName = undefined;
     if (artistName && artistName !== existingArtist.artistName) {
-        const nameExists = yield db_1.default.artistProfile.findFirst({
+        const nameExists = await db_1.default.artistProfile.findFirst({
             where: {
                 artistName,
                 id: { not: id },
@@ -206,73 +214,87 @@ const updateArtistInfo = (id, data, avatarFile) => __awaiter(void 0, void 0, voi
     }
     let avatarUrl = undefined;
     if (avatarFile) {
-        const result = yield (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artists/avatars', 'image');
+        const result = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artists/avatars', 'image');
         avatarUrl = result.secure_url;
     }
-    const updatedArtist = yield db_1.default.artistProfile.update({
+    const updatedArtist = await db_1.default.artistProfile.update({
         where: { id },
-        data: Object.assign(Object.assign(Object.assign(Object.assign({}, (validatedArtistName && { artistName: validatedArtistName })), (bio !== undefined && { bio })), (isActive !== undefined && { isActive: (0, handle_utils_1.toBooleanValue)(isActive) })), (avatarUrl && { avatar: avatarUrl })),
+        data: {
+            ...(validatedArtistName && { artistName: validatedArtistName }),
+            ...(bio !== undefined && { bio }),
+            ...(isActive !== undefined && { isActive: (0, handle_utils_1.toBooleanValue)(isActive) }),
+            ...(avatarUrl && { avatar: avatarUrl }),
+        },
         select: prisma_selects_1.artistProfileSelect,
     });
     return updatedArtist;
-});
+};
 exports.updateArtistInfo = updateArtistInfo;
-const deleteUserById = (id) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteUserById = async (id) => {
     return db_1.default.user.delete({ where: { id } });
-});
+};
 exports.deleteUserById = deleteUserById;
-const deleteArtistById = (id) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteArtistById = async (id) => {
     return db_1.default.artistProfile.delete({ where: { id } });
-});
+};
 exports.deleteArtistById = deleteArtistById;
-const getArtists = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const getArtists = async (req) => {
     const { search = '', status } = req.query;
-    const where = Object.assign(Object.assign({ role: client_1.Role.ARTIST, isVerified: true }, (search
-        ? {
-            OR: [
-                { artistName: { contains: String(search), mode: 'insensitive' } },
-                {
-                    user: {
-                        email: { contains: String(search), mode: 'insensitive' },
+    const where = {
+        role: client_1.Role.ARTIST,
+        isVerified: true,
+        ...(search
+            ? {
+                OR: [
+                    { artistName: { contains: String(search), mode: 'insensitive' } },
+                    {
+                        user: {
+                            email: { contains: String(search), mode: 'insensitive' },
+                        },
                     },
-                },
-            ],
-        }
-        : {})), (status !== undefined ? { isActive: status === 'true' } : {}));
+                ],
+            }
+            : {}),
+        ...(status !== undefined ? { isActive: status === 'true' } : {}),
+    };
     const options = {
         where,
         select: prisma_selects_1.artistProfileSelect,
         orderBy: { createdAt: 'desc' },
     };
-    const result = yield (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, options);
+    const result = await (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, options);
     return {
         artists: result.data,
         pagination: result.pagination,
     };
-});
+};
 exports.getArtists = getArtists;
-const getArtistById = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const artist = yield db_1.default.artistProfile.findUnique({
+const getArtistById = async (id) => {
+    const artist = await db_1.default.artistProfile.findUnique({
         where: { id },
-        select: Object.assign(Object.assign({}, prisma_selects_1.artistProfileSelect), { albums: {
+        select: {
+            ...prisma_selects_1.artistProfileSelect,
+            albums: {
                 orderBy: { releaseDate: 'desc' },
                 select: prisma_selects_1.artistProfileSelect.albums.select,
-            }, tracks: {
+            },
+            tracks: {
                 where: {
                     type: 'SINGLE',
                     albumId: null,
                 },
                 orderBy: { releaseDate: 'desc' },
                 select: prisma_selects_1.artistProfileSelect.tracks.select,
-            } }),
+            },
+        },
     });
     if (!artist) {
         throw new Error('Artist not found');
     }
     return artist;
-});
+};
 exports.getArtistById = getArtistById;
-const getGenres = (req) => __awaiter(void 0, void 0, void 0, function* () {
+const getGenres = async (req) => {
     const { search = '' } = req.query;
     const where = search
         ? {
@@ -287,15 +309,15 @@ const getGenres = (req) => __awaiter(void 0, void 0, void 0, function* () {
         select: prisma_selects_1.genreSelect,
         orderBy: { createdAt: 'desc' },
     };
-    const result = yield (0, handle_utils_1.paginate)(db_1.default.genre, req, options);
+    const result = await (0, handle_utils_1.paginate)(db_1.default.genre, req, options);
     return {
         genres: result.data,
         pagination: result.pagination,
     };
-});
+};
 exports.getGenres = getGenres;
-const createNewGenre = (name) => __awaiter(void 0, void 0, void 0, function* () {
-    const existingGenre = yield db_1.default.genre.findFirst({
+const createNewGenre = async (name) => {
+    const existingGenre = await db_1.default.genre.findFirst({
         where: { name },
     });
     if (existingGenre) {
@@ -304,17 +326,17 @@ const createNewGenre = (name) => __awaiter(void 0, void 0, void 0, function* () 
     return db_1.default.genre.create({
         data: { name },
     });
-});
+};
 exports.createNewGenre = createNewGenre;
-const updateGenreInfo = (id, name) => __awaiter(void 0, void 0, void 0, function* () {
-    const existingGenre = yield db_1.default.genre.findUnique({
+const updateGenreInfo = async (id, name) => {
+    const existingGenre = await db_1.default.genre.findUnique({
         where: { id },
     });
     if (!existingGenre) {
         throw new Error('Genre not found');
     }
     if (name !== existingGenre.name) {
-        const existingGenreWithName = yield db_1.default.genre.findFirst({
+        const existingGenreWithName = await db_1.default.genre.findFirst({
             where: { name, NOT: { id } },
         });
         if (existingGenreWithName) {
@@ -325,14 +347,14 @@ const updateGenreInfo = (id, name) => __awaiter(void 0, void 0, void 0, function
         where: { id },
         data: { name },
     });
-});
+};
 exports.updateGenreInfo = updateGenreInfo;
-const deleteGenreById = (id) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteGenreById = async (id) => {
     return db_1.default.genre.delete({ where: { id } });
-});
+};
 exports.deleteGenreById = deleteGenreById;
-const approveArtistRequest = (requestId) => __awaiter(void 0, void 0, void 0, function* () {
-    const artistProfile = yield db_1.default.artistProfile.findFirst({
+const approveArtistRequest = async (requestId) => {
+    const artistProfile = await db_1.default.artistProfile.findFirst({
         where: {
             id: requestId,
             verificationRequestedAt: { not: null },
@@ -354,10 +376,10 @@ const approveArtistRequest = (requestId) => __awaiter(void 0, void 0, void 0, fu
             user: { select: prisma_selects_1.userSelect },
         },
     });
-});
+};
 exports.approveArtistRequest = approveArtistRequest;
-const rejectArtistRequest = (requestId) => __awaiter(void 0, void 0, void 0, function* () {
-    const artistProfile = yield db_1.default.artistProfile.findFirst({
+const rejectArtistRequest = async (requestId) => {
+    const artistProfile = await db_1.default.artistProfile.findFirst({
         where: {
             id: requestId,
             verificationRequestedAt: { not: null },
@@ -370,17 +392,17 @@ const rejectArtistRequest = (requestId) => __awaiter(void 0, void 0, void 0, fun
     if (!artistProfile) {
         throw new Error('Artist request not found or already verified');
     }
-    yield db_1.default.artistProfile.delete({
+    await db_1.default.artistProfile.delete({
         where: { id: requestId },
     });
     return {
         user: artistProfile.user,
         hasPendingRequest: false,
     };
-});
+};
 exports.rejectArtistRequest = rejectArtistRequest;
-const getSystemStats = () => __awaiter(void 0, void 0, void 0, function* () {
-    const stats = yield Promise.all([
+const getSystemStats = async () => {
+    const stats = await Promise.all([
         db_1.default.user.count({ where: { role: client_1.Role.USER } }),
         db_1.default.artistProfile.count({
             where: {
@@ -424,9 +446,9 @@ const getSystemStats = () => __awaiter(void 0, void 0, void 0, function* () {
         })),
         updatedAt: new Date().toISOString(),
     };
-});
+};
 exports.getSystemStats = getSystemStats;
-const updateCacheStatus = (enabled) => __awaiter(void 0, void 0, void 0, function* () {
+const updateCacheStatus = async (enabled) => {
     try {
         const envPath = path.resolve(__dirname, '../../.env');
         const envContent = fs.readFileSync(envPath, 'utf8');
@@ -441,10 +463,10 @@ const updateCacheStatus = (enabled) => __awaiter(void 0, void 0, void 0, functio
         console.log(`[Redis] Cache ${enabled ? 'enabled' : 'disabled'}`);
         const { client } = require('../middleware/cache.middleware');
         if (enabled && !previousStatus && !client.isOpen) {
-            yield client.connect();
+            await client.connect();
         }
         else if (!enabled && previousStatus && client.isOpen) {
-            yield client.disconnect();
+            await client.disconnect();
         }
         return { enabled };
     }
@@ -452,9 +474,9 @@ const updateCacheStatus = (enabled) => __awaiter(void 0, void 0, void 0, functio
         console.error('Error updating cache status', error);
         throw new Error('Failed to update cache status');
     }
-});
+};
 exports.updateCacheStatus = updateCacheStatus;
-const updateAIModel = (model) => __awaiter(void 0, void 0, void 0, function* () {
+const updateAIModel = async (model) => {
     try {
         const validModels = [
             'gemini-2.5-pro-exp-03-25',
@@ -512,9 +534,9 @@ const updateAIModel = (model) => __awaiter(void 0, void 0, void 0, function* () 
         console.error('[Admin] Error updating AI model:', error);
         throw error;
     }
-});
+};
 exports.updateAIModel = updateAIModel;
-const updateMaintenanceMode = (enabled) => __awaiter(void 0, void 0, void 0, function* () {
+const updateMaintenanceMode = async (enabled) => {
     try {
         const envPath = path.resolve(__dirname, '../../.env');
         const envContent = fs.readFileSync(envPath, 'utf8');
@@ -537,6 +559,6 @@ const updateMaintenanceMode = (enabled) => __awaiter(void 0, void 0, void 0, fun
         console.error('Error updating maintenance mode', error);
         throw new Error('Failed to update maintenance mode');
     }
-});
+};
 exports.updateMaintenanceMode = updateMaintenanceMode;
 //# sourceMappingURL=admin.service.js.map

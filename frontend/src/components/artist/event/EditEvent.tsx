@@ -29,7 +29,13 @@ interface EditEventProps {
 }
 
 export default function EditEvent({ open, onOpenChange }: EditEventProps) {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams();
+  const id = params?.id
+    ? Array.isArray(params.id)
+      ? params.id[0]
+      : params.id
+    : null;
+
   const router = useRouter();
   const token = localStorage.getItem('userToken') || '';
 
@@ -47,7 +53,7 @@ export default function EditEvent({ open, onOpenChange }: EditEventProps) {
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const data = await api.events.getEventById(id, token);
+        const data = await api.events.getEventById(id as string, token);
         setEventData(data);
         setFormData({
           title: data.title,
@@ -63,7 +69,7 @@ export default function EditEvent({ open, onOpenChange }: EditEventProps) {
     };
 
     if (id) fetchEvent();
-  }, [id]);
+  }, [id, token]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -74,7 +80,7 @@ export default function EditEvent({ open, onOpenChange }: EditEventProps) {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await api.events.updateEvent(id, formData, token);
+      await api.events.updateEvent(id as string, formData, token);
       toast.success('Event updated successfully');
       onOpenChange(false);
       router.push('/artist/events');

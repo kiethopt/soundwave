@@ -383,7 +383,7 @@ export default function Sidebar({
                   <Link
                     href="/artist/dashboard"
                     className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                      pathname.startsWith('/artist/dashboard')
+                      pathname && pathname.startsWith('/artist/dashboard')
                         ? theme === 'light'
                           ? 'bg-gray-200 text-gray-900'
                           : 'bg-white/10 text-white'
@@ -404,7 +404,7 @@ export default function Sidebar({
                   <Link
                     href="/artist/albums"
                     className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                      pathname.startsWith('/artist/albums')
+                      pathname && pathname.startsWith('/artist/albums')
                         ? theme === 'light'
                           ? 'bg-gray-200 text-gray-900'
                           : 'bg-white/10 text-white'
@@ -425,7 +425,7 @@ export default function Sidebar({
                   <Link
                     href="/artist/tracks"
                     className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                      pathname.startsWith('/artist/tracks')
+                      pathname && pathname.startsWith('/artist/tracks')
                         ? theme === 'light'
                           ? 'bg-gray-200 text-gray-900'
                           : 'bg-white/10 text-white'
@@ -482,7 +482,7 @@ export default function Sidebar({
                 <Link
                   href="/admin/analytics"
                   className={`flex items-center px-3 py-2.5 ${
-                    pathname.startsWith('/admin/analytics')
+                    pathname && pathname.startsWith('/admin/analytics')
                       ? 'bg-gray-200 text-gray-900'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
@@ -505,7 +505,7 @@ export default function Sidebar({
                 <Link
                   href="/admin/artist-requests"
                   className={`flex items-center px-3 py-2.5 ${
-                    pathname.startsWith('/admin/artist-requests')
+                    pathname && pathname.startsWith('/admin/artist-requests')
                       ? 'bg-gray-200 text-gray-900'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
@@ -534,7 +534,7 @@ export default function Sidebar({
                 <Link
                   href="/admin/users"
                   className={`flex items-center px-3 py-2.5 ${
-                    pathname.startsWith('/admin/users')
+                    pathname && pathname.startsWith('/admin/users')
                       ? 'bg-gray-200 text-gray-900'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
@@ -555,7 +555,7 @@ export default function Sidebar({
                 <Link
                   href="/admin/artists"
                   className={`flex items-center px-3 py-2.5 ${
-                    pathname.startsWith('/admin/artists')
+                    pathname && pathname.startsWith('/admin/artists')
                       ? 'bg-gray-200 text-gray-900'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
@@ -576,7 +576,7 @@ export default function Sidebar({
                 <Link
                   href="/admin/genres"
                   className={`flex items-center px-3 py-2.5 ${
-                    pathname.startsWith('/admin/genres')
+                    pathname && pathname.startsWith('/admin/genres')
                       ? 'bg-gray-200 text-gray-900'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
@@ -597,7 +597,7 @@ export default function Sidebar({
                 <Link
                   href="/admin/labels"
                   className={`flex items-center px-3 py-2.5 ${
-                    pathname.startsWith('/admin/labels')
+                    pathname && pathname.startsWith('/admin/labels')
                       ? 'bg-gray-200 text-gray-900'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
@@ -618,7 +618,7 @@ export default function Sidebar({
                 <Link
                   href="/admin/content"
                   className={`flex items-center px-3 py-2.5 ${
-                    pathname.startsWith('/admin/content')
+                    pathname && pathname.startsWith('/admin/content')
                       ? 'bg-gray-200 text-gray-900'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
@@ -645,7 +645,7 @@ export default function Sidebar({
                 <Link
                   href="/admin/system"
                   className={`flex items-center px-3 py-2.5 ${
-                    pathname.startsWith('/admin/system')
+                    pathname && pathname.startsWith('/admin/system')
                       ? 'bg-gray-200 text-gray-900'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}

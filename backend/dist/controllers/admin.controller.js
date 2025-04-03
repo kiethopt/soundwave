@@ -32,26 +32,6 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
-                t[p[i]] = s[p[i]];
-        }
-    return t;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -61,20 +41,20 @@ const handle_utils_1 = require("../utils/handle-utils");
 const db_1 = __importDefault(require("../config/db"));
 const adminService = __importStar(require("../services/admin.service"));
 const emailService = __importStar(require("../services/email.service"));
-const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllUsers = async (req, res) => {
     try {
-        const { users, pagination } = yield adminService.getUsers(req);
+        const { users, pagination } = await adminService.getUsers(req);
         res.json({ users, pagination });
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Get all users');
     }
-});
+};
 exports.getAllUsers = getAllUsers;
-const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getUserById = async (req, res) => {
     try {
         const { id } = req.params;
-        const user = yield adminService.getUserById(id);
+        const user = await adminService.getUserById(id);
         if (!user) {
             res.status(404).json({ message: 'User not found' });
             return;
@@ -88,22 +68,22 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         (0, handle_utils_1.handleError)(res, error, 'Get user by id');
     }
-});
+};
 exports.getUserById = getUserById;
-const getAllArtistRequests = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllArtistRequests = async (req, res) => {
     try {
-        const { requests, pagination } = yield adminService.getArtistRequests(req);
+        const { requests, pagination } = await adminService.getArtistRequests(req);
         res.json({ requests, pagination });
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Get artist requests');
     }
-});
+};
 exports.getAllArtistRequests = getAllArtistRequests;
-const getArtistRequestDetail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getArtistRequestDetail = async (req, res) => {
     try {
         const { id } = req.params;
-        const request = yield adminService.getArtistRequestDetail(id);
+        const request = await adminService.getArtistRequestDetail(id);
         res.json(request);
     }
     catch (error) {
@@ -113,26 +93,26 @@ const getArtistRequestDetail = (req, res) => __awaiter(void 0, void 0, void 0, f
         }
         (0, handle_utils_1.handleError)(res, error, 'Get artist request details');
     }
-});
+};
 exports.getArtistRequestDetail = getArtistRequestDetail;
-const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
         const avatarFile = req.file;
-        const _a = req.body, { isActive, reason } = _a, userData = __rest(_a, ["isActive", "reason"]);
+        const { isActive, reason, ...userData } = req.body;
         const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
         if (isStatusUpdate) {
             const isActiveBool = isActive === 'true' || isActive === true ? true : false;
-            const currentUser = yield db_1.default.user.findUnique({
+            const currentUser = await db_1.default.user.findUnique({
                 where: { id },
                 select: { isActive: true, email: true, name: true, username: true },
             });
             if (currentUser && currentUser.isActive && !isActiveBool) {
-                const updatedUser = yield adminService.updateUserInfo(id, {
+                const updatedUser = await adminService.updateUserInfo(id, {
                     isActive: false,
                 });
                 if (reason) {
-                    yield db_1.default.notification.create({
+                    await db_1.default.notification.create({
                         data: {
                             type: 'ACCOUNT_DEACTIVATED',
                             message: `Your account has been deactivated. Reason: ${reason}`,
@@ -146,7 +126,7 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                     const userName = currentUser.name || currentUser.username || 'User';
                     try {
                         const emailOptions = emailService.createAccountDeactivatedEmail(currentUser.email, userName, 'user', reason);
-                        yield emailService.sendEmail(emailOptions);
+                        await emailService.sendEmail(emailOptions);
                     }
                     catch (emailError) {
                         console.error(`Failed to send user deactivation email to ${currentUser.email}:`, emailError);
@@ -159,10 +139,10 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 return;
             }
             else if (currentUser && !currentUser.isActive && isActiveBool) {
-                const updatedUser = yield adminService.updateUserInfo(id, {
+                const updatedUser = await adminService.updateUserInfo(id, {
                     isActive: true,
                 });
-                yield db_1.default.notification.create({
+                await db_1.default.notification.create({
                     data: {
                         type: 'ACCOUNT_ACTIVATED',
                         message: 'Your account has been reactivated.',
@@ -175,7 +155,7 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                     const userName = currentUser.name || currentUser.username || 'User';
                     try {
                         const emailOptions = emailService.createAccountActivatedEmail(currentUser.email, userName, 'user');
-                        yield emailService.sendEmail(emailOptions);
+                        await emailService.sendEmail(emailOptions);
                     }
                     catch (emailError) {
                         console.error(`Failed to send user activation email to ${currentUser.email}:`, emailError);
@@ -185,7 +165,7 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 return;
             }
         }
-        const updatedUser = yield adminService.updateUserInfo(id, userData, avatarFile);
+        const updatedUser = await adminService.updateUserInfo(id, userData, avatarFile);
         res.json({
             message: 'User updated successfully',
             user: updatedUser,
@@ -209,34 +189,34 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         }
         (0, handle_utils_1.handleError)(res, error, 'Update user');
     }
-});
+};
 exports.updateUser = updateUser;
-const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateArtist = async (req, res) => {
     try {
         const { id } = req.params;
         const avatarFile = req.file;
-        const _a = req.body, { isActive, reason } = _a, artistData = __rest(_a, ["isActive", "reason"]);
+        const { isActive, reason, ...artistData } = req.body;
         const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
         if (isStatusUpdate) {
             const isActiveBool = isActive === 'true' || isActive === true ? true : false;
-            const currentArtist = yield db_1.default.artistProfile.findUnique({
+            const currentArtist = await db_1.default.artistProfile.findUnique({
                 where: { id },
                 select: { isActive: true, userId: true, artistName: true },
             });
             let ownerUser = null;
-            if (currentArtist === null || currentArtist === void 0 ? void 0 : currentArtist.userId) {
-                ownerUser = yield db_1.default.user.findUnique({
+            if (currentArtist?.userId) {
+                ownerUser = await db_1.default.user.findUnique({
                     where: { id: currentArtist.userId },
                     select: { email: true, name: true, username: true },
                 });
             }
-            const ownerUserName = (ownerUser === null || ownerUser === void 0 ? void 0 : ownerUser.name) || (ownerUser === null || ownerUser === void 0 ? void 0 : ownerUser.username) || 'Artist';
+            const ownerUserName = ownerUser?.name || ownerUser?.username || 'Artist';
             if (currentArtist && currentArtist.isActive && !isActiveBool) {
-                const updatedArtist = yield adminService.updateArtistInfo(id, {
+                const updatedArtist = await adminService.updateArtistInfo(id, {
                     isActive: false,
                 });
                 if (reason && currentArtist.userId) {
-                    yield db_1.default.notification.create({
+                    await db_1.default.notification.create({
                         data: {
                             type: 'ACCOUNT_DEACTIVATED',
                             message: `Your artist account has been deactivated. Reason: ${reason}`,
@@ -246,10 +226,10 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                         },
                     });
                 }
-                if (ownerUser === null || ownerUser === void 0 ? void 0 : ownerUser.email) {
+                if (ownerUser?.email) {
                     try {
                         const emailOptions = emailService.createAccountDeactivatedEmail(ownerUser.email, ownerUserName, 'artist', reason);
-                        yield emailService.sendEmail(emailOptions);
+                        await emailService.sendEmail(emailOptions);
                     }
                     catch (emailError) {
                         console.error(`Failed to send artist deactivation email to ${ownerUser.email}:`, emailError);
@@ -262,11 +242,11 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 return;
             }
             else if (currentArtist && !currentArtist.isActive && isActiveBool) {
-                const updatedArtist = yield adminService.updateArtistInfo(id, {
+                const updatedArtist = await adminService.updateArtistInfo(id, {
                     isActive: true,
                 });
                 if (currentArtist.userId) {
-                    yield db_1.default.notification.create({
+                    await db_1.default.notification.create({
                         data: {
                             type: 'ACCOUNT_ACTIVATED',
                             message: 'Your artist account has been reactivated.',
@@ -276,10 +256,10 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                         },
                     });
                 }
-                if (ownerUser === null || ownerUser === void 0 ? void 0 : ownerUser.email) {
+                if (ownerUser?.email) {
                     try {
                         const emailOptions = emailService.createAccountActivatedEmail(ownerUser.email, ownerUserName, 'artist');
-                        yield emailService.sendEmail(emailOptions);
+                        await emailService.sendEmail(emailOptions);
                     }
                     catch (emailError) {
                         console.error(`Failed to send artist activation email to ${ownerUser.email}:`, emailError);
@@ -292,7 +272,7 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 return;
             }
         }
-        const updatedArtist = yield adminService.updateArtistInfo(id, artistData, avatarFile);
+        const updatedArtist = await adminService.updateArtistInfo(id, artistData, avatarFile);
         res.json({
             message: 'Artist updated successfully',
             artist: updatedArtist,
@@ -311,44 +291,44 @@ const updateArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         }
         (0, handle_utils_1.handleError)(res, error, 'Update artist');
     }
-});
+};
 exports.updateArtist = updateArtist;
-const deleteUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
-        yield adminService.deleteUserById(id);
+        await adminService.deleteUserById(id);
         res.json({ message: 'User deleted successfully' });
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Delete user');
     }
-});
+};
 exports.deleteUser = deleteUser;
-const deleteArtist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteArtist = async (req, res) => {
     try {
         const { id } = req.params;
-        yield adminService.deleteArtistById(id);
+        await adminService.deleteArtistById(id);
         res.json({ message: 'Artist deleted permanently' });
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Delete artist');
     }
-});
+};
 exports.deleteArtist = deleteArtist;
-const getAllArtists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllArtists = async (req, res) => {
     try {
-        const { artists, pagination } = yield adminService.getArtists(req);
+        const { artists, pagination } = await adminService.getArtists(req);
         res.json({ artists, pagination });
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Get all artists');
     }
-});
+};
 exports.getAllArtists = getAllArtists;
-const getArtistById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getArtistById = async (req, res) => {
     try {
         const { id } = req.params;
-        const artist = yield adminService.getArtistById(id);
+        const artist = await adminService.getArtistById(id);
         res.json(artist);
     }
     catch (error) {
@@ -358,9 +338,9 @@ const getArtistById = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         }
         (0, handle_utils_1.handleError)(res, error, 'Get artist by id');
     }
-});
+};
 exports.getArtistById = getArtistById;
-const createGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const createGenre = async (req, res) => {
     try {
         const { name } = req.body;
         const validationErrors = (0, handle_utils_1.runValidations)([
@@ -374,7 +354,7 @@ const createGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 .json({ message: 'Validation failed', errors: validationErrors });
             return;
         }
-        const genre = yield adminService.createNewGenre(name);
+        const genre = await adminService.createNewGenre(name);
         res.status(201).json({ message: 'Genre created successfully', genre });
     }
     catch (error) {
@@ -385,9 +365,9 @@ const createGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         (0, handle_utils_1.handleError)(res, error, 'Create genre');
     }
-});
+};
 exports.createGenre = createGenre;
-const updateGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateGenre = async (req, res) => {
     try {
         const { id } = req.params;
         const { name } = req.body;
@@ -403,7 +383,7 @@ const updateGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 .json({ message: 'Validation failed', errors: validationErrors });
             return;
         }
-        const updatedGenre = yield adminService.updateGenreInfo(id, name);
+        const updatedGenre = await adminService.updateGenreInfo(id, name);
         res.json({
             message: 'Genre updated successfully',
             genre: updatedGenre,
@@ -422,24 +402,24 @@ const updateGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         (0, handle_utils_1.handleError)(res, error, 'Update genre');
     }
-});
+};
 exports.updateGenre = updateGenre;
-const deleteGenre = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteGenre = async (req, res) => {
     try {
         const { id } = req.params;
-        yield adminService.deleteGenreById(id);
+        await adminService.deleteGenreById(id);
         res.json({ message: 'Genre deleted successfully' });
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Delete genre');
     }
-});
+};
 exports.deleteGenre = deleteGenre;
-const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const approveArtistRequest = async (req, res) => {
     try {
         const { requestId } = req.body;
-        const updatedProfile = yield adminService.approveArtistRequest(requestId);
-        yield db_1.default.notification.create({
+        const updatedProfile = await adminService.approveArtistRequest(requestId);
+        await db_1.default.notification.create({
             data: {
                 type: 'ARTIST_REQUEST_APPROVE',
                 message: 'Your request to become an Artist has been approved!',
@@ -451,7 +431,7 @@ const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, fun
         if (updatedProfile.user.email) {
             try {
                 const emailOptions = emailService.createArtistRequestApprovedEmail(updatedProfile.user.email, updatedProfile.user.name || updatedProfile.user.username || 'User');
-                yield emailService.sendEmail(emailOptions);
+                await emailService.sendEmail(emailOptions);
                 console.log(`Artist approval email sent to ${updatedProfile.user.email}`);
             }
             catch (emailError) {
@@ -483,17 +463,17 @@ const approveArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, fun
         }
         (0, handle_utils_1.handleError)(res, error, 'Approve artist request');
     }
-});
+};
 exports.approveArtistRequest = approveArtistRequest;
-const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const rejectArtistRequest = async (req, res) => {
     try {
         const { requestId, reason } = req.body;
-        const result = yield adminService.rejectArtistRequest(requestId);
+        const result = await adminService.rejectArtistRequest(requestId);
         let notificationMessage = 'Your request to become an Artist has been rejected.';
         if (reason && reason.trim() !== '') {
             notificationMessage += ` Reason: ${reason.trim()}`;
         }
-        yield db_1.default.notification.create({
+        await db_1.default.notification.create({
             data: {
                 type: 'ARTIST_REQUEST_REJECT',
                 message: notificationMessage,
@@ -505,7 +485,7 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
         if (result.user.email) {
             try {
                 const emailOptions = emailService.createArtistRequestRejectedEmail(result.user.email, result.user.name || result.user.username || 'User', reason);
-                yield emailService.sendEmail(emailOptions);
+                await emailService.sendEmail(emailOptions);
                 console.log(`Artist rejection email sent to ${result.user.email}`);
             }
             catch (emailError) {
@@ -533,41 +513,41 @@ const rejectArtistRequest = (req, res) => __awaiter(void 0, void 0, void 0, func
         (0, handle_utils_1.handleError)(res, error, 'Reject artist request');
         return;
     }
-});
+};
 exports.rejectArtistRequest = rejectArtistRequest;
-const getStats = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getStats = async (req, res) => {
     try {
-        const statsData = yield adminService.getSystemStats();
+        const statsData = await adminService.getSystemStats();
         res.json(statsData);
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Get stats');
     }
-});
+};
 exports.getStats = getStats;
-const handleCacheStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const handleCacheStatus = async (req, res) => {
     try {
         const { enabled } = req.method === 'POST' ? req.body : {};
-        const result = yield adminService.updateCacheStatus(enabled);
+        const result = await adminService.updateCacheStatus(enabled);
         res.json(result);
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Manage cache status');
     }
-});
+};
 exports.handleCacheStatus = handleCacheStatus;
-const handleMaintenanceMode = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const handleMaintenanceMode = async (req, res) => {
     try {
         const { enabled } = req.method === 'POST' ? req.body : {};
-        const result = yield adminService.updateMaintenanceMode(enabled);
+        const result = await adminService.updateMaintenanceMode(enabled);
         res.json(result);
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Manage maintenance mode');
     }
-});
+};
 exports.handleMaintenanceMode = handleMaintenanceMode;
-const handleAIModelStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const handleAIModelStatus = async (req, res) => {
     try {
         const { model } = req.body;
         if (req.method === 'GET') {
@@ -582,7 +562,7 @@ const handleAIModelStatus = (req, res) => __awaiter(void 0, void 0, void 0, func
             });
             return;
         }
-        const result = yield adminService.updateAIModel(model);
+        const result = await adminService.updateAIModel(model);
         res.status(200).json({
             success: true,
             message: 'AI model settings updated successfully',
@@ -597,6 +577,6 @@ const handleAIModelStatus = (req, res) => __awaiter(void 0, void 0, void 0, func
             error: error instanceof Error ? error.message : String(error),
         });
     }
-});
+};
 exports.handleAIModelStatus = handleAIModelStatus;
 //# sourceMappingURL=admin.controller.js.map

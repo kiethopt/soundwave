@@ -2,7 +2,10 @@ import prisma from '../config/db';
 import { Prisma, PlaylistPrivacy, PlaylistType } from '@prisma/client';
 import { Request } from 'express';
 import { paginate } from '../utils/handle-utils';
-import { createAIGeneratedPlaylist as createAIGeneratedPlaylistFromAIService } from './ai.service';
+import {
+  createAIGeneratedPlaylist as createAIGeneratedPlaylistFromAIService,
+  PlaylistGenerationOptions,
+} from './ai.service';
 import { uploadFile } from './upload.service';
 
 // Select fields for base system playlist
@@ -167,6 +170,35 @@ export const getAllBaseSystemPlaylists = async (req: Request) => {
     where: whereClause,
     select: baseSystemPlaylistSelect,
     orderBy: { createdAt: 'desc' },
+  });
+
+  // Parse AI params từ description của mỗi playlist
+  result.data = result.data.map((playlist: any) => {
+    const parsedPlaylist = { ...playlist }; // Create a shallow copy
+
+    if (
+      parsedPlaylist.description &&
+      parsedPlaylist.description.includes('<!--AI_PARAMS:')
+    ) {
+      const match = parsedPlaylist.description.match(/<!--AI_PARAMS:(.*?)-->/s);
+      if (match && match[1]) {
+        try {
+          const aiParams = JSON.parse(match[1]);
+          // Thêm các tham số AI vào response
+          Object.assign(parsedPlaylist, aiParams);
+
+          // Làm sạch description để hiển thị (remove the comment)
+          parsedPlaylist.description = parsedPlaylist.description
+            .replace(/\n\n<!--AI_PARAMS:.*?-->/s, '')
+            .trim();
+        } catch (e) {
+          console.error('Error parsing AI parameters:', e);
+          // Keep original description if parsing fails
+        }
+      }
+    }
+
+    return parsedPlaylist; // Return the modified or original playlist object
   });
 
   return result; // Returns { data: playlists, pagination: ... }
@@ -465,14 +497,7 @@ export const getSystemPlaylists = async (req: Request) => {
 // Generating AI playlists
 export const generateAIPlaylist = async (
   userId: string,
-  options: {
-    name?: string;
-    description?: string;
-    trackCount?: number;
-    basedOnMood?: string;
-    basedOnGenre?: string;
-    basedOnArtist?: string;
-  }
+  options: PlaylistGenerationOptions // Use imported type
 ) => {
   console.log(
     `[PlaylistService] Generating AI playlist for user ${userId} with options:`,
@@ -597,16 +622,45 @@ export const updateAllSystemPlaylists = async (): Promise<{
               ); // Throw error to be caught below
             }
 
+            // --- START: Parse AI Params from Description ---
+            let aiOptions: PlaylistGenerationOptions = {}; // Define interface if not already done
+            if (
+              templatePlaylist.description &&
+              templatePlaylist.description.includes('<!--AI_PARAMS:')
+            ) {
+              const match = templatePlaylist.description.match(
+                /<!--AI_PARAMS:(.*?)-->/s
+              );
+              if (match && match[1]) {
+                try {
+                  aiOptions = JSON.parse(match[1]);
+                  // Clean the description before passing it if needed
+                  templatePlaylist.description = templatePlaylist.description
+                    .replace(/\n\n<!--AI_PARAMS:.*?-->/s, '')
+                    .trim();
+                } catch (e) {
+                  console.error(
+                    `[PlaylistService] Error parsing AI params for template ${templatePlaylist.name}:`,
+                    e
+                  );
+                  // Proceed without AI params if parsing fails
+                }
+              }
+            }
+            // --- END: Parse AI Params from Description ---
+
             // Default cover if the template doesn't have one
             const coverUrl =
               templatePlaylist.coverUrl ||
               'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
 
             // Call the AI service to create/update the user's personalized version
+            // **Pass parsed aiOptions explicitly**
             await createAIGeneratedPlaylistFromAIService(user.id, {
               name: templatePlaylist.name,
-              description: templatePlaylist.description || undefined,
+              description: templatePlaylist.description || undefined, // Pass cleaned description
               coverUrl: coverUrl,
+              ...aiOptions, // Spread the parsed AI options here
             });
           } catch (error: unknown) {
             // Add type annotation here

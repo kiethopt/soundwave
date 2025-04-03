@@ -12,7 +12,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 
 export default function PlaylistPage() {
-  const { id } = useParams();
+  const params = useParams();
+  const id = params?.id
+    ? Array.isArray(params.id)
+      ? params.id[0]
+      : params.id
+    : null;
   const { isAuthenticated, dialogOpen, setDialogOpen, handleProtectedAction } =
     useAuth();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
