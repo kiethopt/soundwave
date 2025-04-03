@@ -755,7 +755,7 @@ export const api = {
     like: async (trackId: string, token: string) =>
       fetchWithAuth(`/api/tracks/${trackId}/like`, { method: 'POST' }, token),
 
-    unlikeTrack: async (trackId: string, token: string) =>
+    unlike: async (trackId: string, token: string) =>
       fetchWithAuth(`/api/tracks/${trackId}/like`, { method: 'DELETE' }, token),
 
     checkLiked: async (trackId: string, token: string) =>

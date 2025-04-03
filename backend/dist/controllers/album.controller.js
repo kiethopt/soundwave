@@ -95,23 +95,20 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (user.role === client_1.Role.ADMIN && artistId) {
             const targetArtist = yield db_1.default.artistProfile.findFirst({
                 where: { id: artistId, isVerified: true, role: client_1.Role.ARTIST },
-                select: { id: true, artistName: true },
+                select: { id: true, artistName: true }
             });
             if (!targetArtist) {
-                res
-                    .status(404)
-                    .json({ message: 'Artist profile not found or not verified' });
+                res.status(404).json({ message: 'Artist profile not found or not verified' });
                 return;
             }
             targetArtistProfileId = targetArtist.id;
             fetchedArtistProfile = targetArtist;
         }
-        else if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
-            user.artistProfile.role === client_1.Role.ARTIST) {
+        else if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) && user.artistProfile.role === client_1.Role.ARTIST) {
             targetArtistProfileId = user.artistProfile.id;
             fetchedArtistProfile = yield db_1.default.artistProfile.findUnique({
                 where: { id: targetArtistProfileId },
-                select: { artistName: true },
+                select: { artistName: true }
             });
         }
         else {
@@ -151,10 +148,10 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: { followerId: true },
         });
-        const followerIds = followers.map((f) => f.followerId);
+        const followerIds = followers.map(f => f.followerId);
         const followerUsers = yield db_1.default.user.findMany({
             where: { id: { in: followerIds } },
-            select: { id: true, email: true },
+            select: { id: true, email: true }
         });
         const notificationsData = followers.map((follower) => ({
             type: client_2.NotificationType.NEW_ALBUM,
@@ -169,17 +166,15 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 yield db_1.default.notification.createMany({ data: notificationsData });
             }
             catch (notiError) {
-                console.error('Failed to create in-app notifications:', notiError);
+                console.error("Failed to create in-app notifications:", notiError);
             }
         }
         const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
         for (const user of followerUsers) {
-            pusher_1.default
-                .trigger(`user-${user.id}`, 'notification', {
+            pusher_1.default.trigger(`user-${user.id}`, 'notification', {
                 type: client_2.NotificationType.NEW_ALBUM,
                 message: `${artistName} vừa ra album mới: ${album.title}`,
-            })
-                .catch((err) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
+            }).catch((err) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
             if (user.email) {
                 try {
                     const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'album', album.title, releaseLink);
@@ -557,18 +552,83 @@ const searchAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     }
 });
 exports.searchAlbum = searchAlbum;
-const getAllAlbums = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
     try {
-        const result = yield albumService.getAllAlbums(req);
+        const user = req.user;
+        if (!user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        if (user.role !== client_1.Role.ADMIN &&
+            (!((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) || ((_b = user.artistProfile) === null || _b === void 0 ? void 0 : _b.role) !== 'ARTIST')) {
+            res.status(403).json({
+                message: 'Forbidden: Only admins or verified artists can access this resource',
+            });
+            return;
+        }
+        const { page = 1, limit = 10, q: search, status, genres } = req.query;
+        const offset = (Number(page) - 1) * Number(limit);
+        const whereClause = {};
+        const conditions = [];
+        if (search) {
+            conditions.push({
+                OR: [
+                    { title: { contains: String(search), mode: 'insensitive' } },
+                    {
+                        artist: {
+                            artistName: { contains: String(search), mode: 'insensitive' },
+                        },
+                    },
+                ],
+            });
+        }
+        if (status) {
+            whereClause.isActive = status === 'true';
+        }
+        if (genres) {
+            const genreIds = Array.isArray(genres) ? genres : [genres];
+            if (genreIds.length > 0) {
+                conditions.push({
+                    genres: {
+                        some: {
+                            genreId: { in: genreIds },
+                        },
+                    },
+                });
+            }
+        }
+        if (user.role !== client_1.Role.ADMIN && ((_c = user.artistProfile) === null || _c === void 0 ? void 0 : _c.id)) {
+            conditions.push({
+                artistId: user.artistProfile.id,
+            });
+        }
+        if (conditions.length > 0) {
+            whereClause.AND = conditions;
+        }
+        const [albums, total] = yield Promise.all([
+            db_1.default.album.findMany({
+                where: whereClause,
+                skip: offset,
+                take: Number(limit),
+                select: prisma_selects_1.albumSelect,
+                orderBy: { createdAt: 'desc' },
+            }),
+            db_1.default.album.count({ where: whereClause }),
+        ]);
         res.json({
-            success: true,
-            data: result.data,
-            pagination: result.pagination,
+            albums,
+            pagination: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / Number(limit)),
+            },
         });
     }
     catch (error) {
-        console.error('Error in getAllAlbums:', error);
-        next(error);
+        console.error('Get albums error:', error);
+        res.status(500).json({ message: 'Internal server error' });
     }
 });
 exports.getAllAlbums = getAllAlbums;
@@ -671,7 +731,7 @@ const playAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.playAlbum = playAlbum;
-const getNewestAlbums = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+const getNewestAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { limit = 10 } = req.query;
         const albums = yield albumService.getNewestAlbums(Number(limit));

@@ -20,6 +20,7 @@ import {
 import { api } from '@/utils/api';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface CreatePlaylistDialogProps {
   open: boolean;
@@ -39,6 +40,7 @@ export function CreatePlaylistDialog({
     privacy: 'PRIVATE' as 'PUBLIC' | 'PRIVATE',
   });
   const router = useRouter();
+  const { theme } = useTheme();
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -117,9 +119,19 @@ export function CreatePlaylistDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent
+        className={`sm:max-w-[425px] ${
+          theme === 'light'
+            ? 'bg-white text-gray-900 border border-gray-200'
+            : 'bg-[#121212] text-white border border-white/10'
+        }`}
+      >
         <DialogHeader>
-          <DialogTitle>Tạo playlist mới</DialogTitle>
+          <DialogTitle
+            className={theme === 'light' ? 'text-gray-900' : 'text-white'}
+          >
+            Tạo playlist mới
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -129,6 +141,11 @@ export function CreatePlaylistDialog({
               value={formData.name}
               onChange={handleInputChange}
               required
+              className={
+                theme === 'light'
+                  ? 'border-gray-200 focus:border-gray-300'
+                  : 'border-white/10 focus:border-white/20'
+              }
             />
           </div>
           <div className="space-y-2">
@@ -138,6 +155,11 @@ export function CreatePlaylistDialog({
               value={formData.description}
               onChange={handleInputChange}
               rows={3}
+              className={
+                theme === 'light'
+                  ? 'border-gray-200 focus:border-gray-300'
+                  : 'border-white/10 focus:border-white/20'
+              }
             />
           </div>
           <div className="space-y-2">
@@ -145,12 +167,34 @@ export function CreatePlaylistDialog({
               value={formData.privacy}
               onValueChange={handlePrivacyChange}
             >
-              <SelectTrigger>
+              <SelectTrigger
+                className={
+                  theme === 'light'
+                    ? 'border-gray-200 bg-white text-gray-900 focus:border-gray-300'
+                    : 'border-white/10 bg-[#121212] text-white focus:border-white/20'
+                }
+              >
                 <SelectValue placeholder="Chọn quyền riêng tư" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="PRIVATE">Riêng tư</SelectItem>
-                <SelectItem value="PUBLIC">Công khai</SelectItem>
+              <SelectContent
+                className={
+                  theme === 'light'
+                    ? 'bg-white text-gray-900 border-gray-200'
+                    : 'bg-[#121212] text-white border-white/10'
+                }
+              >
+                <SelectItem
+                  value="PRIVATE"
+                  className={theme === 'light' ? 'text-gray-900' : 'text-white'}
+                >
+                  Riêng tư
+                </SelectItem>
+                <SelectItem
+                  value="PUBLIC"
+                  className={theme === 'light' ? 'text-gray-900' : 'text-white'}
+                >
+                  Công khai
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -167,10 +211,21 @@ export function CreatePlaylistDialog({
                 onOpenChange(false);
               }}
               disabled={isLoading}
+              className={
+                theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-800'
+              }
             >
               Hủy
             </Button>
-            <Button type="submit" disabled={isLoading || !formData.name.trim()}>
+            <Button
+              type="submit"
+              disabled={isLoading || !formData.name.trim()}
+              className={
+                theme === 'light'
+                  ? 'bg-black text-white hover:bg-black/80'
+                  : 'bg-white text-black hover:bg-white/80'
+              }
+            >
               {isLoading ? 'Đang tạo...' : 'Tạo playlist'}
             </Button>
           </div>

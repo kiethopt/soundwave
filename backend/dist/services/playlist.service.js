@@ -276,7 +276,7 @@ const DEFAULT_SYSTEM_PLAYLISTS = [
         description: "Discover new music we think you'll like based on your listening habits",
         type: 'SYSTEM',
         privacy: 'PUBLIC',
-        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
+        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/discover_weekly_r1vgon.png',
         isAIGenerated: true,
     },
     {
@@ -284,7 +284,7 @@ const DEFAULT_SYSTEM_PLAYLISTS = [
         description: 'Catch all the latest releases from artists you follow and more',
         type: 'SYSTEM',
         privacy: 'PUBLIC',
-        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
+        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394291/release_radar_lfgrts.png',
         isAIGenerated: true,
     },
     {
@@ -292,7 +292,7 @@ const DEFAULT_SYSTEM_PLAYLISTS = [
         description: 'A perfect mix of your favorites and new discoveries',
         type: 'SYSTEM',
         privacy: 'PUBLIC',
-        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
+        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/daily_mix_aiqzjj.png',
         isAIGenerated: true,
     },
 ];
@@ -610,6 +610,26 @@ const updateSystemPlaylistForUser = (systemPlaylistName, userId) => __awaiter(vo
             console.error(`[PlaylistService] System playlist ${systemPlaylistName} not found`);
             return;
         }
+        let coverUrl = templatePlaylist.coverUrl;
+        if (!coverUrl) {
+            switch (systemPlaylistName) {
+                case 'Discover Weekly':
+                    coverUrl =
+                        'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/discover_weekly_r1vgon.png';
+                    break;
+                case 'Release Radar':
+                    coverUrl =
+                        'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394291/release_radar_lfgrts.png';
+                    break;
+                case 'Daily Mix':
+                    coverUrl =
+                        'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/daily_mix_aiqzjj.png';
+                    break;
+                default:
+                    coverUrl =
+                        'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
+            }
+        }
         let userPlaylist = yield db_1.default.playlist.findFirst({
             where: {
                 name: systemPlaylistName,
@@ -625,12 +645,18 @@ const updateSystemPlaylistForUser = (systemPlaylistName, userId) => __awaiter(vo
                     privacy: templatePlaylist.privacy,
                     type: 'SYSTEM',
                     isAIGenerated: true,
-                    coverUrl: templatePlaylist.coverUrl,
+                    coverUrl: coverUrl,
                     userId: userId,
                     lastGeneratedAt: new Date(),
                 },
             });
             console.log(`[PlaylistService] Created personalized system playlist "${systemPlaylistName}" for user ${userId}`);
+        }
+        else if (!userPlaylist.coverUrl) {
+            yield db_1.default.playlist.update({
+                where: { id: userPlaylist.id },
+                data: { coverUrl },
+            });
         }
         let tracks;
         switch (systemPlaylistName) {
@@ -903,13 +929,31 @@ const getHomePageData = (userId) => __awaiter(void 0, void 0, void 0, function* 
                 userId: userId,
                 type: 'SYSTEM',
             },
-            take: 5,
             include: {
                 _count: { select: { tracks: true } },
+                tracks: {
+                    select: {
+                        trackId: true,
+                    },
+                    take: 1,
+                },
             },
             orderBy: { lastGeneratedAt: 'desc' },
         });
-        responseData.personalizedSystemPlaylists = personalizedSystemPlaylists.map((p) => (Object.assign(Object.assign({}, p), { totalTracks: p._count.tracks })));
+        responseData.personalizedSystemPlaylists = personalizedSystemPlaylists
+            .filter((p) => p.tracks.length > 0)
+            .map((p) => (Object.assign(Object.assign({}, p), { totalTracks: p._count.tracks, tracks: undefined })));
+        for (const playlist of personalizedSystemPlaylists) {
+            if (playlist.tracks.length === 0) {
+                try {
+                    console.log(`[HomeDataService] Found empty system playlist ${playlist.name}, updating for user ${userId}`);
+                    (0, exports.updateSystemPlaylistForUser)(playlist.name, userId).catch((err) => console.error(`[HomeDataService] Error updating playlist: ${err}`));
+                }
+                catch (error) {
+                    console.error(`[HomeDataService] Error updating empty playlist: ${error}`);
+                }
+            }
+        }
     }
     return responseData;
 });

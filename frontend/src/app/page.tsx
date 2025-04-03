@@ -51,8 +51,13 @@ export default function Home() {
         );
 
         if (response.success) {
-          const { systemPlaylists, newestAlbums, hotAlbums, userPlaylists } =
-            response.data;
+          const {
+            systemPlaylists,
+            newestAlbums,
+            hotAlbums,
+            userPlaylists,
+            personalizedSystemPlaylists,
+          } = response.data;
 
           // Set albums data
           setNewestAlbums(newestAlbums || []);
@@ -68,17 +73,15 @@ export default function Home() {
 
             // Set trending playlist (for the featured content and tracks section)
             setTrendingPlaylist(trendingPlaylist || null);
+          }
 
-            // Filter out the trending playlist to avoid duplication
-            const userSpecificPlaylists = systemPlaylists.filter(
-              (playlist: Playlist) =>
-                playlist.name !== 'Soundwave Hits: Trending Right Now'
-            );
-
-            // Set personalized playlists for authenticated users
-            if (isAuthenticated) {
-              setPersonalizedPlaylists(userSpecificPlaylists);
-            }
+          // Use the personalized system playlists directly from the API response
+          if (
+            isAuthenticated &&
+            personalizedSystemPlaylists &&
+            personalizedSystemPlaylists.length > 0
+          ) {
+            setPersonalizedPlaylists(personalizedSystemPlaylists);
           }
 
           // Process user's private playlists if authenticated
@@ -394,7 +397,7 @@ export default function Home() {
                 <div className="flex flex-col space-y-2">
                   <div className="relative aspect-square overflow-hidden rounded-lg">
                     <Image
-                      src={playlist.coverUrl || ''}
+                      src={playlist.coverUrl || '/images/default-playlist.png'}
                       alt={playlist.name}
                       fill
                       className="object-cover"
@@ -434,10 +437,10 @@ export default function Home() {
                       {playlist.name}
                     </p>
                     <p className="text-xs text-muted-foreground line-clamp-1">
-                      {playlist.totalTracks} tracks •{' '}
+                      {playlist.totalTracks || 0} tracks •{' '}
                       {playlist.name.includes('Discover Weekly')
                         ? 'Updated weekly'
-                        : playlist.name.includes('New Releases')
+                        : playlist.name.includes('Release Radar')
                         ? 'Updated on Fridays'
                         : 'For you'}
                     </p>

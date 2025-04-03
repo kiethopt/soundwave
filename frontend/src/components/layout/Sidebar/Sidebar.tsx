@@ -214,7 +214,11 @@ export default function Sidebar({
                           </span>
                         </div>
                         <AddSimple
-                          className="w-6 h-6 ml-auto hover:text-white cursor-pointer"
+                          className={`w-6 h-6 ml-auto hover:text-white cursor-pointer ${
+                            theme === 'light'
+                              ? 'text-gray-600 hover:text-gray-900'
+                              : 'text-white/70 hover:text-white'
+                          }`}
                           onClick={() => {
                             const canProceed = handleProtectedAction();
                             if (canProceed) {

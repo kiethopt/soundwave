@@ -776,6 +776,30 @@ export const updateSystemPlaylistForUser = async (
       return;
     }
 
+    // Get the appropriate cover URL based on playlist name
+    let coverUrl = templatePlaylist.coverUrl;
+
+    // Ensure we have a default cover URL based on playlist type if none exists
+    if (!coverUrl) {
+      switch (systemPlaylistName) {
+        case 'Discover Weekly':
+          coverUrl =
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/discover_weekly_r1vgon.png';
+          break;
+        case 'Release Radar':
+          coverUrl =
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394291/release_radar_lfgrts.png';
+          break;
+        case 'Daily Mix':
+          coverUrl =
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/daily_mix_aiqzjj.png';
+          break;
+        default:
+          coverUrl =
+            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
+      }
+    }
+
     // Tìm hoặc tạo playlist cá nhân hóa cho user
     let userPlaylist = await prisma.playlist.findFirst({
       where: {
@@ -794,7 +818,7 @@ export const updateSystemPlaylistForUser = async (
           privacy: templatePlaylist.privacy,
           type: 'SYSTEM',
           isAIGenerated: true,
-          coverUrl: templatePlaylist.coverUrl,
+          coverUrl: coverUrl,
           userId: userId,
           lastGeneratedAt: new Date(),
         },
@@ -802,6 +826,12 @@ export const updateSystemPlaylistForUser = async (
       console.log(
         `[PlaylistService] Created personalized system playlist "${systemPlaylistName}" for user ${userId}`
       );
+    } else if (!userPlaylist.coverUrl) {
+      // If playlist exists but doesn't have a cover URL, update it
+      await prisma.playlist.update({
+        where: { id: userPlaylist.id },
+        data: { coverUrl },
+      });
     }
 
     // Lấy tracks tùy thuộc vào loại playlist
@@ -1143,7 +1173,7 @@ export const getHomePageData = async (userId?: string) => {
     newestAlbums,
     hotAlbums,
     userPlaylists: [],
-    personalizedSystemPlaylists: [],
+    personalizedSystemPlaylists: [], // Initialize the field
   };
 
   // Additional data for authenticated users
@@ -1174,15 +1204,46 @@ export const getHomePageData = async (userId?: string) => {
         userId: userId,
         type: 'SYSTEM',
       },
-      take: 5, // Limit the number shown
       include: {
         _count: { select: { tracks: true } },
+        tracks: {
+          select: {
+            trackId: true,
+          },
+          take: 1, // Just check if there are any tracks
+        },
       },
       orderBy: { lastGeneratedAt: 'desc' }, // Show most recently generated
     });
-    responseData.personalizedSystemPlaylists = personalizedSystemPlaylists.map(
-      (p) => ({ ...p, totalTracks: p._count.tracks })
-    );
+
+    // Only include playlists that have at least one track
+    responseData.personalizedSystemPlaylists = personalizedSystemPlaylists
+      .filter((p) => p.tracks.length > 0)
+      .map((p) => ({
+        ...p,
+        totalTracks: p._count.tracks,
+        tracks: undefined, // Remove tracks array to reduce payload size
+      }));
+
+    // If any system playlist is empty but should have tracks, trigger an update
+    for (const playlist of personalizedSystemPlaylists) {
+      if (playlist.tracks.length === 0) {
+        try {
+          console.log(
+            `[HomeDataService] Found empty system playlist ${playlist.name}, updating for user ${userId}`
+          );
+          // Don't await to avoid slowing down the response
+          updateSystemPlaylistForUser(playlist.name, userId).catch((err) =>
+            console.error(`[HomeDataService] Error updating playlist: ${err}`)
+          );
+        } catch (error) {
+          // Just log error but don't stop the response
+          console.error(
+            `[HomeDataService] Error updating empty playlist: ${error}`
+          );
+        }
+      }
+    }
   }
 
   return responseData;

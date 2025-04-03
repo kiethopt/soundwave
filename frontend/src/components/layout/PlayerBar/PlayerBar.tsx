@@ -17,11 +17,14 @@ import { useTrack } from '@/contexts/TrackContext';
 import { ListMusic } from 'lucide-react';
 import { QueuePanel } from '@/components/user/player/QueuePanel';
 import { api } from '@/utils/api';
+import { toast } from 'react-hot-toast';
+import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 
 export default function PlayerBar() {
   const [showMobileExpanded, setShowMobileExpanded] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
 
   const {
     currentTrack,
@@ -53,7 +56,37 @@ export default function PlayerBar() {
     setShowMobileExpanded(!showMobileExpanded);
   };
 
-  const handleLike = async (e: any) => {};
+  const handleLike = async (e: any) => {
+    if (e) {
+      e.stopPropagation();
+    }
+
+    if (!currentTrack) return;
+
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      // If user is not logged in, show auth dialog
+      setShowAuthDialog(true);
+      return;
+    }
+
+    try {
+      if (isLiked) {
+        // Unlike the track
+        await api.tracks.unlike(currentTrack.id, token);
+        setIsLiked(false);
+        toast.success('Removed from your Liked Songs');
+      } else {
+        // Like the track
+        await api.tracks.like(currentTrack.id, token);
+        setIsLiked(true);
+        toast.success('Added to your Liked Songs');
+      }
+    } catch (error) {
+      console.error('Error toggling like status:', error);
+      toast.error('There was an error updating your liked songs');
+    }
+  };
 
   useEffect(() => {
     const checkLikeStatus = async () => {
@@ -454,6 +487,20 @@ export default function PlayerBar() {
                     </button>
                   </div>
                 </div>
+
+                {/* Like Button */}
+                <div className="flex justify-center w-full mb-6">
+                  <button
+                    onClick={handleLike}
+                    className="p-3 rounded-full hover:bg-[#383838] transition-colors duration-200"
+                  >
+                    {isLiked ? (
+                      <LikeFilled className="w-8 h-8 text-[#A57865]" />
+                    ) : (
+                      <LikeOutline className="w-8 h-8 text-white" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -470,6 +517,9 @@ export default function PlayerBar() {
 
       {/* Queue panel */}
       <QueuePanel isOpen={isQueueOpen} onClose={() => setIsQueueOpen(false)} />
+
+      {/* Authentication Dialog */}
+      <MusicAuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
     </>
   );
 }
