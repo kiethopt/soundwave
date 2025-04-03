@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { exportToExcel } from '@/utils/export-to-excel';
-import { debounce } from 'lodash';
 import React from 'react';
 import { DataTableFilter } from './data-table-filter';
 
@@ -102,12 +101,13 @@ export function DataTableToolbar({
   theme = 'light',
   searchPlaceholder = 'Search...',
 }: DataTableToolbarProps) {
-  const debouncedSearch = React.useCallback(
-    debounce((value: string) => {
-      onSearchChange(value);
-    }, 300),
-    [onSearchChange]
-  );
+  // Replace the debounced search with a local state to track input value
+  const [inputValue, setInputValue] = React.useState(searchValue);
+
+  // Update the local state when the searchValue prop changes
+  React.useEffect(() => {
+    setInputValue(searchValue);
+  }, [searchValue]);
 
   const handleExport = async () => {
     if (!exportData) return;
@@ -127,10 +127,22 @@ export function DataTableToolbar({
     }
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    e.target.value = value;
-    debouncedSearch(value);
+  // Update the input handling to track value but not trigger search
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+
+  // Add a key press handler to trigger search on Enter
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      onSearchChange(inputValue);
+    }
+  };
+
+  // Add a clear button handler to clear the search input and trigger search
+  const handleClearSearch = () => {
+    setInputValue('');
+    onSearchChange(''); // Trigger search with empty string
   };
 
   // Kiểm tra xem có bất kỳ bộ lọc nào đang được áp dụng không
@@ -149,14 +161,28 @@ export function DataTableToolbar({
         <input
           type="text"
           placeholder={searchPlaceholder}
-          defaultValue={searchValue}
-          onChange={handleSearchChange}
-          className={`w-full h-9 pl-9 pr-4 text-sm rounded-md outline-none border ${
+          value={inputValue}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          className={`w-full h-9 pl-9 pr-9 text-sm rounded-md outline-none border ${
             theme === 'dark'
               ? 'bg-transparent border-white/[0.1] text-white placeholder:text-white/60'
               : 'bg-white border-gray-300'
           }`}
         />
+        {inputValue && (
+          <button
+            onClick={handleClearSearch}
+            className={`absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full ${
+              theme === 'dark'
+                ? 'text-white/60 hover:text-white hover:bg-white/10'
+                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+            }`}
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-2">

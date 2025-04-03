@@ -16,6 +16,7 @@ exports.generateDefaultPlaylistForNewUser = exports.createAIGeneratedPlaylist = 
 const generative_ai_1 = require("@google/generative-ai");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
+const client_1 = require("@prisma/client");
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not defined in environment variables');
@@ -396,14 +397,7 @@ Hướng dẫn quan trọng:
 exports.generateAIPlaylist = generateAIPlaylist;
 const createAIGeneratedPlaylist = (userId_1, ...args_1) => __awaiter(void 0, [userId_1, ...args_1], void 0, function* (userId, options = {}) {
     try {
-        const playlistName = options.name ||
-            (options.basedOnMood
-                ? `${options.basedOnMood} Mood Mix`
-                : options.basedOnGenre
-                    ? `${options.basedOnGenre} Essentials`
-                    : options.basedOnArtist
-                        ? `${options.basedOnArtist} Flow`
-                        : 'Soundwave Discoveries');
+        const playlistName = options.name || 'Soundwave Discoveries';
         const trackIds = yield (0, exports.generateAIPlaylist)(userId, options);
         const tracks = yield db_1.default.track.findMany({
             where: { id: { in: trackIds } },
@@ -439,73 +433,54 @@ const createAIGeneratedPlaylist = (userId_1, ...args_1) => __awaiter(void 0, [us
             .map((id) => artistsInPlaylist.get(id))
             .filter(Boolean);
         const playlistDescription = options.description ||
-            `Curated selection featuring ${sortedArtistNames.slice(0, 3).join(', ')}${sortedArtistNames.length > 3 ? ' and more' : ''}${options.basedOnMood ? `, perfect for a ${options.basedOnMood} mood` : ''}${options.basedOnGenre
-                ? `, focusing on ${options.basedOnGenre} music`
-                : ''}${options.basedOnArtist ? `, inspired by ${options.basedOnArtist}` : ''}. Refreshed regularly based on your listening patterns.`;
+            `Curated selection featuring ${sortedArtistNames.slice(0, 3).join(', ')}${sortedArtistNames.length > 3 ? ' and more' : ''}. Refreshed regularly based on your listening patterns.`;
         const defaultCoverUrl = 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
         let playlist = yield db_1.default.playlist.findFirst({
             where: {
                 userId,
                 name: playlistName,
-                isAIGenerated: true,
+                type: client_1.PlaylistType.SYSTEM,
             },
         });
+        const playlistData = {
+            description: playlistDescription,
+            coverUrl: options.coverUrl || defaultCoverUrl,
+            totalTracks: trackIds.length,
+            totalDuration,
+            updatedAt: new Date(),
+            lastGeneratedAt: new Date(),
+            tracks: {
+                createMany: {
+                    data: trackIds.map((trackId, index) => ({
+                        trackId,
+                        trackOrder: index,
+                    })),
+                    skipDuplicates: true,
+                },
+            },
+        };
         if (playlist) {
-            console.log(`[AI] Đang cập nhật danh sách phát AI đã tạo ${playlist.id}`);
+            console.log(`[AI] Updating personalized system playlist ${playlist.id} for user ${userId}`);
             yield db_1.default.playlistTrack.deleteMany({
                 where: { playlistId: playlist.id },
             });
             playlist = yield db_1.default.playlist.update({
                 where: { id: playlist.id },
-                data: {
-                    description: playlistDescription,
-                    coverUrl: playlist.coverUrl || defaultCoverUrl,
-                    totalTracks: trackIds.length,
-                    totalDuration,
-                    updatedAt: new Date(),
-                    lastGeneratedAt: new Date(),
-                    tracks: {
-                        createMany: {
-                            data: trackIds.map((trackId, index) => ({
-                                trackId,
-                                trackOrder: index,
-                            })),
-                        },
-                    },
-                },
+                data: playlistData,
             });
-            console.log(`[AI] Đã cập nhật danh sách phát với ${trackIds.length} bài hát từ ${artistsInPlaylist.size} nghệ sĩ`);
+            console.log(`[AI] Updated playlist with ${trackIds.length} tracks from ${artistsInPlaylist.size} artists`);
         }
         else {
-            console.log(`[AI] Đang tạo danh sách phát AI mới cho người dùng ${userId}`);
+            console.log(`[AI] Creating new personalized system playlist "${playlistName}" for user ${userId}`);
             playlist = yield db_1.default.playlist.create({
-                data: {
-                    name: playlistName,
-                    description: playlistDescription,
-                    coverUrl: defaultCoverUrl,
-                    privacy: 'PRIVATE',
-                    type: 'NORMAL',
-                    isAIGenerated: true,
-                    totalTracks: trackIds.length,
-                    totalDuration,
-                    lastGeneratedAt: new Date(),
-                    userId,
-                    tracks: {
-                        createMany: {
-                            data: trackIds.map((trackId, index) => ({
-                                trackId,
-                                trackOrder: index,
-                            })),
-                        },
-                    },
-                },
+                data: Object.assign({ name: playlistName, userId, type: client_1.PlaylistType.SYSTEM, privacy: 'PRIVATE', isAIGenerated: true }, playlistData),
             });
-            console.log(`[AI] Đã tạo danh sách phát với ${trackIds.length} bài hát từ ${artistsInPlaylist.size} nghệ sĩ`);
+            console.log(`[AI] Created playlist with ${trackIds.length} tracks from ${artistsInPlaylist.size} artists`);
         }
         return playlist;
     }
     catch (error) {
-        console.error('[AI] Error creating AI-generated playlist:', error);
+        console.error('[AI] Error creating/updating AI-generated playlist:', error);
         throw error;
     }
 });

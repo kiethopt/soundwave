@@ -1,8 +1,176 @@
 import prisma from '../config/db';
-import { Prisma } from '@prisma/client';
+import { Prisma, PlaylistPrivacy, PlaylistType } from '@prisma/client';
 import { Request } from 'express';
 import { paginate } from '../utils/handle-utils';
-import { createAIGeneratedPlaylist as createAIGeneratedPlaylistFromAIService } from './ai.service'; // Import AI service
+import { createAIGeneratedPlaylist as createAIGeneratedPlaylistFromAIService } from './ai.service';
+import { uploadFile } from './upload.service';
+
+// Select fields for base system playlist
+const baseSystemPlaylistSelect = {
+  id: true,
+  name: true,
+  description: true,
+  coverUrl: true,
+  privacy: true,
+  type: true,
+  isAIGenerated: true, // Base system playlists are templates for AI generation
+  totalTracks: true, // Might be useful for admin overview, though generated ones vary
+  totalDuration: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+// Create a base system playlist (Admin only)
+export const createBaseSystemPlaylist = async (
+  data: {
+    name: string;
+    description?: string;
+    privacy?: PlaylistPrivacy;
+  },
+  coverFile?: Express.Multer.File
+) => {
+  // Check if a system playlist with this name already exists
+  const existing = await prisma.playlist.findFirst({
+    where: {
+      name: data.name,
+      type: PlaylistType.SYSTEM,
+      userId: null,
+    },
+  });
+
+  if (existing) {
+    throw new Error(`A system playlist named "${data.name}" already exists.`);
+  }
+
+  let coverUrl = undefined;
+  if (coverFile) {
+    // Upload cover image if provided
+    const uploadResult = await uploadFile(coverFile.buffer, 'playlists/covers');
+    coverUrl = uploadResult.secure_url;
+  }
+
+  return prisma.playlist.create({
+    data: {
+      ...data,
+      coverUrl,
+      type: PlaylistType.SYSTEM,
+      isAIGenerated: true, // Base system playlists act as AI templates
+      userId: null, // Explicitly set userId to null
+    },
+    select: baseSystemPlaylistSelect,
+  });
+};
+
+// Update a base system playlist (Admin only)
+export const updateBaseSystemPlaylist = async (
+  playlistId: string,
+  data: {
+    name?: string;
+    description?: string;
+    privacy?: PlaylistPrivacy;
+  },
+  coverFile?: Express.Multer.File
+) => {
+  // Check if the playlist exists and is a base system playlist
+  const playlist = await prisma.playlist.findUnique({
+    where: { id: playlistId },
+    select: { type: true, userId: true, name: true },
+  });
+
+  if (
+    !playlist ||
+    playlist.type !== PlaylistType.SYSTEM ||
+    playlist.userId !== null
+  ) {
+    throw new Error('Base system playlist not found.');
+  }
+
+  // Check for name collision if name is being changed
+  if (data.name && data.name !== playlist.name) {
+    const existing = await prisma.playlist.findFirst({
+      where: {
+        name: data.name,
+        type: PlaylistType.SYSTEM,
+        userId: null,
+        id: { not: playlistId },
+      },
+    });
+    if (existing) {
+      throw new Error(
+        `Another system playlist named "${data.name}" already exists.`
+      );
+    }
+  }
+
+  let coverUrl = undefined;
+  if (coverFile) {
+    // Upload cover image if provided
+    const uploadResult = await uploadFile(coverFile.buffer, 'playlists/covers');
+    coverUrl = uploadResult.secure_url;
+  }
+
+  return prisma.playlist.update({
+    where: { id: playlistId },
+    data: {
+      ...data,
+      ...(coverUrl && { coverUrl }),
+      // Ensure type and userId remain unchanged
+      type: PlaylistType.SYSTEM,
+      userId: null,
+      isAIGenerated: true, // Keep this flag
+    },
+    select: baseSystemPlaylistSelect,
+  });
+};
+
+// Delete a base system playlist (Admin only)
+export const deleteBaseSystemPlaylist = async (playlistId: string) => {
+  // Check if the playlist exists and is a base system playlist
+  const playlist = await prisma.playlist.findUnique({
+    where: { id: playlistId },
+    select: { type: true, userId: true },
+  });
+
+  if (
+    !playlist ||
+    playlist.type !== PlaylistType.SYSTEM ||
+    playlist.userId !== null
+  ) {
+    throw new Error('Base system playlist not found.');
+  }
+
+  // Delete the base playlist
+  // Note: This does NOT delete the personalized versions for users.
+  // Handling cleanup of personalized versions could be a separate feature/process.
+  return prisma.playlist.delete({
+    where: { id: playlistId },
+  });
+};
+
+// Get all base system playlists (Admin only, with pagination)
+export const getAllBaseSystemPlaylists = async (req: Request) => {
+  const { search } = req.query;
+
+  const whereClause: Prisma.PlaylistWhereInput = {
+    type: PlaylistType.SYSTEM,
+    userId: null, // Only base system playlists
+  };
+
+  if (search && typeof search === 'string') {
+    whereClause.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  const result = await paginate(prisma.playlist, req, {
+    where: whereClause,
+    select: baseSystemPlaylistSelect,
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return result; // Returns { data: playlists, pagination: ... }
+};
 
 // Tạo playlist chứa các bài hát từ lịch sử nghe của người dùng
 export const updateVibeRewindPlaylist = async (
@@ -366,682 +534,6 @@ export const generateAIPlaylist = async (
   };
 };
 
-// Danh sách các system playlist mặc định
-const DEFAULT_SYSTEM_PLAYLISTS = [
-  {
-    name: 'Discover Weekly',
-    description:
-      "Discover new music we think you'll like based on your listening habits",
-    type: 'SYSTEM' as const,
-    privacy: 'PUBLIC' as const,
-    coverUrl:
-      'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
-    isAIGenerated: true,
-  },
-  {
-    name: 'Release Radar',
-    description:
-      'Catch all the latest releases from artists you follow and more',
-    type: 'SYSTEM' as const,
-    privacy: 'PUBLIC' as const,
-    coverUrl:
-      'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
-    isAIGenerated: true,
-  },
-  {
-    name: 'Daily Mix',
-    description: 'A perfect mix of your favorites and new discoveries',
-    type: 'SYSTEM' as const,
-    privacy: 'PUBLIC' as const,
-    coverUrl:
-      'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png',
-    isAIGenerated: true,
-  },
-];
-
-// Tạo các system playlist mặc định (gọi khi khởi tạo hệ thống)
-export const createDefaultSystemPlaylists = async (): Promise<void> => {
-  try {
-    for (const playlist of DEFAULT_SYSTEM_PLAYLISTS) {
-      // Kiểm tra xem playlist đã tồn tại chưa
-      const existingPlaylist = await prisma.playlist.findFirst({
-        where: {
-          name: playlist.name,
-          userId: null, // System playlist không có user ID
-          type: 'SYSTEM',
-        },
-      });
-
-      if (!existingPlaylist) {
-        await prisma.playlist.create({
-          data: {
-            name: playlist.name,
-            description: playlist.description,
-            privacy: playlist.privacy,
-            type: 'SYSTEM',
-            isAIGenerated: true,
-            coverUrl: playlist.coverUrl,
-            lastGeneratedAt: new Date(),
-          },
-        });
-        console.log(
-          `[PlaylistService] Created system playlist: ${playlist.name}`
-        );
-      } else if (!existingPlaylist.isAIGenerated) {
-        // Update existing playlist to set isAIGenerated to true if it's not already
-        await prisma.playlist.update({
-          where: { id: existingPlaylist.id },
-          data: { isAIGenerated: true },
-        });
-        console.log(
-          `[PlaylistService] Updated system playlist: ${playlist.name} to set isAIGenerated flag`
-        );
-      }
-    }
-  } catch (error) {
-    console.error('[PlaylistService] Error creating system playlists:', error);
-    throw error;
-  }
-};
-
-// Lấy recommendations cho một user cụ thể dựa trên lịch sử nghe
-const getPersonalizedRecommendations = async (userId: string, limit = 20) => {
-  // Lấy lịch sử nghe nhạc của user
-  const userHistory = await prisma.history.findMany({
-    where: {
-      userId,
-      type: 'PLAY',
-      playCount: { gt: 0 }, // Chỉ lấy những bài đã được nghe
-    },
-    include: {
-      track: {
-        include: {
-          artist: true,
-          genres: { include: { genre: true } },
-          album: true,
-        },
-      },
-    },
-    orderBy: { playCount: 'desc' },
-    take: 50, // Lấy 50 bài gần đây nhất
-  });
-
-  // Nếu không có lịch sử, trả về các bài hát phổ biến
-  if (userHistory.length === 0) {
-    return prisma.track.findMany({
-      where: { isActive: true },
-      include: { artist: true, album: true },
-      orderBy: { playCount: 'desc' },
-      take: limit,
-    });
-  }
-
-  // Xác định thể loại và nghệ sĩ yêu thích
-  const genreCounts = new Map<string, number>();
-  const artistCounts = new Map<string, number>();
-
-  userHistory.forEach((history) => {
-    const track = history.track;
-    if (track) {
-      track.genres.forEach((genreRel) => {
-        const genreId = genreRel.genre.id;
-        genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
-      });
-
-      const artistId = track.artist?.id;
-      if (artistId) {
-        artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
-      }
-    }
-  });
-
-  const topGenres = [...genreCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map((entry) => entry[0]);
-
-  const topArtists = [...artistCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map((entry) => entry[0]);
-
-  // Lấy những bài hát thuộc thể loại yêu thích hoặc nghệ sĩ yêu thích
-  const recommendations = await prisma.track.findMany({
-    where: {
-      AND: [
-        { isActive: true },
-        {
-          OR: [
-            { genres: { some: { genreId: { in: topGenres } } } },
-            { artistId: { in: topArtists } },
-          ],
-        },
-        // Loại bỏ các bài hát đã nghe
-        {
-          id: {
-            notIn: userHistory
-              .map((h) => h.trackId)
-              .filter((id): id is string => id !== null),
-          },
-        },
-      ],
-    },
-    include: {
-      artist: true,
-      album: true,
-    },
-    orderBy: { playCount: 'desc' },
-    take: limit,
-  });
-
-  // Nếu không đủ khuyến nghị, thêm các bài hát phổ biến
-  if (recommendations.length < limit) {
-    const popularTracks = await prisma.track.findMany({
-      where: {
-        isActive: true,
-        id: {
-          notIn: [
-            ...recommendations.map((t) => t.id),
-            ...userHistory
-              .map((h) => h.trackId)
-              .filter((id): id is string => id !== null),
-          ],
-        },
-      },
-      include: { artist: true, album: true },
-      orderBy: { playCount: 'desc' },
-      take: limit - recommendations.length,
-    });
-
-    return [...recommendations, ...popularTracks];
-  }
-
-  return recommendations;
-};
-
-// Lấy các bài phát hành mới từ các nghệ sĩ mà user theo dõi
-const getNewReleases = async (userId: string, limit = 20) => {
-  // Lấy danh sách nghệ sĩ mà user theo dõi
-  const followedArtists = await prisma.userFollow.findMany({
-    where: {
-      followerId: userId,
-      followingType: 'ARTIST',
-    },
-    select: {
-      followingArtistId: true,
-    },
-  });
-
-  const artistIds = followedArtists
-    .map((f) => f.followingArtistId)
-    .filter((id): id is string => id !== null);
-
-  // Nếu không theo dõi ai, lấy các release mới nhất nói chung
-  if (artistIds.length === 0) {
-    return prisma.track.findMany({
-      where: {
-        isActive: true,
-        releaseDate: {
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 ngày trước
-        },
-      },
-      include: { artist: true, album: true },
-      orderBy: { releaseDate: 'desc' },
-      take: limit,
-    });
-  }
-
-  // Lấy các bản phát hành mới từ nghệ sĩ được theo dõi
-  const followedArtistReleases = await prisma.track.findMany({
-    where: {
-      artistId: { in: artistIds },
-      isActive: true,
-      releaseDate: {
-        gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 ngày trước
-      },
-    },
-    include: { artist: true, album: true },
-    orderBy: { releaseDate: 'desc' },
-    take: limit,
-  });
-
-  // Nếu không đủ bài hát, bổ sung thêm bài hát mới từ các nghệ sĩ phổ biến
-  if (followedArtistReleases.length < limit) {
-    const otherNewReleases = await prisma.track.findMany({
-      where: {
-        artistId: { notIn: artistIds },
-        isActive: true,
-        releaseDate: {
-          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 ngày trước
-        },
-        id: { notIn: followedArtistReleases.map((t) => t.id) },
-      },
-      include: { artist: true, album: true },
-      orderBy: { releaseDate: 'desc' },
-      take: limit - followedArtistReleases.length,
-    });
-
-    return [...followedArtistReleases, ...otherNewReleases];
-  }
-
-  return followedArtistReleases;
-};
-
-// Lấy mix hàng ngày dựa trên thể loại và nghệ sĩ yêu thích
-const getDailyMix = async (userId: string, limit = 20) => {
-  // Lấy bài hát từ lịch sử nghe nhạc
-  const userLikedTracks = await prisma.userLikeTrack.findMany({
-    where: { userId },
-    include: {
-      track: {
-        include: {
-          artist: true,
-          genres: { include: { genre: true } },
-        },
-      },
-    },
-    take: 50,
-  });
-
-  const userPlayHistory = await prisma.history.findMany({
-    where: {
-      userId,
-      type: 'PLAY',
-      playCount: { gt: 2 },
-    },
-    include: {
-      track: {
-        include: {
-          artist: true,
-          genres: { include: { genre: true } },
-        },
-      },
-    },
-    orderBy: { playCount: 'desc' },
-    take: 50,
-  });
-
-  // Nếu không có lịch sử, trả về các bài hát phổ biến
-  if (userPlayHistory.length === 0 && userLikedTracks.length === 0) {
-    return prisma.track.findMany({
-      where: { isActive: true },
-      include: { artist: true, album: true },
-      orderBy: { playCount: 'desc' },
-      take: limit,
-    });
-  }
-
-  // Xây dựng danh sách tracks để phân tích
-  const tracksToAnalyze = [
-    ...userLikedTracks
-      .map((t) => t.track)
-      .filter((track): track is NonNullable<typeof track> => !!track),
-    ...userPlayHistory
-      .map((h) => h.track)
-      .filter((track): track is NonNullable<typeof track> => !!track),
-  ];
-
-  // Xác định thể loại và nghệ sĩ yêu thích
-  const genreCounts = new Map<string, number>();
-  const artistCounts = new Map<string, number>();
-
-  tracksToAnalyze.forEach((track) => {
-    if (track) {
-      track.genres.forEach((genreRel) => {
-        const genreId = genreRel.genre.id;
-        genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
-      });
-
-      const artistId = track.artist?.id;
-      if (artistId) {
-        artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
-      }
-    }
-  });
-
-  const topGenres = [...genreCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map((entry) => entry[0]);
-
-  const topArtists = [...artistCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map((entry) => entry[0]);
-
-  // 50% bài hát từ nghệ sĩ yêu thích, 50% từ thể loại tương tự
-  const favoriteTracks = await prisma.track.findMany({
-    where: {
-      artistId: { in: topArtists },
-      isActive: true,
-      id: {
-        notIn: tracksToAnalyze
-          .map((t) => t.id)
-          .filter((id): id is string => id !== undefined),
-      },
-    },
-    include: { artist: true, album: true },
-    orderBy: [{ playCount: 'desc' }],
-    take: Math.ceil(limit / 2),
-  });
-
-  const similarGenreTracks = await prisma.track.findMany({
-    where: {
-      genres: { some: { genreId: { in: topGenres } } },
-      artistId: { notIn: topArtists }, // Tránh trùng lặp với nghệ sĩ yêu thích
-      isActive: true,
-      id: {
-        notIn: [
-          ...favoriteTracks.map((t) => t.id),
-          ...tracksToAnalyze
-            .map((t) => t.id)
-            .filter((id): id is string => id !== undefined),
-        ],
-      },
-    },
-    include: { artist: true, album: true },
-    orderBy: { playCount: 'desc' },
-    take: Math.floor(limit / 2),
-  });
-
-  // Trộn ngẫu nhiên bài hát
-  const mixedTracks = [...favoriteTracks, ...similarGenreTracks];
-  for (let i = mixedTracks.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [mixedTracks[i], mixedTracks[j]] = [mixedTracks[j], mixedTracks[i]];
-  }
-
-  return mixedTracks;
-};
-
-// Cập nhật System Playlist cho một user cụ thể
-export const updateSystemPlaylistForUser = async (
-  systemPlaylistName: string,
-  userId: string
-): Promise<void> => {
-  try {
-    // Tìm system playlist gốc (template)
-    const templatePlaylist = await prisma.playlist.findFirst({
-      where: {
-        name: systemPlaylistName,
-        type: 'SYSTEM',
-        userId: null,
-      },
-    });
-
-    if (!templatePlaylist) {
-      console.error(
-        `[PlaylistService] System playlist ${systemPlaylistName} not found`
-      );
-      return;
-    }
-
-    // Get the appropriate cover URL based on playlist name
-    let coverUrl = templatePlaylist.coverUrl;
-
-    // Ensure we have a default cover URL based on playlist type if none exists
-    if (!coverUrl) {
-      switch (systemPlaylistName) {
-        case 'Discover Weekly':
-          coverUrl =
-            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/discover_weekly_r1vgon.png';
-          break;
-        case 'Release Radar':
-          coverUrl =
-            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394291/release_radar_lfgrts.png';
-          break;
-        case 'Daily Mix':
-          coverUrl =
-            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/daily_mix_aiqzjj.png';
-          break;
-        default:
-          coverUrl =
-            'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
-      }
-    }
-
-    // Tìm hoặc tạo playlist cá nhân hóa cho user
-    let userPlaylist = await prisma.playlist.findFirst({
-      where: {
-        name: systemPlaylistName,
-        type: 'SYSTEM',
-        userId: userId,
-      },
-    });
-
-    // Nếu không tìm thấy, tạo bản sao cho user
-    if (!userPlaylist) {
-      userPlaylist = await prisma.playlist.create({
-        data: {
-          name: templatePlaylist.name,
-          description: templatePlaylist.description,
-          privacy: templatePlaylist.privacy,
-          type: 'SYSTEM',
-          isAIGenerated: true,
-          coverUrl: coverUrl,
-          userId: userId,
-          lastGeneratedAt: new Date(),
-        },
-      });
-      console.log(
-        `[PlaylistService] Created personalized system playlist "${systemPlaylistName}" for user ${userId}`
-      );
-    } else if (!userPlaylist.coverUrl) {
-      // If playlist exists but doesn't have a cover URL, update it
-      await prisma.playlist.update({
-        where: { id: userPlaylist.id },
-        data: { coverUrl },
-      });
-    }
-
-    // Lấy tracks tùy thuộc vào loại playlist
-    let tracks;
-    switch (systemPlaylistName) {
-      case 'Discover Weekly':
-        tracks = await getPersonalizedRecommendations(userId, 30);
-        break;
-      case 'Release Radar':
-        tracks = await getNewReleases(userId, 30);
-        break;
-      case 'Daily Mix':
-        tracks = await getDailyMix(userId, 30);
-        break;
-      default:
-        tracks = await getPersonalizedRecommendations(userId, 30);
-    }
-
-    if (!tracks || tracks.length === 0) {
-      console.log(
-        `[PlaylistService] No tracks found for ${systemPlaylistName} for user ${userId}`
-      );
-      return;
-    }
-
-    // Xóa tất cả các track hiện tại trong playlist cá nhân hóa
-    await prisma.playlistTrack.deleteMany({
-      where: {
-        playlistId: userPlaylist.id,
-      },
-    });
-
-    // Thêm tracks mới (đảm bảo không trùng lặp)
-    const playlistTrackData = tracks.map((track, index) => ({
-      playlistId: userPlaylist.id,
-      trackId: track.id,
-      trackOrder: index,
-    }));
-
-    // Lọc bỏ các track trùng lặp
-    const uniqueTrackData = playlistTrackData.filter(
-      (track, index, self) =>
-        self.findIndex(
-          (t) =>
-            t.playlistId === track.playlistId && t.trackId === track.trackId
-        ) === index
-    );
-
-    await prisma.$transaction([
-      prisma.playlistTrack.createMany({
-        data: uniqueTrackData,
-      }),
-      prisma.playlist.update({
-        where: { id: userPlaylist.id },
-        data: {
-          totalTracks: tracks.length,
-          totalDuration: tracks.reduce(
-            (sum, track) => sum + (track?.duration || 0),
-            0
-          ),
-          lastGeneratedAt: new Date(),
-        },
-      }),
-    ]);
-
-    console.log(
-      `[PlaylistService] Successfully updated ${tracks.length} tracks for ${systemPlaylistName} for user ${userId}`
-    );
-  } catch (error) {
-    console.error(
-      `[PlaylistService] Error updating tracks for ${systemPlaylistName} for user ${userId}:`,
-      error
-    );
-    throw error;
-  }
-};
-
-// Lấy System Playlist đã được cá nhân hóa cho một user
-export const getPersonalizedSystemPlaylist = async (
-  systemPlaylistName: string,
-  userId: string
-) => {
-  try {
-    // Tìm playlist cá nhân hóa của user trước
-    let userPlaylist = await prisma.playlist.findFirst({
-      where: {
-        name: systemPlaylistName,
-        type: 'SYSTEM',
-        userId: userId,
-      },
-      include: {
-        tracks: {
-          include: {
-            track: {
-              include: {
-                artist: true,
-                album: true,
-                genres: {
-                  include: {
-                    genre: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: {
-            trackOrder: 'asc',
-          },
-        },
-      },
-    });
-
-    // Nếu user chưa có playlist này, hoặc playlist này chưa có tracks hoặc cần cập nhật
-    if (!userPlaylist || userPlaylist.tracks.length === 0) {
-      console.log(
-        `[PlaylistService] User ${userId} doesn't have playlist "${systemPlaylistName}" yet or it's empty. Creating and populating...`
-      );
-
-      // Tạo và cập nhật playlist cho user
-      await updateSystemPlaylistForUser(systemPlaylistName, userId);
-
-      // Lấy lại playlist sau khi cập nhật
-      userPlaylist = await prisma.playlist.findFirst({
-        where: {
-          name: systemPlaylistName,
-          type: 'SYSTEM',
-          userId: userId,
-        },
-        include: {
-          tracks: {
-            include: {
-              track: {
-                include: {
-                  artist: true,
-                  album: true,
-                  genres: {
-                    include: {
-                      genre: true,
-                    },
-                  },
-                },
-              },
-            },
-            orderBy: {
-              trackOrder: 'asc',
-            },
-          },
-        },
-      });
-    } else {
-      // Kiểm tra xem playlist có cần cập nhật không (24 giờ)
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const needsRefresh =
-        !userPlaylist.lastGeneratedAt ||
-        userPlaylist.lastGeneratedAt < oneDayAgo;
-
-      if (needsRefresh) {
-        console.log(
-          `[PlaylistService] Refreshing system playlist "${systemPlaylistName}" for user ${userId}`
-        );
-        try {
-          await updateSystemPlaylistForUser(systemPlaylistName, userId);
-
-          // Lấy lại playlist sau khi cập nhật
-          userPlaylist = await prisma.playlist.findFirst({
-            where: {
-              name: systemPlaylistName,
-              type: 'SYSTEM',
-              userId: userId,
-            },
-            include: {
-              tracks: {
-                include: {
-                  track: {
-                    include: {
-                      artist: true,
-                      album: true,
-                      genres: {
-                        include: {
-                          genre: true,
-                        },
-                      },
-                    },
-                  },
-                },
-                orderBy: {
-                  trackOrder: 'asc',
-                },
-              },
-            },
-          });
-        } catch (error) {
-          console.error(
-            `[PlaylistService] Error refreshing system playlist: ${error}`
-          );
-          // Return existing playlist even if refresh failed
-        }
-      }
-    }
-
-    return userPlaylist;
-  } catch (error) {
-    console.error(
-      `[PlaylistService] Error getting personalized system playlist:`,
-      error
-    );
-    throw error;
-  }
-};
-
 // Cập nhật tất cả system playlists cho tất cả user
 export const updateAllSystemPlaylists = async (): Promise<{
   success: boolean;
@@ -1054,56 +546,104 @@ export const updateAllSystemPlaylists = async (): Promise<{
       select: { id: true },
     });
 
-    // Lấy danh sách system playlists
-    const systemPlaylists = await prisma.playlist.findMany({
+    // Lấy danh sách base system playlists (templates)
+    const baseSystemPlaylists = await prisma.playlist.findMany({
       where: { type: 'SYSTEM', userId: null },
-      select: { name: true },
+      select: { name: true }, // Only need the name to trigger the update
     });
 
+    if (baseSystemPlaylists.length === 0) {
+      console.log(
+        '[PlaylistService] No base system playlists found to update.'
+      );
+      return { success: true, errors: [] };
+    }
+
     console.log(
-      `[PlaylistService] Updating system playlists for ${users.length} users`
+      `[PlaylistService] Updating ${baseSystemPlaylists.length} system playlists for ${users.length} users...`
     );
 
-    // Danh sách lỗi để theo dõi
     const errors: Array<{
       userId: string;
       playlistName: string;
       error: string;
     }> = [];
 
-    // Cập nhật từng playlist cho từng user
-    for (const user of users) {
-      for (const playlist of systemPlaylists) {
-        try {
-          await updateSystemPlaylistForUser(playlist.name, user.id);
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          console.error(
-            `[PlaylistService] Error updating ${playlist.name} for user ${user.id}: ${errorMessage}`
-          );
-          errors.push({
-            userId: user.id,
-            playlistName: playlist.name,
-            error: errorMessage,
-          });
-          // Continue with next playlist/user despite this error
-        }
-      }
-    }
+    // Use Promise.allSettled for better performance and error handling
+    const updatePromises = users.flatMap((user) =>
+      baseSystemPlaylists.map((playlistTemplate) =>
+        // Inline the logic from the removed updateSystemPlaylistForUser function
+        (async () => {
+          try {
+            // Find the base system playlist template (userId is null)
+            const templatePlaylist = await prisma.playlist.findFirst({
+              where: {
+                name: playlistTemplate.name, // Use name from the map iteration
+                type: 'SYSTEM',
+                userId: null,
+              },
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                coverUrl: true,
+                privacy: true,
+              },
+            });
+
+            if (!templatePlaylist) {
+              throw new Error(
+                `Base template "${playlistTemplate.name}" not found.`
+              ); // Throw error to be caught below
+            }
+
+            // Default cover if the template doesn't have one
+            const coverUrl =
+              templatePlaylist.coverUrl ||
+              'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
+
+            // Call the AI service to create/update the user's personalized version
+            await createAIGeneratedPlaylistFromAIService(user.id, {
+              name: templatePlaylist.name,
+              description: templatePlaylist.description || undefined,
+              coverUrl: coverUrl,
+            });
+          } catch (error: unknown) {
+            // Add type annotation here
+            // This catch block handles errors for a single user/playlist update
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            console.error(
+              `[PlaylistService] Error updating ${playlistTemplate.name} for user ${user.id}: ${errorMessage}`
+            );
+            // Push the error details into the shared errors array
+            errors.push({
+              userId: user.id,
+              playlistName: playlistTemplate.name,
+              error: errorMessage,
+            });
+            // Don't rethrow here, let Promise.allSettled handle it
+          }
+        })()
+      )
+    );
+
+    await Promise.allSettled(updatePromises);
 
     if (errors.length === 0) {
       console.log(
-        `[PlaylistService] Successfully updated all system playlists`
+        `[PlaylistService] Successfully finished updating all system playlists.`
       );
       return { success: true, errors: [] };
     } else {
-      console.error(`[PlaylistService] Completed with ${errors.length} errors`);
+      console.warn(
+        `[PlaylistService] Finished updating system playlists with ${errors.length} errors.`
+      );
       return { success: false, errors };
     }
   } catch (error) {
     console.error(
-      '[PlaylistService] Error updating all system playlists:',
+      '[PlaylistService] Critical error during updateAllSystemPlaylists:',
       error
     );
     return {
@@ -1113,138 +653,4 @@ export const updateAllSystemPlaylists = async (): Promise<{
       ],
     };
   }
-};
-
-// Get homepage data (combines multiple endpoints for efficiency)
-export const getHomePageData = async (userId?: string) => {
-  // Get system playlists (global ones for all users)
-  const systemPlaylists = await prisma.playlist.findMany({
-    where: {
-      type: 'SYSTEM',
-      userId: null,
-      privacy: 'PUBLIC', // Ensure only public global playlists
-    },
-    take: 5, // Limit the number of system playlists shown on homepage
-    include: {
-      // Minimal includes for homepage performance
-      user: { select: { name: true } },
-    },
-    orderBy: { createdAt: 'desc' }, // Or some other relevant order
-  });
-
-  // Get newest albums
-  const newestAlbums = await prisma.album.findMany({
-    where: {
-      isActive: true,
-    },
-    orderBy: {
-      releaseDate: 'desc', // Order by release date
-    },
-    take: 10,
-    include: {
-      artist: { select: { id: true, artistName: true, avatar: true } }, // Minimal includes
-    },
-  });
-
-  // Get popular albums (Example: based on recent creation or track plays - simplified here)
-  const hotAlbums = await prisma.album.findMany({
-    where: {
-      isActive: true,
-      // Add logic for "hotness" if needed, e.g., recent track plays
-    },
-    orderBy: [
-      { createdAt: 'desc' }, // Simple ordering for now
-    ],
-    take: 10,
-    include: {
-      artist: { select: { id: true, artistName: true, avatar: true } }, // Minimal includes
-    },
-  });
-
-  // Data to return for all users (authenticated or not)
-  const responseData: {
-    systemPlaylists: any[];
-    newestAlbums: any[];
-    hotAlbums: any[];
-    userPlaylists: any[];
-    personalizedSystemPlaylists: any[]; // Add field for user-specific system playlists
-  } = {
-    systemPlaylists,
-    newestAlbums,
-    hotAlbums,
-    userPlaylists: [],
-    personalizedSystemPlaylists: [], // Initialize the field
-  };
-
-  // Additional data for authenticated users
-  if (userId) {
-    // Get user's playlists (non-system, non-favorite, recent)
-    const userPlaylists = await prisma.playlist.findMany({
-      where: {
-        userId,
-        type: 'NORMAL', // Exclude FAVORITE and SYSTEM
-      },
-      include: {
-        _count: { select: { tracks: true } }, // Get track count efficiently
-      },
-      take: 5, // Limit the number shown
-      orderBy: {
-        updatedAt: 'desc',
-      },
-    });
-    // Add track count to user playlists
-    responseData.userPlaylists = userPlaylists.map((p) => ({
-      ...p,
-      totalTracks: p._count.tracks,
-    }));
-
-    // Get user-specific system playlists (like Discover Weekly, Release Radar, etc.)
-    const personalizedSystemPlaylists = await prisma.playlist.findMany({
-      where: {
-        userId: userId,
-        type: 'SYSTEM',
-      },
-      include: {
-        _count: { select: { tracks: true } },
-        tracks: {
-          select: {
-            trackId: true,
-          },
-          take: 1, // Just check if there are any tracks
-        },
-      },
-      orderBy: { lastGeneratedAt: 'desc' }, // Show most recently generated
-    });
-
-    // Only include playlists that have at least one track
-    responseData.personalizedSystemPlaylists = personalizedSystemPlaylists
-      .filter((p) => p.tracks.length > 0)
-      .map((p) => ({
-        ...p,
-        totalTracks: p._count.tracks,
-        tracks: undefined, // Remove tracks array to reduce payload size
-      }));
-
-    // If any system playlist is empty but should have tracks, trigger an update
-    for (const playlist of personalizedSystemPlaylists) {
-      if (playlist.tracks.length === 0) {
-        try {
-          console.log(
-            `[HomeDataService] Found empty system playlist ${playlist.name}, updating for user ${userId}`
-          );
-          // Don't await to avoid slowing down the response
-          updateSystemPlaylistForUser(playlist.name, userId).catch((err) =>
-            console.error(`[HomeDataService] Error updating playlist: ${err}`)
-          );
-        } catch (error) {
-          // Just log error but don't stop the response
-          console.error(
-            `[HomeDataService] Error updating empty playlist: ${error}`
-          );
-        }
-      }
-    }
-  }
-
-  return responseData;
 };

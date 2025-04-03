@@ -41,14 +41,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getHomePageData = exports.updateSystemPlaylistForUser = exports.updateAllSystemPlaylists = exports.getSystemPlaylist = exports.createSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = void 0;
-const client_1 = require("@prisma/client");
+exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = void 0;
 const playlistService = __importStar(require("../services/playlist.service"));
-const prisma = new client_1.PrismaClient();
+const albumService = __importStar(require("../services/album.service"));
+const handle_utils_1 = require("../utils/handle-utils");
+const client_1 = require("@prisma/client");
+const db_1 = __importDefault(require("../config/db"));
 const createFavoritePlaylist = (userId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield prisma.playlist.create({
+        yield db_1.default.playlist.create({
             data: {
                 name: 'Bài hát yêu thích',
                 description: 'Danh sách những bài hát yêu thích của bạn',
@@ -77,7 +82,7 @@ const createPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             return;
         }
         if (type === 'FAVORITE') {
-            const existingFavorite = yield prisma.playlist.findFirst({
+            const existingFavorite = yield db_1.default.playlist.findFirst({
                 where: {
                     userId,
                     type: 'FAVORITE',
@@ -91,7 +96,7 @@ const createPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
                 return;
             }
         }
-        const playlist = yield prisma.playlist.create({
+        const playlist = yield db_1.default.playlist.create({
             data: {
                 name,
                 description,
@@ -125,14 +130,14 @@ const getPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
         const filterType = req.header('X-Filter-Type');
         const isSystemFilter = filterType === 'system';
         if (!isSystemFilter) {
-            let favoritePlaylist = yield prisma.playlist.findFirst({
+            let favoritePlaylist = yield db_1.default.playlist.findFirst({
                 where: {
                     userId,
                     type: 'FAVORITE',
                 },
             });
             if (!favoritePlaylist) {
-                favoritePlaylist = yield prisma.playlist.create({
+                favoritePlaylist = yield db_1.default.playlist.create({
                     data: {
                         name: 'Bài hát yêu thích',
                         description: 'Danh sách những bài hát yêu thích của bạn',
@@ -142,14 +147,14 @@ const getPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
                     },
                 });
             }
-            let vibeRewindPlaylist = yield prisma.playlist.findFirst({
+            let vibeRewindPlaylist = yield db_1.default.playlist.findFirst({
                 where: {
                     userId,
                     name: 'Vibe Rewind',
                 },
             });
             if (!vibeRewindPlaylist) {
-                vibeRewindPlaylist = yield prisma.playlist.create({
+                vibeRewindPlaylist = yield db_1.default.playlist.create({
                     data: {
                         name: 'Vibe Rewind',
                         description: "Your personal time capsule - tracks you've been vibing to lately",
@@ -167,7 +172,7 @@ const getPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
             }
         }
         if (isSystemFilter) {
-            const systemPlaylists = yield prisma.playlist.findMany({
+            const systemPlaylists = yield db_1.default.playlist.findMany({
                 where: {
                     OR: [
                         {
@@ -223,7 +228,7 @@ const getPlaylists = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
             });
         }
         else {
-            const playlists = yield prisma.playlist.findMany({
+            const playlists = yield db_1.default.playlist.findMany({
                 where: {
                     userId,
                 },
@@ -257,7 +262,7 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
         const userRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
         const isAuthenticated = !!userId;
-        const playlistExists = yield prisma.playlist.findUnique({
+        const playlistExists = yield db_1.default.playlist.findUnique({
             where: { id },
         });
         if (!playlistExists) {
@@ -283,7 +288,7 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
         }
         let playlist;
         if (isSystemPlaylist || isPublicPlaylist) {
-            playlist = yield prisma.playlist.findUnique({
+            playlist = yield db_1.default.playlist.findUnique({
                 where: { id },
                 include: {
                     tracks: {
@@ -310,7 +315,7 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
                 });
                 return;
             }
-            playlist = yield prisma.playlist.findUnique({
+            playlist = yield db_1.default.playlist.findUnique({
                 where: { id },
                 include: {
                     tracks: {
@@ -344,7 +349,7 @@ const getPlaylistById = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
                 });
                 return;
             }
-            playlist = yield prisma.playlist.findUnique({
+            playlist = yield db_1.default.playlist.findUnique({
                 where: { id },
                 include: {
                     tracks: {
@@ -413,7 +418,7 @@ const addTrackToPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0,
             });
             return;
         }
-        const playlist = yield prisma.playlist.findUnique({
+        const playlist = yield db_1.default.playlist.findUnique({
             where: {
                 id: playlistId,
             },
@@ -442,7 +447,7 @@ const addTrackToPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0,
             });
             return;
         }
-        const track = yield prisma.track.findUnique({
+        const track = yield db_1.default.track.findUnique({
             where: {
                 id: trackId,
             },
@@ -454,7 +459,7 @@ const addTrackToPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0,
             });
             return;
         }
-        const existingTrack = yield prisma.playlistTrack.findFirst({
+        const existingTrack = yield db_1.default.playlistTrack.findFirst({
             where: {
                 playlistId,
                 trackId,
@@ -468,14 +473,14 @@ const addTrackToPlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0,
             return;
         }
         const nextTrackOrder = playlist.tracks.length;
-        yield prisma.playlistTrack.create({
+        yield db_1.default.playlistTrack.create({
             data: {
                 playlistId,
                 trackId,
                 trackOrder: nextTrackOrder,
             },
         });
-        yield prisma.playlist.update({
+        yield db_1.default.playlist.update({
             where: {
                 id: playlistId,
             },
@@ -512,7 +517,7 @@ const removeTrackFromPlaylist = (req, res, next) => __awaiter(void 0, void 0, vo
             trackId,
             userId,
         });
-        const playlist = yield prisma.playlist.findUnique({
+        const playlist = yield db_1.default.playlist.findUnique({
             where: {
                 id: playlistId,
             },
@@ -538,13 +543,13 @@ const removeTrackFromPlaylist = (req, res, next) => __awaiter(void 0, void 0, vo
             });
             return;
         }
-        yield prisma.playlistTrack.deleteMany({
+        yield db_1.default.playlistTrack.deleteMany({
             where: {
                 playlistId,
                 trackId,
             },
         });
-        yield prisma.playlist.update({
+        yield db_1.default.playlist.update({
             where: {
                 id: playlistId,
             },
@@ -581,7 +586,7 @@ const updatePlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function*
             });
             return;
         }
-        const playlist = yield prisma.playlist.findUnique({
+        const playlist = yield db_1.default.playlist.findUnique({
             where: { id },
         });
         if (!playlist) {
@@ -605,7 +610,7 @@ const updatePlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function*
             });
             return;
         }
-        const updatedPlaylist = yield prisma.playlist.update({
+        const updatedPlaylist = yield db_1.default.playlist.update({
             where: { id },
             data: {
                 name,
@@ -661,7 +666,7 @@ const deletePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             });
             return;
         }
-        const playlist = yield prisma.playlist.findUnique({
+        const playlist = yield db_1.default.playlist.findUnique({
             where: { id },
         });
         if (!playlist) {
@@ -685,7 +690,7 @@ const deletePlaylist = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             });
             return;
         }
-        yield prisma.playlist.delete({
+        yield db_1.default.playlist.delete({
             where: { id },
         });
         res.json({
@@ -771,53 +776,6 @@ const generateAIPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.generateAIPlaylist = generateAIPlaylist;
-const createSystemPlaylists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        yield playlistService.createDefaultSystemPlaylists();
-        res.status(200).json({
-            success: true,
-            message: 'System playlists created successfully',
-        });
-    }
-    catch (error) {
-        console.error('Create system playlists error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create system playlists',
-        });
-    }
-});
-exports.createSystemPlaylists = createSystemPlaylists;
-const getSystemPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { playlistName } = req.params;
-        const user = req.user;
-        if (!user) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
-            return;
-        }
-        const playlist = yield playlistService.getPersonalizedSystemPlaylist(playlistName, user.id);
-        if (!playlist) {
-            res.status(404).json({
-                success: false,
-                message: `System playlist "${playlistName}" not found`,
-            });
-            return;
-        }
-        res.status(200).json({
-            success: true,
-            data: playlist,
-        });
-    }
-    catch (error) {
-        console.error('Get system playlist error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to retrieve system playlist',
-        });
-    }
-});
-exports.getSystemPlaylist = getSystemPlaylist;
 const updateAllSystemPlaylists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         res.status(200).json({
@@ -849,45 +807,175 @@ const updateAllSystemPlaylists = (req, res) => __awaiter(void 0, void 0, void 0,
     }
 });
 exports.updateAllSystemPlaylists = updateAllSystemPlaylists;
-const updateSystemPlaylistForUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const createBaseSystemPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { playlistName, userId } = req.params;
-        const user = req.user;
-        if (!user) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
+        const { name, description, privacy } = req.body;
+        const coverFile = req.file;
+        if (!name) {
+            res
+                .status(400)
+                .json({ success: false, message: 'Playlist name is required.' });
             return;
         }
-        yield playlistService.updateSystemPlaylistForUser(playlistName, userId);
-        res.status(200).json({
-            success: true,
-            message: `System playlist "${playlistName}" updated successfully for user`,
-        });
+        const playlistData = {
+            name,
+            description,
+            privacy: privacy || 'PUBLIC',
+        };
+        const playlist = yield playlistService.createBaseSystemPlaylist(playlistData, coverFile);
+        res.status(201).json({ success: true, data: playlist });
     }
     catch (error) {
-        console.error('Update system playlist error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to update system playlist',
-        });
+        if (error instanceof Error && error.message.includes('already exists')) {
+            res.status(400).json({ success: false, message: error.message });
+        }
+        else {
+            (0, handle_utils_1.handleError)(res, error, 'Create Base System Playlist');
+        }
     }
 });
-exports.updateSystemPlaylistForUser = updateSystemPlaylistForUser;
-const getHomePageData = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+exports.createBaseSystemPlaylist = createBaseSystemPlaylist;
+const updateBaseSystemPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const user = req.user;
-        const userId = user === null || user === void 0 ? void 0 : user.id;
-        const homeData = yield playlistService.getHomePageData(userId);
+        const { id } = req.params;
+        const { name, description, privacy } = req.body;
+        const coverFile = req.file;
+        const updateData = {
+            name,
+            description,
+            privacy,
+        };
+        const playlist = yield playlistService.updateBaseSystemPlaylist(id, updateData, coverFile);
+        res.status(200).json({ success: true, data: playlist });
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            if (error.message.includes('not found')) {
+                res.status(404).json({ success: false, message: error.message });
+            }
+            else if (error.message.includes('already exists')) {
+                res.status(400).json({ success: false, message: error.message });
+            }
+            else {
+                (0, handle_utils_1.handleError)(res, error, 'Update Base System Playlist');
+            }
+        }
+        else {
+            (0, handle_utils_1.handleError)(res, error, 'Update Base System Playlist');
+        }
+    }
+});
+exports.updateBaseSystemPlaylist = updateBaseSystemPlaylist;
+const deleteBaseSystemPlaylist = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        yield playlistService.deleteBaseSystemPlaylist(id);
         res.status(200).json({
             success: true,
-            data: homeData,
+            message: 'Base system playlist deleted successfully.',
         });
     }
     catch (error) {
-        console.error('Error getting homepage data:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch homepage data',
+        if (error instanceof Error && error.message.includes('not found')) {
+            res.status(404).json({ success: false, message: error.message });
+        }
+        else {
+            (0, handle_utils_1.handleError)(res, error, 'Delete Base System Playlist');
+        }
+    }
+});
+exports.deleteBaseSystemPlaylist = deleteBaseSystemPlaylist;
+const getAllBaseSystemPlaylists = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const result = yield playlistService.getAllBaseSystemPlaylists(req);
+        res.status(200).json(Object.assign({ success: true }, result));
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Get All Base System Playlists');
+    }
+});
+exports.getAllBaseSystemPlaylists = getAllBaseSystemPlaylists;
+const getHomePageData = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const isAuthenticated = !!userId;
+        const [newestAlbums, hotAlbums] = yield Promise.all([
+            albumService.getNewestAlbums(8),
+            albumService.getHotAlbums(8),
+        ]);
+        const responseData = {
+            newestAlbums,
+            hotAlbums,
+            systemPlaylists: [],
+        };
+        if (isAuthenticated && userId) {
+            try {
+                const systemPlaylists = yield db_1.default.playlist.findMany({
+                    where: {
+                        type: 'SYSTEM',
+                        privacy: 'PUBLIC',
+                    },
+                    include: {
+                        tracks: {
+                            select: {
+                                track: {
+                                    include: {
+                                        artist: true,
+                                    },
+                                },
+                                trackOrder: true,
+                            },
+                            orderBy: {
+                                trackOrder: 'asc',
+                            },
+                        },
+                    },
+                });
+                responseData.systemPlaylists = systemPlaylists.map((playlist) => (Object.assign(Object.assign({}, playlist), { tracks: playlist.tracks.map((pt) => (Object.assign(Object.assign({}, pt.track), { trackOrder: pt.trackOrder }))) })));
+                const userSystemPlaylists = yield db_1.default.playlist.findMany({
+                    where: {
+                        userId,
+                        type: 'SYSTEM',
+                    },
+                    include: {
+                        _count: {
+                            select: {
+                                tracks: true,
+                            },
+                        },
+                    },
+                });
+                const userPlaylists = yield db_1.default.playlist.findMany({
+                    where: {
+                        userId,
+                        type: {
+                            not: 'SYSTEM',
+                        },
+                    },
+                    include: {
+                        _count: {
+                            select: {
+                                tracks: true,
+                            },
+                        },
+                    },
+                });
+                responseData.personalizedSystemPlaylists = userSystemPlaylists.map((playlist) => (Object.assign(Object.assign({}, playlist), { totalTracks: playlist._count.tracks })));
+                responseData.userPlaylists = userPlaylists.map((playlist) => (Object.assign(Object.assign({}, playlist), { totalTracks: playlist._count.tracks })));
+            }
+            catch (error) {
+                console.error('Error fetching user playlist data:', error);
+            }
+        }
+        res.json({
+            success: true,
+            data: responseData,
         });
+    }
+    catch (error) {
+        console.error('Error in getHomePageData:', error);
+        next(error);
     }
 });
 exports.getHomePageData = getHomePageData;

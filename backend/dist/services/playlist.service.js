@@ -12,10 +12,117 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getHomePageData = exports.updateAllSystemPlaylists = exports.getPersonalizedSystemPlaylist = exports.updateSystemPlaylistForUser = exports.createDefaultSystemPlaylists = exports.generateAIPlaylist = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = void 0;
+exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
 const db_1 = __importDefault(require("../config/db"));
+const client_1 = require("@prisma/client");
 const handle_utils_1 = require("../utils/handle-utils");
 const ai_service_1 = require("./ai.service");
+const upload_service_1 = require("./upload.service");
+const baseSystemPlaylistSelect = {
+    id: true,
+    name: true,
+    description: true,
+    coverUrl: true,
+    privacy: true,
+    type: true,
+    isAIGenerated: true,
+    totalTracks: true,
+    totalDuration: true,
+    createdAt: true,
+    updatedAt: true,
+};
+const createBaseSystemPlaylist = (data, coverFile) => __awaiter(void 0, void 0, void 0, function* () {
+    const existing = yield db_1.default.playlist.findFirst({
+        where: {
+            name: data.name,
+            type: client_1.PlaylistType.SYSTEM,
+            userId: null,
+        },
+    });
+    if (existing) {
+        throw new Error(`A system playlist named "${data.name}" already exists.`);
+    }
+    let coverUrl = undefined;
+    if (coverFile) {
+        const uploadResult = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'playlists/covers');
+        coverUrl = uploadResult.secure_url;
+    }
+    return db_1.default.playlist.create({
+        data: Object.assign(Object.assign({}, data), { coverUrl, type: client_1.PlaylistType.SYSTEM, isAIGenerated: true, userId: null }),
+        select: baseSystemPlaylistSelect,
+    });
+});
+exports.createBaseSystemPlaylist = createBaseSystemPlaylist;
+const updateBaseSystemPlaylist = (playlistId, data, coverFile) => __awaiter(void 0, void 0, void 0, function* () {
+    const playlist = yield db_1.default.playlist.findUnique({
+        where: { id: playlistId },
+        select: { type: true, userId: true, name: true },
+    });
+    if (!playlist ||
+        playlist.type !== client_1.PlaylistType.SYSTEM ||
+        playlist.userId !== null) {
+        throw new Error('Base system playlist not found.');
+    }
+    if (data.name && data.name !== playlist.name) {
+        const existing = yield db_1.default.playlist.findFirst({
+            where: {
+                name: data.name,
+                type: client_1.PlaylistType.SYSTEM,
+                userId: null,
+                id: { not: playlistId },
+            },
+        });
+        if (existing) {
+            throw new Error(`Another system playlist named "${data.name}" already exists.`);
+        }
+    }
+    let coverUrl = undefined;
+    if (coverFile) {
+        const uploadResult = yield (0, upload_service_1.uploadFile)(coverFile.buffer, 'playlists/covers');
+        coverUrl = uploadResult.secure_url;
+    }
+    return db_1.default.playlist.update({
+        where: { id: playlistId },
+        data: Object.assign(Object.assign(Object.assign({}, data), (coverUrl && { coverUrl })), { type: client_1.PlaylistType.SYSTEM, userId: null, isAIGenerated: true }),
+        select: baseSystemPlaylistSelect,
+    });
+});
+exports.updateBaseSystemPlaylist = updateBaseSystemPlaylist;
+const deleteBaseSystemPlaylist = (playlistId) => __awaiter(void 0, void 0, void 0, function* () {
+    const playlist = yield db_1.default.playlist.findUnique({
+        where: { id: playlistId },
+        select: { type: true, userId: true },
+    });
+    if (!playlist ||
+        playlist.type !== client_1.PlaylistType.SYSTEM ||
+        playlist.userId !== null) {
+        throw new Error('Base system playlist not found.');
+    }
+    return db_1.default.playlist.delete({
+        where: { id: playlistId },
+    });
+});
+exports.deleteBaseSystemPlaylist = deleteBaseSystemPlaylist;
+const getAllBaseSystemPlaylists = (req) => __awaiter(void 0, void 0, void 0, function* () {
+    const { search } = req.query;
+    const whereClause = {
+        type: client_1.PlaylistType.SYSTEM,
+        userId: null,
+    };
+    if (search && typeof search === 'string') {
+        whereClause.OR = [
+            { name: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+        ];
+    }
+    const result = yield (0, handle_utils_1.paginate)(db_1.default.playlist, req, {
+        where: whereClause,
+        select: baseSystemPlaylistSelect,
+        orderBy: { createdAt: 'desc' },
+    });
+    return result;
+});
+exports.getAllBaseSystemPlaylists = getAllBaseSystemPlaylists;
 const updateVibeRewindPlaylist = (userId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let vibeRewindPlaylist = yield db_1.default.playlist.findFirst({
@@ -270,592 +377,71 @@ const generateAIPlaylist = (userId, options) => __awaiter(void 0, void 0, void 0
         }), totalTracks: playlistWithTracks.tracks.length });
 });
 exports.generateAIPlaylist = generateAIPlaylist;
-const DEFAULT_SYSTEM_PLAYLISTS = [
-    {
-        name: 'Discover Weekly',
-        description: "Discover new music we think you'll like based on your listening habits",
-        type: 'SYSTEM',
-        privacy: 'PUBLIC',
-        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/discover_weekly_r1vgon.png',
-        isAIGenerated: true,
-    },
-    {
-        name: 'Release Radar',
-        description: 'Catch all the latest releases from artists you follow and more',
-        type: 'SYSTEM',
-        privacy: 'PUBLIC',
-        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394291/release_radar_lfgrts.png',
-        isAIGenerated: true,
-    },
-    {
-        name: 'Daily Mix',
-        description: 'A perfect mix of your favorites and new discoveries',
-        type: 'SYSTEM',
-        privacy: 'PUBLIC',
-        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/daily_mix_aiqzjj.png',
-        isAIGenerated: true,
-    },
-];
-const createDefaultSystemPlaylists = () => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        for (const playlist of DEFAULT_SYSTEM_PLAYLISTS) {
-            const existingPlaylist = yield db_1.default.playlist.findFirst({
-                where: {
-                    name: playlist.name,
-                    userId: null,
-                    type: 'SYSTEM',
-                },
-            });
-            if (!existingPlaylist) {
-                yield db_1.default.playlist.create({
-                    data: {
-                        name: playlist.name,
-                        description: playlist.description,
-                        privacy: playlist.privacy,
-                        type: 'SYSTEM',
-                        isAIGenerated: true,
-                        coverUrl: playlist.coverUrl,
-                        lastGeneratedAt: new Date(),
-                    },
-                });
-                console.log(`[PlaylistService] Created system playlist: ${playlist.name}`);
-            }
-            else if (!existingPlaylist.isAIGenerated) {
-                yield db_1.default.playlist.update({
-                    where: { id: existingPlaylist.id },
-                    data: { isAIGenerated: true },
-                });
-                console.log(`[PlaylistService] Updated system playlist: ${playlist.name} to set isAIGenerated flag`);
-            }
-        }
-    }
-    catch (error) {
-        console.error('[PlaylistService] Error creating system playlists:', error);
-        throw error;
-    }
-});
-exports.createDefaultSystemPlaylists = createDefaultSystemPlaylists;
-const getPersonalizedRecommendations = (userId_1, ...args_1) => __awaiter(void 0, [userId_1, ...args_1], void 0, function* (userId, limit = 20) {
-    const userHistory = yield db_1.default.history.findMany({
-        where: {
-            userId,
-            type: 'PLAY',
-            playCount: { gt: 0 },
-        },
-        include: {
-            track: {
-                include: {
-                    artist: true,
-                    genres: { include: { genre: true } },
-                    album: true,
-                },
-            },
-        },
-        orderBy: { playCount: 'desc' },
-        take: 50,
-    });
-    if (userHistory.length === 0) {
-        return db_1.default.track.findMany({
-            where: { isActive: true },
-            include: { artist: true, album: true },
-            orderBy: { playCount: 'desc' },
-            take: limit,
-        });
-    }
-    const genreCounts = new Map();
-    const artistCounts = new Map();
-    userHistory.forEach((history) => {
-        var _a;
-        const track = history.track;
-        if (track) {
-            track.genres.forEach((genreRel) => {
-                const genreId = genreRel.genre.id;
-                genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
-            });
-            const artistId = (_a = track.artist) === null || _a === void 0 ? void 0 : _a.id;
-            if (artistId) {
-                artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
-            }
-        }
-    });
-    const topGenres = [...genreCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map((entry) => entry[0]);
-    const topArtists = [...artistCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map((entry) => entry[0]);
-    const recommendations = yield db_1.default.track.findMany({
-        where: {
-            AND: [
-                { isActive: true },
-                {
-                    OR: [
-                        { genres: { some: { genreId: { in: topGenres } } } },
-                        { artistId: { in: topArtists } },
-                    ],
-                },
-                {
-                    id: {
-                        notIn: userHistory
-                            .map((h) => h.trackId)
-                            .filter((id) => id !== null),
-                    },
-                },
-            ],
-        },
-        include: {
-            artist: true,
-            album: true,
-        },
-        orderBy: { playCount: 'desc' },
-        take: limit,
-    });
-    if (recommendations.length < limit) {
-        const popularTracks = yield db_1.default.track.findMany({
-            where: {
-                isActive: true,
-                id: {
-                    notIn: [
-                        ...recommendations.map((t) => t.id),
-                        ...userHistory
-                            .map((h) => h.trackId)
-                            .filter((id) => id !== null),
-                    ],
-                },
-            },
-            include: { artist: true, album: true },
-            orderBy: { playCount: 'desc' },
-            take: limit - recommendations.length,
-        });
-        return [...recommendations, ...popularTracks];
-    }
-    return recommendations;
-});
-const getNewReleases = (userId_1, ...args_1) => __awaiter(void 0, [userId_1, ...args_1], void 0, function* (userId, limit = 20) {
-    const followedArtists = yield db_1.default.userFollow.findMany({
-        where: {
-            followerId: userId,
-            followingType: 'ARTIST',
-        },
-        select: {
-            followingArtistId: true,
-        },
-    });
-    const artistIds = followedArtists
-        .map((f) => f.followingArtistId)
-        .filter((id) => id !== null);
-    if (artistIds.length === 0) {
-        return db_1.default.track.findMany({
-            where: {
-                isActive: true,
-                releaseDate: {
-                    gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-                },
-            },
-            include: { artist: true, album: true },
-            orderBy: { releaseDate: 'desc' },
-            take: limit,
-        });
-    }
-    const followedArtistReleases = yield db_1.default.track.findMany({
-        where: {
-            artistId: { in: artistIds },
-            isActive: true,
-            releaseDate: {
-                gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-            },
-        },
-        include: { artist: true, album: true },
-        orderBy: { releaseDate: 'desc' },
-        take: limit,
-    });
-    if (followedArtistReleases.length < limit) {
-        const otherNewReleases = yield db_1.default.track.findMany({
-            where: {
-                artistId: { notIn: artistIds },
-                isActive: true,
-                releaseDate: {
-                    gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-                },
-                id: { notIn: followedArtistReleases.map((t) => t.id) },
-            },
-            include: { artist: true, album: true },
-            orderBy: { releaseDate: 'desc' },
-            take: limit - followedArtistReleases.length,
-        });
-        return [...followedArtistReleases, ...otherNewReleases];
-    }
-    return followedArtistReleases;
-});
-const getDailyMix = (userId_1, ...args_1) => __awaiter(void 0, [userId_1, ...args_1], void 0, function* (userId, limit = 20) {
-    const userLikedTracks = yield db_1.default.userLikeTrack.findMany({
-        where: { userId },
-        include: {
-            track: {
-                include: {
-                    artist: true,
-                    genres: { include: { genre: true } },
-                },
-            },
-        },
-        take: 50,
-    });
-    const userPlayHistory = yield db_1.default.history.findMany({
-        where: {
-            userId,
-            type: 'PLAY',
-            playCount: { gt: 2 },
-        },
-        include: {
-            track: {
-                include: {
-                    artist: true,
-                    genres: { include: { genre: true } },
-                },
-            },
-        },
-        orderBy: { playCount: 'desc' },
-        take: 50,
-    });
-    if (userPlayHistory.length === 0 && userLikedTracks.length === 0) {
-        return db_1.default.track.findMany({
-            where: { isActive: true },
-            include: { artist: true, album: true },
-            orderBy: { playCount: 'desc' },
-            take: limit,
-        });
-    }
-    const tracksToAnalyze = [
-        ...userLikedTracks
-            .map((t) => t.track)
-            .filter((track) => !!track),
-        ...userPlayHistory
-            .map((h) => h.track)
-            .filter((track) => !!track),
-    ];
-    const genreCounts = new Map();
-    const artistCounts = new Map();
-    tracksToAnalyze.forEach((track) => {
-        var _a;
-        if (track) {
-            track.genres.forEach((genreRel) => {
-                const genreId = genreRel.genre.id;
-                genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
-            });
-            const artistId = (_a = track.artist) === null || _a === void 0 ? void 0 : _a.id;
-            if (artistId) {
-                artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
-            }
-        }
-    });
-    const topGenres = [...genreCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map((entry) => entry[0]);
-    const topArtists = [...artistCounts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map((entry) => entry[0]);
-    const favoriteTracks = yield db_1.default.track.findMany({
-        where: {
-            artistId: { in: topArtists },
-            isActive: true,
-            id: {
-                notIn: tracksToAnalyze
-                    .map((t) => t.id)
-                    .filter((id) => id !== undefined),
-            },
-        },
-        include: { artist: true, album: true },
-        orderBy: [{ playCount: 'desc' }],
-        take: Math.ceil(limit / 2),
-    });
-    const similarGenreTracks = yield db_1.default.track.findMany({
-        where: {
-            genres: { some: { genreId: { in: topGenres } } },
-            artistId: { notIn: topArtists },
-            isActive: true,
-            id: {
-                notIn: [
-                    ...favoriteTracks.map((t) => t.id),
-                    ...tracksToAnalyze
-                        .map((t) => t.id)
-                        .filter((id) => id !== undefined),
-                ],
-            },
-        },
-        include: { artist: true, album: true },
-        orderBy: { playCount: 'desc' },
-        take: Math.floor(limit / 2),
-    });
-    const mixedTracks = [...favoriteTracks, ...similarGenreTracks];
-    for (let i = mixedTracks.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [mixedTracks[i], mixedTracks[j]] = [mixedTracks[j], mixedTracks[i]];
-    }
-    return mixedTracks;
-});
-const updateSystemPlaylistForUser = (systemPlaylistName, userId) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const templatePlaylist = yield db_1.default.playlist.findFirst({
-            where: {
-                name: systemPlaylistName,
-                type: 'SYSTEM',
-                userId: null,
-            },
-        });
-        if (!templatePlaylist) {
-            console.error(`[PlaylistService] System playlist ${systemPlaylistName} not found`);
-            return;
-        }
-        let coverUrl = templatePlaylist.coverUrl;
-        if (!coverUrl) {
-            switch (systemPlaylistName) {
-                case 'Discover Weekly':
-                    coverUrl =
-                        'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/discover_weekly_r1vgon.png';
-                    break;
-                case 'Release Radar':
-                    coverUrl =
-                        'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394291/release_radar_lfgrts.png';
-                    break;
-                case 'Daily Mix':
-                    coverUrl =
-                        'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742394290/daily_mix_aiqzjj.png';
-                    break;
-                default:
-                    coverUrl =
-                        'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
-            }
-        }
-        let userPlaylist = yield db_1.default.playlist.findFirst({
-            where: {
-                name: systemPlaylistName,
-                type: 'SYSTEM',
-                userId: userId,
-            },
-        });
-        if (!userPlaylist) {
-            userPlaylist = yield db_1.default.playlist.create({
-                data: {
-                    name: templatePlaylist.name,
-                    description: templatePlaylist.description,
-                    privacy: templatePlaylist.privacy,
-                    type: 'SYSTEM',
-                    isAIGenerated: true,
-                    coverUrl: coverUrl,
-                    userId: userId,
-                    lastGeneratedAt: new Date(),
-                },
-            });
-            console.log(`[PlaylistService] Created personalized system playlist "${systemPlaylistName}" for user ${userId}`);
-        }
-        else if (!userPlaylist.coverUrl) {
-            yield db_1.default.playlist.update({
-                where: { id: userPlaylist.id },
-                data: { coverUrl },
-            });
-        }
-        let tracks;
-        switch (systemPlaylistName) {
-            case 'Discover Weekly':
-                tracks = yield getPersonalizedRecommendations(userId, 30);
-                break;
-            case 'Release Radar':
-                tracks = yield getNewReleases(userId, 30);
-                break;
-            case 'Daily Mix':
-                tracks = yield getDailyMix(userId, 30);
-                break;
-            default:
-                tracks = yield getPersonalizedRecommendations(userId, 30);
-        }
-        if (!tracks || tracks.length === 0) {
-            console.log(`[PlaylistService] No tracks found for ${systemPlaylistName} for user ${userId}`);
-            return;
-        }
-        yield db_1.default.playlistTrack.deleteMany({
-            where: {
-                playlistId: userPlaylist.id,
-            },
-        });
-        const playlistTrackData = tracks.map((track, index) => ({
-            playlistId: userPlaylist.id,
-            trackId: track.id,
-            trackOrder: index,
-        }));
-        const uniqueTrackData = playlistTrackData.filter((track, index, self) => self.findIndex((t) => t.playlistId === track.playlistId && t.trackId === track.trackId) === index);
-        yield db_1.default.$transaction([
-            db_1.default.playlistTrack.createMany({
-                data: uniqueTrackData,
-            }),
-            db_1.default.playlist.update({
-                where: { id: userPlaylist.id },
-                data: {
-                    totalTracks: tracks.length,
-                    totalDuration: tracks.reduce((sum, track) => sum + ((track === null || track === void 0 ? void 0 : track.duration) || 0), 0),
-                    lastGeneratedAt: new Date(),
-                },
-            }),
-        ]);
-        console.log(`[PlaylistService] Successfully updated ${tracks.length} tracks for ${systemPlaylistName} for user ${userId}`);
-    }
-    catch (error) {
-        console.error(`[PlaylistService] Error updating tracks for ${systemPlaylistName} for user ${userId}:`, error);
-        throw error;
-    }
-});
-exports.updateSystemPlaylistForUser = updateSystemPlaylistForUser;
-const getPersonalizedSystemPlaylist = (systemPlaylistName, userId) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        let userPlaylist = yield db_1.default.playlist.findFirst({
-            where: {
-                name: systemPlaylistName,
-                type: 'SYSTEM',
-                userId: userId,
-            },
-            include: {
-                tracks: {
-                    include: {
-                        track: {
-                            include: {
-                                artist: true,
-                                album: true,
-                                genres: {
-                                    include: {
-                                        genre: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                    orderBy: {
-                        trackOrder: 'asc',
-                    },
-                },
-            },
-        });
-        if (!userPlaylist || userPlaylist.tracks.length === 0) {
-            console.log(`[PlaylistService] User ${userId} doesn't have playlist "${systemPlaylistName}" yet or it's empty. Creating and populating...`);
-            yield (0, exports.updateSystemPlaylistForUser)(systemPlaylistName, userId);
-            userPlaylist = yield db_1.default.playlist.findFirst({
-                where: {
-                    name: systemPlaylistName,
-                    type: 'SYSTEM',
-                    userId: userId,
-                },
-                include: {
-                    tracks: {
-                        include: {
-                            track: {
-                                include: {
-                                    artist: true,
-                                    album: true,
-                                    genres: {
-                                        include: {
-                                            genre: true,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        orderBy: {
-                            trackOrder: 'asc',
-                        },
-                    },
-                },
-            });
-        }
-        else {
-            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-            const needsRefresh = !userPlaylist.lastGeneratedAt ||
-                userPlaylist.lastGeneratedAt < oneDayAgo;
-            if (needsRefresh) {
-                console.log(`[PlaylistService] Refreshing system playlist "${systemPlaylistName}" for user ${userId}`);
-                try {
-                    yield (0, exports.updateSystemPlaylistForUser)(systemPlaylistName, userId);
-                    userPlaylist = yield db_1.default.playlist.findFirst({
-                        where: {
-                            name: systemPlaylistName,
-                            type: 'SYSTEM',
-                            userId: userId,
-                        },
-                        include: {
-                            tracks: {
-                                include: {
-                                    track: {
-                                        include: {
-                                            artist: true,
-                                            album: true,
-                                            genres: {
-                                                include: {
-                                                    genre: true,
-                                                },
-                                            },
-                                        },
-                                    },
-                                },
-                                orderBy: {
-                                    trackOrder: 'asc',
-                                },
-                            },
-                        },
-                    });
-                }
-                catch (error) {
-                    console.error(`[PlaylistService] Error refreshing system playlist: ${error}`);
-                }
-            }
-        }
-        return userPlaylist;
-    }
-    catch (error) {
-        console.error(`[PlaylistService] Error getting personalized system playlist:`, error);
-        throw error;
-    }
-});
-exports.getPersonalizedSystemPlaylist = getPersonalizedSystemPlaylist;
 const updateAllSystemPlaylists = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const users = yield db_1.default.user.findMany({
             where: { isActive: true },
             select: { id: true },
         });
-        const systemPlaylists = yield db_1.default.playlist.findMany({
+        const baseSystemPlaylists = yield db_1.default.playlist.findMany({
             where: { type: 'SYSTEM', userId: null },
             select: { name: true },
         });
-        console.log(`[PlaylistService] Updating system playlists for ${users.length} users`);
-        const errors = [];
-        for (const user of users) {
-            for (const playlist of systemPlaylists) {
-                try {
-                    yield (0, exports.updateSystemPlaylistForUser)(playlist.name, user.id);
-                }
-                catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : String(error);
-                    console.error(`[PlaylistService] Error updating ${playlist.name} for user ${user.id}: ${errorMessage}`);
-                    errors.push({
-                        userId: user.id,
-                        playlistName: playlist.name,
-                        error: errorMessage,
-                    });
-                }
-            }
+        if (baseSystemPlaylists.length === 0) {
+            console.log('[PlaylistService] No base system playlists found to update.');
+            return { success: true, errors: [] };
         }
+        console.log(`[PlaylistService] Updating ${baseSystemPlaylists.length} system playlists for ${users.length} users...`);
+        const errors = [];
+        const updatePromises = users.flatMap((user) => baseSystemPlaylists.map((playlistTemplate) => (() => __awaiter(void 0, void 0, void 0, function* () {
+            try {
+                const templatePlaylist = yield db_1.default.playlist.findFirst({
+                    where: {
+                        name: playlistTemplate.name,
+                        type: 'SYSTEM',
+                        userId: null,
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        coverUrl: true,
+                        privacy: true,
+                    },
+                });
+                if (!templatePlaylist) {
+                    throw new Error(`Base template "${playlistTemplate.name}" not found.`);
+                }
+                const coverUrl = templatePlaylist.coverUrl ||
+                    'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
+                yield (0, ai_service_1.createAIGeneratedPlaylist)(user.id, {
+                    name: templatePlaylist.name,
+                    description: templatePlaylist.description || undefined,
+                    coverUrl: coverUrl,
+                });
+            }
+            catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.error(`[PlaylistService] Error updating ${playlistTemplate.name} for user ${user.id}: ${errorMessage}`);
+                errors.push({
+                    userId: user.id,
+                    playlistName: playlistTemplate.name,
+                    error: errorMessage,
+                });
+            }
+        }))()));
+        yield Promise.allSettled(updatePromises);
         if (errors.length === 0) {
-            console.log(`[PlaylistService] Successfully updated all system playlists`);
+            console.log(`[PlaylistService] Successfully finished updating all system playlists.`);
             return { success: true, errors: [] };
         }
         else {
-            console.error(`[PlaylistService] Completed with ${errors.length} errors`);
+            console.warn(`[PlaylistService] Finished updating system playlists with ${errors.length} errors.`);
             return { success: false, errors };
         }
     }
     catch (error) {
-        console.error('[PlaylistService] Error updating all system playlists:', error);
+        console.error('[PlaylistService] Critical error during updateAllSystemPlaylists:', error);
         return {
             success: false,
             errors: [
@@ -865,97 +451,4 @@ const updateAllSystemPlaylists = () => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.updateAllSystemPlaylists = updateAllSystemPlaylists;
-const getHomePageData = (userId) => __awaiter(void 0, void 0, void 0, function* () {
-    const systemPlaylists = yield db_1.default.playlist.findMany({
-        where: {
-            type: 'SYSTEM',
-            userId: null,
-            privacy: 'PUBLIC',
-        },
-        take: 5,
-        include: {
-            user: { select: { name: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-    });
-    const newestAlbums = yield db_1.default.album.findMany({
-        where: {
-            isActive: true,
-        },
-        orderBy: {
-            releaseDate: 'desc',
-        },
-        take: 10,
-        include: {
-            artist: { select: { id: true, artistName: true, avatar: true } },
-        },
-    });
-    const hotAlbums = yield db_1.default.album.findMany({
-        where: {
-            isActive: true,
-        },
-        orderBy: [
-            { createdAt: 'desc' },
-        ],
-        take: 10,
-        include: {
-            artist: { select: { id: true, artistName: true, avatar: true } },
-        },
-    });
-    const responseData = {
-        systemPlaylists,
-        newestAlbums,
-        hotAlbums,
-        userPlaylists: [],
-        personalizedSystemPlaylists: [],
-    };
-    if (userId) {
-        const userPlaylists = yield db_1.default.playlist.findMany({
-            where: {
-                userId,
-                type: 'NORMAL',
-            },
-            include: {
-                _count: { select: { tracks: true } },
-            },
-            take: 5,
-            orderBy: {
-                updatedAt: 'desc',
-            },
-        });
-        responseData.userPlaylists = userPlaylists.map((p) => (Object.assign(Object.assign({}, p), { totalTracks: p._count.tracks })));
-        const personalizedSystemPlaylists = yield db_1.default.playlist.findMany({
-            where: {
-                userId: userId,
-                type: 'SYSTEM',
-            },
-            include: {
-                _count: { select: { tracks: true } },
-                tracks: {
-                    select: {
-                        trackId: true,
-                    },
-                    take: 1,
-                },
-            },
-            orderBy: { lastGeneratedAt: 'desc' },
-        });
-        responseData.personalizedSystemPlaylists = personalizedSystemPlaylists
-            .filter((p) => p.tracks.length > 0)
-            .map((p) => (Object.assign(Object.assign({}, p), { totalTracks: p._count.tracks, tracks: undefined })));
-        for (const playlist of personalizedSystemPlaylists) {
-            if (playlist.tracks.length === 0) {
-                try {
-                    console.log(`[HomeDataService] Found empty system playlist ${playlist.name}, updating for user ${userId}`);
-                    (0, exports.updateSystemPlaylistForUser)(playlist.name, userId).catch((err) => console.error(`[HomeDataService] Error updating playlist: ${err}`));
-                }
-                catch (error) {
-                    console.error(`[HomeDataService] Error updating empty playlist: ${error}`);
-                }
-            }
-        }
-    }
-    return responseData;
-});
-exports.getHomePageData = getHomePageData;
 //# sourceMappingURL=playlist.service.js.map

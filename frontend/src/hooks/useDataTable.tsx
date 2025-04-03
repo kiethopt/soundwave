@@ -1,26 +1,35 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { debounce } from 'lodash';
 import type { SortingState } from '@tanstack/react-table';
+
+interface FetchDataResponse<T> {
+  // Ensure this matches the type in types/index.ts
+  data: T[];
+  pagination: { totalPages: number };
+}
 
 interface UseDataTableOptions<T> {
   fetchData: (
     page: number,
     params: URLSearchParams
-  ) => Promise<{
-    data: T[];
-    pagination: { totalPages: number };
-  }>;
+  ) => Promise<FetchDataResponse<T>>; // Use the defined interface
   limit?: number;
+  paramKeyPrefix?: string; // Optional prefix for URL params (e.g., 'album_', 'track_')
 }
 
 export function useDataTable<T>({
   fetchData,
   limit = 10,
+  paramKeyPrefix = '', // Default to no prefix
 }: UseDataTableOptions<T>) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // Helper to get prefixed param key
+  const getKey = (key: string) => `${paramKeyPrefix}${key}`;
 
   // Basic states
   const [data, setData] = useState<T[]>([]);
@@ -29,326 +38,413 @@ export function useDataTable<T>({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<T[]>([]);
 
-  // Filter states
-  const [searchInput, setSearchInput] = useState(searchParams.get('q') || '');
+  // Filter states - initialize from URL params using prefixed keys
+  const [searchInput, setSearchInput] = useState(
+    searchParams.get(getKey('q')) || ''
+  );
   const [statusFilter, setStatusFilter] = useState<string[]>(
-    searchParams.getAll('status') || []
+    searchParams.getAll(getKey('status')) || []
   );
   const [genreFilter, setGenreFilter] = useState<string[]>(
-    searchParams.getAll('genres') || []
+    searchParams.getAll(getKey('genres')) || []
   );
   const [sorting, setSorting] = useState<SortingState>(() => {
-    const sortBy = searchParams.get('sortBy');
-    const sortOrder = searchParams.get('sortOrder');
+    const sortBy = searchParams.get(getKey('sortBy'));
+    const sortOrder = searchParams.get(getKey('sortOrder'));
     if (sortBy) {
       return [{ id: sortBy, desc: sortOrder === 'desc' }];
     }
     return [];
   });
 
-  // --- Correctly calculate currentPage based on URL, ensuring it's >= 1 ---
-  const currentPageFromUrl = Number(searchParams.get('page')) || 1;
-  const currentPage = Math.max(1, currentPageFromUrl);
+  // Get currentPage from URL, default to 1
+  const currentPage = Math.max(
+    1,
+    Number(searchParams.get(getKey('page'))) || 1
+  );
 
   // Ref to track initial load & previous state for change detection
   const initialLoad = useRef(true);
-  const prevDeps = useRef({ currentPage, statusFilter, genreFilter, sorting });
+  const prevDeps = useRef({
+    currentPage,
+    searchInput,
+    statusFilter,
+    genreFilter,
+    sorting,
+  });
 
-  // --- Fetching Logic ---
+  // --- Fetching Logic --- //
 
-  // Immediate fetch function
-  const fetchDataNow = useCallback(
+  const fetchDataInternal = useCallback(
     async (
-      page: number,
-      params: URLSearchParams,
+      pageToFetch: number,
+      // paramsToFetch represents the state *intended* for the URL
+      paramsToFetch: URLSearchParams,
       showLoading: boolean = true
     ) => {
-      const validPage = Math.max(1, page);
-      if (!params.has('limit')) {
-        params.set('limit', limit.toString());
+      if (showLoading) {
+        setLoading(true);
       }
-      params.set('page', validPage.toString());
-
       try {
-        if (showLoading) {
-          setLoading(true);
+        // **Create clean params for the API call**
+        const paramsForApi = new URLSearchParams();
+
+        // 1. Set standard pagination
+        paramsForApi.set('page', String(Math.max(1, pageToFetch)));
+        paramsForApi.set('limit', String(limit));
+
+        // 2. Set standard search parameter from the prefixed URL key
+        const currentSearchValue = paramsToFetch.get(getKey('q'));
+        if (currentSearchValue) {
+          paramsForApi.set('search', currentSearchValue);
         }
-        const response = await fetchData(validPage, params);
-        setData(response.data);
-        setTotalPages(response.pagination.totalPages);
+
+        // 3. Set standard filter parameters from current state
+        if (statusFilter.length > 0)
+          statusFilter.forEach((s) => paramsForApi.append('status', s));
+        if (genreFilter.length > 0)
+          genreFilter.forEach((g) => paramsForApi.append('genres', g));
+
+        // 4. Set standard sorting parameters from current state
+        if (sorting.length > 0) {
+          paramsForApi.set('sortBy', sorting[0].id);
+          paramsForApi.set('sortOrder', sorting[0].desc ? 'desc' : 'asc');
+        }
+
+        // console.log(`Fetching data with API params: ${paramsForApi.toString()}`);
+
+        // Call the provided fetchData function with the clean API params
+        const response = await fetchData(pageToFetch, paramsForApi);
+
+        // Validate response structure
+        if (
+          response &&
+          Array.isArray(response.data) &&
+          response.pagination &&
+          typeof response.pagination.totalPages === 'number'
+        ) {
+          setData(response.data);
+          setTotalPages(response.pagination.totalPages);
+        } else {
+          console.error(
+            'Invalid data structure received from fetchData:',
+            response
+          );
+          toast.error('Received invalid data structure from server.');
+          // Reset data to avoid inconsistent state
+          setData([]);
+          setTotalPages(1);
+        }
       } catch (error) {
+        console.error('Fetch data error:', error);
         toast.error((error as Error)?.message ?? 'Failed to fetch data');
+        // Optionally reset state on error
+        // setData([]);
+        // setTotalPages(1);
       } finally {
-        // Always set loading to false, even if it wasn't set to true initially
-        setLoading(false);
+        if (showLoading) {
+          setLoading(false);
+        }
       }
     },
-    [fetchData, limit]
+    // Dependencies now include state variables used to build API params
+    [fetchData, limit, getKey, statusFilter, genreFilter, sorting]
   );
 
-  // Debounced fetch specifically for search input
-  const debouncedSearchFetch = useRef(
+  const debouncedFetch = useRef(
     debounce((page: number, params: URLSearchParams) => {
-      fetchDataNow(page, params); // Defaults to showLoading: true
-    }, 500)
+      // The params passed here are intended for the URL,
+      // fetchDataInternal will extract the necessary info for the API call.
+      fetchDataInternal(page, params);
+    }, 300) // Adjust debounce timing if needed
   ).current;
 
-  // --- URL Update Logic ---
+  // --- URL Update Logic --- //
 
-  const updateQueryParams = useCallback(
-    (updates: Record<string, string | number | string[] | null>) => {
-      const current = new URLSearchParams(searchParams.toString());
+  const updateUrlParams = useCallback(
+    (
+      updates: Record<string, string | number | string[] | null>,
+      replace: boolean = false // Use replace for non-user-initiated changes
+    ) => {
+      // **Start with a clean slate for the new URL parameters**
+      const newParams = new URLSearchParams();
       let changed = false;
 
-      Object.entries(updates).forEach(([param, value]) => {
-        if (param === 'page') {
+      // Get current URL parameters to selectively keep parameters from other tabs
+      const currentParams = new URLSearchParams(searchParams.toString());
+      currentParams.forEach((value, key) => {
+        // Keep parameters that DO NOT start with the current instance's prefix
+        if (!key.startsWith(paramKeyPrefix)) {
+          newParams.append(key, value);
+        }
+      });
+
+      // Apply updates relevant to this instance
+      Object.entries(updates).forEach(([key, value]) => {
+        const prefixedKey = getKey(key);
+
+        // Special handling for page parameter when it's 1 (default)
+        if (key === 'page' && (value === 1 || value === '1')) {
+          // Remove the page parameter if it exists in newParams
+          if (newParams.has(prefixedKey)) {
+            newParams.delete(prefixedKey);
+            changed = true;
+          }
+
+          // Mark as changed if the parameter exists in current URL
+          // This ensures we update the URL even when just removing a parameter
+          if (currentParams.has(prefixedKey)) {
+            changed = true;
+          }
+          return;
+        }
+
+        if (key === 'page') {
           value = Math.max(1, Number(value) || 1);
         }
 
-        const currentValue = current.getAll(param);
+        // Compare with current value in the newParams
+        const currentValueInNew = newParams.getAll(prefixedKey);
 
         if (Array.isArray(value)) {
-          if (value.length === 0 && currentValue.length > 0) {
-            current.delete(param);
-            changed = true;
-          } else if (value.length > 0) {
+          // Handle array values (e.g., filters)
+          newParams.delete(prefixedKey); // Remove existing before adding new
+          if (value.length > 0) {
+            value.forEach((v) => newParams.append(prefixedKey, v.toString()));
             if (
               JSON.stringify(value.sort()) !==
-              JSON.stringify(currentValue.sort())
+              JSON.stringify(currentValueInNew.sort())
             ) {
-              current.delete(param);
-              value.forEach((v) => current.append(param, v.toString()));
               changed = true;
             }
+          } else if (currentValueInNew.length > 0) {
+            // If new value is empty array and old one wasn't
+            changed = true;
           }
         } else {
-          const stringValue = value?.toString();
-          const currentSingleValue = current.get(param);
+          // Handle single values (e.g., search, page, sort)
+          // CRITICAL FIX: Properly handle null, empty strings and undefined
+          if (value === null || value === '' || value === undefined) {
+            // Check if the parameter exists in either newParams or currentParams
+            if (newParams.has(prefixedKey) || currentParams.has(prefixedKey)) {
+              newParams.delete(prefixedKey);
+              changed = true;
+            }
+          } else {
+            const stringValue = value.toString();
+            const currentSingleValueInNew = newParams.get(prefixedKey);
 
-          if ((value === null || value === '') && currentSingleValue !== null) {
-            current.delete(param);
-            changed = true;
-          } else if (
-            value !== null &&
-            value !== '' &&
-            stringValue !== currentSingleValue
-          ) {
-            current.set(param, stringValue!);
-            changed = true;
+            if (stringValue !== currentSingleValueInNew) {
+              newParams.set(prefixedKey, stringValue);
+              changed = true;
+            }
           }
         }
       });
 
+      // Only push/replace URL if changes occurred for this instance
       if (changed) {
-        const queryStr = current.toString() ? `?${current.toString()}` : '';
-        // Use replace instead of push for non-user-initiated updates to avoid messy history
-        router.replace(window.location.pathname + queryStr, { scroll: false });
+        const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
+        const targetUrl = pathname + queryStr;
+        // console.log(`Updating URL (${replace ? 'replace' : 'push'}): ${targetUrl}`);
+        if (replace) {
+          router.replace(targetUrl, { scroll: false });
+        } else {
+          router.push(targetUrl, { scroll: false });
+        }
       }
     },
-    [router, searchParams] // Keep searchParams here as update logic *reads* it
+    // updateUrlParams depends on searchParams to read other tabs' params
+    [router, searchParams, pathname, getKey, paramKeyPrefix]
   );
 
-  // --- Effects for State Changes ---
+  // --- Effects for State and URL Synchronization --- //
 
-  // Effect for Search Input Changes -> Update URL & Debounced Fetch
+  // Effect 1: Handle direct user input changes (search, filters, sorting)
+  // Updates URL (push) and triggers debounced fetch.
   useEffect(() => {
-    // Don't run on initial load if search is already matching URL
-    if (initialLoad.current && searchInput === (searchParams.get('q') || '')) {
-      // But mark initial load as done for the *other* effect
-      // initialLoad.current = false; // Let the other effect handle initial load fetch
-      return;
-    }
-
-    updateQueryParams({ q: searchInput, page: 1 });
-
-    const params = new URLSearchParams();
-    params.set('page', '1');
-    if (searchInput) params.set('search', searchInput);
-    // Include current filters/sorting when search triggers a fetch
-    if (statusFilter.length === 1) params.set('status', statusFilter[0]);
-    genreFilter.forEach((genre) => params.append('genres', genre));
-    if (sorting.length > 0) {
-      const sort = sorting[0];
-      params.set('sortBy', sort.id);
-      params.set('sortOrder', sort.desc ? 'desc' : 'asc');
-    }
-
-    debouncedSearchFetch(1, params);
-  }, [searchInput]);
-
-  // Effect for Page changes (from URL), Filters -> Update URL & Immediate Fetch
-  // IMPORTANT: This effect should NOT depend on `sorting` or `searchInput`
-  useEffect(() => {
-    const currentSearchParams = new URLSearchParams(searchParams.toString()); // Read current params inside
-    // Determine if state relevant to this effect has actually changed since last run
-    const currentState = { currentPage, statusFilter, genreFilter }; // Exclude sorting
-    const hasChanged =
-      JSON.stringify(currentState) !==
-      JSON.stringify({
-        currentPage: prevDeps.current.currentPage,
-        statusFilter: prevDeps.current.statusFilter,
-        genreFilter: prevDeps.current.genreFilter,
-      });
-
-    // Prepare params based on *current* state for potential fetch
-    const params = new URLSearchParams();
-    params.set('page', currentPage.toString());
-    params.set('limit', limit.toString());
-    if (searchInput) params.set('search', searchInput); // Include current search
-    if (statusFilter.length > 0)
-      statusFilter.forEach((s) => params.append('status', s));
-    if (genreFilter.length > 0)
-      genreFilter.forEach((g) => params.append('genres', g));
-    // Include current sorting state (from state, not prevDeps) in the fetch params
-    if (sorting.length > 0) {
-      const sort = sorting[0];
-      params.set('sortBy', sort.id);
-      params.set('sortOrder', sort.desc ? 'desc' : 'asc');
-    }
-
-    // --- Update URL --- Sync URL ONLY with page/filters/search
-    let pageToSync = currentPage;
-    // Reset page in URL update if filters changed significantly
-    if (
-      JSON.stringify(statusFilter) !==
-        JSON.stringify(prevDeps.current.statusFilter) ||
-      JSON.stringify(genreFilter) !==
-        JSON.stringify(prevDeps.current.genreFilter)
-    ) {
-      pageToSync = 1; // Reset page to 1 in the URL if filters change
-      params.set('page', '1'); // Also update fetch params page
-    }
-
-    updateQueryParams({
-      page: pageToSync,
-      status: statusFilter,
-      genres: genreFilter,
-      q: searchInput || null,
-      // DO NOT sync sortBy/sortOrder in URL updates from this effect
-    });
-
-    // --- Trigger Fetch --- Only if it's the initial load or relevant state actually changed
-    if (initialLoad.current || hasChanged) {
-      fetchDataNow(pageToSync, params); // Use potentially reset page for fetch
-    }
-
-    // Update refs for next render AFTER fetch/update logic
-    // Keep the existing sorting state in prevDeps when updating from this effect
-    prevDeps.current = { ...currentState, sorting: prevDeps.current.sorting };
-    if (initialLoad.current) initialLoad.current = false;
-
-    // Dependencies EXCLUDE sorting and searchInput
-  }, [
-    currentPage,
-    statusFilter,
-    genreFilter,
-    limit,
-    // searchInput is implicitly included via params build but not a dependency
-    // sorting is implicitly included via params build but not a dependency
-    fetchDataNow,
-    updateQueryParams,
-  ]);
-
-  // New Effect specifically for Sorting Changes -> Immediate Fetch (NO URL update)
-  useEffect(() => {
-    // Skip initial load fetch if the main effect already handled it
+    // Skip initial load synchronization - Effect 2 handles initial load
     if (initialLoad.current) {
       return;
     }
+    // console.log("Effect 1 Triggered (User Input Change)");
 
-    // Check if sorting actually changed compared to previous committed state
-    if (JSON.stringify(sorting) === JSON.stringify(prevDeps.current.sorting)) {
-      return; // Sorting hasn't changed, do nothing
+    const updates: Record<string, any> = {};
+    let stateChanged = false;
+    let resetPage = false;
+
+    // Check if search changed
+    if (searchInput !== prevDeps.current.searchInput) {
+      // CRITICAL FIX: Always ensure empty string is converted to null
+      // This will cause the parameter to be removed from the URL
+      updates.q = searchInput === '' ? null : searchInput;
+      stateChanged = true;
+      resetPage = true;
+    }
+    // Check if filters changed
+    if (
+      JSON.stringify(statusFilter) !==
+      JSON.stringify(prevDeps.current.statusFilter)
+    ) {
+      updates.status = statusFilter; // Pass array directly
+      stateChanged = true;
+      resetPage = true;
+    }
+    if (
+      JSON.stringify(genreFilter) !==
+      JSON.stringify(prevDeps.current.genreFilter)
+    ) {
+      updates.genres = genreFilter; // Pass array directly
+      stateChanged = true;
+      resetPage = true;
+    }
+    // Check if sorting changed
+    if (JSON.stringify(sorting) !== JSON.stringify(prevDeps.current.sorting)) {
+      if (sorting.length > 0) {
+        updates.sortBy = sorting[0].id;
+        updates.sortOrder = sorting[0].desc ? 'desc' : 'asc';
+      } else {
+        updates.sortBy = null; // Explicitly remove sorting params
+        updates.sortOrder = null;
+      }
+      stateChanged = true;
+      resetPage = true;
     }
 
-    console.log('Sorting changed, fetching data...'); // Debug log
-
-    // Prepare params with the new sorting state
-    const params = new URLSearchParams();
-    const currentUrlPage = Math.max(1, Number(searchParams.get('page')) || 1);
-    params.set('page', currentUrlPage.toString());
-    params.set('limit', limit.toString());
-    if (searchInput) params.set('search', searchInput);
-    if (statusFilter.length > 0)
-      statusFilter.forEach((s) => params.append('status', s));
-    if (genreFilter.length > 0)
-      genreFilter.forEach((g) => params.append('genres', g));
-
-    // Apply the NEW sorting state
-    if (sorting.length > 0) {
-      const sort = sorting[0];
-      params.set('sortBy', sort.id);
-      params.set('sortOrder', sort.desc ? 'desc' : 'asc');
+    if (resetPage) {
+      updates.page = 1; // Reset page if search, filter or sort changed
     }
 
-    // Trigger immediate fetch with new sorting, NO URL update
-    fetchDataNow(currentUrlPage, params, false);
+    // If state relevant to this hook instance changed
+    if (stateChanged) {
+      // Update URL (use push for user-driven changes)
+      updateUrlParams(updates, false);
 
-    // Update the sorting part of prevDeps *after* the fetch is triggered
-    prevDeps.current = { ...prevDeps.current, sorting };
+      // Trigger debounced fetch using parameters intended for the *URL*
+      // fetchDataInternal will correctly extract/map for the API call
+      const paramsForFetch = new URLSearchParams();
+      Object.entries(updates).forEach(([key, value]) => {
+        const prefixedKey = getKey(key);
+        if (Array.isArray(value)) {
+          if (value.length > 0)
+            value.forEach((v) =>
+              paramsForFetch.append(prefixedKey, v.toString())
+            );
+        } else if (value !== null && value !== '') {
+          paramsForFetch.set(prefixedKey, value.toString());
+        }
+      });
+      // Use the (potentially reset) page number
+      debouncedFetch(updates.page || currentPage, paramsForFetch);
+
+      // Update previous dependencies ref *after* logic
+      prevDeps.current = {
+        ...prevDeps.current, // Keep previous page if only search/filter/sort changed
+        currentPage: updates.page || prevDeps.current.currentPage, // Update page if it was reset
+        searchInput,
+        statusFilter,
+        genreFilter,
+        sorting,
+      };
+    }
   }, [
-    sorting,
-    limit,
     searchInput,
     statusFilter,
     genreFilter,
-    fetchDataNow,
-    searchParams,
-  ]); // Depend on sorting and other params needed for fetch
-
-  // Refresh data function
-  const refreshData = useCallback(async () => {
-    const params = new URLSearchParams(searchParams.toString());
-    const pageToRefresh = Math.max(1, Number(params.get('page')) || 1);
-    // Ensure params reflect current state accurately for the refresh
-    params.set('page', pageToRefresh.toString());
-    if (searchInput) params.set('search', searchInput);
-    else params.delete('search');
-    params.delete('status');
-    if (statusFilter.length > 0)
-      statusFilter.forEach((s) => params.append('status', s));
-    params.delete('genres');
-    if (genreFilter.length > 0)
-      genreFilter.forEach((g) => params.append('genres', g));
-    params.delete('sortBy');
-    params.delete('sortOrder');
-    if (sorting.length > 0) {
-      const sort = sorting[0];
-      params.set('sortBy', sort.id);
-      params.set('sortOrder', sort.desc ? 'desc' : 'asc');
-    }
-    if (!params.has('limit')) params.set('limit', limit.toString());
-
-    await fetchDataNow(pageToRefresh, params);
-  }, [
-    fetchDataNow,
-    searchInput,
-    statusFilter,
-    genreFilter,
     sorting,
-    searchParams,
-    limit,
+    updateUrlParams,
+    debouncedFetch,
+    currentPage,
+    getKey,
   ]);
+
+  // Effect 2: Handle URL changes (e.g., browser back/forward, direct URL edit, page changes)
+  // Updates *state* based on URL and triggers *immediate* fetch if necessary.
+  useEffect(() => {
+    // console.log("Effect 2 Triggered (URL Change Check)");
+    const urlPage = Math.max(1, Number(searchParams.get(getKey('page'))) || 1);
+    const urlSearch = searchParams.get(getKey('q')) || '';
+    const urlStatus = searchParams.getAll(getKey('status')) || [];
+    const urlGenres = searchParams.getAll(getKey('genres')) || [];
+    const urlSortBy = searchParams.get(getKey('sortBy'));
+    const urlSortOrder = searchParams.get(getKey('sortOrder'));
+    const urlSorting = urlSortBy
+      ? [{ id: urlSortBy, desc: urlSortOrder === 'desc' }]
+      : [];
+
+    // Check if URL state differs from *current tracked state (prevDeps)*
+    const urlStateDiffers =
+      urlPage !== prevDeps.current.currentPage ||
+      urlSearch !== prevDeps.current.searchInput ||
+      JSON.stringify(urlStatus) !==
+        JSON.stringify(prevDeps.current.statusFilter) ||
+      JSON.stringify(urlGenres) !==
+        JSON.stringify(prevDeps.current.genreFilter) ||
+      JSON.stringify(urlSorting) !== JSON.stringify(prevDeps.current.sorting);
+
+    // console.log(`Effect 2: Initial Load: ${initialLoad.current}, URL State Differs: ${urlStateDiffers}`);
+
+    // If initial load OR URL state has changed from tracked state
+    if (initialLoad.current || urlStateDiffers) {
+      // console.log(`Effect 2: Syncing state and fetching...`);
+
+      // Sync state with URL values for this instance
+      setSearchInput(urlSearch);
+      setStatusFilter(urlStatus);
+      setGenreFilter(urlGenres);
+      setSorting(urlSorting);
+      // Note: currentPage is derived directly from searchParams, so no separate state update needed
+
+      // Fetch data immediately based on URL state
+      // Pass the current searchParams (representing the URL) to fetchDataInternal
+      const paramsFromUrl = new URLSearchParams(searchParams.toString());
+      fetchDataInternal(urlPage, paramsFromUrl, initialLoad.current); // Show loading only on initial load
+
+      // Update previous dependencies ref *after* logic
+      prevDeps.current = {
+        currentPage: urlPage,
+        searchInput: urlSearch,
+        statusFilter: urlStatus,
+        genreFilter: urlGenres,
+        sorting: urlSorting,
+      };
+
+      if (initialLoad.current) {
+        initialLoad.current = false;
+      }
+    }
+    // searchParams is the sole dependency, representing the URL state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Refresh data function (refetches based on current URL state)
+  const refreshData = useCallback(async () => {
+    // console.log("Refreshing data based on current URL");
+    const params = new URLSearchParams(searchParams.toString());
+    const pageToRefresh = Math.max(1, Number(params.get(getKey('page'))) || 1);
+    // Pass the current URL params; fetchDataInternal knows how to map them for the API
+    await fetchDataInternal(pageToRefresh, params);
+  }, [searchParams, fetchDataInternal, getKey]);
 
   return {
     data,
-    setData,
+    setData, // Allow external data manipulation if needed
     loading,
     totalPages,
-    currentPage,
+    currentPage, // This is now always derived directly from URL state
     actionLoading,
     setActionLoading,
-    searchInput,
-    setSearchInput,
-    statusFilter,
-    setStatusFilter,
-    genreFilter,
-    setGenreFilter,
+    searchInput, // Expose state
+    setSearchInput, // Expose setter
+    statusFilter, // Expose state
+    setStatusFilter, // Expose setter
+    genreFilter, // Expose state
+    setGenreFilter, // Expose setter
     selectedRows,
     setSelectedRows,
-    sorting,
-    setSorting,
-    updateQueryParam: updateQueryParams,
-    refreshData,
+    sorting, // Expose state
+    setSorting, // Expose setter
+    updateQueryParam: updateUrlParams, // Expose URL update function
+    refreshData, // Expose refresh function
   };
 }

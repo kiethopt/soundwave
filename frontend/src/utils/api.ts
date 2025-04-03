@@ -383,6 +383,61 @@ export const api = {
         { method: 'POST' },
         token
       ),
+
+    // System playlist management
+    createSystemPlaylist: async (formData: FormData, token: string) => {
+      // Handle file uploads in FormData
+      return fetchWithAuth(
+        '/api/playlists/admin/system/base',
+        {
+          method: 'POST',
+          body: formData,
+          headers: {
+            // Don't set Content-Type with FormData - browser will set it with boundary
+          },
+        },
+        token
+      );
+    },
+
+    updateSystemPlaylist: async (
+      playlistId: string,
+      formData: FormData,
+      token: string
+    ) => {
+      // Handle file uploads in FormData
+      return fetchWithAuth(
+        `/api/playlists/admin/system/base/${playlistId}`,
+        {
+          method: 'PUT',
+          body: formData,
+          headers: {
+            // Don't set Content-Type with FormData - browser will set it with boundary
+          },
+        },
+        token
+      );
+    },
+
+    deleteSystemPlaylist: async (playlistId: string, token: string) => {
+      return fetchWithAuth(
+        `/api/playlists/admin/system/base/${playlistId}`,
+        { method: 'DELETE' },
+        token
+      );
+    },
+
+    // Schedule playlist update for a specific time
+    schedulePlaylistUpdate: async (scheduledTime: Date, token: string) => {
+      return fetchWithAuth(
+        '/api/admin/playlists/global/schedule',
+        {
+          method: 'POST',
+          body: JSON.stringify({ scheduledTime: scheduledTime.toISOString() }),
+        },
+        token
+      );
+    },
   },
 
   user: {
@@ -1221,6 +1276,24 @@ export const api = {
 
     updateVibeRewindPlaylist: async (token: string) =>
       fetchWithAuth('/api/playlists/vibe-rewind', { method: 'POST' }, token),
+
+    getAllBaseSystemPlaylists: async (
+      token: string,
+      page: number = 1,
+      limit: number = 10,
+      params: string = ''
+    ) => {
+      const queryParams = new URLSearchParams(params);
+      queryParams.set('page', page.toString());
+      queryParams.set('limit', limit.toString());
+      const queryString = queryParams.toString();
+
+      return fetchWithAuth(
+        `/api/playlists/admin/system/base?${queryString}`,
+        { method: 'GET' },
+        token
+      );
+    },
   },
 
   upload: {

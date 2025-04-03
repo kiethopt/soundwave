@@ -17,13 +17,45 @@ const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const upload_service_1 = require("./upload.service");
 const handle_utils_1 = require("../utils/handle-utils");
-const getAllLabels = () => __awaiter(void 0, void 0, void 0, function* () {
-    return db_1.default.label.findMany({
-        orderBy: {
-            name: 'asc',
+const getAllLabels = (req) => __awaiter(void 0, void 0, void 0, function* () {
+    const { search, sortBy, sortOrder } = req.query;
+    const whereClause = {};
+    if (search && typeof search === 'string') {
+        whereClause.OR = [
+            { name: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+        ];
+    }
+    const orderByClause = {};
+    if (sortBy &&
+        typeof sortBy === 'string' &&
+        (sortOrder === 'asc' || sortOrder === 'desc')) {
+        if (sortBy === 'name' || sortBy === 'createdAt' || sortBy === 'updatedAt') {
+            orderByClause[sortBy] = sortOrder;
+        }
+        else {
+            orderByClause.name = 'asc';
+        }
+    }
+    else {
+        orderByClause.name = 'asc';
+    }
+    const result = yield (0, handle_utils_1.paginate)(db_1.default.label, req, {
+        where: whereClause,
+        include: {
+            _count: {
+                select: {
+                    tracks: true,
+                    albums: true,
+                },
+            },
         },
-        select: prisma_selects_1.labelSelect,
+        orderBy: orderByClause,
     });
+    return {
+        data: result.data,
+        pagination: result.pagination,
+    };
 });
 exports.getAllLabels = getAllLabels;
 const getLabelById = (id) => __awaiter(void 0, void 0, void 0, function* () {

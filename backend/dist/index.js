@@ -30,7 +30,6 @@ const playlist_routes_1 = __importDefault(require("./routes/playlist.routes"));
 const event_routes_1 = __importDefault(require("./routes/event.routes"));
 const label_routes_1 = __importDefault(require("./routes/label.routes"));
 const db_1 = __importDefault(require("./config/db"));
-const playlist_service_1 = require("./services/playlist.service");
 const playlist_extension_1 = require("./prisma/extensions/playlist.extension");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -66,8 +65,6 @@ const PORT = process.env.PORT || 10000;
 const initApp = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield initializeApp();
-        yield (0, playlist_service_1.createDefaultSystemPlaylists)();
-        console.log('[Init] System playlists initialized');
     }
     catch (error) {
         console.error('[Init] Error during initialization:', error);

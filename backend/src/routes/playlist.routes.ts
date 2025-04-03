@@ -15,25 +15,27 @@ import {
   updateVibeRewindPlaylist,
   generateAIPlaylist,
   // System playlist controllers
-  createSystemPlaylists,
-  getSystemPlaylist,
-  updateSystemPlaylistForUser,
   updateAllSystemPlaylists,
+  // Base System Playlist Controllers (Admin)
+  createBaseSystemPlaylist,
+  updateBaseSystemPlaylist,
+  deleteBaseSystemPlaylist,
+  getAllBaseSystemPlaylists,
   getHomePageData,
 } from '../controllers/playlist.controller';
-import { cacheMiddleware } from '../middleware/cache.middleware';
 import { Role } from '@prisma/client';
+import upload from '../middleware/upload.middleware';
 
 const router = express.Router();
 
 // == Public routes (no authentication required) ==
+router.get('/home', optionalAuthenticate, getHomePageData);
 router.get(
   '/system-all',
   authenticate,
   authorize([Role.ADMIN]),
   getSystemPlaylists
 );
-router.get('/home', optionalAuthenticate, getHomePageData);
 router.get('/:id', optionalAuthenticate, getPlaylistById);
 
 // == Authenticated user routes ==
@@ -55,12 +57,25 @@ router.post('/ai-generate/artist/:artistName', (req, res, next) => {
 
 // User-specific system playlist routes
 router.post('/vibe-rewind', updateVibeRewindPlaylist);
-router.get('/system/:playlistName', getSystemPlaylist);
-router.post('/system/:playlistName/user/:userId', updateSystemPlaylistForUser);
 
 // == Admin-only routes ==
 router.use('/admin', authorize([Role.ADMIN]));
-router.post('/admin/system/create', createSystemPlaylists);
+
+// Routes for managing BASE system playlists
+router.post(
+  '/admin/system/base',
+  upload.single('cover'),
+  createBaseSystemPlaylist
+);
+router.get('/admin/system/base', getAllBaseSystemPlaylists);
+router.put(
+  '/admin/system/base/:id',
+  upload.single('cover'),
+  updateBaseSystemPlaylist
+);
+router.delete('/admin/system/base/:id', deleteBaseSystemPlaylist);
+
+// Route to trigger update for all users (based on base playlists)
 router.post('/admin/system/update-all', updateAllSystemPlaylists);
 
 export default router;

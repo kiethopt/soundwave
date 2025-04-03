@@ -2,16 +2,25 @@ import { Request, Response } from 'express';
 import * as labelService from '../services/label.service';
 import { handleError } from '../utils/handle-utils';
 
-export const getAllLabels = async (req: Request, res: Response): Promise<void> => {
+export const getAllLabels = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
-    const labels = await labelService.getAllLabels();
-    res.json({ labels });
+    const result = await labelService.getAllLabels(req);
+    res.json({
+      labels: result.data,
+      pagination: result.pagination,
+    });
   } catch (error) {
     handleError(res, error, 'Get all labels');
   }
 };
 
-export const getLabelById = async (req: Request, res: Response): Promise<void> => {
+export const getLabelById = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { id } = req.params;
     const label = await labelService.getLabelById(id);
@@ -27,7 +36,10 @@ export const getLabelById = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-export const createLabel = async (req: Request, res: Response): Promise<void> => {
+export const createLabel = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const label = await labelService.createLabel(req);
     res.status(201).json({
@@ -39,7 +51,10 @@ export const createLabel = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-export const updateLabel = async (req: Request, res: Response): Promise<void> => {
+export const updateLabel = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const updatedLabel = await labelService.updateLabel(req);
     res.json({
@@ -51,7 +66,10 @@ export const updateLabel = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-export const deleteLabel = async (req: Request, res: Response): Promise<void> => {
+export const deleteLabel = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { id } = req.params;
     await labelService.deleteLabel(id);

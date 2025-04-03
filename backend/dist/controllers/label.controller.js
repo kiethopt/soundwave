@@ -47,8 +47,11 @@ const labelService = __importStar(require("../services/label.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const getAllLabels = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const labels = yield labelService.getAllLabels();
-        res.json({ labels });
+        const result = yield labelService.getAllLabels(req);
+        res.json({
+            labels: result.data,
+            pagination: result.pagination,
+        });
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Get all labels');

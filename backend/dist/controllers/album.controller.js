@@ -95,20 +95,23 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (user.role === client_1.Role.ADMIN && artistId) {
             const targetArtist = yield db_1.default.artistProfile.findFirst({
                 where: { id: artistId, isVerified: true, role: client_1.Role.ARTIST },
-                select: { id: true, artistName: true }
+                select: { id: true, artistName: true },
             });
             if (!targetArtist) {
-                res.status(404).json({ message: 'Artist profile not found or not verified' });
+                res
+                    .status(404)
+                    .json({ message: 'Artist profile not found or not verified' });
                 return;
             }
             targetArtistProfileId = targetArtist.id;
             fetchedArtistProfile = targetArtist;
         }
-        else if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) && user.artistProfile.role === client_1.Role.ARTIST) {
+        else if (((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.isVerified) &&
+            user.artistProfile.role === client_1.Role.ARTIST) {
             targetArtistProfileId = user.artistProfile.id;
             fetchedArtistProfile = yield db_1.default.artistProfile.findUnique({
                 where: { id: targetArtistProfileId },
-                select: { artistName: true }
+                select: { artistName: true },
             });
         }
         else {
@@ -148,10 +151,10 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: { followerId: true },
         });
-        const followerIds = followers.map(f => f.followerId);
+        const followerIds = followers.map((f) => f.followerId);
         const followerUsers = yield db_1.default.user.findMany({
             where: { id: { in: followerIds } },
-            select: { id: true, email: true }
+            select: { id: true, email: true },
         });
         const notificationsData = followers.map((follower) => ({
             type: client_2.NotificationType.NEW_ALBUM,
@@ -166,15 +169,17 @@ const createAlbum = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 yield db_1.default.notification.createMany({ data: notificationsData });
             }
             catch (notiError) {
-                console.error("Failed to create in-app notifications:", notiError);
+                console.error('Failed to create in-app notifications:', notiError);
             }
         }
         const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
         for (const user of followerUsers) {
-            pusher_1.default.trigger(`user-${user.id}`, 'notification', {
+            pusher_1.default
+                .trigger(`user-${user.id}`, 'notification', {
                 type: client_2.NotificationType.NEW_ALBUM,
                 message: `${artistName} vừa ra album mới: ${album.title}`,
-            }).catch((err) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
+            })
+                .catch((err) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
             if (user.email) {
                 try {
                     const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'album', album.title, releaseLink);
@@ -567,8 +572,7 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             });
             return;
         }
-        const { page = 1, limit = 10, q: search, status, genres } = req.query;
-        const offset = (Number(page) - 1) * Number(limit);
+        const { search, status, genres } = req.query;
         const whereClause = {};
         const conditions = [];
         if (search) {
@@ -606,24 +610,10 @@ const getAllAlbums = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         if (conditions.length > 0) {
             whereClause.AND = conditions;
         }
-        const [albums, total] = yield Promise.all([
-            db_1.default.album.findMany({
-                where: whereClause,
-                skip: offset,
-                take: Number(limit),
-                select: prisma_selects_1.albumSelect,
-                orderBy: { createdAt: 'desc' },
-            }),
-            db_1.default.album.count({ where: whereClause }),
-        ]);
+        const result = yield albumService.getAllAlbums(req);
         res.json({
-            albums,
-            pagination: {
-                total,
-                page: Number(page),
-                limit: Number(limit),
-                totalPages: Math.ceil(total / Number(limit)),
-            },
+            albums: result.data,
+            pagination: result.pagination,
         });
     }
     catch (error) {

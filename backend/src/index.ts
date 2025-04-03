@@ -17,7 +17,6 @@ import eventRoutes from './routes/event.routes';
 import labelRoutes from './routes/label.routes';
 // Import the extended Prisma client to ensure extensions are loaded
 import prisma from './config/db';
-import { createDefaultSystemPlaylists } from './services/playlist.service';
 import { registerPlaylistCronJobs } from './prisma/extensions/playlist.extension';
 
 dotenv.config();
@@ -66,10 +65,6 @@ const initApp = async () => {
   try {
     // First initialize the application
     await initializeApp();
-
-    // Then initialize system playlists
-    await createDefaultSystemPlaylists();
-    console.log('[Init] System playlists initialized');
   } catch (error) {
     console.error('[Init] Error during initialization:', error);
   }

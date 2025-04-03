@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import prisma from '../config/db';
 import { trackSelect } from '../utils/prisma-selects';
 import { Playlist } from '@prisma/client';
+import { PlaylistType } from '@prisma/client';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
@@ -26,6 +27,7 @@ interface PlaylistGenerationOptions {
   basedOnMood?: string;
   basedOnGenre?: string;
   basedOnArtist?: string;
+  coverUrl?: string;
 }
 
 /**
@@ -566,16 +568,8 @@ export const createAIGeneratedPlaylist = async (
   options: PlaylistGenerationOptions = {}
 ): Promise<Playlist> => {
   try {
-    // Create a more appealing playlist name without AI mention
-    const playlistName =
-      options.name ||
-      (options.basedOnMood
-        ? `${options.basedOnMood} Mood Mix`
-        : options.basedOnGenre
-        ? `${options.basedOnGenre} Essentials`
-        : options.basedOnArtist
-        ? `${options.basedOnArtist} Flow`
-        : 'Soundwave Discoveries');
+    // Use the name from options if provided, otherwise generate one
+    const playlistName = options.name || 'Soundwave Discoveries';
 
     // Generate track recommendations
     const trackIds = await generateAIPlaylist(userId, options);
@@ -628,105 +622,90 @@ export const createAIGeneratedPlaylist = async (
       .map((id) => artistsInPlaylist.get(id))
       .filter(Boolean) as string[];
 
-    // Create a more professional description without mentioning AI directly
+    // Use description from options if provided, otherwise generate a default one
     const playlistDescription =
       options.description ||
       `Curated selection featuring ${sortedArtistNames.slice(0, 3).join(', ')}${
         sortedArtistNames.length > 3 ? ' and more' : ''
-      }${
-        options.basedOnMood ? `, perfect for a ${options.basedOnMood} mood` : ''
-      }${
-        options.basedOnGenre
-          ? `, focusing on ${options.basedOnGenre} music`
-          : ''
-      }${
-        options.basedOnArtist ? `, inspired by ${options.basedOnArtist}` : ''
       }. Refreshed regularly based on your listening patterns.`;
 
     // Default cover URL for AI-generated playlists
     const defaultCoverUrl =
       'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
 
-    // Find if the user already has a playlist with this name
+    // Find if the user already has a personalized system playlist with this name
+    // It should match the base playlist name used for generation.
     let playlist = await prisma.playlist.findFirst({
       where: {
         userId,
         name: playlistName,
-        isAIGenerated: true,
+        type: PlaylistType.SYSTEM, // Ensure we are looking for the user's personalized system playlist
       },
     });
 
-    if (playlist) {
-      // Update existing playlist
-      console.log(`[AI] Đang cập nhật danh sách phát AI đã tạo ${playlist.id}`);
+    const playlistData = {
+      description: playlistDescription,
+      coverUrl: options.coverUrl || defaultCoverUrl, // Use cover from options or default
+      totalTracks: trackIds.length,
+      totalDuration,
+      updatedAt: new Date(),
+      lastGeneratedAt: new Date(),
+      tracks: {
+        createMany: {
+          data: trackIds.map((trackId, index) => ({
+            trackId,
+            trackOrder: index,
+          })),
+          skipDuplicates: true, // Avoid errors if track already exists (though we deleted them)
+        },
+      },
+    };
 
-      // Remove existing tracks
+    if (playlist) {
+      // Update existing personalized system playlist
+      console.log(
+        `[AI] Updating personalized system playlist ${playlist.id} for user ${userId}`
+      );
+
+      // Remove existing tracks first
       await prisma.playlistTrack.deleteMany({
         where: { playlistId: playlist.id },
       });
 
-      // Update playlist
+      // Update playlist details and add new tracks
       playlist = await prisma.playlist.update({
         where: { id: playlist.id },
-        data: {
-          description: playlistDescription,
-          coverUrl: playlist.coverUrl || defaultCoverUrl, // Keep existing cover or use default
-          totalTracks: trackIds.length,
-          totalDuration,
-          updatedAt: new Date(),
-          lastGeneratedAt: new Date(),
-          tracks: {
-            createMany: {
-              data: trackIds.map((trackId, index) => ({
-                trackId,
-                trackOrder: index,
-              })),
-            },
-          },
-        },
+        data: playlistData,
       });
 
       console.log(
-        `[AI] Đã cập nhật danh sách phát với ${trackIds.length} bài hát từ ${artistsInPlaylist.size} nghệ sĩ`
+        `[AI] Updated playlist with ${trackIds.length} tracks from ${artistsInPlaylist.size} artists`
       );
     } else {
-      // Create new playlist
+      // Create new personalized system playlist for the user
       console.log(
-        `[AI] Đang tạo danh sách phát AI mới cho người dùng ${userId}`
+        `[AI] Creating new personalized system playlist "${playlistName}" for user ${userId}`
       );
 
-      // Create playlist
       playlist = await prisma.playlist.create({
         data: {
           name: playlistName,
-          description: playlistDescription,
-          coverUrl: defaultCoverUrl, // Use the default cover URL
-          privacy: 'PRIVATE',
-          type: 'NORMAL',
-          isAIGenerated: true,
-          totalTracks: trackIds.length,
-          totalDuration,
-          lastGeneratedAt: new Date(),
           userId,
-          tracks: {
-            createMany: {
-              data: trackIds.map((trackId, index) => ({
-                trackId,
-                trackOrder: index,
-              })),
-            },
-          },
+          type: PlaylistType.SYSTEM, // Mark as user's personalized system playlist
+          privacy: 'PRIVATE', // User's personalized playlists are private
+          isAIGenerated: true,
+          ...playlistData,
         },
       });
 
       console.log(
-        `[AI] Đã tạo danh sách phát với ${trackIds.length} bài hát từ ${artistsInPlaylist.size} nghệ sĩ`
+        `[AI] Created playlist with ${trackIds.length} tracks from ${artistsInPlaylist.size} artists`
       );
     }
 
     return playlist;
   } catch (error) {
-    console.error('[AI] Error creating AI-generated playlist:', error);
+    console.error('[AI] Error creating/updating AI-generated playlist:', error);
     throw error;
   }
 };

@@ -2,15 +2,55 @@ import prisma from '../config/db';
 import { labelSelect } from '../utils/prisma-selects';
 import { Request } from 'express';
 import { uploadFile } from './upload.service';
-import { runValidations, validateField } from '../utils/handle-utils';
+import { runValidations, validateField, paginate } from '../utils/handle-utils';
 
-export const getAllLabels = async () => {
-  return prisma.label.findMany({
-    orderBy: {
-      name: 'asc',
+export const getAllLabels = async (req: Request) => {
+  const { search, sortBy, sortOrder } = req.query;
+
+  // Xây dựng điều kiện tìm kiếm
+  const whereClause: any = {};
+
+  if (search && typeof search === 'string') {
+    whereClause.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  // Xử lý sắp xếp
+  const orderByClause: any = {};
+  if (
+    sortBy &&
+    typeof sortBy === 'string' &&
+    (sortOrder === 'asc' || sortOrder === 'desc')
+  ) {
+    if (sortBy === 'name' || sortBy === 'createdAt' || sortBy === 'updatedAt') {
+      orderByClause[sortBy] = sortOrder;
+    } else {
+      orderByClause.name = 'asc';
+    }
+  } else {
+    orderByClause.name = 'asc';
+  }
+
+  // Dùng hàm paginate để xử lý phân trang
+  const result = await paginate<any>(prisma.label, req, {
+    where: whereClause,
+    include: {
+      _count: {
+        select: {
+          tracks: true,
+          albums: true,
+        },
+      },
     },
-    select: labelSelect,
+    orderBy: orderByClause,
   });
+
+  return {
+    data: result.data,
+    pagination: result.pagination,
+  };
 };
 
 export const getLabelById = async (id: string) => {
@@ -207,7 +247,8 @@ export const deleteLabel = async (id: string) => {
   if (existingLabel._count.albums > 0 || existingLabel._count.tracks > 0) {
     throw {
       status: 400,
-      message: 'Cannot delete label with associated albums or tracks. Remove the associations first.',
+      message:
+        'Cannot delete label with associated albums or tracks. Remove the associations first.',
       data: {
         albums: existingLabel._count.albums,
         tracks: existingLabel._count.tracks,

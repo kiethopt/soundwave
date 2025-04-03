@@ -48,6 +48,12 @@ export interface ResetPasswordData {
   password: string;
 }
 
+// Helper type for useDataTable hook
+export interface FetchDataResponse<T> {
+  data: T[];
+  pagination: { totalPages: number };
+}
+
 // Model Types
 export interface User {
   id: string;

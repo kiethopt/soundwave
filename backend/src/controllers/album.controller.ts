@@ -37,7 +37,10 @@ const validateAlbumData = (data: any): string | null => {
 };
 
 // Tạo album mới (ADMIN & ARTIST only)
-export const createAlbum = async (req: Request, res: Response): Promise<void> => {
+export const createAlbum = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const user = req.user;
     if (!user) {
@@ -69,20 +72,25 @@ export const createAlbum = async (req: Request, res: Response): Promise<void> =>
     if (user.role === Role.ADMIN && artistId) {
       const targetArtist = await prisma.artistProfile.findFirst({
         where: { id: artistId, isVerified: true, role: Role.ARTIST },
-        select: { id: true, artistName: true } // Select artistName
+        select: { id: true, artistName: true }, // Select artistName
       });
       if (!targetArtist) {
-        res.status(404).json({ message: 'Artist profile not found or not verified' });
+        res
+          .status(404)
+          .json({ message: 'Artist profile not found or not verified' });
         return;
       }
       targetArtistProfileId = targetArtist.id;
       fetchedArtistProfile = targetArtist; // Gán profile đã fetch
-    } else if (user.artistProfile?.isVerified && user.artistProfile.role === Role.ARTIST) {
+    } else if (
+      user.artistProfile?.isVerified &&
+      user.artistProfile.role === Role.ARTIST
+    ) {
       targetArtistProfileId = user.artistProfile.id;
       // Fetch lại artist profile để lấy tên nếu cần (hoặc lấy từ req.user nếu có)
       fetchedArtistProfile = await prisma.artistProfile.findUnique({
         where: { id: targetArtistProfileId },
-        select: { artistName: true }
+        select: { artistName: true },
       });
     } else {
       res.status(403).json({ message: 'Not authorized to create albums' });
@@ -129,10 +137,10 @@ export const createAlbum = async (req: Request, res: Response): Promise<void> =>
       select: { followerId: true },
     });
 
-    const followerIds = followers.map(f => f.followerId);
+    const followerIds = followers.map((f) => f.followerId);
     const followerUsers = await prisma.user.findMany({
       where: { id: { in: followerIds } },
-      select: { id: true, email: true }
+      select: { id: true, email: true },
     });
 
     // Tạo thông báo in-app
@@ -149,7 +157,7 @@ export const createAlbum = async (req: Request, res: Response): Promise<void> =>
       try {
         await prisma.notification.createMany({ data: notificationsData });
       } catch (notiError) {
-        console.error("Failed to create in-app notifications:", notiError);
+        console.error('Failed to create in-app notifications:', notiError);
       }
     }
 
@@ -158,10 +166,14 @@ export const createAlbum = async (req: Request, res: Response): Promise<void> =>
 
     for (const user of followerUsers) {
       // Gửi Pusher
-      pusher.trigger(`user-${user.id}`, 'notification', {
-        type: NotificationType.NEW_ALBUM,
-        message: `${artistName} vừa ra album mới: ${album.title}`, // Sử dụng biến artistName
-      }).catch((err: any) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
+      pusher
+        .trigger(`user-${user.id}`, 'notification', {
+          type: NotificationType.NEW_ALBUM,
+          message: `${artistName} vừa ra album mới: ${album.title}`, // Sử dụng biến artistName
+        })
+        .catch((err: any) =>
+          console.error(`Failed to trigger Pusher for user ${user.id}:`, err)
+        );
 
       // Gửi Email
       if (user.email) {
@@ -175,10 +187,15 @@ export const createAlbum = async (req: Request, res: Response): Promise<void> =>
           );
           await emailService.sendEmail(emailOptions);
         } catch (err: any) {
-          console.error(`Failed to send new album email to ${user.email}:`, err);
+          console.error(
+            `Failed to send new album email to ${user.email}:`,
+            err
+          );
         }
       } else {
-        console.warn(`Follower ${user.id} has no email for new album notification.`);
+        console.warn(
+          `Follower ${user.id} has no email for new album notification.`
+        );
       }
     }
 
@@ -269,8 +286,8 @@ export const addTracksToAlbum = async (
     const featuredArtists = Array.isArray(req.body.featuredArtists)
       ? req.body.featuredArtists.map((artists: string) => artists.split(','))
       : req.body.featuredArtists
-        ? [req.body.featuredArtists.split(',')]
-        : [];
+      ? [req.body.featuredArtists.split(',')]
+      : [];
 
     const mm = await import('music-metadata');
 
@@ -425,8 +442,8 @@ export const updateAlbum = async (
       const genresArray = !genres
         ? []
         : Array.isArray(genres)
-          ? genres
-          : [genres];
+        ? genres
+        : [genres];
 
       if (genresArray.length > 0) {
         updateData.genres = {
@@ -531,8 +548,9 @@ export const toggleAlbumVisibility = async (
     });
 
     res.json({
-      message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'
-        } successfully`,
+      message: `Album ${
+        updatedAlbum.isActive ? 'activated' : 'hidden'
+      } successfully`,
       album: updatedAlbum,
     });
   } catch (error) {
@@ -667,8 +685,7 @@ export const getAllAlbums = async (
       return;
     }
 
-    const { page = 1, limit = 10, q: search, status, genres } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const { search, status, genres } = req.query;
 
     // Xây dựng điều kiện where
     const whereClause: Prisma.AlbumWhereInput = {};
@@ -718,25 +735,12 @@ export const getAllAlbums = async (
       whereClause.AND = conditions;
     }
 
-    const [albums, total] = await Promise.all([
-      prisma.album.findMany({
-        where: whereClause,
-        skip: offset,
-        take: Number(limit),
-        select: albumSelect,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.album.count({ where: whereClause }),
-    ]);
+    // Use the album service instead of direct prisma calls
+    const result = await albumService.getAllAlbums(req);
 
     res.json({
-      albums,
-      pagination: {
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / Number(limit)),
-      },
+      albums: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
     console.error('Get albums error:', error);

@@ -7,6 +7,7 @@ import {
   User,
   ArtistRequest,
   Label,
+  Playlist,
 } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -23,6 +24,9 @@ import {
   CheckCircle,
   Trash,
   Tags,
+  Twitter,
+  Facebook,
+  Instagram,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -39,6 +43,9 @@ import { ArtistInfoModal } from './data-table-modals';
 import { AddSimple, Edit, UserIcon } from '@/components/ui/Icons';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/Icons';
+import { Badge } from '@/components/ui/badge';
+import { format, formatDistance } from 'date-fns';
+import { Verified } from '@/components/ui/Icons';
 
 interface GetTrackColumnsOptions {
   theme?: 'light' | 'dark';
@@ -82,6 +89,13 @@ interface GetLabelColumnsOptions {
   theme?: 'light' | 'dark';
   onDelete?: (id: string | string[]) => Promise<void>;
   onEdit?: (label: Label) => void;
+}
+
+interface GetSystemPlaylistColumnsOptions {
+  theme?: 'light' | 'dark';
+  onDelete?: (id: string | string[]) => Promise<void>;
+  onEdit?: (playlist: Playlist) => void;
+  formatUpdatedAt?: (date: string) => string;
 }
 
 export function getTrackColumns({
@@ -1444,6 +1458,156 @@ export function getLabelColumns({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        );
+      },
+    },
+  ];
+}
+
+export function getSystemPlaylistColumns({
+  theme = 'light',
+  onDelete,
+  onEdit,
+  formatUpdatedAt = (date) => new Date(date).toLocaleString(),
+}: GetSystemPlaylistColumnsOptions): ColumnDef<Playlist>[] {
+  return [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && 'indeterminate')
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className={theme === 'dark' ? 'border-white/50' : ''}
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: 'coverUrl',
+      header: 'Cover',
+      cell: ({ row }) => (
+        <div className="relative w-10 h-10 rounded overflow-hidden">
+          <Image
+            src={row.original.coverUrl || '/default-playlist-cover.png'}
+            alt={row.original.name}
+            width={40}
+            height={40}
+            className="object-cover"
+          />
+        </div>
+      ),
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
+    },
+    {
+      accessorKey: 'description',
+      header: 'Description',
+      cell: ({ row }) => (
+        <div className="max-w-[200px] truncate">
+          {row.original.description || 'No description'}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'type',
+      header: 'Type',
+      cell: ({ row }) => (
+        <div className="capitalize">{row.original.type.toLowerCase()}</div>
+      ),
+    },
+    {
+      accessorKey: 'isAIGenerated',
+      header: 'AI Generated',
+      cell: ({ row }) => (
+        <div>
+          {row.original.isAIGenerated ? (
+            <Badge variant={theme === 'dark' ? 'secondary' : 'default'}>
+              Yes
+            </Badge>
+          ) : (
+            <Badge variant="outline">No</Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'totalTracks',
+      header: 'Tracks',
+      cell: ({ row }) => (
+        <div className="text-center">{row.original.totalTracks}</div>
+      ),
+    },
+    {
+      accessorKey: 'updatedAt',
+      header: 'Last Updated',
+      cell: ({ row }) => formatUpdatedAt(row.original.updatedAt),
+    },
+    {
+      id: 'actions',
+      cell: ({ row }) => {
+        const playlist = row.original;
+
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                aria-label="Open menu"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className={theme === 'dark' ? 'bg-[#1e1e1e] border-white/10' : ''}
+            >
+              {onEdit && (
+                <DropdownMenuItem
+                  onClick={() => onEdit(playlist)}
+                  className={
+                    theme === 'dark'
+                      ? 'text-white focus:bg-white/10'
+                      : 'cursor-pointer'
+                  }
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  <span>Edit</span>
+                </DropdownMenuItem>
+              )}
+
+              {onDelete && (
+                <DropdownMenuItem
+                  onClick={() => onDelete(playlist.id)}
+                  className={
+                    theme === 'dark'
+                      ? 'text-red-400 focus:text-red-400 focus:bg-white/10'
+                      : 'text-red-600 cursor-pointer'
+                  }
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  <span>Delete</span>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         );
       },
     },

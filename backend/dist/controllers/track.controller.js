@@ -173,11 +173,11 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             },
             select: { followerId: true },
         });
-        const followerIds = followers.map(f => f.followerId);
+        const followerIds = followers.map((f) => f.followerId);
         if (followerIds.length > 0) {
             const followerUsers = yield db_1.default.user.findMany({
                 where: { id: { in: followerIds } },
-                select: { id: true, email: true }
+                select: { id: true, email: true },
             });
             const notificationsData = followers.map((follower) => ({
                 type: client_2.NotificationType.NEW_TRACK,
@@ -191,14 +191,16 @@ const createTrack = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 yield db_1.default.notification.createMany({ data: notificationsData });
             }
             catch (notiError) {
-                console.error("Failed to create in-app notifications for new track:", notiError);
+                console.error('Failed to create in-app notifications for new track:', notiError);
             }
             const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${track.id}`;
             for (const user of followerUsers) {
-                pusher_1.default.trigger(`user-${user.id}`, 'notification', {
+                pusher_1.default
+                    .trigger(`user-${user.id}`, 'notification', {
                     type: client_2.NotificationType.NEW_TRACK,
                     message: `${artistName} vừa ra track mới: ${track.title}`,
-                }).catch((err) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
+                })
+                    .catch((err) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
                 if (user.email) {
                     try {
                         const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'track', track.title, releaseLink, track.coverUrl);
@@ -569,8 +571,7 @@ const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const { page = 1, limit = 10, q: search, status, genres } = req.query;
-        const offset = (Number(page) - 1) * Number(limit);
+        const { search, status, genres } = req.query;
         const whereClause = {};
         if (search) {
             whereClause.OR = [
@@ -600,24 +601,10 @@ const getAllTracks = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         if (user.role !== client_1.Role.ADMIN && ((_a = user.artistProfile) === null || _a === void 0 ? void 0 : _a.id)) {
             whereClause.artistId = user.artistProfile.id;
         }
-        const [tracks, total] = yield Promise.all([
-            db_1.default.track.findMany({
-                where: whereClause,
-                skip: offset,
-                take: Number(limit),
-                select: prisma_selects_1.trackSelect,
-                orderBy: { createdAt: 'desc' },
-            }),
-            db_1.default.track.count({ where: whereClause }),
-        ]);
+        const result = yield trackService.getAllTracks(req);
         res.json({
-            tracks,
-            pagination: {
-                total,
-                page: Number(page),
-                limit: Number(limit),
-                totalPages: Math.ceil(total / Number(limit)),
-            },
+            tracks: result.data,
+            pagination: result.pagination,
         });
     }
     catch (error) {
