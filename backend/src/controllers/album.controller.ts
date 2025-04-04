@@ -286,8 +286,8 @@ export const addTracksToAlbum = async (
     const featuredArtists = Array.isArray(req.body.featuredArtists)
       ? req.body.featuredArtists.map((artists: string) => artists.split(','))
       : req.body.featuredArtists
-      ? [req.body.featuredArtists.split(',')]
-      : [];
+        ? [req.body.featuredArtists.split(',')]
+        : [];
 
     const mm = await import('music-metadata');
 
@@ -442,8 +442,8 @@ export const updateAlbum = async (
       const genresArray = !genres
         ? []
         : Array.isArray(genres)
-        ? genres
-        : [genres];
+          ? genres
+          : [genres];
 
       if (genresArray.length > 0) {
         updateData.genres = {
@@ -548,9 +548,8 @@ export const toggleAlbumVisibility = async (
     });
 
     res.json({
-      message: `Album ${
-        updatedAlbum.isActive ? 'activated' : 'hidden'
-      } successfully`,
+      message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'
+        } successfully`,
       album: updatedAlbum,
     });
   } catch (error) {
@@ -689,6 +688,12 @@ export const getAllAlbums = async (
 
     // Xây dựng điều kiện where
     const whereClause: Prisma.AlbumWhereInput = {};
+
+    // Nếu không phải ADMIN, chỉ hiển thị album của nghệ sĩ hiện tại
+    if (user.role !== Role.ADMIN && user.artistProfile?.id) {
+      whereClause.artistId = user.artistProfile.id;
+    }
+
     const conditions: any[] = [];
 
     // Thêm điều kiện search nếu có
@@ -724,18 +729,12 @@ export const getAllAlbums = async (
       }
     }
 
-    // Thêm điều kiện artist nếu user là artist
-    if (user.role !== Role.ADMIN && user.artistProfile?.id) {
-      conditions.push({
-        artistId: user.artistProfile.id,
-      });
-    }
     // Kết hợp tất cả điều kiện
     if (conditions.length > 0) {
       whereClause.AND = conditions;
     }
 
-    // Use the album service instead of direct prisma calls
+    // Sử dụng service để lấy danh sách album
     const result = await albumService.getAllAlbums(req);
 
     res.json({

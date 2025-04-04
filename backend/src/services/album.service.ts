@@ -1,6 +1,6 @@
 import { albumSelect } from '../utils/prisma-selects';
 import prisma from '../config/db';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { Request } from 'express';
 import { paginate } from '../utils/handle-utils';
 
@@ -64,8 +64,14 @@ export const getHotAlbums = async (limit = 10) => {
 // Lấy TẤT CẢ albums (cho admin view, với phân trang, tìm kiếm, sắp xếp)
 export const getAllAlbums = async (req: Request) => {
   const { search, sortBy, sortOrder } = req.query;
+  const user = req.user; // Lấy thông tin user từ request
 
   const whereClause: Prisma.AlbumWhereInput = {};
+
+  // Nếu không phải ADMIN, chỉ hiển thị album của nghệ sĩ hiện tại
+  if (user && user.role !== Role.ADMIN && user.artistProfile?.id) {
+    whereClause.artistId = user.artistProfile.id;
+  }
 
   // Thêm điều kiện tìm kiếm nếu có từ khóa tìm kiếm
   if (search && typeof search === 'string') {

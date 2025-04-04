@@ -9,6 +9,12 @@ import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
+// Định nghĩa kiểu dữ liệu cho Label
+interface Label {
+  id: string;
+  name: string;
+}
+
 export default function NewAlbum() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -24,6 +30,10 @@ export default function NewAlbum() {
     Array<{ id: string; name: string }>
   >([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  // --- Thêm State cho Label ---
+  const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null); // Lưu ID label được chọn (null nếu không chọn)
+  // --- Kết thúc thêm State cho Label ---
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -32,16 +42,29 @@ export default function NewAlbum() {
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        const genresResponse = await api.artists.getAllGenres(token, 1, 100);
+        const [genresResponse, labelsResponse] = await Promise.all([
+          api.artists.getAllGenres(token, 1, 100),
+          api.labels.getAll(token, 1, 100), // Giả sử API này tồn tại và trả về { labels: [...] }
+        ]);
+
         setAvailableGenres(
           genresResponse.genres.map((genre: { id: string; name: string }) => ({
             id: genre.id,
             name: genre.name,
           }))
         );
+
+        // --- Cập nhật State cho Labels ---
+        setAvailableLabels(
+          labelsResponse.labels.map((label: Label) => ({
+            id: label.id,
+            name: label.name,
+          }))
+        );
+        // --- Kết thúc Cập nhật State cho Labels ---
       } catch (error) {
         console.error('Failed to fetch data:', error);
-        toast.error('Failed to load required data');
+        toast.error('Failed to load required data (genres or labels)');
       }
     };
 
@@ -97,12 +120,19 @@ export default function NewAlbum() {
         formData.append('genres', genreId);
       });
 
+      // --- Thêm labelId vào FormData nếu đã chọn ---
+      if (selectedLabelId) {
+        formData.append('labelId', selectedLabelId);
+      }
+      // --- Kết thúc thêm labelId ---
+
       await api.albums.create(formData, token);
       toast.success('Album created successfully');
       router.push('/artist/albums');
     } catch (error) {
       console.error('Error creating album:', error);
-      toast.error('Failed to create album');
+      const errorMessage = (error as any)?.response?.data?.message || 'Failed to create album';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -120,8 +150,8 @@ export default function NewAlbum() {
             <Link
               href="/artist/albums"
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${theme === 'light'
-                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
-                  : 'bg-white/10 hover:bg-white/15 text-white/80 hover:text-white'
+                ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
+                : 'bg-white/10 hover:bg-white/15 text-white/80 hover:text-white'
                 }`}
             >
               <ArrowLeft className="w-4 h-4" />
@@ -133,8 +163,8 @@ export default function NewAlbum() {
         {/* Main Form Card */}
         <div
           className={`rounded-xl p-6 border ${theme === 'light'
-              ? 'bg-white border-gray-200'
-              : 'bg-[#121212] border-gray-800'
+            ? 'bg-white border-gray-200'
+            : 'bg-[#121212] border-gray-800'
             }`}
         >
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -155,8 +185,8 @@ export default function NewAlbum() {
                   value={albumData.title}
                   onChange={handleInputChange}
                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                      ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+                    ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
                     }`}
                   required
                 />
@@ -177,23 +207,19 @@ export default function NewAlbum() {
                   value={albumData.type}
                   onChange={handleInputChange}
                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                      ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
+                    ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
+                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
                     }`}
                 >
                   <option
                     value="ALBUM"
-                    className={
-                      theme === 'dark' ? 'bg-[#121212] text-white' : ''
-                    }
+                    className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
                   >
                     Album
                   </option>
                   <option
                     value="EP"
-                    className={
-                      theme === 'dark' ? 'bg-[#121212] text-white' : ''
-                    }
+                    className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
                   >
                     EP
                   </option>
@@ -216,8 +242,8 @@ export default function NewAlbum() {
                   value={albumData.releaseDate}
                   onChange={handleInputChange}
                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                      ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                      : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
+                    ? 'bg-white border-gray-300 focus:ring-blue-500/20'
+                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
                     }`}
                   required
                 />
@@ -230,7 +256,7 @@ export default function NewAlbum() {
                   className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
                     }`}
                 >
-                  Genres
+                  Genres *
                 </label>
                 <SearchableSelect
                   options={availableGenres}
@@ -242,6 +268,27 @@ export default function NewAlbum() {
                 />
               </div>
 
+              {/* --- Thêm trường chọn Label --- */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="label"
+                  className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                    }`}
+                >
+                  Label
+                </label>
+                <SearchableSelect
+                  options={availableLabels}
+                  value={selectedLabelId ? [selectedLabelId] : []}
+                  onChange={(selectedIds) => {
+                    setSelectedLabelId(selectedIds.length > 0 ? selectedIds[0] : null);
+                  }}
+                  placeholder="Select a label..."
+                  multiple={false} // Chỉ cho phép chọn một label
+                />
+              </div>
+              {/* --- Kết thúc thêm trường chọn Label --- */}
+
               {/* Cover Image */}
               <div className="space-y-2">
                 <label
@@ -249,7 +296,7 @@ export default function NewAlbum() {
                   className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
                     }`}
                 >
-                  Cover Image
+                  Cover Image (Optional)
                 </label>
                 <div
                   className="w-full flex flex-col items-center mb-4"
@@ -297,8 +344,8 @@ export default function NewAlbum() {
                   type="submit"
                   disabled={isLoading}
                   className={`px-4 py-2 rounded-md font-medium transition-colors ${theme === 'light'
-                      ? 'bg-gray-900 text-white hover:bg-gray-800'
-                      : 'bg-white text-[#121212] hover:bg-white/90'
+                    ? 'bg-gray-900 text-white hover:bg-gray-800'
+                    : 'bg-white text-[#121212] hover:bg-white/90'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {isLoading ? 'Creating...' : 'Create Album'}

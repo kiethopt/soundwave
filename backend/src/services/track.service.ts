@@ -1,6 +1,6 @@
 import prisma from '../config/db';
 import { trackSelect } from '../utils/prisma-selects';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import { Request } from 'express';
 import { paginate } from '../utils/handle-utils';
 
@@ -126,9 +126,15 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
 // Lấy TẤT CẢ tracks (cho admin view, với phân trang, tìm kiếm, sắp xếp)
 export const getAllTracks = async (req: Request) => {
   const { search, sortBy, sortOrder } = req.query;
+  const user = req.user; // Lấy thông tin user từ request
 
   // Điều kiện tìm kiếm
   const whereClause: Prisma.TrackWhereInput = {};
+
+  // Nếu không phải ADMIN, chỉ hiển thị track của nghệ sĩ hiện tại
+  if (user && user.role !== Role.ADMIN && user.artistProfile?.id) {
+    whereClause.artistId = user.artistProfile.id;
+  }
 
   // Tìm kiếm theo title, artist, album, genres, featuredArtists
   if (search && typeof search === 'string') {
@@ -176,10 +182,7 @@ export const getAllTracks = async (req: Request) => {
       orderByClause.album = { title: sortOrder };
     } else if (sortBy === 'artist') {
       orderByClause.artist = { artistName: sortOrder };
-    }
-    // Note: Sorting by genres or featuredArtists (many-to-many) is complex and might require different approaches.
-    // We'll stick to direct fields and simple relations for now.
-    else {
+    } else {
       orderByClause.releaseDate = 'desc';
     }
   } else {
@@ -189,7 +192,12 @@ export const getAllTracks = async (req: Request) => {
   const result = await paginate<any>(prisma.track, req, {
     where: whereClause,
     include: {
-      artist: { select: { id: true, artistName: true, avatar: true } },
+      artist: {
+        select: { id: true, artistName: true, avatar: true }
+
+
+
+      },
       album: { select: { id: true, title: true } },
       genres: { include: { genre: true } },
       featuredArtists: {

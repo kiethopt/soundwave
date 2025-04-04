@@ -137,15 +137,13 @@ export function EditTrackModal({
   return (
     <Dialog open={!!track} onOpenChange={onClose}>
       <DialogContent
-        className={`${
-          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
-        } p-6 rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto`}
+        className={`${theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+          } p-6 rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto`}
       >
         <DialogHeader>
           <DialogTitle
-            className={`text-xl font-semibold ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
+            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
           >
             Edit Track
           </DialogTitle>
@@ -160,9 +158,8 @@ export function EditTrackModal({
           {/* Cover Image */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Cover Image
             </span>
@@ -171,9 +168,8 @@ export function EditTrackModal({
               onClick={handleCoverClick}
             >
               <div
-                className={`w-40 h-40 rounded-md overflow-hidden cursor-pointer border-2 ${
-                  theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
-                } hover:opacity-90 transition-opacity relative`}
+                className={`w-40 h-40 rounded-md overflow-hidden cursor-pointer border-2 ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
+                  } hover:opacity-90 transition-opacity relative`}
               >
                 <img
                   src={
@@ -205,9 +201,8 @@ export function EditTrackModal({
                 className="hidden"
               />
               <span
-                className={`mt-2 text-sm ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}
+                className={`mt-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  }`}
               >
                 Click to upload new cover image
               </span>
@@ -217,9 +212,8 @@ export function EditTrackModal({
           {/* Title */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Title
             </span>
@@ -228,11 +222,10 @@ export function EditTrackModal({
               name="title" // Cần có name để FormData lấy được giá trị
               defaultValue={track.title}
               required
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50'
-                  : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'
-              } transition-colors focus:outline-none`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50'
+                : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'
+                } transition-colors focus:outline-none`}
               placeholder="Enter track title"
             />
           </div>
@@ -240,9 +233,8 @@ export function EditTrackModal({
           {/* Type (disabled SINGLE) */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Type
             </span>
@@ -250,11 +242,10 @@ export function EditTrackModal({
               id="type_display" // Đổi id để không trùng với input ẩn
               value="SINGLE"
               disabled
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white/70'
-                  : 'bg-gray-100 border-gray-300 text-gray-600'
-              } transition-colors focus:outline-none cursor-not-allowed`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white/70'
+                : 'bg-gray-100 border-gray-300 text-gray-600'
+                } transition-colors focus:outline-none cursor-not-allowed`}
             />
             {/* Input ẩn để gửi giá trị type */}
             <input type="hidden" name="type" value="SINGLE" />
@@ -263,9 +254,8 @@ export function EditTrackModal({
           {/* Release Date */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Release Date
             </span>
@@ -298,22 +288,19 @@ export function EditTrackModal({
                 }
               })()}
               required
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white focus:border-white/50'
-                  : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'
-              } transition-colors focus:outline-none ${
-                theme === 'dark' ? 'date-input-dark' : ''
-              }`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white focus:border-white/50'
+                : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'
+                } transition-colors focus:outline-none ${theme === 'dark' ? 'date-input-dark' : ''
+                }`}
             />
           </div>
 
           {/* Featured Artists */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Featured Artists
             </span>
@@ -323,7 +310,7 @@ export function EditTrackModal({
               onChange={setSelectedFeaturedArtists}
               placeholder="Select featured artists..."
               multiple={true}
-              // Không cần required nếu là optional
+            // Không cần required nếu là optional
             />
             {/* Input ẩn không còn cần thiết vì ta tự append vào FormData */}
           </div>
@@ -331,9 +318,8 @@ export function EditTrackModal({
           {/* Genres */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Genres
             </span>
@@ -343,7 +329,7 @@ export function EditTrackModal({
               onChange={setSelectedGenres}
               placeholder="Select genres..."
               multiple={true}
-              // Không cần required nếu là optional
+            // Không cần required nếu là optional
             />
             {/* Input ẩn không còn cần thiết */}
           </div>
@@ -351,9 +337,8 @@ export function EditTrackModal({
           {/* --- Thêm trường chọn Label --- */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Label (Optional)
             </span>
@@ -367,7 +352,7 @@ export function EditTrackModal({
               }
               placeholder="Select a label..."
               multiple={false} // Chỉ cho chọn 1
-              // Không cần required nếu là optional
+            // Không cần required nếu là optional
             />
             {/* Input ẩn không còn cần thiết */}
           </div>
@@ -392,8 +377,8 @@ export function EditTrackModal({
               className={
                 theme === 'dark' ? 'bg-white text-black hover:bg-white/90' : ''
               }
-              // Thêm trạng thái loading nếu cần
-              // disabled={isLoading}
+            // Thêm trạng thái loading nếu cần
+            // disabled={isLoading}
             >
               {/* {isLoading ? 'Saving...' : 'Save Changes'} */}
               Save Changes
@@ -412,6 +397,10 @@ interface EditAlbumModalProps {
   availableGenres: Array<{ id: string; name: string }>;
   selectedGenres: string[];
   setSelectedGenres: (genres: string[]) => void;
+  // Thêm props cho Label
+  availableLabels: Array<{ id: string; name: string }>;
+  selectedLabelId: string | null;
+  setSelectedLabelId: Dispatch<SetStateAction<string | null>>;
   theme?: 'light' | 'dark';
 }
 
@@ -422,39 +411,71 @@ export function EditAlbumModal({
   availableGenres,
   selectedGenres,
   setSelectedGenres,
+  // Destructure các props mới cho Label
+  availableLabels,
+  selectedLabelId,
+  setSelectedLabelId,
   theme = 'light',
 }: EditAlbumModalProps) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (album?.coverUrl) {
+      setPreviewImage(album.coverUrl);
+    } else {
+      setPreviewImage(null);
+    }
+    // Nếu album có label, cập nhật selectedLabelId khi modal mở
+    if (album?.label?.id) {
+      setSelectedLabelId(album.label.id);
+    }
+  }, [album, setSelectedLabelId]);
 
   if (!album) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Tạo URL tạm thời để xem trước ảnh
       const imageUrl = URL.createObjectURL(file);
       setPreviewImage(imageUrl);
     }
   };
 
-  // Hàm xử lý khi click vào ảnh cover
   const handleCoverClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+
+    // Xóa các trường hiện có để tránh trùng lặp
+    formData.delete('genres');
+    formData.delete('labelId'); // Xóa labelId cũ nếu có
+
+    // Thêm genres từ state
+    selectedGenres.forEach((genreId) => {
+      formData.append('genres', genreId);
+    });
+
+    // Thêm labelId nếu được chọn
+    if (selectedLabelId) {
+      formData.append('labelId', selectedLabelId);
+    }
+
+    // Gửi formData lên hàm onSubmit từ component cha
+    onSubmit(album.id, formData);
   };
 
   return (
     <Dialog open={!!album} onOpenChange={onClose}>
       <DialogContent
-        className={`${
-          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
-        } p-6 rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto`}
+        className={`${theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'} p-6 rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto`}
       >
         <DialogHeader>
           <DialogTitle
-            className={`text-xl font-semibold ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
+            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
           >
             Edit Album
           </DialogTitle>
@@ -464,54 +485,23 @@ export function EditAlbumModal({
             Make changes to your album information here.
           </DialogDescription>
         </DialogHeader>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const formData = new FormData(e.currentTarget);
-
-            // Xóa các trường hiện có để tránh trùng lặp
-            formData.delete('genres');
-
-            // Luôn thêm một trường đánh dấu để backend biết mình đang cố gắng cập nhật
-            formData.append('updateGenres', 'true');
-
-            // Thêm từng genre vào formDataType
-            selectedGenres.forEach((genreId) => {
-              formData.append('genres', genreId);
-            });
-
-            onSubmit(album.id, formData);
-          }}
-          className="space-y-6 mt-4"
-        >
+        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
           {/* Cover Image */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
             >
               Cover Image
             </span>
-            <div
-              className="w-full flex flex-col items-center mb-4"
-              onClick={handleCoverClick}
-            >
+            <div className="w-full flex flex-col items-center mb-4" onClick={handleCoverClick}>
               <div
-                className={`w-40 h-40 rounded-md overflow-hidden cursor-pointer border-2 ${
-                  theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
-                } hover:opacity-90 transition-opacity relative`}
+                className={`w-40 h-40 rounded-md overflow-hidden cursor-pointer border-2 ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'} hover:opacity-90 transition-opacity relative`}
               >
                 <img
-                  src={
-                    previewImage ||
-                    album.coverUrl ||
-                    'https://placehold.co/150x150?text=No+Cover'
-                  }
+                  src={previewImage || album.coverUrl || 'https://placehold.co/150x150?text=No+Cover'}
                   alt="Album cover"
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    // Fallback nếu hình ảnh không load được
                     e.currentTarget.src =
                       'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22150%22%20height%3D%22150%22%20viewBox%3D%220%200%20150%20150%22%3E%3Crect%20fill%3D%22%23ccc%22%20width%3D%22150%22%20height%3D%22150%22%2F%3E%3Ctext%20fill%3D%22%23666%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%20dy%3D%22.5em%22%20text-anchor%3D%22middle%22%20x%3D%2275%22%20y%3D%2275%22%3ENo%20Image%3C%2Ftext%3E%3C%2Fsvg%3E';
                   }}
@@ -532,9 +522,7 @@ export function EditAlbumModal({
                 className="hidden"
               />
               <span
-                className={`mt-2 text-sm ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}
+                className={`mt-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}
               >
                 Click to upload new cover image
               </span>
@@ -544,9 +532,7 @@ export function EditAlbumModal({
           {/* Title */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
             >
               Title
             </span>
@@ -555,11 +541,7 @@ export function EditAlbumModal({
               name="title"
               defaultValue={album.title}
               required
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50'
-                  : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'
-              } transition-colors focus:outline-none`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark' ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50' : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'} transition-colors focus:outline-none`}
               placeholder="Enter album title"
             />
           </div>
@@ -567,9 +549,7 @@ export function EditAlbumModal({
           {/* Type */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
             >
               Type
             </span>
@@ -577,11 +557,7 @@ export function EditAlbumModal({
               id="type"
               name="type"
               defaultValue={album.type}
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50'
-                  : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'
-              } transition-colors focus:outline-none`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark' ? 'bg-[#3a3a3a] border-[#505050] text-white placeholder-gray-400 focus:border-white/50' : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'} transition-colors focus:outline-none`}
             >
               <option value="ALBUM">Album</option>
               <option value="EP">EP</option>
@@ -591,9 +567,7 @@ export function EditAlbumModal({
           {/* Release Date */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
             >
               Release Date
             </span>
@@ -610,25 +584,18 @@ export function EditAlbumModal({
                     day: '2-digit',
                     hour: '2-digit',
                     minute: '2-digit',
-                    second: undefined,
                   })
                   .replace(' ', 'T');
               })()}
               required
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white focus:border-white/50'
-                  : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'
-              } transition-colors focus:outline-none`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark' ? 'bg-[#3a3a3a] border-[#505050] text-white focus:border-white/50' : 'bg-white border-gray-300 text-gray-900 focus:border-gray-400'} transition-colors focus:outline-none`}
             />
           </div>
 
           {/* Genres */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
             >
               Genres
             </span>
@@ -642,25 +609,36 @@ export function EditAlbumModal({
             />
           </div>
 
+          {/* Thêm trường chọn Label */}
+          <div className="space-y-2">
+            <span
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
+            >
+              Label
+            </span>
+            <SearchableSelect
+              options={availableLabels}
+              value={selectedLabelId ? [selectedLabelId] : []}
+              onChange={(ids) => setSelectedLabelId(ids.length > 0 ? ids[0] : null)}
+              placeholder="Select a label..."
+              multiple={false}
+            />
+          </div>
+          {/* Kết thúc thêm trường chọn Label */}
+
           {/* Buttons */}
           <div className="flex justify-end gap-3 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              className={
-                theme === 'dark'
-                  ? 'border-white/50 text-white hover:bg-white/10'
-                  : ''
-              }
+              className={theme === 'dark' ? 'border-white/50 text-white hover:bg-white/10' : ''}
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className={
-                theme === 'dark' ? 'bg-white text-black hover:bg-white/90' : ''
-              }
+              className={theme === 'dark' ? 'bg-white text-black hover:bg-white/90' : ''}
             >
               Save Changes
             </Button>
@@ -730,14 +708,12 @@ export function ArtistInfoModal({
                 </div>
               ) : (
                 <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                    theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
-                  }`}
+                  className={`w-16 h-16 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                    }`}
                 >
                   <span
-                    className={`text-2xl font-bold ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-600'
-                    }`}
+                    className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-600'
+                      }`}
                   >
                     {artist.artistName?.charAt(0).toUpperCase() || 'A'}
                   </span>
@@ -746,24 +722,21 @@ export function ArtistInfoModal({
               <div>
                 <div className="flex items-center gap-1">
                   <h3
-                    className={`text-xl font-bold ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-900'
-                    }`}
+                    className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}
                   >
                     {artist.artistName}
                   </h3>
                   {artist.isVerified && (
                     <Verified
-                      className={`w-5 h-5 ${
-                        theme === 'dark' ? 'text-blue-400' : 'text-blue-500'
-                      }`}
+                      className={`w-5 h-5 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-500'
+                        }`}
                     />
                   )}
                 </div>
                 <p
-                  className={`text-sm ${
-                    theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                  }`}
+                  className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                    }`}
                 >
                   {artist.monthlyListeners
                     ? artist.monthlyListeners.toLocaleString()
@@ -775,9 +748,8 @@ export function ArtistInfoModal({
 
             <div className="space-y-2">
               <p
-                className={`text-sm ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                }`}
+                className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                  }`}
               >
                 {artist.bio || 'No bio available'}
               </p>
@@ -785,48 +757,47 @@ export function ArtistInfoModal({
 
             {(artist.socialMediaLinks?.facebook ||
               artist.socialMediaLinks?.instagram) && (
-              <div className="flex gap-3">
-                {artist.socialMediaLinks?.facebook && (
-                  <a
-                    href={
-                      artist.socialMediaLinks.facebook.startsWith('http')
-                        ? artist.socialMediaLinks.facebook
-                        : `https://www.facebook.com/${artist.socialMediaLinks.facebook}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`text-blue-500 hover:text-blue-600 flex items-center gap-1`}
-                  >
-                    <Facebook className="w-5 h-5" />
-                  </a>
-                )}
-                {artist.socialMediaLinks?.instagram && (
-                  <a
-                    href={
-                      artist.socialMediaLinks.instagram.startsWith('http')
-                        ? artist.socialMediaLinks.instagram
-                        : `https://www.instagram.com/${artist.socialMediaLinks.instagram}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`text-pink-500 hover:text-pink-600 flex items-center gap-1`}
-                  >
-                    <Instagram className="w-5 h-5" />
-                  </a>
-                )}
-              </div>
-            )}
+                <div className="flex gap-3">
+                  {artist.socialMediaLinks?.facebook && (
+                    <a
+                      href={
+                        artist.socialMediaLinks.facebook.startsWith('http')
+                          ? artist.socialMediaLinks.facebook
+                          : `https://www.facebook.com/${artist.socialMediaLinks.facebook}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`text-blue-500 hover:text-blue-600 flex items-center gap-1`}
+                    >
+                      <Facebook className="w-5 h-5" />
+                    </a>
+                  )}
+                  {artist.socialMediaLinks?.instagram && (
+                    <a
+                      href={
+                        artist.socialMediaLinks.instagram.startsWith('http')
+                          ? artist.socialMediaLinks.instagram
+                          : `https://www.instagram.com/${artist.socialMediaLinks.instagram}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`text-pink-500 hover:text-pink-600 flex items-center gap-1`}
+                    >
+                      <Instagram className="w-5 h-5" />
+                    </a>
+                  )}
+                </div>
+              )}
 
             {/* Nút Close ở góc dưới bên phải */}
             <div className="flex justify-end mt-4">
               <Button
                 onClick={onClose}
                 variant="outline"
-                className={`${
-                  theme === 'dark'
-                    ? 'border-gray-600 text-black hover:bg-gray-300'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-                }`}
+                className={`${theme === 'dark'
+                  ? 'border-gray-600 text-black hover:bg-gray-300'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                  }`}
               >
                 Close
               </Button>
@@ -892,9 +863,8 @@ export function EditArtistModal({
   return (
     <Dialog open={!!artist} onOpenChange={onClose}>
       <DialogContent
-        className={`${
-          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
-        } p-6 rounded-lg shadow-lg max-w-lg w-full`}
+        className={`${theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+          } p-6 rounded-lg shadow-lg max-w-lg w-full`}
       >
         <DialogHeader>
           <DialogTitle>Edit Artist</DialogTitle>
@@ -1055,15 +1025,13 @@ export function EditUserModal({
   return (
     <Dialog open={!!user} onOpenChange={onClose}>
       <DialogContent
-        className={`${
-          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
-        } p-6 rounded-lg shadow-lg max-w-2xl w-full`}
+        className={`${theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+          } p-6 rounded-lg shadow-lg max-w-2xl w-full`}
       >
         <DialogHeader>
           <DialogTitle
-            className={`text-xl font-semibold ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
+            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
           >
             Edit User
           </DialogTitle>
@@ -1077,9 +1045,8 @@ export function EditUserModal({
           {/* Avatar */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Avatar
             </span>
@@ -1088,9 +1055,8 @@ export function EditUserModal({
               onClick={handleCoverClick}
             >
               <div
-                className={`w-32 h-32 rounded-full overflow-hidden cursor-pointer border-2 ${
-                  theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
-                } hover:opacity-90 transition-opacity relative`}
+                className={`w-32 h-32 rounded-full overflow-hidden cursor-pointer border-2 ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
+                  } hover:opacity-90 transition-opacity relative`}
               >
                 <img
                   src={
@@ -1117,9 +1083,8 @@ export function EditUserModal({
           {/* Name */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Name
             </span>
@@ -1127,20 +1092,18 @@ export function EditUserModal({
               id="name"
               name="name"
               defaultValue={user.name || ''}
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
-                  : 'bg-white border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                : 'bg-white border-gray-300'
+                }`}
             />
           </div>
 
           {/* Username */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Username
             </span>
@@ -1148,20 +1111,18 @@ export function EditUserModal({
               id="username"
               name="username"
               defaultValue={user.username || ''}
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
-                  : 'bg-white border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                : 'bg-white border-gray-300'
+                }`}
             />
           </div>
 
           {/* Email */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Email
             </span>
@@ -1170,30 +1131,27 @@ export function EditUserModal({
               name="email"
               type="email"
               defaultValue={user.email}
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
-                  : 'bg-white border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                : 'bg-white border-gray-300'
+                }`}
             />
           </div>
 
           {/* Role */}
           <div className="space-y-2">
             <span
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Role
             </span>
             <Select value={role} onValueChange={setRole}>
               <SelectTrigger
-                className={`w-full ${
-                  theme === 'dark'
-                    ? 'bg-[#3a3a3a] border-[#505050] text-white'
-                    : 'bg-white border-gray-300'
-                }`}
+                className={`w-full ${theme === 'dark'
+                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                  : 'bg-white border-gray-300'
+                  }`}
               >
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
@@ -1237,15 +1195,13 @@ export function EditGenreModal({
   return (
     <Dialog open={!!genre} onOpenChange={onClose}>
       <DialogContent
-        className={`${
-          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
-        } p-6 rounded-lg shadow-lg max-w-md w-full`}
+        className={`${theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+          } p-6 rounded-lg shadow-lg max-w-md w-full`}
       >
         <DialogHeader>
           <DialogTitle
-            className={`text-xl font-semibold ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
+            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
           >
             Edit Genre
           </DialogTitle>
@@ -1261,9 +1217,8 @@ export function EditGenreModal({
           <div className="space-y-2">
             <label
               htmlFor="name"
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Name
             </label>
@@ -1273,11 +1228,10 @@ export function EditGenreModal({
               defaultValue={genre.name}
               required
               maxLength={50}
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
-                  : 'bg-white border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                : 'bg-white border-gray-300'
+                }`}
             />
           </div>
 
@@ -1332,15 +1286,13 @@ export function AddGenreModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`${
-          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
-        } p-6 rounded-lg shadow-lg max-w-md w-full`}
+        className={`${theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+          } p-6 rounded-lg shadow-lg max-w-md w-full`}
       >
         <DialogHeader>
           <DialogTitle
-            className={`text-xl font-semibold ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
+            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
           >
             Add New Genre
           </DialogTitle>
@@ -1349,9 +1301,8 @@ export function AddGenreModal({
           <div className="space-y-2">
             <label
               htmlFor="name"
-              className={`block text-sm font-medium ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-              }`}
+              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
             >
               Genre Name
             </label>
@@ -1361,11 +1312,10 @@ export function AddGenreModal({
               onChange={(e) => setName(e.target.value)}
               required
               maxLength={50}
-              className={`w-full px-3 py-2 rounded-md border ${
-                theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
-                  : 'bg-white border-gray-300'
-              }`}
+              className={`w-full px-3 py-2 rounded-md border ${theme === 'dark'
+                ? 'bg-[#3a3a3a] border-[#505050] text-white'
+                : 'bg-white border-gray-300'
+                }`}
             />
           </div>
           <div className="flex justify-end gap-3 pt-4">
@@ -1416,15 +1366,13 @@ export function UserInfoModal({
   return (
     <Dialog open={!!user} onOpenChange={onClose}>
       <DialogContent
-        className={`${
-          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
-        } p-6 rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto`}
+        className={`${theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+          } p-6 rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto`}
       >
         <DialogHeader>
           <DialogTitle
-            className={`text-xl font-semibold ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
+            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
           >
             User Information
           </DialogTitle>
@@ -1447,14 +1395,12 @@ export function UserInfoModal({
                 />
               ) : (
                 <div
-                  className={`w-20 h-20 rounded-full flex items-center justify-center ${
-                    theme === 'dark' ? 'bg-gray-500' : 'bg-gray-200'
-                  }`}
+                  className={`w-20 h-20 rounded-full flex items-center justify-center ${theme === 'dark' ? 'bg-gray-500' : 'bg-gray-200'
+                    }`}
                 >
                   <span
-                    className={`text-2xl font-bold ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-600'
-                    }`}
+                    className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-600'
+                      }`}
                   >
                     {(user.name || user.email)?.charAt(0).toUpperCase()}
                   </span>
@@ -1463,16 +1409,14 @@ export function UserInfoModal({
             </div>
             <div>
               <h3
-                className={`text-lg font-semibold ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}
+                className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}
               >
                 {user.name || 'No name provided'}
               </h3>
               <p
-                className={`text-sm ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                }`}
+                className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                  }`}
               >
                 {user.email}
               </p>
@@ -1481,86 +1425,75 @@ export function UserInfoModal({
 
           {/* Additional Information */}
           <div
-            className={`grid grid-cols-2 gap-4 p-4 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-500' : 'bg-gray-50'
-            }`}
+            className={`grid grid-cols-2 gap-4 p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-500' : 'bg-gray-50'
+              }`}
           >
             <div>
               <p
-                className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
-                }`}
+                className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
+                  }`}
               >
                 Username
               </p>
               <p
-                className={`mt-1 ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}
+                className={`mt-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}
               >
                 {user.username || 'Not set'}
               </p>
             </div>
             <div>
               <p
-                className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
-                }`}
+                className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
+                  }`}
               >
                 Current Profile
               </p>
               <p
-                className={`mt-1 ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}
+                className={`mt-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}
               >
                 {user.currentProfile}
               </p>
             </div>
             <div>
               <p
-                className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
-                }`}
+                className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
+                  }`}
               >
                 Created At
               </p>
               <p
-                className={`mt-1 ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}
+                className={`mt-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}
               >
                 {formatDate(user.createdAt)}
               </p>
             </div>
             <div>
               <p
-                className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
-                }`}
+                className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
+                  }`}
               >
                 Last Login
               </p>
               <p
-                className={`mt-1 ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}
+                className={`mt-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}
               >
                 {user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never'}
               </p>
             </div>
             <div>
               <p
-                className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
-                }`}
+                className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-500'
+                  }`}
               >
                 Role
               </p>
               <p
-                className={`mt-1 ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}
+                className={`mt-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}
               >
                 {user.role}
               </p>
@@ -1570,46 +1503,40 @@ export function UserInfoModal({
           {/* Artist Profile Information (if exists) */}
           {user.artistProfile && (
             <div
-              className={`mt-6 p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
-              }`}
+              className={`mt-6 p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+                }`}
             >
               <h4
-                className={`text-lg font-semibold mb-4 ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}
+                className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}
               >
                 Artist Profile
               </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p
-                    className={`text-sm font-medium ${
-                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                    }`}
+                    className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                      }`}
                   >
                     Artist Name
                   </p>
                   <p
-                    className={`mt-1 ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-900'
-                    }`}
+                    className={`mt-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}
                   >
                     {user.artistProfile.artistName}
                   </p>
                 </div>
                 <div>
                   <p
-                    className={`text-sm font-medium ${
-                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                    }`}
+                    className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                      }`}
                   >
                     Verification Status
                   </p>
                   <p
-                    className={`mt-1 ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-900'
-                    }`}
+                    className={`mt-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}
                   >
                     {user.artistProfile.isVerified
                       ? 'Verified'
@@ -1619,16 +1546,14 @@ export function UserInfoModal({
                 {user.artistProfile.verificationRequestedAt && (
                   <div>
                     <p
-                      className={`text-sm font-medium ${
-                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                      }`}
+                      className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                        }`}
                     >
                       Verification Requested
                     </p>
                     <p
-                      className={`mt-1 ${
-                        theme === 'dark' ? 'text-white' : 'text-gray-900'
-                      }`}
+                      className={`mt-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                        }`}
                     >
                       {formatDate(user.artistProfile.verificationRequestedAt)}
                     </p>
@@ -1637,16 +1562,14 @@ export function UserInfoModal({
                 {user.artistProfile.verifiedAt && (
                   <div>
                     <p
-                      className={`text-sm font-medium ${
-                        theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                      }`}
+                      className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                        }`}
                     >
                       Verified At
                     </p>
                     <p
-                      className={`mt-1 ${
-                        theme === 'dark' ? 'text-white' : 'text-gray-900'
-                      }`}
+                      className={`mt-1 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                        }`}
                     >
                       {formatDate(user.artistProfile.verifiedAt)}
                     </p>
@@ -1660,11 +1583,10 @@ export function UserInfoModal({
           <div className="flex justify-end mt-6">
             <Button
               onClick={onClose}
-              className={`${
-                theme === 'dark'
-                  ? 'bg-white text-black hover:bg-gray-200'
-                  : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-              }`}
+              className={`${theme === 'dark'
+                ? 'bg-white text-black hover:bg-gray-200'
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                }`}
             >
               Close
             </Button>
@@ -1729,16 +1651,14 @@ export function ActionReasonModal({
         >
           <DialogHeader>
             <DialogTitle
-              className={`text-lg font-semibold mb-4 ${
-                theme === 'light' ? 'text-gray-900' : 'text-white'
-              }`}
+              className={`text-lg font-semibold mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                }`}
             >
               {title}
             </DialogTitle>
             <DialogDescription
-              className={`mb-4 text-sm ${
-                theme === 'light' ? 'text-gray-600' : 'text-gray-300'
-              }`}
+              className={`mb-4 text-sm ${theme === 'light' ? 'text-gray-600' : 'text-gray-300'
+                }`}
             >
               {description}
             </DialogDescription>
@@ -1747,9 +1667,8 @@ export function ActionReasonModal({
           {predefinedReasons.length > 0 && (
             <div className="mb-4">
               <div
-                className={`text-sm font-medium mb-2 ${
-                  theme === 'light' ? 'text-gray-700' : 'text-gray-200'
-                }`}
+                className={`text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-gray-200'
+                  }`}
               >
                 Select a reason:
               </div>
@@ -1758,15 +1677,14 @@ export function ActionReasonModal({
                   <div
                     key={preReason}
                     onClick={() => setSelectedPredefined(preReason)}
-                    className={`p-2 rounded-md cursor-pointer text-sm ${
-                      selectedPredefined === preReason
-                        ? theme === 'light'
-                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                          : 'bg-blue-900 text-blue-100 border border-blue-700'
-                        : theme === 'light'
+                    className={`p-2 rounded-md cursor-pointer text-sm ${selectedPredefined === preReason
+                      ? theme === 'light'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                        : 'bg-blue-900 text-blue-100 border border-blue-700'
+                      : theme === 'light'
                         ? 'bg-gray-100 hover:bg-gray-200 text-gray-800'
                         : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                    }`}
+                      }`}
                   >
                     {preReason}
                   </div>
@@ -1776,20 +1694,18 @@ export function ActionReasonModal({
           )}
 
           <div
-            className={`text-sm font-medium mb-2 ${
-              theme === 'light' ? 'text-gray-700' : 'text-gray-200'
-            }`}
+            className={`text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-gray-200'
+              }`}
           >
             {predefinedReasons.length > 0
               ? 'Or enter a custom reason:'
               : 'Enter a reason:'}
           </div>
           <textarea
-            className={`w-full h-32 px-3 py-2 text-sm rounded-md border ${
-              theme === 'light'
-                ? 'border-gray-300 focus:border-blue-500 bg-white text-gray-900'
-                : 'border-gray-700 focus:border-blue-400 bg-gray-700 text-white'
-            } focus:outline-none focus:ring-1 focus:ring-blue-500`}
+            className={`w-full h-32 px-3 py-2 text-sm rounded-md border ${theme === 'light'
+              ? 'border-gray-300 focus:border-blue-500 bg-white text-gray-900'
+              : 'border-gray-700 focus:border-blue-400 bg-gray-700 text-white'
+              } focus:outline-none focus:ring-1 focus:ring-blue-500`}
             placeholder="Enter reason..."
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -1808,9 +1724,8 @@ export function ActionReasonModal({
               variant="destructive"
               onClick={handleConfirm}
               disabled={!reason.trim()}
-              className={`${
-                theme === 'dark' ? 'bg-red-600 hover:bg-red-700' : ''
-              } ${!reason.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`${theme === 'dark' ? 'bg-red-600 hover:bg-red-700' : ''
+                } ${!reason.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {actionText}
             </Button>
@@ -1932,9 +1847,8 @@ export function AlbumDetailModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`${
-          theme === 'dark' ? 'bg-[#1e1e1e] border-[#404040]' : 'bg-white'
-        } p-0 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-hidden`}
+        className={`${theme === 'dark' ? 'bg-[#1e1e1e] border-[#404040]' : 'bg-white'
+          } p-0 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-hidden`}
       >
         <DialogTitle className="sr-only">{album.title}</DialogTitle>
         <div
@@ -1947,8 +1861,8 @@ export function AlbumDetailModal({
                   ${dominantColor}40 30%,
                   ${theme === 'light' ? '#ffffff' : '#1e1e1e'} 100%)`
               : theme === 'light'
-              ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
-              : 'linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)',
+                ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
+                : 'linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)',
           }}
         >
           <div className="p-6 pb-2">
@@ -1960,11 +1874,10 @@ export function AlbumDetailModal({
                   <img
                     src={album.coverUrl}
                     alt={album.title}
-                    className={`w-full aspect-square object-cover rounded-xl shadow-2xl ${
-                      theme === 'light'
-                        ? 'shadow-gray-200/50'
-                        : 'shadow-black/50'
-                    }`}
+                    className={`w-full aspect-square object-cover rounded-xl shadow-2xl ${theme === 'light'
+                      ? 'shadow-gray-200/50'
+                      : 'shadow-black/50'
+                      }`}
                   />
                 </div>
               )}
@@ -1972,9 +1885,8 @@ export function AlbumDetailModal({
               {/* Album Info */}
               <div className="flex flex-col gap-3 text-center md:text-left">
                 <h2
-                  className={`text-2xl md:text-3xl font-bold ${
-                    theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
+                  className={`text-2xl md:text-3xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                    }`}
                 >
                   {album.title}
                 </h2>
@@ -1991,9 +1903,8 @@ export function AlbumDetailModal({
 
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm">
                   <div
-                    className={`flex items-center gap-1.5 ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
+                    className={`flex items-center gap-1.5 ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      }`}
                   >
                     <Calendar className="w-4 h-4" />
                     <span>
@@ -2005,9 +1916,8 @@ export function AlbumDetailModal({
                     </span>
                   </div>
                   <div
-                    className={`flex items-center gap-1.5 ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
+                    className={`flex items-center gap-1.5 ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      }`}
                   >
                     <Music className="w-4 h-4" />
                     <span>{album.totalTracks || 0} tracks</span>
@@ -2019,11 +1929,10 @@ export function AlbumDetailModal({
                     {album.genres.map(({ genre }) => (
                       <span
                         key={genre?.id || 'unknown'}
-                        className={`px-2.5 py-0.5 rounded-full text-xs ${
-                          theme === 'light'
-                            ? 'bg-gray-100 text-gray-800'
-                            : 'bg-white/10 text-white/80'
-                        }`}
+                        className={`px-2.5 py-0.5 rounded-full text-xs ${theme === 'light'
+                          ? 'bg-gray-100 text-gray-800'
+                          : 'bg-white/10 text-white/80'
+                          }`}
                       >
                         {genre?.name || 'Unknown Genre'}
                       </span>
@@ -2038,22 +1947,19 @@ export function AlbumDetailModal({
           {sortedTracks.length > 0 && (
             <div className="px-6 pb-6 pt-2">
               <div
-                className={`w-full rounded-xl overflow-hidden border backdrop-blur-sm ${
-                  theme === 'light'
-                    ? 'bg-gray-50/90 border-gray-200'
-                    : 'bg-black/20 border-white/10'
-                }`}
+                className={`w-full rounded-xl overflow-hidden border backdrop-blur-sm ${theme === 'light'
+                  ? 'bg-gray-50/90 border-gray-200'
+                  : 'bg-black/20 border-white/10'
+                  }`}
               >
                 {/* Header - Desktop only */}
                 <div
-                  className={`hidden md:block px-6 py-3 border-b ${
-                    theme === 'light' ? 'border-gray-200' : 'border-white/10'
-                  }`}
+                  className={`hidden md:block px-6 py-3 border-b ${theme === 'light' ? 'border-gray-200' : 'border-white/10'
+                    }`}
                 >
                   <div
-                    className={`grid grid-cols-[48px_4fr_2fr_100px] gap-4 text-xs ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
+                    className={`grid grid-cols-[48px_4fr_2fr_100px] gap-4 text-xs ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      }`}
                   >
                     <div className="text-center">#</div>
                     <div>Title</div>
@@ -2063,24 +1969,21 @@ export function AlbumDetailModal({
                 </div>
 
                 <div
-                  className={`divide-y ${
-                    theme === 'light' ? 'divide-gray-200' : 'divide-white/10'
-                  }`}
+                  className={`divide-y ${theme === 'light' ? 'divide-gray-200' : 'divide-white/10'
+                    }`}
                 >
                   {sortedTracks.map((track) => (
                     <div
                       key={track.id}
-                      className={`md:grid md:grid-cols-[48px_4fr_2fr_100px] md:gap-4 px-4 md:px-6 py-2.5 md:py-3 ${
-                        theme === 'light'
-                          ? 'hover:bg-gray-100'
-                          : 'hover:bg-white/5'
-                      }`}
+                      className={`md:grid md:grid-cols-[48px_4fr_2fr_100px] md:gap-4 px-4 md:px-6 py-2.5 md:py-3 ${theme === 'light'
+                        ? 'hover:bg-gray-100'
+                        : 'hover:bg-white/5'
+                        }`}
                     >
                       {/* Track number */}
                       <div
-                        className={`hidden md:flex items-center justify-center ${
-                          theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                        }`}
+                        className={`hidden md:flex items-center justify-center ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                          }`}
                       >
                         {track.trackNumber}
                       </div>
@@ -2089,18 +1992,16 @@ export function AlbumDetailModal({
                       <div className="md:hidden flex items-center justify-between gap-2">
                         <div className="flex flex-col flex-1 min-w-0">
                           <span
-                            className={`font-medium text-sm line-clamp-1 ${
-                              theme === 'light' ? 'text-gray-900' : 'text-white'
-                            }`}
+                            className={`font-medium text-sm line-clamp-1 ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                              }`}
                           >
                             {track.title}
                           </span>
                           <div
-                            className={`text-xs line-clamp-1 ${
-                              theme === 'light'
-                                ? 'text-gray-600'
-                                : 'text-white/60'
-                            }`}
+                            className={`text-xs line-clamp-1 ${theme === 'light'
+                              ? 'text-gray-600'
+                              : 'text-white/60'
+                              }`}
                           >
                             {track.artist?.artistName || 'Unknown Artist'}
                             {track.featuredArtists?.length > 0 && (
@@ -2125,20 +2026,18 @@ export function AlbumDetailModal({
                           </div>
                         </div>
                         <span
-                          className={`text-sm whitespace-nowrap pl-3 ${
-                            theme === 'light'
-                              ? 'text-gray-600'
-                              : 'text-white/60'
-                          }`}
+                          className={`text-sm whitespace-nowrap pl-3 ${theme === 'light'
+                            ? 'text-gray-600'
+                            : 'text-white/60'
+                            }`}
                         >
                           {formatDuration(track.duration)}
                         </span>
                       </div>
                       {/* Desktop Layout */}
                       <div
-                        className={`hidden md:flex items-center min-w-0 ${
-                          theme === 'light' ? 'text-gray-900' : 'text-white'
-                        }`}
+                        className={`hidden md:flex items-center min-w-0 ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                          }`}
                       >
                         <span className="font-medium line-clamp-1">
                           {track.title}
@@ -2148,22 +2047,20 @@ export function AlbumDetailModal({
                       <div className="hidden md:flex flex-col justify-center min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span
-                            className={`line-clamp-1 ${
-                              theme === 'light'
-                                ? 'text-gray-900'
-                                : 'text-white/90'
-                            }`}
+                            className={`line-clamp-1 ${theme === 'light'
+                              ? 'text-gray-900'
+                              : 'text-white/90'
+                              }`}
                           >
                             {track.artist?.artistName || 'Unknown Artist'}
                           </span>
                         </div>
                         {track.featuredArtists?.length > 0 && (
                           <div
-                            className={`text-xs line-clamp-1 ${
-                              theme === 'light'
-                                ? 'text-gray-600'
-                                : 'text-white/60'
-                            }`}
+                            className={`text-xs line-clamp-1 ${theme === 'light'
+                              ? 'text-gray-600'
+                              : 'text-white/60'
+                              }`}
                           >
                             feat.{' '}
                             {track.featuredArtists
@@ -2177,9 +2074,8 @@ export function AlbumDetailModal({
                       </div>
 
                       <div
-                        className={`hidden md:flex items-center justify-end ${
-                          theme === 'light' ? 'text-gray-600' : 'text-white'
-                        }`}
+                        className={`hidden md:flex items-center justify-end ${theme === 'light' ? 'text-gray-600' : 'text-white'
+                          }`}
                       >
                         {formatDuration(track.duration)}
                       </div>
@@ -2190,9 +2086,8 @@ export function AlbumDetailModal({
                 {/* Copyright Label Footer */}
                 {album.label && (
                   <div
-                    className={`px-6 py-3 text-xs ${
-                      theme === 'light' ? 'text-gray-500' : 'text-white/40'
-                    }`}
+                    className={`px-6 py-3 text-xs ${theme === 'light' ? 'text-gray-500' : 'text-white/40'
+                      }`}
                   >
                     © {album.label.name || 'Unknown Label'}
                   </div>
@@ -2258,9 +2153,8 @@ export function TrackDetailModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`${
-          theme === 'dark' ? 'bg-[#1e1e1e] border-[#404040]' : 'bg-white'
-        } p-0 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden`}
+        className={`${theme === 'dark' ? 'bg-[#1e1e1e] border-[#404040]' : 'bg-white'
+          } p-0 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden`}
       >
         <DialogTitle className="sr-only">{track.title}</DialogTitle>
         <div
@@ -2273,8 +2167,8 @@ export function TrackDetailModal({
                   ${dominantColor}40 30%,
                   ${theme === 'light' ? '#ffffff' : '#1e1e1e'} 100%)`
               : theme === 'light'
-              ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
-              : 'linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)',
+                ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
+                : 'linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)',
           }}
         >
           <div className="p-6">
@@ -2289,18 +2183,16 @@ export function TrackDetailModal({
                     'https://placehold.co/200x200?text=No+Cover'
                   }
                   alt={track.title}
-                  className={`w-full aspect-square object-cover rounded-xl shadow-2xl ${
-                    theme === 'light' ? 'shadow-gray-200/50' : 'shadow-black/50'
-                  }`}
+                  className={`w-full aspect-square object-cover rounded-xl shadow-2xl ${theme === 'light' ? 'shadow-gray-200/50' : 'shadow-black/50'
+                    }`}
                 />
               </div>
 
               {/* Track Info */}
               <div className="flex flex-col gap-3 text-center md:text-left">
                 <h2
-                  className={`text-2xl md:text-3xl font-bold ${
-                    theme === 'light' ? 'text-gray-900' : 'text-white'
-                  }`}
+                  className={`text-2xl md:text-3xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                    }`}
                 >
                   {track.title}
                 </h2>
@@ -2308,9 +2200,8 @@ export function TrackDetailModal({
                 {/* Main Artist - Not clickable if it's the current artist */}
                 <div className="flex items-center justify-center md:justify-start gap-2">
                   <span
-                    className={`font-medium ${
-                      !isCurrentArtist ? `cursor-pointer hover:underline` : ``
-                    } ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}
+                    className={`font-medium ${!isCurrentArtist ? `cursor-pointer hover:underline` : ``
+                      } ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}
                     onClick={(e) =>
                       !isCurrentArtist &&
                       track.artist?.id &&
@@ -2325,11 +2216,10 @@ export function TrackDetailModal({
                 {track.featuredArtists?.length > 0 && (
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-1">
                     <div
-                      className={`inline-flex items-center ${
-                        theme === 'light'
-                          ? 'bg-gray-100 text-gray-700'
-                          : 'bg-gray-800/40 text-gray-300'
-                      } px-2.5 py-1 rounded-full text-sm`}
+                      className={`inline-flex items-center ${theme === 'light'
+                        ? 'bg-gray-100 text-gray-700'
+                        : 'bg-gray-800/40 text-gray-300'
+                        } px-2.5 py-1 rounded-full text-sm`}
                     >
                       <span
                         className={
@@ -2367,9 +2257,8 @@ export function TrackDetailModal({
 
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm">
                   <div
-                    className={`flex items-center gap-1.5 ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
+                    className={`flex items-center gap-1.5 ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      }`}
                   >
                     <Calendar className="w-4 h-4" />
                     <span>
@@ -2381,9 +2270,8 @@ export function TrackDetailModal({
                     </span>
                   </div>
                   <div
-                    className={`flex items-center gap-1.5 ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
+                    className={`flex items-center gap-1.5 ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      }`}
                   >
                     <Music className="w-4 h-4" />
                     <span>{formatDuration(track.duration)}</span>
@@ -2393,9 +2281,8 @@ export function TrackDetailModal({
                 {track.album && (
                   <div className="mt-4">
                     <span
-                      className={`text-sm font-medium ${
-                        theme === 'light' ? 'text-gray-500' : 'text-gray-400'
-                      }`}
+                      className={`text-sm font-medium ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                        }`}
                     >
                       From the album:
                     </span>
@@ -2415,18 +2302,16 @@ export function TrackDetailModal({
                       />
                       <div>
                         <div
-                          className={`text-sm font-medium ${
-                            theme === 'light' ? 'text-gray-900' : 'text-white'
-                          }`}
+                          className={`text-sm font-medium ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                            }`}
                         >
                           {track.album.title}
                         </div>
                         <div
-                          className={`text-xs ${
-                            theme === 'light'
-                              ? 'text-gray-600'
-                              : 'text-gray-400'
-                          }`}
+                          className={`text-xs ${theme === 'light'
+                            ? 'text-gray-600'
+                            : 'text-gray-400'
+                            }`}
                         >
                           {track.album.type}
                           {'releaseDate' in track.album &&
@@ -2444,11 +2329,10 @@ export function TrackDetailModal({
                     {track.genres.map(({ genre }) => (
                       <span
                         key={genre?.id || 'unknown'}
-                        className={`px-2.5 py-0.5 rounded-full text-xs ${
-                          theme === 'light'
-                            ? 'bg-gray-100 text-gray-800'
-                            : 'bg-white/10 text-white/80'
-                        }`}
+                        className={`px-2.5 py-0.5 rounded-full text-xs ${theme === 'light'
+                          ? 'bg-gray-100 text-gray-800'
+                          : 'bg-white/10 text-white/80'
+                          }`}
                       >
                         {genre?.name || 'Unknown Genre'}
                       </span>
@@ -2458,9 +2342,8 @@ export function TrackDetailModal({
 
                 <div className="mt-2">
                   <div
-                    className={`flex items-center gap-2 ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
+                    className={`flex items-center gap-2 ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      }`}
                   >
                     <span>Track #:</span>
                     <span
@@ -2473,9 +2356,8 @@ export function TrackDetailModal({
                   </div>
 
                   <div
-                    className={`flex items-center gap-2 mt-1 ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                    }`}
+                    className={`flex items-center gap-2 mt-1 ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      }`}
                   >
                     <span>Play count:</span>
                     <span
@@ -2493,9 +2375,8 @@ export function TrackDetailModal({
 
           {/* Track Label */}
           <div
-            className={`px-6 pb-4 pt-2 text-xs ${
-              theme === 'dark' ? 'text-white/40' : 'text-gray-500'
-            }`}
+            className={`px-6 pb-4 pt-2 text-xs ${theme === 'dark' ? 'text-white/40' : 'text-gray-500'
+              }`}
           >
             {track.label && (
               <span>© {track.label.name || 'Unknown Label'}</span>
@@ -2655,9 +2536,8 @@ export function EditArtistProfileModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={`${
-          theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
-        } p-6 rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto`}
+        className={`${theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : 'bg-white'
+          } p-6 rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto`}
       >
         <DialogHeader>
           <DialogTitle className={`text-xl font-semibold ${textColor}`}>
@@ -2861,9 +2741,8 @@ export function EditLabelModal({
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent
-        className={`sm:max-w-md ${
-          theme === 'dark' ? 'bg-[#1e1e1e] text-white border-none' : ''
-        }`}
+        className={`sm:max-w-md ${theme === 'dark' ? 'bg-[#1e1e1e] text-white border-none' : ''
+          }`}
       >
         <form ref={formRef} onSubmit={handleSubmit}>
           <DialogHeader>
@@ -2892,9 +2771,8 @@ export function EditLabelModal({
                 />
               ) : (
                 <Tags
-                  className={`w-16 h-16 ${
-                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                  }`}
+                  className={`w-16 h-16 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                    }`}
                 />
               )}
             </div>
@@ -3045,9 +2923,8 @@ export function AddLabelModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`sm:max-w-md ${
-          theme === 'dark' ? 'bg-[#1e1e1e] text-white border-none' : ''
-        }`}
+        className={`sm:max-w-md ${theme === 'dark' ? 'bg-[#1e1e1e] text-white border-none' : ''
+          }`}
       >
         <form ref={formRef} onSubmit={handleSubmit}>
           <DialogHeader>
@@ -3076,9 +2953,8 @@ export function AddLabelModal({
                 />
               ) : (
                 <Tags
-                  className={`w-16 h-16 ${
-                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                  }`}
+                  className={`w-16 h-16 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                    }`}
                 />
               )}
             </div>
@@ -3342,9 +3218,8 @@ export function SystemPlaylistModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`sm:max-w-[500px] ${
-          theme === 'dark' ? 'bg-[#1e1e1e] text-white border-white/10' : ''
-        }`}
+        className={`sm:max-w-[500px] ${theme === 'dark' ? 'bg-[#1e1e1e] text-white border-white/10' : ''
+          }`}
       >
         <DialogHeader>
           <DialogTitle
@@ -3369,9 +3244,8 @@ export function SystemPlaylistModal({
             <div className="col-span-1">
               <div
                 onClick={handleCoverClick}
-                className={`w-full aspect-square rounded-md ${
-                  theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'
-                } flex items-center justify-center cursor-pointer overflow-hidden`}
+                className={`w-full aspect-square rounded-md ${theme === 'dark' ? 'bg-white/5' : 'bg-gray-100'
+                  } flex items-center justify-center cursor-pointer overflow-hidden`}
               >
                 {coverPreview ? (
                   <Image
@@ -3393,9 +3267,8 @@ export function SystemPlaylistModal({
                 className="hidden"
               />
               <p
-                className={`text-xs mt-1 text-center ${
-                  theme === 'dark' ? 'text-white/50' : 'text-gray-500'
-                }`}
+                className={`text-xs mt-1 text-center ${theme === 'dark' ? 'text-white/50' : 'text-gray-500'
+                  }`}
               >
                 Click to upload
               </p>
@@ -3583,9 +3456,8 @@ export function SystemPlaylistModal({
                     }
                   />
                   <p
-                    className={`text-xs mt-1 ${
-                      theme === 'dark' ? 'text-white/50' : 'text-gray-500'
-                    }`}
+                    className={`text-xs mt-1 ${theme === 'dark' ? 'text-white/50' : 'text-gray-500'
+                      }`}
                   >
                     Recommended: 10-20 tracks for optimal generation
                   </p>
