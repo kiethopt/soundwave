@@ -13,7 +13,6 @@ import artistRoutes from './routes/artist.routes';
 import userRoutes from './routes/user.routes';
 import notificationRoutes from './routes/notification.routes';
 import playlistRoutes from './routes/playlist.routes';
-import eventRoutes from './routes/event.routes';
 import labelRoutes from './routes/label.routes';
 // Import the extended Prisma client to ensure extensions are loaded
 import prisma from './config/db';
@@ -40,7 +39,6 @@ app.use('/api/artist', artistRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/playlists', playlistRoutes);
-app.use('/api/events', eventRoutes);
 app.use('/api/labels', labelRoutes);
 
 // Initialize database connection and extensions

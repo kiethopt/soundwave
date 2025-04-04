@@ -715,9 +715,9 @@ async function main() {
         featuredArtistNames: [],
         playCount: 75, // Add a play count to ensure it appears in search results
       },
-      // Phan Đình Tùng's Single
+      // Phan Đinh Tùng's Single
       {
-        artistName: 'Phan Đình Tùng',
+        artistName: 'Phan Đinh Tùng',
         title: 'Khúc Hát Mừng Sinh Nhật',
         duration: '3:29',
         coverUrl:

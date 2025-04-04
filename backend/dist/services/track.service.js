@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllTracks = exports.unlikeTrack = exports.likeTrack = exports.deleteTrackById = void 0;
 const db_1 = __importDefault(require("../config/db"));
+const client_1 = require("@prisma/client");
 const handle_utils_1 = require("../utils/handle-utils");
 const deleteTrackById = async (id) => {
     const track = await db_1.default.track.findUnique({
@@ -102,7 +103,11 @@ const unlikeTrack = async (userId, trackId) => {
 exports.unlikeTrack = unlikeTrack;
 const getAllTracks = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
+    const user = req.user;
     const whereClause = {};
+    if (user && user.role !== client_1.Role.ADMIN && user.artistProfile?.id) {
+        whereClause.artistId = user.artistProfile.id;
+    }
     if (search && typeof search === 'string') {
         whereClause.OR = [
             { title: { contains: search, mode: 'insensitive' } },
@@ -155,7 +160,9 @@ const getAllTracks = async (req) => {
     const result = await (0, handle_utils_1.paginate)(db_1.default.track, req, {
         where: whereClause,
         include: {
-            artist: { select: { id: true, artistName: true, avatar: true } },
+            artist: {
+                select: { id: true, artistName: true, avatar: true },
+            },
             album: { select: { id: true, title: true } },
             genres: { include: { genre: true } },
             featuredArtists: {

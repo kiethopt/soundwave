@@ -571,6 +571,9 @@ const getAllAlbums = async (req, res) => {
         }
         const { search, status, genres } = req.query;
         const whereClause = {};
+        if (user.role !== client_1.Role.ADMIN && user.artistProfile?.id) {
+            whereClause.artistId = user.artistProfile.id;
+        }
         const conditions = [];
         if (search) {
             conditions.push({
@@ -598,11 +601,6 @@ const getAllAlbums = async (req, res) => {
                     },
                 });
             }
-        }
-        if (user.role !== client_1.Role.ADMIN && user.artistProfile?.id) {
-            conditions.push({
-                artistId: user.artistProfile.id,
-            });
         }
         if (conditions.length > 0) {
             whereClause.AND = conditions;

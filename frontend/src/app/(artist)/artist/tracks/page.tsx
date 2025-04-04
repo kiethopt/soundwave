@@ -263,30 +263,109 @@ export default function TrackManagement() {
     debugTable: process.env.NODE_ENV === 'development',
   });
 
+  // Add useEffect for auto-refresh when release dates pass
+  useEffect(() => {
+    if (tracks.length === 0 || loading) return;
+
+    let nextReleaseTimeout: NodeJS.Timeout | null = null;
+    let shouldRefresh = false;
+
+    const checkForUpcomingReleases = () => {
+      const now = new Date();
+      let closestReleaseTime: Date | null = null;
+      let timeUntilNextRelease = Infinity;
+
+      // Find the closest upcoming release date
+      tracks.forEach((track) => {
+        const releaseDate = new Date(track.releaseDate);
+        const timeUntilRelease = releaseDate.getTime() - now.getTime();
+
+        // If release date is in the future but coming up soon (within 1 hour)
+        if (
+          timeUntilRelease > 0 &&
+          timeUntilRelease < 3600000 &&
+          timeUntilRelease < timeUntilNextRelease
+        ) {
+          timeUntilNextRelease = timeUntilRelease;
+          closestReleaseTime = releaseDate;
+        }
+
+        // If release date just passed (within last 5 seconds) and item is not active
+        if (
+          timeUntilRelease >= -5000 &&
+          timeUntilRelease <= 0 &&
+          !track.isActive
+        ) {
+          shouldRefresh = true;
+        }
+      });
+
+      // If we should refresh now (a release date just passed)
+      if (shouldRefresh) {
+        refreshData();
+        shouldRefresh = false;
+      }
+
+      // If there's an upcoming release, set a timeout to refresh at that time
+      if (closestReleaseTime) {
+        const delayMs = Math.max(100, timeUntilNextRelease);
+
+        if (nextReleaseTimeout) {
+          clearTimeout(nextReleaseTimeout);
+        }
+
+        nextReleaseTimeout = setTimeout(() => {
+          refreshData();
+          // After refresh, check again for next release
+          checkForUpcomingReleases();
+        }, delayMs);
+      }
+    };
+
+    // Initial check
+    checkForUpcomingReleases();
+
+    // Set up an interval to periodically check (every 30 seconds)
+    const intervalId = setInterval(checkForUpcomingReleases, 30000);
+
+    return () => {
+      clearInterval(intervalId);
+      if (nextReleaseTimeout) {
+        clearTimeout(nextReleaseTimeout);
+      }
+    };
+  }, [tracks, loading, refreshData]);
+
   return (
     <div
-      className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''
-        }`}
+      className={`container mx-auto space-y-4 p-4 pb-20 ${
+        theme === 'dark' ? 'text-white' : ''
+      }`}
     >
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
         <div>
           <h1
-            className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'
-              }`}
+            className={`text-2xl md:text-3xl font-bold tracking-tight ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}
           >
             Track Management
           </h1>
           <p
-            className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : ''
-              }`}
+            className={`text-muted-foreground ${
+              theme === 'dark' ? 'text-white/60' : ''
+            }`}
           >
             Manage and monitor your tracks
           </p>
         </div>
         <Link
           href="/artist/tracks/new"
-          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${theme === 'light' ? 'bg-gray-900 text-white hover:bg-gray-800' : 'bg-white text-[#121212] hover:bg-white/90'
-            }`}
+          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${
+            theme === 'light'
+              ? 'bg-gray-900 text-white hover:bg-gray-800'
+              : 'bg-white text-[#121212] hover:bg-white/90'
+          }`}
         >
           New Track
         </Link>

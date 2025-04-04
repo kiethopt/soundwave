@@ -5,7 +5,6 @@ import { artistExtension } from '../prisma/extensions/artist.extension';
 import { userExtension } from '../prisma/extensions/user.extension';
 import { albumExtension } from '../prisma/extensions/album.extension';
 import { trackExtension } from '../prisma/extensions/track.extension';
-import { eventExtension } from '../prisma/extensions/event.extension';
 import { historyExtension } from '../prisma/extensions/history.extension';
 import { labelExtension } from '../prisma/extensions/label.extension';
 import { playlistExtension } from '../prisma/extensions/playlist.extension';
@@ -23,7 +22,6 @@ const extendedPrisma = prisma
   .$extends(userExtension)
   .$extends(trackExtension)
   .$extends(albumExtension)
-  .$extends(eventExtension)
   .$extends(historyExtension)
   .$extends(labelExtension)
   .$extends(playlistExtension);

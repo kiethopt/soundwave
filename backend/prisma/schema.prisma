@@ -29,7 +29,6 @@ model User {
   followed             UserFollow[]    @relation("Follower")
   followers            UserFollow[]    @relation("FollowingUser")
   likedTracks          UserLikeTrack[]
-  eventJoins           EventJoin[]
 
   @@unique([email, username])
   @@index([email])
@@ -59,7 +58,6 @@ model ArtistProfile {
   albums                  Album[]
   genres                  ArtistGenre[]
   user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events                  Event[]
   notifications           Notification[] @relation("ArtistNotifications")
   TrackArtist             TrackArtist[]
   tracks                  Track[]
@@ -235,36 +233,12 @@ model Notification {
   updatedAt     DateTime         @updatedAt
   artist        ArtistProfile?   @relation("ArtistNotifications", fields: [artistId], references: [id], onDelete: Cascade)
   user          User?            @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
-  eventId       String?
 
   @@index([userId])
   @@index([artistId])
   @@index([senderId])
   @@index([createdAt])
   @@map("notifications")
-}
-
-model Event {
-  id           String        @id @default(cuid())
-  title        String
-  description  String?
-  location     String
-  startDate    DateTime
-  endDate      DateTime
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  artistId     String
-  artist       ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  participants EventJoin[]
-
-  @@unique([title, artistId])
-  @@index([artistId])
-  @@index([startDate])
-  @@index([endDate])
-  @@index([isActive])
-  @@index([createdAt])
-  @@map("events")
 }
 
 model UserFollow {
@@ -357,18 +331,6 @@ model UserLikeTrack {
   @@map("user_like_track")
 }
 
-model EventJoin {
-  id       String   @id @default(cuid())
-  event    Event    @relation(fields: [eventId], references: [id])
-  eventId  String
-  user     User     @relation(fields: [userId], references: [id])
-  userId   String
-  joinedAt DateTime @default(now())
-
-  @@unique([eventId, userId])
-  @@map("event_joins")
-}
-
 enum Role {
   USER
   ARTIST
@@ -400,8 +362,6 @@ enum PlaylistType {
 enum NotificationType {
   NEW_TRACK
   NEW_ALBUM
-  NEW_EVENT
-  EVENT_REMINDER
   NEW_FOLLOW
   ARTIST_REQUEST_APPROVE
   ARTIST_REQUEST_REJECT

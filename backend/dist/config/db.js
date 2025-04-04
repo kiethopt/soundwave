@@ -7,7 +7,6 @@ const artist_extension_1 = require("../prisma/extensions/artist.extension");
 const user_extension_1 = require("../prisma/extensions/user.extension");
 const album_extension_1 = require("../prisma/extensions/album.extension");
 const track_extension_1 = require("../prisma/extensions/track.extension");
-const event_extension_1 = require("../prisma/extensions/event.extension");
 const history_extension_1 = require("../prisma/extensions/history.extension");
 const label_extension_1 = require("../prisma/extensions/label.extension");
 const playlist_extension_1 = require("../prisma/extensions/playlist.extension");
@@ -21,7 +20,6 @@ const extendedPrisma = prisma
     .$extends(user_extension_1.userExtension)
     .$extends(track_extension_1.trackExtension)
     .$extends(album_extension_1.albumExtension)
-    .$extends(event_extension_1.eventExtension)
     .$extends(history_extension_1.historyExtension)
     .$extends(label_extension_1.labelExtension)
     .$extends(playlist_extension_1.playlistExtension);

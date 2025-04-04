@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllAlbums = exports.getHotAlbums = exports.getNewestAlbums = exports.deleteAlbumById = void 0;
 const prisma_selects_1 = require("../utils/prisma-selects");
 const db_1 = __importDefault(require("../config/db"));
+const client_1 = require("@prisma/client");
 const handle_utils_1 = require("../utils/handle-utils");
 const deleteAlbumById = async (id) => {
     const album = await db_1.default.album.findUnique({
@@ -60,7 +61,11 @@ const getHotAlbums = async (limit = 10) => {
 exports.getHotAlbums = getHotAlbums;
 const getAllAlbums = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
+    const user = req.user;
     const whereClause = {};
+    if (user && user.role !== client_1.Role.ADMIN && user.artistProfile?.id) {
+        whereClause.artistId = user.artistProfile.id;
+    }
     if (search && typeof search === 'string') {
         whereClause.OR = [
             { title: { contains: search, mode: 'insensitive' } },

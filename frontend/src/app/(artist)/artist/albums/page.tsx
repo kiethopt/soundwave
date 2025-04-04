@@ -1,6 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, Dispatch, SetStateAction } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  Dispatch,
+  SetStateAction,
+} from 'react';
 import type { Album, Genre } from '@/types';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -47,7 +53,12 @@ export default function AlbumManagement() {
       const token = getAuthToken();
       if (!token) throw new Error('Authentication token not found');
 
-      const response = await api.albums.getAll(token, page, limit, params.toString());
+      const response = await api.albums.getAll(
+        token,
+        page,
+        limit,
+        params.toString()
+      );
       return {
         data: response.albums,
         pagination: response.pagination,
@@ -62,9 +73,13 @@ export default function AlbumManagement() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
-  const [availableGenres, setAvailableGenres] = useState<Array<{ id: string; name: string }>>([]);
+  const [availableGenres, setAvailableGenres] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
+  const [availableLabels, setAvailableLabels] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
 
   const getAuthToken = () => localStorage.getItem('userToken');
@@ -86,7 +101,7 @@ export default function AlbumManagement() {
       setAvailableLabels(labelsResponse.labels);
 
       if (selectedAlbum) {
-        setSelectedGenres(selectedAlbum.genres?.map(g => g.genre.id) || []);
+        setSelectedGenres(selectedAlbum.genres?.map((g) => g.genre.id) || []);
         setSelectedLabelId(selectedAlbum.label?.id || null);
       }
     } catch (error) {
@@ -103,7 +118,7 @@ export default function AlbumManagement() {
 
   const handleEditAlbum = (album: Album) => {
     setSelectedAlbum(album);
-    setSelectedGenres(album.genres?.map(g => g.genre.id) || []);
+    setSelectedGenres(album.genres?.map((g) => g.genre.id) || []);
     setSelectedLabelId(album.label?.id || null);
   };
 
@@ -126,12 +141,19 @@ export default function AlbumManagement() {
         ...(statusFilter.length === 1 && { status: statusFilter[0] }),
         ...(genreFilter.length > 0 && { genres: genreFilter.join(',') }),
       });
-      const response = await api.albums.getAll(token, currentPage, limit, params.toString());
+      const response = await api.albums.getAll(
+        token,
+        currentPage,
+        limit,
+        params.toString()
+      );
       setAlbums(response.albums);
 
       setSelectedAlbum(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update album');
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update album'
+      );
     } finally {
       setActionLoading(null);
     }
@@ -147,14 +169,18 @@ export default function AlbumManagement() {
     try {
       setActionLoading(albumId);
       await api.albums.toggleVisibility(albumId, token);
-      setAlbums(prev =>
-        prev.map(album =>
+      setAlbums((prev) =>
+        prev.map((album) =>
           album.id === albumId ? { ...album, isActive: !isActive } : album
         )
       );
-      toast.success(`Album ${isActive ? 'hidden' : 'made visible'} successfully`);
+      toast.success(
+        `Album ${isActive ? 'hidden' : 'made visible'} successfully`
+      );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to toggle visibility');
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to toggle visibility'
+      );
     } finally {
       setActionLoading(null);
     }
@@ -162,7 +188,13 @@ export default function AlbumManagement() {
 
   const handleDeleteAlbums = async (albumIds: string | string[]) => {
     const ids = Array.isArray(albumIds) ? albumIds : [albumIds];
-    if (!confirm(`Are you sure you want to delete ${ids.length} album${ids.length > 1 ? 's' : ''}?`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete ${ids.length} album${
+          ids.length > 1 ? 's' : ''
+        }?`
+      )
+    ) {
       return;
     }
 
@@ -174,7 +206,7 @@ export default function AlbumManagement() {
 
     try {
       setActionLoading(Array.isArray(albumIds) ? ids[0] : albumIds);
-      await Promise.all(ids.map(id => api.albums.delete(id, token)));
+      await Promise.all(ids.map((id) => api.albums.delete(id, token)));
 
       const params = new URLSearchParams({
         page: currentPage.toString(),
@@ -183,12 +215,21 @@ export default function AlbumManagement() {
         ...(statusFilter.length === 1 && { status: statusFilter[0] }),
         ...(genreFilter.length > 0 && { genres: genreFilter.join(',') }),
       });
-      const response = await api.albums.getAll(token, currentPage, limit, params.toString());
+      const response = await api.albums.getAll(
+        token,
+        currentPage,
+        limit,
+        params.toString()
+      );
       setAlbums(response.albums);
 
-      toast.success(`Deleted ${ids.length} album${ids.length > 1 ? 's' : ''} successfully`);
+      toast.success(
+        `Deleted ${ids.length} album${ids.length > 1 ? 's' : ''} successfully`
+      );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete albums');
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to delete albums'
+      );
     } finally {
       setActionLoading(null);
     }
@@ -212,14 +253,13 @@ export default function AlbumManagement() {
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: (updatedSelection: Updater<RowSelectionState>) => {
       setRowSelection(updatedSelection);
-      const selectedRowData = albums.filter(
-        (_, index) => {
-          const selectionState = typeof updatedSelection === 'function'
+      const selectedRowData = albums.filter((_, index) => {
+        const selectionState =
+          typeof updatedSelection === 'function'
             ? updatedSelection(rowSelection)
             : updatedSelection;
-          return selectionState[index.toString()];
-        }
-      );
+        return selectionState[index.toString()];
+      });
       setSelectedRows(selectedRowData);
     },
     state: {
@@ -234,20 +274,35 @@ export default function AlbumManagement() {
   });
 
   return (
-    <div className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''}`}>
+    <div
+      className={`container mx-auto space-y-4 p-4 pb-20 ${
+        theme === 'dark' ? 'text-white' : ''
+      }`}
+    >
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          <h1
+            className={`text-2xl md:text-3xl font-bold tracking-tight ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}
+          >
             Album Management
           </h1>
-          <p className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : ''}`}>
+          <p
+            className={`text-muted-foreground ${
+              theme === 'dark' ? 'text-white/60' : ''
+            }`}
+          >
             Manage and monitor your albums
           </p>
         </div>
         <Link
           href="/artist/albums/new"
-          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${theme === 'light' ? 'bg-gray-900 text-white hover:bg-gray-800' : 'bg-white text-[#121212] hover:bg-white/90'
-            }`}
+          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${
+            theme === 'light'
+              ? 'bg-gray-900 text-white hover:bg-gray-800'
+              : 'bg-white text-[#121212] hover:bg-white/90'
+          }`}
         >
           New Album
         </Link>
@@ -267,7 +322,7 @@ export default function AlbumManagement() {
           searchValue: searchInput,
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
-          onDelete: () => handleDeleteAlbums(selectedRows.map(row => row.id)),
+          onDelete: () => handleDeleteAlbums(selectedRows.map((row) => row.id)),
           showExport: true,
           exportData: {
             data: albums,
@@ -278,7 +333,13 @@ export default function AlbumManagement() {
               {
                 key: 'genres',
                 header: 'Genres',
-                accessor: (row: Album) => row.genres?.map((g: { genre: { id: string; name: string } }) => g.genre.name).join(', ') || ''
+                accessor: (row: Album) =>
+                  row.genres
+                    ?.map(
+                      (g: { genre: { id: string; name: string } }) =>
+                        g.genre.name
+                    )
+                    .join(', ') || '',
               },
               { key: 'duration', header: 'Duration' },
               { key: 'isActive', header: 'Status' },
@@ -296,7 +357,7 @@ export default function AlbumManagement() {
           genreFilter: {
             value: genreFilter,
             onChange: setGenreFilter,
-            options: availableGenres.map(genre => ({
+            options: availableGenres.map((genre) => ({
               value: genre.id,
               label: genre.name,
             })),

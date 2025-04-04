@@ -18,7 +18,6 @@ const artist_routes_1 = __importDefault(require("./routes/artist.routes"));
 const user_routes_1 = __importDefault(require("./routes/user.routes"));
 const notification_routes_1 = __importDefault(require("./routes/notification.routes"));
 const playlist_routes_1 = __importDefault(require("./routes/playlist.routes"));
-const event_routes_1 = __importDefault(require("./routes/event.routes"));
 const label_routes_1 = __importDefault(require("./routes/label.routes"));
 const db_1 = __importDefault(require("./config/db"));
 const playlist_extension_1 = require("./prisma/extensions/playlist.extension");
@@ -38,7 +37,6 @@ app.use('/api/artist', artist_routes_1.default);
 app.use('/api/user', user_routes_1.default);
 app.use('/api/notifications', notification_routes_1.default);
 app.use('/api/playlists', playlist_routes_1.default);
-app.use('/api/events', event_routes_1.default);
 app.use('/api/labels', label_routes_1.default);
 const initializeApp = async () => {
     try {

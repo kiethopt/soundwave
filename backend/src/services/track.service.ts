@@ -1,5 +1,4 @@
 import prisma from '../config/db';
-import { trackSelect } from '../utils/prisma-selects';
 import { Prisma, Role } from '@prisma/client';
 import { Request } from 'express';
 import { paginate } from '../utils/handle-utils';
@@ -193,10 +192,7 @@ export const getAllTracks = async (req: Request) => {
     where: whereClause,
     include: {
       artist: {
-        select: { id: true, artistName: true, avatar: true }
-
-
-
+        select: { id: true, artistName: true, avatar: true },
       },
       album: { select: { id: true, title: true } },
       genres: { include: { genre: true } },

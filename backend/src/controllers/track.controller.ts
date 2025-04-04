@@ -120,14 +120,14 @@ export const createTrack = async (
     const featuredArtistsArray = Array.isArray(featuredArtists)
       ? featuredArtists
       : featuredArtists
-        ? featuredArtists.split(',').map((id: string) => id.trim()) // Xử lý chuỗi ID ngăn cách bởi dấu phẩy
-        : [];
+      ? featuredArtists.split(',').map((id: string) => id.trim()) // Xử lý chuỗi ID ngăn cách bởi dấu phẩy
+      : [];
 
     const genreIdsArray = Array.isArray(genreIds)
       ? genreIds
       : genreIds
-        ? genreIds.split(',').map((id: string) => id.trim()) // Xử lý chuỗi ID ngăn cách bởi dấu phẩy
-        : [];
+      ? genreIds.split(',').map((id: string) => id.trim()) // Xử lý chuỗi ID ngăn cách bởi dấu phẩy
+      : [];
 
     const track = await prisma.track.create({
       data: {
@@ -144,20 +144,20 @@ export const createTrack = async (
         featuredArtists:
           featuredArtistsArray.length > 0
             ? {
-              create: featuredArtistsArray.map((featArtistId: string) => ({
-                artistId: featArtistId, // Sửa lại thành artistId
-              })),
-            }
+                create: featuredArtistsArray.map((featArtistId: string) => ({
+                  artistId: featArtistId, // Sửa lại thành artistId
+                })),
+              }
             : undefined,
         genres:
           genreIdsArray.length > 0
             ? {
-              create: genreIdsArray.map((genreId: string) => ({
-                genre: {
-                  connect: { id: genreId },
-                },
-              })),
-            }
+                create: genreIdsArray.map((genreId: string) => ({
+                  genre: {
+                    connect: { id: genreId },
+                  },
+                })),
+              }
             : undefined,
       },
       select: trackSelect, // Đảm bảo select id
@@ -348,8 +348,8 @@ export const updateTrack = async (
         const artistsArray = !featuredArtists
           ? []
           : Array.isArray(featuredArtists)
-            ? featuredArtists
-            : [featuredArtists];
+          ? featuredArtists
+          : [featuredArtists];
 
         // Thêm mới nếu có
         if (artistsArray.length > 0) {
@@ -374,8 +374,8 @@ export const updateTrack = async (
         const genresArray = !genreIds
           ? []
           : Array.isArray(genreIds)
-            ? genreIds
-            : [genreIds];
+          ? genreIds
+          : [genreIds];
 
         // Thêm mới nếu có
         if (genresArray.length > 0) {
@@ -483,8 +483,9 @@ export const toggleTrackVisibility = async (
     });
 
     res.json({
-      message: `Track ${updatedTrack.isActive ? 'activated' : 'hidden'
-        } successfully`,
+      message: `Track ${
+        updatedTrack.isActive ? 'activated' : 'hidden'
+      } successfully`,
       track: updatedTrack,
     });
   } catch (error) {

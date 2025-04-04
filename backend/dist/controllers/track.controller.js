@@ -557,8 +557,18 @@ const getAllTracks = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
+        if (user.role !== client_1.Role.ADMIN &&
+            (!user.artistProfile?.isVerified || user.artistProfile?.role !== 'ARTIST')) {
+            res.status(403).json({
+                message: 'Forbidden: Only admins or verified artists can access this resource',
+            });
+            return;
+        }
         const { search, status, genres } = req.query;
         const whereClause = {};
+        if (user.role !== client_1.Role.ADMIN && user.artistProfile?.id) {
+            whereClause.artistId = user.artistProfile.id;
+        }
         if (search) {
             whereClause.OR = [
                 { title: { contains: String(search), mode: 'insensitive' } },
@@ -583,9 +593,6 @@ const getAllTracks = async (req, res) => {
                     },
                 },
             };
-        }
-        if (user.role !== client_1.Role.ADMIN && user.artistProfile?.id) {
-            whereClause.artistId = user.artistProfile.id;
         }
         const result = await trackService.getAllTracks(req);
         res.json({

@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback } from 'react';
-import { useTheme } from '@/contexts/ThemeContext'; // Make sure this import exists if used
+import React, { useMemo, useCallback, useState } from 'react';
 import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import { useDataTable } from '@/hooks/useDataTable';
 import { api } from '@/utils/api';
@@ -14,13 +13,29 @@ import {
 } from '@tanstack/react-table';
 import type { Track, FetchDataResponse } from '@/types';
 import toast from 'react-hot-toast';
+import { EditTrackModal } from '@/components/ui/data-table/data-table-modals';
 
 interface TrackManagementProps {
   theme: 'light' | 'dark';
 }
 
 export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
-  // --- Track Management State & Logic ---
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<
+    string[]
+  >([]);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
+  const [availableArtists, setAvailableArtists] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [availableGenres, setAvailableGenres] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [availableLabels, setAvailableLabels] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+
   const fetchTracks = useCallback(
     async (
       page: number,
@@ -69,10 +84,132 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
     setSorting: setTrackSorting,
     loading: tracksLoading,
     updateQueryParam: updateTrackQueryParam,
-    // refreshData: refreshTracks, // Potentially add back if needed
-  } = useDataTable<Track>({ fetchData: fetchTracks, paramKeyPrefix: 'track_' }); // Add prefix
+    refreshData: refreshTracks,
+  } = useDataTable<Track>({ fetchData: fetchTracks, paramKeyPrefix: 'track_' });
 
-  const trackColumns = useMemo(() => getTrackColumns({ theme }), [theme]);
+  // Handler functions for track actions
+  const handleEditTrack = useCallback((track: Track) => {
+    setSelectedTrack(track);
+
+    // Set featured artists
+    if (track.featuredArtists) {
+      const featuredIds = track.featuredArtists.map(
+        (fa) => fa.artistProfile.id
+      );
+      setSelectedFeaturedArtists(featuredIds);
+    } else {
+      setSelectedFeaturedArtists([]);
+    }
+
+    // Set genres
+    if (track.genres) {
+      const genreIds = track.genres.map((g) => g.genre.id);
+      setSelectedGenres(genreIds);
+    } else {
+      setSelectedGenres([]);
+    }
+
+    // Set label
+    if (track.label) {
+      setSelectedLabelId(track.label.id);
+    } else {
+      setSelectedLabelId(null);
+    }
+
+    // Fetch available artists, genres, and labels if not already loaded
+    fetchAvailableData();
+  }, []);
+
+  const handleDeleteTrack = useCallback(
+    async (trackId: string | string[]) => {
+      try {
+        const token = localStorage.getItem('userToken') || '';
+        const id = Array.isArray(trackId) ? trackId[0] : trackId;
+
+        await api.tracks.delete(id, token);
+        toast.success('Track deleted successfully');
+        refreshTracks();
+      } catch (error) {
+        console.error('Failed to delete track:', error);
+        toast.error('Failed to delete track');
+      }
+    },
+    [refreshTracks]
+  );
+
+  const handleTrackEditSubmit = useCallback(
+    async (trackId: string, formData: FormData) => {
+      try {
+        const token = localStorage.getItem('userToken') || '';
+        await api.tracks.update(trackId, formData, token);
+        toast.success('Track updated successfully');
+        setSelectedTrack(null);
+        refreshTracks();
+      } catch (error) {
+        console.error('Failed to update track:', error);
+        toast.error('Failed to update track');
+      }
+    },
+    [refreshTracks]
+  );
+
+  const fetchAvailableData = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('userToken') || '';
+
+      // Fetch artists if not already loaded
+      if (availableArtists.length === 0) {
+        const artistsResponse = await api.artists.getAll(token, 1, 100);
+        if (artistsResponse && artistsResponse.artists) {
+          setAvailableArtists(
+            artistsResponse.artists.map((artist: any) => ({
+              id: artist.id,
+              name: artist.artistName,
+            }))
+          );
+        }
+      }
+
+      // Fetch genres if not already loaded
+      if (availableGenres.length === 0) {
+        const genresResponse = await api.genres.getAll(token);
+        if (genresResponse && genresResponse.genres) {
+          setAvailableGenres(
+            genresResponse.genres.map((genre: any) => ({
+              id: genre.id,
+              name: genre.name,
+            }))
+          );
+        }
+      }
+
+      // Fetch labels if not already loaded
+      if (availableLabels.length === 0) {
+        const labelsResponse = await api.labels.getAll(token, 1, 100, '');
+        if (labelsResponse && labelsResponse.labels) {
+          setAvailableLabels(
+            labelsResponse.labels.map((label: any) => ({
+              id: label.id,
+              name: label.name,
+            }))
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch available data:', error);
+      toast.error('Failed to load some required data');
+    }
+  }, [availableArtists.length, availableGenres.length, availableLabels.length]);
+
+  const trackColumns = useMemo(
+    () =>
+      getTrackColumns({
+        theme,
+        onEdit: handleEditTrack,
+        onDelete: handleDeleteTrack,
+      }),
+    [theme, handleEditTrack, handleDeleteTrack]
+  );
 
   const trackTable = useReactTable({
     data: tracks || [],
@@ -102,20 +239,40 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   });
 
   return (
-    <DataTableWrapper
-      table={trackTable}
-      columns={trackColumns}
-      data={tracks}
-      pageCount={trackTotalPages}
-      pageIndex={trackCurrentPage - 1}
-      loading={tracksLoading}
-      onPageChange={(page) => updateTrackQueryParam({ page: page + 1 })}
-      theme={theme}
-      toolbar={{
-        searchValue: trackSearch,
-        onSearchChange: setTrackSearch,
-        searchPlaceholder: 'Search tracks...',
-      }}
-    />
+    <>
+      <DataTableWrapper
+        table={trackTable}
+        columns={trackColumns}
+        data={tracks}
+        pageCount={trackTotalPages}
+        pageIndex={trackCurrentPage - 1}
+        loading={tracksLoading}
+        onPageChange={(page) => updateTrackQueryParam({ page: page + 1 })}
+        theme={theme}
+        toolbar={{
+          searchValue: trackSearch,
+          onSearchChange: setTrackSearch,
+          searchPlaceholder: 'Search tracks...',
+        }}
+      />
+
+      {selectedTrack && (
+        <EditTrackModal
+          track={selectedTrack}
+          onClose={() => setSelectedTrack(null)}
+          onSubmit={handleTrackEditSubmit}
+          availableArtists={availableArtists}
+          selectedFeaturedArtists={selectedFeaturedArtists}
+          setSelectedFeaturedArtists={setSelectedFeaturedArtists}
+          availableGenres={availableGenres}
+          selectedGenres={selectedGenres}
+          setSelectedGenres={setSelectedGenres}
+          availableLabels={availableLabels}
+          selectedLabelId={selectedLabelId}
+          setSelectedLabelId={setSelectedLabelId}
+          theme={theme}
+        />
+      )}
+    </>
   );
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import { useDataTable } from '@/hooks/useDataTable';
 import { api } from '@/utils/api';
@@ -13,13 +13,23 @@ import {
 } from '@tanstack/react-table';
 import type { Album, FetchDataResponse } from '@/types';
 import toast from 'react-hot-toast';
+import { EditAlbumModal } from '@/components/ui/data-table/data-table-modals';
 
 interface AlbumManagementProps {
   theme: 'light' | 'dark';
 }
 
 export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
-  // --- Album Management State & Logic ---
+  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
+  const [availableGenres, setAvailableGenres] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [availableLabels, setAvailableLabels] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+
   const fetchAlbums = useCallback(
     async (
       page: number,
@@ -68,10 +78,109 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     setSorting: setAlbumSorting,
     loading: albumsLoading,
     updateQueryParam: updateAlbumQueryParam,
-    // refreshData: refreshAlbums, // Potentially add back if needed
-  } = useDataTable<Album>({ fetchData: fetchAlbums, paramKeyPrefix: 'album_' }); // Add prefix
+    refreshData: refreshAlbums,
+  } = useDataTable<Album>({ fetchData: fetchAlbums, paramKeyPrefix: 'album_' });
 
-  const albumColumns = useMemo(() => getAlbumColumns({ theme }), [theme]);
+  // Handler functions for album actions
+  const handleEditAlbum = useCallback((album: Album) => {
+    setSelectedAlbum(album);
+
+    // Set genres
+    if (album.genres) {
+      const genreIds = album.genres.map((g) => g.genre.id);
+      setSelectedGenres(genreIds);
+    } else {
+      setSelectedGenres([]);
+    }
+
+    // Set label
+    if (album.label) {
+      setSelectedLabelId(album.label.id);
+    } else {
+      setSelectedLabelId(null);
+    }
+
+    // Fetch available genres and labels if not already loaded
+    fetchAvailableData();
+  }, []);
+
+  const handleDeleteAlbum = useCallback(
+    async (albumId: string | string[]) => {
+      try {
+        const token = localStorage.getItem('userToken') || '';
+        const id = Array.isArray(albumId) ? albumId[0] : albumId;
+
+        await api.albums.delete(id, token);
+        toast.success('Album deleted successfully');
+        refreshAlbums();
+      } catch (error) {
+        console.error('Failed to delete album:', error);
+        toast.error('Failed to delete album');
+      }
+    },
+    [refreshAlbums]
+  );
+
+  const handleAlbumEditSubmit = useCallback(
+    async (albumId: string, formData: FormData) => {
+      try {
+        const token = localStorage.getItem('userToken') || '';
+        await api.albums.update(albumId, formData, token);
+        toast.success('Album updated successfully');
+        setSelectedAlbum(null);
+        refreshAlbums();
+      } catch (error) {
+        console.error('Failed to update album:', error);
+        toast.error('Failed to update album');
+      }
+    },
+    [refreshAlbums]
+  );
+
+  const fetchAvailableData = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('userToken') || '';
+
+      // Fetch genres if not already loaded
+      if (availableGenres.length === 0) {
+        const genresResponse = await api.genres.getAll(token);
+        if (genresResponse && genresResponse.genres) {
+          setAvailableGenres(
+            genresResponse.genres.map((genre: any) => ({
+              id: genre.id,
+              name: genre.name,
+            }))
+          );
+        }
+      }
+
+      // Fetch labels if not already loaded
+      if (availableLabels.length === 0) {
+        const labelsResponse = await api.labels.getAll(token, 1, 100, '');
+        if (labelsResponse && labelsResponse.labels) {
+          setAvailableLabels(
+            labelsResponse.labels.map((label: any) => ({
+              id: label.id,
+              name: label.name,
+            }))
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch available data:', error);
+      toast.error('Failed to load some required data');
+    }
+  }, [availableGenres.length, availableLabels.length]);
+
+  const albumColumns = useMemo(
+    () =>
+      getAlbumColumns({
+        theme,
+        onEdit: handleEditAlbum,
+        onDelete: handleDeleteAlbum,
+      }),
+    [theme, handleEditAlbum, handleDeleteAlbum]
+  );
 
   const albumTable = useReactTable({
     data: albums || [],
@@ -101,20 +210,37 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
   });
 
   return (
-    <DataTableWrapper
-      table={albumTable}
-      columns={albumColumns}
-      data={albums}
-      pageCount={albumTotalPages}
-      pageIndex={albumCurrentPage - 1}
-      loading={albumsLoading}
-      onPageChange={(page) => updateAlbumQueryParam({ page: page + 1 })}
-      theme={theme}
-      toolbar={{
-        searchValue: albumSearch,
-        onSearchChange: setAlbumSearch,
-        searchPlaceholder: 'Search albums...',
-      }}
-    />
+    <>
+      <DataTableWrapper
+        table={albumTable}
+        columns={albumColumns}
+        data={albums}
+        pageCount={albumTotalPages}
+        pageIndex={albumCurrentPage - 1}
+        loading={albumsLoading}
+        onPageChange={(page) => updateAlbumQueryParam({ page: page + 1 })}
+        theme={theme}
+        toolbar={{
+          searchValue: albumSearch,
+          onSearchChange: setAlbumSearch,
+          searchPlaceholder: 'Search albums...',
+        }}
+      />
+
+      {selectedAlbum && (
+        <EditAlbumModal
+          album={selectedAlbum}
+          onClose={() => setSelectedAlbum(null)}
+          onSubmit={handleAlbumEditSubmit}
+          availableGenres={availableGenres}
+          selectedGenres={selectedGenres}
+          setSelectedGenres={setSelectedGenres}
+          availableLabels={availableLabels}
+          selectedLabelId={selectedLabelId}
+          setSelectedLabelId={setSelectedLabelId}
+          theme={theme}
+        />
+      )}
+    </>
   );
 };
