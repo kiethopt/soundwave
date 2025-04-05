@@ -334,3 +334,56 @@ export const getUserTopAlbums = async (
     res.status(500).json({ message: 'Internal server error' });
   }
 }
+
+export const getGenreTopAlbums = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const albums = await userService.getGenreTopAlbums(id);
+    res.json(albums);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+export const getGenreTopTracks = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const tracks = await userService.getGenreTopTracks(id);
+    res.json(tracks);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+export const getGenreTopArtists = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const artists = await userService.getGenreTopArtists(id);
+    res.json(artists);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+export const getGenreNewestTracks = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const tracks = await userService.getGenreNewestTracks(id);
+    res.json(tracks);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+

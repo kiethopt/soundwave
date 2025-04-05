@@ -19,6 +19,10 @@ import {
   getUserTopAlbums,
   getUserTopTracks,
   getUserTopArtists,
+  getGenreTopAlbums,
+  getGenreTopTracks,
+  getGenreTopArtists,
+  getGenreNewestTracks,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -31,7 +35,7 @@ router.delete('/unfollow/:id', authenticate, cacheMiddleware, unfollowUser);
 router.get('/followers', authenticate, cacheMiddleware, getFollowers);
 router.get('/following', authenticate, cacheMiddleware, getFollowing);
 router.get('/search-all', authenticate, searchAll);
-router.get('/genres', getAllGenres);
+router.get('/genres', authenticate, getAllGenres);
 router.get('/profile/:id', getUserProfile);
 
 // Route yêu cầu trở thành Artist
@@ -82,5 +86,9 @@ router.get('/topAlbums', authenticate, getTopAlbums);
 router.get('/topAlbums/:id', authenticate, getUserTopAlbums);
 router.get('/topTracks/:id', authenticate, getUserTopTracks);
 router.get('/topArtists/:id', authenticate, getUserTopArtists);
+router.get('/genre/topAlbums/:id', authenticate, getGenreTopAlbums);
+router.get('/genre/topTracks/:id', authenticate, getGenreTopTracks);
+router.get('/genre/topArtists/:id', authenticate, getGenreTopArtists);
+router.get('/genre/newestTracks/:id', authenticate, getGenreNewestTracks);
 
 export default router;

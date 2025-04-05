@@ -1,4 +1,5 @@
 import { ArtistRequestFilters, CreatePlaylistData } from '@/types';
+import { get } from 'lodash';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -493,8 +494,12 @@ export const api = {
         token
       ),
 
-    getAllGenres: async () =>
-      fetchWithAuth('/api/user/genres', { method: 'GET' }),
+    getAllGenres: async (token: string) =>
+      fetchWithAuth(
+        `/api/user/genres`,
+        { method: 'GET' },
+        token
+      ),
 
     followUserOrArtist: async (followingId: string, token: string) =>
       fetchWithAuth(
@@ -515,10 +520,18 @@ export const api = {
       ),
 
     getFollowers: async (token: string) =>
-      fetchWithAuth('/api/user/followers', { method: 'GET' }, token),
+      fetchWithAuth(
+        '/api/user/followers', 
+        { method: 'GET' }, 
+        token
+      ),
 
     getFollowing: async (token: string) =>
-      fetchWithAuth('/api/user/following', { method: 'GET' }, token),
+      fetchWithAuth(
+        '/api/user/following', 
+        { method: 'GET' }, 
+        token
+      ),
 
     requestArtistRole: async (token: string, data: FormData) =>
       fetchWithAuth(
@@ -554,32 +567,91 @@ export const api = {
     },
 
     getRecommendedArtists: async (token: string) =>
-      fetchWithAuth('/api/user/recommendedArtists', { method: 'GET' }, token),
+      fetchWithAuth(
+        '/api/user/recommendedArtists', 
+        { method: 'GET' }, 
+        token
+      ),
 
     getNewestAlbums: async (token: string) =>
-      fetchWithAuth('/api/user/newestAlbums', { method: 'GET' }, token),
+      fetchWithAuth(
+        '/api/user/newestAlbums', 
+        { method: 'GET' }, 
+        token
+      ),
 
     getNewestTracks: async (token: string) =>
-      fetchWithAuth('/api/user/newestTracks', { method: 'GET' }, token),
+      fetchWithAuth(
+        '/api/user/newestTracks', 
+        { method: 'GET' }, 
+        token
+      ),
 
     getTopTracks: async (token: string) =>
-      fetchWithAuth('/api/user/topTracks', { method: 'GET' }, token),
+      fetchWithAuth(
+        '/api/user/topTracks', 
+        { method: 'GET' }, 
+        token
+      ),
 
     getTopArtists: async (token: string) =>
-      fetchWithAuth('/api/user/topArtists', { method: 'GET' }, token),
+      fetchWithAuth(
+        '/api/user/topArtists', 
+        { method: 'GET' }, 
+        token
+      ),
 
     getTopAlbums: async (token: string) =>
-      fetchWithAuth('/api/user/topAlbums', { method: 'GET' }, token),
+      fetchWithAuth(
+        '/api/user/topAlbums', 
+        { method: 'GET' }, 
+        token
+      ),
 
     // User profile API
     getUserTopAlbums: async (id: string, token: string) =>
-      fetchWithAuth(`/api/user/topAlbums/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(
+        `/api/user/topAlbums/${id}`, 
+        { method: 'GET' }, token
+      ),
 
     getUserTopTracks: async (id: string, token: string) =>
-      fetchWithAuth(`/api/user/topTracks/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(
+        `/api/user/topTracks/${id}`, 
+        { method: 'GET' }, 
+        token
+      ),
 
     getUserTopArtists: async (id: string, token: string) =>
       fetchWithAuth(`/api/user/topArtists/${id}`, { method: 'GET' }, token),
+
+    getGenreTopAlbums: async (id: string, token: string) =>
+      fetchWithAuth(
+        `/api/user/genre/topAlbums/${id}`,
+        { method: 'GET' },
+        token
+      ),
+
+    getGenreTopTracks: async (id: string, token: string) =>
+      fetchWithAuth(
+        `/api/user/genre/topTracks/${id}`,
+        { method: 'GET' },
+        token
+      ),
+
+    getGenreTopArtists: async (id: string, token: string) =>
+      fetchWithAuth(
+        `/api/user/genre/topArtists/${id}`,
+        { method: 'GET' },
+        token
+      ),
+
+    getGenreNewestTracks: async (id: string, token: string) =>
+      fetchWithAuth(
+        `/api/user/genre/newestTracks/${id}`,
+        { method: 'GET' },
+        token
+      ),
   },
 
   artists: {

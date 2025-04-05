@@ -1319,3 +1319,140 @@ export const getUserTopAlbums = async (user: any) => {
     (a, b) => (albumOrder.get(a.id) || 0) - (albumOrder.get(b.id) || 0)
   );
 };
+
+export const getGenreTopAlbums = async (genreId: string) => {
+  const cacheKey = `/api/genres/${genreId}/top-albums`;
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    const cachedData = await client.get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+  }
+
+  const albums = await prisma.album.findMany({
+    where: {
+      isActive: true,
+      genres: {
+        some: {
+          genreId,
+        },
+      },
+    },
+    select: searchAlbumSelect,
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    await setCache(cacheKey, albums, 1800); // Cache for 30 mins
+  }
+
+  return albums;
+}
+
+export const getGenreTopTracks = async (genreId: string) => {
+  const cacheKey = `/api/genres/${genreId}/top-tracks`;
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    const cachedData = await client.get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+  }
+
+  const tracks = await prisma.track.findMany({
+    where: {
+      isActive: true,
+      genres: {
+        some: {
+          genreId,
+        },
+      },
+    },
+    select: searchTrackSelect,
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    await setCache(cacheKey, tracks, 1800); // Cache for 30 mins
+  }
+
+  return tracks;
+}
+
+export const getGenreNewestTracks = async (genreId: string) => {
+  const cacheKey = `/api/genres/${genreId}/newest-tracks`;
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    const cachedData = await client.get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+  }
+
+  const tracks = await prisma.track.findMany({
+    where: {
+      isActive: true,
+      genres: {
+        some: {
+          genreId,
+        },
+      },
+    },
+    select: searchTrackSelect,
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    await setCache(cacheKey, tracks, 1800); // Cache for 30 mins
+  }
+
+  return tracks;
+}
+
+export const getGenreTopArtists = async (genreId: string) => {
+  const cacheKey = `/api/genres/${genreId}/top-artists`;
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    const cachedData = await client.get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+  }
+
+  const artists = await prisma.artistProfile.findMany({
+    where: {
+      isVerified: true,
+      genres: {
+        some: {
+          genreId,
+        },
+      },
+    },
+    select: {
+      id: true,
+      artistName: true,
+      avatar: true,
+      monthlyListeners: true,
+      genres: {
+        select: {
+          genre: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (process.env.USE_REDIS_CACHE === 'true') {
+    await setCache(cacheKey, artists, 1800); // Cache for 30 mins
+  }
+
+  return artists;
+}

@@ -109,7 +109,8 @@ export default function RequestArtistPage() {
   useEffect(() => {
     const fetchGenres = async () => {
       try {
-        const response = await api.user.getAllGenres();
+        const token = localStorage.getItem('userToken') || '';
+        const response = await api.user.getAllGenres(token);
         setGenreOptions(response);
       } catch (err) {
         console.error('Error fetching genres:', err);
