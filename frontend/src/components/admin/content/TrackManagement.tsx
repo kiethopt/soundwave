@@ -87,7 +87,6 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
     refreshData: refreshTracks,
   } = useDataTable<Track>({ fetchData: fetchTracks, paramKeyPrefix: 'track_' });
 
-  // Handler functions for track actions
   const handleEditTrack = useCallback((track: Track) => {
     setSelectedTrack(track);
 
@@ -109,16 +108,24 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
       setSelectedGenres([]);
     }
 
-    // Set label
-    if (track.label) {
-      setSelectedLabelId(track.label.id);
+    // Set label dựa trên labelId (nếu có) thay vì track.label
+    if (track.labelId) {
+      const matchedLabel = availableLabels.find(
+        (label) => label.id === track.labelId
+      );
+      if (matchedLabel) {
+        setSelectedLabelId(matchedLabel.id);
+      } else {
+        setSelectedLabelId(null);
+        console.warn('Label ID not found in availableLabels:', track.labelId);
+      }
     } else {
       setSelectedLabelId(null);
     }
 
-    // Fetch available artists, genres, and labels if not already loaded
+    // Fetch available data nếu chưa có
     fetchAvailableData();
-  }, []);
+  }, [availableLabels]);
 
   const handleDeleteTrack = useCallback(
     async (trackId: string | string[]) => {
@@ -157,7 +164,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
     try {
       const token = localStorage.getItem('userToken') || '';
 
-      // Fetch artists if not already loaded
+      // Fetch artists nếu chưa có
       if (availableArtists.length === 0) {
         const artistsResponse = await api.artists.getAll(token, 1, 100);
         if (artistsResponse && artistsResponse.artists) {
@@ -170,7 +177,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
         }
       }
 
-      // Fetch genres if not already loaded
+      // Fetch genres nếu chưa có
       if (availableGenres.length === 0) {
         const genresResponse = await api.genres.getAll(token);
         if (genresResponse && genresResponse.genres) {
@@ -183,7 +190,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
         }
       }
 
-      // Fetch labels if not already loaded
+      // Fetch labels nếu chưa có
       if (availableLabels.length === 0) {
         const labelsResponse = await api.labels.getAll(token, 1, 100, '');
         if (labelsResponse && labelsResponse.labels) {

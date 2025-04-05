@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  useState,
-  useEffect,
-  useCallback,
-  Dispatch,
-  SetStateAction,
-} from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Album, Genre } from '@/types';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -59,6 +53,7 @@ export default function AlbumManagement() {
         limit,
         params.toString()
       );
+      console.log('API Response Albums:', response.albums); // Thêm log để kiểm tra response
       return {
         data: response.albums,
         pagination: response.pagination,
@@ -102,7 +97,20 @@ export default function AlbumManagement() {
 
       if (selectedAlbum) {
         setSelectedGenres(selectedAlbum.genres?.map((g) => g.genre.id) || []);
-        setSelectedLabelId(selectedAlbum.label?.id || null);
+        if (selectedAlbum.labelId) {
+          const matchedLabel = labelsResponse.labels.find(
+            (label: { id: string; name: string }) => label.id === selectedAlbum.labelId
+          );
+          if (matchedLabel) {
+            setSelectedLabelId(matchedLabel.id);
+            console.log('Matched Label:', matchedLabel);
+          } else {
+            console.warn('Label ID not found in availableLabels:', selectedAlbum.labelId);
+          }
+        } else {
+          setSelectedLabelId(null);
+          console.log('No label ID in selectedAlbum');
+        }
       }
     } catch (error) {
       console.error('Failed to fetch metadata:', error);
@@ -119,7 +127,7 @@ export default function AlbumManagement() {
   const handleEditAlbum = (album: Album) => {
     setSelectedAlbum(album);
     setSelectedGenres(album.genres?.map((g) => g.genre.id) || []);
-    setSelectedLabelId(album.label?.id || null);
+    setSelectedLabelId(album.labelId || null); // Khởi tạo với labelId
   };
 
   const handleSubmit = async (albumId: string, formData: FormData) => {
@@ -190,8 +198,7 @@ export default function AlbumManagement() {
     const ids = Array.isArray(albumIds) ? albumIds : [albumIds];
     if (
       !confirm(
-        `Are you sure you want to delete ${ids.length} album${
-          ids.length > 1 ? 's' : ''
+        `Are you sure you want to delete ${ids.length} album${ids.length > 1 ? 's' : ''
         }?`
       )
     ) {
@@ -275,34 +282,30 @@ export default function AlbumManagement() {
 
   return (
     <div
-      className={`container mx-auto space-y-4 p-4 pb-20 ${
-        theme === 'dark' ? 'text-white' : ''
-      }`}
+      className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''
+        }`}
     >
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
         <div>
           <h1
-            className={`text-2xl md:text-3xl font-bold tracking-tight ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
+            className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
           >
             Album Management
           </h1>
           <p
-            className={`text-muted-foreground ${
-              theme === 'dark' ? 'text-white/60' : ''
-            }`}
+            className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : ''
+              }`}
           >
             Manage and monitor your albums
           </p>
         </div>
         <Link
           href="/artist/albums/new"
-          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${
-            theme === 'light'
+          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${theme === 'light'
               ? 'bg-gray-900 text-white hover:bg-gray-800'
               : 'bg-white text-[#121212] hover:bg-white/90'
-          }`}
+            }`}
         >
           New Album
         </Link>

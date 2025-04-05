@@ -81,7 +81,6 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     refreshData: refreshAlbums,
   } = useDataTable<Album>({ fetchData: fetchAlbums, paramKeyPrefix: 'album_' });
 
-  // Handler functions for album actions
   const handleEditAlbum = useCallback((album: Album) => {
     setSelectedAlbum(album);
 
@@ -93,16 +92,24 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
       setSelectedGenres([]);
     }
 
-    // Set label
-    if (album.label) {
-      setSelectedLabelId(album.label.id);
+    // Set label dựa trên labelId (nếu có) thay vì album.label
+    if (album.labelId) {
+      const matchedLabel = availableLabels.find(
+        (label) => label.id === album.labelId
+      );
+      if (matchedLabel) {
+        setSelectedLabelId(matchedLabel.id);
+      } else {
+        setSelectedLabelId(null);
+        console.warn('Label ID not found in availableLabels:', album.labelId);
+      }
     } else {
       setSelectedLabelId(null);
     }
 
-    // Fetch available genres and labels if not already loaded
+    // Fetch available genres and labels nếu chưa có
     fetchAvailableData();
-  }, []);
+  }, [availableLabels]);
 
   const handleDeleteAlbum = useCallback(
     async (albumId: string | string[]) => {
@@ -141,7 +148,7 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     try {
       const token = localStorage.getItem('userToken') || '';
 
-      // Fetch genres if not already loaded
+      // Fetch genres nếu chưa có
       if (availableGenres.length === 0) {
         const genresResponse = await api.genres.getAll(token);
         if (genresResponse && genresResponse.genres) {
@@ -154,7 +161,7 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
         }
       }
 
-      // Fetch labels if not already loaded
+      // Fetch labels nếu chưa có
       if (availableLabels.length === 0) {
         const labelsResponse = await api.labels.getAll(token, 1, 100, '');
         if (labelsResponse && labelsResponse.labels) {

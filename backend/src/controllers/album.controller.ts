@@ -393,7 +393,7 @@ export const updateAlbum = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, releaseDate, type, genres, updateGenres } = req.body;
+    const { title, releaseDate, type, genres, labelId } = req.body; // Loại bỏ updateGenres
     const coverFile = req.file;
     const user = req.user;
 
@@ -404,7 +404,7 @@ export const updateAlbum = async (
 
     const album = await prisma.album.findUnique({
       where: { id },
-      select: { artistId: true, coverUrl: true },
+      select: { artistId: true, coverUrl: true, labelId: true },
     });
 
     if (!album) {
@@ -433,8 +433,32 @@ export const updateAlbum = async (
     if (type) updateData.type = type;
     if (coverUrl) updateData.coverUrl = coverUrl;
 
-    // Xử lý genres
-    if (updateGenres === 'true') {
+    // Xử lý labelId nếu được cung cấp
+    if (labelId !== undefined) {
+      console.log(`Received labelId: ${labelId}`);
+      if (typeof labelId !== 'string' && labelId !== null) {
+        res.status(400).json({
+          message: `Invalid labelId type: expected string or null, got ${typeof labelId}`
+        });
+        return;
+      }
+
+      if (labelId === null || labelId === '') {
+        updateData.labelId = null;
+      } else {
+        const labelExists = await prisma.label.findUnique({
+          where: { id: labelId },
+        });
+        if (!labelExists) {
+          res.status(400).json({ message: `Invalid label ID: ${labelId} does not exist` });
+          return;
+        }
+        updateData.labelId = labelId;
+      }
+    }
+
+    // Xử lý genres nếu có dữ liệu genres trong request
+    if (genres !== undefined) {
       // Xóa tất cả genres hiện tại
       await prisma.albumGenre.deleteMany({ where: { albumId: id } });
 
@@ -443,9 +467,26 @@ export const updateAlbum = async (
         ? []
         : Array.isArray(genres)
           ? genres
-          : [genres];
+          : typeof genres === 'string'
+            ? genres.split(',').map((g: string) => g.trim())
+            : [genres];
 
       if (genresArray.length > 0) {
+        const existingGenres = await prisma.genre.findMany({
+          where: { id: { in: genresArray } },
+          select: { id: true },
+        });
+
+        const validGenreIds = existingGenres.map((genre) => genre.id);
+        const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
+
+        if (invalidGenreIds.length > 0) {
+          res.status(400).json({
+            message: `Invalid genre IDs: ${invalidGenreIds.join(', ')}`
+          });
+          return;
+        }
+
         updateData.genres = {
           create: genresArray.map((genreId: string) => ({
             genre: { connect: { id: genreId.trim() } },

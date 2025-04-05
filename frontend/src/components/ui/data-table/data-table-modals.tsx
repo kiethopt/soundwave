@@ -633,18 +633,13 @@ export function EditAlbumModal({
 
           {/* Thêm trường chọn Label */}
           <div className="space-y-2">
-            <span
-              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                }`}
-            >
-              Label
+            <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
+              Label (Optional)
             </span>
             <SearchableSelect
               options={availableLabels}
               value={selectedLabelId ? [selectedLabelId] : []}
-              onChange={(ids) =>
-                setSelectedLabelId(ids.length > 0 ? ids[0] : null)
-              }
+              onChange={(ids) => setSelectedLabelId(ids.length > 0 ? ids[0] : null)}
               placeholder="Select a label..."
               multiple={false}
             />

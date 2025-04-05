@@ -240,6 +240,7 @@ export interface Album {
       name: string;
     };
   }[];
+  labelId?: string; // Thêm trường labelId để khớp với API
   label?: {
     id: string;
     name: string;
