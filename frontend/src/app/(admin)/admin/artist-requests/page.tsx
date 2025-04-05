@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -91,6 +91,12 @@ export default function ArtistRequestManagement() {
   const [startDate, setStartDate] = useState<string>(safeGetParam('startDate'));
   const [endDate, setEndDate] = useState<string>(safeGetParam('endDate'));
 
+  // Effect to sync local state with URL changes (e.g., back/forward)
+  useEffect(() => {
+    setStartDate(safeGetParam('startDate'));
+    setEndDate(safeGetParam('endDate'));
+  }, [searchParams, safeGetParam]);
+
   // Action handlers
   const handleApprove = async (requestId: string) => {
     try {
@@ -132,10 +138,7 @@ export default function ArtistRequestManagement() {
   };
 
   const handleBulkRejectClick = () => {
-    if (
-      !selectedRows.length ||
-      !confirm(`Reject ${selectedRows.length} selected requests?`)
-    )
+    if (!selectedRows.length)
       return;
     setIsRejectModalOpen(true);
   };
@@ -165,18 +168,6 @@ export default function ArtistRequestManagement() {
 
   const handleViewDetails = (requestId: string) => {
     router.push(`/admin/artist-requests/${requestId}`);
-  };
-
-  // Cập nhật URL khi thay đổi filters
-  const updateFilters = (newStartDate?: string, newEndDate?: string) => {
-    const params = new URLSearchParams(safeParamsToString());
-    if (newStartDate) params.set('startDate', newStartDate);
-    else params.delete('startDate');
-    if (newEndDate) params.set('endDate', newEndDate);
-    else params.delete('endDate');
-    if (currentPage !== 1) params.set('page', '1');
-    const queryStr = params.toString() ? `?${params.toString()}` : '';
-    router.push(`/admin/artist-requests${queryStr}`);
   };
 
   // Define columns
@@ -249,11 +240,19 @@ export default function ArtistRequestManagement() {
           endDate={endDate}
           onStartDateChange={(date) => {
             setStartDate(date);
-            updateFilters(date, endDate);
+            updateQueryParam({ 
+              startDate: date || null,
+              endDate: endDate || null,
+              page: 1
+            });
           }}
           onEndDateChange={(date) => {
             setEndDate(date);
-            updateFilters(startDate, date);
+            updateQueryParam({ 
+              startDate: startDate || null,
+              endDate: date || null,
+              page: 1
+            });
           }}
         />
       </div>

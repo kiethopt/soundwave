@@ -103,6 +103,37 @@ export function DateRangePicker({
             selected={date}
             onSelect={handleSelect}
             numberOfMonths={2}
+            modifiers={{
+              selected: date ?? [],
+            }}
+            modifiersStyles={{
+              selected: {
+                backgroundColor: theme === 'light' ? '#ffaa3b' : '#eab308',
+                color: theme === 'light' ? '#ffffff' : '#111827',
+                fontWeight: 'bold',
+              },
+              range_start: {
+                backgroundColor: theme === 'light' ? '#ffaa3b' : '#eab308',
+                color: theme === 'light' ? '#ffffff' : '#111827',
+                borderTopLeftRadius: '50%',
+                borderBottomLeftRadius: '50%',
+                borderTopRightRadius: '0', 
+                borderBottomRightRadius: '0', 
+              },
+              range_end: {
+                backgroundColor: theme === 'light' ? '#ffaa3b' : '#eab308',
+                color: theme === 'light' ? '#ffffff' : '#111827',
+                borderTopLeftRadius: '0', 
+                borderBottomLeftRadius: '0', 
+                borderTopRightRadius: '50%',
+                borderBottomRightRadius: '50%',
+              },
+              range_middle: { 
+                backgroundColor: theme === 'light' ? '#ffedd5' : 'rgba(234, 179, 8, 0.2)', 
+                color: theme === 'light' ? '#9a3412' : '#fef3c7', 
+                borderRadius: '0',
+              }
+            }}
             className={cn(
               'max-h-[350px] overflow-y-auto',
               theme === 'light'

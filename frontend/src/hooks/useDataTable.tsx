@@ -79,6 +79,8 @@ export function useDataTable<T>({
     statusFilter,
     genreFilter,
     sorting,
+    startDate: safeGetParam(getKey('startDate')), 
+    endDate: safeGetParam(getKey('endDate')), 
   });
 
   // --- Fetching Logic --- //
@@ -86,7 +88,6 @@ export function useDataTable<T>({
   const fetchDataInternal = useCallback(
     async (
       pageToFetch: number,
-      // paramsToFetch represents the state *intended* for the URL
       paramsToFetch: URLSearchParams,
       showLoading: boolean = true
     ) => {
@@ -94,29 +95,46 @@ export function useDataTable<T>({
         setLoading(true);
       }
       try {
-        // **Create clean params for the API call**
         const paramsForApi = new URLSearchParams();
 
-        // 1. Set standard pagination
+        // 1. Set standard pagination from pageToFetch and limit
         paramsForApi.set('page', String(Math.max(1, pageToFetch)));
         paramsForApi.set('limit', String(limit));
 
-        // 2. Set standard search parameter from the prefixed URL key
+        // 2. Set search parameter from the prefixed URL key in paramsToFetch
         const currentSearchValue = paramsToFetch.get(getKey('q'));
         if (currentSearchValue) {
-          paramsForApi.set('search', currentSearchValue);
+          paramsForApi.set('search', currentSearchValue); // Use 'search' for API
         }
 
-        // 3. Set standard filter parameters from current state
-        if (statusFilter.length > 0)
-          statusFilter.forEach((s) => paramsForApi.append('status', s));
-        if (genreFilter.length > 0)
-          genreFilter.forEach((g) => paramsForApi.append('genres', g));
+        // 3. Set filter parameters from the prefixed URL keys in paramsToFetch
+        const currentStatusValues = paramsToFetch.getAll(getKey('status'));
+        if (currentStatusValues.length > 0) {
+          currentStatusValues.forEach((s) => paramsForApi.append('status', s));
+        }
+        const currentGenreValues = paramsToFetch.getAll(getKey('genres'));
+        if (currentGenreValues.length > 0) {
+          currentGenreValues.forEach((g) => paramsForApi.append('genres', g));
+        }
 
-        // 4. Set standard sorting parameters from current state
-        if (sorting.length > 0) {
-          paramsForApi.set('sortBy', sorting[0].id);
-          paramsForApi.set('sortOrder', sorting[0].desc ? 'desc' : 'asc');
+        // 4. Set sorting parameters from the prefixed URL keys in paramsToFetch
+        const currentSortBy = paramsToFetch.get(getKey('sortBy'));
+        const currentSortOrder = paramsToFetch.get(getKey('sortOrder'));
+        if (currentSortBy) {
+          paramsForApi.set('sortBy', currentSortBy);
+          if (currentSortOrder) {
+            paramsForApi.set('sortOrder', currentSortOrder);
+          }
+        }
+
+        // 5. Set date range parameters from the prefixed URL keys in paramsToFetch
+        const currentStartDate = paramsToFetch.get(getKey('startDate'));
+        const currentEndDate = paramsToFetch.get(getKey('endDate'));
+        if (currentStartDate) {
+          paramsForApi.set('startDate', currentStartDate);
+        }
+        if (currentEndDate) {
+          paramsForApi.set('endDate', currentEndDate);
         }
 
         // console.log(`Fetching data with API params: ${paramsForApi.toString()}`);
@@ -155,8 +173,8 @@ export function useDataTable<T>({
         }
       }
     },
-    // Dependencies now include state variables used to build API params
-    [fetchData, limit, getKey, statusFilter, genreFilter, sorting]
+    // Dependencies simplified: only rely on fetchData, limit, and getKey
+    [fetchData, limit, getKey]
   );
 
   const debouncedFetch = useRef(
@@ -280,6 +298,7 @@ export function useDataTable<T>({
     const updates: Record<string, any> = {};
     let stateChanged = false;
     let resetPage = false;
+    const newPage = Math.max(1, Number(safeGetParam(getKey('page'))) || 1); // Start with current URL page
 
     // Check if search changed
     if (searchInput !== prevDeps.current.searchInput) {
@@ -321,38 +340,52 @@ export function useDataTable<T>({
 
     if (resetPage) {
       updates.page = 1; // Reset page if search, filter or sort changed
+    } else {
+      // If only page changed (e.g. pagination click), ensure page update is included
+      if (currentPage !== prevDeps.current.currentPage) {
+        updates.page = currentPage;
+        // No need to set stateChanged = true here, URL change (Effect 2) handles page-only changes
+      }
     }
 
-    // If state relevant to this hook instance changed
+    // If state relevant to this hook instance changed (search, filter, sort)
     if (stateChanged) {
       // Update URL (use push for user-driven changes)
       updateUrlParams(updates, false);
 
-      // Trigger debounced fetch using parameters intended for the *URL*
-      // fetchDataInternal will correctly extract/map for the API call
-      const paramsForFetch = new URLSearchParams();
+      // Construct the full set of parameters for the *next URL state*
+      const paramsForFetch = new URLSearchParams(safeParamsToString()); // Start with existing URL params
+
+      // Apply the changes from 'updates' to build the final parameter set
       Object.entries(updates).forEach(([key, value]) => {
-        const prefixedKey = getKey(key);
-        if (Array.isArray(value)) {
-          if (value.length > 0)
-            value.forEach((v) =>
-              paramsForFetch.append(prefixedKey, v.toString())
-            );
-        } else if (value !== null && value !== '') {
-          paramsForFetch.set(prefixedKey, value.toString());
-        }
+          const prefixedKey = getKey(key);
+          paramsForFetch.delete(prefixedKey); // Remove existing before potentially adding new
+
+          if (key === 'page' && (value === 1 || value === '1')) {
+              // Already deleted, do nothing more
+          } else if (Array.isArray(value)) {
+              if (value.length > 0) {
+                  value.forEach((v) => paramsForFetch.append(prefixedKey, v.toString()));
+              }
+          } else if (value !== null && value !== '' && value !== undefined) {
+              paramsForFetch.set(prefixedKey, value.toString());
+          }
       });
-      // Use the (potentially reset) page number
-      debouncedFetch(updates.page || currentPage, paramsForFetch);
+
+
+      // Trigger debounced fetch using the complete, intended URL parameters
+      debouncedFetch(updates.page || newPage, paramsForFetch);
+
 
       // Update previous dependencies ref *after* logic
       prevDeps.current = {
-        ...prevDeps.current, // Keep previous page if only search/filter/sort changed
         currentPage: updates.page || prevDeps.current.currentPage, // Update page if it was reset
         searchInput,
         statusFilter,
         genreFilter,
         sorting,
+        startDate: safeGetParam(getKey('startDate')), // Update previous startDate
+        endDate: safeGetParam(getKey('endDate')), // Update previous endDate
       };
     }
   }, [
@@ -379,6 +412,8 @@ export function useDataTable<T>({
     const urlSorting = urlSortBy
       ? [{ id: urlSortBy, desc: urlSortOrder === 'desc' }]
       : [];
+    const urlStartDate = safeGetParam(getKey('startDate')); // Read startDate from URL
+    const urlEndDate = safeGetParam(getKey('endDate')); // Read endDate from URL
 
     // Check if URL state differs from *current tracked state (prevDeps)*
     const urlStateDiffers =
@@ -388,7 +423,9 @@ export function useDataTable<T>({
         JSON.stringify(prevDeps.current.statusFilter) ||
       JSON.stringify(urlGenres) !==
         JSON.stringify(prevDeps.current.genreFilter) ||
-      JSON.stringify(urlSorting) !== JSON.stringify(prevDeps.current.sorting);
+      JSON.stringify(urlSorting) !== JSON.stringify(prevDeps.current.sorting) ||
+      urlStartDate !== prevDeps.current.startDate || // Compare startDate
+      urlEndDate !== prevDeps.current.endDate; // Compare endDate
 
     // console.log(`Effect 2: Initial Load: ${initialLoad.current}, URL State Differs: ${urlStateDiffers}`);
 
@@ -415,6 +452,8 @@ export function useDataTable<T>({
         statusFilter: urlStatus,
         genreFilter: urlGenres,
         sorting: urlSorting,
+        startDate: urlStartDate, // Update previous startDate
+        endDate: urlEndDate, // Update previous endDate
       };
 
       if (initialLoad.current) {
