@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createPasswordResetEmail = exports.createAccountDeactivatedEmail = exports.createAccountActivatedEmail = exports.createNewReleaseEmail = exports.createArtistRequestRejectedEmail = exports.createArtistRequestApprovedEmail = exports.createNewFollowerEmail = exports.sendEmail = void 0;
+exports.createWelcomeEmail = exports.createPasswordResetEmail = exports.createAccountDeactivatedEmail = exports.createAccountActivatedEmail = exports.createNewReleaseEmail = exports.createArtistRequestRejectedEmail = exports.createArtistRequestApprovedEmail = exports.createNewFollowerEmail = exports.sendEmail = void 0;
 const mail_1 = __importDefault(require("@sendgrid/mail"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
@@ -219,4 +219,16 @@ const createPasswordResetEmail = (to, userName, resetLink) => {
     return { to, subject, html };
 };
 exports.createPasswordResetEmail = createPasswordResetEmail;
+const createWelcomeEmail = (to, userName) => {
+    const subject = 'Welcome to SoundWave!';
+    const mainContentHtml = `
+    <h2 style="color: ${TEXT_DARK}; margin-top: 0; margin-bottom: 20px; font-size: 24px; text-align: center;">Welcome to SoundWave!</h2>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Hello ${userName},</p>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Thank you for joining SoundWave! We're excited to have you on board.</p>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Start exploring our vast collection of music and create your own playlists.</p>
+  `;
+    const html = createRichHtmlTemplate(subject, mainContentHtml, to, undefined, `${FRONTEND_URL}/`, 'Start Exploring');
+    return { to, subject, html };
+};
+exports.createWelcomeEmail = createWelcomeEmail;
 //# sourceMappingURL=email.service.js.map

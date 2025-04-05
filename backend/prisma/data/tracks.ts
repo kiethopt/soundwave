@@ -64,6 +64,20 @@ export const singles: SingleTrackData[] = [
     labelName: 'Đông Tây Promotion',
     featuredArtistNames: [],
     playCount: 90
+  },
+  
+  // HIEUTHUHAI's Single
+  {
+    artistName: 'HIEUTHUHAI',
+    title: 'Nước Mắt Cá Sấu',
+    duration: 206, // 3:26
+    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743870605/NMCS_rq3wmm.webp',
+    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1743870609/N%C6%B0%E1%BB%9Bc_M%E1%BA%AFt_C%C3%A1_S%E1%BA%A5u_ldpno8.mp3',
+    genreNames: ['V-Pop', 'Hip-Hop', 'Rap'],
+    labelName: 'M Music Records',
+    featuredArtistNames: [],
+    playCount: 0,
+    releaseDate: new Date('2025-04-01')
   }
 ];
 

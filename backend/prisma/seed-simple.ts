@@ -1,6 +1,8 @@
 import { PrismaClient, Role, AlbumType } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
+import * as cliProgress from 'cli-progress';
+import colors from 'colors';
 
 // Import data from our modular structure
 import { artists } from './data/artists';
@@ -28,21 +30,32 @@ function durationToSeconds(durationStr: string): number {
 
 async function main() {
   try {
-    console.log('🔄 Starting database seeding with optimized structure...');
+    console.log(colors.cyan('🔄 Starting database seeding with optimized structure...'));
     const hashedPassword = await bcrypt.hash('123456', 10);
     const now = new Date();
 
+    // Create a multi-progress bar container
+    const multibar = new cliProgress.MultiBar({
+      clearOnComplete: false,
+      hideCursor: true,
+      format: colors.cyan('{bar}') + ' | {percentage}% | {value}/{total} {task}',
+    }, cliProgress.Presets.shades_grey);
+
     // === 1. Seed Genres ===
-    console.log('🔄 Seeding genres...');
+    const genreBar = multibar.create(genreNames.length, 0, { task: 'Seeding genres' });
     await prisma.genre.createMany({
-      data: genreNames.map((name) => ({ name })),
+      data: genreNames.map((name, index) => {
+        genreBar.update(index + 1);
+        return { name };
+      }),
       skipDuplicates: true,
     });
-    console.log('✅ Genres seeded successfully.');
+    genreBar.update(genreNames.length);
 
     // === 2. Seed Labels ===
-    console.log('🔄 Seeding labels...');
-    for (const label of labelData) {
+    const labelBar = multibar.create(labelData.length, 0, { task: 'Seeding labels' });
+    for (let i = 0; i < labelData.length; i++) {
+      const label = labelData[i];
       await prisma.label.upsert({
         where: { name: label.name },
         update: {
@@ -55,11 +68,11 @@ async function main() {
           logoUrl: label.logoUrl || null,
         },
       });
+      labelBar.update(i + 1);
     }
-    console.log('✅ Labels seeded successfully.');
 
     // === 3. Seed Admin Account ===
-    console.log('🔄 Seeding admin account...');
+    const adminBar = multibar.create(1, 0, { task: 'Seeding admin account' });
     await prisma.user.upsert({
       where: { email: 'admin@soundwave.com' },
       update: { isActive: true, role: Role.ADMIN },
@@ -72,16 +85,17 @@ async function main() {
         isActive: true,
       },
     });
-    console.log('✅ Admin account seeded successfully.');
+    adminBar.update(1);
 
     // === 4. Seed Artists (from artists.ts) ===
-    console.log('🔄 Seeding artists...');
+    const artistBar = multibar.create(artists.length, 0, { task: 'Seeding artists' });
     
     // Create a Map to store artistName -> artistId for easier lookup
     const artistProfilesMap = new Map<string, string>();
 
     // Seed all artists
-    for (const artistData of artists) {
+    for (let i = 0; i < artists.length; i++) {
+      const artistData = artists[i];
       const user = await prisma.user.upsert({
         where: { email: artistData.user.email },
         update: {
@@ -118,18 +132,24 @@ async function main() {
         },
       });
       artistProfilesMap.set(artistProfile.artistName, artistProfile.id);
-      console.log(`✅ Seeded Artist: ${artistData.profile.artistName}`);
+      artistBar.update(i + 1);
     }
 
     // === 5. Seed Albums and Tracks (from albums.ts) ===
-    console.log('🔄 Seeding albums and tracks...');
-
-    for (const albumData of albums) {
+    const albumBar = multibar.create(albums.length, 0, { task: 'Seeding albums' });
+    let totalTracksCount = 0; // Count total number of tracks across all albums
+    albums.forEach(album => totalTracksCount += album.tracks.length);
+    const trackBar = multibar.create(totalTracksCount, 0, { task: 'Seeding album tracks' });
+    
+    let processedTracks = 0;
+    for (let i = 0; i < albums.length; i++) {
+      const albumData = albums[i];
       const artistId = artistProfilesMap.get(albumData.artistName);
       if (!artistId) {
         console.warn(
-          `⚠️ Could not find artistId for ${albumData.artistName}. Skipping album "${albumData.title}".`
+          colors.yellow(`⚠️ Could not find artistId for ${albumData.artistName}. Skipping album "${albumData.title}".`)
         );
+        albumBar.increment();
         continue;
       }
 
@@ -171,7 +191,7 @@ async function main() {
           genres: { create: albumGenreIds.map((genreId) => ({ genreId })) },
         },
       });
-      console.log(`✅ Seeded Album: ${album.title} by ${albumData.artistName}`);
+      albumBar.update(i + 1);
 
       // Find featured artist IDs mentioned for the whole album
       const albumFeaturedArtistIds = (
@@ -237,20 +257,24 @@ async function main() {
             })),
             skipDuplicates: true,
           });
-          console.log(`  → Added ${trackFeaturedArtistIds.length} featured artists to track: ${track.title}`);
         }
+        
+        processedTracks++;
+        trackBar.update(processedTracks);
       }
-      console.log(`✅ Seeded ${totalTracks} Tracks for Album: ${album.title}`);
     }
     
     // === 6. Seed Standalone Singles (from tracks.ts) ===
-    console.log('🔄 Seeding standalone singles...');
-    for (const singleData of singles) {
+    const singleBar = multibar.create(singles.length, 0, { task: 'Seeding standalone singles' });
+    
+    for (let i = 0; i < singles.length; i++) {
+      const singleData = singles[i];
       const artistId = artistProfilesMap.get(singleData.artistName);
       if (!artistId) {
         console.warn(
-          `⚠️ Could not find artistId for ${singleData.artistName} while seeding single "${singleData.title}". Skipping.`
+          colors.yellow(`⚠️ Could not find artistId for ${singleData.artistName} while seeding single "${singleData.title}". Skipping.`)
         );
+        singleBar.increment();
         continue;
       }
 
@@ -263,7 +287,7 @@ async function main() {
         .filter((id): id is string => {
           if (!id)
             console.warn(
-              `⚠️ Could not find featured artist ID for "${name}" on single "${singleData.title}".`
+              colors.yellow(`⚠️ Could not find featured artist ID for "${name}" on single "${singleData.title}".`)
             );
           return !!id;
         });
@@ -303,9 +327,6 @@ async function main() {
           genres: { create: singleGenreIds.map((genreId) => ({ genreId })) },
         },
       });
-      console.log(
-        `✅ Seeded Single: "${track.title}" by ${singleData.artistName}`
-      );
 
       // Link featured artists if any
       if (featuredArtistIds.length > 0) {
@@ -316,20 +337,21 @@ async function main() {
           })),
           skipDuplicates: true, // Avoid errors if feature link already exists
         });
-        console.log(
-          `   -> Added features: ${singleData.featuredArtistNames.join(', ')}`
-        );
       }
+      
+      singleBar.update(i + 1);
     }
-    console.log('✅ Standalone singles seeded successfully.');
 
-    console.log('🎉 Database seeding completed with modular data structure!');
+    // Stop all progress bars when done
+    multibar.stop();
+    
+    console.log(colors.green('\n🎉 Database seeding completed successfully!'));
   } catch (error) {
-    console.error('❌ Error during seeding:', error);
+    console.error(colors.red('❌ Error during seeding:'), error);
     process.exit(1);
   } finally {
     await prisma.$disconnect();
-    console.log('🔌 Prisma client disconnected.');
+    console.log(colors.cyan('🔌 Prisma client disconnected.'));
   }
 }
 

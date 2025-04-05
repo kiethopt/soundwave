@@ -260,6 +260,19 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       );
     }
 
+    // Gửi email chào mừng
+    try {
+      const emailOptions = emailService.createWelcomeEmail(
+        user.email,
+        user.name || user.username || 'there'
+      );
+      await emailService.sendEmail(emailOptions);
+      console.log(`[Register] Welcome email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('[Register] Error sending welcome email:', emailError);
+      // Không làm gián đoạn quá trình đăng ký nếu gửi email thất bại
+    }
+
     res.status(201).json({ message: 'User registered successfully', user });
   } catch (error) {
     console.error('Register error:', error);
@@ -517,6 +530,19 @@ export const googleRegister = async (req: Request, res: Response): Promise<void>
         `[Google Register] Error creating initial playlists for user ${user.id}:`,
         playlistError
       );
+    }
+
+    // Gửi email chào mừng
+    try {
+      const emailOptions = emailService.createWelcomeEmail(
+        user.email,
+        user.name || 'there'
+      );
+      await emailService.sendEmail(emailOptions);
+      console.log(`[Google Register] Welcome email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('[Google Register] Error sending welcome email:', emailError);
+      // Không làm gián đoạn quá trình đăng ký nếu gửi email thất bại
     }
 
     const tokenResponse = generateToken(user.id, user.role);

@@ -164,4 +164,9 @@ export const labelData = [
     logoUrl:
       'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743431552/labels/aohzj3xpsp445v9pfpob.png',
   },
+  {
+    name: 'QP hype',
+    description: 'Hãng thu âm và sản xuất âm nhạc QP hype...',
+    logoUrl: null,
+  },
 ]; 

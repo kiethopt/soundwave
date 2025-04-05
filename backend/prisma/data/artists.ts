@@ -110,7 +110,7 @@ export const artists: ArtistData[] = [
     },
   },
   
-  // Shiki (existing artist added here for completeness)
+  // Shiki
   {
     user: {
       email: 'shiki@soundwave.com',
@@ -228,6 +228,175 @@ export const artists: ArtistData[] = [
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743442756/testAlbum/Phan%20%C4%90inh%20T%C3%B9ng/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/tomj0zyas6grk3zft230.jpg',
       socialMediaLinks: {
         facebook: 'phandinhtung.singer',
+      },
+    },
+  },
+
+  // Trung Trần
+  {
+    user: {
+      email: 'trungtran@soundwave.com', 
+      username: 'trungtran_artist',
+      name: 'Trung Trần',
+    },
+    profile: {
+      artistName: 'Trung Trần',
+      bio: '',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743867463/Trung_Tran_ys1ply.webp',
+      socialMediaLinks: {},
+    },
+  },
+
+  // Hoàng Tôn
+  {
+    user: {
+      email: 'hoangton@soundwave.com', 
+      username: 'hoangton_artist',
+      name: 'Hoàng Tôn',
+    },
+    profile: {
+      artistName: 'Hoàng Tôn',
+      bio: 'Nguyễn Hoàng Tôn là một nam ca sĩ, nhạc sĩ và nhà sản xuất âm nhạc người Việt Nam.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743867515/Hoang_Ton_i6mzhx.jpg',
+      socialMediaLinks: {
+        facebook: 'hoangton.official',
+        instagram: 'hoangton.official'
+      },
+    },
+  },
+
+  // HIEUTHUHAI
+  {
+    user: {
+      email: 'hieuthuhai@soundwave.com',
+      username: 'hieuthuhai_artist',
+      name: 'HIEUTHUHAI',
+    },
+    profile: {
+      artistName: 'HIEUTHUHAI',
+      bio: 'HIEUTHUHAI tên thật Trần Minh Hiếu, là một rapper và ca sĩ người Việt Nam. Anh được biết đến rộng rãi qua chương trình King of Rap và Rap Việt mùa 2.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743867958/HIEUTHUHAI_bh8xzk.webp',
+      socialMediaLinks: {
+        facebook: 'hieuthuhai',
+        instagram: 'hieuthuhai'
+      },
+    },
+  },
+
+  // Bray
+  {
+    user: {
+      email: 'bray@soundwave.com', 
+      username: 'bray_artist',
+      name: 'Bray',
+    },
+    profile: {
+      artistName: 'Bray',
+      bio: 'B Ray tên thật là Trần Thiện Thanh Bảo, là một nam rapper người Mỹ gốc Việt.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743868367/Bray_rmfple.jpg',
+      socialMediaLinks: {
+        facebook: 'yunbray110',
+        instagram: 'yunbray110'
+      },
+    },
+  },
+
+  // Tage
+  {
+    user: {
+      email: 'tage@soundwave.com', 
+      username: 'tage_artist',
+      name: 'Tage',
+    },
+    profile: {
+      artistName: 'Tage',
+      bio: 'Tage tên thật là Vũ Tuấn Huy, là một rapper, ca sĩ, nhạc sĩ người Việt Nam.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743868350/Tage_pcmon9.webp',
+      socialMediaLinks: {
+        facebook: 'ta.gekun',
+        instagram: 'ta.gekun'
+      },
+    },
+  },
+
+  // marzuz
+  {
+    user: {
+      email: 'marzuz@soundwave.com', 
+      username: 'marzuz_artist',
+      name: 'marzuz',
+    },
+    profile: {
+      artistName: 'marzuz',
+      bio: 'marzuz tên thật là Trần My Anh, là một ca sĩ, nhạc sĩ, nhà sản xuất âm nhạc người Việt Nam.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743868415/marzuz_cf4kcy.jpg',
+      socialMediaLinks: {
+        facebook: 'marzuzisntreal',
+        instagram: 'marzuzisntreal'
+      },
+    },
+  },
+  {
+    user: {
+      email: 'shayda@soundwave.com',
+      username: 'shayda_artist',
+      name: 'Shayda',
+    },
+    profile: {
+      artistName: 'Shayda',
+      bio: 'Shayda là một nghệ sĩ với phong cách âm nhạc đặc trưng.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743870424/Shayda_n0vdby.webp',
+      socialMediaLinks: {
+        facebook: 'shaydaofficial',
+        instagram: 'shaydaofficial'
+      },
+    },
+  },
+  {
+    user: {
+      email: 'soobin@soundwave.com',
+      username: 'soobin_artist',
+      name: 'SOOBIN',
+    },
+    profile: {
+      artistName: 'SOOBIN',
+      bio: 'SOOBIN là một ca sĩ, nhạc sĩ nổi tiếng người Việt Nam. Anh là thành viên nhóm SpaceSpeakers và đã phát hành nhiều ca khúc hit.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743874021/Soobin_eo3d2y.jpg',
+      socialMediaLinks: {
+        facebook: 'soobinhoangson',
+        instagram: 'soobinhoangson'
+      },
+    },
+  },
+  {
+    user: {
+      email: 'andree@soundwave.com',
+      username: 'andree_artist',
+      name: 'Andree Right Hand',
+    },
+    profile: {
+      artistName: 'Andree Right Hand',
+      bio: 'Andree Right Hand là một nhà sản xuất âm nhạc và rapper người Việt Nam. Anh nổi tiếng với vai trò là thành viên của SpaceSpeakers và nhiều sản phẩm âm nhạc chất lượng.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743874323/andree_bpcik4.jpg',
+      socialMediaLinks: {
+        facebook: 'andreerighthand',
+        instagram: 'andreerighthand'
+      },
+    },
+  },
+  {
+    user: {
+      email: 'krisv@soundwave.com',
+      username: 'krisv_artist',
+      name: 'Kris V',
+    },
+    profile: {
+      artistName: 'Kris V',
+      bio: 'Kris V là một nghệ sĩ trẻ trong làng nhạc Việt, với phong cách âm nhạc đặc trưng của mình.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743874348/kris_v_nucwck.jpg',
+      socialMediaLinks: {
+        facebook: 'krisv.official',
+        instagram: 'krisv.official'
       },
     },
   },
