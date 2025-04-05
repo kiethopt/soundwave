@@ -130,7 +130,7 @@ export default function Sidebar({
           ${
             theme === 'light'
               ? 'bg-white border-r border-gray-200'
-              : 'bg-[#121212] border-r border-white/10'
+              : 'bg-[#1a1a1a] border-r border-white/10'
           }
         `}
       >

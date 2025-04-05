@@ -9,6 +9,8 @@ import { useTrack } from '@/contexts/TrackContext';
 import { ChevronRight, Play, MoreHorizontal, Pause } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
+import { useDominantColor } from '@/hooks/useDominantColor';
+import { useBackground } from '@/contexts/BackgroundContext';
 
 export default function Home() {
   const router = useRouter();
@@ -37,8 +39,14 @@ export default function Home() {
   const [playingAlbumId, setPlayingAlbumId] = useState<string | null>(null);
   const { dialogOpen, setDialogOpen, handleProtectedAction, isAuthenticated } =
     useAuth();
+  const { setBackgroundStyle } = useBackground();
 
   const token = localStorage.getItem('userToken') || '';
+
+  // Use the hook to get the dominant color from the first newest album
+  const { dominantColor } = useDominantColor(
+    newestAlbums.length > 0 ? newestAlbums[0].coverUrl : undefined
+  );
 
   useEffect(() => {
     const fetchHomeData = async () => {
@@ -105,6 +113,23 @@ export default function Home() {
 
     fetchHomeData();
   }, [token, isAuthenticated]);
+
+  // Effect to update background based on dominant color
+  useEffect(() => {
+    if (dominantColor) {
+      setBackgroundStyle(
+        `linear-gradient(to bottom, ${dominantColor} 0%, #111111 70%)`
+      );
+    } else {
+      // Ensure default background if no color found initially
+      setBackgroundStyle('#111111');
+    }
+
+    // Cleanup function to reset background when component unmounts
+    return () => {
+      setBackgroundStyle('#111111');
+    };
+  }, [dominantColor, setBackgroundStyle]);
 
   // Update playingAlbumId based on currentTrack
   useEffect(() => {
@@ -281,7 +306,9 @@ export default function Home() {
   );
 
   return (
-    <div className="min-h-screen w-full px-6 py-8">
+    <div
+      className="min-h-screen w-full px-6 py-8"
+    >
       {/* Header Section */}
       <h1 className="text-4xl font-bold mb-6">New</h1>
 

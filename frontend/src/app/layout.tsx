@@ -13,6 +13,7 @@ import PlayerBar from '@/components/layout/PlayerBar/PlayerBar';
 import { MaintenanceProvider } from '@/contexts/MaintenanceContext';
 import { MaintenanceBanner } from '@/components/ui/MaintenanceBanner';
 import { useMaintenance } from '@/contexts/MaintenanceContext';
+import { BackgroundProvider, useBackground } from '@/contexts/BackgroundContext';
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -21,6 +22,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const { currentTrack } = useTrack();
   const { isMaintenanceMode, isLoading } = useMaintenance();
+  const { backgroundStyle } = useBackground();
 
   const isAuthPage = useMemo(
     () =>
@@ -82,8 +84,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                   <div
                     suppressHydrationWarning
                     className={`min-h-full p-2 ${
-                      theme === 'light' ? 'bg-gray-50' : 'bg-[#111111]'
+                      theme === 'light' ? 'bg-gray-50' : ''
                     }`}
+                    style={{
+                      background: theme === 'dark' ? backgroundStyle : undefined,
+                    }}
                   >
                     {children}
                   </div>
@@ -113,11 +118,13 @@ export default function RootLayout({
       <ThemeProvider>
         <MaintenanceProvider>
           <TrackProvider>
-            <body className="bg-[#111]" suppressHydrationWarning>
-              <MaintenanceBanner />
-              <LayoutContent>{children}</LayoutContent>
-              <Toaster position="top-center" />
-            </body>
+            <BackgroundProvider>
+              <body className="bg-[#111]" suppressHydrationWarning>
+                <MaintenanceBanner />
+                <LayoutContent>{children}</LayoutContent>
+                <Toaster position="top-center" />
+              </body>
+            </BackgroundProvider>
           </TrackProvider>
         </MaintenanceProvider>
       </ThemeProvider>

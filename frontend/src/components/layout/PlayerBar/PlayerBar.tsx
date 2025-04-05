@@ -110,7 +110,7 @@ export default function PlayerBar() {
   return (
     <>
       {/* Desktop & Tablet Player Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-black p-4 grid-cols-5 gap-4 items-center w-full hidden md:grid">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#1c1c1c] p-4 grid-cols-5 gap-4 items-center w-full hidden md:grid">
         {/* Track Info */}
         <div className="flex items-center col-span-1 overflow-hidden">
           {currentTrack && (
@@ -320,7 +320,7 @@ export default function PlayerBar() {
         <>
           <div
             onClick={toggleMobileExpanded}
-            className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-black border-t border-[#383838] px-4 py-6 flex items-center w-full cursor-pointer"
+            className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#1c1c1c] border-t border-[#383838] px-4 py-6 flex items-center w-full cursor-pointer"
           >
             {/* Track Image */}
             <img
@@ -364,7 +364,7 @@ export default function PlayerBar() {
 
           {/* Expanded Mobile Player */}
           {showMobileExpanded && (
-            <div className="md:hidden fixed inset-0 z-50 bg-black bg-opacity-95 flex flex-col">
+            <div className="md:hidden fixed inset-0 z-[60] bg-[#1c1c1c] flex flex-col p-4">
               {/* Header with close button */}
               <div className="flex items-center justify-between p-4">
                 <button

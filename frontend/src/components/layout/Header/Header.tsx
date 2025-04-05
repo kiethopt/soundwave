@@ -308,7 +308,7 @@ export default function Header({
       className={`h-[72px] flex items-center justify-between px-2 md:px-4 lg:px-6 border-b ${
         theme === 'light'
           ? 'bg-white border-gray-200'
-          : 'bg-[#111111] border-white/10'
+          : 'bg-[#1c1c1c] border-white/10'
       }`}
     >
       {/* Left Side */}
