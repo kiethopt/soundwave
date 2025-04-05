@@ -908,8 +908,7 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/tracks/search?${
-          queryParams || `q=${query}&page=${page}&limit=${limit}`
+        `/api/tracks/search?${queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
         { method: 'GET' },
         token
@@ -1086,8 +1085,7 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/albums/search?${
-          queryParams || `q=${query}&page=${page}&limit=${limit}`
+        `/api/albums/search?${queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
         { method: 'GET' },
         token

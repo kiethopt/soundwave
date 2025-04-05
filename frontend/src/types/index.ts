@@ -262,6 +262,7 @@ export interface Track {
   updatedAt: string;
   artistId: string;
   albumId?: string;
+  labelId?: string; // Thêm trường labelId để khớp với API
   album?: {
     id: string;
     title: string;
@@ -288,7 +289,7 @@ export interface Track {
       name: string;
     };
   }[];
-  label?: {
+  label?: { // Giữ optional, nhưng có thể không cần nếu API không trả về
     id: string;
     name: string;
     logoUrl?: string | null;
@@ -344,14 +345,14 @@ export interface Playlist {
 export interface Notification {
   id: string;
   type:
-    | 'NEW_TRACK'
-    | 'NEW_ALBUM'
-    | 'EVENT_REMINDER'
-    | 'NEW_FOLLOW'
-    | 'ARTIST_REQUEST_APPROVE'
-    | 'ARTIST_REQUEST_REJECT'
-    | 'ACCOUNT_ACTIVATED'
-    | 'ACCOUNT_DEACTIVATED';
+  | 'NEW_TRACK'
+  | 'NEW_ALBUM'
+  | 'EVENT_REMINDER'
+  | 'NEW_FOLLOW'
+  | 'ARTIST_REQUEST_APPROVE'
+  | 'ARTIST_REQUEST_REJECT'
+  | 'ACCOUNT_ACTIVATED'
+  | 'ACCOUNT_DEACTIVATED';
   message: string;
   isRead: boolean;
   recipientType: 'USER' | 'ARTIST'; // Loại người nhận (USER hoặc ARTIST)

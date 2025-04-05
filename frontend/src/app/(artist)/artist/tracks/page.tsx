@@ -52,6 +52,7 @@ export default function TrackManagement() {
         limit,
         params.toString()
       );
+      console.log('API Response Tracks:', response.tracks); // Log để xem cấu trúc dữ liệu
       return {
         data: response.tracks,
         pagination: response.pagination,
@@ -72,13 +73,11 @@ export default function TrackManagement() {
   const [availableGenres, setAvailableGenres] = useState<
     Array<{ id: string; name: string }>
   >([]);
-  const [availableLabels, setAvailableLabels] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
   const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<
     string[]
   >([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [availableLabels, setAvailableLabels] = useState<{ id: string; name: string }[]>([]);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
 
   const fetchMetadata = useCallback(async () => {
@@ -90,38 +89,49 @@ export default function TrackManagement() {
       const token = localStorage.getItem('userToken');
       if (!token) return;
 
-      const [artistsResponse, genresResponse, labelsResponse] =
-        await Promise.all([
-          api.artists.getAllArtistsProfile(token, 1, 500),
-          api.genres.getAll(token, 1, 100),
-          api.labels.getAll(token, 1, 500),
-        ]);
+      const [artistsResponse, genresResponse, labelsResponse] = await Promise.all([
+        api.artists.getAllArtistsProfile(token, 1, 500),
+        api.genres.getAll(token, 1, 100),
+        api.labels.getAll(token, 1, 500),
+      ]);
 
-      setAvailableArtists(
-        artistsResponse.artists.map((artist: ArtistProfile) => ({
-          id: artist.id,
-          name: artist.artistName,
-        }))
-      );
-      setAvailableGenres(
-        genresResponse.genres.map((genre: Genre) => ({
-          id: genre.id,
-          name: genre.name,
-        }))
-      );
-      setAvailableLabels(
-        labelsResponse.labels.map((label: Label) => ({
-          id: label.id,
-          name: label.name,
-        }))
-      );
+      const artists = artistsResponse.artists.map((artist: ArtistProfile) => ({
+        id: artist.id,
+        name: artist.artistName,
+      }));
+      const genres = genresResponse.genres.map((genre: Genre) => ({
+        id: genre.id,
+        name: genre.name,
+      }));
+      const labels = labelsResponse.labels.map((label: { id: string; name: string }) => ({
+        id: label.id,
+        name: label.name,
+      }));
+
+      setAvailableArtists(artists);
+      setAvailableGenres(genres);
+      setAvailableLabels(labels);
 
       if (editingTrack) {
         setSelectedFeaturedArtists(
           editingTrack.featuredArtists?.map((fa) => fa.artistProfile.id) || []
         );
         setSelectedGenres(editingTrack.genres?.map((g) => g.genre.id) || []);
-        setSelectedLabelId(editingTrack.label?.id || null);
+
+        // Sử dụng labelId thay vì label
+        if (editingTrack.labelId) {
+          const matchedLabel = labels.find((label: { id: string; name: string }) =>
+            label.id === editingTrack.labelId
+          );
+          if (matchedLabel) {
+            setSelectedLabelId(matchedLabel.id);
+            console.log('Matched Label:', matchedLabel);
+          } else {
+            console.warn('Label ID not found in availableLabels:', editingTrack.labelId);
+          }
+        } else {
+          console.log('No label ID in editingTrack');
+        }
       }
     } catch (error) {
       console.error('Failed to fetch metadata:', error);
@@ -202,11 +212,7 @@ export default function TrackManagement() {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      if (formData.has('labelId')) formData.delete('labelId');
-      if (selectedLabelId) {
-        formData.append('labelId', selectedLabelId);
-      }
-
+      // Đảm bảo labelId đã được thêm vào formData từ handleFormSubmit
       await api.tracks.update(trackId, formData, token);
       await refreshData();
       setEditingTrack(null);
@@ -338,34 +344,30 @@ export default function TrackManagement() {
 
   return (
     <div
-      className={`container mx-auto space-y-4 p-4 pb-20 ${
-        theme === 'dark' ? 'text-white' : ''
-      }`}
+      className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''
+        }`}
     >
       <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
         <div>
           <h1
-            className={`text-2xl md:text-3xl font-bold tracking-tight ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
+            className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
           >
             Track Management
           </h1>
           <p
-            className={`text-muted-foreground ${
-              theme === 'dark' ? 'text-white/60' : ''
-            }`}
+            className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : ''
+              }`}
           >
             Manage and monitor your tracks
           </p>
         </div>
         <Link
           href="/artist/tracks/new"
-          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${
-            theme === 'light'
-              ? 'bg-gray-900 text-white hover:bg-gray-800'
-              : 'bg-white text-[#121212] hover:bg-white/90'
-          }`}
+          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${theme === 'light'
+            ? 'bg-gray-900 text-white hover:bg-gray-800'
+            : 'bg-white text-[#121212] hover:bg-white/90'
+            }`}
         >
           New Track
         </Link>
