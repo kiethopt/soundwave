@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { api } from '@/utils/api';
 import { Eye, EyeOff } from 'lucide-react';
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
 interface RegisterFormData {
   email: string;
@@ -209,6 +210,17 @@ function RegisterForm() {
         >
           Sign up
         </button>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-white/10"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-[#121212] px-2 text-white/70">OR</span>
+          </div>
+        </div>
+
+        <GoogleRegisterButton />
       </div>
 
       <div className="text-center text-sm text-white/70">
@@ -224,41 +236,92 @@ function RegisterForm() {
   );
 }
 
+function GoogleRegisterButton() {
+  const router = useRouter();
+  const login = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const backendResponse = await api.auth.googleRegister({
+          token: tokenResponse.access_token,
+        });
+        console.log('Backend response:', backendResponse);
+
+        if (backendResponse.token && backendResponse.user) {
+          // Lưu token và thông tin user
+          localStorage.setItem('userToken', backendResponse.token);
+          localStorage.setItem('userData', JSON.stringify(backendResponse.user));
+
+          // Nếu là đăng ký mới (status 201)
+          if (backendResponse.message === 'Registration successful') {
+            router.push('/login');
+          } else {
+            // Nếu là đăng nhập (email đã tồn tại)
+            if (backendResponse.user.role === 'ADMIN') {
+              window.location.href = '/admin/dashboard';
+            } else if (backendResponse.user.artistProfile?.isVerified) {
+              window.location.href = '/artist/dashboard';
+            } else {
+              window.location.href = '/';
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error sending token to backend:', error);
+      }
+    },
+    onError: () => {
+      console.error('Google login failed');
+    },
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={() => login()}
+      className="w-full bg-blue-500 text-white py-2 rounded-md font-medium hover:bg-blue-600"
+    >
+      Sign up with Google
+    </button>
+  );
+}
+
 export default function RegisterPage() {
   return (
-    <div className="grid min-h-svh lg:grid-cols-2">
-      <div className="flex flex-col gap-4 p-6 md:p-10 bg-[#121212]">
-        <div className="flex justify-center md:justify-start">
-          <a href="/" className="inline-block">
-            <Image
-              src="/images/Soundwave_full.webp"
-              alt="Soundwave Logo"
-              width={140}
-              height={40}
-              className="object-contain"
-            />
-          </a>
+    <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
+      <div className="grid min-h-svh lg:grid-cols-2">
+        <div className="flex flex-col gap-4 p-6 md:p-10 bg-[#121212]">
+          <div className="flex justify-center md:justify-start">
+            <a href="/" className="inline-block">
+              <Image
+                src="/images/Soundwave_full.webp"
+                alt="Soundwave Logo"
+                width={140}
+                height={40}
+                className="object-contain"
+              />
+            </a>
+          </div>
+          <div className="flex flex-1 items-center justify-center">
+            <div className="w-full max-w-xs">
+              <RegisterForm />
+            </div>
+          </div>
         </div>
-        <div className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-xs">
-            <RegisterForm />
+        <div className="relative hidden bg-[#0a0a0a] lg:block">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#A57865]/30 via-black-500/20 to-pink-500/20"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-white mb-4">
+                Join Soundwave Today
+              </h2>
+              <p className="text-white/70 max-w-md mx-auto">
+                Create an account to enjoy unlimited access to millions of songs
+                and albums. No credit card needed.
+              </p>
+            </div>
           </div>
         </div>
       </div>
-      <div className="relative hidden bg-[#0a0a0a] lg:block">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#A57865]/30 via-black-500/20 to-pink-500/20"></div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Join Soundwave Today
-            </h2>
-            <p className="text-white/70 max-w-md mx-auto">
-              Create an account to enjoy unlimited access to millions of songs
-              and albums. No credit card needed.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    </GoogleOAuthProvider>
   );
 }

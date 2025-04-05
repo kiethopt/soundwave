@@ -1,12 +1,13 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { api } from '@/utils/api';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, EyeOff } from 'lucide-react';
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
 interface LoginFormData {
   emailOrUsername: string;
@@ -98,7 +99,25 @@ function LoginForm() {
       </div>
 
       {error && (
-        <div className="bg-red-500/10 text-red-500 p-3 rounded-md">{error}</div>
+        <div className="bg-red-500/10 text-red-500 p-3 rounded-md text-sm">
+          {error}
+          <div className="mt-2 space-x-2">
+            {error !== 'Invalid email/username or password' && (
+              <>
+                <Link href="/register" className="text-white hover:underline">
+                  Sign up
+                </Link>
+                <span className="text-white/70">or</span>
+              </>
+            )}
+            <button 
+              onClick={() => setError('')}
+              className="text-white hover:underline"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="grid gap-6">
@@ -185,6 +204,17 @@ function LoginForm() {
         >
           Login
         </button>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-white/10"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-[#121212] px-2 text-white/70">OR</span>
+          </div>
+        </div>
+
+        <GoogleLoginButton onError={setError} />
       </div>
 
       <div className="text-center text-sm text-white/70">
@@ -200,43 +230,94 @@ function LoginForm() {
   );
 }
 
+interface GoogleLoginButtonProps {
+  onError: (error: string) => void;
+}
+
+function GoogleLoginButton({ onError }: GoogleLoginButtonProps) {
+  const router = useRouter();
+  const login = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const backendResponse = await api.auth.googleLogin({
+          token: tokenResponse.access_token,
+        });
+        console.log('Backend response:', backendResponse);
+
+        if (backendResponse.token && backendResponse.user) {
+          // Lưu token và thông tin user
+          localStorage.setItem('userToken', backendResponse.token);
+          localStorage.setItem('userData', JSON.stringify(backendResponse.user));
+
+          // Điều hướng đến trang tương ứng
+          if (backendResponse.user.role === 'ADMIN') {
+            window.location.href = '/admin/dashboard';
+          } else if (backendResponse.user.artistProfile?.isVerified) {
+            window.location.href = '/artist/dashboard';
+          } else {
+            window.location.href = '/';
+          }
+        }
+      } catch (error: any) {
+        console.error('Error sending token to backend:', error);
+        onError(error.message || 'An unexpected error occurred');
+      }
+    },
+    onError: () => {
+      onError('Google login failed. Please try again.');
+    },
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={() => login()}
+      className="w-full bg-blue-500 text-white py-2 rounded-md font-medium hover:bg-blue-600"
+    >
+      Login with Google
+    </button>
+  );
+}
+
 export default function LoginPage() {
   return (
-    <div className="grid min-h-svh lg:grid-cols-2">
-      <div className="flex flex-col gap-4 p-6 md:p-10 bg-[#121212]">
-        <div className="flex justify-center md:justify-start">
-          <a href="/" className="inline-block">
-            <Image
-              src="/images/Soundwave_full.webp"
-              alt="Soundwave Logo"
-              width={140}
-              height={40}
-              className="object-contain"
-            />
-          </a>
+    <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
+      <div className="grid min-h-svh lg:grid-cols-2">
+        <div className="flex flex-col gap-4 p-6 md:p-10 bg-[#121212]">
+          <div className="flex justify-center md:justify-start">
+            <a href="/" className="inline-block">
+              <Image
+                src="/images/Soundwave_full.webp"
+                alt="Soundwave Logo"
+                width={140}
+                height={40}
+                className="object-contain"
+              />
+            </a>
+          </div>
+          <div className="flex flex-1 items-center justify-center">
+            <div className="w-full max-w-xs">
+              <Suspense fallback={<div>Loading...</div>}>
+                <LoginForm />
+              </Suspense>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-xs">
-            <Suspense fallback={<div>Loading...</div>}>
-              <LoginForm />
-            </Suspense>
+        <div className="relative hidden bg-[#0a0a0a] lg:block">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#A57865]/30 via-black-500/20 to-pink-500/20"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold text-white mb-4">
+                Welcome to Soundwave
+              </h2>
+              <p className="text-white/70 max-w-md mx-auto">
+                Discover, stream, and share a constantly expanding mix of music
+                from emerging and major artists around the world.
+              </p>
+            </div>
           </div>
         </div>
       </div>
-      <div className="relative hidden bg-[#0a0a0a] lg:block">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#A57865]/30 via-black-500/20 to-pink-500/20"></div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              Welcome to Soundwave
-            </h2>
-            <p className="text-white/70 max-w-md mx-auto">
-              Discover, stream, and share a constantly expanding mix of music
-              from emerging and major artists around the world.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    </GoogleOAuthProvider>
   );
 }

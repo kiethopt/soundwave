@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import {
   register,
   login,
@@ -9,8 +9,12 @@ import {
   switchProfile,
   logout,
   getMaintenanceStatus,
+  googleLogin,
+  googleRegister,
+  convertGoogleAvatar,
 } from '../controllers/auth.controller';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate } from '../middleware/auth.middleware'
+import { uploadToCloudinary } from '../utils/cloudinary';
 
 const router = express.Router();
 
@@ -28,5 +32,12 @@ router.post('/register-admin', registerAdmin);
 router.get('/validate-token', authenticate, validateToken);
 
 router.post('/switch-profile', authenticate, switchProfile);
+
+// Google OAuth routes
+router.post('/google-login', googleLogin);
+router.post('/google-register', googleRegister);
+
+// Chuyển đổi avatar Google sang Cloudinary
+router.post('/convert-google-avatar', convertGoogleAvatar);
 
 export default router;

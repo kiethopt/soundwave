@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
+import Image from 'next/image';
 
 const DEFAULT_AVATAR = '/images/default-avatar.jpg';
 
@@ -36,6 +37,12 @@ export default function UserProfilePage({
   const { dominantColor } = useDominantColor(
     userData?.avatar || DEFAULT_AVATAR
   );
+
+  console.log('Avatar URL:', userData?.avatar);
+  console.log('Default Avatar:', DEFAULT_AVATAR);
+  console.log('Final Avatar:', userData?.avatar || DEFAULT_AVATAR);
+  console.log('Dominant Color:', dominantColor);
+
   const [following, setFollowing] = useState<ArtistProfile[]>([]);
   const [followingArtists, setFollowingArtists] = useState<ArtistProfile[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -229,6 +236,12 @@ export default function UserProfilePage({
     );
   };
 
+  if (user && user.avatar) {
+    console.log('Avatar exists:', user.avatar);
+  } else {
+    console.log('No avatar, using default');
+  }
+
   return (
     <div
       className="min-h-screen w-full rounded-lg"
@@ -268,10 +281,13 @@ export default function UserProfilePage({
 
             <div className="flex flex-row items-center justify-start w-full">
               {/* Avatar */}
-              <img
-                src={user.avatar || DEFAULT_AVATAR}
-                alt={user.name}
+              <Image
+                src={userData?.avatar || DEFAULT_AVATAR}
+                alt={user.name || 'User avatar'}
+                width={192}
+                height={192}
                 className="w-32 h-32 md:w-48 md:h-48 rounded-full"
+                priority
               />
 
               {/* Username */}
@@ -281,7 +297,7 @@ export default function UserProfilePage({
                   className="text-4xl md:text-6xl font-bold capitalize"
                   style={{ lineHeight: '1.1' }}
                 >
-                  {user.username}
+                  {userData?.name || userData?.username || 'User'}
                 </h1>
                 {isOwner && (
                   <div>

@@ -116,6 +116,34 @@ export const api = {
         return { enabled: false };
       }
     },
+
+    googleLogin: async (data: { token: string }) =>
+      fetchWithAuth('/api/auth/google-login', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    googleRegister: async (data: { token: string }) =>
+      fetchWithAuth('/api/auth/google-register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    uploadGoogleAvatar: async (googleImageUrl: string) => {
+      const response = await fetch(`${API_BASE}/auth/upload-google-avatar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ googleImageUrl }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload Google avatar');
+      }
+
+      return response.json();
+    },
   },
 
   session: {
