@@ -98,29 +98,11 @@ function LoginForm() {
           Enter your email or username below to login to your account
         </p>
       </div>
-
-      {error && (
-        <div className="bg-red-500/10 text-red-500 p-3 rounded-md text-sm">
-          {error}
-          <div className="mt-2 space-x-2">
-            {error !== 'Invalid email/username or password' && (
-              <>
-                <Link href="/register" className="text-white hover:underline">
-                  Sign up
-                </Link>
-                <span className="text-white/70">or</span>
-              </>
-            )}
-            <button 
-              onClick={() => setError('')}
-              className="text-white hover:underline"
-            >
-              Try again
-            </button>
+        {error && (
+          <div className="bg-red-500/10 text-red-500 p-3 rounded-md text-sm">
+            {error}
           </div>
-        </div>
-      )}
-
+        )}
       <div className="grid gap-6">
         <div className="grid gap-2">
           <label
@@ -276,7 +258,7 @@ function GoogleLoginButton({ onError }: GoogleLoginButtonProps) {
       className="w-full bg-white text-black py-2 rounded-md font-medium hover:bg-white/90 flex items-center justify-center gap-2"
     >
       <FcGoogle className="w-5 h-5" />
-      <span>Login with Google</span>
+      <span>Continue with Google</span>
     </button>
   );
 }

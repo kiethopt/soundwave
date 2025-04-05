@@ -124,12 +124,6 @@ export const api = {
         body: JSON.stringify(data),
       }),
 
-    googleRegister: async (data: { token: string }) =>
-      fetchWithAuth('/api/auth/google-register', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-
     uploadGoogleAvatar: async (googleImageUrl: string) => {
       const response = await fetch(`${API_BASE}/auth/upload-google-avatar`, {
         method: 'POST',

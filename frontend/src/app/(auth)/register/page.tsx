@@ -242,7 +242,7 @@ function GoogleRegisterButton() {
   const login = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
-        const backendResponse = await api.auth.googleRegister({
+        const backendResponse = await api.auth.googleLogin({
           token: tokenResponse.access_token,
         });
         console.log('Backend response:', backendResponse);
@@ -252,18 +252,13 @@ function GoogleRegisterButton() {
           localStorage.setItem('userToken', backendResponse.token);
           localStorage.setItem('userData', JSON.stringify(backendResponse.user));
 
-          // Nếu là đăng ký mới (status 201)
-          if (backendResponse.message === 'Registration successful') {
-            router.push('/login');
+          // Điều hướng đến trang tương ứng
+          if (backendResponse.user.role === 'ADMIN') {
+            window.location.href = '/admin/dashboard';
+          } else if (backendResponse.user.currentProfile === 'ARTIST' && backendResponse.user.artistProfile?.isVerified) {
+            window.location.href = '/artist/dashboard';
           } else {
-            // Nếu là đăng nhập (email đã tồn tại)
-            if (backendResponse.user.role === 'ADMIN') {
-              window.location.href = '/admin/dashboard';
-            } else if (backendResponse.user.artistProfile?.isVerified) {
-              window.location.href = '/artist/dashboard';
-            } else {
-              window.location.href = '/';
-            }
+            window.location.href = '/';
           }
         }
       } catch (error) {
@@ -282,7 +277,7 @@ function GoogleRegisterButton() {
       className="w-full bg-white text-black py-2 rounded-md font-medium hover:bg-white/90 flex items-center justify-center gap-2"
     >
       <FcGoogle className="w-5 h-5" />
-      <span>Sign up with Google</span>
+      <span>Continue with Google</span>
     </button>
   );
 }

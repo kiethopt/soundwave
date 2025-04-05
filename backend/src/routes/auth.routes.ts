@@ -10,7 +10,6 @@ import {
   logout,
   getMaintenanceStatus,
   googleLogin,
-  googleRegister,
   convertGoogleAvatar,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth.middleware'
@@ -35,7 +34,6 @@ router.post('/switch-profile', authenticate, switchProfile);
 
 // Google OAuth routes
 router.post('/google-login', googleLogin);
-router.post('/google-register', googleRegister);
 
 // Chuyển đổi avatar Google sang Cloudinary
 router.post('/convert-google-avatar', convertGoogleAvatar);
