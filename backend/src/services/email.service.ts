@@ -360,4 +360,29 @@ export const createPasswordResetEmail = (
   return { to, subject, html };
 };
 
-// --- END: Updated email creation functions ---
+/**
+ * Create email content for welcome notification after registration
+ */
+export const createWelcomeEmail = (
+  to: string,
+  userName: string
+): EmailOptions => {
+  const subject = 'Welcome to SoundWave!';
+  const mainContentHtml = `
+    <h2 style="color: ${TEXT_DARK}; margin-top: 0; margin-bottom: 20px; font-size: 24px; text-align: center;">Welcome to SoundWave!</h2>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Hello ${userName},</p>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Thank you for joining SoundWave! We're excited to have you on board.</p>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Start exploring our vast collection of music and create your own playlists.</p>
+  `;
+  const html = createRichHtmlTemplate(
+    subject,
+    mainContentHtml,
+    to,
+    undefined, 
+    `${FRONTEND_URL}/`, 
+    'Start Exploring'
+  );
+  return { to, subject, html };
+};
+
+

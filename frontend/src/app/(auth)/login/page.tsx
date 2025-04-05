@@ -8,6 +8,7 @@ import { api } from '@/utils/api';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, EyeOff } from 'lucide-react';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
+import { FcGoogle } from 'react-icons/fc';
 
 interface LoginFormData {
   emailOrUsername: string;
@@ -272,9 +273,10 @@ function GoogleLoginButton({ onError }: GoogleLoginButtonProps) {
     <button
       type="button"
       onClick={() => login()}
-      className="w-full bg-blue-500 text-white py-2 rounded-md font-medium hover:bg-blue-600"
+      className="w-full bg-white text-black py-2 rounded-md font-medium hover:bg-white/90 flex items-center justify-center gap-2"
     >
-      Login with Google
+      <FcGoogle className="w-5 h-5" />
+      <span>Login with Google</span>
     </button>
   );
 }
