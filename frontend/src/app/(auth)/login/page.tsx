@@ -61,7 +61,7 @@ function LoginForm() {
           // Điều hướng đến trang tương ứng
           if (response.user.role === 'ADMIN') {
             window.location.href = '/admin/dashboard';
-          } else if (response.user.artistProfile?.isVerified) {
+          } else if (response.user.currentProfile === 'ARTIST' && response.user.artistProfile?.isVerified) {
             window.location.href = '/artist/dashboard';
           } else {
             window.location.href = '/';
@@ -252,7 +252,7 @@ function GoogleLoginButton({ onError }: GoogleLoginButtonProps) {
           // Điều hướng đến trang tương ứng
           if (backendResponse.user.role === 'ADMIN') {
             window.location.href = '/admin/dashboard';
-          } else if (backendResponse.user.artistProfile?.isVerified) {
+          } else if (backendResponse.user.currentProfile === 'ARTIST' && backendResponse.user.artistProfile?.isVerified) {
             window.location.href = '/artist/dashboard';
           } else {
             window.location.href = '/';
