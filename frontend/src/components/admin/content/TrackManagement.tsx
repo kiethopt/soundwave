@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import { useDataTable } from '@/hooks/useDataTable';
 import { api } from '@/utils/api';
@@ -87,79 +87,6 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
     refreshData: refreshTracks,
   } = useDataTable<Track>({ fetchData: fetchTracks, paramKeyPrefix: 'track_' });
 
-  const handleEditTrack = useCallback((track: Track) => {
-    setSelectedTrack(track);
-
-    // Set featured artists
-    if (track.featuredArtists) {
-      const featuredIds = track.featuredArtists.map(
-        (fa) => fa.artistProfile.id
-      );
-      setSelectedFeaturedArtists(featuredIds);
-    } else {
-      setSelectedFeaturedArtists([]);
-    }
-
-    // Set genres
-    if (track.genres) {
-      const genreIds = track.genres.map((g) => g.genre.id);
-      setSelectedGenres(genreIds);
-    } else {
-      setSelectedGenres([]);
-    }
-
-    // Set label dựa trên labelId (nếu có) thay vì track.label
-    if (track.labelId) {
-      const matchedLabel = availableLabels.find(
-        (label) => label.id === track.labelId
-      );
-      if (matchedLabel) {
-        setSelectedLabelId(matchedLabel.id);
-      } else {
-        setSelectedLabelId(null);
-        console.warn('Label ID not found in availableLabels:', track.labelId);
-      }
-    } else {
-      setSelectedLabelId(null);
-    }
-
-    // Fetch available data nếu chưa có
-    fetchAvailableData();
-  }, [availableLabels]);
-
-  const handleDeleteTrack = useCallback(
-    async (trackId: string | string[]) => {
-      try {
-        const token = localStorage.getItem('userToken') || '';
-        const id = Array.isArray(trackId) ? trackId[0] : trackId;
-
-        await api.tracks.delete(id, token);
-        toast.success('Track deleted successfully');
-        refreshTracks();
-      } catch (error) {
-        console.error('Failed to delete track:', error);
-        toast.error('Failed to delete track');
-      }
-    },
-    [refreshTracks]
-  );
-
-  const handleTrackEditSubmit = useCallback(
-    async (trackId: string, formData: FormData) => {
-      try {
-        const token = localStorage.getItem('userToken') || '';
-        await api.tracks.update(trackId, formData, token);
-        toast.success('Track updated successfully');
-        setSelectedTrack(null);
-        refreshTracks();
-      } catch (error) {
-        console.error('Failed to update track:', error);
-        toast.error('Failed to update track');
-      }
-    },
-    [refreshTracks]
-  );
-
   const fetchAvailableData = useCallback(async () => {
     try {
       const token = localStorage.getItem('userToken') || '';
@@ -207,6 +134,86 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
       toast.error('Failed to load some required data');
     }
   }, [availableArtists.length, availableGenres.length, availableLabels.length]);
+
+  // Tải availableLabels ngay khi component mount
+  useEffect(() => {
+    fetchAvailableData();
+  }, [fetchAvailableData]);
+
+  const handleEditTrack = useCallback(
+    (track: Track) => {
+      setSelectedTrack(track);
+
+      // Set featured artists
+      if (track.featuredArtists) {
+        const featuredIds = track.featuredArtists.map(
+          (fa) => fa.artistProfile.id
+        );
+        setSelectedFeaturedArtists(featuredIds);
+      } else {
+        setSelectedFeaturedArtists([]);
+      }
+
+      // Set genres
+      if (track.genres) {
+        const genreIds = track.genres.map((g) => g.genre.id);
+        setSelectedGenres(genreIds);
+      } else {
+        setSelectedGenres([]);
+      }
+
+      // Set label từ database (track.labelId)
+      if (track.labelId) {
+        const matchedLabel = availableLabels.find(
+          (label) => label.id === track.labelId
+        );
+        if (matchedLabel) {
+          setSelectedLabelId(matchedLabel.id);
+          console.log('Matched Label for Track:', matchedLabel);
+        } else {
+          setSelectedLabelId(null);
+          console.warn('Label ID not found in availableLabels:', track.labelId);
+        }
+      } else {
+        setSelectedLabelId(null);
+        console.log('No labelId found for track:', track.id);
+      }
+    },
+    [availableLabels]
+  );
+
+  const handleDeleteTrack = useCallback(
+    async (trackId: string | string[]) => {
+      try {
+        const token = localStorage.getItem('userToken') || '';
+        const id = Array.isArray(trackId) ? trackId[0] : trackId;
+
+        await api.tracks.delete(id, token);
+        toast.success('Track deleted successfully');
+        refreshTracks();
+      } catch (error) {
+        console.error('Failed to delete track:', error);
+        toast.error('Failed to delete track');
+      }
+    },
+    [refreshTracks]
+  );
+
+  const handleTrackEditSubmit = useCallback(
+    async (trackId: string, formData: FormData) => {
+      try {
+        const token = localStorage.getItem('userToken') || '';
+        await api.tracks.update(trackId, formData, token);
+        toast.success('Track updated successfully');
+        setSelectedTrack(null);
+        refreshTracks();
+      } catch (error) {
+        console.error('Failed to update track:', error);
+        toast.error('Failed to update track');
+      }
+    },
+    [refreshTracks]
+  );
 
   const trackColumns = useMemo(
     () =>

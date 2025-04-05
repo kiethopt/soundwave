@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import { useDataTable } from '@/hooks/useDataTable';
 import { api } from '@/utils/api';
@@ -81,69 +81,6 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     refreshData: refreshAlbums,
   } = useDataTable<Album>({ fetchData: fetchAlbums, paramKeyPrefix: 'album_' });
 
-  const handleEditAlbum = useCallback((album: Album) => {
-    setSelectedAlbum(album);
-
-    // Set genres
-    if (album.genres) {
-      const genreIds = album.genres.map((g) => g.genre.id);
-      setSelectedGenres(genreIds);
-    } else {
-      setSelectedGenres([]);
-    }
-
-    // Set label dựa trên labelId (nếu có) thay vì album.label
-    if (album.labelId) {
-      const matchedLabel = availableLabels.find(
-        (label) => label.id === album.labelId
-      );
-      if (matchedLabel) {
-        setSelectedLabelId(matchedLabel.id);
-      } else {
-        setSelectedLabelId(null);
-        console.warn('Label ID not found in availableLabels:', album.labelId);
-      }
-    } else {
-      setSelectedLabelId(null);
-    }
-
-    // Fetch available genres and labels nếu chưa có
-    fetchAvailableData();
-  }, [availableLabels]);
-
-  const handleDeleteAlbum = useCallback(
-    async (albumId: string | string[]) => {
-      try {
-        const token = localStorage.getItem('userToken') || '';
-        const id = Array.isArray(albumId) ? albumId[0] : albumId;
-
-        await api.albums.delete(id, token);
-        toast.success('Album deleted successfully');
-        refreshAlbums();
-      } catch (error) {
-        console.error('Failed to delete album:', error);
-        toast.error('Failed to delete album');
-      }
-    },
-    [refreshAlbums]
-  );
-
-  const handleAlbumEditSubmit = useCallback(
-    async (albumId: string, formData: FormData) => {
-      try {
-        const token = localStorage.getItem('userToken') || '';
-        await api.albums.update(albumId, formData, token);
-        toast.success('Album updated successfully');
-        setSelectedAlbum(null);
-        refreshAlbums();
-      } catch (error) {
-        console.error('Failed to update album:', error);
-        toast.error('Failed to update album');
-      }
-    },
-    [refreshAlbums]
-  );
-
   const fetchAvailableData = useCallback(async () => {
     try {
       const token = localStorage.getItem('userToken') || '';
@@ -178,6 +115,76 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
       toast.error('Failed to load some required data');
     }
   }, [availableGenres.length, availableLabels.length]);
+
+  // Tải availableLabels ngay khi component mount
+  useEffect(() => {
+    fetchAvailableData();
+  }, [fetchAvailableData]);
+
+  const handleEditAlbum = useCallback(
+    (album: Album) => {
+      setSelectedAlbum(album);
+
+      // Set genres
+      if (album.genres) {
+        const genreIds = album.genres.map((g) => g.genre.id);
+        setSelectedGenres(genreIds);
+      } else {
+        setSelectedGenres([]);
+      }
+
+      // Set label từ database (album.labelId)
+      if (album.labelId) {
+        const matchedLabel = availableLabels.find(
+          (label) => label.id === album.labelId
+        );
+        if (matchedLabel) {
+          setSelectedLabelId(matchedLabel.id);
+          console.log('Matched Label for Album:', matchedLabel);
+        } else {
+          setSelectedLabelId(null);
+          console.warn('Label ID not found in availableLabels:', album.labelId);
+        }
+      } else {
+        setSelectedLabelId(null);
+        console.log('No labelId found for album:', album.id);
+      }
+    },
+    [availableLabels]
+  );
+
+  const handleDeleteAlbum = useCallback(
+    async (albumId: string | string[]) => {
+      try {
+        const token = localStorage.getItem('userToken') || '';
+        const id = Array.isArray(albumId) ? albumId[0] : albumId;
+
+        await api.albums.delete(id, token);
+        toast.success('Album deleted successfully');
+        refreshAlbums();
+      } catch (error) {
+        console.error('Failed to delete album:', error);
+        toast.error('Failed to delete album');
+      }
+    },
+    [refreshAlbums]
+  );
+
+  const handleAlbumEditSubmit = useCallback(
+    async (albumId: string, formData: FormData) => {
+      try {
+        const token = localStorage.getItem('userToken') || '';
+        await api.albums.update(albumId, formData, token);
+        toast.success('Album updated successfully');
+        setSelectedAlbum(null);
+        refreshAlbums();
+      } catch (error) {
+        console.error('Failed to update album:', error);
+        toast.error('Failed to update album');
+      }
+    },
+    [refreshAlbums]
+  );
 
   const albumColumns = useMemo(
     () =>

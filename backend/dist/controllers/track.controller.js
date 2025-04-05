@@ -63,7 +63,7 @@ const createTrack = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        const { title, releaseDate, trackNumber, albumId, featuredArtists, artistId, genreIds, } = req.body;
+        const { title, releaseDate, trackNumber, albumId, featuredArtists, artistId, genreIds, labelId, } = req.body;
         const finalArtistId = user.role === 'ADMIN' && artistId ? artistId : user.artistProfile?.id;
         if (!finalArtistId) {
             res.status(400).json({
@@ -106,8 +106,6 @@ const createTrack = async (req, res) => {
             if (album) {
                 isActive = album.isActive;
                 trackReleaseDate = album.releaseDate;
-                if (!coverUrl && album.coverUrl) {
-                }
             }
         }
         else {
@@ -124,6 +122,17 @@ const createTrack = async (req, res) => {
             : genreIds
                 ? genreIds.split(',').map((id) => id.trim())
                 : [];
+        let finalLabelId = null;
+        if (labelId) {
+            const labelExists = await db_1.default.label.findUnique({
+                where: { id: labelId },
+            });
+            if (!labelExists) {
+                res.status(400).json({ message: 'Invalid label ID' });
+                return;
+            }
+            finalLabelId = labelId;
+        }
         const track = await db_1.default.track.create({
             data: {
                 title,
@@ -136,6 +145,7 @@ const createTrack = async (req, res) => {
                 albumId: albumId || null,
                 type: albumId ? undefined : 'SINGLE',
                 isActive,
+                labelId: finalLabelId,
                 featuredArtists: featuredArtistsArray.length > 0
                     ? {
                         create: featuredArtistsArray.map((featArtistId) => ({
@@ -176,31 +186,16 @@ const createTrack = async (req, res) => {
                 artistId: finalArtistId,
                 senderId: finalArtistId,
             }));
-            try {
-                await db_1.default.notification.createMany({ data: notificationsData });
-            }
-            catch (notiError) {
-                console.error('Failed to create in-app notifications for new track:', notiError);
-            }
+            await db_1.default.notification.createMany({ data: notificationsData });
             const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${track.id}`;
             for (const user of followerUsers) {
-                pusher_1.default
-                    .trigger(`user-${user.id}`, 'notification', {
+                pusher_1.default.trigger(`user-${user.id}`, 'notification', {
                     type: client_2.NotificationType.NEW_TRACK,
                     message: `${artistName} vừa ra track mới: ${track.title}`,
-                })
-                    .catch((err) => console.error(`Failed to trigger Pusher for user ${user.id}:`, err));
+                });
                 if (user.email) {
-                    try {
-                        const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'track', track.title, releaseLink, track.coverUrl);
-                        await emailService.sendEmail(emailOptions);
-                    }
-                    catch (err) {
-                        console.error(`Failed to send new track email to ${user.email}:`, err);
-                    }
-                }
-                else {
-                    console.warn(`Follower ${user.id} has no email for new track notification.`);
+                    const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'track', track.title, releaseLink, track.coverUrl);
+                    await emailService.sendEmail(emailOptions);
                 }
             }
         }
@@ -218,7 +213,7 @@ exports.createTrack = createTrack;
 const updateTrack = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, releaseDate, type, trackNumber, albumId, featuredArtists, genreIds, updateFeaturedArtists, updateGenres, } = req.body;
+        const { title, releaseDate, type, trackNumber, albumId, featuredArtists, genreIds, updateFeaturedArtists, updateGenres, labelId, } = req.body;
         const currentTrack = await db_1.default.track.findUnique({
             where: { id },
             select: {
@@ -228,6 +223,7 @@ const updateTrack = async (req, res) => {
                 featuredArtists: true,
                 genres: true,
                 coverUrl: true,
+                labelId: true,
             },
         });
         if (!currentTrack) {
@@ -250,6 +246,26 @@ const updateTrack = async (req, res) => {
             updateData.trackNumber = Number(trackNumber);
         if (albumId !== undefined)
             updateData.albumId = albumId || null;
+        if (labelId !== undefined) {
+            console.log(`Received labelId: ${labelId}`);
+            if (typeof labelId !== 'string' && labelId !== null) {
+                res.status(400).json({ message: `Invalid labelId type: expected string or null, got ${typeof labelId}` });
+                return;
+            }
+            if (labelId === null || labelId === '') {
+                updateData.labelId = null;
+            }
+            else {
+                const labelExists = await db_1.default.label.findUnique({
+                    where: { id: labelId },
+                });
+                if (!labelExists) {
+                    res.status(400).json({ message: `Invalid label ID: ${labelId} does not exist` });
+                    return;
+                }
+                updateData.labelId = labelId;
+            }
+        }
         if (req.files && req.files.coverFile) {
             const coverFile = req.files.coverFile[0];
             const coverUpload = await (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
@@ -272,7 +288,7 @@ const updateTrack = async (req, res) => {
                 data: updateData,
                 select: prisma_selects_1.trackSelect,
             });
-            if (updateFeaturedArtists === 'true') {
+            if (updateFeaturedArtists === 'true' || updateFeaturedArtists === true) {
                 await tx.trackArtist.deleteMany({
                     where: { trackId: id },
                 });
@@ -291,16 +307,41 @@ const updateTrack = async (req, res) => {
                     });
                 }
             }
-            if (updateGenres === 'true') {
+            console.log('updateGenres:', updateGenres, 'genreIds:', genreIds);
+            if (updateGenres === 'true' || updateGenres === true) {
                 await tx.trackGenre.deleteMany({
                     where: { trackId: id },
                 });
-                const genresArray = !genreIds
-                    ? []
-                    : Array.isArray(genreIds)
-                        ? genreIds
-                        : [genreIds];
+                let genresArray = [];
+                if (genreIds) {
+                    if (Array.isArray(genreIds)) {
+                        genresArray = genreIds;
+                    }
+                    else if (typeof genreIds === 'string') {
+                        try {
+                            genresArray = JSON.parse(genreIds);
+                            if (!Array.isArray(genresArray)) {
+                                genresArray = [genreIds];
+                            }
+                        }
+                        catch {
+                            genresArray = [genreIds];
+                        }
+                    }
+                }
+                console.log('genresArray after processing:', genresArray);
                 if (genresArray.length > 0) {
+                    const existingGenres = await tx.genre.findMany({
+                        where: {
+                            id: { in: genresArray },
+                        },
+                        select: { id: true },
+                    });
+                    const validGenreIds = existingGenres.map((genre) => genre.id);
+                    const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
+                    if (invalidGenreIds.length > 0) {
+                        throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
+                    }
                     await tx.trackGenre.createMany({
                         data: genresArray.map((genreId) => ({
                             trackId: id,
@@ -319,7 +360,6 @@ const updateTrack = async (req, res) => {
     }
     catch (error) {
         console.error('Update track error:', error);
-        res.status(500).json({ message: 'Internal server error' });
     }
 };
 exports.updateTrack = updateTrack;

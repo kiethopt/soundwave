@@ -333,7 +333,7 @@ exports.addTracksToAlbum = addTracksToAlbum;
 const updateAlbum = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, releaseDate, type, genres, updateGenres } = req.body;
+        const { title, releaseDate, type, genres, labelId } = req.body;
         const coverFile = req.file;
         const user = req.user;
         if (!user) {
@@ -342,7 +342,7 @@ const updateAlbum = async (req, res) => {
         }
         const album = await db_1.default.album.findUnique({
             where: { id },
-            select: { artistId: true, coverUrl: true },
+            select: { artistId: true, coverUrl: true, labelId: true },
         });
         if (!album) {
             res.status(404).json({ message: 'Album not found' });
@@ -369,14 +369,50 @@ const updateAlbum = async (req, res) => {
             updateData.type = type;
         if (coverUrl)
             updateData.coverUrl = coverUrl;
-        if (updateGenres === 'true') {
+        if (labelId !== undefined) {
+            console.log(`Received labelId: ${labelId}`);
+            if (typeof labelId !== 'string' && labelId !== null) {
+                res.status(400).json({
+                    message: `Invalid labelId type: expected string or null, got ${typeof labelId}`
+                });
+                return;
+            }
+            if (labelId === null || labelId === '') {
+                updateData.labelId = null;
+            }
+            else {
+                const labelExists = await db_1.default.label.findUnique({
+                    where: { id: labelId },
+                });
+                if (!labelExists) {
+                    res.status(400).json({ message: `Invalid label ID: ${labelId} does not exist` });
+                    return;
+                }
+                updateData.labelId = labelId;
+            }
+        }
+        if (genres !== undefined) {
             await db_1.default.albumGenre.deleteMany({ where: { albumId: id } });
             const genresArray = !genres
                 ? []
                 : Array.isArray(genres)
                     ? genres
-                    : [genres];
+                    : typeof genres === 'string'
+                        ? genres.split(',').map((g) => g.trim())
+                        : [genres];
             if (genresArray.length > 0) {
+                const existingGenres = await db_1.default.genre.findMany({
+                    where: { id: { in: genresArray } },
+                    select: { id: true },
+                });
+                const validGenreIds = existingGenres.map((genre) => genre.id);
+                const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
+                if (invalidGenreIds.length > 0) {
+                    res.status(400).json({
+                        message: `Invalid genre IDs: ${invalidGenreIds.join(', ')}`
+                    });
+                    return;
+                }
                 updateData.genres = {
                     create: genresArray.map((genreId) => ({
                         genre: { connect: { id: genreId.trim() } },
