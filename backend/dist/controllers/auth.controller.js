@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMaintenanceStatus = exports.switchProfile = exports.resetPassword = exports.requestPasswordReset = exports.logout = exports.login = exports.register = exports.registerAdmin = exports.validateToken = void 0;
+exports.convertGoogleAvatar = exports.getMaintenanceStatus = exports.switchProfile = exports.resetPassword = exports.requestPasswordReset = exports.logout = exports.googleRegister = exports.googleLogin = exports.login = exports.register = exports.registerAdmin = exports.validateToken = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = __importDefault(require("../config/db"));
@@ -46,10 +46,14 @@ const date_fns_1 = require("date-fns");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const emailService = __importStar(require("../services/email.service"));
 const aiService = __importStar(require("../services/ai.service"));
+const google_auth_library_1 = require("google-auth-library");
+const node_fetch_1 = __importDefault(require("node-fetch"));
+const cloudinary_1 = require("../utils/cloudinary");
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error('Missing JWT_SECRET in environment variables');
 }
+const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -225,6 +229,14 @@ const register = async (req, res) => {
         catch (playlistError) {
             console.error(`[Register] Error creating initial playlists for user ${user.id}:`, playlistError);
         }
+        try {
+            const emailOptions = emailService.createWelcomeEmail(user.email, user.name || user.username || 'there');
+            await emailService.sendEmail(emailOptions);
+            console.log(`[Register] Welcome email sent to ${user.email}`);
+        }
+        catch (emailError) {
+            console.error('[Register] Error sending welcome email:', emailError);
+        }
         res.status(201).json({ message: 'User registered successfully', user });
     }
     catch (error) {
@@ -296,6 +308,153 @@ const login = async (req, res) => {
     }
 };
 exports.login = login;
+const googleLogin = async (req, res) => {
+    try {
+        const { token } = req.body;
+        if (!token) {
+            res.status(400).json({ message: 'Google token is required' });
+            return;
+        }
+        const userInfo = await (0, node_fetch_1.default)('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${token}` }
+        }).then(res => res.json());
+        if (!userInfo.email) {
+            res.status(400).json({ message: 'Invalid Google token' });
+            return;
+        }
+        const { email, name, sub: googleId } = userInfo;
+        const user = await db_1.default.user.findUnique({ where: { email } });
+        if (!user) {
+            res.status(400).json({
+                message: 'You do not have a SoundWave account connected to a Google account. If you have a SoundWave account, please try logging in with your SoundWave email or username. If you do not have a SoundWave account, please sign up.',
+                code: 'GOOGLE_ACCOUNT_NOT_FOUND'
+            });
+            return;
+        }
+        const tokenResponse = generateToken(user.id, user.role);
+        res.json({
+            message: 'Login successful',
+            token: tokenResponse,
+            user,
+        });
+    }
+    catch (error) {
+        console.error('Google login error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+exports.googleLogin = googleLogin;
+const googleRegister = async (req, res) => {
+    try {
+        const { token } = req.body;
+        if (!token) {
+            res.status(400).json({ message: 'Google token is required' });
+            return;
+        }
+        const userInfo = await (0, node_fetch_1.default)('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${token}` }
+        }).then(res => res.json());
+        if (!userInfo.email) {
+            res.status(400).json({ message: 'Invalid Google token' });
+            return;
+        }
+        const { email, name, sub: googleId, picture: googleAvatarUrl } = userInfo;
+        let user = await db_1.default.user.findUnique({ where: { email } });
+        if (user) {
+            const tokenResponse = generateToken(user.id, user.role);
+            res.json({
+                message: 'Login successful',
+                token: tokenResponse,
+                user,
+            });
+            return;
+        }
+        let avatar = googleAvatarUrl;
+        if (googleAvatarUrl) {
+            try {
+                const response = await (0, node_fetch_1.default)(googleAvatarUrl);
+                const buffer = await response.arrayBuffer();
+                const result = await (0, cloudinary_1.uploadToCloudinary)(Buffer.from(buffer), {
+                    folder: 'avatars',
+                    resource_type: 'image'
+                });
+                avatar = result.secure_url;
+            }
+            catch (error) {
+                console.error('Error converting Google avatar:', error);
+            }
+        }
+        const randomPassword = (0, uuid_1.v4)();
+        const hashedPassword = await bcrypt_1.default.hash(randomPassword, 10);
+        user = await db_1.default.user.create({
+            data: {
+                email,
+                name,
+                role: client_1.Role.USER,
+                password: hashedPassword,
+                avatar,
+            },
+        });
+        try {
+            const defaultTrackIds = await aiService.generateDefaultPlaylistForNewUser(user.id);
+            if (defaultTrackIds.length > 0) {
+                const tracksInfo = await db_1.default.track.findMany({
+                    where: { id: { in: defaultTrackIds } },
+                    select: { id: true, duration: true },
+                });
+                const totalDuration = tracksInfo.reduce((sum, track) => sum + track.duration, 0);
+                const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
+                const orderedTrackIds = defaultTrackIds.filter((id) => trackIdMap.has(id));
+                await db_1.default.playlist.create({
+                    data: {
+                        name: 'Welcome Mix',
+                        description: 'A selection of popular tracks to start your journey on Soundwave.',
+                        privacy: 'PRIVATE',
+                        type: 'NORMAL',
+                        isAIGenerated: false,
+                        userId: user.id,
+                        totalTracks: orderedTrackIds.length,
+                        totalDuration: totalDuration,
+                        tracks: {
+                            createMany: {
+                                data: orderedTrackIds.map((trackId, index) => ({
+                                    trackId,
+                                    trackOrder: index,
+                                })),
+                            },
+                        },
+                    },
+                });
+                console.log(`[Google Register] Created Welcome Mix for new user ${user.id} with ${orderedTrackIds.length} popular tracks.`);
+            }
+            else {
+                console.log(`[Google Register] No popular tracks found to create Welcome Mix for user ${user.id}.`);
+            }
+        }
+        catch (playlistError) {
+            console.error(`[Google Register] Error creating initial playlists for user ${user.id}:`, playlistError);
+        }
+        try {
+            const emailOptions = emailService.createWelcomeEmail(user.email, user.name || 'there');
+            await emailService.sendEmail(emailOptions);
+            console.log(`[Google Register] Welcome email sent to ${user.email}`);
+        }
+        catch (emailError) {
+            console.error('[Google Register] Error sending welcome email:', emailError);
+        }
+        const tokenResponse = generateToken(user.id, user.role);
+        res.status(201).json({
+            message: 'Registration successful',
+            token: tokenResponse,
+            user,
+        });
+    }
+    catch (error) {
+        console.error('Google register error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+};
+exports.googleRegister = googleRegister;
 const logout = async (req, res) => {
     try {
         const userId = req.user?.id;
@@ -461,4 +620,25 @@ const getMaintenanceStatus = async (req, res) => {
     }
 };
 exports.getMaintenanceStatus = getMaintenanceStatus;
+const convertGoogleAvatar = async (req, res) => {
+    try {
+        const { googleAvatarUrl } = req.body;
+        if (!googleAvatarUrl) {
+            res.status(400).json({ error: 'Google avatar URL is required' });
+            return;
+        }
+        const response = await (0, node_fetch_1.default)(googleAvatarUrl);
+        const buffer = await response.arrayBuffer();
+        const result = await (0, cloudinary_1.uploadToCloudinary)(Buffer.from(buffer), {
+            folder: 'avatars',
+            resource_type: 'image'
+        });
+        res.json({ url: result.secure_url });
+    }
+    catch (error) {
+        console.error('Error converting Google avatar:', error);
+        res.status(500).json({ error: 'Failed to convert Google avatar' });
+    }
+};
+exports.convertGoogleAvatar = convertGoogleAvatar;
 //# sourceMappingURL=auth.controller.js.map

@@ -34,7 +34,7 @@ export default function NewAlbum({
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        const response = await api.user.getAllGenres();
+        const response = await api.user.getAllGenres(token);
         setGenres(response);
       } catch (error) {
         console.error('Error fetching genres:', error);

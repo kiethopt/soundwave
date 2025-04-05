@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
@@ -1133,4 +1133,125 @@ const getUserTopAlbums = async (user) => {
     return albums.sort((a, b) => (albumOrder.get(a.id) || 0) - (albumOrder.get(b.id) || 0));
 };
 exports.getUserTopAlbums = getUserTopAlbums;
+const getGenreTopAlbums = async (genreId) => {
+    const cacheKey = `/api/genres/${genreId}/top-albums`;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        const cachedData = await cache_middleware_1.client.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+    }
+    const albums = await db_1.default.album.findMany({
+        where: {
+            isActive: true,
+            genres: {
+                some: {
+                    genreId,
+                },
+            },
+        },
+        select: prisma_selects_1.searchAlbumSelect,
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+    });
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        await (0, cache_middleware_1.setCache)(cacheKey, albums, 1800);
+    }
+    return albums;
+};
+exports.getGenreTopAlbums = getGenreTopAlbums;
+const getGenreTopTracks = async (genreId) => {
+    const cacheKey = `/api/genres/${genreId}/top-tracks`;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        const cachedData = await cache_middleware_1.client.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+    }
+    const tracks = await db_1.default.track.findMany({
+        where: {
+            isActive: true,
+            genres: {
+                some: {
+                    genreId,
+                },
+            },
+        },
+        select: prisma_selects_1.searchTrackSelect,
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+    });
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        await (0, cache_middleware_1.setCache)(cacheKey, tracks, 1800);
+    }
+    return tracks;
+};
+exports.getGenreTopTracks = getGenreTopTracks;
+const getGenreNewestTracks = async (genreId) => {
+    const cacheKey = `/api/genres/${genreId}/newest-tracks`;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        const cachedData = await cache_middleware_1.client.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+    }
+    const tracks = await db_1.default.track.findMany({
+        where: {
+            isActive: true,
+            genres: {
+                some: {
+                    genreId,
+                },
+            },
+        },
+        select: prisma_selects_1.searchTrackSelect,
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+    });
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        await (0, cache_middleware_1.setCache)(cacheKey, tracks, 1800);
+    }
+    return tracks;
+};
+exports.getGenreNewestTracks = getGenreNewestTracks;
+const getGenreTopArtists = async (genreId) => {
+    const cacheKey = `/api/genres/${genreId}/top-artists`;
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        const cachedData = await cache_middleware_1.client.get(cacheKey);
+        if (cachedData) {
+            return JSON.parse(cachedData);
+        }
+    }
+    const artists = await db_1.default.artistProfile.findMany({
+        where: {
+            isVerified: true,
+            genres: {
+                some: {
+                    genreId,
+                },
+            },
+        },
+        select: {
+            id: true,
+            artistName: true,
+            avatar: true,
+            monthlyListeners: true,
+            genres: {
+                select: {
+                    genre: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+    if (process.env.USE_REDIS_CACHE === 'true') {
+        await (0, cache_middleware_1.setCache)(cacheKey, artists, 1800);
+    }
+    return artists;
+};
+exports.getGenreTopArtists = getGenreTopArtists;
 //# sourceMappingURL=user.service.js.map

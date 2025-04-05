@@ -48,7 +48,7 @@ router.delete('/unfollow/:id', auth_middleware_1.authenticate, cache_middleware_
 router.get('/followers', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, user_controller_1.getFollowers);
 router.get('/following', auth_middleware_1.authenticate, cache_middleware_1.cacheMiddleware, user_controller_1.getFollowing);
 router.get('/search-all', auth_middleware_1.authenticate, user_controller_1.searchAll);
-router.get('/genres', user_controller_1.getAllGenres);
+router.get('/genres', auth_middleware_1.authenticate, user_controller_1.getAllGenres);
 router.get('/profile/:id', user_controller_1.getUserProfile);
 router.post('/request-artist', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.USER]), upload_middleware_1.default.single('avatar'), upload_middleware_1.handleUploadError, user_controller_1.requestToBecomeArtist);
 router.put('/edit-profile', auth_middleware_1.authenticate, upload_middleware_1.default.single('avatar'), upload_middleware_1.handleUploadError, user_controller_1.editProfile);
@@ -62,5 +62,9 @@ router.get('/topAlbums', auth_middleware_1.authenticate, user_controller_1.getTo
 router.get('/topAlbums/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopAlbums);
 router.get('/topTracks/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopTracks);
 router.get('/topArtists/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopArtists);
+router.get('/genre/topAlbums/:id', auth_middleware_1.authenticate, user_controller_1.getGenreTopAlbums);
+router.get('/genre/topTracks/:id', auth_middleware_1.authenticate, user_controller_1.getGenreTopTracks);
+router.get('/genre/topArtists/:id', auth_middleware_1.authenticate, user_controller_1.getGenreTopArtists);
+router.get('/genre/newestTracks/:id', auth_middleware_1.authenticate, user_controller_1.getGenreNewestTracks);
 exports.default = router;
 //# sourceMappingURL=user.routes.js.map
