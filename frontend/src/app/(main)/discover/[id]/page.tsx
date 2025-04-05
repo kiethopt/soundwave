@@ -1,13 +1,12 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ArtistProfile, Track, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
-import { getDominantHexColor } from '@/utils/tailwind-color-map';
 import { Play, Pause, Edit, Up, Down } from '@/components/ui/Icons';
 import { ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
@@ -26,13 +25,11 @@ export default function DiscoveryGenrePage({
   params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
-  const { theme } = useTheme();
-  const searchParams = useSearchParams();
+  const { theme, genreData } = useTheme();
   const { id } = use(params);
   const [token, setToken] = useState<string | null>(null);
-  const colorClass = searchParams.get('color') ?? '';
-  const genre = searchParams.get('name') ?? '';
-  const dominantColor = getDominantHexColor(colorClass);
+  const dominantColor = genreData.color || '';
+  const genreName = genreData.name || '';
   const [topTracks, setTopTracks] = useState<Track[]>([]);
   const [topAlbums, setTopAlbums] = useState<Track[]>([]);
   const [topArtists, setTopArtists] = useState<ArtistProfile[]>([]);
@@ -69,7 +66,7 @@ export default function DiscoveryGenrePage({
         setTopTracks(tracks);
         setTopArtists(artists);
         setNewestTracks(newest);
-              } catch (error) {
+      } catch (error) {
         console.error('Error fetching genre data:', error);
         toast.error('Failed to load genre data');
       }
@@ -118,7 +115,7 @@ export default function DiscoveryGenrePage({
             className={`text-4xl md:text-6xl lg:text-7xl font-bold text-white drop-shadow-md`}
             style={{ textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)' }}
           >
-            {genre}
+            {genreName}
           </h1>
         </div>
         

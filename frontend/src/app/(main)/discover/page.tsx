@@ -6,9 +6,10 @@ import { Genre } from '@/types';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { api } from '@/utils/api';
+import { getDominantHexColor } from '@/utils/tailwind-color-map';
 
 export default function DiscoveryPage() {
-  const { theme } = useTheme();
+  const { theme, updateGenreData } = useTheme();
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +20,6 @@ export default function DiscoveryPage() {
         setLoading(true);
         const token = localStorage.getItem('userToken') || '';        
         const response = await api.user.getAllGenres(token);
-        console.log('API response from genres.getAll:', response);
         
         if (response && response.genres && response.genres.length > 0) {
           setGenres(response.genres);
@@ -108,9 +108,12 @@ export default function DiscoveryPage() {
               <Link 
                 href={{
                   pathname: `/discover/${genre.id}`,
-                  query: { name: genre.name, color: colorClass }
                 }} 
                 key={genre.id}
+                onClick={() => {
+                  const dominantColor = getDominantHexColor(colorClass);
+                  updateGenreData(genre.name, dominantColor || '');
+                }}
               >
                 <div 
                   className={`relative h-32 md:h-40 rounded-lg overflow-hidden group cursor-pointer

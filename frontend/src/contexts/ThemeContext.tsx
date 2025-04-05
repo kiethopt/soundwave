@@ -1,16 +1,24 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 
 type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
   theme: Theme;
   toggleTheme: () => void;
+  genreData: { name: string; color: string };
+  setGenreData: React.Dispatch<React.SetStateAction<{ name: string; color: string }>>;
+  updateGenreData: (name: string, color: string) => void; 
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark');
+  const [genreData, setGenreData] = useState({ name: '', color: '' });
+
+  const updateGenreData = useCallback((name: string, color: string) => {
+    setGenreData({ name, color });
+  }, []);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -76,7 +84,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ 
+      theme, 
+      toggleTheme, 
+      genreData, 
+      setGenreData,
+      updateGenreData 
+    }}>
       {children}
     </ThemeContext.Provider>
   );
