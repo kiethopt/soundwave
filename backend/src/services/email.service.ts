@@ -131,18 +131,16 @@ const createRichHtmlTemplate = (
         </tr>
         <tr>
           <td style="padding: 40px 30px; background-color: #ffffff;">
-            ${
-              coverImageUrl
-                ? `
+            ${coverImageUrl
+      ? `
               <div style="text-align: center; margin-bottom: 25px;">
-                <a href="${
-                  actionLink || '#'
-                }" target="_blank"> <img src="${coverImageUrl}" alt="${title}" style="max-width: 200px; height: auto; border-radius: 4px; display: inline-block; border: 1px solid #eee;">
+                <a href="${actionLink || '#'
+      }" target="_blank"> <img src="${coverImageUrl}" alt="${title}" style="max-width: 200px; height: auto; border-radius: 4px; display: inline-block; border: 1px solid #eee;">
                 </a>
               </div>
             `
-                : ''
-            }
+      : ''
+    }
             ${mainContentHtml}
             ${actionButtonHtml}
           </td>
@@ -263,9 +261,8 @@ export const createNewReleaseEmail = (
   const typeText = releaseType === 'album' ? 'new album' : 'new track';
   const subject = `${artistName} has released a ${typeText}: ${releaseTitle}`;
   const mainContentHtml = `
-    <h2 style="color: ${TEXT_DARK}; margin-top: 0; margin-bottom: 20px; font-size: 24px; text-align: center;">${
-    typeText.charAt(0).toUpperCase() + typeText.slice(1)
-  } from ${artistName}!</h2>
+    <h2 style="color: ${TEXT_DARK}; margin-top: 0; margin-bottom: 20px; font-size: 24px; text-align: center;">${typeText.charAt(0).toUpperCase() + typeText.slice(1)
+    } from ${artistName}!</h2>
     <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Hello,</p>
     <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">The artist <strong>${artistName}</strong> you follow has just released a ${typeText} <strong>"${releaseTitle}"</strong> on SoundWave.</p>
   `;
@@ -378,8 +375,8 @@ export const createWelcomeEmail = (
     subject,
     mainContentHtml,
     to,
-    undefined, 
-    `${FRONTEND_URL}/`, 
+    undefined,
+    `${FRONTEND_URL}/`,
     'Start Exploring'
   );
   return { to, subject, html };

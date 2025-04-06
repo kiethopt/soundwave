@@ -1,11 +1,35 @@
-import { albumSelect } from '../utils/prisma-selects';
-import prisma from '../config/db';
-import { Prisma, Role } from '@prisma/client';
 import { Request } from 'express';
-import { paginate } from '../utils/handle-utils';
+import prisma from '../config/db';
+import { uploadFile } from './upload.service';
+import { Role, AlbumType, Prisma, HistoryType, NotificationType, RecipientType } from '@prisma/client';
+import { albumSelect, trackSelect } from '../utils/prisma-selects';
+import pusher from '../config/pusher';
+import * as emailService from './email.service';
+import { paginate } from 'src/utils/handle-utils';
 
+// Hàm utility từ controller trước đó
+const canManageAlbum = (user: any, albumArtistId: string): boolean => {
+  if (!user) return false;
+  if (user.role === Role.ADMIN) return true;
+  return (
+    user.artistProfile?.isVerified &&
+    user.artistProfile?.role === Role.ARTIST &&
+    user.artistProfile?.id === albumArtistId
+  );
+};
+
+const validateAlbumData = (data: any): string | null => {
+  const { title, releaseDate, type } = data;
+  if (!title?.trim()) return 'Title is required';
+  if (!releaseDate || isNaN(Date.parse(releaseDate)))
+    return 'Valid release date is required';
+  if (type && !Object.values(AlbumType).includes(type))
+    return 'Invalid album type';
+  return null;
+};
+
+// Các hàm service đã có
 export const deleteAlbumById = async (id: string) => {
-  // Kiểm tra xem album có tồn tại không
   const album = await prisma.album.findUnique({
     where: { id },
     select: { id: true },
@@ -15,93 +39,59 @@ export const deleteAlbumById = async (id: string) => {
     throw new Error('Album not found');
   }
 
-  // Xóa album
   return prisma.album.delete({
     where: { id },
   });
 };
 
-// Lấy album mới nhất
 export const getNewestAlbums = async (limit = 10) => {
   return prisma.album.findMany({
-    where: {
-      isActive: true,
-    },
-    orderBy: {
-      releaseDate: 'desc',
-    },
+    where: { isActive: true },
+    orderBy: { releaseDate: 'desc' },
     take: limit,
     select: albumSelect,
   });
 };
 
-// Lấy album hot nhất (dựa trên lượt nghe bài hát trong album)
 export const getHotAlbums = async (limit = 10) => {
   return prisma.album.findMany({
     where: {
       isActive: true,
-      tracks: {
-        some: {
-          isActive: true,
-        },
-      },
+      tracks: { some: { isActive: true } },
     },
     orderBy: [
-      {
-        tracks: {
-          _count: 'desc',
-        },
-      },
-      {
-        releaseDate: 'desc',
-      },
+      { tracks: { _count: 'desc' } },
+      { releaseDate: 'desc' },
     ],
     take: limit,
     select: albumSelect,
   });
 };
 
-// Lấy TẤT CẢ albums (cho admin view, với phân trang, tìm kiếm, sắp xếp)
 export const getAllAlbums = async (req: Request) => {
   const { search, sortBy, sortOrder } = req.query;
-  const user = req.user; // Lấy thông tin user từ request
+  const user = req.user;
 
   const whereClause: Prisma.AlbumWhereInput = {};
 
-  // Nếu không phải ADMIN, chỉ hiển thị album của nghệ sĩ hiện tại
   if (user && user.role !== Role.ADMIN && user.artistProfile?.id) {
     whereClause.artistId = user.artistProfile.id;
   }
 
-  // Thêm điều kiện tìm kiếm nếu có từ khóa tìm kiếm
   if (search && typeof search === 'string') {
     whereClause.OR = [
       { title: { contains: search, mode: 'insensitive' } },
       { artist: { artistName: { contains: search, mode: 'insensitive' } } },
-      {
-        genres: {
-          some: {
-            genre: {
-              name: { contains: search, mode: 'insensitive' },
-            },
-          },
-        },
-      },
+      { genres: { some: { genre: { name: { contains: search, mode: 'insensitive' } } } } },
     ];
   }
 
   const orderByClause: Prisma.AlbumOrderByWithRelationInput = {};
-  if (
-    sortBy &&
-    typeof sortBy === 'string' &&
-    (sortOrder === 'asc' || sortOrder === 'desc')
-  ) {
+  if (sortBy && typeof sortBy === 'string' && (sortOrder === 'asc' || sortOrder === 'desc')) {
     if (sortBy === 'title' || sortBy === 'type' || sortBy === 'releaseDate') {
       orderByClause[sortBy] = sortOrder;
     } else if (sortBy === 'totalTracks') {
-      orderByClause.tracks = {
-        _count: sortOrder,
-      };
+      orderByClause.tracks = { _count: sortOrder };
     } else {
       orderByClause.releaseDate = 'desc';
     }
@@ -119,7 +109,6 @@ export const getAllAlbums = async (req: Request) => {
     orderBy: orderByClause,
   });
 
-  // Map data để đảm bảo cấu trúc và thêm trường dẫn đến genre
   const formattedAlbums = result.data.map((album: any) => ({
     ...album,
     totalTracks: album._count?.tracks ?? 0,
@@ -130,4 +119,490 @@ export const getAllAlbums = async (req: Request) => {
     data: formattedAlbums,
     pagination: result.pagination,
   };
+};
+
+// Các hàm service mới từ controller
+export const createAlbum = async (req: Request) => {
+  const user = req.user;
+  if (!user) throw new Error('Forbidden');
+
+  const { title, releaseDate, type = AlbumType.ALBUM, genres = [], artistId, labelId } = req.body;
+  const coverFile = req.file;
+
+  const genreArray = Array.isArray(genres) ? genres : genres ? [genres] : [];
+  const validationError = validateAlbumData({ title, releaseDate, type });
+  if (validationError) throw new Error(validationError);
+
+  let targetArtistProfileId: string;
+  let fetchedArtistProfile: { artistName: string | null } | null = null;
+
+  if (user.role === Role.ADMIN && artistId) {
+    const targetArtist = await prisma.artistProfile.findFirst({
+      where: { id: artistId, isVerified: true, role: Role.ARTIST },
+      select: { id: true, artistName: true },
+    });
+    if (!targetArtist) throw new Error('Artist profile not found or not verified');
+    targetArtistProfileId = targetArtist.id;
+    fetchedArtistProfile = targetArtist;
+  } else if (user.artistProfile?.isVerified && user.artistProfile.role === Role.ARTIST) {
+    targetArtistProfileId = user.artistProfile.id;
+    fetchedArtistProfile = await prisma.artistProfile.findUnique({
+      where: { id: targetArtistProfileId },
+      select: { artistName: true },
+    });
+  } else {
+    throw new Error('Not authorized to create albums');
+  }
+
+  const artistName = fetchedArtistProfile?.artistName || 'Nghệ sĩ';
+  let coverUrl: string | null = null;
+  if (coverFile) {
+    const coverUpload = await uploadFile(coverFile.buffer, 'covers', 'image');
+    coverUrl = coverUpload.secure_url;
+  }
+
+  const releaseDateObj = new Date(releaseDate);
+  const isActive = releaseDateObj <= new Date();
+
+  let finalLabelId: string | null = null;
+  if (labelId !== undefined) {
+    if (typeof labelId !== 'string' && labelId !== null) {
+      throw new Error(`Invalid labelId type: expected string or null, got ${typeof labelId}`);
+    }
+    if (labelId === null || labelId === '') {
+      finalLabelId = null;
+    } else {
+      const labelExists = await prisma.label.findUnique({ where: { id: labelId } });
+      if (!labelExists) throw new Error(`Invalid label ID: ${labelId} does not exist`);
+      finalLabelId = labelId;
+    }
+  }
+
+  const album = await prisma.album.create({
+    data: {
+      title,
+      coverUrl,
+      releaseDate: releaseDateObj,
+      type,
+      duration: 0,
+      totalTracks: 0,
+      artistId: targetArtistProfileId,
+      isActive,
+      labelId: finalLabelId,
+      genres: { create: genreArray.map((genreId: string) => ({ genre: { connect: { id: genreId } } })) },
+    },
+    select: albumSelect,
+  });
+
+  const followers = await prisma.userFollow.findMany({
+    where: { followingArtistId: targetArtistProfileId, followingType: 'ARTIST' },
+    select: { followerId: true },
+  });
+
+  const followerIds = followers.map((f) => f.followerId);
+  const followerUsers = await prisma.user.findMany({
+    where: { id: { in: followerIds } },
+    select: { id: true, email: true },
+  });
+
+  const notificationsData = followers.map((follower) => ({
+    type: NotificationType.NEW_ALBUM,
+    message: `${artistName} vừa ra album mới: ${title}`,
+    recipientType: RecipientType.USER,
+    userId: follower.followerId,
+    artistId: targetArtistProfileId,
+    senderId: targetArtistProfileId,
+  }));
+
+  if (notificationsData.length > 0) {
+    await prisma.notification.createMany({ data: notificationsData });
+  }
+
+  const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
+  for (const user of followerUsers) {
+    await pusher.trigger(`user-${user.id}`, 'notification', {
+      type: NotificationType.NEW_ALBUM,
+      message: `${artistName} vừa ra album mới: ${album.title}`,
+    });
+
+    if (user.email) {
+      const emailOptions = emailService.createNewReleaseEmail(
+        user.email,
+        artistName,
+        'album',
+        album.title,
+        releaseLink
+      );
+      await emailService.sendEmail(emailOptions);
+    }
+  }
+
+  return { message: 'Album created successfully', album };
+};
+
+export const addTracksToAlbum = async (req: Request) => {
+  const user = req.user;
+  const { albumId } = req.params;
+
+  if (!user) throw new Error('Forbidden');
+
+  const album = await prisma.album.findUnique({
+    where: { id: albumId },
+    select: { artistId: true, type: true, coverUrl: true, isActive: true, tracks: { select: { trackNumber: true } } },
+  });
+
+  if (!album) throw new Error('Album not found');
+  if (!canManageAlbum(user, album.artistId)) throw new Error('You can only add tracks to your own albums');
+
+  const files = req.files as Express.Multer.File[];
+  if (!files || !files.length) throw new Error('No files uploaded');
+
+  const existingTracks = await prisma.track.findMany({
+    where: { albumId },
+    select: { trackNumber: true },
+  });
+
+  const maxTrackNumber = existingTracks.length > 0 ? Math.max(...existingTracks.map((t) => t.trackNumber || 0)) : 0;
+
+  const titles = Array.isArray(req.body.title) ? req.body.title : [req.body.title];
+  const releaseDates = Array.isArray(req.body.releaseDate) ? req.body.releaseDate : [req.body.releaseDate];
+  const featuredArtists = Array.isArray(req.body.featuredArtists)
+    ? req.body.featuredArtists.map((artists: string) => artists.split(','))
+    : req.body.featuredArtists ? [req.body.featuredArtists.split(',')] : [];
+
+  const mm = await import('music-metadata');
+  const createdTracks = await Promise.all(
+    files.map(async (file, index) => {
+      const metadata = await mm.parseBuffer(file.buffer);
+      const duration = Math.floor(metadata.format.duration || 0);
+      const uploadResult = await uploadFile(file.buffer, 'tracks', 'auto');
+
+      const existingTrack = await prisma.track.findFirst({
+        where: { title: titles[index], artistId: album.artistId },
+      });
+      if (existingTrack) throw new Error(`Track with title "${titles[index]}" already exists for this artist.`);
+
+      const newTrackNumber = maxTrackNumber + index + 1;
+      const track = await prisma.track.create({
+        data: {
+          title: titles[index],
+          duration,
+          releaseDate: new Date(releaseDates[index] || Date.now()),
+          trackNumber: newTrackNumber,
+          coverUrl: album.coverUrl,
+          audioUrl: uploadResult.secure_url,
+          artistId: album.artistId,
+          albumId,
+          type: album.type,
+          isActive: album.isActive,
+          ...(featuredArtists[index]?.length && {
+            featuredArtists: {
+              create: featuredArtists[index].map((artistProfileId: string) => ({
+                artistProfile: { connect: { id: artistProfileId.trim() } },
+              })),
+            },
+          }),
+        },
+        select: trackSelect,
+      });
+      return track;
+    })
+  );
+
+  const tracks = await prisma.track.findMany({ where: { albumId }, select: { duration: true } });
+  const totalDuration = tracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+
+  const updatedAlbum = await prisma.album.update({
+    where: { id: albumId },
+    data: { duration: totalDuration, totalTracks: tracks.length },
+    select: albumSelect,
+  });
+
+  return { message: 'Tracks added to album successfully', album: updatedAlbum, tracks: createdTracks };
+};
+
+export const updateAlbum = async (req: Request) => {
+  const { id } = req.params;
+  const { title, releaseDate, type, genres, labelId } = req.body;
+  const coverFile = req.file;
+  const user = req.user;
+
+  if (!user) throw new Error('Forbidden');
+
+  const album = await prisma.album.findUnique({
+    where: { id },
+    select: { artistId: true, coverUrl: true, labelId: true },
+  });
+
+  if (!album) throw new Error('Album not found');
+  if (!canManageAlbum(user, album.artistId)) throw new Error('You can only update your own albums');
+
+  let coverUrl: string | undefined;
+  if (coverFile) {
+    const coverUpload = await uploadFile(coverFile.buffer, 'covers', 'image');
+    coverUrl = coverUpload.secure_url;
+  }
+
+  const updateData: any = {};
+  if (title) updateData.title = title;
+
+  if (releaseDate) {
+    const newReleaseDate = new Date(releaseDate);
+    updateData.releaseDate = newReleaseDate;
+    updateData.isActive = newReleaseDate <= new Date();
+  }
+  if (type) updateData.type = type;
+  if (coverUrl) updateData.coverUrl = coverUrl;
+
+  // Xử lý labelId
+  if (labelId !== undefined) {
+    if (typeof labelId !== 'string' && labelId !== null) {
+      throw new Error(`Invalid labelId type: expected string or null, got ${typeof labelId}`);
+    }
+
+    // Nếu labelId là null hoặc chuỗi rỗng, xóa label bằng cách đặt labelId thành null
+    if (labelId === null || labelId === '') {
+      updateData.labelId = null;
+    } else {
+      // Kiểm tra xem label có tồn tại không
+      const labelExists = await prisma.label.findUnique({ where: { id: labelId } });
+      if (!labelExists) throw new Error(`Invalid label ID: ${labelId} does not exist`);
+      updateData.labelId = labelId;
+    }
+  }
+
+  // Xử lý genres
+  if (genres !== undefined) {
+    await prisma.albumGenre.deleteMany({ where: { albumId: id } });
+    const genresArray = !genres
+      ? []
+      : Array.isArray(genres)
+        ? genres
+        : typeof genres === 'string'
+          ? genres.split(',').map((g: string) => g.trim())
+          : [genres];
+
+    if (genresArray.length > 0) {
+      const existingGenres = await prisma.genre.findMany({
+        where: { id: { in: genresArray } },
+        select: { id: true },
+      });
+      const validGenreIds = existingGenres.map((genre) => genre.id);
+      const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
+      if (invalidGenreIds.length > 0) {
+        throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
+      }
+      updateData.genres = {
+        create: genresArray.map((genreId: string) => ({
+          genre: { connect: { id: genreId.trim() } },
+        })),
+      };
+    }
+  }
+
+  const updatedAlbum = await prisma.album.update({
+    where: { id },
+    data: updateData,
+    select: albumSelect,
+  });
+
+  return { message: 'Album updated successfully', album: updatedAlbum };
+};
+
+export const deleteAlbum = async (req: Request) => {
+  const { id } = req.params;
+  const user = req.user;
+
+  if (!user) throw new Error('Forbidden');
+
+  const album = await prisma.album.findUnique({
+    where: { id },
+    select: { artistId: true },
+  });
+
+  if (!album) throw new Error('Album not found');
+  if (!canManageAlbum(user, album.artistId)) throw new Error('You can only delete your own albums');
+
+  await deleteAlbumById(id);
+  return { message: 'Album deleted successfully' };
+};
+
+export const toggleAlbumVisibility = async (req: Request) => {
+  const { id } = req.params;
+  const user = req.user;
+
+  if (!user) throw new Error('Forbidden');
+
+  const album = await prisma.album.findUnique({
+    where: { id },
+    select: { artistId: true, isActive: true },
+  });
+
+  if (!album) throw new Error('Album not found');
+  if (!canManageAlbum(user, album.artistId)) throw new Error('You can only toggle your own albums');
+
+  const updatedAlbum = await prisma.album.update({
+    where: { id },
+    data: { isActive: !album.isActive },
+    select: albumSelect,
+  });
+
+  return {
+    message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'} successfully`,
+    album: updatedAlbum,
+  };
+};
+
+export const searchAlbum = async (req: Request) => {
+  const { q, page = 1, limit = 10 } = req.query;
+  const offset = (Number(page) - 1) * Number(limit);
+  const user = req.user;
+
+  if (!q) throw new Error('Query is required');
+  const searchQuery = String(q).trim();
+
+  if (user) {
+    const existingHistory = await prisma.history.findFirst({
+      where: { userId: user.id, type: HistoryType.SEARCH, query: { equals: searchQuery, mode: 'insensitive' } },
+    });
+
+    if (existingHistory) {
+      await prisma.history.update({ where: { id: existingHistory.id }, data: { updatedAt: new Date() } });
+    } else {
+      await prisma.history.create({ data: { type: HistoryType.SEARCH, query: searchQuery, userId: user.id } });
+    }
+  }
+
+  const whereClause: Prisma.AlbumWhereInput = {
+    OR: [
+      { title: { contains: searchQuery, mode: 'insensitive' } },
+      { artist: { artistName: { contains: searchQuery, mode: 'insensitive' } } },
+    ],
+  };
+
+  if (user?.currentProfile === 'ARTIST' && user?.artistProfile?.id) {
+    whereClause.artistId = user.artistProfile.id;
+  }
+
+  if (!user || user.role !== Role.ADMIN) {
+    if (user?.artistProfile?.isVerified && user?.currentProfile === 'ARTIST') {
+      whereClause.OR = [
+        { isActive: true },
+        { AND: [{ isActive: false }, { artistId: user.artistProfile.id }] },
+      ];
+    } else {
+      whereClause.isActive = true;
+    }
+  }
+
+  const [albums, total] = await Promise.all([
+    prisma.album.findMany({
+      where: whereClause,
+      skip: offset,
+      take: Number(limit),
+      select: albumSelect,
+    }),
+    prisma.album.count({ where: whereClause }),
+  ]);
+
+  return {
+    albums,
+    pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / Number(limit)) },
+  };
+};
+
+export const getAdminAllAlbums = async (req: Request) => {
+  const user = req.user;
+  if (!user) throw new Error('Unauthorized');
+  if (user.role !== Role.ADMIN && (!user.artistProfile?.isVerified || user.artistProfile?.role !== 'ARTIST')) {
+    throw new Error('Forbidden: Only admins or verified artists can access this resource');
+  }
+
+  const { search, status, genres } = req.query;
+  const whereClause: Prisma.AlbumWhereInput = {};
+
+  if (user.role !== Role.ADMIN && user.artistProfile?.id) {
+    whereClause.artistId = user.artistProfile.id;
+  }
+
+  const conditions: any[] = [];
+  if (search) {
+    conditions.push({
+      OR: [
+        { title: { contains: String(search), mode: 'insensitive' } },
+        { artist: { artistName: { contains: String(search), mode: 'insensitive' } } },
+      ],
+    });
+  }
+
+  if (status) whereClause.isActive = status === 'true';
+  if (genres) {
+    const genreIds = Array.isArray(genres) ? genres : [genres];
+    if (genreIds.length > 0) {
+      conditions.push({ genres: { some: { genreId: { in: genreIds } } } });
+    }
+  }
+
+  if (conditions.length > 0) whereClause.AND = conditions;
+
+  const result = await getAllAlbums(req);
+  return { albums: result.data, pagination: result.pagination };
+};
+
+export const getAlbumById = async (req: Request) => {
+  const { id } = req.params;
+  const user = req.user;
+  const isAuthenticated = !!user;
+
+  const album = await prisma.album.findUnique({
+    where: { id, isActive: true },
+    select: albumSelect,
+  });
+
+  if (!album) throw new Error('Album not found');
+  return { ...album, requiresAuth: !isAuthenticated };
+};
+
+export const playAlbum = async (req: Request) => {
+  const { albumId } = req.params;
+  const user = req.user;
+
+  if (!user) throw new Error('Unauthorized');
+
+  const album = await prisma.album.findFirst({
+    where: { id: albumId, isActive: true },
+    include: { tracks: { where: { isActive: true }, orderBy: { trackNumber: 'asc' }, take: 1, select: trackSelect } },
+  });
+
+  if (!album || album.tracks.length === 0) throw new Error('Album or tracks not found');
+
+  const firstTrack = album.tracks[0];
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+  const existingListen = await prisma.history.findFirst({
+    where: { userId: user.id, track: { artistId: firstTrack.artistId }, createdAt: { gte: lastMonth } },
+  });
+
+  if (!existingListen) {
+    await prisma.artistProfile.update({
+      where: { id: firstTrack.artistId },
+      data: { monthlyListeners: { increment: 1 } },
+    });
+  }
+
+  await prisma.history.upsert({
+    where: { userId_trackId_type: { userId: user.id, trackId: firstTrack.id, type: 'PLAY' } },
+    update: { playCount: { increment: 1 }, updatedAt: new Date() },
+    create: {
+      type: 'PLAY',
+      trackId: firstTrack.id,
+      userId: user.id,
+      duration: firstTrack.duration,
+      completed: true,
+      playCount: 1,
+    },
+  });
+
+  return { message: 'Album playback started', track: firstTrack };
 };
