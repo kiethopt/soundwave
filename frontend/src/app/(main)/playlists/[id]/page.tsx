@@ -1,15 +1,18 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { TrackList } from '@/components/user/track/TrackList';
-import { EditPlaylistDialog } from '@/components/user/playlist/EditPlaylistDialog';
-import { api } from '@/utils/api';
-import { Playlist } from '@/types';
-import Image from 'next/image';
-import { useAuth } from '@/hooks/useAuth';
-import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { TrackList } from "@/components/user/track/TrackList";
+import { EditPlaylistDialog } from "@/components/user/playlist/EditPlaylistDialog";
+import { DeletePlaylistDialog } from "@/components/user/playlist/DeletePlaylistDialog";
+import { api } from "@/utils/api";
+import { Playlist } from "@/types";
+import Image from "next/image";
+import { useAuth } from "@/hooks/useAuth";
+import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
+import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 export default function PlaylistPage() {
   const params = useParams();
@@ -24,11 +27,22 @@ export default function PlaylistPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const router = useRouter();
 
   // Check if this is a special system playlist
-  const isVibeRewindPlaylist = playlist?.name === 'Vibe Rewind';
-  const isFavoritePlaylist = playlist?.type === 'FAVORITE';
-  const isSpecialPlaylist = isVibeRewindPlaylist || isFavoritePlaylist;
+  const isVibeRewindPlaylist = playlist?.name === "Vibe Rewind";
+  const isFavoritePlaylist = playlist?.type === "FAVORITE";
+  const isWelcomeMixPlaylist = playlist?.name === "Welcome Mix";
+  const isSpecialPlaylist =
+    isVibeRewindPlaylist || isFavoritePlaylist || isWelcomeMixPlaylist;
+
+  // Check if this is a normal playlist (not special playlists or AI generated)
+  const isNormalPlaylist =
+    !playlist?.isAIGenerated &&
+    playlist?.type !== "FAVORITE" &&
+    playlist?.name !== "Vibe Rewind" &&
+    playlist?.name !== "Welcome Mix";
 
   useEffect(() => {
     const fetchPlaylist = async () => {
@@ -36,23 +50,23 @@ export default function PlaylistPage() {
         setLoading(true);
 
         // Get token if available
-        const token = localStorage.getItem('userToken');
+        const token = localStorage.getItem("userToken");
 
-        console.log('Fetching playlist with ID:', id);
+        console.log("Fetching playlist with ID:", id);
         const response = await api.playlists.getById(
           id as string,
           token ?? undefined
         );
-        console.log('Playlist response:', response);
+        console.log("Playlist response:", response);
 
         if (response.success) {
           setPlaylist(response.data);
         } else {
-          setError(response.message || 'Could not load playlist');
+          setError(response.message || "Could not load playlist");
         }
       } catch (error: any) {
-        console.error('Error fetching playlist:', error);
-        setError(error.message || 'Could not load playlist');
+        console.error("Error fetching playlist:", error);
+        setError(error.message || "Could not load playlist");
       } finally {
         setLoading(false);
       }
@@ -66,7 +80,7 @@ export default function PlaylistPage() {
   const handleRemoveTrack = async (trackId: string) => {
     handleProtectedAction(async () => {
       try {
-        const token = localStorage.getItem('userToken');
+        const token = localStorage.getItem("userToken");
         if (!token || !playlist) return;
 
         await api.playlists.removeTrack(id as string, trackId, token);
@@ -76,7 +90,39 @@ export default function PlaylistPage() {
           totalTracks: playlist.totalTracks - 1,
         });
       } catch (error) {
-        console.error('Error removing track:', error);
+        console.error("Error removing track:", error);
+      }
+    });
+  };
+
+  const handleDeletePlaylist = async () => {
+    handleProtectedAction(async () => {
+      try {
+        const token = localStorage.getItem("userToken");
+        if (!token || !playlist) {
+          toast.error("Please log in to delete this playlist");
+          return;
+        }
+
+        setIsDeleteOpen(false); // Close the dialog first
+
+        // Delete the playlist
+        await api.playlists.delete(id as string, token);
+
+        // Show success message
+        toast.success("Playlist deleted successfully");
+
+        // Wait a bit for the delete operation to complete
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Navigate to home page
+        window.location.href = "/";
+      } catch (error: any) {
+        console.error("Error deleting playlist:", error);
+        const errorMessage =
+          error.message || "Could not delete playlist. Please try again.";
+        toast.error(errorMessage);
+        setIsDeleteOpen(false);
       }
     });
   };
@@ -126,11 +172,11 @@ export default function PlaylistPage() {
           )}
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           <div className="text-sm font-medium text-white/70">
-            {playlist.privacy === 'PRIVATE'
-              ? 'Private Playlist'
-              : 'Public Playlist'}
+            {playlist.privacy === "PRIVATE"
+              ? "Private Playlist"
+              : "Public Playlist"}
           </div>
           <div className="flex items-center gap-2">
             <h1 className="text-[2rem] font-bold leading-tight">
@@ -158,21 +204,34 @@ export default function PlaylistPage() {
           <div className="flex items-center gap-1 text-sm text-white/70">
             <span>{playlist.tracks.length} songs</span>
           </div>
-          <div className="mt-4">
-            {playlist.canEdit && !playlist.isAIGenerated && (
-              <Button
-                onClick={() => handleProtectedAction(() => setIsEditOpen(true))}
-                disabled={false}
-              >
-                Edit playlist
-              </Button>
+          <div className="flex items-center gap-2 mt-2">
+            {playlist.canEdit && (
+              <>
+                <Button
+                  onClick={() =>
+                    handleProtectedAction(() => setIsEditOpen(true))
+                  }
+                  disabled={false}
+                >
+                  Edit playlist
+                </Button>
+                {isNormalPlaylist && (
+                  <Button
+                    onClick={() => setIsDeleteOpen(true)}
+                    variant="destructive"
+                    className="ml-2"
+                  >
+                    Delete playlist
+                  </Button>
+                )}
+              </>
             )}
             {isVibeRewindPlaylist && (
               <Button
                 onClick={() =>
                   handleProtectedAction(async () => {
                     try {
-                      const token = localStorage.getItem('userToken');
+                      const token = localStorage.getItem("userToken");
                       if (!token) return;
 
                       await api.playlists.updateVibeRewindPlaylist(token);
@@ -180,7 +239,7 @@ export default function PlaylistPage() {
                       // Refresh the page to show updated playlist
                       window.location.reload();
                     } catch (error) {
-                      console.error('Error updating Vibe Rewind:', error);
+                      console.error("Error updating Vibe Rewind:", error);
                     }
                   })
                 }
@@ -221,6 +280,13 @@ export default function PlaylistPage() {
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
         isSpecialPlaylist={isSpecialPlaylist}
+      />
+
+      <DeletePlaylistDialog
+        open={isDeleteOpen}
+        onOpenChange={setIsDeleteOpen}
+        onConfirm={handleDeletePlaylist}
+        playlistName={playlist.name}
       />
 
       <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />

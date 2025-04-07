@@ -10,10 +10,10 @@ export const createFavoritePlaylist = async (userId: string): Promise<void> => {
   try {
     await prisma.playlist.create({
       data: {
-        name: 'Bài hát yêu thích',
-        description: 'Danh sách những bài hát yêu thích của bạn',
-        privacy: 'PRIVATE',
-        type: 'FAVORITE',
+        name: "Favorite songs",
+        description: "List of your favorite songs",
+        privacy: "PRIVATE",
+        type: "FAVORITE",
         userId,
       },
     });
@@ -120,10 +120,10 @@ export const getPlaylists: RequestHandler = async (
       if (!favoritePlaylist) {
         favoritePlaylist = await prisma.playlist.create({
           data: {
-            name: 'Bài hát yêu thích',
-            description: 'Danh sách những bài hát yêu thích của bạn',
-            privacy: 'PRIVATE',
-            type: 'FAVORITE',
+            name: "Favorite songs",
+            description: "List of your favorite songs",
+            privacy: "PRIVATE",
+            type: "FAVORITE",
             userId,
           },
         });

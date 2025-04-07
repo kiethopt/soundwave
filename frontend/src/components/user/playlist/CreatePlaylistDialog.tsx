@@ -77,14 +77,14 @@ export function CreatePlaylistDialog({
       });
 
       if (!token || !userData) {
-        toast.error('Vui lòng đăng nhập lại');
+        toast.error("Please log in again");
         router.push('/login');
         return;
       }
 
       // Validate form data
       if (!formData.name?.trim()) {
-        toast.error('Vui lòng nhập tên playlist');
+        toast.error("Please enter playlist name");
         return;
       }
 
@@ -106,12 +106,12 @@ export function CreatePlaylistDialog({
           privacy: 'PRIVATE',
         });
         onOpenChange(false);
-        toast.success('Đã tạo playlist thành công');
+        toast.success("Playlist created successfully");
         await onSuccess();
       }
     } catch (error: any) {
       console.error('Error creating playlist:', error);
-      toast.error(error.message || 'Không thể tạo playlist');
+      toast.error(error.message || "Cannot create playlist");
     } finally {
       setIsLoading(false);
     }
@@ -121,44 +121,44 @@ export function CreatePlaylistDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={`sm:max-w-[425px] ${
-          theme === 'light'
-            ? 'bg-white text-gray-900 border border-gray-200'
-            : 'bg-[#121212] text-white border border-white/10'
+          theme === "light"
+            ? "bg-white text-gray-900 border border-gray-200"
+            : "bg-[#121212] text-white border border-white/10"
         }`}
       >
         <DialogHeader>
           <DialogTitle
-            className={theme === 'light' ? 'text-gray-900' : 'text-white'}
+            className={theme === "light" ? "text-gray-900" : "text-white"}
           >
-            Tạo playlist mới
+            Create new playlist
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Input
               name="name"
-              placeholder="Tên playlist"
+              placeholder="Playlist name"
               value={formData.name}
               onChange={handleInputChange}
               required
               className={
-                theme === 'light'
-                  ? 'border-gray-200 focus:border-gray-300'
-                  : 'border-white/10 focus:border-white/20'
+                theme === "light"
+                  ? "border-gray-200 focus:border-gray-300"
+                  : "border-white/10 focus:border-white/20"
               }
             />
           </div>
           <div className="space-y-2">
             <Textarea
               name="description"
-              placeholder="Mô tả (tùy chọn)"
+              placeholder="Description (optional)"
               value={formData.description}
               onChange={handleInputChange}
               rows={3}
               className={
-                theme === 'light'
-                  ? 'border-gray-200 focus:border-gray-300'
-                  : 'border-white/10 focus:border-white/20'
+                theme === "light"
+                  ? "border-gray-200 focus:border-gray-300"
+                  : "border-white/10 focus:border-white/20"
               }
             />
           </div>
@@ -169,31 +169,31 @@ export function CreatePlaylistDialog({
             >
               <SelectTrigger
                 className={
-                  theme === 'light'
-                    ? 'border-gray-200 bg-white text-gray-900 focus:border-gray-300'
-                    : 'border-white/10 bg-[#121212] text-white focus:border-white/20'
+                  theme === "light"
+                    ? "border-gray-200 bg-white text-gray-900 focus:border-gray-300"
+                    : "border-white/10 bg-[#121212] text-white focus:border-white/20"
                 }
               >
-                <SelectValue placeholder="Chọn quyền riêng tư" />
+                <SelectValue placeholder="Select privacy" />
               </SelectTrigger>
               <SelectContent
                 className={
-                  theme === 'light'
-                    ? 'bg-white text-gray-900 border-gray-200'
-                    : 'bg-[#121212] text-white border-white/10'
+                  theme === "light"
+                    ? "bg-white text-gray-900 border-gray-200"
+                    : "bg-[#121212] text-white border-white/10"
                 }
               >
                 <SelectItem
                   value="PRIVATE"
-                  className={theme === 'light' ? 'text-gray-900' : 'text-white'}
+                  className={theme === "light" ? "text-gray-900" : "text-white"}
                 >
-                  Riêng tư
+                  Private
                 </SelectItem>
                 <SelectItem
                   value="PUBLIC"
-                  className={theme === 'light' ? 'text-gray-900' : 'text-white'}
+                  className={theme === "light" ? "text-gray-900" : "text-white"}
                 >
-                  Công khai
+                  Public
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -204,29 +204,29 @@ export function CreatePlaylistDialog({
               variant="outline"
               onClick={() => {
                 setFormData({
-                  name: '',
-                  description: '',
-                  privacy: 'PRIVATE',
+                  name: "",
+                  description: "",
+                  privacy: "PRIVATE",
                 });
                 onOpenChange(false);
               }}
               disabled={isLoading}
               className={
-                theme === 'light' ? 'hover:bg-gray-100' : 'hover:bg-neutral-800'
+                theme === "light" ? "hover:bg-gray-100" : "hover:bg-neutral-800"
               }
             >
-              Hủy
+              Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading || !formData.name.trim()}
               className={
-                theme === 'light'
-                  ? 'bg-black text-white hover:bg-black/80'
-                  : 'bg-white text-black hover:bg-white/80'
+                theme === "light"
+                  ? "bg-black text-white hover:bg-black/80"
+                  : "bg-white text-black hover:bg-white/80"
               }
             >
-              {isLoading ? 'Đang tạo...' : 'Tạo playlist'}
+              {isLoading ? "Creating..." : "Create playlist"}
             </Button>
           </div>
         </form>

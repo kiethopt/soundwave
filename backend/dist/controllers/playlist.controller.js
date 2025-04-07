@@ -46,10 +46,10 @@ const createFavoritePlaylist = async (userId) => {
     try {
         await db_1.default.playlist.create({
             data: {
-                name: 'Bài hát yêu thích',
-                description: 'Danh sách những bài hát yêu thích của bạn',
-                privacy: 'PRIVATE',
-                type: 'FAVORITE',
+                name: "Favorite songs",
+                description: "List of your favorite songs",
+                privacy: "PRIVATE",
+                type: "FAVORITE",
                 userId,
             },
         });
@@ -128,10 +128,10 @@ const getPlaylists = async (req, res, next) => {
             if (!favoritePlaylist) {
                 favoritePlaylist = await db_1.default.playlist.create({
                     data: {
-                        name: 'Bài hát yêu thích',
-                        description: 'Danh sách những bài hát yêu thích của bạn',
-                        privacy: 'PRIVATE',
-                        type: 'FAVORITE',
+                        name: "Favorite songs",
+                        description: "List of your favorite songs",
+                        privacy: "PRIVATE",
+                        type: "FAVORITE",
                         userId,
                     },
                 });

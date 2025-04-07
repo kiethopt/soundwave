@@ -1,7 +1,7 @@
-import { Track } from '@/types';
-import { useTrack } from '@/contexts/TrackContext';
-import { useAuth } from '@/hooks/useAuth';
-import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
+import { Track } from "@/types";
+import { useTrack } from "@/contexts/TrackContext";
+import { useAuth } from "@/hooks/useAuth";
+import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
 
 interface TrackListProps {
   tracks: Track[];
@@ -43,9 +43,9 @@ export function TrackList({
       }
 
       // If clicking a new track
-      const token = localStorage.getItem('userToken');
+      const token = localStorage.getItem("userToken");
       if (!token) {
-        console.error('No token found');
+        console.error("No token found");
         return;
       }
 
@@ -55,20 +55,20 @@ export function TrackList({
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         }
       );
 
       if (!response.ok) {
-        throw new Error('Failed to fetch track details');
+        throw new Error("Failed to fetch track details");
       }
 
       const trackData = await response.json();
-      console.log('Track data from API:', trackData);
+      console.log("Track data from API:", trackData);
 
       if (!trackData.audioUrl) {
-        throw new Error('Audio URL is missing from track data');
+        throw new Error("Audio URL is missing from track data");
       }
 
       const trackToPlay = {
@@ -81,10 +81,10 @@ export function TrackList({
       await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/tracks/play/${track.id}`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         }
       );
@@ -92,12 +92,12 @@ export function TrackList({
       trackQueue([trackToPlay]);
       playTrack(trackToPlay);
     } catch (error) {
-      console.error('Error playing track:', error);
+      console.error("Error playing track:", error);
     }
   };
 
   // Add log when component renders
-  console.log('6. Tracks prop:', JSON.stringify(tracks, null, 2));
+  console.log("6. Tracks prop:", JSON.stringify(tracks, null, 2));
 
   return (
     <>
@@ -116,7 +116,7 @@ export function TrackList({
               <div className="flex items-center justify-center w-4">
                 <span
                   className={`group-hover:hidden ${
-                    isCurrentTrack ? 'text-[#A57865]' : ''
+                    isCurrentTrack ? "text-[#A57865]" : ""
                   }`}
                 >
                   {index + 1}
@@ -160,7 +160,7 @@ export function TrackList({
                 <div className="flex flex-col">
                   <span
                     className={`font-medium ${
-                      isCurrentTrack ? 'text-[#A57865]' : ''
+                      isCurrentTrack ? "text-[#A57865]" : ""
                     }`}
                   >
                     {track.title}
@@ -173,13 +173,13 @@ export function TrackList({
 
               {/* Album (if showAlbum=true) */}
               {showAlbum && (
-                <div className="text-white/70">{track.album?.title || '-'}</div>
+                <div className="text-white/70">{track.album?.title || "-"}</div>
               )}
 
               {/* Date added (if showDateAdded=true) */}
               {showDateAdded && (
                 <div className="text-white/70">
-                  {new Date(track.createdAt).toLocaleDateString('vi-VN')}
+                  {new Date(track.createdAt).toLocaleDateString("vi-VN")}
                 </div>
               )}
 
@@ -187,7 +187,7 @@ export function TrackList({
               <div className="flex items-center justify-end gap-2">
                 <span className="text-white/70">
                   {Math.floor(track.duration / 60)}:
-                  {String(track.duration % 60).padStart(2, '0')}
+                  {String(track.duration % 60).padStart(2, "0")}
                 </span>
 
                 {allowRemove && (

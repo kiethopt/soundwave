@@ -1,5 +1,5 @@
-import { ArtistRequestFilters, CreatePlaylistData } from '@/types';
-import { get } from 'lodash';
+import { ArtistRequestFilters, CreatePlaylistData } from "@/types";
+import { get } from "lodash";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -9,15 +9,15 @@ const fetchWithAuth = async (
   options: RequestInit = {},
   token?: string
 ) => {
-  const sessionId = localStorage.getItem('sessionId');
+  const sessionId = localStorage.getItem("sessionId");
   const headers: Record<string, string> = {
     ...(token && { Authorization: `Bearer ${token}` }),
-    ...(sessionId && { 'Session-ID': sessionId }),
+    ...(sessionId && { "Session-ID": sessionId }),
     ...(options.headers as Record<string, string>),
   };
 
   if (!(options.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
+    headers["Content-Type"] = "application/json";
   }
 
   const response = await fetch(`${API_BASE}${url}`, {
@@ -27,17 +27,17 @@ const fetchWithAuth = async (
 
   if (!response.ok) {
     const errorText = await response.text();
-    let errorMessage = 'An unexpected error occurred';
-    let errorCode = '';
+    let errorMessage = "An unexpected error occurred";
+    let errorCode = "";
 
     try {
       const errorResponse = JSON.parse(errorText);
       errorMessage = errorResponse.message || errorMessage;
-      errorCode = errorResponse.code || '';
+      errorCode = errorResponse.code || "";
 
       // Thêm xử lý error code cho tài khoản bị khóa
-      if (errorCode === 'ARTIST_DEACTIVATED') {
-        errorMessage = 'Your artist account has been deactivated';
+      if (errorCode === "ARTIST_DEACTIVATED") {
+        errorMessage = "Your artist account has been deactivated";
       }
     } catch (e) {
       errorMessage = errorText;
@@ -70,71 +70,71 @@ interface ResetPasswordData {
 export const api = {
   auth: {
     register: async (data: RegisterData) =>
-      fetchWithAuth('/api/auth/register', {
-        method: 'POST',
+      fetchWithAuth("/api/auth/register", {
+        method: "POST",
         body: JSON.stringify(data),
       }),
 
     login: async (data: LoginData) =>
-      fetchWithAuth('/api/auth/login', {
-        method: 'POST',
+      fetchWithAuth("/api/auth/login", {
+        method: "POST",
         body: JSON.stringify(data),
       }),
 
     requestPasswordReset: async (email: string) =>
-      fetchWithAuth('/api/auth/request-password-reset', {
-        method: 'POST',
+      fetchWithAuth("/api/auth/request-password-reset", {
+        method: "POST",
         body: JSON.stringify({ email }),
       }),
 
     resetPassword: async (data: ResetPasswordData) =>
-      fetchWithAuth('/api/auth/reset-password', {
-        method: 'POST',
+      fetchWithAuth("/api/auth/reset-password", {
+        method: "POST",
         body: JSON.stringify(data),
       }),
 
     validateToken: async (token: string) =>
-      fetchWithAuth('/api/auth/validate-token', { method: 'GET' }, token),
+      fetchWithAuth("/api/auth/validate-token", { method: "GET" }, token),
 
     switchProfile: async (token: string) => {
       return fetchWithAuth(
-        '/api/auth/switch-profile',
-        { method: 'POST' },
+        "/api/auth/switch-profile",
+        { method: "POST" },
         token
       );
     },
 
     logout: async (token: string) =>
-      fetchWithAuth('/api/auth/logout', { method: 'POST' }, token),
+      fetchWithAuth("/api/auth/logout", { method: "POST" }, token),
 
     getMaintenanceStatus: async (): Promise<{ enabled: boolean }> => {
       try {
-        return await fetchWithAuth('/api/auth/maintenance-status', {
-          method: 'GET',
+        return await fetchWithAuth("/api/auth/maintenance-status", {
+          method: "GET",
         });
       } catch (error) {
-        console.error('Failed to fetch maintenance status:', error);
+        console.error("Failed to fetch maintenance status:", error);
         return { enabled: false };
       }
     },
 
     googleLogin: async (data: { token: string }) =>
-      fetchWithAuth('/api/auth/google-login', {
-        method: 'POST',
+      fetchWithAuth("/api/auth/google-login", {
+        method: "POST",
         body: JSON.stringify(data),
       }),
 
     uploadGoogleAvatar: async (googleImageUrl: string) => {
       const response = await fetch(`${API_BASE}/auth/upload-google-avatar`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ googleImageUrl }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload Google avatar');
+        throw new Error("Failed to upload Google avatar");
       }
 
       return response.json();
@@ -146,7 +146,7 @@ export const api = {
       fetchWithAuth(
         `/api/session/handle-audio-play`,
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ userId, sessionId }),
         },
         token
@@ -155,13 +155,13 @@ export const api = {
 
   admin: {
     getAIModelStatus: async (token: string) =>
-      fetchWithAuth('/api/admin/system/ai-model', { method: 'GET' }, token),
+      fetchWithAuth("/api/admin/system/ai-model", { method: "GET" }, token),
 
     updateAIModelStatus: async (model: string, token: string) =>
       fetchWithAuth(
-        '/api/admin/system/ai-model',
+        "/api/admin/system/ai-model",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ model }),
         },
         token
@@ -180,22 +180,22 @@ export const api = {
 
       if (filters) {
         if (filters.startDate) {
-          params.append('startDate', filters.startDate.toISOString());
+          params.append("startDate", filters.startDate.toISOString());
         }
         if (filters.endDate) {
-          params.append('endDate', filters.endDate.toISOString());
+          params.append("endDate", filters.endDate.toISOString());
         }
         if (filters.status) {
-          params.append('status', filters.status);
+          params.append("status", filters.status);
         }
         if (filters.search) {
-          params.append('search', filters.search);
+          params.append("search", filters.search);
         }
       }
 
       return fetchWithAuth(
         `/api/admin/artist-requests?${params.toString()}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       );
     },
@@ -203,15 +203,15 @@ export const api = {
     getArtistRequestDetail: async (requestId: string, token: string) =>
       fetchWithAuth(
         `/api/admin/artist-requests/${requestId}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     approveArtistRequest: async (requestId: string, token: string) =>
       fetchWithAuth(
-        '/api/admin/artist-requests/approve',
+        "/api/admin/artist-requests/approve",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ requestId }),
         },
         token
@@ -219,13 +219,13 @@ export const api = {
 
     rejectArtistRequest: async (
       requestId: string,
-      reason: string = '',
+      reason: string = "",
       token: string
     ) =>
       fetchWithAuth(
-        '/api/admin/artist-requests/reject',
+        "/api/admin/artist-requests/reject",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ requestId, reason }),
         },
         token
@@ -239,12 +239,12 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/admin/artists?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getArtistById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/artists/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/admin/artists/${id}`, { method: "GET" }, token),
 
     getAllUsers: async (
       token: string,
@@ -254,12 +254,12 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/admin/users?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getUserById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/users/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/admin/users/${id}`, { method: "GET" }, token),
 
     updateUser: async (
       userId: string,
@@ -270,7 +270,7 @@ export const api = {
         return fetchWithAuth(
           `/api/admin/users/${userId}`,
           {
-            method: 'PUT',
+            method: "PUT",
             body: data,
           },
           token
@@ -284,7 +284,7 @@ export const api = {
         return fetchWithAuth(
           `/api/admin/users/${userId}`,
           {
-            method: 'PUT',
+            method: "PUT",
             body: JSON.stringify(postData),
           },
           token
@@ -301,14 +301,14 @@ export const api = {
         return fetchWithAuth(
           `/api/admin/artists/${artistId}`,
           {
-            method: 'PUT',
+            method: "PUT",
             body: data,
           },
           token
         );
       } else {
         // Make sure we convert boolean values to strings consistently
-        if (data.hasOwnProperty('isActive')) {
+        if (data.hasOwnProperty("isActive")) {
           data = {
             ...data,
             isActive: data.isActive?.toString(),
@@ -318,7 +318,7 @@ export const api = {
         return fetchWithAuth(
           `/api/admin/artists/${artistId}`,
           {
-            method: 'PUT',
+            method: "PUT",
             body: JSON.stringify(data),
           },
           token
@@ -327,10 +327,10 @@ export const api = {
     },
 
     deleteUser: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/users/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/admin/users/${id}`, { method: "DELETE" }, token),
 
     deleteArtist: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/artists/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/admin/artists/${id}`, { method: "DELETE" }, token),
 
     getAllGenres: async (
       token: string,
@@ -340,15 +340,15 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/admin/genres?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     createGenre: async (data: any, token: string) =>
       fetchWithAuth(
-        '/api/admin/genres',
+        "/api/admin/genres",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify(data),
         },
         token
@@ -358,36 +358,36 @@ export const api = {
       fetchWithAuth(
         `/api/admin/genres/${genreId}`,
         {
-          method: 'PUT',
+          method: "PUT",
           body: data,
         },
         token
       ),
 
     deleteGenre: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/genres/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/admin/genres/${id}`, { method: "DELETE" }, token),
 
     getCacheStatus: async (token: string) =>
-      fetchWithAuth('/api/admin/system/cache', { method: 'GET' }, token),
+      fetchWithAuth("/api/admin/system/cache", { method: "GET" }, token),
 
     updateCacheStatus: async (enabled: boolean, token: string) =>
       fetchWithAuth(
-        '/api/admin/system/cache',
+        "/api/admin/system/cache",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ enabled }),
         },
         token
       ),
 
     getMaintenanceStatus: async (token: string) =>
-      fetchWithAuth('/api/admin/system/maintenance', { method: 'GET' }, token),
+      fetchWithAuth("/api/admin/system/maintenance", { method: "GET" }, token),
 
     updateMaintenanceStatus: async (enabled: boolean, token: string) =>
       fetchWithAuth(
-        '/api/admin/system/maintenance',
+        "/api/admin/system/maintenance",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ enabled }),
         },
         token
@@ -396,22 +396,22 @@ export const api = {
     getRecommendationMatrix: async (limit: number, token: string) =>
       fetchWithAuth(
         `/api/admin/analytics/matrix?limit=${limit}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     updateGlobalPlaylist: async (token: string) =>
       fetchWithAuth(
-        '/api/admin/playlists/global/update',
-        { method: 'POST' },
+        "/api/admin/playlists/global/update",
+        { method: "POST" },
         token
       ),
 
     // Add the correct endpoint function for updating all system playlists
     updateAllSystemPlaylists: async (token: string) =>
       fetchWithAuth(
-        '/api/playlists/admin/system/update-all',
-        { method: 'POST' },
+        "/api/playlists/admin/system/update-all",
+        { method: "POST" },
         token
       ),
 
@@ -419,9 +419,9 @@ export const api = {
     createSystemPlaylist: async (formData: FormData, token: string) => {
       // Handle file uploads in FormData
       return fetchWithAuth(
-        '/api/playlists/admin/system/base',
+        "/api/playlists/admin/system/base",
         {
-          method: 'POST',
+          method: "POST",
           body: formData,
           headers: {
             // Don't set Content-Type with FormData - browser will set it with boundary
@@ -440,7 +440,7 @@ export const api = {
       return fetchWithAuth(
         `/api/playlists/admin/system/base/${playlistId}`,
         {
-          method: 'PUT',
+          method: "PUT",
           body: formData,
           headers: {
             // Don't set Content-Type with FormData - browser will set it with boundary
@@ -453,7 +453,7 @@ export const api = {
     deleteSystemPlaylist: async (playlistId: string, token: string) => {
       return fetchWithAuth(
         `/api/playlists/admin/system/base/${playlistId}`,
-        { method: 'DELETE' },
+        { method: "DELETE" },
         token
       );
     },
@@ -461,9 +461,9 @@ export const api = {
     // Schedule playlist update for a specific time
     schedulePlaylistUpdate: async (scheduledTime: Date, token: string) => {
       return fetchWithAuth(
-        '/api/admin/playlists/global/schedule',
+        "/api/admin/playlists/global/schedule",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ scheduledTime: scheduledTime.toISOString() }),
         },
         token
@@ -475,7 +475,7 @@ export const api = {
     getUserById: async (id: string, token: string) => {
       const response = await fetchWithAuth(
         `/api/user/profile/${id}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       );
       return response;
@@ -484,22 +484,18 @@ export const api = {
     searchAll: async (query: string, token: string) =>
       fetchWithAuth(
         `/api/user/search-all?q=${query}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getAllGenres: async (token: string) =>
-      fetchWithAuth(
-        `/api/user/genres`,
-        { method: 'GET' },
-        token
-      ),
+      fetchWithAuth(`/api/user/genres`, { method: "GET" }, token),
 
     followUserOrArtist: async (followingId: string, token: string) =>
       fetchWithAuth(
         `/api/user/follow/${followingId}`,
         {
-          method: 'POST',
+          method: "POST",
         },
         token
       ),
@@ -508,30 +504,22 @@ export const api = {
       fetchWithAuth(
         `/api/user/unfollow/${followingId}`,
         {
-          method: 'DELETE',
+          method: "DELETE",
         },
         token
       ),
 
     getFollowers: async (token: string) =>
-      fetchWithAuth(
-        '/api/user/followers', 
-        { method: 'GET' }, 
-        token
-      ),
+      fetchWithAuth("/api/user/followers", { method: "GET" }, token),
 
     getFollowing: async (token: string) =>
-      fetchWithAuth(
-        '/api/user/following', 
-        { method: 'GET' }, 
-        token
-      ),
+      fetchWithAuth("/api/user/following", { method: "GET" }, token),
 
     requestArtistRole: async (token: string, data: FormData) =>
       fetchWithAuth(
-        '/api/user/request-artist',
+        "/api/user/request-artist",
         {
-          method: 'POST',
+          method: "POST",
           body: data,
         },
         token
@@ -539,9 +527,9 @@ export const api = {
 
     editProfile: async (token: string, data: FormData) =>
       fetchWithAuth(
-        '/api/user/edit-profile',
+        "/api/user/edit-profile",
         {
-          method: 'PUT',
+          method: "PUT",
           body: data,
         },
         token
@@ -554,96 +542,65 @@ export const api = {
       isVerified: boolean;
     }> => {
       return fetchWithAuth(
-        '/api/user/check-artist-request',
-        { method: 'GET' },
+        "/api/user/check-artist-request",
+        { method: "GET" },
         token
       );
     },
 
     getRecommendedArtists: async (token: string) =>
-      fetchWithAuth(
-        '/api/user/recommendedArtists', 
-        { method: 'GET' }, 
-        token
-      ),
+      fetchWithAuth("/api/user/recommendedArtists", { method: "GET" }, token),
 
     getNewestAlbums: async (token: string) =>
-      fetchWithAuth(
-        '/api/user/newestAlbums', 
-        { method: 'GET' }, 
-        token
-      ),
+      fetchWithAuth("/api/user/newestAlbums", { method: "GET" }, token),
 
     getNewestTracks: async (token: string) =>
-      fetchWithAuth(
-        '/api/user/newestTracks', 
-        { method: 'GET' }, 
-        token
-      ),
+      fetchWithAuth("/api/user/newestTracks", { method: "GET" }, token),
 
     getTopTracks: async (token: string) =>
-      fetchWithAuth(
-        '/api/user/topTracks', 
-        { method: 'GET' }, 
-        token
-      ),
+      fetchWithAuth("/api/user/topTracks", { method: "GET" }, token),
 
     getTopArtists: async (token: string) =>
-      fetchWithAuth(
-        '/api/user/topArtists', 
-        { method: 'GET' }, 
-        token
-      ),
+      fetchWithAuth("/api/user/topArtists", { method: "GET" }, token),
 
     getTopAlbums: async (token: string) =>
-      fetchWithAuth(
-        '/api/user/topAlbums', 
-        { method: 'GET' }, 
-        token
-      ),
+      fetchWithAuth("/api/user/topAlbums", { method: "GET" }, token),
 
     // User profile API
     getUserTopAlbums: async (id: string, token: string) =>
-      fetchWithAuth(
-        `/api/user/topAlbums/${id}`, 
-        { method: 'GET' }, token
-      ),
+      fetchWithAuth(`/api/user/topAlbums/${id}`, { method: "GET" }, token),
 
     getUserTopTracks: async (id: string, token: string) =>
-      fetchWithAuth(
-        `/api/user/topTracks/${id}`, 
-        { method: 'GET' }, 
-        token
-      ),
+      fetchWithAuth(`/api/user/topTracks/${id}`, { method: "GET" }, token),
 
     getUserTopArtists: async (id: string, token: string) =>
-      fetchWithAuth(`/api/user/topArtists/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/user/topArtists/${id}`, { method: "GET" }, token),
 
     getGenreTopAlbums: async (id: string, token: string) =>
       fetchWithAuth(
         `/api/user/genre/topAlbums/${id}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getGenreTopTracks: async (id: string, token: string) =>
       fetchWithAuth(
         `/api/user/genre/topTracks/${id}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getGenreTopArtists: async (id: string, token: string) =>
       fetchWithAuth(
         `/api/user/genre/topArtists/${id}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getGenreNewestTracks: async (id: string, token: string) =>
       fetchWithAuth(
         `/api/user/genre/newestTracks/${id}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
   },
@@ -652,45 +609,45 @@ export const api = {
     getAll: async (token: string, page: number, limit: number) =>
       fetchWithAuth(
         `/api/admin/artists?page=${page}&limit=${limit}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getRequests: async (token: string, page: number, limit: number) =>
       fetchWithAuth(
         `/api/admin/artist-requests?page=${page}&limit=${limit}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/artists/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/admin/artists/${id}`, { method: "GET" }, token),
 
     getArtistById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/profile/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/artist/profile/${id}`, { method: "GET" }, token),
 
     create: async (data: FormData, token: string) =>
       fetchWithAuth(
-        '/api/admin/artists',
-        { method: 'POST', body: data },
+        "/api/admin/artists",
+        { method: "POST", body: data },
         token
       ),
 
     getProfile: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/profile/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/artist/profile/${id}`, { method: "GET" }, token),
 
     updateProfile: async (id: string, data: FormData, token: string) =>
       fetchWithAuth(
         `/api/artist/profile/${id}`,
         {
-          method: 'PUT',
+          method: "PUT",
           body: data,
         },
         token
       ),
 
     getStats: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/stats/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/artist/stats/${id}`, { method: "GET" }, token),
 
     getAllGenres: async (
       token: string,
@@ -699,22 +656,22 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/artist/genres?page=${page}&limit=${limit}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getTrackByArtistId: async (id: string, token: string, type?: string) =>
       fetchWithAuth(
-        `/api/artist/tracks/${id}${type ? `?type=${type}` : ''}`,
-        { method: 'GET' },
+        `/api/artist/tracks/${id}${type ? `?type=${type}` : ""}`,
+        { method: "GET" },
         token
       ),
 
     getAlbumByArtistId: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/albums/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/artist/albums/${id}`, { method: "GET" }, token),
 
     getRelatedArtists: async (id: string, token: string) =>
-      fetchWithAuth(`/api/artist/related/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/artist/related/${id}`, { method: "GET" }, token),
 
     getAllTracks: async (
       token: string,
@@ -724,7 +681,7 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/tracks?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
@@ -736,7 +693,7 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/albums?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
@@ -748,7 +705,7 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/artist/${artistId}/albums?page=${page}&limit=${limit}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
@@ -756,7 +713,7 @@ export const api = {
       fetchWithAuth(
         `/api/admin/artists/${id}/update-monthly-listeners`,
         {
-          method: 'POST',
+          method: "POST",
         },
         token
       ),
@@ -769,14 +726,14 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/artist/profiles?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
   },
 
   artist: {
     getStats: async (token: string) =>
-      fetchWithAuth('/api/artist/stats', { method: 'GET' }, token),
+      fetchWithAuth("/api/artist/stats", { method: "GET" }, token),
   },
 
   tracks: {
@@ -789,11 +746,11 @@ export const api = {
       try {
         return await fetchWithAuth(
           `/api/tracks?${queryParams || `page=${page}&limit=${limit}`}`,
-          { method: 'GET' },
+          { method: "GET" },
           token
         );
       } catch (error) {
-        console.error('Error fetching tracks:', error);
+        console.error("Error fetching tracks:", error);
         return { success: false, data: [], pagination: { totalPages: 1 } };
       }
     },
@@ -802,12 +759,12 @@ export const api = {
       try {
         return await fetchWithAuth(
           `/api/tracks/${trackId}`,
-          { method: 'GET' },
+          { method: "GET" },
           token
         );
       } catch (error) {
         console.error(`Error fetching track ${trackId}:`, error);
-        return { success: false, message: 'Failed to fetch track' };
+        return { success: false, message: "Failed to fetch track" };
       }
     },
 
@@ -815,12 +772,12 @@ export const api = {
       try {
         return await fetchWithAuth(
           `/api/tracks/type/${type}`,
-          { method: 'GET' },
+          { method: "GET" },
           token
         );
       } catch (error) {
         console.error(`Error fetching tracks by type ${type}:`, error);
-        return { success: false, data: [], message: 'Failed to fetch tracks' };
+        return { success: false, data: [], message: "Failed to fetch tracks" };
       }
     },
 
@@ -828,12 +785,12 @@ export const api = {
       try {
         return await fetchWithAuth(
           `/api/tracks/genre/${genreId}`,
-          { method: 'GET' },
+          { method: "GET" },
           token
         );
       } catch (error) {
         console.error(`Error fetching tracks by genre ${genreId}:`, error);
-        return { success: false, data: [], message: 'Failed to fetch tracks' };
+        return { success: false, data: [], message: "Failed to fetch tracks" };
       }
     },
 
@@ -845,7 +802,7 @@ export const api = {
       try {
         return await fetchWithAuth(
           `/api/tracks/type/${type}/genre/${genreId}`,
-          { method: 'GET' },
+          { method: "GET" },
           token
         );
       } catch (error) {
@@ -853,7 +810,7 @@ export const api = {
           `Error fetching tracks by type ${type} and genre ${genreId}:`,
           error
         );
-        return { success: false, data: [], message: 'Failed to fetch tracks' };
+        return { success: false, data: [], message: "Failed to fetch tracks" };
       }
     },
 
@@ -861,7 +818,7 @@ export const api = {
       try {
         return await fetchWithAuth(
           `/api/tracks/${trackId}/play`,
-          { method: 'POST' },
+          { method: "POST" },
           token
         );
       } catch (error) {
@@ -872,25 +829,25 @@ export const api = {
     },
 
     create: async (formData: FormData, token: string) =>
-      fetchWithAuth('/api/tracks', { method: 'POST', body: formData }, token),
+      fetchWithAuth("/api/tracks", { method: "POST", body: formData }, token),
 
     update: async (trackId: string, data: FormData, token: string) =>
       fetchWithAuth(
         `/api/tracks/${trackId}`,
         {
-          method: 'PUT',
+          method: "PUT",
           body: data,
         },
         token
       ),
 
     delete: async (id: string, token: string) =>
-      fetchWithAuth(`/api/tracks/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/tracks/${id}`, { method: "DELETE" }, token),
 
     toggleVisibility: async (trackId: string, token: string) =>
       fetchWithAuth(
         `/api/tracks/${trackId}/toggle-visibility`,
-        { method: 'PUT' },
+        { method: "PUT" },
         token
       ),
 
@@ -902,23 +859,24 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/tracks/search?${queryParams || `q=${query}&page=${page}&limit=${limit}`
+        `/api/tracks/search?${
+          queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     like: async (trackId: string, token: string) =>
-      fetchWithAuth(`/api/tracks/${trackId}/like`, { method: 'POST' }, token),
+      fetchWithAuth(`/api/tracks/${trackId}/like`, { method: "POST" }, token),
 
     unlike: async (trackId: string, token: string) =>
-      fetchWithAuth(`/api/tracks/${trackId}/like`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/tracks/${trackId}/like`, { method: "DELETE" }, token),
 
     checkLiked: async (trackId: string, token: string) =>
       fetchWithAuth(
         `/api/tracks/${trackId}/liked`,
         {
-          method: 'GET',
+          method: "GET",
         },
         token
       ),
@@ -926,22 +884,22 @@ export const api = {
 
   history: {
     getPlayHistory: async (token: string) =>
-      fetchWithAuth('/api/history/play', { method: 'GET' }, token),
+      fetchWithAuth("/api/history/play", { method: "GET" }, token),
 
     getSearchHistory: async (token: string) =>
-      fetchWithAuth('/api/history/search', { method: 'GET' }, token),
+      fetchWithAuth("/api/history/search", { method: "GET" }, token),
 
     getAllHistory: async (token: string) =>
-      fetchWithAuth('/api/history', { method: 'GET' }, token),
+      fetchWithAuth("/api/history", { method: "GET" }, token),
 
     savePlayHistory: async (
       data: { trackId: string; duration: number; completed: boolean },
       token: string
     ) =>
       fetchWithAuth(
-        '/api/history/play',
+        "/api/history/play",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify(data),
         },
         token
@@ -949,9 +907,9 @@ export const api = {
 
     saveSearchHistory: async (query: string, token: string) =>
       fetchWithAuth(
-        '/api/history/search',
+        "/api/history/search",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify({ query }),
         },
         token
@@ -961,16 +919,16 @@ export const api = {
     getSystemPlaylistsForAdmin: async (token: string) => {
       try {
         return await fetchWithAuth(
-          '/api/playlists/system-all',
-          { method: 'GET' },
+          "/api/playlists/system-all",
+          { method: "GET" },
           token
         );
       } catch (error) {
-        console.error('Error fetching system playlists for admin:', error);
+        console.error("Error fetching system playlists for admin:", error);
         return {
           success: false,
           data: [],
-          message: 'Failed to fetch system playlists',
+          message: "Failed to fetch system playlists",
         };
       }
     },
@@ -981,16 +939,16 @@ export const api = {
     getNewestAlbums: async (token?: string) => {
       try {
         return await fetchWithAuth(
-          '/api/albums/newest',
-          { method: 'GET' },
+          "/api/albums/newest",
+          { method: "GET" },
           token
         );
       } catch (error) {
-        console.error('Error fetching newest albums:', error);
+        console.error("Error fetching newest albums:", error);
         return {
           success: false,
           albums: [],
-          message: 'Failed to fetch albums',
+          message: "Failed to fetch albums",
         };
       }
     },
@@ -998,13 +956,13 @@ export const api = {
     // Get hot albums - works for both authenticated and non-authenticated users
     getHotAlbums: async (token?: string) => {
       try {
-        return await fetchWithAuth('/api/albums/hot', { method: 'GET' }, token);
+        return await fetchWithAuth("/api/albums/hot", { method: "GET" }, token);
       } catch (error) {
-        console.error('Error fetching hot albums:', error);
+        console.error("Error fetching hot albums:", error);
         return {
           success: false,
           albums: [],
-          message: 'Failed to fetch albums',
+          message: "Failed to fetch albums",
         };
       }
     },
@@ -1014,13 +972,13 @@ export const api = {
       try {
         const response = await fetchWithAuth(
           `/api/albums/${albumId}`,
-          { method: 'GET' },
+          { method: "GET" },
           token
         );
         return response;
       } catch (error) {
         console.error(`Error fetching album ${albumId}:`, error);
-        return { success: false, message: 'Failed to fetch album details' };
+        return { success: false, message: "Failed to fetch album details" };
       }
     },
 
@@ -1034,28 +992,28 @@ export const api = {
       try {
         return await fetchWithAuth(
           `/api/albums?${queryParams || `page=${page}&limit=${limit}`}`,
-          { method: 'GET' },
+          { method: "GET" },
           token
         );
       } catch (error) {
-        console.error('Error fetching albums:', error);
+        console.error("Error fetching albums:", error);
         return { success: false, data: [], pagination: { totalPages: 1 } };
       }
     },
 
     create: async (data: FormData, token: string) =>
-      fetchWithAuth('/api/albums', { method: 'POST', body: data }, token),
+      fetchWithAuth("/api/albums", { method: "POST", body: data }, token),
 
     update: async (id: string, data: FormData, token: string) =>
-      fetchWithAuth(`/api/albums/${id}`, { method: 'PUT', body: data }, token),
+      fetchWithAuth(`/api/albums/${id}`, { method: "PUT", body: data }, token),
 
     delete: async (id: string, token: string) =>
-      fetchWithAuth(`/api/albums/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/albums/${id}`, { method: "DELETE" }, token),
 
     toggleVisibility: async (albumId: string, token: string) =>
       fetchWithAuth(
         `/api/albums/${albumId}/toggle-visibility`,
-        { method: 'PUT' },
+        { method: "PUT" },
         token
       ),
 
@@ -1063,7 +1021,7 @@ export const api = {
       return fetchWithAuth(
         `/api/albums/${id}/tracks`,
         {
-          method: 'POST',
+          method: "POST",
           body: data,
           headers: {},
         },
@@ -1079,14 +1037,15 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/albums/search?${queryParams || `q=${query}&page=${page}&limit=${limit}`
+        `/api/albums/search?${
+          queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     playAlbum: async (albumId: string, token: string) =>
-      fetchWithAuth(`/api/albums/${albumId}/play`, { method: 'POST' }, token),
+      fetchWithAuth(`/api/albums/${albumId}/play`, { method: "POST" }, token),
   },
 
   genres: {
@@ -1098,7 +1057,7 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/genres?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
   },
@@ -1112,18 +1071,18 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/labels?${queryParams || `page=${page}&limit=${limit}`}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     getById: async (id: string, token: string) =>
-      fetchWithAuth(`/api/labels/${id}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/labels/${id}`, { method: "GET" }, token),
 
     create: async (data: FormData, token: string) =>
       fetchWithAuth(
-        '/api/labels',
+        "/api/labels",
         {
-          method: 'POST',
+          method: "POST",
           body: data,
         },
         token
@@ -1133,31 +1092,31 @@ export const api = {
       fetchWithAuth(
         `/api/labels/${id}`,
         {
-          method: 'PUT',
+          method: "PUT",
           body: data,
         },
         token
       ),
 
     delete: async (id: string, token: string) =>
-      fetchWithAuth(`/api/labels/${id}`, { method: 'DELETE' }, token),
+      fetchWithAuth(`/api/labels/${id}`, { method: "DELETE" }, token),
   },
 
   dashboard: {
     getStats: async (token: string) =>
-      fetchWithAuth('/api/admin/stats', { method: 'GET' }, token),
+      fetchWithAuth("/api/admin/stats", { method: "GET" }, token),
   },
 
   notifications: {
     // Lấy danh sách notifications
     getList: async (token: string) =>
-      fetchWithAuth('/api/notifications', { method: 'GET' }, token),
+      fetchWithAuth("/api/notifications", { method: "GET" }, token),
 
     // Lấy số lượng thông báo chưa đọc
     getUnreadCount: async (token: string) =>
       fetchWithAuth(
-        '/api/notifications/unread-count',
-        { method: 'GET' },
+        "/api/notifications/unread-count",
+        { method: "GET" },
         token
       ),
 
@@ -1165,27 +1124,27 @@ export const api = {
     markAsRead: async (notificationId: string, token: string) =>
       fetchWithAuth(
         `/api/notifications/${notificationId}/read`,
-        { method: 'PATCH' },
+        { method: "PATCH" },
         token
       ),
 
     // Đánh dấu tất cả thông báo đã đọc
     markAllAsRead: async (token: string) =>
-      fetchWithAuth('/api/notifications/read-all', { method: 'PATCH' }, token),
+      fetchWithAuth("/api/notifications/read-all", { method: "PATCH" }, token),
 
     // Xóa tất cả thông báo
     deleteAll: async (token: string) =>
       fetchWithAuth(
-        '/api/notifications/delete-all',
-        { method: 'DELETE' },
+        "/api/notifications/delete-all",
+        { method: "DELETE" },
         token
       ),
 
     // Xóa các thông báo đã đọc
     deleteRead: async (token: string) =>
       fetchWithAuth(
-        '/api/notifications/delete-read',
-        { method: 'DELETE' },
+        "/api/notifications/delete-read",
+        { method: "DELETE" },
         token
       ), // Thêm dòng này
   },
@@ -1193,26 +1152,26 @@ export const api = {
   playlists: {
     create: async (data: CreatePlaylistData, token: string) =>
       fetchWithAuth(
-        '/api/playlists',
+        "/api/playlists",
         {
-          method: 'POST',
+          method: "POST",
           body: JSON.stringify(data),
         },
         token
       ),
 
     getAll: async (token: string) =>
-      fetchWithAuth('/api/playlists', { method: 'GET' }, token),
+      fetchWithAuth("/api/playlists", { method: "GET" }, token),
 
     getUserPlaylists: async (token: string) => {
       try {
-        return await fetchWithAuth('/api/playlists', { method: 'GET' }, token);
+        return await fetchWithAuth("/api/playlists", { method: "GET" }, token);
       } catch (error) {
-        console.error('Error fetching user playlists:', error);
+        console.error("Error fetching user playlists:", error);
         return {
           success: false,
           data: [],
-          message: 'Failed to fetch playlists',
+          message: "Failed to fetch playlists",
         };
       }
     },
@@ -1221,7 +1180,7 @@ export const api = {
       try {
         return await fetchWithAuth(
           `/api/playlists/${playlistId}`,
-          { method: 'GET' },
+          { method: "GET" },
           token
         );
       } catch (error) {
@@ -1229,7 +1188,7 @@ export const api = {
         return {
           success: false,
           data: null,
-          message: 'Failed to fetch playlist',
+          message: "Failed to fetch playlist",
         };
       }
     },
@@ -1239,7 +1198,7 @@ export const api = {
         return await fetchWithAuth(
           `/api/playlists/${playlistId}`,
           {
-            method: 'PATCH',
+            method: "PATCH",
             body: JSON.stringify(data),
           },
           token
@@ -1250,11 +1209,27 @@ export const api = {
       }
     },
 
+    delete: async (playlistId: string, token: string) => {
+      try {
+        const response = await fetchWithAuth(
+          `/api/playlists/${playlistId}`,
+          {
+            method: "DELETE",
+          },
+          token
+        );
+        return response;
+      } catch (error) {
+        console.error(`Error deleting playlist ${playlistId}:`, error);
+        throw error;
+      }
+    },
+
     removeTrack: async (playlistId: string, trackId: string, token: string) => {
       try {
         return await fetchWithAuth(
           `/api/playlists/${playlistId}/tracks/${trackId}`,
-          { method: 'DELETE' },
+          { method: "DELETE" },
           token
         );
       } catch (error) {
@@ -1272,13 +1247,13 @@ export const api = {
         return await fetchWithAuth(
           `/api/playlists/${playlistId}/tracks`,
           {
-            method: 'POST',
+            method: "POST",
             body: JSON.stringify({ trackId }),
           },
           token
         );
       } catch (error) {
-        console.error('API Error:', error);
+        console.error("API Error:", error);
         throw error;
       }
     },
@@ -1287,9 +1262,9 @@ export const api = {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/playlists/personalized`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(data),
@@ -1297,7 +1272,7 @@ export const api = {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to create personalized playlist');
+        throw new Error("Failed to create personalized playlist");
       }
 
       return response.json();
@@ -1308,20 +1283,20 @@ export const api = {
       token?: string,
       page: number = 1,
       limit: number = 10,
-      params: string = '' // Accept URLSearchParams string
+      params: string = "" // Accept URLSearchParams string
     ) => {
       try {
         const queryParams = new URLSearchParams(params);
-        queryParams.set('page', page.toString());
-        queryParams.set('limit', limit.toString());
+        queryParams.set("page", page.toString());
+        queryParams.set("limit", limit.toString());
         const url = `/api/playlists/system-all?${queryParams.toString()}`;
-        return await fetchWithAuth(url, { method: 'GET' }, token);
+        return await fetchWithAuth(url, { method: "GET" }, token);
       } catch (error) {
-        console.error('Error fetching system playlists:', error);
+        console.error("Error fetching system playlists:", error);
         return {
           success: false,
           data: [],
-          message: 'Failed to fetch system playlists',
+          message: "Failed to fetch system playlists",
           pagination: { currentPage: 1, totalPages: 1, totalItems: 0 }, // Provide default pagination on error
         };
       }
@@ -1329,18 +1304,18 @@ export const api = {
 
     getSystemPlaylist: async () => {
       try {
-        const token = localStorage.getItem('userToken');
+        const token = localStorage.getItem("userToken");
         if (!token) {
-          throw new Error('Token não encontrado');
+          throw new Error("Token não encontrado");
         }
 
         return await fetchWithAuth(
-          '/api/playlists/system',
-          { method: 'GET' },
+          "/api/playlists/system",
+          { method: "GET" },
           token
         );
       } catch (error) {
-        console.error('API Error:', error);
+        console.error("API Error:", error);
         throw error;
       }
     },
@@ -1348,12 +1323,12 @@ export const api = {
     getHomePageData: async (token?: string) => {
       try {
         return await fetchWithAuth(
-          '/api/playlists/home',
-          { method: 'GET' },
+          "/api/playlists/home",
+          { method: "GET" },
           token
         );
       } catch (error) {
-        console.error('Error fetching homepage data:', error);
+        console.error("Error fetching homepage data:", error);
         // Return empty data on error to prevent app from crashing
         return {
           success: false,
@@ -1363,34 +1338,34 @@ export const api = {
             hotAlbums: [],
             userPlaylists: [],
           },
-          message: 'Failed to fetch homepage data',
+          message: "Failed to fetch homepage data",
         };
       }
     },
 
     getPlaylists: async (token: string) =>
-      fetchWithAuth('/api/playlists', { method: 'GET' }, token),
+      fetchWithAuth("/api/playlists", { method: "GET" }, token),
 
     getPlaylistById: async (playlistId: string, token?: string) =>
-      fetchWithAuth(`/api/playlists/${playlistId}`, { method: 'GET' }, token),
+      fetchWithAuth(`/api/playlists/${playlistId}`, { method: "GET" }, token),
 
     updateVibeRewindPlaylist: async (token: string) =>
-      fetchWithAuth('/api/playlists/vibe-rewind', { method: 'POST' }, token),
+      fetchWithAuth("/api/playlists/vibe-rewind", { method: "POST" }, token),
 
     getAllBaseSystemPlaylists: async (
       token: string,
       page: number = 1,
       limit: number = 10,
-      params: string = ''
+      params: string = ""
     ) => {
       const queryParams = new URLSearchParams(params);
-      queryParams.set('page', page.toString());
-      queryParams.set('limit', limit.toString());
+      queryParams.set("page", page.toString());
+      queryParams.set("limit", limit.toString());
       const queryString = queryParams.toString();
 
       return fetchWithAuth(
         `/api/playlists/admin/system/base?${queryString}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       );
     },
@@ -1399,7 +1374,7 @@ export const api = {
   upload: {
     image: async (formData: FormData, token: string) => {
       const response = await fetch(`${API_BASE}/upload/image`, {
-        method: 'POST',
+        method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -1407,7 +1382,7 @@ export const api = {
       });
 
       if (!response.ok) {
-        throw new Error('Không thể tải ảnh lên');
+        throw new Error("Không thể tải ảnh lên");
       }
 
       return response.json();
@@ -1423,17 +1398,17 @@ export const api = {
     ) =>
       fetchWithAuth(
         `/api/user/check-follow/${targetId}?type=${type}`,
-        { method: 'GET' },
+        { method: "GET" },
         token
       ),
 
     follow: async (targetId: string, token: string) =>
-      fetchWithAuth(`/api/user/follow/${targetId}`, { method: 'POST' }, token),
+      fetchWithAuth(`/api/user/follow/${targetId}`, { method: "POST" }, token),
 
     unfollow: async (targetId: string, token: string) =>
       fetchWithAuth(
         `/api/user/unfollow/${targetId}`,
-        { method: 'DELETE' },
+        { method: "DELETE" },
         token
       ),
   },

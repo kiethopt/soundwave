@@ -1,25 +1,26 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Playlist } from '@/types';
-import { api } from '@/utils/api';
-import toast from 'react-hot-toast';
+} from "@/components/ui/select";
+import { Playlist } from "@/types";
+import { api } from "@/utils/api";
+import toast from "react-hot-toast";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface EditPlaylistDialogProps {
   playlist: Playlist;
@@ -31,7 +32,7 @@ interface EditPlaylistDialogProps {
 interface FormData {
   name: string;
   description: string;
-  privacy: 'PUBLIC' | 'PRIVATE';
+  privacy: "PUBLIC" | "PRIVATE";
 }
 
 export function EditPlaylistDialog({
@@ -41,33 +42,34 @@ export function EditPlaylistDialog({
   isSpecialPlaylist = false,
 }: EditPlaylistDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { theme } = useTheme();
+
   const [formData, setFormData] = useState<FormData>({
     name: playlist.name,
-    description: playlist.description || '',
+    description: playlist.description || "",
     privacy: playlist.privacy,
   });
 
-  // Check for special playlists - this covers both Vibe Rewind and Favorites
-  const isVibeRewind = playlist.name === 'Vibe Rewind';
-  const isFavorite = playlist.type === 'FAVORITE';
+  const isVibeRewind = playlist.name === "Vibe Rewind";
+  const isFavorite = playlist.type === "FAVORITE";
   const isFixedPrivacy = isSpecialPlaylist || isVibeRewind || isFavorite;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('userToken');
+      const token = localStorage.getItem("userToken");
       if (!token) {
-        toast.error('Vui lòng đăng nhập lại');
+        toast.error("Please log in again");
         return;
       }
 
       await api.playlists.update(playlist.id, formData, token);
-      toast.success('Đã cập nhật playlist');
+      toast.success("Đã cập nhật playlist");
       onOpenChange(false);
     } catch (error) {
-      console.error('Error updating playlist:', error);
-      toast.error('Không thể cập nhật playlist');
+      console.error("Error updating playlist:", error);
+      toast.error("Unable to update playlist");
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +85,7 @@ export function EditPlaylistDialog({
     }));
   };
 
-  const handlePrivacyChange = (value: 'PUBLIC' | 'PRIVATE') => {
+  const handlePrivacyChange = (value: "PUBLIC" | "PRIVATE") => {
     setFormData((prev) => ({
       ...prev,
       privacy: value,
@@ -92,15 +94,30 @@ export function EditPlaylistDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader className="text-white">
-          <DialogTitle>Chỉnh sửa playlist</DialogTitle>
+      <DialogContent
+        className={`sm:max-w-[425px] ${
+          theme === "light"
+            ? "bg-white text-gray-900 border border-gray-200"
+            : "bg-[#121212] text-white border border-white/10"
+        }`}
+      >
+        <DialogHeader>
+          <DialogTitle
+            className={theme === "light" ? "text-gray-900" : "text-white"}
+          >
+            Edit playlist
+          </DialogTitle>
           {isFixedPrivacy && (
-            <p className="text-sm text-white/60 mt-2">
+            <p
+              className={`text-sm mt-2 ${
+                theme === "light" ? "text-gray-500" : "text-white/60"
+              }`}
+            >
               This is a special playlist with fixed privacy settings
             </p>
           )}
         </DialogHeader>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Input
@@ -108,52 +125,102 @@ export function EditPlaylistDialog({
               placeholder="Tên playlist"
               value={formData.name}
               onChange={handleInputChange}
-              className="text-white"
               required
               readOnly={isVibeRewind || isFavorite}
+              className={
+                theme === "light"
+                  ? "border-gray-200 focus:border-gray-300"
+                  : "border-white/10 focus:border-white/20 text-white"
+              }
             />
           </div>
+
           <div className="space-y-2">
             <Textarea
               name="description"
               placeholder="Mô tả (tùy chọn)"
               value={formData.description}
               onChange={handleInputChange}
-              className="text-white"
               rows={3}
+              className={
+                theme === "light"
+                  ? "border-gray-200 focus:border-gray-300"
+                  : "border-white/10 focus:border-white/20 text-white"
+              }
             />
           </div>
+
           <div className="space-y-2">
             <Select
               value={formData.privacy}
               onValueChange={handlePrivacyChange}
               disabled={isFixedPrivacy}
             >
-              <SelectTrigger className="text-white">
-                <SelectValue placeholder="Chọn quyền riêng tư" />
+              <SelectTrigger
+                className={
+                  theme === "light"
+                    ? "border-gray-200 bg-white text-gray-900 focus:border-gray-300"
+                    : "border-white/10 bg-[#121212] text-white focus:border-white/20"
+                }
+              >
+                <SelectValue placeholder="Select privacy" />
               </SelectTrigger>
-              <SelectContent className="text-white bg-[#121212]">
-                <SelectItem value="PRIVATE">Riêng tư</SelectItem>
-                <SelectItem value="PUBLIC">Công khai</SelectItem>
+              <SelectContent
+                className={
+                  theme === "light"
+                    ? "bg-white text-gray-900 border-gray-200"
+                    : "bg-[#121212] text-white border-white/10"
+                }
+              >
+                <SelectItem
+                  value="PRIVATE"
+                  className={theme === "light" ? "text-gray-900" : "text-white"}
+                >
+                  Private
+                </SelectItem>
+                <SelectItem
+                  value="PUBLIC"
+                  className={theme === "light" ? "text-gray-900" : "text-white"}
+                >
+                  Public
+                </SelectItem>
               </SelectContent>
             </Select>
             {isFixedPrivacy && (
-              <p className="text-xs text-white/60 mt-1">
+              <p
+                className={`text-xs mt-1 ${
+                  theme === "light" ? "text-gray-500" : "text-white/60"
+                }`}
+              >
                 This playlist is always private and cannot be changed
               </p>
             )}
           </div>
+
           <div className="flex justify-end space-x-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
+              className={
+                theme === "light"
+                  ? "hover:bg-gray-100"
+                  : "hover:bg-neutral-800 text-white"
+              }
             >
-              Hủy
+              Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Đang lưu...' : 'Lưu thay đổi'}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className={
+                theme === "light"
+                  ? "bg-black text-white hover:bg-black/80"
+                  : "bg-white text-black hover:bg-white/80"
+              }
+            >
+              {isLoading ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </form>

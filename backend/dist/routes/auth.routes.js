@@ -17,7 +17,6 @@ router.post('/register-admin', auth_controller_1.registerAdmin);
 router.get('/validate-token', auth_middleware_1.authenticate, auth_controller_1.validateToken);
 router.post('/switch-profile', auth_middleware_1.authenticate, auth_controller_1.switchProfile);
 router.post('/google-login', auth_controller_1.googleLogin);
-router.post('/google-register', auth_controller_1.googleRegister);
 router.post('/convert-google-avatar', auth_controller_1.convertGoogleAvatar);
 exports.default = router;
 //# sourceMappingURL=auth.routes.js.map
