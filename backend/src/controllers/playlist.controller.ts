@@ -1,9 +1,9 @@
-import { RequestHandler } from 'express';
-import * as playlistService from '../services/playlist.service';
-import * as albumService from '../services/album.service';
-import { handleError } from '../utils/handle-utils'; // Import error handler
-import { PrismaClient, Prisma } from '@prisma/client';
-import prisma from '../config/db'; // Import configured prisma instance
+import { RequestHandler } from "express";
+import * as playlistService from "../services/playlist.service";
+import * as albumService from "../services/album.service";
+import { handleError } from "../utils/handle-utils"; // Import error handler
+import { PrismaClient, Prisma } from "@prisma/client";
+import prisma from "../config/db"; // Import configured prisma instance
 
 // Tạo playlist FAVORITE (mặc định khi tạo tài khoản sẽ có 1 cái playlist này)
 export const createFavoritePlaylist = async (userId: string): Promise<void> => {
@@ -18,7 +18,7 @@ export const createFavoritePlaylist = async (userId: string): Promise<void> => {
       },
     });
   } catch (error) {
-    console.error('Error creating favorite playlist:', error);
+    console.error("Error creating favorite playlist:", error);
     throw error;
   }
 };
@@ -34,31 +34,31 @@ export const createPlaylist: RequestHandler = async (
     const {
       name,
       description,
-      privacy = 'PRIVATE',
-      type = 'NORMAL',
+      privacy = "PRIVATE",
+      type = "NORMAL",
     } = req.body;
 
     if (!userId) {
       res.status(401).json({
         success: false,
-        message: 'Unauthorized',
+        message: "Unauthorized",
       });
       return;
     }
 
     // Nếu đang cố tạo playlist FAVORITE, kiểm tra xem đã có chưa
-    if (type === 'FAVORITE') {
+    if (type === "FAVORITE") {
       const existingFavorite = await prisma.playlist.findFirst({
         where: {
           userId,
-          type: 'FAVORITE',
+          type: "FAVORITE",
         },
       });
 
       if (existingFavorite) {
         res.status(400).json({
           success: false,
-          message: 'Bạn đã có playlist Yêu thích',
+          message: "Bạn đã có playlist Yêu thích",
         });
         return;
       }
@@ -77,7 +77,7 @@ export const createPlaylist: RequestHandler = async (
 
     res.status(201).json({
       success: true,
-      message: 'Đã tạo playlist thành công',
+      message: "Đã tạo playlist thành công",
       data: playlist,
     });
   } catch (error) {
@@ -97,14 +97,14 @@ export const getPlaylists: RequestHandler = async (
     if (!userId) {
       res.status(401).json({
         success: false,
-        message: 'Unauthorized',
+        message: "Unauthorized",
       });
       return;
     }
 
     // Check if we're filtering for system playlists only
-    const filterType = req.header('X-Filter-Type');
-    const isSystemFilter = filterType === 'system';
+    const filterType = req.header("X-Filter-Type");
+    const isSystemFilter = filterType === "system";
 
     // Create favorite playlist if it doesn't exist (for all non-system requests)
     if (!isSystemFilter) {
@@ -112,7 +112,7 @@ export const getPlaylists: RequestHandler = async (
       let favoritePlaylist = await prisma.playlist.findFirst({
         where: {
           userId,
-          type: 'FAVORITE',
+          type: "FAVORITE",
         },
       });
 
@@ -133,7 +133,7 @@ export const getPlaylists: RequestHandler = async (
       let vibeRewindPlaylist = await prisma.playlist.findFirst({
         where: {
           userId,
-          name: 'Vibe Rewind',
+          name: "Vibe Rewind",
         },
       });
 
@@ -141,11 +141,11 @@ export const getPlaylists: RequestHandler = async (
       if (!vibeRewindPlaylist) {
         vibeRewindPlaylist = await prisma.playlist.create({
           data: {
-            name: 'Vibe Rewind',
+            name: "Vibe Rewind",
             description:
               "Your personal time capsule - tracks you've been vibing to lately",
-            privacy: 'PRIVATE',
-            type: 'NORMAL',
+            privacy: "PRIVATE",
+            type: "NORMAL",
             userId,
           },
         });
@@ -154,7 +154,7 @@ export const getPlaylists: RequestHandler = async (
         try {
           await playlistService.updateVibeRewindPlaylist(userId);
         } catch (error) {
-          console.error('Error initializing Vibe Rewind playlist:', error);
+          console.error("Error initializing Vibe Rewind playlist:", error);
           // Continue even if this fails
         }
       }
@@ -168,14 +168,14 @@ export const getPlaylists: RequestHandler = async (
             // User's own system playlists
             {
               userId,
-              type: 'SYSTEM',
+              type: "SYSTEM",
             },
             // Global system playlists
             {
-              type: 'SYSTEM',
-              privacy: 'PUBLIC',
+              type: "SYSTEM",
+              privacy: "PUBLIC",
               user: {
-                role: 'ADMIN',
+                role: "ADMIN",
               },
             },
           ],
@@ -191,12 +191,12 @@ export const getPlaylists: RequestHandler = async (
               },
             },
             orderBy: {
-              trackOrder: 'asc',
+              trackOrder: "asc",
             },
           },
         },
         orderBy: {
-          createdAt: 'desc',
+          createdAt: "desc",
         },
       });
 
@@ -216,7 +216,7 @@ export const getPlaylists: RequestHandler = async (
         return {
           ...playlist,
           tracks: formattedTracks,
-          canEdit: req.user?.role === 'ADMIN' || playlist.userId === userId,
+          canEdit: req.user?.role === "ADMIN" || playlist.userId === userId,
         };
       });
 
@@ -242,7 +242,7 @@ export const getPlaylists: RequestHandler = async (
           },
         },
         orderBy: {
-          createdAt: 'desc',
+          createdAt: "desc",
         },
       });
 
@@ -279,28 +279,28 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
     if (!playlistExists) {
       res.status(404).json({
         success: false,
-        message: 'Playlist not found',
+        message: "Playlist not found",
       });
       return;
     }
 
     // Check if this is a system playlist, favorite playlist, or public playlist
-    const isSystemPlaylist = playlistExists.type === 'SYSTEM';
-    const isFavoritePlaylist = playlistExists.type === 'FAVORITE';
-    const isPublicPlaylist = playlistExists.privacy === 'PUBLIC';
+    const isSystemPlaylist = playlistExists.type === "SYSTEM";
+    const isFavoritePlaylist = playlistExists.type === "FAVORITE";
+    const isPublicPlaylist = playlistExists.privacy === "PUBLIC";
 
     // For unauthenticated users, only allow PUBLIC or SYSTEM playlists
     if (!isAuthenticated && !isPublicPlaylist && !isSystemPlaylist) {
       res.status(401).json({
         success: false,
-        message: 'Please log in to view this playlist',
+        message: "Please log in to view this playlist",
       });
       return;
     }
     // If the playlist is the Recommended Playlist, update it automatically
     if (
-      playlistExists.type === 'NORMAL' &&
-      playlistExists.name === 'Vibe Rewind'
+      playlistExists.type === "NORMAL" &&
+      playlistExists.name === "Vibe Rewind"
     ) {
       await playlistService.updateVibeRewindPlaylist(userId!);
     }
@@ -322,7 +322,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
               },
             },
             orderBy: {
-              trackOrder: 'asc',
+              trackOrder: "asc",
             },
           },
         },
@@ -352,7 +352,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
               },
             },
             orderBy: {
-              trackOrder: 'asc',
+              trackOrder: "asc",
             },
           },
         },
@@ -363,7 +363,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       if (!isAuthenticated) {
         res.status(401).json({
           success: false,
-          message: 'Please log in to view this playlist',
+          message: "Please log in to view this playlist",
         });
         return;
       }
@@ -390,7 +390,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
               },
             },
             orderBy: {
-              trackOrder: 'asc',
+              trackOrder: "asc",
             },
           },
         },
@@ -409,7 +409,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
     // Only ADMIN can edit SYSTEM playlists, and only owner can edit their playlists
     const canEdit =
       isAuthenticated && // Must be authenticated to edit anything
-      ((isSystemPlaylist && userRole === 'ADMIN') ||
+      ((isSystemPlaylist && userRole === "ADMIN") ||
         (!isSystemPlaylist && playlist.userId === userId));
 
     // Transform data structure
@@ -433,7 +433,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       },
     });
   } catch (error) {
-    console.error('Error in getPlaylistById:', error);
+    console.error("Error in getPlaylistById:", error);
     next(error);
   }
 };
@@ -441,7 +441,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
 // Thêm bài hát vào playlist
 export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
   try {
-    console.log('AddToPlaylist request:', {
+    console.log("AddToPlaylist request:", {
       params: req.params,
       body: req.body,
       user: req.user,
@@ -455,7 +455,7 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
     if (!trackId) {
       res.status(400).json({
         success: false,
-        message: 'Track ID is required',
+        message: "Track ID is required",
       });
       return;
     }
@@ -473,25 +473,25 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
     if (!playlist) {
       res.status(404).json({
         success: false,
-        message: 'Playlist not found',
+        message: "Playlist not found",
       });
       return;
     }
 
     // Check if it's a SYSTEM playlist - only ADMIN can modify
-    if (playlist.type === 'SYSTEM' && userRole !== 'ADMIN') {
+    if (playlist.type === "SYSTEM" && userRole !== "ADMIN") {
       res.status(403).json({
         success: false,
-        message: 'Only administrators can modify system playlists',
+        message: "Only administrators can modify system playlists",
       });
       return;
     }
 
     // For regular playlists, check if the user owns it
-    if (playlist.type !== 'SYSTEM' && playlist.userId !== userId) {
+    if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
       res.status(403).json({
         success: false,
-        message: 'You do not have permission to modify this playlist',
+        message: "You do not have permission to modify this playlist",
       });
       return;
     }
@@ -506,7 +506,7 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
     if (!track) {
       res.status(404).json({
         success: false,
-        message: 'Track not found',
+        message: "Track not found",
       });
       return;
     }
@@ -522,7 +522,7 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
     if (existingTrack) {
       res.status(400).json({
         success: false,
-        message: 'Track already exists in playlist',
+        message: "Track already exists in playlist",
       });
       return;
     }
@@ -555,11 +555,11 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Track added to playlist successfully',
+      message: "Track added to playlist successfully",
     });
     return;
   } catch (error) {
-    console.error('Error in addTrackToPlaylist:', error);
+    console.error("Error in addTrackToPlaylist:", error);
     next(error);
     return;
   }
@@ -576,7 +576,7 @@ export const removeTrackFromPlaylist: RequestHandler = async (
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
-    console.log('Removing track from playlist:', {
+    console.log("Removing track from playlist:", {
       playlistId,
       trackId,
       userId,
@@ -592,25 +592,25 @@ export const removeTrackFromPlaylist: RequestHandler = async (
     if (!playlist) {
       res.status(404).json({
         success: false,
-        message: 'Playlist not found',
+        message: "Playlist not found",
       });
       return;
     }
 
     // Check if it's a SYSTEM playlist - only ADMIN can modify
-    if (playlist.type === 'SYSTEM' && userRole !== 'ADMIN') {
+    if (playlist.type === "SYSTEM" && userRole !== "ADMIN") {
       res.status(403).json({
         success: false,
-        message: 'Only administrators can modify system playlists',
+        message: "Only administrators can modify system playlists",
       });
       return;
     }
 
     // For regular playlists, check if the user owns it
-    if (playlist.type !== 'SYSTEM' && playlist.userId !== userId) {
+    if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
       res.status(403).json({
         success: false,
-        message: 'You do not have permission to modify this playlist',
+        message: "You do not have permission to modify this playlist",
       });
       return;
     }
@@ -637,11 +637,11 @@ export const removeTrackFromPlaylist: RequestHandler = async (
 
     res.json({
       success: true,
-      message: 'Đã xóa bài hát khỏi playlist',
+      message: "Đã xóa bài hát khỏi playlist",
     });
     return;
   } catch (error) {
-    console.error('Error removing track:', error);
+    console.error("Error removing track:", error);
     next(error);
     return;
   }
@@ -661,7 +661,7 @@ export const updatePlaylist: RequestHandler = async (
     if (!userId) {
       res.status(401).json({
         success: false,
-        message: 'Unauthorized',
+        message: "Unauthorized",
       });
       return;
     }
@@ -674,36 +674,69 @@ export const updatePlaylist: RequestHandler = async (
     if (!playlist) {
       res.status(404).json({
         success: false,
-        message: 'Playlist not found',
+        message: "Playlist not found",
       });
       return;
     }
 
     // Check if it's a SYSTEM playlist - only ADMIN can modify
-    if (playlist.type === 'SYSTEM' && userRole !== 'ADMIN') {
+    if (playlist.type === "SYSTEM" && userRole !== "ADMIN") {
       res.status(403).json({
         success: false,
-        message: 'Only administrators can modify system playlists',
+        message: "Only administrators can modify system playlists",
       });
       return;
     }
 
     // For regular playlists, check if the user owns it
-    if (playlist.type !== 'SYSTEM' && playlist.userId !== userId) {
+    if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
       res.status(403).json({
         success: false,
-        message: 'You do not have permission to modify this playlist',
+        message: "You do not have permission to modify this playlist",
       });
       return;
     }
 
+    // Chuẩn bị dữ liệu cập nhật
+    const updateData: any = {
+      name,
+      description,
+      privacy,
+    };
+
+    // Xử lý upload file nếu có
+    if (req.file) {
+      try {
+        // Import service upload cho Cloudinary
+        const { uploadFile } = require("../services/upload.service");
+
+        // Upload file vào Cloudinary
+        const result = await uploadFile(
+          req.file.buffer,
+          "playlists/covers",
+          "image"
+        );
+
+        // Thêm coverUrl vào dữ liệu cập nhật
+        updateData.coverUrl = result.secure_url;
+
+        console.log(
+          "Uploaded new cover image to Cloudinary:",
+          result.secure_url
+        );
+      } catch (uploadError) {
+        console.error("Error uploading cover image:", uploadError);
+        res.status(500).json({
+          success: false,
+          message: "Failed to upload cover image",
+        });
+        return;
+      }
+    }
+
     const updatedPlaylist = await prisma.playlist.update({
       where: { id },
-      data: {
-        name,
-        description,
-        privacy,
-      },
+      data: updateData,
       include: {
         tracks: {
           include: {
@@ -714,28 +747,34 @@ export const updatePlaylist: RequestHandler = async (
             },
           },
           orderBy: {
-            trackOrder: 'asc',
+            trackOrder: "asc",
           },
         },
       },
     });
 
+    // Thêm thuộc tính canEdit vào kết quả trả về
+    const responseData = {
+      ...updatedPlaylist,
+      canEdit: req.user?.role === "ADMIN" || updatedPlaylist.userId === userId,
+    };
+
     res.json({
       success: true,
-      data: updatedPlaylist,
+      data: responseData,
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
+      if (error.code === "P2002") {
         res.status(400).json({
           success: false,
-          message: 'Bạn đã có playlist với tên này',
+          message: "Bạn đã có playlist với tên này",
         });
       }
     }
     res.status(500).json({
       success: false,
-      message: 'Đã có lỗi xảy ra',
+      message: "Đã có lỗi xảy ra",
     });
   }
 };
@@ -754,7 +793,7 @@ export const deletePlaylist: RequestHandler = async (
     if (!userId) {
       res.status(401).json({
         success: false,
-        message: 'Unauthorized',
+        message: "Unauthorized",
       });
       return;
     }
@@ -767,25 +806,25 @@ export const deletePlaylist: RequestHandler = async (
     if (!playlist) {
       res.status(404).json({
         success: false,
-        message: 'Playlist not found',
+        message: "Playlist not found",
       });
       return;
     }
 
     // Check if it's a SYSTEM playlist - only ADMIN can delete
-    if (playlist.type === 'SYSTEM' && userRole !== 'ADMIN') {
+    if (playlist.type === "SYSTEM" && userRole !== "ADMIN") {
       res.status(403).json({
         success: false,
-        message: 'Only administrators can delete system playlists',
+        message: "Only administrators can delete system playlists",
       });
       return;
     }
 
     // For regular playlists, check if the user owns it
-    if (playlist.type !== 'SYSTEM' && playlist.userId !== userId) {
+    if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
       res.status(403).json({
         success: false,
-        message: 'You do not have permission to delete this playlist',
+        message: "You do not have permission to delete this playlist",
       });
       return;
     }
@@ -796,7 +835,7 @@ export const deletePlaylist: RequestHandler = async (
 
     res.json({
       success: true,
-      message: 'Đã xóa playlist thành công',
+      message: "Đã xóa playlist thành công",
     });
   } catch (error) {
     next(error);
@@ -819,7 +858,7 @@ export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
       pagination: result.pagination,
     });
   } catch (error) {
-    console.error('Error in getSystemPlaylists:', error);
+    console.error("Error in getSystemPlaylists:", error);
     next(error);
   }
 };
@@ -833,7 +872,7 @@ export const updateVibeRewindPlaylist: RequestHandler = async (
   try {
     const user = req.user;
     if (!user) {
-      res.status(401).json({ success: false, message: 'Unauthorized' });
+      res.status(401).json({ success: false, message: "Unauthorized" });
       return;
     }
 
@@ -842,13 +881,13 @@ export const updateVibeRewindPlaylist: RequestHandler = async (
 
     res.status(200).json({
       success: true,
-      message: 'Vibe Rewind playlist updated successfully',
+      message: "Vibe Rewind playlist updated successfully",
     });
   } catch (error) {
-    console.error('Update Vibe Rewind playlist error:', error);
+    console.error("Update Vibe Rewind playlist error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update Vibe Rewind playlist',
+      message: "Failed to update Vibe Rewind playlist",
     });
   }
 };
@@ -863,7 +902,7 @@ export const generateAIPlaylist: RequestHandler = async (
     if (!userId) {
       res.status(401).json({
         success: false,
-        message: 'Unauthorized, please login',
+        message: "Unauthorized, please login",
       });
       return;
     }
@@ -894,10 +933,10 @@ export const generateAIPlaylist: RequestHandler = async (
       data: playlistData,
     });
   } catch (error) {
-    console.error('Error generating AI playlist:', error);
+    console.error("Error generating AI playlist:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to generate AI playlist',
+      message: "Failed to generate AI playlist",
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -916,19 +955,19 @@ export const updateAllSystemPlaylists: RequestHandler = async (
     // Respond immediately
     res.status(200).json({
       success: true,
-      message: 'System playlists update job started',
+      message: "System playlists update job started",
     });
 
     // Trigger background update using the service function
     setTimeout(async () => {
       try {
-        console.log('[ServiceTrigger] Starting system playlist update');
+        console.log("[ServiceTrigger] Starting system playlist update");
         // Call the service function directly
         const result = await playlistService.updateAllSystemPlaylists();
 
         if (result.success) {
           console.log(
-            '[ServiceTrigger] Successfully updated all system playlists'
+            "[ServiceTrigger] Successfully updated all system playlists"
           );
         } else {
           console.error(
@@ -938,16 +977,16 @@ export const updateAllSystemPlaylists: RequestHandler = async (
         }
       } catch (error) {
         console.error(
-          '[ServiceTrigger] Critical error while updating system playlists:',
+          "[ServiceTrigger] Critical error while updating system playlists:",
           error
         );
       }
     }, 10);
   } catch (error) {
-    console.error('Update all system playlists error:', error);
+    console.error("Update all system playlists error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to start system playlists update job',
+      message: "Failed to start system playlists update job",
     });
   }
 };
@@ -974,12 +1013,12 @@ export const createBaseSystemPlaylist: RequestHandler = async (
     if (!name) {
       res
         .status(400)
-        .json({ success: false, message: 'Playlist name is required.' });
+        .json({ success: false, message: "Playlist name is required." });
       return;
     }
 
     // Tạo metadata AI params
-    let finalDescription = description || '';
+    let finalDescription = description || "";
     const aiParams: Record<string, any> = {}; // Use Record for better type safety
     if (basedOnMood) aiParams.basedOnMood = basedOnMood;
     if (basedOnGenre) aiParams.basedOnGenre = basedOnGenre;
@@ -995,7 +1034,7 @@ export const createBaseSystemPlaylist: RequestHandler = async (
     const playlistData: any = {
       name,
       description: finalDescription, // Use the description with metadata
-      privacy: privacy || 'PUBLIC',
+      privacy: privacy || "PUBLIC",
     };
 
     const playlist = await playlistService.createBaseSystemPlaylist(
@@ -1005,10 +1044,10 @@ export const createBaseSystemPlaylist: RequestHandler = async (
 
     res.status(201).json({ success: true, data: playlist });
   } catch (error) {
-    if (error instanceof Error && error.message.includes('already exists')) {
+    if (error instanceof Error && error.message.includes("already exists")) {
       res.status(400).json({ success: false, message: error.message });
     } else {
-      handleError(res, error, 'Create Base System Playlist');
+      handleError(res, error, "Create Base System Playlist");
     }
   }
 };
@@ -1033,7 +1072,7 @@ export const updateBaseSystemPlaylist: RequestHandler = async (
     const coverFile = req.file;
 
     // Tạo metadata AI params
-    let finalDescription = description || '';
+    let finalDescription = description || "";
     const aiParams: Record<string, any> = {}; // Use Record for better type safety
     if (basedOnMood) aiParams.basedOnMood = basedOnMood;
     if (basedOnGenre) aiParams.basedOnGenre = basedOnGenre;
@@ -1042,7 +1081,7 @@ export const updateBaseSystemPlaylist: RequestHandler = async (
 
     // Xóa metadata cũ nếu có
     finalDescription = finalDescription
-      .replace(/<!--AI_PARAMS:.*?-->/s, '')
+      .replace(/<!--AI_PARAMS:.*?-->/s, "")
       .trim();
 
     // Thêm metadata mới nếu có bất kỳ tham số AI nào
@@ -1066,15 +1105,15 @@ export const updateBaseSystemPlaylist: RequestHandler = async (
     res.status(200).json({ success: true, data: playlist });
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes('not found')) {
+      if (error.message.includes("not found")) {
         res.status(404).json({ success: false, message: error.message });
-      } else if (error.message.includes('already exists')) {
+      } else if (error.message.includes("already exists")) {
         res.status(400).json({ success: false, message: error.message });
       } else {
-        handleError(res, error, 'Update Base System Playlist');
+        handleError(res, error, "Update Base System Playlist");
       }
     } else {
-      handleError(res, error, 'Update Base System Playlist');
+      handleError(res, error, "Update Base System Playlist");
     }
   }
 };
@@ -1089,13 +1128,13 @@ export const deleteBaseSystemPlaylist: RequestHandler = async (
     await playlistService.deleteBaseSystemPlaylist(id);
     res.status(200).json({
       success: true,
-      message: 'Base system playlist deleted successfully.',
+      message: "Base system playlist deleted successfully.",
     });
   } catch (error) {
-    if (error instanceof Error && error.message.includes('not found')) {
+    if (error instanceof Error && error.message.includes("not found")) {
       res.status(404).json({ success: false, message: error.message });
     } else {
-      handleError(res, error, 'Delete Base System Playlist');
+      handleError(res, error, "Delete Base System Playlist");
     }
   }
 };
@@ -1109,7 +1148,7 @@ export const getAllBaseSystemPlaylists: RequestHandler = async (
     const result = await playlistService.getAllBaseSystemPlaylists(req);
     res.status(200).json({ success: true, ...result }); // Spread result to include data and pagination
   } catch (error) {
-    handleError(res, error, 'Get All Base System Playlists');
+    handleError(res, error, "Get All Base System Playlists");
   }
 };
 
@@ -1137,8 +1176,8 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
       try {
         const systemPlaylists = await prisma.playlist.findMany({
           where: {
-            type: 'SYSTEM',
-            privacy: 'PUBLIC',
+            type: "SYSTEM",
+            privacy: "PUBLIC",
           },
           include: {
             tracks: {
@@ -1151,7 +1190,7 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
                 trackOrder: true,
               },
               orderBy: {
-                trackOrder: 'asc',
+                trackOrder: "asc",
               },
             },
           },
@@ -1170,7 +1209,7 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
         const userSystemPlaylists = await prisma.playlist.findMany({
           where: {
             userId,
-            type: 'SYSTEM',
+            type: "SYSTEM",
           },
           include: {
             _count: {
@@ -1186,7 +1225,7 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
           where: {
             userId,
             type: {
-              not: 'SYSTEM',
+              not: "SYSTEM",
             },
           },
           include: {
@@ -1211,7 +1250,7 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
           totalTracks: playlist._count.tracks,
         }));
       } catch (error: any) {
-        console.error('Error fetching user playlist data:', error);
+        console.error("Error fetching user playlist data:", error);
         // Continue with partial data rather than failing completely
       }
     }
@@ -1222,7 +1261,7 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
       data: responseData,
     });
   } catch (error: any) {
-    console.error('Error in getHomePageData:', error);
+    console.error("Error in getHomePageData:", error);
     next(error);
   }
 };

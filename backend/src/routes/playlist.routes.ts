@@ -45,7 +45,7 @@ router.use(authenticate);
 // Standard playlist management routes
 router.get("/", getPlaylists);
 router.post("/", createPlaylist);
-router.patch("/:id", updatePlaylist);
+router.patch("/:id", upload.single("cover"), updatePlaylist);
 router.delete("/:id", deletePlaylist);
 router.delete("/:playlistId/tracks/:trackId", removeTrackFromPlaylist);
 router.post("/:id/tracks", addTrackToPlaylist);

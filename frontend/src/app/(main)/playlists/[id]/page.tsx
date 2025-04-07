@@ -13,6 +13,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { PlaylistIcon } from "@/components/user/playlist/PlaylistIcon";
+
+// Khai báo event bus đơn giản để gọi fetchPlaylists từ sidebar
+const playlistUpdateEvent = new CustomEvent("playlist-updated");
 
 export default function PlaylistPage() {
   const params = useParams();
@@ -160,13 +164,12 @@ export default function PlaylistPage() {
           ) : (
             <div className="w-full h-full bg-white/10 flex items-center justify-center rounded-md">
               <div className="text-white/70">
-                <svg
-                  className="w-16 h-16"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-                </svg>
+                <PlaylistIcon
+                  name={playlist.name}
+                  type={playlist.type}
+                  isAIGenerated={playlist.isAIGenerated}
+                  size={64}
+                />
               </div>
             </div>
           )}
@@ -188,13 +191,23 @@ export default function PlaylistPage() {
               </span>
             )}
             {isFavoritePlaylist && (
-              <span className="px-2 py-1 text-xs font-medium rounded-full bg-primary/20 text-primary">
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-400">
                 Favorites
               </span>
             )}
             {playlist.isAIGenerated && (
               <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-500/20 text-purple-400 flex items-center gap-1">
                 <span>Personalized</span>
+              </span>
+            )}
+            {!isFavoritePlaylist && playlist.privacy === "PRIVATE" && (
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-500/20 text-gray-300">
+                Private
+              </span>
+            )}
+            {playlist.privacy === "PUBLIC" && (
+              <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-500/20 text-blue-400">
+                Public
               </span>
             )}
           </div>
@@ -280,6 +293,32 @@ export default function PlaylistPage() {
         open={isEditOpen}
         onOpenChange={setIsEditOpen}
         isSpecialPlaylist={isSpecialPlaylist}
+        onPlaylistUpdated={(updatedPlaylist) => {
+          // Cập nhật state playlist với dữ liệu mới
+          // Đảm bảo giữ lại thuộc tính canEdit nếu không có trong dữ liệu mới
+          const updatedTracks = updatedPlaylist.tracks || [];
+
+          // Format tracks đúng nếu cần thiết
+          let formattedTracks = updatedTracks;
+
+          // Kiểm tra nếu tracks được trả về dưới dạng PlaylistTrack thay vì Track
+          if (updatedTracks.length > 0 && "track" in updatedTracks[0]) {
+            // Giữ lại tracks hiện tại thay vì cố gắng chuyển đổi dữ liệu không đầy đủ
+            formattedTracks = playlist.tracks;
+          }
+
+          setPlaylist({
+            ...updatedPlaylist,
+            canEdit:
+              updatedPlaylist.canEdit !== undefined
+                ? updatedPlaylist.canEdit
+                : playlist.canEdit,
+            tracks: formattedTracks,
+          });
+
+          // Phát sự kiện để sidebar biết cần cập nhật playlists
+          window.dispatchEvent(playlistUpdateEvent);
+        }}
       />
 
       <DeletePlaylistDialog
