@@ -119,9 +119,8 @@ export default function ArtistDashboard() {
       <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h1
-            className={`text-2xl sm:text-3xl font-bold ${
-              theme === 'light' ? 'text-gray-900' : 'text-white'
-            }`}
+            className={`text-2xl sm:text-3xl font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'
+              }`}
           >
             Artist Dashboard
           </h1>
@@ -130,17 +129,8 @@ export default function ArtistDashboard() {
           </h2>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            className={`flex-1 sm:flex-none px-3 py-1.5 sm:px-4 sm:py-2 ${
-              theme === 'light'
-                ? 'bg-gray-200 hover:bg-gray-300 text-gray-900'
-                : 'bg-white/10 hover:bg-white/20 text-white'
-            } rounded-lg text-xs sm:text-sm font-medium`}
-          >
-            Export Data
-          </button>
           <button className="flex-1 sm:flex-none px-3 py-1.5 sm:px-4 sm:py-2 bg-[#A57865] text-white rounded-lg hover:bg-[#A57865]/90 text-xs sm:text-sm font-medium">
-            Generate Report
+            Export Data
           </button>
         </div>
       </div>
@@ -167,26 +157,23 @@ export default function ArtistDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             <Link
               href="/artist/albums"
-              className={`p-3 sm:p-4 md:p-6 rounded-lg ${
-                theme === 'light'
-                  ? 'bg-gray-100 hover:bg-gray-200'
-                  : 'bg-white/5 hover:bg-white/10'
-              }`}
+              className={`p-3 sm:p-4 md:p-6 rounded-lg ${theme === 'light'
+                ? 'bg-gray-100 hover:bg-gray-200'
+                : 'bg-white/5 hover:bg-white/10'
+                }`}
             >
               <div className="flex items-center justify-between mb-2 md:mb-4">
                 <Album
-                  className={`w-5 h-5 md:w-8 md:h-8 ${
-                    theme === 'light' ? 'text-blue-500' : 'text-blue-400'
-                  }`}
+                  className={`w-5 h-5 md:w-8 md:h-8 ${theme === 'light' ? 'text-blue-500' : 'text-blue-400'
+                    }`}
                 />
                 <span className="text-lg sm:text-xl md:text-2xl font-bold">
                   {stats.albumCount}
                 </span>
               </div>
               <h3
-                className={`text-sm sm:text-base md:text-lg font-bold ${
-                  theme === 'light' ? 'text-gray-900' : 'text-white'
-                }`}
+                className={`text-sm sm:text-base md:text-lg font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
               >
                 Albums
               </h3>
@@ -201,26 +188,23 @@ export default function ArtistDashboard() {
 
             <Link
               href="/artist/tracks"
-              className={`p-3 sm:p-4 md:p-6 rounded-lg ${
-                theme === 'light'
-                  ? 'bg-gray-100 hover:bg-gray-200'
-                  : 'bg-white/5 hover:bg-white/10'
-              }`}
+              className={`p-3 sm:p-4 md:p-6 rounded-lg ${theme === 'light'
+                ? 'bg-gray-100 hover:bg-gray-200'
+                : 'bg-white/5 hover:bg-white/10'
+                }`}
             >
               <div className="flex items-center justify-between mb-2 md:mb-4">
                 <Music
-                  className={`w-5 h-5 md:w-8 md:h-8 ${
-                    theme === 'light' ? 'text-green-500' : 'text-green-400'
-                  }`}
+                  className={`w-5 h-5 md:w-8 md:h-8 ${theme === 'light' ? 'text-green-500' : 'text-green-400'
+                    }`}
                 />
                 <span className="text-lg sm:text-xl md:text-2xl font-bold">
                   {stats.trackCount}
                 </span>
               </div>
               <h3
-                className={`text-sm sm:text-base md:text-lg font-bold ${
-                  theme === 'light' ? 'text-gray-900' : 'text-white'
-                }`}
+                className={`text-sm sm:text-base md:text-lg font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
               >
                 Tracks
               </h3>
@@ -234,24 +218,21 @@ export default function ArtistDashboard() {
             </Link>
 
             <div
-              className={`p-3 sm:p-4 md:p-6 rounded-lg ${
-                theme === 'light' ? 'bg-gray-100' : 'bg-white/5'
-              }`}
+              className={`p-3 sm:p-4 md:p-6 rounded-lg ${theme === 'light' ? 'bg-gray-100' : 'bg-white/5'
+                }`}
             >
               <div className="flex items-center justify-between mb-2 md:mb-4">
                 <Users
-                  className={`w-5 h-5 md:w-8 md:h-8 ${
-                    theme === 'light' ? 'text-purple-500' : 'text-purple-400'
-                  }`}
+                  className={`w-5 h-5 md:w-8 md:h-8 ${theme === 'light' ? 'text-purple-500' : 'text-purple-400'
+                    }`}
                 />
                 <span className="text-lg sm:text-xl md:text-2xl font-bold">
                   {stats.monthlyListeners}
                 </span>
               </div>
               <h3
-                className={`text-sm sm:text-base md:text-lg font-bold ${
-                  theme === 'light' ? 'text-gray-900' : 'text-white'
-                }`}
+                className={`text-sm sm:text-base md:text-lg font-bold ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
               >
                 Monthly Listeners
               </h3>
@@ -268,14 +249,12 @@ export default function ArtistDashboard() {
           {/* Charts Section */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
             <div
-              className={`md:col-span-2 p-3 sm:p-4 md:p-6 rounded-lg ${
-                theme === 'light' ? 'bg-gray-100' : 'bg-white/5'
-              }`}
+              className={`md:col-span-2 p-3 sm:p-4 md:p-6 rounded-lg ${theme === 'light' ? 'bg-gray-100' : 'bg-white/5'
+                }`}
             >
               <h3
-                className={`text-sm sm:text-base md:text-xl font-bold mb-3 md:mb-4 ${
-                  theme === 'light' ? 'text-gray-900' : 'text-white'
-                }`}
+                className={`text-sm sm:text-base md:text-xl font-bold mb-3 md:mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
               >
                 Monthly Listeners Trend
               </h3>
@@ -335,22 +314,19 @@ export default function ArtistDashboard() {
             </div>
 
             <div
-              className={`p-3 sm:p-4 md:p-6 rounded-lg ${
-                theme === 'light' ? 'bg-gray-100' : 'bg-white/5'
-              }`}
+              className={`p-3 sm:p-4 md:p-6 rounded-lg ${theme === 'light' ? 'bg-gray-100' : 'bg-white/5'
+                }`}
             >
               <h3
-                className={`text-sm sm:text-base md:text-xl font-bold mb-3 md:mb-4 ${
-                  theme === 'light' ? 'text-gray-900' : 'text-white'
-                }`}
+                className={`text-sm sm:text-base md:text-xl font-bold mb-3 md:mb-4 ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                  }`}
               >
                 Top Tracks
               </h3>
               {topTracks.length > 0 ? (
                 <ul
-                  className={`divide-y ${
-                    theme === 'light' ? 'divide-gray-200' : 'divide-white/10'
-                  } space-y-2`}
+                  className={`divide-y ${theme === 'light' ? 'divide-gray-200' : 'divide-white/10'
+                    } space-y-2`}
                 >
                   {topTracks.map((track) => (
                     <li
@@ -358,16 +334,14 @@ export default function ArtistDashboard() {
                       className="py-2 flex justify-between items-center"
                     >
                       <span
-                        className={`font-medium text-sm sm:text-base ${
-                          theme === 'light' ? 'text-gray-900' : 'text-white'
-                        }`}
+                        className={`font-medium text-sm sm:text-base ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                          }`}
                       >
                         {track.title}
                       </span>
                       <span
-                        className={`text-xs sm:text-sm ${
-                          theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                        }`}
+                        className={`text-xs sm:text-sm ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                          }`}
                       >
                         {track.playCount} plays
                       </span>
@@ -376,9 +350,8 @@ export default function ArtistDashboard() {
                 </ul>
               ) : (
                 <p
-                  className={`text-sm ${
-                    theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                  }`}
+                  className={`text-sm ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    }`}
                 >
                   No data available
                 </p>

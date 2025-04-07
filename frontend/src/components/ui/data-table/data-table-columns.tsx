@@ -97,7 +97,17 @@ interface GetSystemPlaylistColumnsOptions {
   onEdit?: (playlist: Playlist) => void;
   formatUpdatedAt?: (date: string) => string;
 }
-
+const getUserRole = () => {
+  const token = localStorage.getItem('userToken');
+  if (!token) return 'USER'; // Mặc định là USER nếu không có token
+  try {
+    const decodedToken = JSON.parse(atob(token.split('.')[1])); // Giải mã JWT
+    return decodedToken.role || 'USER';
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return 'USER'; // Trả về mặc định nếu có lỗi
+  }
+};
 export function getTrackColumns({
   theme = 'light',
   onVisibilityChange,
@@ -137,9 +147,8 @@ export function getTrackColumns({
         return (
           <div className="flex items-center gap-3">
             <div
-              className={`w-8 h-8 rounded overflow-hidden ${
-                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
-              }`}
+              className={`w-8 h-8 rounded overflow-hidden ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+                }`}
             >
               {track.coverUrl ? (
                 <Image
@@ -151,18 +160,16 @@ export function getTrackColumns({
                 />
               ) : (
                 <Music
-                  className={`w-8 h-8 p-1.5 ${
-                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                  }`}
+                  className={`w-8 h-8 p-1.5 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                    }`}
                 />
               )}
             </div>
             <div>
               <Link
                 href={`/artist/tracks/${track.id}`}
-                className={`font-medium hover:underline ${
-                  theme === 'dark' ? 'text-white' : ''
-                }`}
+                className={`font-medium hover:underline ${theme === 'dark' ? 'text-white' : ''
+                  }`}
               >
                 {track.title}
               </Link>
@@ -284,11 +291,10 @@ export function getTrackColumns({
             {genres.map((g, index) => (
               <Fragment key={g.genre.id}>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-xs ${
-                    theme === 'dark'
-                      ? 'bg-white/10 text-white/80'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}
+                  className={`px-2 py-0.5 rounded-full text-xs ${theme === 'dark'
+                    ? 'bg-white/10 text-white/80'
+                    : 'bg-gray-100 text-gray-700'
+                    }`}
                 >
                   {g.genre.name}
                 </span>
@@ -324,11 +330,10 @@ export function getTrackColumns({
       header: 'Status',
       cell: ({ row }) => (
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            row.original.isActive
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-red-500/20 text-red-400'
-          }`}
+          className={`px-2 py-1 rounded-full text-xs font-medium ${row.original.isActive
+            ? 'bg-green-500/20 text-green-400'
+            : 'bg-red-500/20 text-red-400'
+            }`}
         >
           {row.original.isActive ? 'Active' : 'Hidden'}
         </span>
@@ -403,6 +408,8 @@ export function getTrackColumns({
       id: 'actions',
       cell: ({ row }) => {
         const track = row.original;
+        const userRole = getUserRole(); // Sử dụng hàm trong cùng file
+
         return (
           <DropdownMenu>
             <DropdownMenuTrigger>
@@ -426,14 +433,18 @@ export function getTrackColumns({
                 )}
                 {track.isActive ? 'Hide Track' : 'Show Track'}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onDelete && onDelete(track.id)}
-                className="text-red-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Track
-              </DropdownMenuItem>
+              {userRole === 'ADMIN' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onDelete && onDelete(track.id)}
+                    className="text-red-600"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Track
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -480,9 +491,8 @@ export function getAlbumColumns({
         return (
           <div className="flex items-center gap-3">
             <div
-              className={`w-8 h-8 rounded overflow-hidden ${
-                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
-              }`}
+              className={`w-8 h-8 rounded overflow-hidden ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+                }`}
             >
               {album.coverUrl ? (
                 <Image
@@ -494,18 +504,16 @@ export function getAlbumColumns({
                 />
               ) : (
                 <Music
-                  className={`w-8 h-8 p-1.5 ${
-                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                  }`}
+                  className={`w-8 h-8 p-1.5 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                    }`}
                 />
               )}
             </div>
             <div>
               <Link
                 href={`/artist/albums/${album.id}`}
-                className={`font-medium hover:underline ${
-                  theme === 'dark' ? 'text-white' : ''
-                }`}
+                className={`font-medium hover:underline ${theme === 'dark' ? 'text-white' : ''
+                  }`}
               >
                 {album.title}
               </Link>
@@ -519,13 +527,12 @@ export function getAlbumColumns({
       header: 'Type',
       cell: ({ row }) => (
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            row.original.type === 'ALBUM'
-              ? 'bg-blue-500/20 text-blue-400'
-              : row.original.type === 'EP'
+          className={`px-2 py-1 rounded-full text-xs font-medium ${row.original.type === 'ALBUM'
+            ? 'bg-blue-500/20 text-blue-400'
+            : row.original.type === 'EP'
               ? 'bg-purple-500/20 text-purple-400'
               : 'bg-green-500/20 text-green-400'
-          }`}
+            }`}
         >
           {row.original.type}
         </span>
@@ -550,11 +557,10 @@ export function getAlbumColumns({
             {genres.map((genreObj) => (
               <span
                 key={genreObj.genre.id}
-                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                  theme === 'dark'
-                    ? 'bg-white/10 text-white'
-                    : 'bg-gray-100 text-gray-800'
-                }`}
+                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${theme === 'dark'
+                  ? 'bg-white/10 text-white'
+                  : 'bg-gray-100 text-gray-800'
+                  }`}
               >
                 {genreObj.genre.name}
               </span>
@@ -584,11 +590,10 @@ export function getAlbumColumns({
       header: 'Status',
       cell: ({ row }) => (
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            row.original.isActive
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-red-500/20 text-red-400'
-          }`}
+          className={`px-2 py-1 rounded-full text-xs font-medium ${row.original.isActive
+            ? 'bg-green-500/20 text-green-400'
+            : 'bg-red-500/20 text-red-400'
+            }`}
         >
           {row.original.isActive ? 'Active' : 'Hidden'}
         </span>
@@ -664,16 +669,21 @@ export function getAlbumColumns({
       id: 'actions',
       cell: ({ row }) => {
         const album = row.original;
+        const userRole = getUserRole(); // Lấy vai trò người dùng
+
         return (
           <DropdownMenu>
             <DropdownMenuTrigger>
               <MoreVertical className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {/* Edit - Hiển thị cho cả ARTIST và ADMIN */}
               <DropdownMenuItem onClick={() => onEdit && onEdit(album)}>
                 <Pencil className="w-4 h-4 mr-2" />
                 Edit Album
               </DropdownMenuItem>
+
+              {/* Hide/Show - Hiển thị cho cả ARTIST và ADMIN */}
               <DropdownMenuItem
                 onClick={() =>
                   onVisibilityChange &&
@@ -687,14 +697,20 @@ export function getAlbumColumns({
                 )}
                 {album.isActive ? 'Hide Album' : 'Show Album'}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onDelete && onDelete(album.id)}
-                className="text-red-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Album
-              </DropdownMenuItem>
+
+              {/* Delete - Chỉ hiển thị cho ADMIN */}
+              {userRole === 'ADMIN' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onDelete && onDelete(album.id)}
+                    className="text-red-600"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Album
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -744,9 +760,8 @@ export function getUserColumns({
             onClick={() => onView && onView(user)}
           >
             <div
-              className={`w-8 h-8 rounded-full overflow-hidden ${
-                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
-              }`}
+              className={`w-8 h-8 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+                }`}
             >
               {user.avatar ? (
                 <Image
@@ -758,17 +773,15 @@ export function getUserColumns({
                 />
               ) : (
                 <UserIcon
-                  className={`w-8 h-8 p-1.5 ${
-                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                  }`}
+                  className={`w-8 h-8 p-1.5 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                    }`}
                 />
               )}
             </div>
             <div>
               <div
-                className={`font-medium ${
-                  theme === 'dark' ? 'text-white' : ''
-                }`}
+                className={`font-medium ${theme === 'dark' ? 'text-white' : ''
+                  }`}
               >
                 {user.name || 'Anonymous'}
               </div>
@@ -803,11 +816,10 @@ export function getUserColumns({
           onClick={() => onView && onView(row.original)}
         >
           <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${
-              row.original.isActive
-                ? 'bg-green-500/20 text-green-400'
-                : 'bg-red-500/20 text-red-400'
-            }`}
+            className={`px-2 py-1 rounded-full text-xs font-medium ${row.original.isActive
+              ? 'bg-green-500/20 text-green-400'
+              : 'bg-red-500/20 text-red-400'
+              }`}
           >
             {row.original.isActive ? 'Active' : 'Inactive'}
           </span>
@@ -930,11 +942,10 @@ export function getGenreColumns({
             onClick={() => {
               window.dispatchEvent(new Event('openAddGenreModal'));
             }}
-            className={`h-8 w-8 p-0 rounded-full flex items-center justify-center ${
-              theme === 'dark'
-                ? 'text-white hover:bg-white/10'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`h-8 w-8 p-0 rounded-full flex items-center justify-center ${theme === 'dark'
+              ? 'text-white hover:bg-white/10'
+              : 'text-gray-600 hover:bg-gray-100'
+              }`}
             title="Add New Genre"
           >
             <AddSimple className="w-4 h-4" />
@@ -1010,9 +1021,8 @@ export function getArtistColumns({
         return (
           <div className="flex items-center gap-3">
             <div
-              className={`w-8 h-8 rounded-full overflow-hidden ${
-                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
-              }`}
+              className={`w-8 h-8 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+                }`}
             >
               {artist.avatar ? (
                 <Image
@@ -1024,18 +1034,16 @@ export function getArtistColumns({
                 />
               ) : (
                 <UserIcon
-                  className={`w-8 h-8 p-1.5 ${
-                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                  }`}
+                  className={`w-8 h-8 p-1.5 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                    }`}
                 />
               )}
             </div>
             <div>
               <Link
                 href={`/admin/artists/${artist.id}`}
-                className={`font-medium hover:underline ${
-                  theme === 'dark' ? 'text-white' : ''
-                }`}
+                className={`font-medium hover:underline ${theme === 'dark' ? 'text-white' : ''
+                  }`}
               >
                 {artist.artistName}
               </Link>
@@ -1063,11 +1071,10 @@ export function getArtistColumns({
       header: 'Verification',
       cell: ({ row }) => (
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            row.original.isVerified
-              ? 'bg-blue-500/20 text-blue-400'
-              : 'bg-yellow-500/20 text-yellow-400'
-          }`}
+          className={`px-2 py-1 rounded-full text-xs font-medium ${row.original.isVerified
+            ? 'bg-blue-500/20 text-blue-400'
+            : 'bg-yellow-500/20 text-yellow-400'
+            }`}
         >
           {row.original.isVerified ? 'Verified' : 'Unverified'}
         </span>
@@ -1078,11 +1085,10 @@ export function getArtistColumns({
       header: 'Status',
       cell: ({ row }) => (
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            row.original.isActive
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-red-500/20 text-red-400'
-          }`}
+          className={`px-2 py-1 rounded-full text-xs font-medium ${row.original.isActive
+            ? 'bg-green-500/20 text-green-400'
+            : 'bg-red-500/20 text-red-400'
+            }`}
         >
           {row.original.isActive ? 'Active' : 'Inactive'}
         </span>
@@ -1146,8 +1152,8 @@ export function getArtistColumns({
                       theme === 'dark'
                         ? 'hover:bg-white/10 text-white'
                         : artist.isActive
-                        ? 'text-orange-600 hover:text-orange-700'
-                        : 'text-green-600 hover:text-green-700'
+                          ? 'text-orange-600 hover:text-orange-700'
+                          : 'text-green-600 hover:text-green-700'
                     }
                   >
                     {artist.isActive ? (
@@ -1227,9 +1233,8 @@ export function getArtistRequestColumns({
         return (
           <Link
             href={`/admin/artist-requests/${request.id}`}
-            className={`font-medium text-sm hover:underline ${
-              theme === 'dark' ? 'text-white' : ''
-            }`}
+            className={`font-medium text-sm hover:underline ${theme === 'dark' ? 'text-white' : ''
+              }`}
           >
             {request.artistName}
           </Link>
@@ -1341,9 +1346,8 @@ export function getLabelColumns({
         return (
           <div className="flex items-center gap-3">
             <div
-              className={`w-8 h-8 rounded-full overflow-hidden ${
-                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
-              }`}
+              className={`w-8 h-8 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+                }`}
             >
               {label.logoUrl ? (
                 <Image
@@ -1355,18 +1359,16 @@ export function getLabelColumns({
                 />
               ) : (
                 <Tags
-                  className={`w-8 h-8 p-1.5 ${
-                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                  }`}
+                  className={`w-8 h-8 p-1.5 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                    }`}
                 />
               )}
             </div>
             <div>
               <Link
                 href={`/admin/labels/${label.id}`}
-                className={`font-medium hover:underline ${
-                  theme === 'dark' ? 'text-white' : ''
-                }`}
+                className={`font-medium hover:underline ${theme === 'dark' ? 'text-white' : ''
+                  }`}
               >
                 {label.name}
               </Link>
@@ -1421,11 +1423,10 @@ export function getLabelColumns({
             onClick={() => {
               window.dispatchEvent(new Event('openAddLabelModal'));
             }}
-            className={`h-8 w-8 p-0 rounded-full flex items-center justify-center ${
-              theme === 'dark'
-                ? 'text-white hover:bg-white/10'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
+            className={`h-8 w-8 p-0 rounded-full flex items-center justify-center ${theme === 'dark'
+              ? 'text-white hover:bg-white/10'
+              : 'text-gray-600 hover:bg-gray-100'
+              }`}
             title="Add New Label"
           >
             <AddSimple className="w-4 h-4" />
