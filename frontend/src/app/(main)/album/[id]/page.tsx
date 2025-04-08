@@ -81,11 +81,11 @@ export default function AlbumDetailPage() {
       if (currentTrack?.id === track.id && isPlaying && queueType === 'album') {
         pauseTrack();
       } else {
-        playTrack(track);
         setQueueType('album');
         if (album) {
           trackQueue(album.tracks);
         }
+        playTrack(track);
       }
     });
   };

@@ -1,6 +1,6 @@
 import { Track } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Play, Pause, MoreHorizontal, Heart, Share2 } from 'lucide-react';
+import { MoreHorizontal, Heart, Share2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Play, Pause } from '@/components/ui/Icons';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 

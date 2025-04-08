@@ -18,81 +18,17 @@ export function TrackList({
   allowRemove = false,
   showAlbum = false,
   showDateAdded = false,
-  requiresAuth = false,
 }: TrackListProps) {
   const { playTrack, currentTrack, trackQueue, isPlaying, pauseTrack } =
     useTrack();
   const { dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
 
-  const handlePlay = async (track: Track) => {
-    try {
-      // If requiresAuth is true, check authentication before playing
-      if (requiresAuth) {
-        const canProceed = handleProtectedAction();
-        if (!canProceed) return;
-      }
-
-      // If clicking the currently playing track
-      if (currentTrack?.id === track.id) {
-        if (isPlaying) {
-          pauseTrack(); // If playing, pause
-        } else {
-          playTrack(currentTrack); // If paused, play again
-        }
-        return;
-      }
-
-      // If clicking a new track
-      const token = localStorage.getItem("userToken");
-      if (!token) {
-        console.error("No token found");
-        return;
-      }
-
-      // Handle playing a new track
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/tracks/${track.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch track details");
-      }
-
-      const trackData = await response.json();
-      console.log("Track data from API:", trackData);
-
-      if (!trackData.audioUrl) {
-        throw new Error("Audio URL is missing from track data");
-      }
-
-      const trackToPlay = {
-        ...track,
-        ...trackData,
-        audioUrl: trackData.audioUrl,
-      };
-
-      // Call API to notify about playing music
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/tracks/play/${track.id}`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      trackQueue([trackToPlay]);
-      playTrack(trackToPlay);
-    } catch (error) {
-      console.error("Error playing track:", error);
+  const handlePlay = (track: Track) => {
+    if (currentTrack?.id === track.id && isPlaying) {
+      pauseTrack();
+    } else {
+      trackQueue(tracks);
+      playTrack(track);
     }
   };
 

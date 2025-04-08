@@ -12,6 +12,21 @@ import {
 import { Track } from '@/types';
 import { api } from '@/utils/api';
 
+
+// Helper function to get initial volume from localStorage
+const getInitialVolume = (): number => {
+  if (typeof window === 'undefined') return 1;
+  
+  const savedVolume = localStorage.getItem('userVolume');
+  if (savedVolume !== null) {
+    const parsedVolume = parseFloat(savedVolume);
+    if (!isNaN(parsedVolume) && parsedVolume >= 0 && parsedVolume <= 1) {
+      return parsedVolume;
+    }
+  }
+  return 1;
+};
+
 interface TrackContextType {
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -74,7 +89,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [volume, setVolume] = useState(1);
+  const [volume, setVolume] = useState(getInitialVolume());
   const [loop, setLoop] = useState(false);
   const [duration, setDuration] = useState<number>(0);
   const [shuffle, setShuffle] = useState(false);
@@ -350,6 +365,13 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       audioRef.current.volume = newVolume;
     }
     setVolume(newVolume);
+    
+    // Save volume to localStorage for persistence
+    try {
+      localStorage.setItem('userVolume', newVolume.toString());
+    } catch (error) {
+      console.error('Failed to save volume to localStorage:', error);
+    }
   }, []);
 
   const loopTrack = useCallback(async () => {

@@ -163,9 +163,9 @@ export default function UserProfilePage({
     if (currentTrack?.id === track.id && isPlaying && queueType === 'track') {
       pauseTrack();
     } else {
-      playTrack(track);
       setQueueType('track');
       trackQueue(topTracks);
+      playTrack(track);
     }
   };
 
@@ -197,9 +197,9 @@ export default function UserProfilePage({
         if (isCurrentArtistPlaying) {
           pauseTrack();
         } else {
-          playTrack(artistTracks[0]);
           setQueueType(queueTypeValue);
           trackQueue(artistTracks);
+          playTrack(artistTracks[0]);
         }
       } else {
         toast.error('No tracks available for this artist');

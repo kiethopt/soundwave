@@ -186,9 +186,9 @@ export default function ArtistProfilePage({
     if (currentTrack?.id === track.id && isPlaying && queueType === 'track') {
       pauseTrack();
     } else {
-      playTrack(track);
       setQueueType('track');
       trackQueue(tracks);
+      playTrack(track);
     }
   };
 
@@ -213,9 +213,9 @@ export default function ArtistProfilePage({
         if (isArtistPlaying(artist.id)) {
           pauseTrack();
         } else {
-          playTrack(artistTracks[0]);
           setQueueType('artist');
           trackQueue(artistTracks);
+          playTrack(artistTracks[0]);
         }
       } else {
         toast.error('No tracks available for this artist');
@@ -242,9 +242,9 @@ export default function ArtistProfilePage({
           pauseTrack();
         } else {
           // Nếu không thì phát track đầu tiên và set queue là toàn bộ tracks của album
-          playTrack(album.tracks[0]);
           setQueueType('album');
           trackQueue(album.tracks);
+          playTrack(album.tracks[0]);
         }
       } else {
         toast.error('No tracks available for this album');

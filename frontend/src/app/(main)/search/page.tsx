@@ -204,9 +204,9 @@ function SearchContent() {
             playTrack(item);
           }
         } else {
-          playTrack(item);
           setQueueType('track');
           trackQueue(results.tracks);
+          playTrack(item);
         }
       } else if ('tracks' in item) {
         // Xử lý phát Album
@@ -220,9 +220,9 @@ function SearchContent() {
           if (isCurrentAlbumPlaying) {
             pauseTrack();
           } else {
-            playTrack(item.tracks[0]);
             setQueueType('album');
             trackQueue(item.tracks);
+            playTrack(item.tracks[0]);
           }
         } else {
           toast.error('No tracks available for this album');
@@ -246,9 +246,10 @@ function SearchContent() {
             const sortedTracks = artistTracks.sort(
               (a: any, b: any) => b.playCount - a.playCount
             );
-            playTrack(sortedTracks[0]);
             setQueueType('artist');
             trackQueue(sortedTracks);
+            playTrack(sortedTracks[0]);
+
           } else {
             toast.error('No tracks available for this artist');
           }

@@ -6,7 +6,8 @@ import Image from 'next/image';
 import { api } from '@/utils/api';
 import { Album, Track, Playlist } from '@/types';
 import { useTrack } from '@/contexts/TrackContext';
-import { ChevronRight, Play, MoreHorizontal, Pause } from 'lucide-react';
+import { ChevronRight, MoreHorizontal } from 'lucide-react';
+import { Play, Pause } from '@/components/ui/Icons';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { useDominantColor } from '@/hooks/useDominantColor';
@@ -454,7 +455,7 @@ export default function Home() {
                           className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
                           onClick={(e) => handlePlayPlaylist(playlist, e)}
                         >
-                          <Play size={18} />
+                          <Play className="w-4 h-4" />
                         </button>
                       </div>
                     )}
@@ -526,7 +527,7 @@ export default function Home() {
                           className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
                           onClick={(e) => handlePlayPlaylist(playlist, e)}
                         >
-                          <Play size={18} />
+                          <Play className="w-4 h-4" />
                         </button>
                       </div>
                     )}
@@ -583,9 +584,9 @@ export default function Home() {
                         onClick={(e) => handlePlayTrack(track, e)}
                       >
                         {isCurrentlyPlaying(track.id) ? (
-                          <Pause size={16} />
+                          <Pause className="w-4 h-4" />
                         ) : (
-                          <Play size={16} />
+                          <Play className="w-4 h-4" />
                         )}
                       </button>
                     </div>
@@ -649,9 +650,9 @@ export default function Home() {
                         onClick={(e) => handlePlayAlbum(album, e)}
                       >
                         {isAlbumPlaying(album.id) ? (
-                          <Pause size={18} />
+                          <Pause className="w-4 h-4" />
                         ) : (
-                          <Play size={18} />
+                          <Play className="w-4 h-4" />
                         )}
                       </button>
 
@@ -659,7 +660,7 @@ export default function Home() {
                         className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <MoreHorizontal size={18} />
+                        <MoreHorizontal className="w-4 h-4" />
                       </button>
                     </div>
                   )}
@@ -716,9 +717,9 @@ export default function Home() {
                         onClick={(e) => handlePlayAlbum(album, e)}
                       >
                         {isAlbumPlaying(album.id) ? (
-                          <Pause size={18} />
+                          <Pause className="w-4 h-4" />
                         ) : (
-                          <Play size={18} />
+                          <Play className="w-4 h-4" />
                         )}
                       </button>
 
