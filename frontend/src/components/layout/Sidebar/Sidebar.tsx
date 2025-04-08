@@ -26,6 +26,7 @@ import { api } from "@/utils/api";
 import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
 import { PlaylistIcon } from "@/components/user/playlist/PlaylistIcon";
+import { BsFillPinAngleFill } from "react-icons/bs";
 
 interface Playlist {
   id: string;
@@ -287,7 +288,7 @@ export default function Sidebar({
                                 className="object-cover w-full h-full"
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-neutral-800">
+                              <div className="w-full h-full flex items-center justify-center bg-neutral-800 relative">
                                 <PlaylistIcon
                                   name={favoritePlaylist.name}
                                   type={favoritePlaylist.type}
@@ -298,9 +299,16 @@ export default function Sidebar({
                             )}
                           </div>
                           <div className="flex flex-col min-w-0 flex-1">
-                            <span className="truncate font-medium text-sm leading-tight">
-                              {favoritePlaylist.name}
-                            </span>
+                            <div className="flex items-center">
+                              <BsFillPinAngleFill
+                                className="mr-1.5 -mt-0.5 rotate-12"
+                                size={14}
+                                color="#A57865"
+                              />
+                              <span className="truncate font-medium text-sm leading-tight">
+                                {favoritePlaylist.name}
+                              </span>
+                            </div>
                             <span className="text-xs text-white/50 truncate mt-0.5">
                               {favoritePlaylist.privacy === "PRIVATE"
                                 ? "Private"

@@ -10,7 +10,7 @@ export const createFavoritePlaylist = async (userId: string): Promise<void> => {
   try {
     await prisma.playlist.create({
       data: {
-        name: "Favorite songs",
+        name: "Favorites",
         description: "List of your favorite songs",
         privacy: "PRIVATE",
         type: "FAVORITE",
@@ -58,7 +58,7 @@ export const createPlaylist: RequestHandler = async (
       if (existingFavorite) {
         res.status(400).json({
           success: false,
-          message: "Bạn đã có playlist Yêu thích",
+          message: "You already have a Favorites playlist",
         });
         return;
       }
@@ -77,7 +77,7 @@ export const createPlaylist: RequestHandler = async (
 
     res.status(201).json({
       success: true,
-      message: "Đã tạo playlist thành công",
+      message: "Playlist created successfully",
       data: playlist,
     });
   } catch (error) {
@@ -120,7 +120,7 @@ export const getPlaylists: RequestHandler = async (
       if (!favoritePlaylist) {
         favoritePlaylist = await prisma.playlist.create({
           data: {
-            name: "Favorite songs",
+            name: "Favorites",
             description: "List of your favorite songs",
             privacy: "PRIVATE",
             type: "FAVORITE",
@@ -637,7 +637,7 @@ export const removeTrackFromPlaylist: RequestHandler = async (
 
     res.json({
       success: true,
-      message: "Đã xóa bài hát khỏi playlist",
+      message: "Track removed from playlist successfully",
     });
     return;
   } catch (error) {
@@ -768,13 +768,13 @@ export const updatePlaylist: RequestHandler = async (
       if (error.code === "P2002") {
         res.status(400).json({
           success: false,
-          message: "Bạn đã có playlist với tên này",
+          message: "You already have a playlist with this name",
         });
       }
     }
     res.status(500).json({
       success: false,
-      message: "Đã có lỗi xảy ra",
+      message: "An error has occurred",
     });
   }
 };
@@ -835,7 +835,7 @@ export const deletePlaylist: RequestHandler = async (
 
     res.json({
       success: true,
-      message: "Đã xóa playlist thành công",
+      message: "Playlist deleted successfully",
     });
   } catch (error) {
     next(error);

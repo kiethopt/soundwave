@@ -127,7 +127,7 @@ export function EditPlaylistDialog({
           },
           token
         );
-        toast.success("Đã cập nhật playlist");
+        toast.success("Playlist updated successfully");
         // Gọi callback với playlist đã cập nhật
         if (onPlaylistUpdated && response.data) {
           onPlaylistUpdated(response.data);
