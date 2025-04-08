@@ -136,6 +136,18 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
+  // Add function to reorganize queue when a track is selected
+  const reorderQueueFromSelected = useCallback((tracks: Track[], selectedIndex: number) => {
+    if (selectedIndex < 0 || selectedIndex >= tracks.length) return tracks;
+    
+    // Split the array at the selected index
+    const firstPart = tracks.slice(0, selectedIndex);
+    const secondPart = tracks.slice(selectedIndex);
+    
+    // Combine the arrays so selected track comes first, followed by the rest in order
+    return [...secondPart, ...firstPart];
+  }, []);
+
   const playTrack = useCallback(
     async (track: Track) => {
       if (currentPlayRequestRef.current) {
@@ -148,6 +160,20 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         let trackToPlay = track;
+
+        // Find the index of the track in the queue
+        const trackIndex = trackQueueRef.current.findIndex(
+          (t) => t.id === track.id
+        );
+
+        // If track is in queue, reorganize the queue
+        if (trackIndex !== -1) {
+          const reorderedQueue = reorderQueueFromSelected(trackQueueRef.current, trackIndex);
+          setTrackQueue(reorderedQueue);
+          trackQueueRef.current = reorderedQueue;
+          setQueue(reorderedQueue);
+          setCurrentIndex(0);
+        }
 
         if (!trackToPlay.audioUrl) {
           console.log(
@@ -295,7 +321,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     },
-    [currentTrack, isPlaying, saveHistory, tabId, trackQueueRef]
+    [currentTrack, isPlaying, saveHistory, tabId, trackQueueRef, reorderQueueFromSelected]
   );
 
   const pauseTrack = useCallback(() => {

@@ -17,7 +17,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [genreData, setGenreData] = useState({ name: '', color: '' });
 
   const updateGenreData = useCallback((name: string, color: string) => {
-    setGenreData({ name, color });
+    // Save to localStorage
+    localStorage.setItem('genreData', JSON.stringify({ name, color }));
   }, []);
 
   useEffect(() => {

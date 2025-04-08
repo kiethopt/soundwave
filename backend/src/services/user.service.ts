@@ -1371,7 +1371,7 @@ export const getGenreTopTracks = async (genreId: string) => {
       },
     },
     select: searchTrackSelect,
-    orderBy: { createdAt: 'desc' },
+    orderBy: { playCount: 'desc' },
     take: 20,
   });
 

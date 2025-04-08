@@ -4,20 +4,23 @@ import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import { useTheme } from '@/contexts/ThemeContext';
-import { ArtistProfile, Track, User } from '@/types';
-import { Button } from '@/components/ui/button';
+import { ArtistProfile, Track, Playlist, Album } from '@/types';
 import toast from 'react-hot-toast';
-import { Play, Pause, Edit, Up, Down } from '@/components/ui/Icons';
-import { ArrowLeft, MoreHorizontal } from 'lucide-react';
+import { Play, Pause, AddSimple, Right } from '@/components/ui/Icons';
+import { ArrowLeft, Heart, ListMusic, MoreHorizontal, Share2 } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
-import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
-
+import { set } from 'lodash';
 
 export default function DiscoveryGenrePage({
   params,
@@ -25,15 +28,18 @@ export default function DiscoveryGenrePage({
   params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
-  const { theme, genreData } = useTheme();
+  const { theme } = useTheme();
   const { id } = use(params);
   const [token, setToken] = useState<string | null>(null);
-  const dominantColor = genreData.color || '';
+  const genreData = JSON.parse(localStorage.getItem('genreData') || '{}')
+  const dominantColor = genreData.color || null;
   const genreName = genreData.name || '';
   const [topTracks, setTopTracks] = useState<Track[]>([]);
-  const [topAlbums, setTopAlbums] = useState<Track[]>([]);
+  const [topAlbums, setTopAlbums] = useState<Album[]>([]);
   const [topArtists, setTopArtists] = useState<ArtistProfile[]>([]);
   const [newestTracks, setNewestTracks] = useState<Track[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [section, setSection] = useState<string | null>(null);
   
   const {
     currentTrack,
@@ -43,6 +49,7 @@ export default function DiscoveryGenrePage({
     queueType,
     setQueueType,
     trackQueue,
+    addToQueue
   } = useTrack();
 
   useEffect(() => {
@@ -71,9 +78,106 @@ export default function DiscoveryGenrePage({
         toast.error('Failed to load genre data');
       }
     }
+
+    const fetchPlaylists = async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) return;
+
+        const response = await api.playlists.getAll(token);
+        setPlaylists(response.data);
+      } catch (error) {
+        console.error('Error fetching playlists:', error);
+      }
+    };
+
+    fetchPlaylists();
     fetchGenreData();
   }, [id, router]);
 
+  const handleAddToPlaylist = async (playlistId: string, trackId: string) => {
+    try {
+      console.log('Adding track to playlist:', { playlistId, trackId });
+      const token = localStorage.getItem('userToken');
+      console.log('Token:', token);
+
+      await api.playlists.addTrack(playlistId, trackId, token || '');
+      toast.success('Track added to playlist');
+    } catch (error: any) {
+      console.error('Error adding track:', error);
+      toast.error(error.message || 'Cannot add track to playlist');
+    }
+  };
+
+  const getArtistTracks = async (artistId: string) => {
+    try {
+      if (!token) {
+        throw new Error('Token is null');
+      }
+      const data = await api.artists.getTrackByArtistId(artistId, token);
+      return data.tracks.sort((a: any, b: any) => b.playCount - a.playCount);
+    } catch (error) {
+      console.error(error);
+      return [];
+    }
+  };
+
+  const handleArtistPlay = async (
+    artist: ArtistProfile,
+    type: 'topArtist',
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    event.stopPropagation();
+    setQueueType(type);
+    const tracks = await getArtistTracks(artist.id);
+    if (tracks.length === 0) {
+      toast.error('No tracks found for this artist');
+      return;
+    }
+    if (isPlaying && currentTrack?.id === tracks[0].id) {
+      pauseTrack();
+    } else {
+      setQueueType('topArtist');
+      trackQueue(tracks);
+      playTrack(tracks[0]);
+    }
+  };
+
+  const handleTrackPlay = (track: Track, section: string, tracks: Track[]) => {
+    if (isPlaying && currentTrack?.id === track.id) {
+      pauseTrack();
+    } else {
+      setQueueType('track');
+      trackQueue(tracks);
+      setSection(section);
+      playTrack(track);
+    }
+  };
+
+  const handleAlbumPlay = (album: Album) => {
+    if (isPlaying && currentTrack?.id === album.id) {
+      pauseTrack();
+    } else {
+      setQueueType('album');
+      trackQueue(album.tracks);
+      playTrack(album.tracks[0]);
+    }
+  }
+
+  const isArtistPlaying = (artistId: string, type: 'topArtist') => {
+    return isPlaying && currentTrack?.id === artistId && queueType === type;
+  };
+
+  const isTrackPlaying = (trackId: string) => {
+    return isPlaying && currentTrack?.id === trackId;
+  };
+
+  const isAlbumPlaying = (albumId: string) => {
+    return isPlaying && currentTrack?.id === albumId && queueType === 'album';
+  };
+
+  console.log('Top Tracks:', topAlbums);
+  
   return (
     <div
       className="min-h-screen w-full rounded-lg"
@@ -92,7 +196,7 @@ export default function DiscoveryGenrePage({
       <div>
         {/* Genre Banner */}
         <div
-          className="relative w-full h-[330px] flex flex-col justify-between rounded-t-lg px-4 md:px-6 py-6"
+          className="relative w-full h-[330px] flex flex-col justify-between rounded-t-lg px-4 md:px-6 py-6 mb-6"
           style={{ backgroundColor: dominantColor || undefined }}
         >
           {/* Header with Back button */}
@@ -118,7 +222,473 @@ export default function DiscoveryGenrePage({
             {genreName}
           </h1>
         </div>
-        
+
+        {/* Top Artists Section */}
+        {topArtists.length > 0 && (
+          <section className="px-4 md:px-8 py-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white drop-shadow-sm">
+                Most Streamed {genreName} Artists
+              </h2>
+              <button 
+                className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
+                onClick={() => router.push(`/genre/${id}/artists`)}
+              >
+                See all<Right className="w-3 h-3 inline-block ml-1" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5">
+              {topArtists.map((artist) => (
+                <div
+                  key={artist.id}
+                  className="bg-white/5 hover:bg-white/10 p-4 rounded-xl group cursor-pointer transition-all duration-300"
+                  onClick={() => router.push(`/artist/profile/${artist.id}`)}
+                >
+                  <div className="relative overflow-hidden">
+                    <div className="relative rounded-full overflow-hidden mb-4 shadow-lg aspect-square">
+                      <img
+                        src={artist.avatar || '/images/default-avatar.jpg'}
+                        alt={artist.artistName}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors duration-300"/>
+                    </div>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleArtistPlay(artist, 'topArtist', e);
+                      }}
+                      className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] shadow-md 
+                                 opacity-0 group-hover:opacity-100 transition-all duration-300 
+                                 hover:bg-[#8D6553]"
+                      aria-label={isArtistPlaying(artist.id, 'topArtist') ? "Pause" : "Play"}
+                    >
+                      {isArtistPlaying(artist.id, 'topArtist') ? (
+                        <Pause className="w-6 h-6 text-white" />
+                      ) : (
+                        <Play className="w-6 h-6 text-white ml-0.5" />
+                      )}
+                    </button>
+                  </div>
+                  
+                  <h3 className={`font-semibold text-base truncate mb-1 transition-colors ${
+                    isArtistPlaying(artist.id, 'topArtist') && queueType === 'topArtist'
+                      ? 'text-[#A57865]'
+                      : 'text-white'
+                  }`}>
+                    {artist.artistName}
+                  </h3>
+                  
+                  <p className="text-white/60 text-sm truncate">
+                    {new Intl.NumberFormat('en-US').format(artist.monthlyListeners)} monthly listeners
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Top Tracks Section */}
+        {topTracks.length > 0 && (
+          <section className="px-4 md:px-8 py-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white drop-shadow-sm">
+                Most Listened {genreName} Tracks
+              </h2>
+              <button 
+                className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
+                onClick={() => router.push(`/genre/${id}/tracks`)}
+              >
+                See all<Right className="w-3 h-3 inline-block ml-1" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+              {topTracks.slice(0, 8).map((track) => (
+                <div
+                  key={track.id}
+                  className="rounded-xl group cursor-pointer transition-all duration-300"
+                  onClick={() => handleTrackPlay(track, 'topTracks', topTracks)}
+                >
+                  <div className="relative aspect-square rounded-md overflow-hidden mb-3">
+                    <img
+                      src={track.coverUrl || '/images/default-cover.jpg'}
+                      alt={track.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/30 transition-colors duration-300"/>
+                    
+                    {/* Play/Pause Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTrackPlay(track, 'topTracks', topTracks);
+                      }}
+                      className="absolute bottom-2.5 left-2.5 p-2.5 rounded-full bg-[#A57865] shadow-md 
+                               opacity-0 group-hover:opacity-100 transition-all duration-300 
+                               hover:bg-[#8D6553]"
+                      aria-label={isTrackPlaying(track.id) ? "Pause" : "Play"}
+                    >
+                      {isTrackPlaying(track.id) && section === 'topTracks' ? (
+                        <Pause className="w-5 h-5 text-white" />
+                      ) : (
+                        <Play className="w-5 h-5 text-white ml-0.5" />
+                      )}
+                    </button>
+                    
+                    {/* More Options Button */}
+                    <div 
+                      className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button 
+                            className="p-2 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/40 
+                                       opacity-0 group-hover:opacity-100 transition-all duration-200"
+                            aria-label="More options"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent 
+                          align="end" 
+                          className="w-56 py-1.5 bg-zinc-900/95 backdrop-blur-md border border-white/10 shadow-xl rounded-lg"
+                        >
+                          <DropdownMenuItem
+                            className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToQueue(track);
+                            }}
+                          >
+                            <ListMusic className="w-4 h-4 mr-3 text-white/70" />
+                            Add to Queue
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger className="px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10">
+                              <AddSimple className="w-4 h-4 mr-3 text-white/70" />
+                              Add to Playlist
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                              <DropdownMenuSubContent className="w-52 py-1.5 bg-zinc-900/95 backdrop-blur-md border border-white/10 shadow-xl rounded-lg">
+                                {playlists.length === 0 ? (
+                                  <DropdownMenuItem disabled className="px-3 py-2 text-sm text-white/50">
+                                    No playlists available
+                                  </DropdownMenuItem>
+                                ) : (
+                                  playlists.map((playlist) => (
+                                    <DropdownMenuItem
+                                      key={playlist.id}
+                                      className="px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10"
+                                      onClick={() => handleAddToPlaylist(playlist.id, track.id)}
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <div className="w-7 h-7 relative flex-shrink-0 rounded overflow-hidden">
+                                          {playlist.coverUrl ? (
+                                            <img
+                                              src={playlist.coverUrl}
+                                              alt={playlist.name}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full bg-white/10 flex items-center justify-center">
+                                              <svg
+                                                className="w-4 h-4 text-white/70"
+                                                fill="currentColor"
+                                                viewBox="0 0 24 24"
+                                              >
+                                                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                                              </svg>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <span className="truncate font-medium">{playlist.name}</span>
+                                      </div>
+                                    </DropdownMenuItem>
+                                  ))
+                                )}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                          </DropdownMenuSub>
+                          
+                          <DropdownMenuItem className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10">
+                            <Heart className="w-4 h-4 mr-3 text-white/70" />
+                            Add to Favorites
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+                          
+                          <DropdownMenuItem className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10">
+                            <Share2 className="w-4 h-4 mr-3 text-white/70" />
+                            Share
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  
+                  <h3 
+                    className={`font-semibold text-sm truncate mb-1 transition-colors ${
+                    isTrackPlaying(track.id) && section === 'topTracks'
+                      ? 'text-[#A57865]'
+                      : 'text-white'
+                  }`}>
+                    {track.title}
+                  </h3>
+                  
+                  <p 
+                    className="text-white/60 text-xs truncate hover:underline cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/artist/profile/${track.artist.id}`);
+                    }}
+                  >
+                    {track.artist.artistName || "Unknown Artist"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Newest Tracks Section */}
+        {newestTracks.length > 0 && (
+          <section className="px-4 md:px-8 py-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white drop-shadow-sm">
+                {genreName} New Releases
+              </h2>
+              <button 
+                className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
+                onClick={() => router.push(`/genre/${id}/tracks`)}
+              >
+                See all<Right className="w-3 h-3 inline-block ml-1" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+              {newestTracks.slice(0, 8).map((track) => (
+                <div
+                  key={track.id}
+                  className="rounded-xl group cursor-pointer transition-all duration-300"
+                  onClick={() => handleTrackPlay(track, 'newestTracks', newestTracks)}
+                >
+                  <div className="relative aspect-square rounded-md overflow-hidden mb-3">
+                    <img
+                      src={track.coverUrl || '/images/default-cover.jpg'}
+                      alt={track.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/30 transition-colors duration-300"/>
+                    
+                    {/* Play/Pause Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTrackPlay(track, 'newestTracks', newestTracks);
+                      }}
+                      className="absolute bottom-2.5 left-2.5 p-2.5 rounded-full bg-[#A57865] shadow-md 
+                               opacity-0 group-hover:opacity-100 transition-all duration-300 
+                               hover:bg-[#8D6553]"
+                      aria-label={isTrackPlaying(track.id) ? "Pause" : "Play"}
+                    >
+                      {isTrackPlaying(track.id) && section === 'newestTracks' ? (
+                        <Pause className="w-5 h-5 text-white" />
+                      ) : (
+                        <Play className="w-5 h-5 text-white ml-0.5" />
+                      )}
+                    </button>
+                    
+                    {/* More Options Button */}
+                    <div 
+                      className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button 
+                            className="p-2 rounded-full bg-black/30 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/40 
+                                       opacity-0 group-hover:opacity-100 transition-all duration-200"
+                            aria-label="More options"
+                          >
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent 
+                          align="end" 
+                          className="w-56 py-1.5 bg-zinc-900/95 backdrop-blur-md border border-white/10 shadow-xl rounded-lg"
+                        >
+                          <DropdownMenuItem
+                            className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToQueue(track);
+                            }}
+                          >
+                            <ListMusic className="w-4 h-4 mr-3 text-white/70" />
+                            Add to Queue
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger className="px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10">
+                              <AddSimple className="w-4 h-4 mr-3 text-white/70" />
+                              Add to Playlist
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                              <DropdownMenuSubContent className="w-52 py-1.5 bg-zinc-900/95 backdrop-blur-md border border-white/10 shadow-xl rounded-lg">
+                                {playlists.length === 0 ? (
+                                  <DropdownMenuItem disabled className="px-3 py-2 text-sm text-white/50">
+                                    No playlists available
+                                  </DropdownMenuItem>
+                                ) : (
+                                  playlists.map((playlist) => (
+                                    <DropdownMenuItem
+                                      key={playlist.id}
+                                      className="px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10"
+                                      onClick={() => handleAddToPlaylist(playlist.id, track.id)}
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <div className="w-7 h-7 relative flex-shrink-0 rounded overflow-hidden">
+                                          {playlist.coverUrl ? (
+                                            <img
+                                              src={playlist.coverUrl}
+                                              alt={playlist.name}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full bg-white/10 flex items-center justify-center">
+                                              <svg
+                                                className="w-4 h-4 text-white/70"
+                                                fill="currentColor"
+                                                viewBox="0 0 24 24"
+                                              >
+                                                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                                              </svg>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <span className="truncate font-medium">{playlist.name}</span>
+                                      </div>
+                                    </DropdownMenuItem>
+                                  ))
+                                )}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                          </DropdownMenuSub>
+                          
+                          <DropdownMenuItem className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10">
+                            <Heart className="w-4 h-4 mr-3 text-white/70" />
+                            Add to Favorites
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
+                          
+                          <DropdownMenuItem className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10">
+                            <Share2 className="w-4 h-4 mr-3 text-white/70" />
+                            Share
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  
+                  <h3 className={`font-semibold text-sm truncate mb-1 transition-colors ${
+                    isTrackPlaying(track.id)  && section === 'newestTracks'
+                      ? 'text-[#A57865]'
+                      : 'text-white'
+                  }`}>
+                    {track.title}
+                  </h3>
+                  
+                  <p 
+                    className="text-white/60 text-xs truncate hover:underline cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/artist/profile/${track.artist.id}`);
+                    }}
+                  >
+                    {track.artist.artistName || "Unknown Artist"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Top Albums Section */}
+        {topAlbums.length > 0 && (
+          <section className="px-4 md:px-8 py-8">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white drop-shadow-sm">
+                Popular {genreName} Albums
+              </h2>
+              <button 
+                className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
+                onClick={() => router.push(`/genre/${id}/albums`)}
+              >
+                See all<Right className="w-3 h-3 inline-block ml-1" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+              {topAlbums.slice(0, 8).map((album) => (
+                <div
+                  key={album.id}
+                  className="cursor-pointer rounded-lg group relative"
+                  onClick={() => router.push(`/album/${album.id}`)}
+                >
+                  <div className="relative">
+                    <img
+                      src={album.coverUrl || '/images/default-album.png'}
+                      alt={album.title}
+                      className="w-full aspect-square object-cover rounded-md mb-4"
+                    />
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleAlbumPlay(album);
+                      }}
+                      className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      {currentTrack &&
+                      album.tracks.some(
+                        (track) => track.id === currentTrack.id
+                      ) &&
+                      isPlaying &&
+                      queueType === 'album' ? (
+                        <Pause className="w-6 h-6 text-white" />
+                      ) : (
+                        <Play className="w-6 h-6 text-white" />
+                      )}
+                    </button>
+                  </div>
+                  <h3
+                    className={`font-medium truncate ${
+                      isAlbumPlaying(album.id) && queueType === 'album'
+                        ? 'text-[#A57865]'
+                        : 'text-white'
+                    }`}
+                  >
+                    {album.title}
+                  </h3>
+                  <p 
+                    className="text-white/60 text-sm truncate hover:underline cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/artist/profile/${album.artist.id}`);
+                    }}
+                  >
+                    {album.artist.artistName}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   )
