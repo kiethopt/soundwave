@@ -3,22 +3,12 @@
 import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
-import { useTheme } from '@/contexts/ThemeContext';
 import { ArtistProfile, Track, User } from '@/types';
-import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
-import { useDominantColor } from '@/hooks/useDominantColor';
-import { Play, Pause, Edit, Up, Down, Right } from '@/components/ui/Icons';
-import { ArrowLeft, MoreHorizontal } from 'lucide-react';
+import { Play, Pause } from '@/components/ui/Icons';
 import { useTrack } from '@/contexts/TrackContext';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
-import Image from 'next/image';
+
+type FollowingFilterType = 'all' | 'artists' | 'users';
 
 const DEFAULT_AVATAR = '/images/default-avatar.jpg';
 
@@ -28,16 +18,14 @@ export default function UserProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
-  const { theme } = useTheme();
   const { id } = use(params);
-  const [follow, setFollow] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [followingUsers, setFollowingUsers] = useState<User[]>([]);
   const [followingArtists, setFollowingArtists] = useState<ArtistProfile[]>([]);
   const [artistTracksMap, setArtistTracksMap] = useState<
     Record<string, Track[]>
   >({});
+  const [activeFilter, setActiveFilter] = useState<FollowingFilterType>('all');
 
   const {
     currentTrack,
@@ -56,10 +44,6 @@ export default function UserProfilePage({
       return;
     }
     setToken(storedToken);
-
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-    const isOwner = userData.id === id;
-    setIsOwner(isOwner);
 
     const fetchUserData = async () => {
       try {
@@ -152,68 +136,115 @@ export default function UserProfilePage({
     );
   };
 
+  const filterButtons: { label: string; value: FollowingFilterType }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Artists', value: 'artists' },
+    { label: 'Users', value: 'users' },
+  ];
+
   return (
     <div className='px-4 md:px-6 py-6'>
       <div className='flex flex-col gap-4'>
-        <h1 className='text-2xl font-bold'>Following</h1>
-        <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-4'>
-          {followingArtists.map((artist) => (
-            <div
-              key={artist.id}
-              className="hover:bg-white/5 p-3 rounded-lg group relative cursor-pointer flex flex-col items-center flex-shrink-0 w-[180px]"
-              onClick={() => router.push(`/artist/profile/${artist.id}`)}
-            >
-              <div className="relative w-full mb-4">
-                <img
-                  src={artist.avatar || DEFAULT_AVATAR}
-                  alt={artist.artistName}
-                  className="w-full aspect-square object-cover rounded-full"
-                />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleArtistPlay(artist, 'followingArtist', e);
-                  }}
-                  className="absolute bottom-1 right-1 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center"
-                  aria-label={`Play ${artist.artistName}`}
-                >
-                  {isArtistPlaying(artist.id, 'followingArtist') ? (
-                    <Pause className="w-5 h-5 text-white" />
-                  ) : (
-                    <Play className="w-5 h-5 text-white" />
-                  )}
-                </button>
-              </div>
-              <div className="w-full text-left mt-1">
-                <h3 className="font-medium truncate text-white w-full">
-                  {artist.artistName}
-                </h3>
-                <p className="text-sm text-white/60">Artist</p>
-              </div>
-            </div>
-          ))}
-          {followingUsers.map((user) => (
-            <div
-              key={user.id}
-              className="hover:bg-white/5 p-3 rounded-lg group relative cursor-pointer flex flex-col items-center flex-shrink-0 w-[180px]"
-              onClick={() => router.push(`/profile/${user.id}`)}
-            >
-              <div className="w-full mb-4">
-                <img
-                  src={user.avatar || DEFAULT_AVATAR}
-                  alt={user.name}
-                  className="w-full aspect-square object-cover rounded-full"
-                />
-              </div>
-              <div className="w-full text-left mt-1">
-                <h3 className="font-medium truncate text-white w-full">
-                  {user.name}
-                </h3>
-                <p className="text-sm text-white/60">Profile</p>
-              </div>
-            </div>
-          ))}
+        <h1 className='text-2xl font-bold mb-4'>Following</h1> 
+        
+        {/* Filter Bar - Copied and adapted from search page */}
+        <div className="w-full border-b border-white/10 mb-6">
+          <div className="flex gap-8 px-0">
+            {filterButtons.map((button) => (
+              <button
+                key={button.value}
+                onClick={() => setActiveFilter(button.value)}
+                className={`py-2.5 text-sm font-medium transition-colors relative ${
+                  activeFilter === button.value
+                    ? 'text-white'
+                    : 'text-white/70 hover:text-white'
+                }`}
+              >
+                {button.label}
+                {activeFilter === button.value && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-full" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Grid for content */}
+        <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 md:gap-4'>
+          {/* Render Artists if filter is 'all' or 'artists' */}
+          {(activeFilter === 'all' || activeFilter === 'artists') && 
+            followingArtists.map((artist) => (
+              <div
+                key={artist.id}
+                className="hover:bg-white/5 p-3 rounded-lg group relative cursor-pointer flex flex-col items-center flex-shrink-0 w-[180px]"
+                onClick={() => router.push(`/artist/profile/${artist.id}`)}
+              >
+                <div className="relative w-full mb-4">
+                  <img
+                    src={artist.avatar || DEFAULT_AVATAR}
+                    alt={artist.artistName}
+                    className="w-full aspect-square object-cover rounded-full"
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleArtistPlay(artist, 'followingArtist', e);
+                    }}
+                    className="absolute bottom-1 right-1 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center"
+                    aria-label={`Play ${artist.artistName}`}
+                  >
+                    {isArtistPlaying(artist.id, 'followingArtist') ? (
+                      <Pause className="w-5 h-5 text-white" />
+                    ) : (
+                      <Play className="w-5 h-5 text-white" />
+                    )}
+                  </button>
+                </div>
+                <div className="w-full text-left mt-1">
+                  <h3 className="font-medium truncate text-white w-full">
+                    {artist.artistName}
+                  </h3>
+                  <p className="text-sm text-white/60">Artist</p>
+                </div>
+              </div>
+            ))}
+
+          {/* Render Users if filter is 'all' or 'users' */}
+          {(activeFilter === 'all' || activeFilter === 'users') && 
+            followingUsers.map((user) => (
+              <div
+                key={user.id}
+                className="hover:bg-white/5 p-3 rounded-lg group relative cursor-pointer flex flex-col items-center flex-shrink-0 w-[180px]"
+                onClick={() => router.push(`/profile/${user.id}`)}
+              >
+                <div className="w-full mb-4">
+                  <img
+                    src={user.avatar || DEFAULT_AVATAR}
+                    alt={user.name}
+                    className="w-full aspect-square object-cover rounded-full"
+                  />
+                </div>
+                <div className="w-full text-left mt-1">
+                  <h3 className="font-medium truncate text-white w-full">
+                    {user.name}
+                  </h3>
+                  <p className="text-sm text-white/60">Profile</p>
+                </div>
+              </div>
+            ))}
+        </div>
+        
+        {/* Optional: Message for empty results based on filter */}
+        {(activeFilter === 'artists' && followingArtists.length === 0) && (
+          <p className="text-white/60 mt-4">You are not following any artists.</p>
+        )}
+        {(activeFilter === 'users' && followingUsers.length === 0) && (
+          <p className="text-white/60 mt-4">You are not following any users.</p>
+        )}
+        {(activeFilter === 'all' && followingArtists.length === 0 && followingUsers.length === 0) && (
+          <p className="text-white/60 mt-4">You are not following anyone yet.</p>
+        )}
+
       </div>
     </div>
   )
