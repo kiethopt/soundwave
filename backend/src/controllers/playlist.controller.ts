@@ -863,6 +863,17 @@ export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
   }
 };
 
+export const getUserSystemPlaylists: RequestHandler = async (req, res, next) => {
+  try {
+    const result = await playlistService.getUserSystemPlaylists(req);
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error in getSystemPlaylists:", error);
+    next(error);
+  }
+};
+
 // Update the Vibe Rewind playlist (tracks user has listened to)
 export const updateVibeRewindPlaylist: RequestHandler = async (
   req,

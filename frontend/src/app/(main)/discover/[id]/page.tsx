@@ -40,6 +40,7 @@ export default function DiscoveryGenrePage({
   const [newestTracks, setNewestTracks] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [section, setSection] = useState<string | null>(null);
+  const [genreSystemPlaylists, setGenreSystemPlaylists] = useState<Playlist[]>([]);
   
   const {
     currentTrack,
@@ -63,16 +64,20 @@ export default function DiscoveryGenrePage({
     // Fetch genre top albums, tracks, and artists, and newest tracks
     const fetchGenreData = async () => {
       try {
-        const [albums, tracks, artists, newest] = await Promise.all([
+        const [albums, tracks, artists, newest, systemPlaylists] = await Promise.all([
           api.user.getGenreTopAlbums(id, storedToken),
           api.user.getGenreTopTracks(id, storedToken),
           api.user.getGenreTopArtists(id, storedToken),
           api.user.getGenreNewestTracks(id, storedToken),
+          api.playlists.getUserSystemPlaylist(),
         ]);
         setTopAlbums(albums);
         setTopTracks(tracks);
         setTopArtists(artists);
         setNewestTracks(newest);
+        const sortedGenreSystemPlaylists = sortSystemPlaylists(systemPlaylists, id);
+        console.log('Sorted Genre System Playlists:', sortedGenreSystemPlaylists);
+        setGenreSystemPlaylists(sortedGenreSystemPlaylists);
       } catch (error) {
         console.error('Error fetching genre data:', error);
         toast.error('Failed to load genre data');
@@ -94,6 +99,20 @@ export default function DiscoveryGenrePage({
     fetchPlaylists();
     fetchGenreData();
   }, [id, router]);
+
+  const sortSystemPlaylists = (playlists: Playlist[], genreId: string) => {
+    const genreSystemPlaylists = playlists.filter((playlist) => {
+      if (!playlist.tracks || playlist.tracks.length === 0) {
+        return false; // Bỏ qua playlist không có bài hát nào
+      }
+      const genreTrackCount = playlist.tracks.filter((track) =>
+        track.genres.some((genre) => genre.genre.id === genreId)
+      ).length;
+      const genrePercentage = genreTrackCount / playlist.tracks.length;
+      return genrePercentage >= 0.7; // Chỉ giữ lại playlist có ít nhất 70% bài hát thuộc thể loại
+    });
+    return genreSystemPlaylists;
+  };
 
   const handleAddToPlaylist = async (playlistId: string, trackId: string) => {
     try {
