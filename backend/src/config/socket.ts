@@ -17,16 +17,6 @@ export const initializeSocket = (server: http.Server): SocketIOServer => {
   io.on('connection', (socket) => {
     console.log(`🔌 Socket connected: ${socket.id}`);
 
-    // Placeholder: Later, you'll likely want logic here to associate
-    // the socket with a logged-in user, perhaps by having the
-    // client emit an event with an auth token or user ID.
-    // For now, we just log the connection.
-    // Example:
-    // socket.on('authenticate', (userId) => {
-    //   socket.join(`user-${userId}`); // Join a room specific to the user
-    //   console.log(`Socket ${socket.id} authenticated and joined room user-${userId}`);
-    // });
-
     // Handle socket disconnection
     socket.on('disconnect', () => {
       console.log(`🔌 Socket disconnected: ${socket.id}`);
@@ -34,7 +24,6 @@ export const initializeSocket = (server: http.Server): SocketIOServer => {
     });
   });
 
-  console.log('✅ Socket.IO initialized');
   return io;
 };
 
