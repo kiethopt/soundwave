@@ -4,19 +4,29 @@ import Image from 'next/image';
 import toast from 'react-hot-toast';
 import { api } from '@/utils/api';
 
+// Định nghĩa icon cho từng loại thông báo
+const notificationIcons = {
+  NEW_TRACK: '/icons/track.svg',
+  NEW_ALBUM: '/icons/album.svg',
+  EVENT_REMINDER: '/icons/event.svg',
+  NEW_FOLLOW: '/icons/follow.svg',
+  ARTIST_REQUEST_APPROVE: '/icons/approve.svg',
+  ARTIST_REQUEST_REJECT: '/icons/reject.svg',
+};
+
 export type NotificationType = {
   id: string;
   type:
-    | 'NEW_TRACK'
-    | 'NEW_ALBUM'
-    | 'EVENT_REMINDER'
-    | 'NEW_FOLLOW'
-    | 'ARTIST_REQUEST_APPROVE'
-    | 'ARTIST_REQUEST_REJECT';
+  | 'NEW_TRACK'
+  | 'NEW_ALBUM'
+  | 'EVENT_REMINDER'
+  | 'NEW_FOLLOW'
+  | 'ARTIST_REQUEST_APPROVE'
+  | 'ARTIST_REQUEST_REJECT';
   message: string;
   isRead: boolean;
-  coverUrl?: string; // Nếu có ảnh track/album, nếu không dùng ảnh mặc định
-  title?: string; // Tiêu đề của track hoặc album (nếu có)
+  coverUrl?: string;
+  title?: string;
   createdAt: string;
 };
 
@@ -29,10 +39,9 @@ export default function NotificationsPage() {
       try {
         const token = localStorage.getItem('userToken');
         if (!token) {
-          toast.error('Bạn cần đăng nhập để xem thông báo!');
+          toast.error('You need to log in to view notifications!');
           return;
         }
-        // Lưu ý: api.notifications.getList sẽ gọi đến URL: `${process.env.NEXT_PUBLIC_API_URL}/notifications`
         const data = await api.notifications.getList(token);
         setNotifications(data);
       } catch (error) {
@@ -48,76 +57,91 @@ export default function NotificationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-gray-600">Loading notifications...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="mt-4 text-gray-600 text-lg">Loading notifications...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-6">Thông báo của bạn</h1>
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
+          {notifications.length > 0 && (
+            <span className="text-sm text-gray-500">
+              {notifications.filter((n) => !n.isRead).length} unread
+            </span>
+          )}
+        </div>
+
         {notifications.length === 0 ? (
-          <p className="text-gray-600">Không có thông báo nào.</p>
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No notifications yet.</p>
+            <p className="text-gray-400 mt-2">Check back later!</p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
             {notifications.map((notification) => (
-              <Link
-                key={notification.id}
-                href={`/notification/${notification.id}`}
-              >
-                <a className="flex items-center bg-white rounded-lg shadow p-4 hover:shadow-md transition">
-                  <div className="w-16 h-16 relative rounded-md overflow-hidden mr-4 flex-shrink-0">
+              <Link key={notification.id} href={`/notification/${notification.id}`}>
+                <a
+                  className={`flex items-center bg-white rounded-xl shadow-sm p-4 transition-all duration-200 hover:shadow-lg ${notification.isRead ? 'opacity-75' : 'border-l-4 border-blue-500'
+                    }`}
+                >
+                  {/* Icon */}
+                  <div className="w-12 h-12 relative rounded-full overflow-hidden mr-4 flex-shrink-0 bg-gray-100">
                     <Image
                       src={
                         notification.coverUrl ||
-                        (notification.type === 'NEW_ALBUM'
-                          ? '/images/default-album.jpg'
-                          : '/images/default-track.jpg')
+                        notificationIcons[notification.type] ||
+                        '/images/default-notification.jpg'
                       }
-                      alt={notification.title || 'Notification cover'}
+                      alt={notification.title || 'Notification'}
                       layout="fill"
                       objectFit="cover"
                     />
                   </div>
+
+                  {/* Nội dung */}
                   <div className="flex-1">
                     <h2
-                      className={`text-lg ${
-                        notification.isRead
-                          ? 'font-normal text-gray-700'
-                          : 'font-semibold text-blue-600'
-                      }`}
+                      className={`text-lg ${notification.isRead
+                          ? 'text-gray-600'
+                          : 'text-gray-900 font-semibold'
+                        }`}
                     >
                       {notification.title || notification.message}
                     </h2>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 mt-1">
                       {new Date(notification.createdAt).toLocaleString()}
                     </p>
-                    <p className="text-xs mt-1">
-                      {notification.isRead ? (
-                        <span className="text-green-600">Đã đọc</span>
-                      ) : (
-                        <span className="text-red-600 font-medium">
-                          Chưa đọc
-                        </span>
-                      )}
-                    </p>
                   </div>
+
+                  {/* Trạng thái */}
+                  {!notification.isRead && (
+                    <span className="ml-4 px-2 py-1 text-xs font-medium text-white bg-blue-500 rounded-full">
+                      New
+                    </span>
+                  )}
                 </a>
               </Link>
             ))}
           </div>
         )}
 
-        {/* Nút "Xem tất cả" để chuyển hướng tới trang chi tiết thông báo */}
-        <div className="mt-8 text-center">
-          <Link href="/notifications/all">
-            <a className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-              Xem tất cả
-            </a>
-          </Link>
-        </div>
+        {/* Nút View All */}
+        {notifications.length > 0 && (
+          <div className="mt-10 text-center">
+            <Link href="/notifications/all">
+              <a className="inline-block px-8 py-3 bg-blue-600 text-white font-medium rounded-full hover:bg-blue-700 transition-all duration-200">
+                View All Notifications
+              </a>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

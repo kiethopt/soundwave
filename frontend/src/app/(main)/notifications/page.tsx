@@ -9,12 +9,12 @@ import { api } from '@/utils/api';
 export type NotificationType = {
   id: string;
   type:
-    | 'NEW_TRACK'
-    | 'NEW_ALBUM'
-    | 'EVENT_REMINDER'
-    | 'NEW_FOLLOW'
-    | 'ARTIST_REQUEST_APPROVE'
-    | 'ARTIST_REQUEST_REJECT';
+  | 'NEW_TRACK'
+  | 'NEW_ALBUM'
+  | 'EVENT_REMINDER'
+  | 'NEW_FOLLOW'
+  | 'ARTIST_REQUEST_APPROVE'
+  | 'ARTIST_REQUEST_REJECT';
   message: string;
   isRead: boolean;
   coverUrl?: string;
@@ -25,16 +25,14 @@ export type NotificationType = {
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [hoveredNotification, setHoveredNotification] = useState<string | null>(
-    null
-  );
+  const [hoveredNotification, setHoveredNotification] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
         const token = localStorage.getItem('userToken');
         if (!token) {
-          toast.error('Bạn cần đăng nhập để xem thông báo!');
+          toast.error('You need to log in to view notifications!');
           return;
         }
         const data = await api.notifications.getList(token);
@@ -54,76 +52,86 @@ export default function NotificationsPage() {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) {
-        toast.error('Bạn cần đăng nhập để thực hiện hành động này!');
+        toast.error('You need to log in to perform this action!');
         return;
       }
       await api.notifications.markAllAsRead(token);
       setNotifications((prev) =>
         prev.map((notification) => ({ ...notification, isRead: true }))
       );
-      toast.success('Đã đánh dấu tất cả thông báo là đã đọc!');
+      toast.success('All notifications have been marked as read!');
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
-      toast.error('Có lỗi xảy ra khi đánh dấu đã đọc!');
+      toast.error('An error occurred while marking notifications as read!');
     }
+  };
+
+  const getDeleteAction = (hasUnread: boolean, hasRead: boolean): string | null => {
+    if (hasUnread && hasRead) {
+      return prompt(
+        'What do you want to delete?\n- Enter "all" to delete all notifications\n- Enter "read" to delete only read notifications\n- Press Cancel to abort'
+      );
+    } else if (hasRead && !hasUnread) {
+      return confirm('Are you sure you want to delete all read notifications?') ? 'all' : null;
+    }
+    return null;
   };
 
   const handleDeleteNotifications = async () => {
     try {
       const token = localStorage.getItem('userToken');
       if (!token) {
-        toast.error('Bạn cần đăng nhập để thực hiện hành động này!');
+        toast.error('You need to log in to perform this action!');
         return;
       }
 
-      // Kiểm tra xem có thông báo chưa đọc nào không
       const hasUnread = notifications.some((n) => !n.isRead);
       const hasRead = notifications.some((n) => n.isRead);
 
-      if (!hasRead) {
-        toast.error('Không có thông báo đã đọc để xóa!');
+      if (!hasRead && !hasUnread) {
+        toast.error('There are no notifications to delete!');
         return;
       }
 
-      // Hỏi người dùng muốn xóa gì
-      let action: string | null;
-      if (hasUnread) {
-        action = prompt(
-          'Bạn muốn xóa gì?\n- Nhập "all" để xóa tất cả thông báo\n- Nhập "read" để chỉ xóa thông báo đã đọc\n- Nhấn Cancel để hủy'
-        );
-      } else {
-        // Nếu chỉ có thông báo đã đọc, chỉ hỏi xác nhận xóa tất cả
-        if (!confirm('Bạn có chắc chắn muốn xóa tất cả thông báo đã đọc?')) {
-          return;
-        }
-        action = 'all';
+      if (!hasRead) {
+        toast.error('There are no read notifications to delete!');
+        return;
       }
 
-      if (!action) return; // Người dùng nhấn Cancel
+      const action = getDeleteAction(hasUnread, hasRead);
+      if (!action) return;
 
       if (action.toLowerCase() === 'all') {
-        // Xóa tất cả thông báo
-        await api.notifications.deleteAll(token);
-        setNotifications([]);
-        toast.success('Đã xóa tất cả thông báo!');
+        const response = await api.notifications.deleteAll(token);
+        if (response.message === 'All notifications deleted successfully') {
+          setNotifications([]); // Reset state
+          toast.success('All notifications have been deleted!');
+        } else {
+          throw new Error('Failed to delete all notifications');
+        }
       } else if (action.toLowerCase() === 'read') {
-        // Xóa chỉ thông báo đã đọc
-        await api.notifications.deleteRead(token);
-        setNotifications((prev) => prev.filter((n) => !n.isRead));
-        toast.success('Đã xóa các thông báo đã đọc!');
+        const response = await api.notifications.deleteRead(token);
+        if (response.message === 'Read notifications deleted successfully') {
+          // Tải lại danh sách từ server để đồng bộ
+          const updatedData = await api.notifications.getList(token);
+          setNotifications(updatedData);
+          toast.success('Read notifications have been deleted!');
+        } else {
+          throw new Error('Failed to delete read notifications');
+        }
       } else {
-        toast.error('Lựa chọn không hợp lệ!');
+        toast.error('Invalid choice!');
       }
     } catch (error) {
       console.error('Error deleting notifications:', error);
-      toast.error('Có lỗi xảy ra khi xóa thông báo!');
+      toast.error('An error occurred while deleting notifications!');
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#111111]">
-        <p className="text-secondary animate-pulse">Đang tải thông báo...</p>
+        <p className="text-secondary animate-pulse">Loading notifications...</p>
       </div>
     );
   }
@@ -134,7 +142,7 @@ export default function NotificationsPage() {
         <div className="mb-6 flex justify-between items-center animate-fade-in">
           <div>
             <h1 className="text-2xl font-bold text-primary inline-block">
-              Thông báo
+              Notifications
             </h1>
             <span className="ml-2 text-sm text-secondary">
               ({notifications.length})
@@ -144,7 +152,7 @@ export default function NotificationsPage() {
             {notifications.length > 0 &&
               notifications.some((n) => !n.isRead) && (
                 <button onClick={handleMarkAllAsRead} className="btn-secondary">
-                  Đánh dấu tất cả đã đọc
+                  Mark all as read
                 </button>
               )}
             {notifications.length > 0 && (
@@ -152,7 +160,7 @@ export default function NotificationsPage() {
                 onClick={handleDeleteNotifications}
                 className="btn-secondary bg-red-600 hover:bg-red-700"
               >
-                Xóa tất cả thông báo
+                Delete all notifications
               </button>
             )}
           </div>
@@ -160,10 +168,10 @@ export default function NotificationsPage() {
 
         {notifications.length === 0 ? (
           <div className="text-center py-12 animate-fade-in">
-            <p className="text-lg text-secondary">Không có thông báo nào.</p>
+            <p className="text-lg text-secondary">No notifications available.</p>
             <Link href="/">
               <button className="btn-primary mt-4 animate-slide-up">
-                Quay về trang chủ
+                Back to homepage
               </button>
             </Link>
           </div>
@@ -173,19 +181,16 @@ export default function NotificationsPage() {
               <div key={notification.id} className="animate-slide-up">
                 <Link href={`/notification/${notification.id}`}>
                   <div
-                    className={`dashboard-card flex items-center p-4 transition-all duration-300 ${
-                      notification.isRead
-                        ? 'opacity-80'
-                        : 'border-l-4 border-blue-500'
-                    } ${
-                      index !== notifications.length - 1
+                    className={`dashboard-card flex items-center p-4 transition-all duration-300 ${notification.isRead
+                      ? 'opacity-80'
+                      : 'border-l-4 border-blue-500'
+                      } ${index !== notifications.length - 1
                         ? 'border-b border-white/20'
                         : ''
-                    } ${
-                      hoveredNotification === notification.id
+                      } ${hoveredNotification === notification.id
                         ? 'scale-102 shadow-lg'
                         : 'scale-100 shadow-md'
-                    }`}
+                      }`}
                     onMouseEnter={() => setHoveredNotification(notification.id)}
                     onMouseLeave={() => setHoveredNotification(null)}
                   >
@@ -205,11 +210,10 @@ export default function NotificationsPage() {
                     </div>
                     <div className="flex-1">
                       <h2
-                        className={`text-lg font-semibold transition-colors duration-200 ${
-                          notification.isRead
-                            ? 'text-secondary'
-                            : 'text-blue-400'
-                        }`}
+                        className={`text-lg font-semibold transition-colors duration-200 ${notification.isRead
+                          ? 'text-secondary'
+                          : 'text-blue-400'
+                          }`}
                       >
                         {notification.title || notification.message}
                       </h2>
@@ -218,10 +222,10 @@ export default function NotificationsPage() {
                       </p>
                       <p className="text-xs mt-1">
                         {notification.isRead ? (
-                          <span className="text-green-400">Đã đọc</span>
+                          <span className="text-green-400">Read</span>
                         ) : (
                           <span className="text-red-400 font-medium animate-pulse">
-                            Chưa đọc
+                            Unread
                           </span>
                         )}
                       </p>
