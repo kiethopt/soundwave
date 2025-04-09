@@ -119,6 +119,7 @@ export default function Header({
         if (prev.some((n) => n.id === data.id)) return prev;
         return [data, ...prev];
       });
+
       if (!data.isRead) {
         setNotificationCount((prev) => {
           const newCount = prev + 1;
@@ -126,6 +127,25 @@ export default function Header({
           return newCount;
         });
       }
+
+      // --- Fetch updated user data and update localStorage ---
+      const fetchAndUpdateUserData = async () => {
+        const token = localStorage.getItem('userToken');
+        if (!token) return
+        try {
+          const newUserData = await api.auth.getMe(token);
+          if (newUserData) {
+            localStorage.setItem('userData', JSON.stringify(newUserData));
+            setUserData(newUserData);
+          } else {
+            console.warn('Received null user data after notification');
+          }
+        } catch (error) {
+          console.error('Failed to fetch updated user data after notification:', error);
+        }
+      };
+
+      fetchAndUpdateUserData();
     };
 
     const handleArtistRequestStatus = (data: { type: string }) => {
@@ -163,28 +183,36 @@ export default function Header({
 
   // Check authentication and set initial userData
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       const token = localStorage.getItem('userToken');
-      const storedUserData = localStorage.getItem('userData');
+      if (!token) {
+          setIsAuthenticated(false);
+          setUserData(null);
+          return;
+      }
 
-      if (token && storedUserData) {
-        try {
-            const parsedUserData = JSON.parse(storedUserData);
-            console.log('Current user:', parsedUserData);
-            setIsAuthenticated(true);
-            setUserData(parsedUserData); // Set userData here
-        } catch (e) {
-            console.error("Failed to parse user data from localStorage", e);
-            // Handle logout or clear invalid data if necessary
-             localStorage.removeItem('userToken');
-             localStorage.removeItem('sessionId');
-             localStorage.removeItem('userData');
-             setIsAuthenticated(false);
-             setUserData(null);
-        }
-      } else {
-        setIsAuthenticated(false);
-        setUserData(null);
+      try {
+          const fetchedUserData = await api.auth.getMe(token);
+          
+          if (fetchedUserData) {
+              setIsAuthenticated(true);
+              setUserData(fetchedUserData);
+              localStorage.setItem('userData', JSON.stringify(fetchedUserData));
+          } else {
+              console.warn("Couldn't fetch user data with existing token.");
+              localStorage.removeItem('userToken');
+              localStorage.removeItem('sessionId');
+              localStorage.removeItem('userData');
+              setIsAuthenticated(false);
+              setUserData(null);
+          }
+      } catch (e) {
+          console.error("Failed to fetch user data:", e);
+          localStorage.removeItem('userToken');
+          localStorage.removeItem('sessionId');
+          localStorage.removeItem('userData');
+          setIsAuthenticated(false);
+          setUserData(null);
       }
     };
     checkAuth();
@@ -197,7 +225,7 @@ export default function Header({
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
 
-  }, []); // Runs once on mount
+  }, [router]); // Runs once on mount
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

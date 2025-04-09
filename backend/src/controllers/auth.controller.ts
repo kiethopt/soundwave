@@ -280,6 +280,28 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+// Lấy thông tin người dùng đang đăng nhập
+export const getMe = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
+    const userData = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: userSelect,
+    });
+
+    console.log(userData);
+    res.json(userData);
+  } catch (error) {
+    console.error('Get me error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Đăng nhập (Login)
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {

@@ -69,6 +69,14 @@ interface ResetPasswordData {
 
 export const api = {
   auth: {
+    getMe: async (token: string) => {
+      const response = await fetchWithAuth(
+        `/api/auth/me`,
+        { method: "GET" },
+        token
+      );
+      return response;
+    },
     register: async (data: RegisterData) =>
       fetchWithAuth("/api/auth/register", {
         method: "POST",
