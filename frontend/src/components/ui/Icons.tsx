@@ -327,7 +327,12 @@ export const Home = (props: React.SVGProps<SVGSVGElement>) => (
     <path d="M15.67 19.29h3.37c0.93 0 1.68-0.75 1.68-1.68v-7.51c0-0.5-0.22-0.97-0.6-1.29l-8.41-7.12c-0.63-0.53-1.55-0.53-2.18 0l-8.42 7.12c-0.38 0.32-0.6 0.79-0.6 1.29v7.51c0 0.93 0.75 1.68 1.68 1.68h3.37" />
   </svg>
 );
-
+// TrendingUp Icon
+export const TrendingUp = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M16.5 3a.75.75 0 01.53.22l4.5 4.5a.75.75 0 01-1.06 1.06L17 5.31l-3.72 3.72a.75.75 0 01-1.06 0L9 5.81 4.28 10.53a.75.75 0 01-1.06-1.06l5-5a.75.75 0 011.06 0L12.5 7.69l3.47-3.47H13.5a.75.75 0 010-1.5h3zM21 10.5a.75.75 0 01.75.75v9a.75.75 0 01-1.5 0v-9a.75.75 0 01.75-.75zM3 15.75a.75.75 0 011.5 0v4.5a.75.75 0 01-1.5 0v-4.5zM9 13.5a.75.75 0 011.5 0v7.5a.75.75 0 01-1.5 0v-7.5z" />
+  </svg>
+);
 // Home Outline Icon
 export const HomeOutline = (props: React.SVGProps<SVGSVGElement>) => (
   <svg

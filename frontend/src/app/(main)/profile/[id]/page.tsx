@@ -8,7 +8,7 @@ import { ArtistProfile, Track, User } from '@/types';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
 import { useDominantColor } from '@/hooks/useDominantColor';
-import { Play, Pause, Edit, Up, Down } from '@/components/ui/Icons';
+import { Play, Pause, Edit, Up, Down, Right } from '@/components/ui/Icons';
 import { ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
 import {
@@ -33,7 +33,7 @@ export default function UserProfilePage({
   const [follow, setFollow] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const [following, setFollowing] = useState<ArtistProfile[]>([]);
+  const [following, setFollowing] = useState<User[]>([]);
   const [followingArtists, setFollowingArtists] = useState<ArtistProfile[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [topArtists, setTopArtists] = useState<ArtistProfile[]>([]);
@@ -299,6 +299,7 @@ export default function UserProfilePage({
                       className="text-sm font-semibold hover:underline cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
+                        router.push(`/profile/${id}/following`);
                       }}
                     >
                       {following.length} Following
@@ -369,12 +370,20 @@ export default function UserProfilePage({
           {/* Top Artists Section */}
           {topArtists.length > 0 && (
             <div className="px-4 md:px-6 py-6">
-              <h2 className="text-2xl font-bold">Top artists this month</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Top artists this month</h2>
+                <button
+                  className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
+                  onClick={() => router.push(`/profile/${id}/top-artists`)}
+                >
+                  See all<Right className="w-3 h-3 inline-block ml-1" />
+                </button>
+              </div>
+              <div className="flex space-x-4 mt-4 overflow-x-auto pb-4">
                 {topArtists.map((topArtist) => (
                   <div
                     key={topArtist.id}
-                    className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
+                    className="hover:bg-white/5 p-4 rounded-lg group relative cursor-pointer flex-shrink-0 w-[180px]"
                     onClick={() =>
                       router.push(`/artist/profile/${topArtist.id}`)
                     }
@@ -468,12 +477,20 @@ export default function UserProfilePage({
           {/* Following Artists Section */}
           {followingArtists.length > 0 && (
             <div className="px-4 md:px-6 py-6">
-              <h2 className="text-2xl font-bold">Following artists</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Following artists</h2>
+                <button
+                  className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
+                  onClick={() => router.push(`/profile/${id}/following-artists`)}
+                >
+                  See all<Right className="w-3 h-3 inline-block ml-1" />
+                </button>
+              </div>
+              <div className="flex space-x-4 mt-4 overflow-x-auto pb-4">
                 {followingArtists.map((followArtist) => (
                   <div
                     key={followArtist.id}
-                    className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
+                    className="hover:bg-white/5 p-4 rounded-lg group relative cursor-pointer flex-shrink-0 w-[180px]"
                     onClick={() =>
                       router.push(`/artist/profile/${followArtist.id}`)
                     }

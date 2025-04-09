@@ -9,8 +9,8 @@ import {
 } from '../utils/prisma-selects';
 import { paginate } from '../utils/handle-utils';
 import { client, setCache } from '../middleware/cache.middleware';
-import pusher from '../config/pusher';
 import * as emailService from './email.service';
+import { getIO } from '../config/socket';
 
 // Hàm helper để lấy ngày đầu tháng hiện tại
 const getMonthStartDate = (): Date => {
@@ -256,55 +256,51 @@ export const followTarget = async (follower: any, followingId: string) => {
     throw new Error('Unauthorized');
   }
 
-  const FRONTEND_URL =
-    process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
-
-  // ... (kiểm tra userExists, artistExists, self-follow, existingFollow như cũ) ...
+  const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
 
   let followingType: FollowingType;
   let followedUserEmail: string | null = null;
   let followedEntityName: string = 'Người dùng';
-  let followedUserIdForPusher: string | null = null; // ID để trigger Pusher
-  let isFollowingArtistOwner = false; // Cờ để xác định có đang follow user chủ của artist không
+  let followedUserIdForPusher: string | null = null;
+  let isSelfFollow = false;
+  let recipientCurrentProfile: string | null = null;
 
-  const userExists = await prisma.user.findUnique({
+  const targetUser = await prisma.user.findUnique({
     where: { id: followingId },
-  });
-  const artistExists = await prisma.artistProfile.findUnique({
-    where: { id: followingId },
-    select: { id: true, artistName: true, userId: true }, // Lấy thêm userId
+    select: { id: true, email: true, name: true, username: true, currentProfile: true },
   });
 
-  if (userExists) {
+  const targetArtistProfile = await prisma.artistProfile.findUnique({
+    where: { id: followingId },
+    select: { id: true, artistName: true, userId: true },
+  });
+
+  if (targetUser) {
     followingType = FollowingType.USER;
-    followedUserEmail = userExists.email;
-    followedEntityName = userExists.name || userExists.username || 'Người dùng';
-    followedUserIdForPusher = userExists.id;
-  } else if (artistExists) {
+    followedUserEmail = targetUser.email;
+    followedEntityName = targetUser.name || targetUser.username || 'Người dùng';
+    followedUserIdForPusher = targetUser.id;
+    isSelfFollow = targetUser.id === follower.id;
+    recipientCurrentProfile = targetUser.currentProfile;
+  } else if (targetArtistProfile) {
     followingType = FollowingType.ARTIST;
     const artistOwner = await prisma.user.findUnique({
-      where: { id: artistExists.userId },
-      select: { email: true, name: true, username: true },
+      where: { id: targetArtistProfile.userId },
+      select: { email: true, name: true, username: true, currentProfile: true },
     });
-    followedUserEmail = artistOwner?.email || null; // Email của user sở hữu artist profile
-    followedEntityName = artistExists.artistName || 'Nghệ sĩ';
-    followedUserIdForPusher = artistExists.userId; // ID của user sở hữu artist profile để gửi Pusher notification
-    isFollowingArtistOwner = artistExists.userId === follower.id; // Kiểm tra xem follower có phải là chủ sở hữu artist không
+    followedUserEmail = artistOwner?.email || null;
+    followedEntityName = targetArtistProfile.artistName || 'Nghệ sĩ';
+    followedUserIdForPusher = targetArtistProfile.userId;
+    isSelfFollow = targetArtistProfile.userId === follower.id;
+    recipientCurrentProfile = artistOwner?.currentProfile || null;
   } else {
     throw new Error('Target not found');
   }
 
-  // Validate self-follow (cập nhật để kiểm tra cả user ID và artist ID của follower)
-  if (
-    (followingType === FollowingType.USER && followingId === follower.id) ||
-    (followingType === FollowingType.ARTIST &&
-      followingId === follower.artistProfile?.id) ||
-    (followingType === FollowingType.ARTIST && isFollowingArtistOwner) // Ngăn chặn user follow chính artist profile của mình
-  ) {
+  if (isSelfFollow) {
     throw new Error('Cannot follow yourself');
   }
 
-  // Check existing follow
   const existingFollow = await prisma.userFollow.findFirst({
     where: {
       followerId: follower.id,
@@ -324,83 +320,75 @@ export const followTarget = async (follower: any, followingId: string) => {
     ...(followingType === 'ARTIST' && { followingArtistId: followingId }),
   };
 
-  // Transaction
   return prisma.$transaction(async (tx) => {
     await tx.userFollow.create({ data: followData });
 
-    const followerName = follower.name || follower.username || 'Một người dùng';
-    // **Sửa lỗi ở đây: Thêm biến followerProfileLink**
+    const followerName = follower.name || follower.username || 'A user';
     const followerProfileLink = `${FRONTEND_URL}/user/${follower.id}`;
 
-    let notificationMessage = `Người dùng ${followerName} đã bắt đầu theo dõi bạn.`;
+    let notificationMessage: string | null = null;
+    let notificationRecipientType: FollowingType | null = null;
 
-    // Chỉ gửi email và tạo notification nếu người được follow không phải là chính người follow (trong trường hợp artist)
-    if (!isFollowingArtistOwner) {
-      if (followedUserEmail) {
-        try {
-          // **Sửa lỗi ở đây: Truyền đủ 4 tham số**
-          const emailOptions = emailService.createNewFollowerEmail(
-            followedUserEmail,
-            followerName,
-            followedEntityName,
-            followerProfileLink // Tham số thứ 4 bị thiếu trước đó
-          );
-          await emailService.sendEmail(emailOptions);
-          console.log(`Follow notification email sent to ${followedUserEmail}`);
-        } catch (emailError) {
-          console.error(
-            `Failed to send follow notification email to ${followedUserEmail}:`,
-            emailError
-          );
-        }
-      } else {
-        console.warn(
-          `Could not send follow email: No email found for target ${followingId} (type: ${followingType})`
+    // Determine message and recipient type based ONLY on who was followed
+    if (followingType === FollowingType.USER) {
+      notificationMessage = `${followerName} started following your profile.`;
+      notificationRecipientType = FollowingType.USER;
+    } else if (followingType === FollowingType.ARTIST) {
+      notificationMessage = `You have a new follower on your artist profile.`;
+      notificationRecipientType = FollowingType.ARTIST;
+    }
+
+    if (followedUserEmail && notificationMessage) {
+      try {
+        const emailOptions = emailService.createNewFollowerEmail(
+          followedUserEmail,
+          followerName,
+          followedEntityName,
+          followerProfileLink
         );
+        await emailService.sendEmail(emailOptions);
+      } catch (error) {
+        console.error('Failed to send email:', error);
       }
+    }
 
-      // Tạo in-app notification và Pusher
-      if (followingType === 'ARTIST') {
+    // Send notification if a message was generated
+    if (followedUserIdForPusher && notificationMessage && notificationRecipientType) {
+      try {
         const notification = await tx.notification.create({
           data: {
             type: 'NEW_FOLLOW',
             message: notificationMessage,
-            recipientType: 'ARTIST',
-            artistId: followingId, // ID của ArtistProfile
+            recipientType: notificationRecipientType, // Use the determined type
+            ...(notificationRecipientType === 'USER' && { userId: followingId }),
+            ...(notificationRecipientType === 'ARTIST' && { artistId: followingId }),
             senderId: follower.id,
           },
         });
-        if (followedUserIdForPusher) {
-          await pusher.trigger(
-            `user-${followedUserIdForPusher}`,
-            'notification',
-            {
-              type: 'NEW_FOLLOW',
-              message: notificationMessage,
-              notificationId: notification.id,
-            }
-          );
-        }
-      } else {
-        // followingType === 'USER'
-        const notification = await tx.notification.create({
-          data: {
-            type: 'NEW_FOLLOW',
-            message: notificationMessage,
-            recipientType: 'USER',
-            userId: followingId, // ID của User được follow
-            senderId: follower.id,
-          },
-        });
-        await pusher.trigger(`user-${followingId}`, 'notification', {
+
+        // Correctly emit to the specific user's room
+        const io = getIO();
+        const room = `user-${followedUserIdForPusher}`; // Define the room based on the followed user ID
+        io.to(room).emit('notification', { // Use io.to(room).emit
+          id: notification.id,
           type: 'NEW_FOLLOW',
           message: notificationMessage,
-          notificationId: notification.id,
+          recipientType: notificationRecipientType, // Send the determined type
+          isRead: false,
+          createdAt: notification.createdAt.toISOString(),
+          // Include sender details for frontend display
+          sender: {
+            id: follower.id,
+            name: follower.name || follower.username,
+            avatar: follower.avatar
+          }
         });
+      } catch (error) {
+        console.error('Error creating or sending notification:', error);
       }
-    } // Kết thúc kiểm tra isFollowingArtistOwner
+    }
 
-    // Cập nhật monthlyListeners nếu follow artist (luôn thực hiện)
+    // Cập nhật monthlyListeners cho ARTIST (không phụ thuộc vào currentProfile)
     if (followingType === FollowingType.ARTIST) {
       await tx.artistProfile.update({
         where: { id: followingId },
@@ -418,7 +406,6 @@ export const unfollowTarget = async (follower: any, followingId: string) => {
     throw new Error('Unauthorized');
   }
 
-  // Kiểm tra xem đang follow User hay Artist
   const [userExists, artistExists] = await Promise.all([
     prisma.user.findUnique({ where: { id: followingId } }),
     prisma.artistProfile.findUnique({
@@ -430,7 +417,7 @@ export const unfollowTarget = async (follower: any, followingId: string) => {
   let followingType: FollowingType;
   const whereConditions: any = {
     followerId: follower.id,
-    followingType: 'USER' as FollowingType, // mặc định
+    followingType: 'USER' as FollowingType,
   };
 
   if (userExists) {
@@ -444,7 +431,6 @@ export const unfollowTarget = async (follower: any, followingId: string) => {
     throw new Error('Target not found');
   }
 
-  // Find and delete the follow relation
   const follow = await prisma.userFollow.findFirst({
     where: whereConditions,
   });
@@ -453,14 +439,12 @@ export const unfollowTarget = async (follower: any, followingId: string) => {
     throw new Error('Not following this target');
   }
 
-  // Delete the follow relation and handle artist stats
   await prisma.$transaction(async (tx) => {
-    // Delete follow record
     await tx.userFollow.delete({
       where: { id: follow.id },
     });
 
-    // Update artist monthly listeners if unfollowing an artist
+    // Giảm monthlyListeners cho ARTIST (không phụ thuộc vào currentProfile)
     if (followingType === FollowingType.ARTIST) {
       await tx.artistProfile.update({
         where: { id: followingId },
