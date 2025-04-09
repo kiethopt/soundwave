@@ -11,9 +11,9 @@ import {
   getMaintenanceStatus,
   googleLogin,
   convertGoogleAvatar,
+  getMe,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth.middleware'
-import { uploadToCloudinary } from '../utils/cloudinary';
 
 const router = express.Router();
 
@@ -24,6 +24,7 @@ router.post('/logout', authenticate, logout);
 router.post('/request-password-reset', requestPasswordReset);
 router.post('/reset-password', resetPassword);
 router.get('/maintenance-status', getMaintenanceStatus);
+router.get('/me', authenticate, getMe);
 
 // Route đăng ký admin (chỉ dành cho development)
 router.post('/register-admin', registerAdmin);
