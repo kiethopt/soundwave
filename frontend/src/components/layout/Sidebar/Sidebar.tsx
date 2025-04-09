@@ -27,16 +27,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
 import { PlaylistIcon } from "@/components/user/playlist/PlaylistIcon";
 import { BsFillPinAngleFill } from "react-icons/bs";
-
-interface Playlist {
-  id: string;
-  name: string;
-  privacy: "PUBLIC" | "PRIVATE";
-  type: "FAVORITE" | "NORMAL";
-  isAIGenerated?: boolean;
-  coverUrl?: string;
-  totalTracks?: number;
-}
+import { Playlist } from "@/types";
+import { Loader2, RefreshCw } from "lucide-react";
 
 export default function Sidebar({
   isOpen,
@@ -52,12 +44,24 @@ export default function Sidebar({
   const [currentProfile, setCurrentProfile] = useState<"USER" | "ARTIST">(
     "USER"
   );
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { theme } = useTheme();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const { dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
+  const [favoritePlaylist, setFavoritePlaylist] = useState<Playlist | null>(
+    null
+  );
+  const [vibeRewindPlaylist, setVibeRewindPlaylist] = useState<Playlist | null>(
+    null
+  );
+  const [welcomeMixPlaylist, setWelcomeMixPlaylist] = useState<Playlist | null>(
+    null
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isUpdatingVibeRewind, setIsUpdatingVibeRewind] = useState(false);
 
   useEffect(() => {
     const savedCollapsedState = localStorage.getItem("sidebarCollapsed");
@@ -84,52 +88,75 @@ export default function Sidebar({
     }
   }, []);
 
-  // Fetch playlists
   const fetchPlaylists = async () => {
-    try {
-      const token = localStorage.getItem("userToken");
-      if (!token) {
-        return;
-      }
+    setLoading(true);
+    setError(null);
+    setFavoritePlaylist(null);
+    setVibeRewindPlaylist(null);
+    setWelcomeMixPlaylist(null);
+    setPlaylists([]);
 
+    const token = localStorage.getItem("userToken");
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    try {
       const response = await api.playlists.getAll(token);
-      console.log("Fetched playlists:", response.data);
-      setPlaylists(response.data || []);
-    } catch (error) {
-      console.error("Error fetching playlists:", error);
+
+      if (response.success) {
+        const allPlaylists: Playlist[] = response.data || [];
+
+        const fav =
+          allPlaylists.find((p: Playlist) => p.type === "FAVORITE") || null;
+        const vibe =
+          allPlaylists.find((p: Playlist) => p.name === "Vibe Rewind") || null;
+        const welcome =
+          allPlaylists.find((p: Playlist) => p.name === "Welcome Mix") || null;
+
+        setFavoritePlaylist(fav);
+        setVibeRewindPlaylist(vibe);
+        setWelcomeMixPlaylist(welcome);
+
+        const normal = allPlaylists.filter(
+          (p: Playlist) =>
+            p.type !== "FAVORITE" &&
+            p.name !== "Vibe Rewind" &&
+            p.name !== "Welcome Mix" &&
+            !p.isAIGenerated
+        );
+        setPlaylists(normal);
+      } else {
+        setError(response.message || "Could not load playlists");
+      }
+    } catch (err: any) {
+      console.error("Error fetching playlists:", err);
+      setError("Could not load playlists");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Lắng nghe sự kiện cập nhật playlist từ các components khác
   useEffect(() => {
-    // Gọi lần đầu khi component mount
     if (isAuthenticated) {
       fetchPlaylists();
     }
 
-    // Lắng nghe sự kiện cập nhật playlist
     const handlePlaylistUpdate = () => {
       console.log("Playlist updated event received, refreshing playlists");
       fetchPlaylists();
     };
 
-    // Đăng ký lắng nghe sự kiện
     window.addEventListener("playlist-updated", handlePlaylistUpdate);
 
-    // Cleanup khi component unmount
     return () => {
       window.removeEventListener("playlist-updated", handlePlaylistUpdate);
     };
   }, [isAuthenticated]);
 
   const isActive = (path: string) => pathname === path;
-
-  // Tách playlist yêu thích và playlist thường
-  const favoritePlaylist = playlists.find((p) => p.type === "FAVORITE");
-  const vibeRewindPlaylist = playlists.find((p) => p.name === "Vibe Rewind");
-  const normalPlaylists = playlists.filter(
-    (p) => p.type === "NORMAL" && p.name !== "Vibe Rewind"
-  );
 
   return (
     <>
@@ -147,7 +174,7 @@ export default function Sidebar({
           md:transform-none md:transition-none
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0 md:flex-shrink-0
-          ${isCollapsed ? "w-20" : "w-64"}
+          ${isCollapsed ? "w-24" : "w-64"}
           ${
             theme === "light"
               ? "bg-white border-r border-gray-200"
@@ -173,7 +200,6 @@ export default function Sidebar({
             </button>
           </div>
 
-          {/* Admin Sidebar Logo */}
           {userRole === "ADMIN" && (
             <div className="px-4 py-6">
               <div
@@ -197,7 +223,6 @@ export default function Sidebar({
           )}
 
           <nav className={`flex-1 ${userRole === "ADMIN" ? "px-2" : "px-4"}`}>
-            {/* Library Section - Only for regular users */}
             {currentProfile === "USER" && userRole === "USER" && (
               <div className="flex flex-col">
                 <div className="h-[72px] -mx-4 border-b border-white/10">
@@ -252,33 +277,59 @@ export default function Sidebar({
                   </div>
                 </div>
 
-                {/* Playlists List */}
-                <div className="mt-2 px-2 space-y-1">
-                  {/* Favorite Playlist */}
+                <div
+                  className={`mt-2 px-2 ${
+                    isCollapsed
+                      ? "space-y-2 flex flex-col items-center"
+                      : "space-y-1"
+                  }`}
+                >
                   {favoritePlaylist && (
                     <Link
                       href={`/playlists/${favoritePlaylist.id}`}
-                      className={`flex items-center px-3 py-2 rounded-md ${
-                        pathname === `/playlists/${favoritePlaylist.id}`
-                          ? theme === "light"
-                            ? "bg-gray-200 text-gray-900"
-                            : "bg-white/10 text-white"
-                          : theme === "light"
-                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      className={`flex items-center rounded-md ${
+                        isCollapsed
+                          ? "w-12 h-auto justify-center"
+                          : `px-3 py-2 ${
+                              isActive(`/playlists/${favoritePlaylist.id}`)
+                                ? theme === "light"
+                                  ? "bg-gray-200 text-gray-900"
+                                  : "bg-[#A57865]/30 text-white"
+                                : theme === "light"
+                                ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                                : "text-white/70 hover:bg-white/10 hover:text-white"
+                            }`
                       }`}
                     >
                       {isCollapsed ? (
-                        <PlaylistIcon
-                          coverUrl={favoritePlaylist.coverUrl}
-                          name={favoritePlaylist.name}
-                          type={favoritePlaylist.type}
-                          isAIGenerated={favoritePlaylist.isAIGenerated}
-                          size={20}
-                        />
+                        <div
+                          className={`p-1 rounded-md ${
+                            isActive(`/playlists/${favoritePlaylist.id}`)
+                              ? "bg-[#A57865]/30"
+                              : "bg-neutral-800/70 hover:bg-neutral-700/80"
+                          } flex items-center justify-center w-10 h-10 relative group`}
+                        >
+                          <PlaylistIcon
+                            coverUrl={favoritePlaylist.coverUrl}
+                            name={favoritePlaylist.name}
+                            type={favoritePlaylist.type}
+                            isAIGenerated={favoritePlaylist.isAIGenerated}
+                            size={28}
+                            className="rounded object-cover"
+                          />
+                          <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
+                            <div className="font-medium">
+                              {favoritePlaylist.name}
+                            </div>
+                            <div className="text-white/50">
+                              Private • {favoritePlaylist.totalTracks || 0}{" "}
+                              songs
+                            </div>
+                          </div>
+                        </div>
                       ) : (
-                        <div className="flex items-center w-full">
-                          <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-3">
+                        <div className="flex items-center w-full gap-2">
+                          <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
                             {favoritePlaylist.coverUrl ? (
                               <Image
                                 src={favoritePlaylist.coverUrl}
@@ -299,54 +350,81 @@ export default function Sidebar({
                             )}
                           </div>
                           <div className="flex flex-col min-w-0 flex-1">
-                            <div className="flex items-center">
-                              <BsFillPinAngleFill
-                                className="mr-1.5 -mt-0.5 rotate-12"
-                                size={14}
-                                color="#A57865"
-                              />
+                            <div className="flex items-center gap-1">
+                              <BsFillPinAngleFill className="w-3 h-3 text-[#A57865] flex-shrink-0" />
                               <span className="truncate font-medium text-sm leading-tight">
                                 {favoritePlaylist.name}
                               </span>
                             </div>
-                            <span className="text-xs text-white/50 truncate mt-0.5">
-                              {favoritePlaylist.privacy === "PRIVATE"
-                                ? "Private"
-                                : "Public"}{" "}
-                              • {favoritePlaylist.totalTracks || 0} songs
-                            </span>
+                            <div className="flex items-center text-xs text-white/50 mt-0.5">
+                              <span className="truncate">
+                                Private • {favoritePlaylist.totalTracks || 0}{" "}
+                                songs
+                              </span>
+                            </div>
                           </div>
                         </div>
                       )}
                     </Link>
                   )}
 
-                  {/* Vibe Rewind Playlist */}
+                  {/* Divider after Favorite playlist */}
+                  {favoritePlaylist &&
+                    (vibeRewindPlaylist || welcomeMixPlaylist) && (
+                      <div className="w-full border-t border-[#333333] my-2" />
+                    )}
+
                   {vibeRewindPlaylist && (
-                    <div className="flex flex-col">
+                    <div
+                      className={`relative group ${
+                        isCollapsed ? "w-12 h-auto" : "flex flex-col"
+                      }`}
+                    >
                       <Link
                         href={`/playlists/${vibeRewindPlaylist.id}`}
-                        className={`flex items-center px-3 py-2 rounded-md group ${
-                          pathname === `/playlists/${vibeRewindPlaylist.id}`
-                            ? theme === "light"
-                              ? "bg-gray-200 text-gray-900"
-                              : "bg-white/10 text-white"
-                            : theme === "light"
-                            ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                            : "text-white/70 hover:bg-white/10 hover:text-white"
+                        className={`flex items-center rounded-md group ${
+                          isCollapsed
+                            ? "w-full h-full justify-center"
+                            : `px-3 py-2 ${
+                                isActive(`/playlists/${vibeRewindPlaylist.id}`)
+                                  ? theme === "light"
+                                    ? "bg-gray-200 text-gray-900"
+                                    : "bg-[#A57865]/30 text-white"
+                                  : theme === "light"
+                                  ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                                  : "text-white/70 hover:bg-white/10 hover:text-white"
+                              }`
                         }`}
                       >
                         {isCollapsed ? (
-                          <PlaylistIcon
-                            coverUrl={vibeRewindPlaylist.coverUrl}
-                            name={vibeRewindPlaylist.name}
-                            type={vibeRewindPlaylist.type}
-                            isAIGenerated={vibeRewindPlaylist.isAIGenerated}
-                            size={20}
-                          />
+                          <div
+                            className={`p-1 rounded-md ${
+                              isActive(`/playlists/${vibeRewindPlaylist.id}`)
+                                ? "bg-[#A57865]/30"
+                                : "bg-neutral-800/70 hover:bg-neutral-700/80"
+                            } flex items-center justify-center w-10 h-10 relative group`}
+                          >
+                            <PlaylistIcon
+                              coverUrl={vibeRewindPlaylist.coverUrl}
+                              name={vibeRewindPlaylist.name}
+                              type={vibeRewindPlaylist.type}
+                              isAIGenerated={vibeRewindPlaylist.isAIGenerated}
+                              size={28}
+                              className="rounded object-cover text-emerald-500"
+                            />
+                            <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
+                              <div className="font-medium">
+                                {vibeRewindPlaylist.name}
+                              </div>
+                              <div className="text-white/50">
+                                Private • {vibeRewindPlaylist.totalTracks || 0}{" "}
+                                songs
+                              </div>
+                            </div>
+                          </div>
                         ) : (
-                          <div className="flex items-center w-full">
-                            <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-3">
+                          <div className="flex items-center w-full gap-2">
+                            <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
                               {vibeRewindPlaylist.coverUrl ? (
                                 <Image
                                   src={vibeRewindPlaylist.coverUrl}
@@ -356,7 +434,7 @@ export default function Sidebar({
                                   className="object-cover w-full h-full"
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-neutral-800">
+                                <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-emerald-500">
                                   <PlaylistIcon
                                     name={vibeRewindPlaylist.name}
                                     type={vibeRewindPlaylist.type}
@@ -369,54 +447,17 @@ export default function Sidebar({
                               )}
                             </div>
                             <div className="flex flex-col min-w-0 flex-1">
-                              <div className="flex items-center">
+                              <div className="flex items-center gap-1">
+                                <BsFillPinAngleFill className="w-3 h-3 text-emerald-500 flex-shrink-0" />
                                 <span className="truncate font-medium text-sm leading-tight">
                                   {vibeRewindPlaylist.name}
                                 </span>
                               </div>
-                              <div className="flex items-center mt-0.5">
-                                <span className="text-xs text-white/50 truncate flex-grow">
-                                  Auto-Updated •{" "}
+                              <div className="flex items-center text-xs text-white/50 mt-0.5">
+                                <span className="truncate">
+                                  Private •{" "}
                                   {vibeRewindPlaylist.totalTracks || 0} songs
                                 </span>
-                                <button
-                                  className="ml-1 opacity-0 group-hover:opacity-100 hover:text-emerald-500 transition-opacity"
-                                  title="Update with recent tracks"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const token =
-                                      localStorage.getItem("userToken");
-                                    if (token) {
-                                      api.playlists
-                                        .updateVibeRewindPlaylist(token)
-                                        .then(() => {
-                                          // Refresh playlists
-                                          fetchPlaylists();
-                                        })
-                                        .catch((error) => {
-                                          console.error(
-                                            "Error updating Vibe Rewind:",
-                                            error
-                                          );
-                                        });
-                                    }
-                                  }}
-                                >
-                                  <svg
-                                    className="w-3 h-3"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                    />
-                                  </svg>
-                                </button>
                               </div>
                             </div>
                           </div>
@@ -425,37 +466,145 @@ export default function Sidebar({
                     </div>
                   )}
 
-                  {/* Divider */}
-                  {normalPlaylists.length > 0 && (
-                    <div className="h-px bg-white/10 my-2" />
-                  )}
-
-                  {/* Normal Playlists */}
-                  {normalPlaylists.map((playlist) => (
+                  {welcomeMixPlaylist && (
                     <Link
-                      key={playlist.id}
-                      href={`/playlists/${playlist.id}`}
-                      className={`flex items-center px-3 py-2 rounded-md ${
-                        pathname === `/playlists/${playlist.id}`
-                          ? theme === "light"
-                            ? "bg-gray-200 text-gray-900"
-                            : "bg-white/10 text-white"
-                          : theme === "light"
-                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      href={`/playlists/${welcomeMixPlaylist.id}`}
+                      className={`relative flex items-center rounded-md group ${
+                        isCollapsed
+                          ? "w-12 h-auto justify-center"
+                          : `px-3 py-2 -mt-1 ${
+                              isActive(`/playlists/${welcomeMixPlaylist.id}`)
+                                ? theme === "light"
+                                  ? "bg-gray-200 text-gray-900"
+                                  : "bg-[#A57865]/30 text-white"
+                                : theme === "light"
+                                ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                                : "text-white/70 hover:bg-white/10 hover:text-white"
+                            }`
                       }`}
                     >
                       {isCollapsed ? (
-                        <PlaylistIcon
-                          coverUrl={playlist.coverUrl}
-                          name={playlist.name}
-                          type={playlist.type}
-                          isAIGenerated={playlist.isAIGenerated}
-                          size={20}
-                        />
+                        <div
+                          className={`p-1 rounded-md ${
+                            isActive(`/playlists/${welcomeMixPlaylist.id}`)
+                              ? "bg-[#A57865]/30"
+                              : "bg-neutral-800/70 hover:bg-neutral-700/80"
+                          } flex items-center justify-center w-10 h-10 relative group`}
+                        >
+                          <PlaylistIcon
+                            coverUrl={welcomeMixPlaylist.coverUrl}
+                            name={welcomeMixPlaylist.name}
+                            type={welcomeMixPlaylist.type}
+                            isAIGenerated={welcomeMixPlaylist.isAIGenerated}
+                            size={28}
+                            className="rounded object-cover text-violet-500"
+                          />
+                          <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
+                            <div className="font-medium">
+                              {welcomeMixPlaylist.name}
+                            </div>
+                            <div className="text-white/50">
+                              Private • {welcomeMixPlaylist.totalTracks || 0}{" "}
+                              songs
+                            </div>
+                          </div>
+                        </div>
                       ) : (
-                        <div className="flex items-center w-full">
-                          <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-3">
+                        <div className="flex items-center w-full gap-2">
+                          <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
+                            {welcomeMixPlaylist.coverUrl ? (
+                              <Image
+                                src={welcomeMixPlaylist.coverUrl}
+                                alt={welcomeMixPlaylist.name}
+                                width={40}
+                                height={40}
+                                className="object-cover w-full h-full"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-violet-500">
+                                <PlaylistIcon
+                                  name={welcomeMixPlaylist.name}
+                                  type={welcomeMixPlaylist.type}
+                                  isAIGenerated={
+                                    welcomeMixPlaylist.isAIGenerated
+                                  }
+                                  size={24}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <div className="flex items-center gap-1">
+                              <BsFillPinAngleFill className="w-3 h-3 text-violet-500 flex-shrink-0" />
+                              <span className="truncate font-medium text-sm leading-tight">
+                                {welcomeMixPlaylist.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center text-xs text-white/50 mt-0.5">
+                              <span className="truncate">
+                                Private • {welcomeMixPlaylist.totalTracks || 0}{" "}
+                                songs
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </Link>
+                  )}
+
+                  {/* Divider before normal playlists */}
+                  {playlists.length > 0 && (
+                    <div className="w-full border-t border-[#333333] my-2" />
+                  )}
+
+                  {playlists.map((playlist, index) => (
+                    <Link
+                      key={playlist.id}
+                      href={`/playlists/${playlist.id}`}
+                      className={`flex items-center rounded-md ${
+                        isCollapsed
+                          ? "w-12 h-auto justify-center" +
+                            (index > 0 ? " -mt-1" : "")
+                          : `px-3 py-2 ${index > 0 ? "-mt-1" : ""} ${
+                              isActive(`/playlists/${playlist.id}`)
+                                ? theme === "light"
+                                  ? "bg-gray-200 text-gray-900"
+                                  : "bg-[#A57865]/30 text-white"
+                                : theme === "light"
+                                ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                                : "text-white/70 hover:bg-white/10 hover:text-white"
+                            }`
+                      }`}
+                    >
+                      {isCollapsed ? (
+                        <div
+                          className={`p-1 rounded-md ${
+                            isActive(`/playlists/${playlist.id}`)
+                              ? "bg-[#A57865]/30"
+                              : "bg-neutral-800/70 hover:bg-neutral-700/80"
+                          } flex items-center justify-center w-10 h-10 relative group`}
+                        >
+                          <PlaylistIcon
+                            coverUrl={playlist.coverUrl}
+                            name={playlist.name}
+                            type={playlist.type}
+                            isAIGenerated={playlist.isAIGenerated}
+                            size={28}
+                            className="rounded object-cover"
+                          />
+                          <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
+                            <div className="font-medium">{playlist.name}</div>
+                            <div className="text-white/50">
+                              {playlist.privacy === "PRIVATE"
+                                ? "Private"
+                                : "Public"}{" "}
+                              • {playlist.totalTracks || 0} songs
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center w-full gap-2">
+                          <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
                             {playlist.coverUrl ? (
                               <Image
                                 src={playlist.coverUrl}
@@ -479,12 +628,14 @@ export default function Sidebar({
                             <span className="truncate font-medium text-sm leading-tight">
                               {playlist.name}
                             </span>
-                            <span className="text-xs text-white/50 truncate mt-0.5">
-                              {playlist.privacy === "PRIVATE"
-                                ? "Private"
-                                : "Public"}{" "}
-                              • {playlist.totalTracks || 0} songs
-                            </span>
+                            <div className="flex items-center text-xs text-white/50 mt-0.5">
+                              <span className="truncate">
+                                {playlist.privacy === "PRIVATE"
+                                  ? "Private"
+                                  : "Public"}{" "}
+                                • {playlist.totalTracks || 0} songs
+                              </span>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -494,7 +645,6 @@ export default function Sidebar({
               </div>
             )}
 
-            {/* Artist Section */}
             {hasArtistProfile &&
               isArtistVerified &&
               currentProfile === "ARTIST" && (
@@ -514,7 +664,7 @@ export default function Sidebar({
                       pathname && pathname.startsWith("/artist/dashboard")
                         ? theme === "light"
                           ? "bg-gray-200 text-gray-900"
-                          : "bg-white/10 text-white"
+                          : "bg-[#A57865]/30 text-white"
                         : theme === "light"
                         ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
                         : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -535,7 +685,7 @@ export default function Sidebar({
                       pathname && pathname.startsWith("/artist/albums")
                         ? theme === "light"
                           ? "bg-gray-200 text-gray-900"
-                          : "bg-white/10 text-white"
+                          : "bg-[#A57865]/30 text-white"
                         : theme === "light"
                         ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
                         : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -556,7 +706,7 @@ export default function Sidebar({
                       pathname && pathname.startsWith("/artist/tracks")
                         ? theme === "light"
                           ? "bg-gray-200 text-gray-900"
-                          : "bg-white/10 text-white"
+                          : "bg-[#A57865]/30 text-white"
                         : theme === "light"
                         ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
                         : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -574,7 +724,6 @@ export default function Sidebar({
                 </div>
               )}
 
-            {/* Admin Section - Redesigned */}
             {userRole === "ADMIN" && (
               <div className="mt-2 flex flex-col gap-1">
                 {!isCollapsed && (
@@ -583,7 +732,6 @@ export default function Sidebar({
                   </div>
                 )}
 
-                {/* Dashboard Section */}
                 <Link
                   href="/admin/dashboard"
                   className={`flex items-center px-3 py-2.5 ${
@@ -606,7 +754,6 @@ export default function Sidebar({
                   )}
                 </Link>
 
-                {/* Analytics Section */}
                 <Link
                   href="/admin/analytics"
                   className={`flex items-center px-3 py-2.5 ${
@@ -629,7 +776,6 @@ export default function Sidebar({
                   )}
                 </Link>
 
-                {/* Artist Requests Section */}
                 <Link
                   href="/admin/artist-requests"
                   className={`flex items-center px-3 py-2.5 ${
@@ -658,7 +804,6 @@ export default function Sidebar({
                   </div>
                 )}
 
-                {/* Users Section */}
                 <Link
                   href="/admin/users"
                   className={`flex items-center px-3 py-2.5 ${
@@ -679,7 +824,6 @@ export default function Sidebar({
                   )}
                 </Link>
 
-                {/* Artists Section */}
                 <Link
                   href="/admin/artists"
                   className={`flex items-center px-3 py-2.5 ${
@@ -700,7 +844,6 @@ export default function Sidebar({
                   )}
                 </Link>
 
-                {/* Genres Section */}
                 <Link
                   href="/admin/genres"
                   className={`flex items-center px-3 py-2.5 ${
@@ -721,7 +864,6 @@ export default function Sidebar({
                   )}
                 </Link>
 
-                {/* Labels Section */}
                 <Link
                   href="/admin/labels"
                   className={`flex items-center px-3 py-2.5 ${
@@ -742,7 +884,6 @@ export default function Sidebar({
                   )}
                 </Link>
 
-                {/* Content Section - NEW */}
                 <Link
                   href="/admin/content"
                   className={`flex items-center px-3 py-2.5 ${
@@ -769,7 +910,6 @@ export default function Sidebar({
                   </div>
                 )}
 
-                {/* System Section */}
                 <Link
                   href="/admin/system"
                   className={`flex items-center px-3 py-2.5 ${

@@ -39,7 +39,7 @@ export default function PlaylistPage() {
   const isFavoritePlaylist = playlist?.type === "FAVORITE";
   const isWelcomeMixPlaylist = playlist?.name === "Welcome Mix";
   const isSpecialPlaylist =
-    isVibeRewindPlaylist || isFavoritePlaylist || isWelcomeMixPlaylist;
+    isFavoritePlaylist || isVibeRewindPlaylist || isWelcomeMixPlaylist;
 
   // Check if this is a normal playlist (not special playlists or AI generated)
   const isNormalPlaylist =
@@ -220,15 +220,16 @@ export default function PlaylistPage() {
           <div className="flex items-center gap-2 mt-2">
             {playlist.canEdit && (
               <>
-                <Button
-                  onClick={() =>
-                    handleProtectedAction(() => setIsEditOpen(true))
-                  }
-                  disabled={false}
-                >
-                  Edit playlist
-                </Button>
-                {isNormalPlaylist && (
+                {playlist.type === "NORMAL" && (
+                  <Button
+                    onClick={() =>
+                      handleProtectedAction(() => setIsEditOpen(true))
+                    }
+                  >
+                    Edit playlist
+                  </Button>
+                )}
+                {playlist.type === "NORMAL" && (
                   <Button
                     onClick={() => setIsDeleteOpen(true)}
                     variant="destructive"
@@ -257,7 +258,6 @@ export default function PlaylistPage() {
                   })
                 }
                 variant="outline"
-                className="ml-2"
               >
                 Update Now
               </Button>
@@ -282,7 +282,7 @@ export default function PlaylistPage() {
           tracks={playlist.tracks}
           showAlbum
           showDateAdded
-          allowRemove={playlist.canEdit && isAuthenticated}
+          allowRemove={playlist.canEdit && playlist.type === "NORMAL"}
           onRemove={handleRemoveTrack}
           requiresAuth={!isAuthenticated}
         />
