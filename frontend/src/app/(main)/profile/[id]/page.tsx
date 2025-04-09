@@ -33,16 +33,6 @@ export default function UserProfilePage({
   const [follow, setFollow] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-  const { dominantColor } = useDominantColor(
-    userData?.avatar || DEFAULT_AVATAR
-  );
-
-  console.log('Avatar URL:', userData?.avatar);
-  console.log('Default Avatar:', DEFAULT_AVATAR);
-  console.log('Final Avatar:', userData?.avatar || DEFAULT_AVATAR);
-  console.log('Dominant Color:', dominantColor);
-
   const [following, setFollowing] = useState<ArtistProfile[]>([]);
   const [followingArtists, setFollowingArtists] = useState<ArtistProfile[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -51,6 +41,9 @@ export default function UserProfilePage({
   const [artistTracksMap, setArtistTracksMap] = useState<
     Record<string, Track[]>
   >({});
+  const { dominantColor } = useDominantColor(
+    user?.avatar || DEFAULT_AVATAR
+  );
   const [showAllTracks, setShowAllTracks] = useState(false);
 
   const {
@@ -282,7 +275,7 @@ export default function UserProfilePage({
             <div className="flex flex-row items-center justify-start w-full">
               {/* Avatar */}
               <Image
-                src={userData?.avatar || DEFAULT_AVATAR}
+                src={user?.avatar || DEFAULT_AVATAR}
                 alt={user.name || 'User avatar'}
                 width={192}
                 height={192}
@@ -297,7 +290,7 @@ export default function UserProfilePage({
                   className="text-4xl md:text-6xl font-bold capitalize"
                   style={{ lineHeight: '1.1' }}
                 >
-                  {userData?.name || userData?.username || 'User'}
+                  {user?.name || user?.username || 'User'}
                 </h1>
                 {isOwner && (
                   <div>

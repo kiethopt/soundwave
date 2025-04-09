@@ -76,7 +76,7 @@ function EditProfileContent() {
         setName(parsedUserData.name);
         setEmail(parsedUserData.email);
         setAvatar(parsedUserData.avatar || '');
-        setUsername(parsedUserData.username);
+        setUsername(parsedUserData.username || '');
       }
 
       if (!token || !storedUserData) {
@@ -133,6 +133,7 @@ function EditProfileContent() {
               id="username"
               name="username"
               value={username}
+              required
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
             />
@@ -169,6 +170,7 @@ function EditProfileContent() {
               type="text"
               id="name"
               name="name"
+              required
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"

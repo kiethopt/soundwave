@@ -707,11 +707,6 @@ function SearchContent() {
             )}
 
           {/* Users Section */}
-          {/* import { useRouter } from 'next/navigation';
-
-          const router = useRouter(); */}
-
-          {/* Users Section */}
           {(activeFilter === 'all' || activeFilter === 'users') &&
             results.users.length > 0 && (
               <div>
@@ -734,7 +729,7 @@ function SearchContent() {
                       </div>
                       <div className="text-center">
                         <h3 className="text-white font-medium truncate hover:underline">
-                          {user.name}
+                          {user.name || user.username || 'User'}
                         </h3>
                         <p className="text-white/60 text-sm truncate">
                           {user.username || 'No username'}
