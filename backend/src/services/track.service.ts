@@ -3,10 +3,10 @@ import { Prisma, Role, AlbumType, NotificationType, RecipientType } from '@prism
 import { Request } from 'express';
 import { uploadFile } from './upload.service';
 import { paginate } from '../utils/handle-utils';
-import pusher from '../config/pusher';
 import * as emailService from './email.service';
 import { client, setCache } from '../middleware/cache.middleware';
 import { trackSelect } from '../utils/prisma-selects';
+import { getIO } from '../config/socket';
 
 // Hàm kiểm tra quyền
 export const canManageTrack = (user: any, trackArtistId: string): boolean => {
@@ -362,7 +362,7 @@ export const createTrack = async (req: Request) => {
 
     const notificationsData = followers.map((follower) => ({
       type: NotificationType.NEW_TRACK,
-      message: `${artistName} vừa ra track mới: ${title}`,
+      message: `${artistName} just released a new: ${title}`,
       recipientType: RecipientType.USER,
       userId: follower.followerId,
       artistId: finalArtistId,
@@ -372,11 +372,13 @@ export const createTrack = async (req: Request) => {
     await prisma.notification.createMany({ data: notificationsData });
 
     const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${track.id}`;
+    const io = getIO();
 
     for (const user of followerUsers) {
-      pusher.trigger(`user-${user.id}`, 'notification', {
+      const room = `user-${user.id}`;
+      io.to(room).emit('notification', {
         type: NotificationType.NEW_TRACK,
-        message: `${artistName} vừa ra track mới: ${track.title}`,
+        message: `${artistName} just released a new track: ${track.title}`,
       });
 
       if (user.email) {
