@@ -494,6 +494,77 @@ export const getSystemPlaylists = async (req: Request) => {
   };
 };
 
+// Lấy các system playlist của người dùng
+export const getUserSystemPlaylists = async (req: Request) => {
+  const { search, sortBy, sortOrder } = req.query;
+
+  // Dựa vào type là SYSTEM và userId
+  const whereClause: Prisma.PlaylistWhereInput = {
+    type: 'SYSTEM',
+    userId: req.user?.id,
+  };
+
+  // Thêm điều kiện tìm kiếm nếu có từ khóa tìm kiếm
+  if (search && typeof search === 'string') {
+    whereClause.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  const result = await paginate<any>(prisma.playlist, req, {  
+    where: whereClause,
+    include: {
+      tracks: {
+        include: {
+          track: {
+            include: {
+              artist: true,
+              album: true,
+              genres: {
+                include: {
+                  genre: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          trackOrder: 'asc',
+        },
+      },
+      user: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  // Chuyển đổi dữ liệu để định dạng nhất quán
+  const formattedPlaylists = result.data.map((playlist: any) => {
+    const formattedTracks = playlist.tracks.map((pt: any) => ({
+      id: pt.track.id,
+      title: pt.track.title,
+      audioUrl: pt.track.audioUrl,
+      duration: pt.track.duration,
+      coverUrl: pt.track.coverUrl,
+      artist: pt.track.artist,
+      album: pt.track.album,
+      genres: pt.track.genres,
+      createdAt: pt.track.createdAt.toISOString(),
+    }));
+
+    return {
+      ...playlist,
+      tracks: formattedTracks,
+    };
+  });
+
+  return formattedPlaylists;
+};
+
 // Generating AI playlists
 export const generateAIPlaylist = async (
   userId: string,

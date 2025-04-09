@@ -23,6 +23,7 @@ import {
   deleteBaseSystemPlaylist,
   getAllBaseSystemPlaylists,
   getHomePageData,
+  getUserSystemPlaylists
 } from "../controllers/playlist.controller";
 import { Role } from "@prisma/client";
 import upload from "../middleware/upload.middleware";
@@ -59,6 +60,7 @@ router.post("/ai-generate/artist/:artistName", (req, res, next) => {
 
 // User-specific system playlist routes
 router.post("/vibe-rewind", updateVibeRewindPlaylist);
+router.get("/system/user", authenticate, getUserSystemPlaylists);
 
 // == Admin-only routes ==
 router.use("/admin", authorize([Role.ADMIN]));

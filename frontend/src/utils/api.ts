@@ -1302,15 +1302,15 @@ export const api = {
       }
     },
 
-    getSystemPlaylist: async () => {
+    getUserSystemPlaylist: async () => {
       try {
         const token = localStorage.getItem("userToken");
         if (!token) {
-          throw new Error("Token não encontrado");
+          throw new Error("Token not found");
         }
 
         return await fetchWithAuth(
-          "/api/playlists/system",
+          "/api/playlists/system/user",
           { method: "GET" },
           token
         );
