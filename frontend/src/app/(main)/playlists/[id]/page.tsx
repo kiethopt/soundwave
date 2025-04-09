@@ -218,9 +218,11 @@ export default function PlaylistPage() {
             <span>{playlist.tracks.length} songs</span>
           </div>
           <div className="flex items-center gap-2 mt-2">
-            {playlist.canEdit && (
-              <>
-                {playlist.type === "NORMAL" && (
+            {playlist.canEdit &&
+              playlist.type === "NORMAL" &&
+              playlist.name !== "Vibe Rewind" &&
+              playlist.name !== "Welcome Mix" && (
+                <>
                   <Button
                     onClick={() =>
                       handleProtectedAction(() => setIsEditOpen(true))
@@ -228,8 +230,6 @@ export default function PlaylistPage() {
                   >
                     Edit playlist
                   </Button>
-                )}
-                {playlist.type === "NORMAL" && (
                   <Button
                     onClick={() => setIsDeleteOpen(true)}
                     variant="destructive"
@@ -237,9 +237,8 @@ export default function PlaylistPage() {
                   >
                     Delete playlist
                   </Button>
-                )}
-              </>
-            )}
+                </>
+              )}
             {isVibeRewindPlaylist && (
               <Button
                 onClick={() =>

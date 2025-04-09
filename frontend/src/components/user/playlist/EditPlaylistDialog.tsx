@@ -64,6 +64,7 @@ export function EditPlaylistDialog({
   const isWelcomeMix = playlist.name === "Welcome Mix";
   const isAIGenerated = playlist.isAIGenerated;
   const isFixedPrivacy = isSpecialPlaylist || isVibeRewind || isFavorite;
+  const isNormalPlaylist = playlist.type === "NORMAL";
 
   // Chỉ cho phép đổi hình ảnh với playlist thường (normal)
   const canChangeImage =
@@ -71,16 +72,21 @@ export function EditPlaylistDialog({
     !isFavorite &&
     !isWelcomeMix &&
     !isAIGenerated &&
-    playlist.type !== "SYSTEM";
+    playlist.type !== "SYSTEM" &&
+    isNormalPlaylist;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+
     try {
+      if (!isNormalPlaylist || isVibeRewind || isWelcomeMix) {
+        throw new Error("Không thể chỉnh sửa playlist đặc biệt này");
+      }
+
       const token = localStorage.getItem("userToken");
       if (!token) {
-        toast.error("Please log in again");
-        return;
+        throw new Error("Vui lòng đăng nhập để thực hiện thao tác này");
       }
 
       // Nếu có file hình ảnh mới thì sử dụng FormData để gửi
