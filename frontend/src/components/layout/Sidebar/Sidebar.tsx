@@ -114,9 +114,17 @@ export default function Sidebar({
         const fav =
           allPlaylists.find((p: Playlist) => p.type === "FAVORITE") || null;
         const vibe =
-          allPlaylists.find((p: Playlist) => p.name === "Vibe Rewind") || null;
+          allPlaylists.find(
+            (p: Playlist) =>
+              p.name === "Vibe Rewind" ||
+              (p.type === "SYSTEM" && p.name === "Vibe Rewind")
+          ) || null;
         const welcome =
-          allPlaylists.find((p: Playlist) => p.name === "Welcome Mix") || null;
+          allPlaylists.find(
+            (p: Playlist) =>
+              p.name === "Welcome Mix" ||
+              (p.type === "SYSTEM" && p.name === "Welcome Mix")
+          ) || null;
 
         setFavoritePlaylist(fav);
         setVibeRewindPlaylist(vibe);
@@ -127,6 +135,7 @@ export default function Sidebar({
             p.type !== "FAVORITE" &&
             p.name !== "Vibe Rewind" &&
             p.name !== "Welcome Mix" &&
+            p.type !== "SYSTEM" &&
             !p.isAIGenerated
         );
         setPlaylists(normal);

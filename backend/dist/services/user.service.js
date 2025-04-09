@@ -43,8 +43,8 @@ const upload_service_1 = require("./upload.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const handle_utils_1 = require("../utils/handle-utils");
 const cache_middleware_1 = require("../middleware/cache.middleware");
-const pusher_1 = __importDefault(require("../config/pusher"));
 const emailService = __importStar(require("./email.service"));
+const socket_1 = require("../config/socket");
 const getMonthStartDate = () => {
     const date = new Date();
     return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -260,38 +260,40 @@ const followTarget = async (follower, followingId) => {
     let followedUserEmail = null;
     let followedEntityName = 'Người dùng';
     let followedUserIdForPusher = null;
-    let isFollowingArtistOwner = false;
-    const userExists = await db_1.default.user.findUnique({
+    let isSelfFollow = false;
+    let recipientCurrentProfile = null;
+    const targetUser = await db_1.default.user.findUnique({
         where: { id: followingId },
+        select: { id: true, email: true, name: true, username: true, currentProfile: true },
     });
-    const artistExists = await db_1.default.artistProfile.findUnique({
+    const targetArtistProfile = await db_1.default.artistProfile.findUnique({
         where: { id: followingId },
         select: { id: true, artistName: true, userId: true },
     });
-    if (userExists) {
+    if (targetUser) {
         followingType = client_1.FollowingType.USER;
-        followedUserEmail = userExists.email;
-        followedEntityName = userExists.name || userExists.username || 'Người dùng';
-        followedUserIdForPusher = userExists.id;
+        followedUserEmail = targetUser.email;
+        followedEntityName = targetUser.name || targetUser.username || 'Người dùng';
+        followedUserIdForPusher = targetUser.id;
+        isSelfFollow = targetUser.id === follower.id;
+        recipientCurrentProfile = targetUser.currentProfile;
     }
-    else if (artistExists) {
+    else if (targetArtistProfile) {
         followingType = client_1.FollowingType.ARTIST;
         const artistOwner = await db_1.default.user.findUnique({
-            where: { id: artistExists.userId },
-            select: { email: true, name: true, username: true },
+            where: { id: targetArtistProfile.userId },
+            select: { email: true, name: true, username: true, currentProfile: true },
         });
         followedUserEmail = artistOwner?.email || null;
-        followedEntityName = artistExists.artistName || 'Nghệ sĩ';
-        followedUserIdForPusher = artistExists.userId;
-        isFollowingArtistOwner = artistExists.userId === follower.id;
+        followedEntityName = targetArtistProfile.artistName || 'Nghệ sĩ';
+        followedUserIdForPusher = targetArtistProfile.userId;
+        isSelfFollow = targetArtistProfile.userId === follower.id;
+        recipientCurrentProfile = artistOwner?.currentProfile || null;
     }
     else {
         throw new Error('Target not found');
     }
-    if ((followingType === client_1.FollowingType.USER && followingId === follower.id) ||
-        (followingType === client_1.FollowingType.ARTIST &&
-            followingId === follower.artistProfile?.id) ||
-        (followingType === client_1.FollowingType.ARTIST && isFollowingArtistOwner)) {
+    if (isSelfFollow) {
         throw new Error('Cannot follow yourself');
     }
     const existingFollow = await db_1.default.userFollow.findFirst({
@@ -313,56 +315,57 @@ const followTarget = async (follower, followingId) => {
     };
     return db_1.default.$transaction(async (tx) => {
         await tx.userFollow.create({ data: followData });
-        const followerName = follower.name || follower.username || 'Một người dùng';
+        const followerName = follower.name || follower.username || 'A user';
         const followerProfileLink = `${FRONTEND_URL}/user/${follower.id}`;
-        let notificationMessage = `Người dùng ${followerName} đã bắt đầu theo dõi bạn.`;
-        if (!isFollowingArtistOwner) {
-            if (followedUserEmail) {
-                try {
-                    const emailOptions = emailService.createNewFollowerEmail(followedUserEmail, followerName, followedEntityName, followerProfileLink);
-                    await emailService.sendEmail(emailOptions);
-                    console.log(`Follow notification email sent to ${followedUserEmail}`);
-                }
-                catch (emailError) {
-                    console.error(`Failed to send follow notification email to ${followedUserEmail}:`, emailError);
-                }
+        let notificationMessage = null;
+        let notificationRecipientType = null;
+        if (followingType === client_1.FollowingType.USER) {
+            notificationMessage = `${followerName} started following your profile.`;
+            notificationRecipientType = client_1.FollowingType.USER;
+        }
+        else if (followingType === client_1.FollowingType.ARTIST) {
+            notificationMessage = `You have a new follower on your artist profile.`;
+            notificationRecipientType = client_1.FollowingType.ARTIST;
+        }
+        if (followedUserEmail && notificationMessage) {
+            try {
+                const emailOptions = emailService.createNewFollowerEmail(followedUserEmail, followerName, followedEntityName, followerProfileLink);
+                await emailService.sendEmail(emailOptions);
             }
-            else {
-                console.warn(`Could not send follow email: No email found for target ${followingId} (type: ${followingType})`);
+            catch (error) {
+                console.error('Failed to send email:', error);
             }
-            if (followingType === 'ARTIST') {
+        }
+        if (followedUserIdForPusher && notificationMessage && notificationRecipientType) {
+            try {
                 const notification = await tx.notification.create({
                     data: {
                         type: 'NEW_FOLLOW',
                         message: notificationMessage,
-                        recipientType: 'ARTIST',
-                        artistId: followingId,
+                        recipientType: notificationRecipientType,
+                        ...(notificationRecipientType === 'USER' && { userId: followingId }),
+                        ...(notificationRecipientType === 'ARTIST' && { artistId: followingId }),
                         senderId: follower.id,
                     },
                 });
-                if (followedUserIdForPusher) {
-                    await pusher_1.default.trigger(`user-${followedUserIdForPusher}`, 'notification', {
-                        type: 'NEW_FOLLOW',
-                        message: notificationMessage,
-                        notificationId: notification.id,
-                    });
-                }
-            }
-            else {
-                const notification = await tx.notification.create({
-                    data: {
-                        type: 'NEW_FOLLOW',
-                        message: notificationMessage,
-                        recipientType: 'USER',
-                        userId: followingId,
-                        senderId: follower.id,
-                    },
-                });
-                await pusher_1.default.trigger(`user-${followingId}`, 'notification', {
+                const io = (0, socket_1.getIO)();
+                const room = `user-${followedUserIdForPusher}`;
+                io.to(room).emit('notification', {
+                    id: notification.id,
                     type: 'NEW_FOLLOW',
                     message: notificationMessage,
-                    notificationId: notification.id,
+                    recipientType: notificationRecipientType,
+                    isRead: false,
+                    createdAt: notification.createdAt.toISOString(),
+                    sender: {
+                        id: follower.id,
+                        name: follower.name || follower.username,
+                        avatar: follower.avatar
+                    }
                 });
+            }
+            catch (error) {
+                console.error('Error creating or sending notification:', error);
             }
         }
         if (followingType === client_1.FollowingType.ARTIST) {
@@ -1178,7 +1181,7 @@ const getGenreTopTracks = async (genreId) => {
             },
         },
         select: prisma_selects_1.searchTrackSelect,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { playCount: 'desc' },
         take: 20,
     });
     if (process.env.USE_REDIS_CACHE === 'true') {

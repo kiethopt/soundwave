@@ -24,8 +24,13 @@ export function PlaylistIcon({
   const isVibeRewind = name === "Vibe Rewind";
   const isFavorite = type === "FAVORITE";
   const isWelcomeMix = name === "Welcome Mix";
+  const isSystemPlaylist = type === "SYSTEM";
   const isNormalPlaylist =
-    type === "NORMAL" && !isAIGenerated && !isVibeRewind && !isWelcomeMix;
+    type === "NORMAL" &&
+    !isAIGenerated &&
+    !isVibeRewind &&
+    !isWelcomeMix &&
+    !isSystemPlaylist;
 
   // Chỉ hiển thị hình ảnh bìa cho playlist normal
   const shouldShowCover = isNormalPlaylist && coverUrl;

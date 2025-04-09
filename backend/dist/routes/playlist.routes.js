@@ -15,7 +15,7 @@ router.get("/:id", auth_middleware_1.optionalAuthenticate, playlist_controller_1
 router.use(auth_middleware_1.authenticate);
 router.get("/", playlist_controller_1.getPlaylists);
 router.post("/", playlist_controller_1.createPlaylist);
-router.patch("/:id", playlist_controller_1.updatePlaylist);
+router.patch("/:id", upload_middleware_1.default.single("cover"), playlist_controller_1.updatePlaylist);
 router.delete("/:id", playlist_controller_1.deletePlaylist);
 router.delete("/:playlistId/tracks/:trackId", playlist_controller_1.removeTrackFromPlaylist);
 router.post("/:id/tracks", playlist_controller_1.addTrackToPlaylist);
@@ -25,6 +25,7 @@ router.post("/ai-generate/artist/:artistName", (req, res, next) => {
     (0, playlist_controller_1.generateAIPlaylist)(req, res, next);
 });
 router.post("/vibe-rewind", playlist_controller_1.updateVibeRewindPlaylist);
+router.get("/system/user", auth_middleware_1.authenticate, playlist_controller_1.getUserSystemPlaylists);
 router.use("/admin", (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]));
 router.post("/admin/system/base", upload_middleware_1.default.single("cover"), playlist_controller_1.createBaseSystemPlaylist);
 router.get("/admin/system/base", playlist_controller_1.getAllBaseSystemPlaylists);

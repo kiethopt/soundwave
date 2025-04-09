@@ -41,9 +41,9 @@ const db_1 = __importDefault(require("../config/db"));
 const upload_service_1 = require("./upload.service");
 const client_1 = require("@prisma/client");
 const prisma_selects_1 = require("../utils/prisma-selects");
-const pusher_1 = __importDefault(require("../config/pusher"));
 const emailService = __importStar(require("./email.service"));
 const handle_utils_1 = require("src/utils/handle-utils");
+const socket_1 = require("../config/socket");
 const canManageAlbum = (user, albumArtistId) => {
     if (!user)
         return false;
@@ -230,7 +230,7 @@ const createAlbum = async (req) => {
     });
     const notificationsData = followers.map((follower) => ({
         type: client_1.NotificationType.NEW_ALBUM,
-        message: `${artistName} vừa ra album mới: ${title}`,
+        message: `${artistName} just released a new album: ${title}`,
         recipientType: client_1.RecipientType.USER,
         userId: follower.followerId,
         artistId: targetArtistProfileId,
@@ -240,13 +240,15 @@ const createAlbum = async (req) => {
         await db_1.default.notification.createMany({ data: notificationsData });
     }
     const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
+    const io = (0, socket_1.getIO)();
     for (const user of followerUsers) {
-        await pusher_1.default.trigger(`user-${user.id}`, 'notification', {
+        const room = `user-${user.id}`;
+        io.to(room).emit('notification', {
             type: client_1.NotificationType.NEW_ALBUM,
-            message: `${artistName} vừa ra album mới: ${album.title}`,
+            message: `${artistName} just released a new album: ${album.title}`,
         });
         if (user.email) {
-            const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'album', album.title, releaseLink);
+            const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'album', album.title, releaseLink, album.coverUrl);
             await emailService.sendEmail(emailOptions);
         }
     }

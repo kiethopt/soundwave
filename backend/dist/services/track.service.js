@@ -41,10 +41,10 @@ const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
 const handle_utils_1 = require("../utils/handle-utils");
-const pusher_1 = __importDefault(require("../config/pusher"));
 const emailService = __importStar(require("./email.service"));
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const prisma_selects_1 = require("../utils/prisma-selects");
+const socket_1 = require("../config/socket");
 const canManageTrack = (user, trackArtistId) => {
     if (!user)
         return false;
@@ -343,7 +343,7 @@ const createTrack = async (req) => {
         });
         const notificationsData = followers.map((follower) => ({
             type: client_1.NotificationType.NEW_TRACK,
-            message: `${artistName} vừa ra track mới: ${title}`,
+            message: `${artistName} just released a new: ${title}`,
             recipientType: client_1.RecipientType.USER,
             userId: follower.followerId,
             artistId: finalArtistId,
@@ -351,10 +351,12 @@ const createTrack = async (req) => {
         }));
         await db_1.default.notification.createMany({ data: notificationsData });
         const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${track.id}`;
+        const io = (0, socket_1.getIO)();
         for (const user of followerUsers) {
-            pusher_1.default.trigger(`user-${user.id}`, 'notification', {
+            const room = `user-${user.id}`;
+            io.to(room).emit('notification', {
                 type: client_1.NotificationType.NEW_TRACK,
-                message: `${artistName} vừa ra track mới: ${track.title}`,
+                message: `${artistName} just released a new track: ${track.title}`,
             });
             if (user.email) {
                 const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'track', track.title, releaseLink, track.coverUrl);

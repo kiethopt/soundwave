@@ -12,7 +12,8 @@
     "seed:simple": "tsx prisma/seed-simple.ts",
     "backup": "tsx scripts/backup-auto.ts",
     "restore": "tsx scripts/restore-auto.ts",
-    "backup:manage": "tsx scripts/manage-backups.ts"
+    "backup:manage": "tsx scripts/manage-backups.ts",
+    "migrate-special-playlists": "tsx src/scripts/migrate-special-playlists.ts"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +30,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.13.0",
     "@types/node-cron": "^3.0.11",
+    "@types/node-fetch": "^2.6.12",
     "@types/nodemailer": "^6.4.17",
     "@types/socket.io": "^3.0.2",
     "@types/uuid": "^10.0.0",

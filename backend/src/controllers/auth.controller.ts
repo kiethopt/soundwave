@@ -1,20 +1,20 @@
-import { NextFunction, Request, Response, RequestHandler } from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import prisma from '../config/db';
-import { Role } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
-import { addHours } from 'date-fns';
-import { userSelect } from '../utils/prisma-selects';
-import * as emailService from '../services/email.service';
-import * as aiService from '../services/ai.service';
-import { OAuth2Client } from 'google-auth-library';
-import fetch from 'node-fetch';
-import { uploadToCloudinary } from '../utils/cloudinary';
+import { NextFunction, Request, Response, RequestHandler } from "express";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import prisma from "../config/db";
+import { Role } from "@prisma/client";
+import { v4 as uuidv4 } from "uuid";
+import { addHours } from "date-fns";
+import { userSelect } from "../utils/prisma-selects";
+import * as emailService from "../services/email.service";
+import * as aiService from "../services/ai.service";
+import { OAuth2Client } from "google-auth-library";
+import fetch from "node-fetch";
+import { uploadToCloudinary } from "../utils/cloudinary";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  throw new Error('Missing JWT_SECRET in environment variables');
+  throw new Error("Missing JWT_SECRET in environment variables");
 }
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -23,7 +23,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const validateEmail = (email: string): string | null => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Regex để kiểm tra định dạng email
   if (!emailRegex.test(email)) {
-    return 'Invalid email format';
+    return "Invalid email format";
   }
   return null;
 };
@@ -32,16 +32,16 @@ const validateEmail = (email: string): string | null => {
 const validateRegisterData = (data: any): string | null => {
   const { email, password, username } = data;
 
-  if (!email?.trim()) return 'Email is required';
+  if (!email?.trim()) return "Email is required";
   const emailValidationError = validateEmail(email);
   if (emailValidationError) return emailValidationError; // Kiểm tra định dạng email
 
-  if (!password?.trim()) return 'Password is required';
-  if (password.length < 6) return 'Password must be at least 6 characters';
+  if (!password?.trim()) return "Password is required";
+  if (password.length < 6) return "Password must be at least 6 characters";
 
-  if (!username?.trim()) return 'Username is required';
-  if (username.length < 3) return 'Username must be at least 3 characters';
-  if (/\s/.test(username)) return 'Username cannot contain spaces'; // Kiểm tra dấu cách ở username
+  if (!username?.trim()) return "Username is required";
+  if (username.length < 3) return "Username must be at least 3 characters";
+  if (/\s/.test(username)) return "Username cannot contain spaces"; // Kiểm tra dấu cách ở username
 
   return null;
 };
@@ -54,7 +54,7 @@ const generateToken = (userId: string, role: Role, artistProfile?: any) => {
       role,
     },
     JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: "24h" }
   );
 };
 
@@ -65,9 +65,9 @@ export const validateToken = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header("Authorization")?.replace("Bearer ", "");
     if (!token) {
-      res.status(401).json({ message: 'Access denied. No token provided.' });
+      res.status(401).json({ message: "Access denied. No token provided." });
       return;
     }
 
@@ -84,12 +84,12 @@ export const validateToken = async (
     });
 
     if (!user) {
-      res.status(404).json({ message: 'User not found' });
+      res.status(404).json({ message: "User not found" });
       return;
     }
 
     res.json({
-      message: 'Token is valid',
+      message: "Token is valid",
       user,
     });
   } catch (error) {
@@ -113,7 +113,7 @@ export const registerAdmin = async (
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      res.status(400).json({ message: 'Email already exists' });
+      res.status(400).json({ message: "Email already exists" });
       return;
     }
 
@@ -122,7 +122,7 @@ export const registerAdmin = async (
         where: { username },
       });
       if (existingUsername) {
-        res.status(400).json({ message: 'Username already exists' });
+        res.status(400).json({ message: "Username already exists" });
         return;
       }
     }
@@ -140,10 +140,10 @@ export const registerAdmin = async (
       select: userSelect, // Sử dụng userSelect để trả về thông tin người dùng
     });
 
-    res.status(201).json({ message: 'Admin registered successfully', user });
+    res.status(201).json({ message: "Admin registered successfully", user });
   } catch (error) {
-    console.error('Register admin error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("Register admin error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -154,7 +154,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Kiểm tra password và confirmPassword có khớp không
     if (password !== confirmPassword) {
-      res.status(400).json({ message: 'Passwords do not match' });
+      res.status(400).json({ message: "Passwords do not match" });
       return;
     }
 
@@ -168,7 +168,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     // Kiểm tra email đã tồn tại chưa
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      res.status(400).json({ message: 'Email already exists' });
+      res.status(400).json({ message: "Email already exists" });
       return;
     }
 
@@ -178,7 +178,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         where: { username },
       });
       if (existingUsername) {
-        res.status(400).json({ message: 'Username already exists' });
+        res.status(400).json({ message: "Username already exists" });
         return;
       }
     }
@@ -224,11 +224,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
         await prisma.playlist.create({
           data: {
-            name: 'Welcome Mix',
+            name: "Welcome Mix",
             description:
-              'A selection of popular tracks to start your journey on Soundwave.',
-            privacy: 'PRIVATE',
-            type: 'NORMAL',
+              "A selection of popular tracks to start your journey on Soundwave.",
+            privacy: "PRIVATE",
+            type: "SYSTEM",
             isAIGenerated: false,
             userId: user.id, // Playlist này thuộc về người dùng
             totalTracks: orderedTrackIds.length,
@@ -264,19 +264,19 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     try {
       const emailOptions = emailService.createWelcomeEmail(
         user.email,
-        user.name || user.username || 'there'
+        user.name || user.username || "there"
       );
       await emailService.sendEmail(emailOptions);
       console.log(`[Register] Welcome email sent to ${user.email}`);
     } catch (emailError) {
-      console.error('[Register] Error sending welcome email:', emailError);
+      console.error("[Register] Error sending welcome email:", emailError);
       // Không làm gián đoạn quá trình đăng ký nếu gửi email thất bại
     }
 
-    res.status(201).json({ message: 'User registered successfully', user });
+    res.status(201).json({ message: "User registered successfully", user });
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("Register error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -285,7 +285,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
   try {
     const user = req.user;
     if (!user) {
-      res.status(401).json({ message: 'Unauthorized' });
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
@@ -297,8 +297,8 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
     console.log(userData);
     res.json(userData);
   } catch (error) {
-    console.error('Get me error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("Get me error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -311,7 +311,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     if (!emailOrUsername || !password) {
       res
         .status(400)
-        .json({ message: 'Email/username and password are required' });
+        .json({ message: "Email/username and password are required" });
       return;
     }
 
@@ -323,17 +323,17 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
 
     if (!user) {
-      res.status(400).json({ message: 'Invalid email/username or password' });
+      res.status(400).json({ message: "Invalid email/username or password" });
       return;
     }
 
     // Kiểm tra maintenance mode - chỉ cho phép ADMIN đăng nhập
-    const maintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+    const maintenanceMode = process.env.MAINTENANCE_MODE === "true";
     if (maintenanceMode && user.role !== Role.ADMIN) {
       res.status(503).json({
         message:
-          'The system is currently under maintenance. Please try again later.',
-        code: 'MAINTENANCE_MODE',
+          "The system is currently under maintenance. Please try again later.",
+        code: "MAINTENANCE_MODE",
       });
       return;
     }
@@ -341,14 +341,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     if (!user.isActive) {
       res.status(403).json({
         message:
-          'Your account has been deactivated. Please contact administrator.',
+          "Your account has been deactivated. Please contact administrator.",
       });
       return;
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      res.status(401).json({ message: 'Invalid email/username or password' });
+      res.status(401).json({ message: "Invalid email/username or password" });
       return;
     }
 
@@ -357,7 +357,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       where: { id: user.id },
       data: {
         lastLoginAt: new Date(),
-        currentProfile: user.role === Role.ADMIN ? 'ADMIN' : 'USER', // Nếu là ADMIN thì currentProfile là ADMIN
+        currentProfile: user.role === Role.ADMIN ? "ADMIN" : "USER", // Nếu là ADMIN thì currentProfile là ADMIN
       },
       select: userSelect,
     });
@@ -372,33 +372,39 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     };
 
     res.json({
-      message: 'Login successful',
+      message: "Login successful",
       token,
       user: userResponse,
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
 // Đăng nhập bằng Google OAuth
-export const googleLogin = async (req: Request, res: Response): Promise<void> => {
+export const googleLogin = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const { token } = req.body;
 
     if (!token) {
-      res.status(400).json({ message: 'Google token is required' });
+      res.status(400).json({ message: "Google token is required" });
       return;
     }
 
     // Get user info using access token
-    const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(res => res.json());
+    const userInfo = await fetch(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    ).then((res) => res.json());
 
     if (!userInfo.email) {
-      res.status(400).json({ message: 'Invalid Google token' });
+      res.status(400).json({ message: "Invalid Google token" });
       return;
     }
 
@@ -418,13 +424,13 @@ export const googleLogin = async (req: Request, res: Response): Promise<void> =>
         try {
           const response = await fetch(googleAvatarUrl);
           const buffer = await response.arrayBuffer();
-          const result = await uploadToCloudinary(Buffer.from(buffer), {
-            folder: 'avatars',
-            resource_type: 'image'
-          }) as { secure_url: string };
+          const result = (await uploadToCloudinary(Buffer.from(buffer), {
+            folder: "avatars",
+            resource_type: "image",
+          })) as { secure_url: string };
           avatar = result.secure_url;
         } catch (error) {
-          console.error('Error converting Google avatar:', error);
+          console.error("Error converting Google avatar:", error);
         }
       }
 
@@ -440,22 +446,29 @@ export const googleLogin = async (req: Request, res: Response): Promise<void> =>
 
       // Tạo playlist mặc định cho người dùng mới
       try {
-        const defaultTrackIds = await aiService.generateDefaultPlaylistForNewUser(user.id);
+        const defaultTrackIds =
+          await aiService.generateDefaultPlaylistForNewUser(user.id);
         if (defaultTrackIds.length > 0) {
           const tracksInfo = await prisma.track.findMany({
             where: { id: { in: defaultTrackIds } },
             select: { id: true, duration: true },
           });
-          const totalDuration = tracksInfo.reduce((sum, track) => sum + track.duration, 0);
+          const totalDuration = tracksInfo.reduce(
+            (sum, track) => sum + track.duration,
+            0
+          );
           const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
-          const orderedTrackIds = defaultTrackIds.filter((id) => trackIdMap.has(id));
+          const orderedTrackIds = defaultTrackIds.filter((id) =>
+            trackIdMap.has(id)
+          );
 
           await prisma.playlist.create({
             data: {
-              name: 'Welcome Mix',
-              description: 'A selection of popular tracks to start your journey on Soundwave.',
-              privacy: 'PRIVATE',
-              type: 'NORMAL',
+              name: "Welcome Mix",
+              description:
+                "A selection of popular tracks to start your journey on Soundwave.",
+              privacy: "PRIVATE",
+              type: "SYSTEM",
               isAIGenerated: false,
               userId: user.id,
               totalTracks: orderedTrackIds.length,
@@ -472,31 +485,34 @@ export const googleLogin = async (req: Request, res: Response): Promise<void> =>
           });
         }
       } catch (playlistError) {
-        console.error(`Error creating initial playlists for user ${user.id}:`, playlistError);
+        console.error(
+          `Error creating initial playlists for user ${user.id}:`,
+          playlistError
+        );
       }
 
       // Gửi email chào mừng
       try {
         const emailOptions = emailService.createWelcomeEmail(
           user.email,
-          user.name || 'there'
+          user.name || "there"
         );
         await emailService.sendEmail(emailOptions);
       } catch (emailError) {
-        console.error('Error sending welcome email:', emailError);
+        console.error("Error sending welcome email:", emailError);
       }
     }
 
     const tokenResponse = generateToken(user.id, user.role);
 
     res.json({
-      message: 'Login successful',
+      message: "Login successful",
       token: tokenResponse,
       user,
     });
   } catch (error) {
-    console.error('Google login error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("Google login error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -506,7 +522,7 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ message: 'Unauthorized' });
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
@@ -515,19 +531,19 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
       await prisma.user.update({
         where: { id: userId },
         data: {
-          currentProfile: req.user?.role === Role.ADMIN ? 'ADMIN' : 'USER',
+          currentProfile: req.user?.role === Role.ADMIN ? "ADMIN" : "USER",
         },
       });
     } catch (error) {
       // Nếu update thất bại (ví dụ user không tồn tại), vẫn tiếp tục xóa session
-      console.error('Error updating user profile:', error);
+      console.error("Error updating user profile:", error);
     }
 
-    res.json({ message: 'Logged out successfully' });
+    res.json({ message: "Logged out successfully" });
   } catch (error) {
-    console.error('Logout error:', error);
+    console.error("Logout error:", error);
     // Vẫn trả về success nếu có lỗi để đảm bảo client xóa được token
-    res.json({ message: 'Logged out successfully' });
+    res.json({ message: "Logged out successfully" });
   }
 };
 
@@ -547,7 +563,7 @@ export const requestPasswordReset = async (
 
     if (!user) {
       console.log(`[Reset Password] User not found for email: ${email}`);
-      res.status(404).json({ message: 'User not found' });
+      res.status(404).json({ message: "User not found" });
       return;
     }
     console.log(`[Reset Password] User found: ${user.id}`);
@@ -573,7 +589,7 @@ export const requestPasswordReset = async (
 
     // Gửi email chứa link đặt lại mật khẩu
     try {
-      const userName = user.name || user.username || 'bạn';
+      const userName = user.name || user.username || "bạn";
       // Tạo email options bằng hàm mới, resetLink đã được định nghĩa
       const emailOptions = emailService.createPasswordResetEmail(
         user.email,
@@ -589,16 +605,16 @@ export const requestPasswordReset = async (
         `[Reset Password] Email send attempt finished for: ${user.email}`
       );
 
-      res.json({ message: 'Password reset email sent successfully' });
+      res.json({ message: "Password reset email sent successfully" });
       return;
     } catch (emailError) {
-      console.error('[Reset Password] Failed to send email:', emailError);
-      res.status(500).json({ message: 'Failed to send password reset email' });
+      console.error("[Reset Password] Failed to send email:", emailError);
+      res.status(500).json({ message: "Failed to send password reset email" });
       return;
     }
   } catch (error) {
-    console.error('[Reset Password] General error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("[Reset Password] General error:", error);
+    res.status(500).json({ message: "Internal server error" });
     return;
   }
 };
@@ -620,7 +636,7 @@ export const resetPassword = async (
     });
 
     if (!user) {
-      res.status(400).json({ message: 'Invalid or expired token' });
+      res.status(400).json({ message: "Invalid or expired token" });
       return;
     }
 
@@ -628,7 +644,7 @@ export const resetPassword = async (
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
       res.status(400).json({
-        message: 'New password cannot be the same as the old password',
+        message: "New password cannot be the same as the old password",
       });
       return;
     }
@@ -646,10 +662,10 @@ export const resetPassword = async (
       },
     });
 
-    res.json({ message: 'Password reset successfully' });
+    res.json({ message: "Password reset successfully" });
   } catch (error) {
-    console.error('Reset password error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("Reset password error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -662,7 +678,7 @@ export const switchProfile = async (
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ message: 'Unauthorized' });
+      res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
@@ -672,14 +688,14 @@ export const switchProfile = async (
     });
 
     if (!user) {
-      res.status(404).json({ message: 'User not found' });
+      res.status(404).json({ message: "User not found" });
       return;
     }
 
     // Kiểm tra trạng thái active của artist profile
     if (user.artistProfile && !user.artistProfile.isActive) {
       res.status(403).json({
-        message: 'Artist profile has been deactivated. Please contact admin.',
+        message: "Artist profile has been deactivated. Please contact admin.",
       });
       return;
     }
@@ -687,13 +703,13 @@ export const switchProfile = async (
     // Kiểm tra verify và active status
     if (!user.artistProfile?.isVerified || !user.artistProfile?.isActive) {
       res.status(403).json({
-        message: 'You do not have a verified and active artist profile',
+        message: "You do not have a verified and active artist profile",
       });
       return;
     }
 
     // Chỉ thay đổi currentProfile, giữ nguyên role là USER
-    const newProfile = user.currentProfile === 'USER' ? 'ARTIST' : 'USER';
+    const newProfile = user.currentProfile === "USER" ? "ARTIST" : "USER";
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
@@ -702,12 +718,12 @@ export const switchProfile = async (
     });
 
     res.json({
-      message: 'Profile switched successfully',
+      message: "Profile switched successfully",
       user: updatedUser,
     });
   } catch (error) {
-    console.error('Switch profile error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error("Switch profile error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -717,35 +733,35 @@ export const getMaintenanceStatus = async (
   res: Response
 ): Promise<void> => {
   try {
-    const maintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+    const maintenanceMode = process.env.MAINTENANCE_MODE === "true";
     res.json({ enabled: maintenanceMode });
   } catch (error) {
-    console.error('Error getting maintenance status:', error);
+    console.error("Error getting maintenance status:", error);
     // Avoid exposing internal errors publicly
-    res.status(500).json({ message: 'Could not retrieve maintenance status' });
+    res.status(500).json({ message: "Could not retrieve maintenance status" });
   }
 };
 
 export const convertGoogleAvatar: RequestHandler = async (req, res) => {
   try {
     const { googleAvatarUrl } = req.body;
-    
+
     if (!googleAvatarUrl) {
-      res.status(400).json({ error: 'Google avatar URL is required' });
+      res.status(400).json({ error: "Google avatar URL is required" });
       return;
     }
 
     const response = await fetch(googleAvatarUrl);
     const buffer = await response.arrayBuffer();
 
-    const result = await uploadToCloudinary(Buffer.from(buffer), {
-      folder: 'avatars',
-      resource_type: 'image'
-    }) as { secure_url: string };
+    const result = (await uploadToCloudinary(Buffer.from(buffer), {
+      folder: "avatars",
+      resource_type: "image",
+    })) as { secure_url: string };
 
     res.json({ url: result.secure_url });
   } catch (error) {
-    console.error('Error converting Google avatar:', error);
-    res.status(500).json({ error: 'Failed to convert Google avatar' });
+    console.error("Error converting Google avatar:", error);
+    res.status(500).json({ error: "Failed to convert Google avatar" });
   }
 };

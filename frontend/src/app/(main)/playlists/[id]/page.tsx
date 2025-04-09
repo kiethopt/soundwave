@@ -35,16 +35,24 @@ export default function PlaylistPage() {
   const router = useRouter();
 
   // Check if this is a special system playlist
-  const isVibeRewindPlaylist = playlist?.name === "Vibe Rewind";
+  const isVibeRewindPlaylist =
+    playlist?.name === "Vibe Rewind" ||
+    (playlist?.type === "SYSTEM" && playlist?.name === "Vibe Rewind");
   const isFavoritePlaylist = playlist?.type === "FAVORITE";
-  const isWelcomeMixPlaylist = playlist?.name === "Welcome Mix";
+  const isWelcomeMixPlaylist =
+    playlist?.name === "Welcome Mix" ||
+    (playlist?.type === "SYSTEM" && playlist?.name === "Welcome Mix");
   const isSpecialPlaylist =
-    isFavoritePlaylist || isVibeRewindPlaylist || isWelcomeMixPlaylist;
+    isFavoritePlaylist ||
+    isVibeRewindPlaylist ||
+    isWelcomeMixPlaylist ||
+    playlist?.type === "SYSTEM";
 
   // Check if this is a normal playlist (not special playlists or AI generated)
   const isNormalPlaylist =
     !playlist?.isAIGenerated &&
     playlist?.type !== "FAVORITE" &&
+    playlist?.type !== "SYSTEM" &&
     playlist?.name !== "Vibe Rewind" &&
     playlist?.name !== "Welcome Mix";
 

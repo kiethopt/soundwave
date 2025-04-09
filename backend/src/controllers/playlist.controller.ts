@@ -145,7 +145,7 @@ export const getPlaylists: RequestHandler = async (
             description:
               "Your personal time capsule - tracks you've been vibing to lately",
             privacy: "PRIVATE",
-            type: "NORMAL",
+            type: "SYSTEM",
             userId,
           },
         });
@@ -863,7 +863,11 @@ export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
   }
 };
 
-export const getUserSystemPlaylists: RequestHandler = async (req, res, next) => {
+export const getUserSystemPlaylists: RequestHandler = async (
+  req,
+  res,
+  next
+) => {
   try {
     const result = await playlistService.getUserSystemPlaylists(req);
 

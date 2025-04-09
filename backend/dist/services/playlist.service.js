@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
+exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const handle_utils_1 = require("../utils/handle-utils");
@@ -35,7 +35,7 @@ const createBaseSystemPlaylist = async (data, coverFile) => {
     }
     let coverUrl = undefined;
     if (coverFile) {
-        const uploadResult = await (0, upload_service_1.uploadFile)(coverFile.buffer, 'playlists/covers');
+        const uploadResult = await (0, upload_service_1.uploadFile)(coverFile.buffer, "playlists/covers");
         coverUrl = uploadResult.secure_url;
     }
     return db_1.default.playlist.create({
@@ -58,7 +58,7 @@ const updateBaseSystemPlaylist = async (playlistId, data, coverFile) => {
     if (!playlist ||
         playlist.type !== client_1.PlaylistType.SYSTEM ||
         playlist.userId !== null) {
-        throw new Error('Base system playlist not found.');
+        throw new Error("Base system playlist not found.");
     }
     if (data.name && data.name !== playlist.name) {
         const existing = await db_1.default.playlist.findFirst({
@@ -75,7 +75,7 @@ const updateBaseSystemPlaylist = async (playlistId, data, coverFile) => {
     }
     let coverUrl = undefined;
     if (coverFile) {
-        const uploadResult = await (0, upload_service_1.uploadFile)(coverFile.buffer, 'playlists/covers');
+        const uploadResult = await (0, upload_service_1.uploadFile)(coverFile.buffer, "playlists/covers");
         coverUrl = uploadResult.secure_url;
     }
     return db_1.default.playlist.update({
@@ -99,7 +99,7 @@ const deleteBaseSystemPlaylist = async (playlistId) => {
     if (!playlist ||
         playlist.type !== client_1.PlaylistType.SYSTEM ||
         playlist.userId !== null) {
-        throw new Error('Base system playlist not found.');
+        throw new Error("Base system playlist not found.");
     }
     return db_1.default.playlist.delete({
         where: { id: playlistId },
@@ -112,32 +112,32 @@ const getAllBaseSystemPlaylists = async (req) => {
         type: client_1.PlaylistType.SYSTEM,
         userId: null,
     };
-    if (search && typeof search === 'string') {
+    if (search && typeof search === "string") {
         whereClause.OR = [
-            { name: { contains: search, mode: 'insensitive' } },
-            { description: { contains: search, mode: 'insensitive' } },
+            { name: { contains: search, mode: "insensitive" } },
+            { description: { contains: search, mode: "insensitive" } },
         ];
     }
     const result = await (0, handle_utils_1.paginate)(db_1.default.playlist, req, {
         where: whereClause,
         select: baseSystemPlaylistSelect,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
     });
     result.data = result.data.map((playlist) => {
         const parsedPlaylist = { ...playlist };
         if (parsedPlaylist.description &&
-            parsedPlaylist.description.includes('<!--AI_PARAMS:')) {
+            parsedPlaylist.description.includes("<!--AI_PARAMS:")) {
             const match = parsedPlaylist.description.match(/<!--AI_PARAMS:(.*?)-->/s);
             if (match && match[1]) {
                 try {
                     const aiParams = JSON.parse(match[1]);
                     Object.assign(parsedPlaylist, aiParams);
                     parsedPlaylist.description = parsedPlaylist.description
-                        .replace(/\n\n<!--AI_PARAMS:.*?-->/s, '')
+                        .replace(/\n\n<!--AI_PARAMS:.*?-->/s, "")
                         .trim();
                 }
                 catch (e) {
-                    console.error('Error parsing AI parameters:', e);
+                    console.error("Error parsing AI parameters:", e);
                 }
             }
         }
@@ -149,22 +149,22 @@ exports.getAllBaseSystemPlaylists = getAllBaseSystemPlaylists;
 const updateVibeRewindPlaylist = async (userId) => {
     try {
         let vibeRewindPlaylist = await db_1.default.playlist.findFirst({
-            where: { userId, name: 'Vibe Rewind' },
+            where: { userId, name: "Vibe Rewind" },
         });
         if (!vibeRewindPlaylist) {
             console.log(`[PlaylistService] Creating new Vibe Rewind playlist for user ${userId}...`);
             vibeRewindPlaylist = await db_1.default.playlist.create({
                 data: {
-                    name: 'Vibe Rewind',
+                    name: "Vibe Rewind",
                     description: "Your personal time capsule - tracks you've been vibing to lately",
-                    privacy: 'PRIVATE',
-                    type: 'NORMAL',
+                    privacy: "PRIVATE",
+                    type: "SYSTEM",
                     userId,
                 },
             });
         }
         const userHistory = await db_1.default.history.findMany({
-            where: { userId, type: 'PLAY', playCount: { gt: 2 } },
+            where: { userId, type: "PLAY", playCount: { gt: 2 } },
             include: {
                 track: {
                     include: { artist: true, genres: { include: { genre: true } } },
@@ -178,7 +178,7 @@ const updateVibeRewindPlaylist = async (userId) => {
         const topPlayedTracks = await db_1.default.history.findMany({
             where: { userId, playCount: { gt: 5 } },
             include: { track: true },
-            orderBy: { playCount: 'desc' },
+            orderBy: { playCount: "desc" },
             take: 10,
         });
         console.log(`[PlaylistService] Found ${topPlayedTracks.length} frequently played tracks for user ${userId}`);
@@ -216,7 +216,7 @@ const updateVibeRewindPlaylist = async (userId) => {
                 isActive: true,
             },
             include: { artist: true, album: true },
-            orderBy: { playCount: 'desc' },
+            orderBy: { playCount: "desc" },
             take: 10,
         });
         console.log(`[PlaylistService] Found ${recommendedTracks.length} content-based tracks`);
@@ -230,14 +230,14 @@ const updateVibeRewindPlaylist = async (userId) => {
                 userId: { not: userId },
             },
             select: { userId: true },
-            distinct: ['userId'],
+            distinct: ["userId"],
         });
         const similarUserIds = similarUsers.map((u) => u.userId);
         console.log(`[PlaylistService] Found ${similarUserIds.length} similar users`);
         const collaborativeTracks = await db_1.default.history.findMany({
             where: { userId: { in: similarUserIds } },
             include: { track: true },
-            orderBy: { playCount: 'desc' },
+            orderBy: { playCount: "desc" },
             take: 10,
         });
         console.log(`[PlaylistService] Found ${collaborativeTracks.length} collaborative filtering tracks`);
@@ -287,31 +287,31 @@ exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
 const getSystemPlaylists = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
     const whereClause = {
-        type: 'SYSTEM',
+        type: "SYSTEM",
     };
-    if (search && typeof search === 'string') {
+    if (search && typeof search === "string") {
         whereClause.OR = [
-            { name: { contains: search, mode: 'insensitive' } },
-            { description: { contains: search, mode: 'insensitive' } },
+            { name: { contains: search, mode: "insensitive" } },
+            { description: { contains: search, mode: "insensitive" } },
         ];
     }
     const orderByClause = {};
     if (sortBy &&
-        typeof sortBy === 'string' &&
-        (sortOrder === 'asc' || sortOrder === 'desc')) {
-        if (sortBy === 'name' ||
-            sortBy === 'type' ||
-            sortBy === 'createdAt' ||
-            sortBy === 'updatedAt' ||
-            sortBy === 'totalTracks') {
+        typeof sortBy === "string" &&
+        (sortOrder === "asc" || sortOrder === "desc")) {
+        if (sortBy === "name" ||
+            sortBy === "type" ||
+            sortBy === "createdAt" ||
+            sortBy === "updatedAt" ||
+            sortBy === "totalTracks") {
             orderByClause[sortBy] = sortOrder;
         }
         else {
-            orderByClause.createdAt = 'desc';
+            orderByClause.createdAt = "desc";
         }
     }
     else {
-        orderByClause.createdAt = 'desc';
+        orderByClause.createdAt = "desc";
     }
     const result = await (0, handle_utils_1.paginate)(db_1.default.playlist, req, {
         where: whereClause,
@@ -326,7 +326,7 @@ const getSystemPlaylists = async (req) => {
                     },
                 },
                 orderBy: {
-                    trackOrder: 'asc',
+                    trackOrder: "asc",
                 },
             },
             user: {
@@ -357,6 +357,67 @@ const getSystemPlaylists = async (req) => {
     };
 };
 exports.getSystemPlaylists = getSystemPlaylists;
+const getUserSystemPlaylists = async (req) => {
+    const { search, sortBy, sortOrder } = req.query;
+    const whereClause = {
+        type: "SYSTEM",
+        userId: req.user?.id,
+    };
+    if (search && typeof search === "string") {
+        whereClause.OR = [
+            { name: { contains: search, mode: "insensitive" } },
+            { description: { contains: search, mode: "insensitive" } },
+        ];
+    }
+    const result = await (0, handle_utils_1.paginate)(db_1.default.playlist, req, {
+        where: whereClause,
+        include: {
+            tracks: {
+                include: {
+                    track: {
+                        include: {
+                            artist: true,
+                            album: true,
+                            genres: {
+                                include: {
+                                    genre: true,
+                                },
+                            },
+                        },
+                    },
+                },
+                orderBy: {
+                    trackOrder: "asc",
+                },
+            },
+            user: {
+                select: { id: true, name: true, email: true },
+            },
+        },
+        orderBy: {
+            createdAt: "desc",
+        },
+    });
+    const formattedPlaylists = result.data.map((playlist) => {
+        const formattedTracks = playlist.tracks.map((pt) => ({
+            id: pt.track.id,
+            title: pt.track.title,
+            audioUrl: pt.track.audioUrl,
+            duration: pt.track.duration,
+            coverUrl: pt.track.coverUrl,
+            artist: pt.track.artist,
+            album: pt.track.album,
+            genres: pt.track.genres,
+            createdAt: pt.track.createdAt.toISOString(),
+        }));
+        return {
+            ...playlist,
+            tracks: formattedTracks,
+        };
+    });
+    return formattedPlaylists;
+};
+exports.getUserSystemPlaylists = getUserSystemPlaylists;
 const generateAIPlaylist = async (userId, options) => {
     console.log(`[PlaylistService] Generating AI playlist for user ${userId} with options:`, options);
     const playlist = await (0, ai_service_1.createAIGeneratedPlaylist)(userId, options);
@@ -378,13 +439,13 @@ const generateAIPlaylist = async (userId, options) => {
                     },
                 },
                 orderBy: {
-                    trackOrder: 'asc',
+                    trackOrder: "asc",
                 },
             },
         },
     });
     if (!playlistWithTracks) {
-        throw new Error('Failed to retrieve created playlist details');
+        throw new Error("Failed to retrieve created playlist details");
     }
     const artistsInPlaylist = new Set();
     playlistWithTracks.tracks.forEach((pt) => {
@@ -411,11 +472,11 @@ const updateAllSystemPlaylists = async () => {
             select: { id: true },
         });
         const baseSystemPlaylists = await db_1.default.playlist.findMany({
-            where: { type: 'SYSTEM', userId: null },
+            where: { type: "SYSTEM", userId: null },
             select: { name: true },
         });
         if (baseSystemPlaylists.length === 0) {
-            console.log('[PlaylistService] No base system playlists found to update.');
+            console.log("[PlaylistService] No base system playlists found to update.");
             return { success: true, errors: [] };
         }
         console.log(`[PlaylistService] Updating ${baseSystemPlaylists.length} system playlists for ${users.length} users...`);
@@ -425,7 +486,7 @@ const updateAllSystemPlaylists = async () => {
                 const templatePlaylist = await db_1.default.playlist.findFirst({
                     where: {
                         name: playlistTemplate.name,
-                        type: 'SYSTEM',
+                        type: "SYSTEM",
                         userId: null,
                     },
                     select: {
@@ -441,13 +502,13 @@ const updateAllSystemPlaylists = async () => {
                 }
                 let aiOptions = {};
                 if (templatePlaylist.description &&
-                    templatePlaylist.description.includes('<!--AI_PARAMS:')) {
+                    templatePlaylist.description.includes("<!--AI_PARAMS:")) {
                     const match = templatePlaylist.description.match(/<!--AI_PARAMS:(.*?)-->/s);
                     if (match && match[1]) {
                         try {
                             aiOptions = JSON.parse(match[1]);
                             templatePlaylist.description = templatePlaylist.description
-                                .replace(/\n\n<!--AI_PARAMS:.*?-->/s, '')
+                                .replace(/\n\n<!--AI_PARAMS:.*?-->/s, "")
                                 .trim();
                         }
                         catch (e) {
@@ -456,7 +517,7 @@ const updateAllSystemPlaylists = async () => {
                     }
                 }
                 const coverUrl = templatePlaylist.coverUrl ||
-                    'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
+                    "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
                 await (0, ai_service_1.createAIGeneratedPlaylist)(user.id, {
                     name: templatePlaylist.name,
                     description: templatePlaylist.description || undefined,
@@ -485,7 +546,7 @@ const updateAllSystemPlaylists = async () => {
         }
     }
     catch (error) {
-        console.error('[PlaylistService] Critical error during updateAllSystemPlaylists:', error);
+        console.error("[PlaylistService] Critical error during updateAllSystemPlaylists:", error);
         return {
             success: false,
             errors: [

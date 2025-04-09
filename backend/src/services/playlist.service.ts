@@ -1,12 +1,12 @@
-import prisma from '../config/db';
-import { Prisma, PlaylistPrivacy, PlaylistType } from '@prisma/client';
-import { Request } from 'express';
-import { paginate } from '../utils/handle-utils';
+import prisma from "../config/db";
+import { Prisma, PlaylistPrivacy, PlaylistType } from "@prisma/client";
+import { Request } from "express";
+import { paginate } from "../utils/handle-utils";
 import {
   createAIGeneratedPlaylist as createAIGeneratedPlaylistFromAIService,
   PlaylistGenerationOptions,
-} from './ai.service';
-import { uploadFile } from './upload.service';
+} from "./ai.service";
+import { uploadFile } from "./upload.service";
 
 // Select fields for base system playlist
 const baseSystemPlaylistSelect = {
@@ -48,7 +48,7 @@ export const createBaseSystemPlaylist = async (
   let coverUrl = undefined;
   if (coverFile) {
     // Upload cover image if provided
-    const uploadResult = await uploadFile(coverFile.buffer, 'playlists/covers');
+    const uploadResult = await uploadFile(coverFile.buffer, "playlists/covers");
     coverUrl = uploadResult.secure_url;
   }
 
@@ -85,7 +85,7 @@ export const updateBaseSystemPlaylist = async (
     playlist.type !== PlaylistType.SYSTEM ||
     playlist.userId !== null
   ) {
-    throw new Error('Base system playlist not found.');
+    throw new Error("Base system playlist not found.");
   }
 
   // Check for name collision if name is being changed
@@ -108,7 +108,7 @@ export const updateBaseSystemPlaylist = async (
   let coverUrl = undefined;
   if (coverFile) {
     // Upload cover image if provided
-    const uploadResult = await uploadFile(coverFile.buffer, 'playlists/covers');
+    const uploadResult = await uploadFile(coverFile.buffer, "playlists/covers");
     coverUrl = uploadResult.secure_url;
   }
 
@@ -139,7 +139,7 @@ export const deleteBaseSystemPlaylist = async (playlistId: string) => {
     playlist.type !== PlaylistType.SYSTEM ||
     playlist.userId !== null
   ) {
-    throw new Error('Base system playlist not found.');
+    throw new Error("Base system playlist not found.");
   }
 
   // Delete the base playlist
@@ -159,17 +159,17 @@ export const getAllBaseSystemPlaylists = async (req: Request) => {
     userId: null, // Only base system playlists
   };
 
-  if (search && typeof search === 'string') {
+  if (search && typeof search === "string") {
     whereClause.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
+      { name: { contains: search, mode: "insensitive" } },
+      { description: { contains: search, mode: "insensitive" } },
     ];
   }
 
   const result = await paginate(prisma.playlist, req, {
     where: whereClause,
     select: baseSystemPlaylistSelect,
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: "desc" },
   });
 
   // Parse AI params từ description của mỗi playlist
@@ -178,7 +178,7 @@ export const getAllBaseSystemPlaylists = async (req: Request) => {
 
     if (
       parsedPlaylist.description &&
-      parsedPlaylist.description.includes('<!--AI_PARAMS:')
+      parsedPlaylist.description.includes("<!--AI_PARAMS:")
     ) {
       const match = parsedPlaylist.description.match(/<!--AI_PARAMS:(.*?)-->/s);
       if (match && match[1]) {
@@ -189,10 +189,10 @@ export const getAllBaseSystemPlaylists = async (req: Request) => {
 
           // Làm sạch description để hiển thị (remove the comment)
           parsedPlaylist.description = parsedPlaylist.description
-            .replace(/\n\n<!--AI_PARAMS:.*?-->/s, '')
+            .replace(/\n\n<!--AI_PARAMS:.*?-->/s, "")
             .trim();
         } catch (e) {
-          console.error('Error parsing AI parameters:', e);
+          console.error("Error parsing AI parameters:", e);
           // Keep original description if parsing fails
         }
       }
@@ -211,7 +211,7 @@ export const updateVibeRewindPlaylist = async (
   try {
     // Tìm hoặc tạo playlist "Vibe Rewind"
     let vibeRewindPlaylist = await prisma.playlist.findFirst({
-      where: { userId, name: 'Vibe Rewind' },
+      where: { userId, name: "Vibe Rewind" },
     });
 
     if (!vibeRewindPlaylist) {
@@ -220,11 +220,11 @@ export const updateVibeRewindPlaylist = async (
       );
       vibeRewindPlaylist = await prisma.playlist.create({
         data: {
-          name: 'Vibe Rewind',
+          name: "Vibe Rewind",
           description:
             "Your personal time capsule - tracks you've been vibing to lately",
-          privacy: 'PRIVATE',
-          type: 'NORMAL',
+          privacy: "PRIVATE",
+          type: "SYSTEM",
           userId,
         },
       });
@@ -232,7 +232,7 @@ export const updateVibeRewindPlaylist = async (
 
     // Lấy lịch sử nghe nhạc của người dùng (bài có playCount > 2)
     const userHistory = await prisma.history.findMany({
-      where: { userId, type: 'PLAY', playCount: { gt: 2 } },
+      where: { userId, type: "PLAY", playCount: { gt: 2 } },
       include: {
         track: {
           include: { artist: true, genres: { include: { genre: true } } },
@@ -249,7 +249,7 @@ export const updateVibeRewindPlaylist = async (
     const topPlayedTracks = await prisma.history.findMany({
       where: { userId, playCount: { gt: 5 } },
       include: { track: true },
-      orderBy: { playCount: 'desc' },
+      orderBy: { playCount: "desc" },
       take: 10, // Giới hạn số lượng bài hát phổ biến
     });
 
@@ -299,7 +299,7 @@ export const updateVibeRewindPlaylist = async (
         isActive: true,
       },
       include: { artist: true, album: true },
-      orderBy: { playCount: 'desc' },
+      orderBy: { playCount: "desc" },
       take: 10,
     });
 
@@ -318,7 +318,7 @@ export const updateVibeRewindPlaylist = async (
         userId: { not: userId },
       },
       select: { userId: true },
-      distinct: ['userId'],
+      distinct: ["userId"],
     });
 
     const similarUserIds = similarUsers.map((u) => u.userId);
@@ -330,7 +330,7 @@ export const updateVibeRewindPlaylist = async (
     const collaborativeTracks = await prisma.history.findMany({
       where: { userId: { in: similarUserIds } },
       include: { track: true },
-      orderBy: { playCount: 'desc' },
+      orderBy: { playCount: "desc" },
       take: 10,
     });
 
@@ -412,14 +412,14 @@ export const getSystemPlaylists = async (req: Request) => {
 
   // Dựa vào type là SYSTEM
   const whereClause: Prisma.PlaylistWhereInput = {
-    type: 'SYSTEM',
+    type: "SYSTEM",
   };
 
   // Thêm điều kiện tìm kiếm nếu có từ khóa tìm kiếm
-  if (search && typeof search === 'string') {
+  if (search && typeof search === "string") {
     whereClause.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
+      { name: { contains: search, mode: "insensitive" } },
+      { description: { contains: search, mode: "insensitive" } },
     ];
   }
 
@@ -427,22 +427,22 @@ export const getSystemPlaylists = async (req: Request) => {
   const orderByClause: Prisma.PlaylistOrderByWithRelationInput = {};
   if (
     sortBy &&
-    typeof sortBy === 'string' &&
-    (sortOrder === 'asc' || sortOrder === 'desc')
+    typeof sortBy === "string" &&
+    (sortOrder === "asc" || sortOrder === "desc")
   ) {
     if (
-      sortBy === 'name' ||
-      sortBy === 'type' ||
-      sortBy === 'createdAt' ||
-      sortBy === 'updatedAt' ||
-      sortBy === 'totalTracks'
+      sortBy === "name" ||
+      sortBy === "type" ||
+      sortBy === "createdAt" ||
+      sortBy === "updatedAt" ||
+      sortBy === "totalTracks"
     ) {
       orderByClause[sortBy] = sortOrder;
     } else {
-      orderByClause.createdAt = 'desc';
+      orderByClause.createdAt = "desc";
     }
   } else {
-    orderByClause.createdAt = 'desc';
+    orderByClause.createdAt = "desc";
   }
 
   const result = await paginate<any>(prisma.playlist, req, {
@@ -458,7 +458,7 @@ export const getSystemPlaylists = async (req: Request) => {
           },
         },
         orderBy: {
-          trackOrder: 'asc',
+          trackOrder: "asc",
         },
       },
       user: {
@@ -500,19 +500,19 @@ export const getUserSystemPlaylists = async (req: Request) => {
 
   // Dựa vào type là SYSTEM và userId
   const whereClause: Prisma.PlaylistWhereInput = {
-    type: 'SYSTEM',
+    type: "SYSTEM",
     userId: req.user?.id,
   };
 
   // Thêm điều kiện tìm kiếm nếu có từ khóa tìm kiếm
-  if (search && typeof search === 'string') {
+  if (search && typeof search === "string") {
     whereClause.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
+      { name: { contains: search, mode: "insensitive" } },
+      { description: { contains: search, mode: "insensitive" } },
     ];
   }
 
-  const result = await paginate<any>(prisma.playlist, req, {  
+  const result = await paginate<any>(prisma.playlist, req, {
     where: whereClause,
     include: {
       tracks: {
@@ -530,7 +530,7 @@ export const getUserSystemPlaylists = async (req: Request) => {
           },
         },
         orderBy: {
-          trackOrder: 'asc',
+          trackOrder: "asc",
         },
       },
       user: {
@@ -538,7 +538,7 @@ export const getUserSystemPlaylists = async (req: Request) => {
       },
     },
     orderBy: {
-      createdAt: 'desc',
+      createdAt: "desc",
     },
   });
 
@@ -600,14 +600,14 @@ export const generateAIPlaylist = async (
           },
         },
         orderBy: {
-          trackOrder: 'asc',
+          trackOrder: "asc",
         },
       },
     },
   });
 
   if (!playlistWithTracks) {
-    throw new Error('Failed to retrieve created playlist details');
+    throw new Error("Failed to retrieve created playlist details");
   }
 
   // Count artists in the playlist
@@ -644,13 +644,13 @@ export const updateAllSystemPlaylists = async (): Promise<{
 
     // Lấy danh sách base system playlists (templates)
     const baseSystemPlaylists = await prisma.playlist.findMany({
-      where: { type: 'SYSTEM', userId: null },
+      where: { type: "SYSTEM", userId: null },
       select: { name: true }, // Only need the name to trigger the update
     });
 
     if (baseSystemPlaylists.length === 0) {
       console.log(
-        '[PlaylistService] No base system playlists found to update.'
+        "[PlaylistService] No base system playlists found to update."
       );
       return { success: true, errors: [] };
     }
@@ -675,7 +675,7 @@ export const updateAllSystemPlaylists = async (): Promise<{
             const templatePlaylist = await prisma.playlist.findFirst({
               where: {
                 name: playlistTemplate.name, // Use name from the map iteration
-                type: 'SYSTEM',
+                type: "SYSTEM",
                 userId: null,
               },
               select: {
@@ -697,7 +697,7 @@ export const updateAllSystemPlaylists = async (): Promise<{
             let aiOptions: PlaylistGenerationOptions = {}; // Define interface if not already done
             if (
               templatePlaylist.description &&
-              templatePlaylist.description.includes('<!--AI_PARAMS:')
+              templatePlaylist.description.includes("<!--AI_PARAMS:")
             ) {
               const match = templatePlaylist.description.match(
                 /<!--AI_PARAMS:(.*?)-->/s
@@ -707,7 +707,7 @@ export const updateAllSystemPlaylists = async (): Promise<{
                   aiOptions = JSON.parse(match[1]);
                   // Clean the description before passing it if needed
                   templatePlaylist.description = templatePlaylist.description
-                    .replace(/\n\n<!--AI_PARAMS:.*?-->/s, '')
+                    .replace(/\n\n<!--AI_PARAMS:.*?-->/s, "")
                     .trim();
                 } catch (e) {
                   console.error(
@@ -723,7 +723,7 @@ export const updateAllSystemPlaylists = async (): Promise<{
             // Default cover if the template doesn't have one
             const coverUrl =
               templatePlaylist.coverUrl ||
-              'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
+              "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
 
             // Call the AI service to create/update the user's personalized version
             // **Pass parsed aiOptions explicitly**
@@ -768,7 +768,7 @@ export const updateAllSystemPlaylists = async (): Promise<{
     }
   } catch (error) {
     console.error(
-      '[PlaylistService] Critical error during updateAllSystemPlaylists:',
+      "[PlaylistService] Critical error during updateAllSystemPlaylists:",
       error
     );
     return {

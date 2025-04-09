@@ -4,12 +4,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createWelcomeEmail = exports.createPasswordResetEmail = exports.createAccountDeactivatedEmail = exports.createAccountActivatedEmail = exports.createNewReleaseEmail = exports.createArtistRequestRejectedEmail = exports.createArtistRequestApprovedEmail = exports.createNewFollowerEmail = exports.sendEmail = void 0;
-const mail_1 = __importDefault(require("@sendgrid/mail"));
+const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const EMAIL_USER = process.env.EMAIL_USER;
 const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
+const SMTP_HOST = process.env.SMTP_HOST;
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
+const SMTP_SECURE = process.env.SMTP_SECURE === 'true';
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || 'SoundWave';
+const SMTP_FROM_EMAIL = process.env.SMTP_FROM_EMAIL || SMTP_USER;
 const SOUNDWAVE_LOGO_URL = 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743396192/fcazc9wdyqvaz1c3xwg7.png';
 const BRAND_COLOR_PRIMARY = '#A57865';
 const BACKGROUND_DARK = '#1a1a1a';
@@ -18,19 +23,33 @@ const TEXT_LIGHT = '#ffffff';
 const TEXT_DARK = '#333333';
 const TEXT_MUTED = '#cccccc';
 const FONT_FAMILY = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
-if (!SENDGRID_API_KEY) {
-    console.warn('SENDGRID_API_KEY is not set. Email notifications will be disabled.');
+let transporter = null;
+if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+    transporter = nodemailer_1.default.createTransport({
+        host: SMTP_HOST,
+        port: SMTP_PORT,
+        secure: SMTP_SECURE,
+        auth: {
+            user: SMTP_USER,
+            pass: SMTP_PASS,
+        },
+    });
+    transporter.verify((error, success) => {
+        if (error) {
+            console.error('❌ Nodemailer transporter verification failed:', error);
+            transporter = null;
+        }
+        else {
+            console.log('✅ Nodemailer transporter is ready to send emails.');
+        }
+    });
 }
 else {
-    mail_1.default.setApiKey(SENDGRID_API_KEY);
-    console.log('✅ SendGrid configured.');
-}
-if (!EMAIL_USER) {
-    console.warn('EMAIL_USER is not set. Emails might not be sent.');
+    console.warn('SMTP configuration is incomplete (HOST, USER, or PASS missing). Email notifications will be disabled.');
 }
 const sendEmail = async (options) => {
-    if (!SENDGRID_API_KEY || !EMAIL_USER) {
-        console.error('SendGrid API Key or Sender Email not configured. Cannot send email.');
+    if (!transporter) {
+        console.error('Nodemailer transporter is not configured or failed verification. Cannot send email.');
         return false;
     }
     const plainText = options.text ||
@@ -38,25 +57,25 @@ const sendEmail = async (options) => {
             .replace(/<[^>]*>?/gm, ' ')
             .replace(/\s+/g, ' ')
             .trim();
-    const msg = {
+    const mailOptions = {
+        from: `"${SMTP_FROM_NAME}" <${SMTP_FROM_EMAIL}>`,
         to: options.to,
-        from: {
-            name: 'SoundWave',
-            email: EMAIL_USER,
-        },
         subject: options.subject,
-        html: options.html,
         text: plainText,
+        html: options.html,
     };
     try {
-        await mail_1.default.send(msg);
-        console.log(`Email sent successfully to ${options.to} with subject "${options.subject}"`);
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`Email sent successfully to ${options.to} with subject "${options.subject}". Message ID: ${info.messageId}`);
         return true;
     }
     catch (error) {
-        console.error(`Error sending email to ${options.to}:`, error);
+        console.error(`Error sending email to ${options.to} via Nodemailer:`, error);
+        if (error.responseCode) {
+            console.error(`Nodemailer Error Response Code: ${error.responseCode}`);
+        }
         if (error.response) {
-            console.error('SendGrid Error Response:', error.response.body?.errors || error.response.body);
+            console.error(`Nodemailer Error Response: ${error.response}`);
         }
         return false;
     }

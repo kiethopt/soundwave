@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = void 0;
+exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = void 0;
 const playlistService = __importStar(require("../services/playlist.service"));
 const albumService = __importStar(require("../services/album.service"));
 const handle_utils_1 = require("../utils/handle-utils");
@@ -46,7 +46,7 @@ const createFavoritePlaylist = async (userId) => {
     try {
         await db_1.default.playlist.create({
             data: {
-                name: "Favorite songs",
+                name: "Favorites",
                 description: "List of your favorite songs",
                 privacy: "PRIVATE",
                 type: "FAVORITE",
@@ -55,7 +55,7 @@ const createFavoritePlaylist = async (userId) => {
         });
     }
     catch (error) {
-        console.error('Error creating favorite playlist:', error);
+        console.error("Error creating favorite playlist:", error);
         throw error;
     }
 };
@@ -63,25 +63,25 @@ exports.createFavoritePlaylist = createFavoritePlaylist;
 const createPlaylist = async (req, res, next) => {
     try {
         const userId = req.user?.id;
-        const { name, description, privacy = 'PRIVATE', type = 'NORMAL', } = req.body;
+        const { name, description, privacy = "PRIVATE", type = "NORMAL", } = req.body;
         if (!userId) {
             res.status(401).json({
                 success: false,
-                message: 'Unauthorized',
+                message: "Unauthorized",
             });
             return;
         }
-        if (type === 'FAVORITE') {
+        if (type === "FAVORITE") {
             const existingFavorite = await db_1.default.playlist.findFirst({
                 where: {
                     userId,
-                    type: 'FAVORITE',
+                    type: "FAVORITE",
                 },
             });
             if (existingFavorite) {
                 res.status(400).json({
                     success: false,
-                    message: 'Bạn đã có playlist Yêu thích',
+                    message: "You already have a Favorites playlist",
                 });
                 return;
             }
@@ -97,7 +97,7 @@ const createPlaylist = async (req, res, next) => {
         });
         res.status(201).json({
             success: true,
-            message: 'Đã tạo playlist thành công',
+            message: "Playlist created successfully",
             data: playlist,
         });
     }
@@ -112,23 +112,23 @@ const getPlaylists = async (req, res, next) => {
         if (!userId) {
             res.status(401).json({
                 success: false,
-                message: 'Unauthorized',
+                message: "Unauthorized",
             });
             return;
         }
-        const filterType = req.header('X-Filter-Type');
-        const isSystemFilter = filterType === 'system';
+        const filterType = req.header("X-Filter-Type");
+        const isSystemFilter = filterType === "system";
         if (!isSystemFilter) {
             let favoritePlaylist = await db_1.default.playlist.findFirst({
                 where: {
                     userId,
-                    type: 'FAVORITE',
+                    type: "FAVORITE",
                 },
             });
             if (!favoritePlaylist) {
                 favoritePlaylist = await db_1.default.playlist.create({
                     data: {
-                        name: "Favorite songs",
+                        name: "Favorites",
                         description: "List of your favorite songs",
                         privacy: "PRIVATE",
                         type: "FAVORITE",
@@ -139,16 +139,16 @@ const getPlaylists = async (req, res, next) => {
             let vibeRewindPlaylist = await db_1.default.playlist.findFirst({
                 where: {
                     userId,
-                    name: 'Vibe Rewind',
+                    name: "Vibe Rewind",
                 },
             });
             if (!vibeRewindPlaylist) {
                 vibeRewindPlaylist = await db_1.default.playlist.create({
                     data: {
-                        name: 'Vibe Rewind',
+                        name: "Vibe Rewind",
                         description: "Your personal time capsule - tracks you've been vibing to lately",
-                        privacy: 'PRIVATE',
-                        type: 'NORMAL',
+                        privacy: "PRIVATE",
+                        type: "SYSTEM",
                         userId,
                     },
                 });
@@ -156,7 +156,7 @@ const getPlaylists = async (req, res, next) => {
                     await playlistService.updateVibeRewindPlaylist(userId);
                 }
                 catch (error) {
-                    console.error('Error initializing Vibe Rewind playlist:', error);
+                    console.error("Error initializing Vibe Rewind playlist:", error);
                 }
             }
         }
@@ -166,13 +166,13 @@ const getPlaylists = async (req, res, next) => {
                     OR: [
                         {
                             userId,
-                            type: 'SYSTEM',
+                            type: "SYSTEM",
                         },
                         {
-                            type: 'SYSTEM',
-                            privacy: 'PUBLIC',
+                            type: "SYSTEM",
+                            privacy: "PUBLIC",
                             user: {
-                                role: 'ADMIN',
+                                role: "ADMIN",
                             },
                         },
                     ],
@@ -188,12 +188,12 @@ const getPlaylists = async (req, res, next) => {
                             },
                         },
                         orderBy: {
-                            trackOrder: 'asc',
+                            trackOrder: "asc",
                         },
                     },
                 },
                 orderBy: {
-                    createdAt: 'desc',
+                    createdAt: "desc",
                 },
             });
             const formattedPlaylists = systemPlaylists.map((playlist) => {
@@ -210,7 +210,7 @@ const getPlaylists = async (req, res, next) => {
                 return {
                     ...playlist,
                     tracks: formattedTracks,
-                    canEdit: req.user?.role === 'ADMIN' || playlist.userId === userId,
+                    canEdit: req.user?.role === "ADMIN" || playlist.userId === userId,
                 };
             });
             console.log(`Returning ${formattedPlaylists.length} system playlists for authenticated user.`);
@@ -232,7 +232,7 @@ const getPlaylists = async (req, res, next) => {
                     },
                 },
                 orderBy: {
-                    createdAt: 'desc',
+                    createdAt: "desc",
                 },
             });
             const playlistsWithCount = playlists.map((playlist) => ({
@@ -263,22 +263,22 @@ const getPlaylistById = async (req, res, next) => {
         if (!playlistExists) {
             res.status(404).json({
                 success: false,
-                message: 'Playlist not found',
+                message: "Playlist not found",
             });
             return;
         }
-        const isSystemPlaylist = playlistExists.type === 'SYSTEM';
-        const isFavoritePlaylist = playlistExists.type === 'FAVORITE';
-        const isPublicPlaylist = playlistExists.privacy === 'PUBLIC';
+        const isSystemPlaylist = playlistExists.type === "SYSTEM";
+        const isFavoritePlaylist = playlistExists.type === "FAVORITE";
+        const isPublicPlaylist = playlistExists.privacy === "PUBLIC";
         if (!isAuthenticated && !isPublicPlaylist && !isSystemPlaylist) {
             res.status(401).json({
                 success: false,
-                message: 'Please log in to view this playlist',
+                message: "Please log in to view this playlist",
             });
             return;
         }
-        if (playlistExists.type === 'NORMAL' &&
-            playlistExists.name === 'Vibe Rewind') {
+        if (playlistExists.type === "NORMAL" &&
+            playlistExists.name === "Vibe Rewind") {
             await playlistService.updateVibeRewindPlaylist(userId);
         }
         let playlist;
@@ -296,7 +296,7 @@ const getPlaylistById = async (req, res, next) => {
                             },
                         },
                         orderBy: {
-                            trackOrder: 'asc',
+                            trackOrder: "asc",
                         },
                     },
                 },
@@ -323,7 +323,7 @@ const getPlaylistById = async (req, res, next) => {
                             },
                         },
                         orderBy: {
-                            trackOrder: 'asc',
+                            trackOrder: "asc",
                         },
                     },
                 },
@@ -333,7 +333,7 @@ const getPlaylistById = async (req, res, next) => {
             if (!isAuthenticated) {
                 res.status(401).json({
                     success: false,
-                    message: 'Please log in to view this playlist',
+                    message: "Please log in to view this playlist",
                 });
                 return;
             }
@@ -357,7 +357,7 @@ const getPlaylistById = async (req, res, next) => {
                             },
                         },
                         orderBy: {
-                            trackOrder: 'asc',
+                            trackOrder: "asc",
                         },
                     },
                 },
@@ -371,7 +371,7 @@ const getPlaylistById = async (req, res, next) => {
             return;
         }
         const canEdit = isAuthenticated &&
-            ((isSystemPlaylist && userRole === 'ADMIN') ||
+            ((isSystemPlaylist && userRole === "ADMIN") ||
                 (!isSystemPlaylist && playlist.userId === userId));
         const formattedTracks = playlist.tracks.map((pt) => ({
             id: pt.track.id,
@@ -393,14 +393,14 @@ const getPlaylistById = async (req, res, next) => {
         });
     }
     catch (error) {
-        console.error('Error in getPlaylistById:', error);
+        console.error("Error in getPlaylistById:", error);
         next(error);
     }
 };
 exports.getPlaylistById = getPlaylistById;
 const addTrackToPlaylist = async (req, res, next) => {
     try {
-        console.log('AddToPlaylist request:', {
+        console.log("AddToPlaylist request:", {
             params: req.params,
             body: req.body,
             user: req.user,
@@ -412,7 +412,7 @@ const addTrackToPlaylist = async (req, res, next) => {
         if (!trackId) {
             res.status(400).json({
                 success: false,
-                message: 'Track ID is required',
+                message: "Track ID is required",
             });
             return;
         }
@@ -427,21 +427,21 @@ const addTrackToPlaylist = async (req, res, next) => {
         if (!playlist) {
             res.status(404).json({
                 success: false,
-                message: 'Playlist not found',
+                message: "Playlist not found",
             });
             return;
         }
-        if (playlist.type === 'SYSTEM' && userRole !== 'ADMIN') {
+        if (playlist.type === "SYSTEM" && userRole !== "ADMIN") {
             res.status(403).json({
                 success: false,
-                message: 'Only administrators can modify system playlists',
+                message: "Only administrators can modify system playlists",
             });
             return;
         }
-        if (playlist.type !== 'SYSTEM' && playlist.userId !== userId) {
+        if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
             res.status(403).json({
                 success: false,
-                message: 'You do not have permission to modify this playlist',
+                message: "You do not have permission to modify this playlist",
             });
             return;
         }
@@ -453,7 +453,7 @@ const addTrackToPlaylist = async (req, res, next) => {
         if (!track) {
             res.status(404).json({
                 success: false,
-                message: 'Track not found',
+                message: "Track not found",
             });
             return;
         }
@@ -466,7 +466,7 @@ const addTrackToPlaylist = async (req, res, next) => {
         if (existingTrack) {
             res.status(400).json({
                 success: false,
-                message: 'Track already exists in playlist',
+                message: "Track already exists in playlist",
             });
             return;
         }
@@ -493,12 +493,12 @@ const addTrackToPlaylist = async (req, res, next) => {
         });
         res.status(200).json({
             success: true,
-            message: 'Track added to playlist successfully',
+            message: "Track added to playlist successfully",
         });
         return;
     }
     catch (error) {
-        console.error('Error in addTrackToPlaylist:', error);
+        console.error("Error in addTrackToPlaylist:", error);
         next(error);
         return;
     }
@@ -509,7 +509,7 @@ const removeTrackFromPlaylist = async (req, res, next) => {
         const { playlistId, trackId } = req.params;
         const userId = req.user?.id;
         const userRole = req.user?.role;
-        console.log('Removing track from playlist:', {
+        console.log("Removing track from playlist:", {
             playlistId,
             trackId,
             userId,
@@ -522,21 +522,21 @@ const removeTrackFromPlaylist = async (req, res, next) => {
         if (!playlist) {
             res.status(404).json({
                 success: false,
-                message: 'Playlist not found',
+                message: "Playlist not found",
             });
             return;
         }
-        if (playlist.type === 'SYSTEM' && userRole !== 'ADMIN') {
+        if (playlist.type === "SYSTEM" && userRole !== "ADMIN") {
             res.status(403).json({
                 success: false,
-                message: 'Only administrators can modify system playlists',
+                message: "Only administrators can modify system playlists",
             });
             return;
         }
-        if (playlist.type !== 'SYSTEM' && playlist.userId !== userId) {
+        if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
             res.status(403).json({
                 success: false,
-                message: 'You do not have permission to modify this playlist',
+                message: "You do not have permission to modify this playlist",
             });
             return;
         }
@@ -558,12 +558,12 @@ const removeTrackFromPlaylist = async (req, res, next) => {
         });
         res.json({
             success: true,
-            message: 'Đã xóa bài hát khỏi playlist',
+            message: "Track removed from playlist successfully",
         });
         return;
     }
     catch (error) {
-        console.error('Error removing track:', error);
+        console.error("Error removing track:", error);
         next(error);
         return;
     }
@@ -578,7 +578,7 @@ const updatePlaylist = async (req, res) => {
         if (!userId) {
             res.status(401).json({
                 success: false,
-                message: 'Unauthorized',
+                message: "Unauthorized",
             });
             return;
         }
@@ -588,31 +588,48 @@ const updatePlaylist = async (req, res) => {
         if (!playlist) {
             res.status(404).json({
                 success: false,
-                message: 'Playlist not found',
+                message: "Playlist not found",
             });
             return;
         }
-        if (playlist.type === 'SYSTEM' && userRole !== 'ADMIN') {
+        if (playlist.type === "SYSTEM" && userRole !== "ADMIN") {
             res.status(403).json({
                 success: false,
-                message: 'Only administrators can modify system playlists',
+                message: "Only administrators can modify system playlists",
             });
             return;
         }
-        if (playlist.type !== 'SYSTEM' && playlist.userId !== userId) {
+        if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
             res.status(403).json({
                 success: false,
-                message: 'You do not have permission to modify this playlist',
+                message: "You do not have permission to modify this playlist",
             });
             return;
+        }
+        const updateData = {
+            name,
+            description,
+            privacy,
+        };
+        if (req.file) {
+            try {
+                const { uploadFile } = require("../services/upload.service");
+                const result = await uploadFile(req.file.buffer, "playlists/covers", "image");
+                updateData.coverUrl = result.secure_url;
+                console.log("Uploaded new cover image to Cloudinary:", result.secure_url);
+            }
+            catch (uploadError) {
+                console.error("Error uploading cover image:", uploadError);
+                res.status(500).json({
+                    success: false,
+                    message: "Failed to upload cover image",
+                });
+                return;
+            }
         }
         const updatedPlaylist = await db_1.default.playlist.update({
             where: { id },
-            data: {
-                name,
-                description,
-                privacy,
-            },
+            data: updateData,
             include: {
                 tracks: {
                     include: {
@@ -623,28 +640,32 @@ const updatePlaylist = async (req, res) => {
                         },
                     },
                     orderBy: {
-                        trackOrder: 'asc',
+                        trackOrder: "asc",
                     },
                 },
             },
         });
+        const responseData = {
+            ...updatedPlaylist,
+            canEdit: req.user?.role === "ADMIN" || updatedPlaylist.userId === userId,
+        };
         res.json({
             success: true,
-            data: updatedPlaylist,
+            data: responseData,
         });
     }
     catch (error) {
         if (error instanceof client_1.Prisma.PrismaClientKnownRequestError) {
-            if (error.code === 'P2002') {
+            if (error.code === "P2002") {
                 res.status(400).json({
                     success: false,
-                    message: 'Bạn đã có playlist với tên này',
+                    message: "You already have a playlist with this name",
                 });
             }
         }
         res.status(500).json({
             success: false,
-            message: 'Đã có lỗi xảy ra',
+            message: "An error has occurred",
         });
     }
 };
@@ -657,7 +678,7 @@ const deletePlaylist = async (req, res, next) => {
         if (!userId) {
             res.status(401).json({
                 success: false,
-                message: 'Unauthorized',
+                message: "Unauthorized",
             });
             return;
         }
@@ -667,21 +688,21 @@ const deletePlaylist = async (req, res, next) => {
         if (!playlist) {
             res.status(404).json({
                 success: false,
-                message: 'Playlist not found',
+                message: "Playlist not found",
             });
             return;
         }
-        if (playlist.type === 'SYSTEM' && userRole !== 'ADMIN') {
+        if (playlist.type === "SYSTEM" && userRole !== "ADMIN") {
             res.status(403).json({
                 success: false,
-                message: 'Only administrators can delete system playlists',
+                message: "Only administrators can delete system playlists",
             });
             return;
         }
-        if (playlist.type !== 'SYSTEM' && playlist.userId !== userId) {
+        if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
             res.status(403).json({
                 success: false,
-                message: 'You do not have permission to delete this playlist',
+                message: "You do not have permission to delete this playlist",
             });
             return;
         }
@@ -690,7 +711,7 @@ const deletePlaylist = async (req, res, next) => {
         });
         res.json({
             success: true,
-            message: 'Đã xóa playlist thành công',
+            message: "Playlist deleted successfully",
         });
     }
     catch (error) {
@@ -708,29 +729,40 @@ const getSystemPlaylists = async (req, res, next) => {
         });
     }
     catch (error) {
-        console.error('Error in getSystemPlaylists:', error);
+        console.error("Error in getSystemPlaylists:", error);
         next(error);
     }
 };
 exports.getSystemPlaylists = getSystemPlaylists;
+const getUserSystemPlaylists = async (req, res, next) => {
+    try {
+        const result = await playlistService.getUserSystemPlaylists(req);
+        res.json(result);
+    }
+    catch (error) {
+        console.error("Error in getSystemPlaylists:", error);
+        next(error);
+    }
+};
+exports.getUserSystemPlaylists = getUserSystemPlaylists;
 const updateVibeRewindPlaylist = async (req, res, next) => {
     try {
         const user = req.user;
         if (!user) {
-            res.status(401).json({ success: false, message: 'Unauthorized' });
+            res.status(401).json({ success: false, message: "Unauthorized" });
             return;
         }
         await playlistService.updateVibeRewindPlaylist(user.id);
         res.status(200).json({
             success: true,
-            message: 'Vibe Rewind playlist updated successfully',
+            message: "Vibe Rewind playlist updated successfully",
         });
     }
     catch (error) {
-        console.error('Update Vibe Rewind playlist error:', error);
+        console.error("Update Vibe Rewind playlist error:", error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update Vibe Rewind playlist',
+            message: "Failed to update Vibe Rewind playlist",
         });
     }
 };
@@ -741,7 +773,7 @@ const generateAIPlaylist = async (req, res) => {
         if (!userId) {
             res.status(401).json({
                 success: false,
-                message: 'Unauthorized, please login',
+                message: "Unauthorized, please login",
             });
             return;
         }
@@ -761,10 +793,10 @@ const generateAIPlaylist = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error generating AI playlist:', error);
+        console.error("Error generating AI playlist:", error);
         res.status(500).json({
             success: false,
-            message: 'Failed to generate AI playlist',
+            message: "Failed to generate AI playlist",
             error: error instanceof Error ? error.message : String(error),
         });
     }
@@ -774,29 +806,29 @@ const updateAllSystemPlaylists = async (req, res) => {
     try {
         res.status(200).json({
             success: true,
-            message: 'System playlists update job started',
+            message: "System playlists update job started",
         });
         setTimeout(async () => {
             try {
-                console.log('[ServiceTrigger] Starting system playlist update');
+                console.log("[ServiceTrigger] Starting system playlist update");
                 const result = await playlistService.updateAllSystemPlaylists();
                 if (result.success) {
-                    console.log('[ServiceTrigger] Successfully updated all system playlists');
+                    console.log("[ServiceTrigger] Successfully updated all system playlists");
                 }
                 else {
                     console.error(`[ServiceTrigger] Completed with ${result.errors.length} errors`);
                 }
             }
             catch (error) {
-                console.error('[ServiceTrigger] Critical error while updating system playlists:', error);
+                console.error("[ServiceTrigger] Critical error while updating system playlists:", error);
             }
         }, 10);
     }
     catch (error) {
-        console.error('Update all system playlists error:', error);
+        console.error("Update all system playlists error:", error);
         res.status(500).json({
             success: false,
-            message: 'Failed to start system playlists update job',
+            message: "Failed to start system playlists update job",
         });
     }
 };
@@ -808,10 +840,10 @@ const createBaseSystemPlaylist = async (req, res) => {
         if (!name) {
             res
                 .status(400)
-                .json({ success: false, message: 'Playlist name is required.' });
+                .json({ success: false, message: "Playlist name is required." });
             return;
         }
-        let finalDescription = description || '';
+        let finalDescription = description || "";
         const aiParams = {};
         if (basedOnMood)
             aiParams.basedOnMood = basedOnMood;
@@ -827,17 +859,17 @@ const createBaseSystemPlaylist = async (req, res) => {
         const playlistData = {
             name,
             description: finalDescription,
-            privacy: privacy || 'PUBLIC',
+            privacy: privacy || "PUBLIC",
         };
         const playlist = await playlistService.createBaseSystemPlaylist(playlistData, coverFile);
         res.status(201).json({ success: true, data: playlist });
     }
     catch (error) {
-        if (error instanceof Error && error.message.includes('already exists')) {
+        if (error instanceof Error && error.message.includes("already exists")) {
             res.status(400).json({ success: false, message: error.message });
         }
         else {
-            (0, handle_utils_1.handleError)(res, error, 'Create Base System Playlist');
+            (0, handle_utils_1.handleError)(res, error, "Create Base System Playlist");
         }
     }
 };
@@ -847,7 +879,7 @@ const updateBaseSystemPlaylist = async (req, res) => {
         const { id } = req.params;
         const { name, description, privacy, basedOnMood, basedOnGenre, basedOnArtist, trackCount, } = req.body;
         const coverFile = req.file;
-        let finalDescription = description || '';
+        let finalDescription = description || "";
         const aiParams = {};
         if (basedOnMood)
             aiParams.basedOnMood = basedOnMood;
@@ -858,7 +890,7 @@ const updateBaseSystemPlaylist = async (req, res) => {
         if (trackCount)
             aiParams.trackCount = Number(trackCount);
         finalDescription = finalDescription
-            .replace(/<!--AI_PARAMS:.*?-->/s, '')
+            .replace(/<!--AI_PARAMS:.*?-->/s, "")
             .trim();
         if (Object.keys(aiParams).length > 0) {
             finalDescription += `\n\n<!--AI_PARAMS:${JSON.stringify(aiParams)}-->`;
@@ -873,18 +905,18 @@ const updateBaseSystemPlaylist = async (req, res) => {
     }
     catch (error) {
         if (error instanceof Error) {
-            if (error.message.includes('not found')) {
+            if (error.message.includes("not found")) {
                 res.status(404).json({ success: false, message: error.message });
             }
-            else if (error.message.includes('already exists')) {
+            else if (error.message.includes("already exists")) {
                 res.status(400).json({ success: false, message: error.message });
             }
             else {
-                (0, handle_utils_1.handleError)(res, error, 'Update Base System Playlist');
+                (0, handle_utils_1.handleError)(res, error, "Update Base System Playlist");
             }
         }
         else {
-            (0, handle_utils_1.handleError)(res, error, 'Update Base System Playlist');
+            (0, handle_utils_1.handleError)(res, error, "Update Base System Playlist");
         }
     }
 };
@@ -895,15 +927,15 @@ const deleteBaseSystemPlaylist = async (req, res) => {
         await playlistService.deleteBaseSystemPlaylist(id);
         res.status(200).json({
             success: true,
-            message: 'Base system playlist deleted successfully.',
+            message: "Base system playlist deleted successfully.",
         });
     }
     catch (error) {
-        if (error instanceof Error && error.message.includes('not found')) {
+        if (error instanceof Error && error.message.includes("not found")) {
             res.status(404).json({ success: false, message: error.message });
         }
         else {
-            (0, handle_utils_1.handleError)(res, error, 'Delete Base System Playlist');
+            (0, handle_utils_1.handleError)(res, error, "Delete Base System Playlist");
         }
     }
 };
@@ -914,7 +946,7 @@ const getAllBaseSystemPlaylists = async (req, res) => {
         res.status(200).json({ success: true, ...result });
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Get All Base System Playlists');
+        (0, handle_utils_1.handleError)(res, error, "Get All Base System Playlists");
     }
 };
 exports.getAllBaseSystemPlaylists = getAllBaseSystemPlaylists;
@@ -935,8 +967,8 @@ const getHomePageData = async (req, res, next) => {
             try {
                 const systemPlaylists = await db_1.default.playlist.findMany({
                     where: {
-                        type: 'SYSTEM',
-                        privacy: 'PUBLIC',
+                        type: "SYSTEM",
+                        privacy: "PUBLIC",
                     },
                     include: {
                         tracks: {
@@ -949,7 +981,7 @@ const getHomePageData = async (req, res, next) => {
                                 trackOrder: true,
                             },
                             orderBy: {
-                                trackOrder: 'asc',
+                                trackOrder: "asc",
                             },
                         },
                     },
@@ -964,7 +996,7 @@ const getHomePageData = async (req, res, next) => {
                 const userSystemPlaylists = await db_1.default.playlist.findMany({
                     where: {
                         userId,
-                        type: 'SYSTEM',
+                        type: "SYSTEM",
                     },
                     include: {
                         _count: {
@@ -978,7 +1010,7 @@ const getHomePageData = async (req, res, next) => {
                     where: {
                         userId,
                         type: {
-                            not: 'SYSTEM',
+                            not: "SYSTEM",
                         },
                     },
                     include: {
@@ -999,7 +1031,7 @@ const getHomePageData = async (req, res, next) => {
                 }));
             }
             catch (error) {
-                console.error('Error fetching user playlist data:', error);
+                console.error("Error fetching user playlist data:", error);
             }
         }
         res.json({
@@ -1008,7 +1040,7 @@ const getHomePageData = async (req, res, next) => {
         });
     }
     catch (error) {
-        console.error('Error in getHomePageData:', error);
+        console.error("Error in getHomePageData:", error);
         next(error);
     }
 };
