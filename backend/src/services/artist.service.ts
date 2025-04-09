@@ -1,8 +1,9 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient, Role, FollowingType, Album, Track, HistoryType } from '@prisma/client';
 import {
   artistProfileSelect,
   albumSelect,
   trackSelect,
+  userSelect,
 } from '../utils/prisma-selects';
 import { client, setCache } from '../middleware/cache.middleware';
 import { uploadFile } from './upload.service';
@@ -321,30 +322,213 @@ export class ArtistService {
     }
 
     const artistProfileId = user.artistProfile.id;
-    const artistStats = await prisma.artistProfile.findUnique({
-      where: { id: artistProfileId },
-      select: {
-        monthlyListeners: true,
-        _count: { select: { albums: true, tracks: true } },
-      },
-    });
 
-    if (!artistStats) {
+    const [
+        artistData,
+        totalPlaysData,
+        albumsData,
+        topTracksData,
+        listenerHistory,
+        followersData,
+        trackLikersData,
+        artistGenresData
+    ] = await Promise.all([
+      prisma.artistProfile.findUnique({
+        where: { id: artistProfileId },
+        select: {
+          artistName: true,
+          avatar: true,
+          monthlyListeners: true,
+          _count: {
+            select: {
+              albums: { where: { isActive: true } },
+              tracks: { where: { isActive: true } },
+              followers: { where: { followingType: FollowingType.ARTIST } },
+            },
+          },
+        },
+      }),
+      prisma.track.aggregate({
+        where: { artistId: artistProfileId, isActive: true },
+        _sum: {
+          playCount: true,
+        },
+      }),
+      prisma.album.findMany({
+        where: {
+          artistId: artistProfileId,
+          isActive: true,
+          tracks: { some: { isActive: true } },
+        },
+        select: {
+          id: true,
+          title: true,
+          coverUrl: true,
+          tracks: {
+            where: { isActive: true },
+            select: {
+              playCount: true,
+            },
+          },
+        },
+      }),
+      prisma.track.findMany({
+        where: { artistId: artistProfileId, isActive: true },
+        select: {
+          id: true,
+          title: true,
+          playCount: true,
+          coverUrl: true,
+          duration: true,
+          album: {
+            select: {
+              id: true,
+              title: true,
+            }
+          }
+        },
+        orderBy: { playCount: 'desc' },
+        take: 5,
+      }),
+      prisma.history.groupBy({
+        by: ['userId'],
+        where: {
+          type: HistoryType.PLAY,
+          track: {
+            artistId: artistProfileId,
+            isActive: true,
+          },
+          user: {
+            isActive: true,
+          }
+        },
+        _sum: {
+          playCount: true,
+        },
+        orderBy: {
+          _sum: {
+            playCount: 'desc',
+          },
+        },
+        take: 7,
+      }),
+      prisma.userFollow.findMany({
+        where: {
+          followingArtistId: artistProfileId,
+          followingType: FollowingType.ARTIST,
+          follower: {
+            isActive: true,
+          }
+        },
+        select: {
+          follower: {
+            select: userSelect,
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 10,
+      }),
+      prisma.userLikeTrack.findMany({
+          where: {
+              track: {
+                  artistId: artistProfileId,
+                  isActive: true,
+              },
+              user: {
+                  isActive: true,
+              }
+          },
+          select: {
+              user: {
+                  select: userSelect,
+              },
+              createdAt: true,
+          },
+          orderBy: {
+              createdAt: 'desc',
+          },
+          distinct: ['userId'],
+          take: 10,
+      }),
+      prisma.trackGenre.findMany({
+        where: {
+          track: {
+            artistId: artistProfileId,
+            isActive: true,
+          }
+        },
+        select: {
+          genre: {
+            select: {
+              id: true,
+              name: true,
+            }
+          }
+        },
+        distinct: ['genreId'],
+      }),
+    ]);
+
+    if (!artistData) {
       throw new Error('Artist profile not found');
     }
 
-    const topTracks = await prisma.track.findMany({
-      where: { artistId: artistProfileId },
-      select: trackSelect,
-      orderBy: { playCount: 'desc' },
-      take: 5,
+    const topListenerIds = listenerHistory.map(item => item.userId);
+    const topListenersDetails = topListenerIds.length > 0 ? await prisma.user.findMany({
+        where: { id: { in: topListenerIds } },
+        select: userSelect,
+    }) : [];
+
+    const topListeners = listenerHistory.map(hist => {
+        const userDetail = topListenersDetails.find(u => u.id === hist.userId);
+        return {
+            ...(userDetail || {}),
+            totalPlays: hist._sum.playCount || 0,
+        };
+    }).filter(listener => listener.id);
+
+    // Tính tổng lượt nghe cho mỗi album và sắp xếp
+    const albumsWithTotalPlays = albumsData.map((album: { id: string; title: string; coverUrl: string | null; tracks: { playCount: number | null }[] }) => {
+      const totalAlbumPlays = album.tracks.reduce((sum: number, track: { playCount: number | null }) => sum + (track.playCount || 0), 0);
+      return {
+        id: album.id,
+        title: album.title,
+        coverUrl: album.coverUrl,
+        totalPlays: totalAlbumPlays,
+      };
     });
 
+    // Sắp xếp albums theo tổng lượt nghe và lấy top 5
+    const topAlbums = albumsWithTotalPlays
+      .sort((a, b) => b.totalPlays - a.totalPlays)
+      .slice(0, 5);
+
+    const followerCount = artistData._count.followers;
+    const totalPlays = totalPlaysData._sum.playCount || 0;
+
+    // Trích xuất thông tin followers và track likers
+    const followers = followersData.map(f => f.follower);
+    const trackLikers = trackLikersData.map(l => l.user);
+
+    // Extract genres from the new query result
+    const genres = artistGenresData.map(tg => tg.genre);
+
     return {
-      monthlyListeners: artistStats.monthlyListeners,
-      albumCount: artistStats._count.albums,
-      trackCount: artistStats._count.tracks,
-      topTracks,
+      artistName: artistData.artistName,
+      avatar: artistData.avatar,
+      monthlyListeners: artistData.monthlyListeners || 0,
+      albumCount: artistData._count.albums,
+      trackCount: artistData._count.tracks,
+      followerCount: followerCount,
+      totalPlays: totalPlays,
+      topTracks: topTracksData,
+      topAlbums: topAlbums,
+      topListeners: topListeners,
+      followers: followers,
+      trackLikers: trackLikers,
+      genres: genres,
     };
   }
 

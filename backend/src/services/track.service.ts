@@ -362,7 +362,7 @@ export const createTrack = async (req: Request) => {
 
     const notificationsData = followers.map((follower) => ({
       type: NotificationType.NEW_TRACK,
-      message: `${artistName} just released a new: ${title}`,
+      message: `${artistName} just released a new tracks: ${title}`,
       recipientType: RecipientType.USER,
       userId: follower.followerId,
       artistId: finalArtistId,
