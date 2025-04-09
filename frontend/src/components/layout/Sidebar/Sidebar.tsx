@@ -17,6 +17,7 @@ import {
   ChartIcon,
   Tags,
   LayoutGrid,
+  TrendingUp,
 } from "@/components/ui/Icons";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -98,10 +99,10 @@ export default function Sidebar({
 
     const token = localStorage.getItem("userToken");
 
-    if (!token) {
+      if (!token) {
       setLoading(false);
-      return;
-    }
+        return;
+      }
 
     try {
       const response = await api.playlists.getAll(token);
@@ -174,26 +175,31 @@ export default function Sidebar({
           md:transform-none md:transition-none
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0 md:flex-shrink-0
+<<<<<<< HEAD
           ${isCollapsed ? "w-24" : "w-64"}
           ${
             theme === "light"
               ? "bg-white border-r border-gray-200"
               : "bg-[#1a1a1a] border-r border-white/10"
+=======
+          ${isCollapsed ? "w-20" : "w-64"}
+          ${theme === "light"
+            ? "bg-white border-r border-gray-200"
+            : "bg-[#1a1a1a] border-r border-white/10"
+>>>>>>> 1f10c8d88b6166debefeda8bb7bdca4356348a52
           }
         `}
       >
         <div className="h-full flex flex-col">
           <div
-            className={`md:hidden p-4 ${
-              isCollapsed ? "flex justify-center" : "flex justify-end"
+            className={`md:hidden p-4 ${isCollapsed ? "flex justify-center" : "flex justify-end"
             }`}
           >
             <button
               onClick={onClose}
-              className={`p-1 flex items-center justify-center w-8 h-8 rounded-full ${
-                theme === "light"
-                  ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  : "bg-white/10 text-white/60 hover:text-white"
+              className={`p-1 flex items-center justify-center w-8 h-8 rounded-full ${theme === "light"
+                ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                : "bg-white/10 text-white/60 hover:text-white"
               }`}
             >
               <XIcon className="w-6 h-6" />
@@ -230,25 +236,22 @@ export default function Sidebar({
                     {isCollapsed ? (
                       <div className="group">
                         <LibraryOutline
-                          className={`w-7 h-7 ${
-                            theme === "light"
-                              ? "text-gray-600 group-hover:hidden"
-                              : "text-white/70 group-hover:hidden"
+                          className={`w-7 h-7 ${theme === "light"
+                            ? "text-gray-600 group-hover:hidden"
+                            : "text-white/70 group-hover:hidden"
                           }`}
                         />
                         <LibraryFilled
-                          className={`w-7 h-7 hidden group-hover:block ${
-                            theme === "light" ? "text-gray-900" : "text-white"
+                          className={`w-7 h-7 hidden group-hover:block ${theme === "light" ? "text-gray-900" : "text-white"
                           }`}
                         />
                       </div>
                     ) : (
                       <>
                         <div
-                          className={`flex items-center gap-3 group ${
-                            theme === "light"
-                              ? "text-gray-600 hover:text-gray-900"
-                              : "text-white/70 hover:text-white"
+                          className={`flex items-center gap-3 group ${theme === "light"
+                            ? "text-gray-600 hover:text-gray-900"
+                            : "text-white/70 hover:text-white"
                           }`}
                         >
                           <div className="relative">
@@ -260,10 +263,9 @@ export default function Sidebar({
                           </span>
                         </div>
                         <AddSimple
-                          className={`w-6 h-6 ml-auto hover:text-white cursor-pointer ${
-                            theme === "light"
-                              ? "text-gray-600 hover:text-gray-900"
-                              : "text-white/70 hover:text-white"
+                          className={`w-6 h-6 ml-auto hover:text-white cursor-pointer ${theme === "light"
+                            ? "text-gray-600 hover:text-gray-900"
+                            : "text-white/70 hover:text-white"
                           }`}
                           onClick={() => {
                             const canProceed = handleProtectedAction();
@@ -287,6 +289,7 @@ export default function Sidebar({
                   {favoritePlaylist && (
                     <Link
                       href={`/playlists/${favoritePlaylist.id}`}
+<<<<<<< HEAD
                       className={`flex items-center rounded-md ${
                         isCollapsed
                           ? "w-12 h-auto justify-center"
@@ -300,6 +303,16 @@ export default function Sidebar({
                                 : "text-white/70 hover:bg-white/10 hover:text-white"
                             }`
                       }`}
+=======
+                      className={`flex items-center px-3 py-2 rounded-md ${pathname === `/playlists/${favoritePlaylist.id}`
+                        ? theme === "light"
+                          ? "bg-gray-200 text-gray-900"
+                          : "bg-white/10 text-white"
+                        : theme === "light"
+                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                        }`}
+>>>>>>> 1f10c8d88b6166debefeda8bb7bdca4356348a52
                     >
                       {isCollapsed ? (
                         <div
@@ -353,8 +366,8 @@ export default function Sidebar({
                             <div className="flex items-center gap-1">
                               <BsFillPinAngleFill className="w-3 h-3 text-[#A57865] flex-shrink-0" />
                               <span className="truncate font-medium text-sm leading-tight">
-                                {favoritePlaylist.name}
-                              </span>
+                            {favoritePlaylist.name}
+                          </span>
                             </div>
                             <div className="flex items-center text-xs text-white/50 mt-0.5">
                               <span className="truncate">
@@ -382,6 +395,7 @@ export default function Sidebar({
                     >
                       <Link
                         href={`/playlists/${vibeRewindPlaylist.id}`}
+<<<<<<< HEAD
                         className={`flex items-center rounded-md group ${
                           isCollapsed
                             ? "w-full h-full justify-center"
@@ -395,6 +409,16 @@ export default function Sidebar({
                                   : "text-white/70 hover:bg-white/10 hover:text-white"
                               }`
                         }`}
+=======
+                        className={`flex items-center px-3 py-2 rounded-md group ${pathname === `/playlists/${vibeRewindPlaylist.id}`
+                          ? theme === "light"
+                            ? "bg-gray-200 text-gray-900"
+                            : "bg-white/10 text-white"
+                          : theme === "light"
+                            ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                            : "text-white/70 hover:bg-white/10 hover:text-white"
+                          }`}
+>>>>>>> 1f10c8d88b6166debefeda8bb7bdca4356348a52
                       >
                         {isCollapsed ? (
                           <div
@@ -450,8 +474,8 @@ export default function Sidebar({
                               <div className="flex items-center gap-1">
                                 <BsFillPinAngleFill className="w-3 h-3 text-emerald-500 flex-shrink-0" />
                                 <span className="truncate font-medium text-sm leading-tight">
-                                  {vibeRewindPlaylist.name}
-                                </span>
+                              {vibeRewindPlaylist.name}
+                            </span>
                               </div>
                               <div className="flex items-center text-xs text-white/50 mt-0.5">
                                 <span className="truncate">
@@ -468,6 +492,7 @@ export default function Sidebar({
 
                   {welcomeMixPlaylist && (
                     <Link
+<<<<<<< HEAD
                       href={`/playlists/${welcomeMixPlaylist.id}`}
                       className={`relative flex items-center rounded-md group ${
                         isCollapsed
@@ -482,6 +507,18 @@ export default function Sidebar({
                                 : "text-white/70 hover:bg-white/10 hover:text-white"
                             }`
                       }`}
+=======
+                      key={playlist.id}
+                      href={`/playlists/${playlist.id}`}
+                      className={`flex items-center px-3 py-2 rounded-md ${pathname === `/playlists/${playlist.id}`
+                        ? theme === "light"
+                          ? "bg-gray-200 text-gray-900"
+                          : "bg-white/10 text-white"
+                        : theme === "light"
+                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                        }`}
+>>>>>>> 1f10c8d88b6166debefeda8bb7bdca4356348a52
                     >
                       {isCollapsed ? (
                         <div
@@ -547,7 +584,7 @@ export default function Sidebar({
                               </span>
                             </div>
                           </div>
-                        </div>
+                    </div>
                       )}
                     </Link>
                   )}
@@ -601,8 +638,8 @@ export default function Sidebar({
                               • {playlist.totalTracks || 0} songs
                             </div>
                           </div>
-                        </div>
-                      ) : (
+                            </div>
+                          ) : (
                         <div className="flex items-center w-full gap-2">
                           <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
                             {playlist.coverUrl ? (
@@ -651,8 +688,7 @@ export default function Sidebar({
                 <div className="mt-4 space-y-2">
                   {!isCollapsed && (
                     <div
-                      className={`px-3 text-sm font-medium ${
-                        theme === "light" ? "text-gray-600" : "text-white/70"
+                      className={`px-3 text-sm font-medium ${theme === "light" ? "text-gray-600" : "text-white/70"
                       }`}
                     >
                       Artist Dashboard
@@ -681,12 +717,20 @@ export default function Sidebar({
                   </Link>
                   <Link
                     href="/artist/albums"
+<<<<<<< HEAD
                     className={`flex items-center gap-3 px-3 py-2 rounded-md ${
                       pathname && pathname.startsWith("/artist/albums")
                         ? theme === "light"
                           ? "bg-gray-200 text-gray-900"
                           : "bg-[#A57865]/30 text-white"
                         : theme === "light"
+=======
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md ${pathname && pathname.startsWith("/artist/albums")
+                      ? theme === "light"
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-white/10 text-white"
+                      : theme === "light"
+>>>>>>> 1f10c8d88b6166debefeda8bb7bdca4356348a52
                         ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
                         : "text-white/70 hover:bg-white/10 hover:text-white"
                     }`}
@@ -702,12 +746,20 @@ export default function Sidebar({
                   </Link>
                   <Link
                     href="/artist/tracks"
+<<<<<<< HEAD
                     className={`flex items-center gap-3 px-3 py-2 rounded-md ${
                       pathname && pathname.startsWith("/artist/tracks")
                         ? theme === "light"
                           ? "bg-gray-200 text-gray-900"
                           : "bg-[#A57865]/30 text-white"
                         : theme === "light"
+=======
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md ${pathname && pathname.startsWith("/artist/tracks")
+                      ? theme === "light"
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-white/10 text-white"
+                      : theme === "light"
+>>>>>>> 1f10c8d88b6166debefeda8bb7bdca4356348a52
                         ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
                         : "text-white/70 hover:bg-white/10 hover:text-white"
                     }`}
@@ -718,6 +770,26 @@ export default function Sidebar({
                       <>
                         <Music className="w-6 h-6" />
                         <span>Tracks</span>
+                      </>
+                    )}
+                  </Link>
+                  <Link
+                    href="/artist/stats"
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md ${pathname && pathname.startsWith("/artist/stats")
+                      ? theme === "light"
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-white/10 text-white"
+                      : theme === "light"
+                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                        : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                  >
+                    {isCollapsed ? (
+                      <TrendingUp className="w-6 h-6 mx-auto" />
+                    ) : (
+                      <>
+                        <TrendingUp className="w-6 h-6" />
+                        <span>Stats</span>
                       </>
                     )}
                   </Link>
@@ -734,10 +806,9 @@ export default function Sidebar({
 
                 <Link
                   href="/admin/dashboard"
-                  className={`flex items-center px-3 py-2.5 ${
-                    isActive("/admin/dashboard")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
+                  className={`flex items-center px-3 py-2.5 ${isActive("/admin/dashboard")
+                    ? "bg-gray-200 text-gray-900"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {isCollapsed ? (
@@ -756,10 +827,9 @@ export default function Sidebar({
 
                 <Link
                   href="/admin/analytics"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/analytics")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
+                  className={`flex items-center px-3 py-2.5 ${pathname && pathname.startsWith("/admin/analytics")
+                    ? "bg-gray-200 text-gray-900"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {isCollapsed ? (
@@ -778,10 +848,9 @@ export default function Sidebar({
 
                 <Link
                   href="/admin/artist-requests"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/artist-requests")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
+                  className={`flex items-center px-3 py-2.5 ${pathname && pathname.startsWith("/admin/artist-requests")
+                    ? "bg-gray-200 text-gray-900"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {isCollapsed ? (
@@ -806,10 +875,9 @@ export default function Sidebar({
 
                 <Link
                   href="/admin/users"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/users")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
+                  className={`flex items-center px-3 py-2.5 ${pathname && pathname.startsWith("/admin/users")
+                    ? "bg-gray-200 text-gray-900"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {isCollapsed ? (
@@ -826,10 +894,9 @@ export default function Sidebar({
 
                 <Link
                   href="/admin/artists"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/artists")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
+                  className={`flex items-center px-3 py-2.5 ${pathname && pathname.startsWith("/admin/artists")
+                    ? "bg-gray-200 text-gray-900"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {isCollapsed ? (
@@ -846,10 +913,9 @@ export default function Sidebar({
 
                 <Link
                   href="/admin/genres"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/genres")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
+                  className={`flex items-center px-3 py-2.5 ${pathname && pathname.startsWith("/admin/genres")
+                    ? "bg-gray-200 text-gray-900"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {isCollapsed ? (
@@ -866,10 +932,9 @@ export default function Sidebar({
 
                 <Link
                   href="/admin/labels"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/labels")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
+                  className={`flex items-center px-3 py-2.5 ${pathname && pathname.startsWith("/admin/labels")
+                    ? "bg-gray-200 text-gray-900"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {isCollapsed ? (
@@ -886,10 +951,9 @@ export default function Sidebar({
 
                 <Link
                   href="/admin/content"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/content")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
+                  className={`flex items-center px-3 py-2.5 ${pathname && pathname.startsWith("/admin/content")
+                    ? "bg-gray-200 text-gray-900"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {isCollapsed ? (
@@ -912,10 +976,9 @@ export default function Sidebar({
 
                 <Link
                   href="/admin/system"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/system")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
+                  className={`flex items-center px-3 py-2.5 ${pathname && pathname.startsWith("/admin/system")
+                    ? "bg-gray-200 text-gray-900"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   {isCollapsed ? (
@@ -936,10 +999,9 @@ export default function Sidebar({
           <div className={`p-4 ${userRole === "ADMIN" ? "mt-auto" : ""}`}>
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className={`w-10 h-10 flex items-center justify-center rounded-full ${
-                userRole === "ADMIN"
-                  ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                  : theme === "light"
+              className={`w-10 h-10 flex items-center justify-center rounded-full ${userRole === "ADMIN"
+                ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                : theme === "light"
                   ? "bg-gray-200 hover:bg-gray-200 text-gray-600"
                   : "bg-white/10 hover:bg-white/20 text-white"
               }`}

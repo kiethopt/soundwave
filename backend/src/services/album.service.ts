@@ -3,9 +3,9 @@ import prisma from '../config/db';
 import { uploadFile } from './upload.service';
 import { Role, AlbumType, Prisma, HistoryType, NotificationType, RecipientType } from '@prisma/client';
 import { albumSelect, trackSelect } from '../utils/prisma-selects';
-import pusher from '../config/pusher';
 import * as emailService from './email.service';
 import { paginate } from 'src/utils/handle-utils';
+import { getIO } from '../config/socket';
 
 // Hàm utility từ controller trước đó
 const canManageAlbum = (user: any, albumArtistId: string): boolean => {
@@ -207,7 +207,7 @@ export const createAlbum = async (req: Request) => {
 
   const notificationsData = followers.map((follower) => ({
     type: NotificationType.NEW_ALBUM,
-    message: `${artistName} vừa ra album mới: ${title}`,
+    message: `${artistName} just released a new album: ${title}`,
     recipientType: RecipientType.USER,
     userId: follower.followerId,
     artistId: targetArtistProfileId,
@@ -219,10 +219,12 @@ export const createAlbum = async (req: Request) => {
   }
 
   const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
+  const io = getIO();
   for (const user of followerUsers) {
-    await pusher.trigger(`user-${user.id}`, 'notification', {
+    const room = `user-${user.id}`;
+    io.to(room).emit('notification', {
       type: NotificationType.NEW_ALBUM,
-      message: `${artistName} vừa ra album mới: ${album.title}`,
+      message: `${artistName} just released a new album: ${album.title}`,
     });
 
     if (user.email) {
@@ -231,7 +233,8 @@ export const createAlbum = async (req: Request) => {
         artistName,
         'album',
         album.title,
-        releaseLink
+        releaseLink,
+        album.coverUrl
       );
       await emailService.sendEmail(emailOptions);
     }
