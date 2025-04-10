@@ -408,6 +408,7 @@ export default function ArtistDetailedStats() {
     const lineChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 0 },
         scales: {
             y: {
                 beginAtZero: true,
@@ -444,6 +445,7 @@ export default function ArtistDetailedStats() {
     const doughnutChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 0 },
         plugins: {
             legend: {
                 position: 'bottom' as 'bottom',
@@ -483,6 +485,7 @@ export default function ArtistDetailedStats() {
     const barChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 0 },
         scales: {
              y: {
                 beginAtZero: true,
@@ -540,7 +543,7 @@ export default function ArtistDetailedStats() {
                     alt={stats.artistName || 'Artist Avatar'}
                     width={128}
                     height={128}
-                    className="rounded-full object-cover border-4 border-gray-300 dark:border-gray-700 shadow-lg"
+                    className="w-32 h-32 rounded-full object-cover border-4 border-gray-300 dark:border-gray-700 shadow-lg"
                     priority
                 />
                 <div className="text-center sm:text-left">
@@ -747,7 +750,7 @@ export default function ArtistDetailedStats() {
                                         alt={listener.name || listener.username || 'Listener'}
                                         width={80}
                                         height={80}
-                                        className="rounded-full object-cover border-2 border-gray-300 dark:border-gray-600 w-20 h-20"
+                                        className="w-20 h-20 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
                                     />
                                     {/* Rank Badge */}
                                     <span className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded-full shadow-md">
@@ -807,7 +810,7 @@ function StatsCard({ icon, title, value, theme, link }: StatsCardProps) {
     const formattedValue = formatNumber(value);
 
     const cardContent = (
-        <div className={`p-4 rounded-xl shadow-sm transition-shadow duration-200 ease-in-out ${theme === 'light' ? 'bg-white hover:shadow-md' : 'bg-gray-800 hover:bg-gray-700'}`}>
+        <div className={`p-4 rounded-xl shadow-sm ${theme === 'light' ? 'bg-white hover:shadow-md' : 'bg-gray-800 hover:bg-gray-700'}`}>
             <div className="flex items-center justify-between mb-2">
                 <div className={`p-2 rounded-full ${theme === 'light' ? 'bg-gray-100' : 'bg-gray-700'}`}>
                     {icon}
