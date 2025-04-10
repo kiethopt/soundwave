@@ -815,10 +815,10 @@ export default function Sidebar({
                     }`}
                   >
                     {isCollapsed ? (
-                      <TrendingUp className="w-6 h-6 mx-auto" />
+                      <ChartIcon className="w-6 h-6 mx-auto" />
                     ) : (
                       <>
-                        <TrendingUp className="w-6 h-6" />
+                        <ChartIcon className="w-6 h-6" />
                         <span>Stats</span>
                       </>
                     )}

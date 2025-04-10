@@ -20,6 +20,7 @@ export type NotificationType = {
   coverUrl?: string;
   title?: string;
   createdAt: string;
+  senderId?: string;
 };
 
 export default function NotificationsPage() {
@@ -179,7 +180,13 @@ export default function NotificationsPage() {
           <div className="grid grid-cols-1 gap-4">
             {notifications.map((notification, index) => (
               <div key={notification.id} className="animate-slide-up">
-                <Link href={`/notification/${notification.id}`}>
+                <Link
+                  href={
+                    notification.type === 'NEW_FOLLOW' && notification.senderId
+                      ? `/profile/${notification.senderId}`
+                      : `/notification/${notification.id}`
+                  }
+                >
                   <div
                     className={`dashboard-card flex items-center p-4 transition-all duration-300 ${notification.isRead
                       ? 'opacity-80'

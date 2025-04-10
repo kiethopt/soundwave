@@ -693,43 +693,81 @@ export default function ArtistDetailedStats() {
                 <h3 className="text-xl font-semibold mb-1">Top Tracks</h3>
                 <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Most played tracks overall</p>
                 {topTracks.length > 0 ? (
-                    <ul className="space-y-4">
-                        {topTracks.slice(0, 5).map((track, index) => (
-                            <li key={track.id} className="flex items-center justify-between text-sm gap-4">
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <span className={`text-gray-500 dark:text-gray-400 w-5 text-right`}>{index + 1}</span>
-                                    <Image
-                                        src={track.coverUrl || '/placeholder-image.png'}
-                                        alt={track.title}
-                                        width={40}
-                                        height={40}
-                                        className="rounded flex-shrink-0 object-cover"
-                                    />
-                                    <div className="flex items-center justify-between min-w-0 flex-1">
-                                        <span className="font-medium truncate mr-2">{track.title}</span>
-                                        <div className="flex items-center space-x-2 text-xs flex-shrink-0">
-                                            {track.album && (
-                                                <Link href={`/album/${track.album.id}`} className={`${theme === 'light' ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200'} truncate hidden sm:inline`}>
-                                                    {track.album.title}
-                                                </Link>
-                                            )}
-                                            {track.album && track.duration && (
-                                                 <span className="text-gray-400 dark:text-gray-600 hidden sm:inline">•</span>
-                                            )}
-                                            {track.duration && (
-                                                <span className={`${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
-                                                    {formatDuration(track.duration)}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
+                    <div className="flex gap-x-4 md:gap-x-6 text-sm">
+                        {/* Column 1: Rank */}
+                        <div className="flex flex-col space-y-3 pt-[26px]"> {/* pt to align with header height approx */}
+                            {topTracks.slice(0, 5).map((track, index) => (
+                                <div key={`${track.id}-rank`} className="h-10 flex items-center justify-end w-6 text-gray-500 dark:text-gray-400">
+                                    {index + 1}
                                 </div>
-                                <span className={`font-semibold ${theme === 'light' ? 'text-indigo-600' : 'text-indigo-400'} flex-shrink-0`}>
-                                    {formatNumber(track.playCount)} plays
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
+                            ))}
+                        </div>
+
+                        {/* Column 2: Track (Cover + Title) */}
+                        <div className="flex flex-col flex-1 min-w-0">
+                            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2 h-[18px] flex items-center">Track</div>
+                            <div className="flex flex-col space-y-3">
+                                {topTracks.slice(0, 5).map((track) => (
+                                    <div key={`${track.id}-track`} className="flex items-center gap-3 h-10 min-w-0">
+                                        <Image
+                                            src={track.coverUrl || '/placeholder-image.png'}
+                                            alt={track.title}
+                                            width={40}
+                                            height={40}
+                                            className="rounded flex-shrink-0 object-cover w-10 h-10"
+                                        />
+                                        <span className="font-medium truncate flex-1">{track.title}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Column 3: Album (Hidden on small, visible md+) */}
+                        <div className="hidden md:flex flex-col min-w-[100px] lg:min-w-[150px] xl:min-w-[200px]">
+                             <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2 h-[18px] flex items-center">Album</div>
+                             <div className="flex flex-col space-y-3">
+                                {topTracks.slice(0, 5).map((track) => (
+                                    <div key={`${track.id}-album`} className="h-10 flex items-center truncate min-w-0">
+                                        {track.album ? (
+                                            <Link href={`/album/${track.album.id}`} className={`${theme === 'light' ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 hover:text-gray-200'} truncate`}>
+                                                {track.album.title}
+                                            </Link>
+                                        ) : (
+                                            <span className={`text-sm ${theme === 'light' ? 'text-gray-400' : 'text-gray-500'}`}>-</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                       {/* Column 4: Duration (Hidden on small/medium, visible lg+) */}
+                       <div className="hidden lg:flex flex-col w-16">
+                           <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2 h-[18px] flex items-center justify-end">Duration</div>
+                           <div className="flex flex-col space-y-3">
+                                {topTracks.slice(0, 5).map((track) => (
+                                    <div key={`${track.id}-duration`} className="h-10 flex items-center justify-end">
+                                         {track.duration ? (
+                                             <span className={`${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>{formatDuration(track.duration)}</span>
+                                         ) : (
+                                             <span className={`${theme === 'light' ? 'text-gray-400' : 'text-gray-500'}`}>--:--</span>
+                                         )}
+                                    </div>
+                                ))}
+                            </div>
+                       </div>
+
+                       {/* Column 5: Plays */}
+                       <div className="flex flex-col w-20 md:w-24">
+                            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2 h-[18px] flex items-center justify-end">Plays</div>
+                            <div className="flex flex-col space-y-3">
+                                {topTracks.slice(0, 5).map((track) => (
+                                    <div key={`${track.id}-plays`} className={`h-10 flex items-center justify-end font-semibold ${theme === 'light' ? 'text-indigo-600' : 'text-indigo-400'} flex-shrink-0 whitespace-nowrap`}>
+                                        {formatNumber(track.playCount)} plays
+                                    </div>
+                                ))}
+                            </div>
+                       </div>
+                    </div>
                 ) : (
                     <p className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>No track data available.</p>
                 )}
