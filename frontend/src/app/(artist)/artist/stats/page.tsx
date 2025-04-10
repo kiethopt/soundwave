@@ -12,17 +12,19 @@ import {
     ListMusic,
     TrendingUp,
 } from '@/components/ui/Icons';
-import { Line } from 'react-chartjs-2';
+import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
     CategoryScale,
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend,
-    Filler
+    Filler,
+    ArcElement
 } from 'chart.js';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -31,13 +33,27 @@ ChartJS.register(
     LinearScale,
     PointElement,
     LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend,
-    Filler
+    Filler,
+    ArcElement
 );
 
-// Cập nhật interface để bao gồm thông tin nghệ sĩ
+// Define structure for trend data
+interface TrendData {
+    labels: string[];
+    data: number[];
+}
+
+// Define structure for genre distribution data
+interface GenreDistribution {
+    genreName: string;
+    trackCount: number;
+}
+
+// Cập nhật interface để bao gồm thông tin nghệ sĩ, trends, và genre distribution
 interface ArtistStats {
     monthlyListeners: number;
     albumCount: number;
@@ -47,6 +63,12 @@ interface ArtistStats {
     artistName?: string;
     avatar?: string;
     genres?: { id: string; name: string }[];
+    followerTrend?: TrendData;
+    likeTrend?: TrendData;
+    playlistAddTrend?: TrendData;
+    genreDistribution?: GenreDistribution[];
+    monthlyStreamTrend?: TrendData;
+    yearlyStreamTrend?: TrendData;
 }
 
 interface Track {
@@ -122,6 +144,15 @@ export default function ArtistDetailedStats() {
         labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
         datasets: [],
     });
+    // --- State for new trend charts --- 
+    const [followerChartData, setFollowerChartData] = useState<any>({ labels: [], datasets: [] });
+    const [likeChartData, setLikeChartData] = useState<any>({ labels: [], datasets: [] });
+    const [playlistAddChartData, setPlaylistAddChartData] = useState<any>({ labels: [], datasets: [] });
+    // --- State for new Genre Distribution Doughnut chart ---
+    const [genreChartData, setGenreChartData] = useState<any>({ labels: [], datasets: [] });
+    // --- State for Stream Bar charts ---
+    const [monthlyStreamChartData, setMonthlyStreamChartData] = useState<any>({ labels: [], datasets: [] });
+    const [yearlyStreamChartData, setYearlyStreamChartData] = useState<any>({ labels: [], datasets: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const { theme } = useTheme();
@@ -148,13 +179,100 @@ export default function ArtistDetailedStats() {
                     artistName: data.artistName || 'Artist Name',
                     avatar: data.avatar || '/default-avatar.png',
                     genres: data.genres || [],
+                    followerTrend: data.followerTrend,
+                    likeTrend: data.likeTrend,
+                    playlistAddTrend: data.playlistAddTrend,
+                    genreDistribution: data.genreDistribution,
+                    monthlyStreamTrend: data.monthlyStreamTrend,
+                    yearlyStreamTrend: data.yearlyStreamTrend,
                 });
 
                 setTopTracks(data.topTracks || []);
                 setTopListeners(data.topListeners || []);
-                setFollowers(data.followers || []);
-                setTrackLikers(data.trackLikers || []);
 
+                // --- Helper to create chart config --- 
+                const createLineChartConfig = (trendData: TrendData | undefined, label: string, borderColorLight: string, borderColorDark: string, bgColorLight: string[], bgColorDark: string[]) => {
+                    if (!trendData || !trendData.labels || !trendData.data) {
+                        return { labels: [], datasets: [] };
+                    }
+                    return {
+                        labels: trendData.labels,
+                        datasets: [
+                            {
+                                label: label,
+                                data: trendData.data,
+                                fill: true,
+                                borderColor: theme === 'light' ? borderColorLight : borderColorDark,
+                                backgroundColor: (context: any) => {
+                                    const ctx = context.chart.ctx;
+                                    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                                    if (theme === 'light') {
+                                        gradient.addColorStop(0, bgColorLight[0]);
+                                        gradient.addColorStop(1, bgColorLight[1]);
+                                    } else {
+                                        gradient.addColorStop(0, bgColorDark[0]);
+                                        gradient.addColorStop(1, bgColorDark[1]);
+                                    }
+                                    return gradient;
+                                },
+                                tension: 0.4,
+                                pointBackgroundColor: theme === 'light' ? borderColorLight : borderColorDark,
+                                pointBorderColor: theme === 'light' ? '#fff' : '#111827',
+                                pointHoverBackgroundColor: theme === 'light' ? '#fff' : '#111827',
+                                pointHoverBorderColor: theme === 'light' ? borderColorLight : borderColorDark,
+                            },
+                        ],
+                    };
+                };
+
+                // --- Helper to create Bar chart config --- 
+                const createBarChartConfig = (trendData: TrendData | undefined, label: string, bgColorLight: string, bgColorDark: string) => {
+                    if (!trendData || !trendData.labels || !trendData.data) {
+                        return { labels: [], datasets: [] };
+                    }
+                    return {
+                        labels: trendData.labels,
+                        datasets: [
+                            {
+                                label: label,
+                                data: trendData.data,
+                                backgroundColor: theme === 'light' ? bgColorLight : bgColorDark,
+                                borderRadius: 4,
+                            },
+                        ],
+                    };
+                };
+
+                // Predefined colors for Doughnut chart slices
+                const doughnutColorsLight = [
+                    '#a78bfa', '#f472b6', '#fbbf24', '#34d399', '#60a5fa', '#f87171', '#c084fc'
+                ];
+                const doughnutColorsDark = [
+                    '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#a855f7'
+                ];
+
+                // --- Configure Genre Doughnut Chart ---
+                if (data.genreDistribution && data.genreDistribution.length > 0) {
+                    const labels = data.genreDistribution.map((g: GenreDistribution) => g.genreName);
+                    const counts = data.genreDistribution.map((g: GenreDistribution) => g.trackCount);
+                    const backgroundColors = theme === 'light' ? doughnutColorsLight : doughnutColorsDark;
+                    
+                    setGenreChartData({
+                        labels: labels,
+                        datasets: [
+                            {
+                                data: counts,
+                                backgroundColor: backgroundColors.slice(0, counts.length),
+                                borderColor: theme === 'light' ? '#ffffff' : '#1f2937', // bg-white / gray-800
+                                borderWidth: 2,
+                            },
+                        ],
+                    });
+                } else {
+                     setGenreChartData({ labels: [], datasets: [] }); // Handle empty data
+                }
+
+                // --- Configure all charts --- 
                 const listenerData = [
                     data.monthlyListeners * 0.8,
                     data.monthlyListeners * 0.85,
@@ -164,10 +282,11 @@ export default function ArtistDetailedStats() {
                     data.monthlyListeners,
                 ].map(val => Math.max(0, Math.round(val)));
 
-                const chartConfig = {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                // Existing Listener Trend Chart Config (Example - you might need to adjust)
+                const listenerConfig = {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], // Use actual labels if available
                     datasets: [
-                        {
+                         {
                             label: 'Monthly Listeners',
                             data: listenerData,
                             fill: true,
@@ -192,7 +311,52 @@ export default function ArtistDetailedStats() {
                         },
                     ],
                 };
-                setChartData(chartConfig);
+                setChartData(listenerConfig); // Set existing chart data
+
+                // New Follower Trend Chart
+                setFollowerChartData(createLineChartConfig(
+                    data.followerTrend,
+                    'New Followers',
+                    '#10b981', // green-500
+                    '#34d399', // green-400
+                    ['rgba(16, 185, 129, 0.5)', 'rgba(16, 185, 129, 0)'], // bg light
+                    ['rgba(52, 211, 153, 0.5)', 'rgba(52, 211, 153, 0)']  // bg dark
+                ));
+
+                // New Like Trend Chart
+                setLikeChartData(createLineChartConfig(
+                    data.likeTrend,
+                    'Track Likes',
+                    '#ec4899', // pink-500
+                    '#f472b6', // pink-400
+                    ['rgba(236, 72, 153, 0.5)', 'rgba(236, 72, 153, 0)'], // bg light
+                    ['rgba(244, 114, 182, 0.5)', 'rgba(244, 114, 182, 0)'] // bg dark
+                ));
+
+                // New Playlist Add Trend Chart
+                setPlaylistAddChartData(createLineChartConfig(
+                    data.playlistAddTrend,
+                    'Playlist Adds',
+                    '#f59e0b', // amber-500
+                    '#fbbf24', // amber-400
+                    ['rgba(245, 158, 11, 0.5)', 'rgba(245, 158, 11, 0)'], // bg light
+                    ['rgba(251, 191, 36, 0.5)', 'rgba(251, 191, 36, 0)']  // bg dark
+                ));
+
+                // --- Configure Stream Bar charts --- 
+                setMonthlyStreamChartData(createBarChartConfig(
+                    data.monthlyStreamTrend,
+                    'Streams',
+                    '#60a5fa', // blue-400 light
+                    '#3b82f6'  // blue-500 dark
+                ));
+                 setYearlyStreamChartData(createBarChartConfig(
+                    data.yearlyStreamTrend,
+                    'Streams',
+                     '#a78bfa', // purple-400 light
+                     '#8b5cf6'  // purple-500 dark
+                ));
+
             } catch (err: any) {
                 console.error('Error fetching stats:', err);
                 setError(err.message || 'Failed to fetch stats. Please try again later.');
@@ -239,7 +403,9 @@ export default function ArtistDetailedStats() {
         );
     }
 
-    const chartOptions = {
+    // --- Chart Options --- 
+    // Options for Line charts
+    const lineChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
@@ -271,6 +437,98 @@ export default function ArtistDetailedStats() {
         interaction: {
             intersect: false,
             mode: 'index' as 'index',
+        },
+    };
+
+    // Options for Doughnut chart
+    const doughnutChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom' as 'bottom',
+                labels: {
+                    color: theme === 'light' ? '#374151' : '#d1d5db', // text-gray-700 / text-gray-300
+                    padding: 15,
+                    boxWidth: 12,
+                    font: {
+                        size: 12
+                    }
+                }
+            },
+            tooltip: {
+                backgroundColor: theme === 'light' ? '#111827' : '#ffffff',
+                titleColor: theme === 'light' ? '#ffffff' : '#111827',
+                bodyColor: theme === 'light' ? '#ffffff' : '#111827',
+                padding: 10,
+                cornerRadius: 4,
+                callbacks: {
+                    label: function(context: any) {
+                        let label = context.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        if (context.parsed !== null) {
+                            label += context.parsed + ' tracks';
+                        }
+                        return label;
+                    }
+                }
+            }
+        },
+        cutout: '60%', // Makes it a doughnut chart
+    };
+
+    // Options for Bar charts (can be similar to line, adjust tooltip)
+    const barChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+             y: {
+                beginAtZero: true,
+                grid: { color: theme === 'light' ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.1)' },
+                ticks: {
+                    color: theme === 'light' ? '#6b7280' : '#9ca3af', 
+                    padding: 10,
+                    // Optional: Format Y-axis ticks for large numbers
+                    callback: function(value: number | string) {
+                        if (typeof value === 'number' && value >= 1000) {
+                            return formatNumber(value); // Use existing helper
+                        }
+                        return value;
+                    }
+                },
+            },
+            x: {
+                grid: { display: false },
+                ticks: { color: theme === 'light' ? '#6b7280' : '#9ca3af', padding: 10 },
+            },
+        },
+        plugins: {
+            legend: {
+                display: false, // Often hidden for simple bar charts
+            },
+            tooltip: {
+                backgroundColor: theme === 'light' ? '#111827' : '#ffffff',
+                titleColor: theme === 'light' ? '#ffffff' : '#111827',
+                bodyColor: theme === 'light' ? '#ffffff' : '#111827',
+                padding: 10,
+                cornerRadius: 4,
+                displayColors: false,
+                callbacks: {
+                    label: function(context: any) {
+                        let label = context.dataset.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        if (context.parsed.y !== null) {
+                            // Format the number for the tooltip
+                            label += formatNumber(context.parsed.y); 
+                        }
+                        return label;
+                    }
+                }
+            },
         },
     };
 
@@ -336,19 +594,101 @@ export default function ArtistDetailedStats() {
                 />
             </div>
 
-            <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
-                <h3 className="text-xl font-semibold mb-4">Monthly Listener Trend</h3>
-                <div className="h-[300px] sm:h-[350px]">
-                    {chartData.datasets.length > 0 ? (
-                        <Line data={chartData} options={chartOptions} />
-                    ) : (
-                        <div className="flex items-center justify-center h-full text-gray-500">Loading chart...</div>
-                    )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
+                    <h3 className="text-xl font-semibold mb-1">Monthly Listener Trend</h3>
+                    <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Listeners over the last 12 months</p>
+                    <div className="h-[300px] sm:h-[350px]">
+                        {chartData.datasets.length > 0 ? (
+                            <Line data={chartData} options={lineChartOptions} />
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">Loading chart...</div>
+                        )}
+                    </div>
+                </div>
+
+                <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
+                    <h3 className="text-xl font-semibold mb-1">Genre Distribution</h3>
+                    <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Distribution of tracks across genres</p>
+                    <div className="h-[300px] sm:h-[350px] flex items-center justify-center">
+                        {genreChartData.datasets.length > 0 && genreChartData.datasets[0]?.data?.length > 0 ? (
+                            <Doughnut data={genreChartData} options={doughnutChartOptions} />
+                        ) : (
+                             <div className="flex items-center justify-center h-full text-gray-500">No genre data available.</div>
+                        )}
+                     </div>
+                </div>
+            </div>
+
+            {/* --- Stream Bar Charts Section (2 Columns) --- */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Monthly Streams */}
+                <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
+                    <h3 className="text-xl font-semibold mb-1">Streams by month</h3>
+                    <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Total streams per month</p>
+                    <div className="h-[300px]">
+                         {monthlyStreamChartData.datasets.length > 0 && monthlyStreamChartData.datasets[0]?.data?.length > 0 ? (
+                            <Bar data={monthlyStreamChartData} options={barChartOptions} />
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">No stream data available.</div>
+                        )}
+                    </div>
+                </div>
+                 {/* Yearly Streams */}
+                 <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
+                    <h3 className="text-xl font-semibold mb-1">Streams by year</h3>
+                    <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Total streams per year</p>
+                    <div className="h-[300px]">
+                         {yearlyStreamChartData.datasets.length > 0 && yearlyStreamChartData.datasets[0]?.data?.length > 0 ? (
+                            <Bar data={yearlyStreamChartData} options={barChartOptions} />
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">No stream data available.</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
+                    <h3 className="text-lg font-semibold mb-1">Followers</h3>
+                    <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>New followers in the last 6 months</p>
+                    <div className="h-[250px]">
+                        {followerChartData.datasets.length > 0 && followerChartData.datasets[0]?.data?.length > 0 ? (
+                            <Line data={followerChartData} options={lineChartOptions} />
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">No follower data available.</div>
+                        )}
+                    </div>
+                </div>
+
+                <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
+                    <h3 className="text-lg font-semibold mb-1">Favorite</h3>
+                    <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Track likes in the last 6 months</p>
+                    <div className="h-[250px]">
+                        {likeChartData.datasets.length > 0 && likeChartData.datasets[0]?.data?.length > 0 ? (
+                            <Line data={likeChartData} options={lineChartOptions} />
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">No like data available.</div>
+                        )}
+                    </div>
+                </div>
+
+                <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
+                    <h3 className="text-lg font-semibold mb-1">Playlist Adds </h3>
+                    <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Users adding tracks in the last 6 months</p>
+                    <div className="h-[250px]">
+                        {playlistAddChartData.datasets.length > 0 && playlistAddChartData.datasets[0]?.data?.length > 0 ? (
+                            <Line data={playlistAddChartData} options={lineChartOptions} />
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">No playlist add data available.</div>
+                        )}
+                    </div>
                 </div>
             </div>
 
             <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
-                <h3 className="text-xl font-semibold mb-4">Top Tracks</h3>
+                <h3 className="text-xl font-semibold mb-1">Top Tracks</h3>
+                <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Most played tracks overall</p>
                 {topTracks.length > 0 ? (
                     <ul className="space-y-4">
                         {topTracks.slice(0, 5).map((track, index) => (
@@ -392,11 +732,10 @@ export default function ArtistDetailedStats() {
                 )}
             </div>
 
-            {/* Top Listeners */}
             <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
                 <h3 className="text-xl font-semibold mb-1">Top listeners</h3>
                 <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
-                    People who listen a lot to {stats.artistName}
+                    People who listen a lot to {stats.artistName || 'this artist'}
                 </p>
                 {topListeners.length > 0 ? (
                     <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
@@ -427,55 +766,6 @@ export default function ArtistDetailedStats() {
                 )}
             </div>
 
-            {/* Followers */}
-            <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
-                <h3 className="text-xl font-semibold mb-4">Recent Followers</h3>
-                {followers.length > 0 ? (
-                    <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
-                        {followers.map((user) => (
-                            <div key={user.id} className="flex flex-col items-center text-center flex-shrink-0 w-24">
-                                <Link href={`/user/${user.id}`} className="block">
-                                    <Image
-                                        src={user.avatar || '/default-avatar.png'}
-                                        alt={user.name || user.username || 'User'}
-                                        width={64}
-                                        height={64}
-                                        className="rounded-full object-cover border border-gray-300 dark:border-gray-600 mb-2 w-16 h-16"
-                                    />
-                                    <span className="text-xs font-medium truncate w-full">{user.name || user.username}</span>
-                                </Link>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>No recent followers.</p>
-                )}
-            </div>
-
-            {/* Track Likers */}
-            <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
-                <h3 className="text-xl font-semibold mb-4">Recent Track Likers</h3>
-                {trackLikers.length > 0 ? (
-                    <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
-                        {trackLikers.map((user) => (
-                             <div key={user.id} className="flex flex-col items-center text-center flex-shrink-0 w-24">
-                                <Link href={`/user/${user.id}`} className="block">
-                                    <Image
-                                        src={user.avatar || '/default-avatar.png'}
-                                        alt={user.name || user.username || 'User'}
-                                        width={64}
-                                        height={64}
-                                        className="rounded-full object-cover border border-gray-300 dark:border-gray-600 mb-2 w-16 h-16"
-                                    />
-                                    <span className="text-xs font-medium truncate w-full">{user.name || user.username}</span>
-                                </Link>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>No recent track likers.</p>
-                )}
-            </div>
         </div>
     );
 }

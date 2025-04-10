@@ -1,4 +1,4 @@
-import { PrismaClient, Role, FollowingType, Album, Track, HistoryType } from '@prisma/client';
+import { PrismaClient, Role, FollowingType, Album, Track, HistoryType, Prisma } from '@prisma/client';
 import {
   artistProfileSelect,
   albumSelect,
@@ -7,6 +7,7 @@ import {
 } from '../utils/prisma-selects';
 import { client, setCache } from '../middleware/cache.middleware';
 import { uploadFile } from './upload.service';
+import { format } from 'date-fns';
 
 const prisma = new PrismaClient();
 
@@ -323,16 +324,36 @@ export class ArtistService {
 
     const artistProfileId = user.artistProfile.id;
 
+    // --- Calculate date ranges --- 
+    const endDate = new Date();
+    // For 6-month trends
+    const trendStartDate6M = new Date();
+    trendStartDate6M.setMonth(trendStartDate6M.getMonth() - 6);
+    trendStartDate6M.setDate(1);
+    trendStartDate6M.setHours(0, 0, 0, 0);
+    // For 12-month stream trend
+    const trendStartDate12M = new Date();
+    trendStartDate12M.setMonth(trendStartDate12M.getMonth() - 12);
+    trendStartDate12M.setDate(1);
+    trendStartDate12M.setHours(0, 0, 0, 0);
+     // For 5-year stream trend
+    const trendStartDate5Y = new Date();
+    trendStartDate5Y.setFullYear(trendStartDate5Y.getFullYear() - 5);
+    trendStartDate5Y.setMonth(0, 1); // Start of the year
+    trendStartDate5Y.setHours(0, 0, 0, 0);
+
+    // Fetch main artist stats and trend data points
     const [
         artistData,
         totalPlaysData,
         albumsData,
         topTracksData,
-        listenerHistory,
-        followersData,
-        trackLikersData,
-        artistGenresData
+        listenerHistory, // Should use trendStartDate6M or adjust range
+        followerRecords,
+        likeRecords,
+        playlistAddRecords
     ] = await Promise.all([
+      // Artist Profile Data
       prisma.artistProfile.findUnique({
         where: { id: artistProfileId },
         select: {
@@ -343,17 +364,19 @@ export class ArtistService {
             select: {
               albums: { where: { isActive: true } },
               tracks: { where: { isActive: true } },
-              followers: { where: { followingType: FollowingType.ARTIST } },
+              followers: { where: { followingType: FollowingType.ARTIST } }, // Total follower count
             },
           },
         },
       }),
+      // Total Plays
       prisma.track.aggregate({
         where: { artistId: artistProfileId, isActive: true },
         _sum: {
           playCount: true,
         },
       }),
+      // Albums for top album calculation
       prisma.album.findMany({
         where: {
           artistId: artistProfileId,
@@ -372,6 +395,7 @@ export class ArtistService {
           },
         },
       }),
+      // Top Tracks
       prisma.track.findMany({
         where: { artistId: artistProfileId, isActive: true },
         select: {
@@ -390,6 +414,7 @@ export class ArtistService {
         orderBy: { playCount: 'desc' },
         take: 5,
       }),
+      // Listener History for Top Listeners
       prisma.history.groupBy({
         by: ['userId'],
         where: {
@@ -400,9 +425,13 @@ export class ArtistService {
           },
           user: {
             isActive: true,
-          }
+          },
+           createdAt: { // Using 6 month window for top listeners
+             gte: trendStartDate6M, 
+             lte: endDate,
+            }
         },
-        _sum: {
+         _sum: {
           playCount: true,
         },
         orderBy: {
@@ -412,62 +441,57 @@ export class ArtistService {
         },
         take: 7,
       }),
+      // Follower records for trend (6 months)
       prisma.userFollow.findMany({
         where: {
           followingArtistId: artistProfileId,
           followingType: FollowingType.ARTIST,
-          follower: {
-            isActive: true,
-          }
+          createdAt: {
+            gte: trendStartDate6M,
+            lte: endDate,
+          },
         },
         select: {
-          follower: {
-            select: userSelect,
-          },
+          createdAt: true,
         },
-        orderBy: {
-          createdAt: 'desc',
-        },
-        take: 10,
       }),
+      // Like records for trend (6 months)
       prisma.userLikeTrack.findMany({
-          where: {
-              track: {
-                  artistId: artistProfileId,
-                  isActive: true,
-              },
-              user: {
-                  isActive: true,
-              }
-          },
-          select: {
-              user: {
-                  select: userSelect,
-              },
-              createdAt: true,
-          },
-          orderBy: {
-              createdAt: 'desc',
-          },
-          distinct: ['userId'],
-          take: 10,
-      }),
-      prisma.trackGenre.findMany({
         where: {
           track: {
             artistId: artistProfileId,
             isActive: true,
+          },
+          createdAt: {
+            gte: trendStartDate6M,
+            lte: endDate,
+          },
+        },
+        select: {
+          createdAt: true,
+        },
+      }),
+      // Playlist add records for trend (6 months)
+      prisma.playlistTrack.findMany({
+        where: {
+          track: {
+            artistId: artistProfileId,
+            isActive: true,
+          },
+          addedAt: {
+            gte: trendStartDate6M,
+            lte: endDate,
+          },
+          playlist: {
+            userId: { not: null },
           }
         },
         select: {
-          genre: {
-            select: {
-              id: true,
-              name: true,
-            }
+          addedAt: true,
+          playlist: {
+            select: { userId: true }
           }
         },
-        distinct: ['genreId'],
       }),
     ]);
 
@@ -475,6 +499,45 @@ export class ArtistService {
       throw new Error('Artist profile not found');
     }
 
+    // --- Fetch Stream Trends Separately (using groupBy for efficiency) ---
+    const monthlyStreamDataPromise = prisma.history.groupBy({
+      by: ['createdAt'], // Group by the full date initially
+      where: {
+        type: HistoryType.PLAY,
+        track: { artistId: artistProfileId, isActive: true },
+        createdAt: {
+          gte: trendStartDate12M,
+          lte: endDate,
+        },
+      },
+      _sum: {
+        playCount: true,
+      },
+      orderBy: {
+        createdAt: 'asc', 
+      }
+    });
+
+    const yearlyStreamDataPromise = prisma.history.groupBy({
+      by: ['createdAt'], // Group by the full date initially
+      where: {
+        type: HistoryType.PLAY,
+        track: { artistId: artistProfileId, isActive: true },
+        createdAt: {
+          gte: trendStartDate5Y,
+          lte: endDate,
+        },
+      },
+      _sum: {
+        playCount: true,
+      },
+       orderBy: {
+        createdAt: 'asc', 
+      }
+    });
+
+    // --- Process Top Listeners, Albums etc. --- 
+    // --- Process Top Listeners ---
     const topListenerIds = listenerHistory.map(item => item.userId);
     const topListenersDetails = topListenerIds.length > 0 ? await prisma.user.findMany({
         where: { id: { in: topListenerIds } },
@@ -489,7 +552,7 @@ export class ArtistService {
         };
     }).filter(listener => listener.id);
 
-    // Tính tổng lượt nghe cho mỗi album và sắp xếp
+    // --- Process Top Albums ---
     const albumsWithTotalPlays = albumsData.map((album: { id: string; title: string; coverUrl: string | null; tracks: { playCount: number | null }[] }) => {
       const totalAlbumPlays = album.tracks.reduce((sum: number, track: { playCount: number | null }) => sum + (track.playCount || 0), 0);
       return {
@@ -499,8 +562,6 @@ export class ArtistService {
         totalPlays: totalAlbumPlays,
       };
     });
-
-    // Sắp xếp albums theo tổng lượt nghe và lấy top 5
     const topAlbums = albumsWithTotalPlays
       .sort((a, b) => b.totalPlays - a.totalPlays)
       .slice(0, 5);
@@ -508,12 +569,181 @@ export class ArtistService {
     const followerCount = artistData._count.followers;
     const totalPlays = totalPlaysData._sum.playCount || 0;
 
-    // Trích xuất thông tin followers và track likers
-    const followers = followersData.map(f => f.follower);
-    const trackLikers = trackLikersData.map(l => l.user);
+    // --- Process 6-Month Trends --- 
+    const processTotalCountTrend6M = (records: { createdAt?: Date, addedAt?: Date }[], dateField: 'createdAt' | 'addedAt') => {
+      const monthlyCounts: { [key: string]: number } = {};
+      const labels: string[] = [];
+      const data: number[] = [];
+      const monthFormatter = new Intl.DateTimeFormat('en', { month: 'short' });
 
-    // Extract genres from the new query result
-    const genres = artistGenresData.map(tg => tg.genre);
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(endDate);
+        date.setMonth(endDate.getMonth() - i);
+        const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const label = monthFormatter.format(date);
+        monthlyCounts[yearMonth] = 0;
+        labels.push(label);
+      }
+      
+      records.forEach(record => {
+        const recordDate = record[dateField];
+        if (recordDate) {
+          const yearMonth = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
+          if (monthlyCounts[yearMonth] !== undefined) {
+            monthlyCounts[yearMonth] += 1; // Increment count
+          }
+        }
+      });
+
+      labels.forEach((_, index) => {
+        const date = new Date(endDate);
+        date.setMonth(endDate.getMonth() - (5 - index));
+        const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        data.push(monthlyCounts[yearMonth] || 0);
+      });
+
+      return { labels, data };
+    };
+    const processUniqueUserTrend6M = (records: { addedAt?: Date; playlist?: { userId: string | null } }[]) => {
+      const monthlyUserSets: { [key: string]: Set<string> } = {};
+      const labels: string[] = [];
+      const data: number[] = [];
+      const monthFormatter = new Intl.DateTimeFormat('en', { month: 'short' });
+
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(endDate);
+        date.setMonth(endDate.getMonth() - i);
+        const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const label = monthFormatter.format(date);
+        monthlyUserSets[yearMonth] = new Set<string>();
+        labels.push(label);
+      }
+      
+      records.forEach(record => {
+        const recordDate = record.addedAt;
+        const userId = record.playlist?.userId;
+        if (recordDate && userId) {
+          const yearMonth = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
+          if (monthlyUserSets[yearMonth]) {
+            monthlyUserSets[yearMonth].add(userId);
+          }
+        }
+      });
+
+      labels.forEach((_, index) => {
+        const date = new Date(endDate);
+        date.setMonth(endDate.getMonth() - (5 - index));
+        const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        data.push(monthlyUserSets[yearMonth]?.size || 0);
+      });
+
+      return { labels, data };
+    };
+    const followerTrend = processTotalCountTrend6M(followerRecords, 'createdAt');
+    const likeTrend = processTotalCountTrend6M(likeRecords, 'createdAt');
+    const playlistAddTrend = processUniqueUserTrend6M(playlistAddRecords);
+
+    // --- Fetch and Process Genre Distribution Data (Added Separately) --- 
+    type GenreCountResult = { genreId: string; _count: { trackId: number } };
+    const genreCounts = await prisma.trackGenre.groupBy({
+        by: ['genreId'],
+        where: {
+          track: {
+            artistId: artistProfileId,
+            isActive: true,
+          }
+        },
+        _count: {
+          trackId: true,
+        },
+        orderBy: {
+          _count: {
+            trackId: 'desc'
+          }
+        }
+      });
+
+    let genreDistribution: { genreName: string; trackCount: number }[] = [];
+    if (genreCounts.length > 0) {
+      const genreIds = genreCounts.map(gc => gc.genreId);
+      const genreDetails = await prisma.genre.findMany({
+        where: { id: { in: genreIds } },
+        select: { id: true, name: true }
+      });
+      const genreMap = new Map(genreDetails.map(g => [g.id, g.name]));
+      genreDistribution = genreCounts.map(gc => ({
+          genreName: genreMap.get(gc.genreId) || 'Unknown',
+          trackCount: gc._count.trackId,
+        })).filter(g => g.genreName !== 'Unknown');
+    }
+    // --- End Genre Distribution ---
+
+    // --- Process Stream Trends --- 
+    const [monthlyStreamData, yearlyStreamData] = await Promise.all([
+        monthlyStreamDataPromise,
+        yearlyStreamDataPromise
+    ]);
+
+    // Helper to process grouped stream data (monthly or yearly)
+    const processStreamTrend = (streamData: { createdAt: Date; _sum: { playCount: number | null } }[], months: number, unit: 'month' | 'year') => {
+      const counts: { [key: string]: number } = {};
+      const labels: string[] = [];
+      const data: number[] = [];
+      const now = new Date();
+
+      // Initialize counts and labels
+      for (let i = months - 1; i >= 0; i--) {
+        const date = new Date(now);
+        if (unit === 'month') {
+            date.setMonth(now.getMonth() - i);
+            const key = format(date, 'yyyy-MM');
+            const label = format(date, 'MMM');
+            counts[key] = 0;
+            labels.push(label);
+        } else { // year
+             date.setFullYear(now.getFullYear() - i);
+             const key = format(date, 'yyyy');
+             const label = key;
+             counts[key] = 0;
+             labels.push(label);
+        }
+      }
+
+      // Aggregate counts from query results
+      streamData.forEach(item => {
+        const playCount = item._sum.playCount || 0;
+         if (unit === 'month') {
+            const key = format(item.createdAt, 'yyyy-MM');
+            if (counts[key] !== undefined) {
+                counts[key] += playCount;
+            }
+         } else { // year
+             const key = format(item.createdAt, 'yyyy');
+             if (counts[key] !== undefined) {
+                 counts[key] += playCount;
+             }
+         }
+      });
+
+       // Populate data array
+       labels.forEach((label, index) => {
+            const date = new Date(now);
+            let key = '';
+             if (unit === 'month') {
+                date.setMonth(now.getMonth() - (months - 1 - index));
+                key = format(date, 'yyyy-MM');
+             } else { // year
+                 date.setFullYear(now.getFullYear() - (months - 1 - index));
+                 key = format(date, 'yyyy');
+             }
+             data.push(counts[key] || 0);
+       });
+
+      return { labels, data };
+    };
+
+    const monthlyStreamTrend = processStreamTrend(monthlyStreamData, 12, 'month');
+    const yearlyStreamTrend = processStreamTrend(yearlyStreamData, 5, 'year');
 
     return {
       artistName: artistData.artistName,
@@ -526,9 +756,13 @@ export class ArtistService {
       topTracks: topTracksData,
       topAlbums: topAlbums,
       topListeners: topListeners,
-      followers: followers,
-      trackLikers: trackLikers,
-      genres: genres,
+      followerTrend,
+      likeTrend,
+      playlistAddTrend,
+      genreDistribution,
+      // --- Add Stream Trends ---
+      monthlyStreamTrend,
+      yearlyStreamTrend,
     };
   }
 
