@@ -294,7 +294,6 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
       select: userSelect,
     });
 
-    console.log(userData);
     res.json(userData);
   } catch (error) {
     console.error("Get me error:", error);

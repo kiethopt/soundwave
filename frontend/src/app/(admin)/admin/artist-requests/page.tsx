@@ -137,32 +137,46 @@ export default function ArtistRequestManagement() {
     }
   };
 
-  const handleBulkRejectClick = () => {
-    if (!selectedRows.length)
+  const handleBulkDelete = async () => {
+    if (!selectedRows.length) {
+      toast.error('No requests selected for deletion.');
       return;
-    setIsRejectModalOpen(true);
-  };
+    }
 
-  const handleBulkRejectConfirm = async (reason: string) => {
+    if (
+      !confirm(
+        `Are you sure you want to permanently delete ${selectedRows.length} selected request(s)? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication token not found.');
+      return;
+    }
+
+    const deletePromises = selectedRows.map((row) =>
+      api.admin.deleteArtistRequest(row.id, token)
+    );
+
     try {
-      setIsRejectModalOpen(false);
+      await Promise.all(deletePromises);
 
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-
-      await Promise.all(
-        selectedRows.map((row) =>
-          api.admin.rejectArtistRequest(row.id, reason, token)
-        )
-      );
-
+      // Update local state after successful deletion
       setRequests((prev) =>
         prev.filter((req) => !selectedRows.some((row) => row.id === req.id))
       );
-      setSelectedRows([]);
-      toast.success(`Rejected ${selectedRows.length} requests successfully`);
+      setSelectedRows([]); // Clear selection
+      toast.success(`Deleted ${selectedRows.length} requests successfully.`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Rejection failed');
+      console.error('Bulk delete error:', err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete some or all selected requests.'
+      );
     }
   };
 
@@ -271,7 +285,7 @@ export default function ArtistRequestManagement() {
           searchValue: searchInput,
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
-          onDelete: handleBulkRejectClick,
+          onDelete: handleBulkDelete,
           showExport: true,
           exportData: {
             data: requests,
@@ -291,16 +305,14 @@ export default function ArtistRequestManagement() {
         }}
       />
 
-      {/* Rejection Reason Modal */}
+      {/* Rejection Reason Modal (Only for single reject) */}
       <RejectModal
-        isOpen={isRejectModalOpen}
+        isOpen={isRejectModalOpen && !!requestIdToReject}
         onClose={() => {
           setIsRejectModalOpen(false);
           setRequestIdToReject(null);
         }}
-        onConfirm={
-          requestIdToReject ? handleRejectConfirm : handleBulkRejectConfirm
-        }
+        onConfirm={handleRejectConfirm}
         theme={theme === 'dark' ? 'dark' : 'light'}
       />
     </div>

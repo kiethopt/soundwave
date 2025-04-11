@@ -12,7 +12,6 @@ export const createAlbum = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-// Các hàm khác giữ nguyên...
 export const addTracksToAlbum = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await albumService.addTracksToAlbum(req);

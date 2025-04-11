@@ -15,6 +15,7 @@ import {
   rejectArtistRequest,
   getArtistRequestDetail,
   deleteArtist,
+  deleteArtistRequest,
   updateArtist,
   handleCacheStatus,
   handleAIModelStatus,
@@ -102,6 +103,14 @@ router.get(
   authorize([Role.ADMIN]),
   cacheMiddleware,
   getArtistRequestDetail
+);
+
+// Thêm route DELETE cho artist requests
+router.delete(
+  '/artist-requests/:id',
+  authenticate,
+  authorize([Role.ADMIN]),
+  deleteArtistRequest // Tham chiếu đến controller function mới
 );
 
 // Quản lý thể loại nhạc

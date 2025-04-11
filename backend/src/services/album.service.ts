@@ -7,7 +7,6 @@ import * as emailService from './email.service';
 import { paginate } from 'src/utils/handle-utils';
 import { getIO } from '../config/socket';
 
-// Hàm utility từ controller trước đó
 const canManageAlbum = (user: any, albumArtistId: string): boolean => {
   if (!user) return false;
   if (user.role === Role.ADMIN) return true;
@@ -28,7 +27,6 @@ const validateAlbumData = (data: any): string | null => {
   return null;
 };
 
-// Các hàm service đã có
 export const deleteAlbumById = async (id: string) => {
   const album = await prisma.album.findUnique({
     where: { id },
@@ -121,7 +119,6 @@ export const getAllAlbums = async (req: Request) => {
   };
 };
 
-// Các hàm service mới từ controller
 export const createAlbum = async (req: Request) => {
   const user = req.user;
   if (!user) throw new Error('Forbidden');

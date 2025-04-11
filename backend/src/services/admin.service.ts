@@ -460,6 +460,29 @@ export const rejectArtistRequest = async (requestId: string) => {
   };
 };
 
+// Service function to delete an artist request without rejection logic
+export const deleteArtistRequest = async (requestId: string) => {
+  const artistProfile = await prisma.artistProfile.findFirst({
+    where: {
+      id: requestId,
+      verificationRequestedAt: { not: null },
+      isVerified: false,
+    },
+  });
+
+  if (!artistProfile) {
+    throw new Error('Artist request not found or already verified/rejected');
+  }
+
+  // Directly delete the profile
+  await prisma.artistProfile.delete({
+    where: { id: requestId },
+  });
+
+  // No return value needed, or maybe return the deleted profile ID
+  return { deletedRequestId: requestId };
+};
+
 // Stats services
 export const getSystemStats = async () => {
   // Sử dụng Promise.all để thực hiện đồng thời các truy vấn

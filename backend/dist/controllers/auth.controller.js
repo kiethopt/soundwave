@@ -256,7 +256,6 @@ const getMe = async (req, res) => {
             where: { id: user.id },
             select: prisma_selects_1.userSelect,
         });
-        console.log(userData);
         res.json(userData);
     }
     catch (error) {

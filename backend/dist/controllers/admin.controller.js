@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleAIModelStatus = exports.handleMaintenanceMode = exports.handleCacheStatus = exports.getStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.handleAIModelStatus = exports.handleMaintenanceMode = exports.handleCacheStatus = exports.getStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const db_1 = __importDefault(require("../config/db"));
 const adminService = __importStar(require("../services/admin.service"));
@@ -515,6 +515,24 @@ const rejectArtistRequest = async (req, res) => {
     }
 };
 exports.rejectArtistRequest = rejectArtistRequest;
+const deleteArtistRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await adminService.deleteArtistRequest(id);
+        res.json({ message: 'Artist request deleted successfully' });
+    }
+    catch (error) {
+        if (error instanceof Error &&
+            error.message.includes('not found or already verified/rejected')) {
+            res
+                .status(404)
+                .json({ message: 'Artist request not found or already verified/rejected' });
+            return;
+        }
+        (0, handle_utils_1.handleError)(res, error, 'Delete artist request');
+    }
+};
+exports.deleteArtistRequest = deleteArtistRequest;
 const getStats = async (req, res) => {
     try {
         const statsData = await adminService.getSystemStats();

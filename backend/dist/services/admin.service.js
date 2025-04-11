@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateMaintenanceMode = exports.updateAIModel = exports.updateCacheStatus = exports.getSystemStats = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.updateMaintenanceMode = exports.updateAIModel = exports.updateCacheStatus = exports.getSystemStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
@@ -401,6 +401,23 @@ const rejectArtistRequest = async (requestId) => {
     };
 };
 exports.rejectArtistRequest = rejectArtistRequest;
+const deleteArtistRequest = async (requestId) => {
+    const artistProfile = await db_1.default.artistProfile.findFirst({
+        where: {
+            id: requestId,
+            verificationRequestedAt: { not: null },
+            isVerified: false,
+        },
+    });
+    if (!artistProfile) {
+        throw new Error('Artist request not found or already verified/rejected');
+    }
+    await db_1.default.artistProfile.delete({
+        where: { id: requestId },
+    });
+    return { deletedRequestId: requestId };
+};
+exports.deleteArtistRequest = deleteArtistRequest;
 const getSystemStats = async () => {
     const stats = await Promise.all([
         db_1.default.user.count({ where: { role: client_1.Role.USER } }),

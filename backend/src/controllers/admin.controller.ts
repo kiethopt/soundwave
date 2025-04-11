@@ -663,6 +663,29 @@ export const rejectArtistRequest = async (
   }
 };
 
+// Delete an artist request directly - ADMIN only
+export const deleteArtistRequest = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await adminService.deleteArtistRequest(id);
+    res.json({ message: 'Artist request deleted successfully' });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes('not found or already verified/rejected')
+    ) {
+      res
+        .status(404)
+        .json({ message: 'Artist request not found or already verified/rejected' });
+      return;
+    }
+    handleError(res, error, 'Delete artist request');
+  }
+};
+
 // Lấy thông số tổng quan để thống kê - ADMIN only
 export const getStats = async (req: Request, res: Response): Promise<void> => {
   try {

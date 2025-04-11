@@ -477,6 +477,13 @@ export const api = {
         token
       );
     },
+
+    // Delete an artist request
+    deleteArtistRequest: async (requestId: string, token: string) => {
+      return fetchWithAuth(`/api/admin/artist-requests/${requestId}`, {
+        method: 'DELETE',
+      }, token);
+    },
   },
 
   user: {
