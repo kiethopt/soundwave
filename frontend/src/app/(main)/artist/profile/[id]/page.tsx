@@ -8,7 +8,7 @@ import { Album, AlbumType, ArtistProfile, Track } from '@/types';
 import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
 import { useDominantColor } from '@/hooks/useDominantColor';
-import { Verified, Play, Pause, Edit } from '@/components/ui/Icons';
+import { Verified, Play, Pause, Edit, Up, Down } from '@/components/ui/Icons';
 import { ArrowLeft } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
 import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
@@ -570,7 +570,7 @@ export default function ArtistProfilePage({
           </div>
 
           {/* Track Section */}
-          <div className="px-4 md:px-6 py-6 flex flex-col-reverse md:flex-row gap-4 lg:gap-12">
+          <div className="px-4 md:px-6 py-6 flex flex-col-reverse lg:flex-row gap-4 lg:gap-12">
             {tracks.length > 0 && (
               <div className="flex-grow mt-4 md:mt-0">
                 <h2 className="text-2xl font-bold">Popular Tracks</h2>
@@ -595,20 +595,24 @@ export default function ArtistProfilePage({
 
                 {/* "See More" Button */}
                 {tracks.length > 5 && (
-                  <div className="mt-4">
-                    <button
-                      onClick={() => setShowAllTracks(!showAllTracks)}
-                      className="text-[#A57865] hover:underline"
-                    >
-                      {showAllTracks ? 'See Less' : 'See More'}
-                    </button>
-                  </div>
+                  <Button
+                    variant="link"
+                    className="flex items-center gap-2 mt-4"
+                    onClick={() => setShowAllTracks((prev) => !prev)}
+                  >
+                    {showAllTracks ? (
+                      <Up className="w-4 h-4" />
+                    ) : (
+                      <Down className="w-4 h-4" />
+                    )}
+                      {showAllTracks ? 'See less' : 'See all'}
+                  </Button>
                 )}
               </div>
             )}
 
             {/* About Section */}
-            <div className="flex-grow">
+            <div className="flex-grow md:max-w-lg">
               <div className="flex items-center gap-4">
                 <h2 className="text-2xl font-bold">About</h2>
               </div>
@@ -670,7 +674,7 @@ export default function ArtistProfilePage({
                 {relatedArtists.map((relatedArtist) => (
                   <div
                     key={relatedArtist.id}
-                    className="hover:bg-white/5 p-4 rounded-lg group relative w-full"
+                    className="hover:bg-white/5 p-4 rounded-lg group relative w-full "
                     onClick={() =>
                       router.push(`/artist/profile/${relatedArtist.id}`)
                     }
@@ -698,7 +702,9 @@ export default function ArtistProfilePage({
                       </button>
                     </div>
                     <h3
-                      className={`font-medium truncate dark:text-white ${
+                      className={`font-medium truncate ${
+                        theme === 'light' ? 'text-neutral-800' : 'text-white'
+                      } ${
                         artistTracksMap[relatedArtist.id]?.some(
                           (track) => track.id === currentTrack?.id
                         ) && queueType === 'artist'
@@ -708,7 +714,11 @@ export default function ArtistProfilePage({
                     >
                       {relatedArtist.artistName}
                     </h3>
-                    <p className="text-black/60 text-sm truncate dark:text-white/60">
+                    <p className={`text-sm truncate ${
+                      theme === 'light' 
+                      ? 'text-neutral-600' 
+                      : 'text-white/60'}`}
+                    >
                       {new Intl.NumberFormat('en-US').format(
                         relatedArtist.monthlyListeners
                       )}{' '}

@@ -250,7 +250,7 @@ export default function DiscoveryGenrePage({
                 Most Streamed {genreName} Artists
               </h2>
               <button 
-                className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
+                className="flex items-center text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
                 onClick={() => router.push(`/genre/${id}/artists`)}
               >
                 See all<Right className="w-3 h-3 inline-block ml-1" />
@@ -261,7 +261,7 @@ export default function DiscoveryGenrePage({
               {topArtists.map((artist) => (
                 <div
                   key={artist.id}
-                  className="bg-white/5 hover:bg-white/10 p-4 rounded-xl group cursor-pointer transition-all duration-300"
+                  className="hover:bg-white/10 p-4 rounded-xl group cursor-pointer transition-all duration-300"
                   onClick={() => router.push(`/artist/profile/${artist.id}`)}
                 >
                   <div className="relative overflow-hidden">
@@ -285,9 +285,9 @@ export default function DiscoveryGenrePage({
                       aria-label={isArtistPlaying(artist.id, 'topArtist') ? "Pause" : "Play"}
                     >
                       {isArtistPlaying(artist.id, 'topArtist') ? (
-                        <Pause className="w-6 h-6 text-white" />
+                        <Pause className="w-5 h-5 text-white" />
                       ) : (
-                        <Play className="w-6 h-6 text-white ml-0.5" />
+                        <Play className="w-5 h-5 text-white ml-0.5" />
                       )}
                     </button>
                   </div>
@@ -317,7 +317,7 @@ export default function DiscoveryGenrePage({
                 Most Listened {genreName} Tracks
               </h2>
               <button 
-                className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
+                className="flex items-center text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
                 onClick={() => router.push(`/genre/${id}/tracks`)}
               >
                 See all<Right className="w-3 h-3 inline-block ml-1" />
@@ -345,15 +345,15 @@ export default function DiscoveryGenrePage({
                         e.stopPropagation();
                         handleTrackPlay(track, 'topTracks', topTracks);
                       }}
-                      className="absolute bottom-2.5 left-2.5 p-2.5 rounded-full bg-[#A57865] shadow-md 
+                      className="absolute bottom-2 left-2 p-2 rounded-full bg-[#A57865] shadow-md 
                                opacity-0 group-hover:opacity-100 transition-all duration-300 
                                hover:bg-[#8D6553]"
                       aria-label={isTrackPlaying(track.id) ? "Pause" : "Play"}
                     >
                       {isTrackPlaying(track.id) && section === 'topTracks' ? (
-                        <Pause className="w-5 h-5 text-white" />
+                        <Pause className="w-4 h-4 text-white" />
                       ) : (
-                        <Play className="w-5 h-5 text-white ml-0.5" />
+                        <Play className="w-4 h-4 text-white ml-0.5" />
                       )}
                     </button>
                     
@@ -482,7 +482,7 @@ export default function DiscoveryGenrePage({
                 {genreName} New Releases
               </h2>
               <button 
-                className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
+                className="flex items-center text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
                 onClick={() => router.push(`/genre/${id}/tracks`)}
               >
                 See all<Right className="w-3 h-3 inline-block ml-1" />
@@ -510,15 +510,15 @@ export default function DiscoveryGenrePage({
                         e.stopPropagation();
                         handleTrackPlay(track, 'newestTracks', newestTracks);
                       }}
-                      className="absolute bottom-2.5 left-2.5 p-2.5 rounded-full bg-[#A57865] shadow-md 
+                      className="absolute bottom-2 left-2 p-2 rounded-full bg-[#A57865] shadow-md 
                                opacity-0 group-hover:opacity-100 transition-all duration-300 
                                hover:bg-[#8D6553]"
                       aria-label={isTrackPlaying(track.id) ? "Pause" : "Play"}
                     >
                       {isTrackPlaying(track.id) && section === 'newestTracks' ? (
-                        <Pause className="w-5 h-5 text-white" />
+                        <Pause className="w-4 h-4 text-white" />
                       ) : (
-                        <Play className="w-5 h-5 text-white ml-0.5" />
+                        <Play className="w-4 h-4 text-white" />
                       )}
                     </button>
                     
@@ -646,7 +646,7 @@ export default function DiscoveryGenrePage({
                 Popular {genreName} Albums
               </h2>
               <button 
-                className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
+                className="flex items-center text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
                 onClick={() => router.push(`/genre/${id}/albums`)}
               >
                 See all<Right className="w-3 h-3 inline-block ml-1" />
@@ -671,7 +671,7 @@ export default function DiscoveryGenrePage({
                         event.stopPropagation();
                         handleAlbumPlay(album);
                       }}
-                      className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute bottom-2 right-2 p-2 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       {currentTrack &&
                       album.tracks.some(
@@ -679,9 +679,9 @@ export default function DiscoveryGenrePage({
                       ) &&
                       isPlaying &&
                       queueType === 'album' ? (
-                        <Pause className="w-6 h-6 text-white" />
+                        <Pause className="w-4 h-4 text-white" />
                       ) : (
-                        <Play className="w-6 h-6 text-white" />
+                        <Play className="w-4 h-4 text-white" />
                       )}
                     </button>
                   </div>

@@ -19,12 +19,14 @@ import { QueuePanel } from '@/components/user/player/QueuePanel';
 import { api } from '@/utils/api';
 import { toast } from 'react-hot-toast';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
+import { useRouter } from 'next/navigation';
 
 export default function PlayerBar() {
   const [showMobileExpanded, setShowMobileExpanded] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const router = useRouter();
 
   const {
     currentTrack,
@@ -110,7 +112,7 @@ export default function PlayerBar() {
   return (
     <>
       {/* Desktop & Tablet Player Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#1c1c1c] p-4 grid-cols-5 gap-4 items-center w-full hidden md:grid">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#1c1c1c] p-3 px-4 grid-cols-5 gap-4 items-center w-full hidden md:grid">
         {/* Track Info */}
         <div className="flex items-center col-span-1 overflow-hidden">
           {currentTrack && (
@@ -121,10 +123,16 @@ export default function PlayerBar() {
                 className="w-12 h-12 rounded"
               />
               <div className="ml-4 flex-1 overflow-hidden">
-                <h3 className="text-white font-medium text-ellipsis overflow-hidden whitespace-nowrap">
+                <h3 
+                  className="text-white font-medium text-ellipsis overflow-hidden whitespace-nowrap hover:underline cursor-pointer underline-offset-2"
+                  onClick={() => {router.push(`/track/${currentTrack.id}`)}}
+                >
                   {currentTrack.title}
                 </h3>
-                <p className="text-white/60 text-sm text-ellipsis overflow-hidden whitespace-nowrap">
+                <p 
+                  className="text-white/60 text-sm text-ellipsis overflow-hidden whitespace-nowrap hover:underline cursor-pointer underline-offset-2"
+                  onClick={() => {router.push(`/artist/profile/${currentTrack.artist.id}`)}}
+                >
                   {typeof currentTrack.artist === 'string'
                     ? currentTrack.artist
                     : currentTrack.artist.artistName}
@@ -147,7 +155,7 @@ export default function PlayerBar() {
         </div>
 
         {/* Track Controls */}
-        <div className="flex flex-col items-center justify-center col-span-3 space-y-4">
+        <div className="flex flex-col items-center justify-center col-span-3 space-y-2">
           {/* Track Controls */}
           <div className="flex items-center space-x-4">
             {/* Shuffle Button */}

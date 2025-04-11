@@ -4,6 +4,10 @@ import React, { Suspense, useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
+import { Label } from '@/components/ui/label';
+import { UserIcon } from '@/components/ui/Icons';
+import { Input } from '@/components/ui/input';
+import { useTheme } from '@/contexts/ThemeContext';
 
 function LoadingUI() {
   return (
@@ -14,13 +18,16 @@ function LoadingUI() {
 }
 
 function EditProfileContent() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [avatar, setAvatar] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const router = useRouter();
+  const { theme } = useTheme();
+  const [userData, setUserData] = useState({
+    name: '',
+    email: '',
+    username: '',
+    password: '',
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -44,10 +51,10 @@ function EditProfileContent() {
       }
 
       const formDataObj = new FormData();
-      formDataObj.append('email', email);
-      formDataObj.append('username', username);
-      formDataObj.append('name', name);
-      formDataObj.append('password', password);
+      formDataObj.append('email', userData.email);
+      formDataObj.append('username', userData.username);
+      formDataObj.append('name', userData.name);
+      formDataObj.append('password', userData.password);
 
       // Append avatar file if selected
       if (avatarFile) {
@@ -70,13 +77,15 @@ function EditProfileContent() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('userToken');
-      const storedUserData = localStorage.getItem('userData');
+      const storedUserData = JSON.parse(localStorage.getItem('userData') || '{}');
       if (storedUserData) {
-        const parsedUserData = JSON.parse(storedUserData);
-        setName(parsedUserData.name);
-        setEmail(parsedUserData.email);
-        setAvatar(parsedUserData.avatar || '');
-        setUsername(parsedUserData.username || '');
+        setUserData({
+          name: storedUserData.name,
+          email: storedUserData.email,
+          username: storedUserData.username,
+          password: storedUserData.password,
+        });
+        setAvatar(storedUserData.avatar || '');
       }
 
       if (!token || !storedUserData) {
@@ -120,61 +129,82 @@ function EditProfileContent() {
           onSubmit={(e) => e.preventDefault()}
           className=" w-full flex-1 space-y-6"
         >
-          {/* Username */}
-          <div>
-            <label
-              htmlFor="username"
-              className="block text-sm font-medium text-white/70 mb-2"
-            >
-              Username
-            </label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              value={username}
-              required
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
-            />
-          </div>
-
-          {/* Email */}
-          <div>
-            <label
+          {/* Email (now first and read-only) */}
+          <div className="space-y-3">
+            <Label
               htmlFor="email"
               className="block text-sm font-medium text-white/70 mb-2"
             >
               Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
-              required
-            />
+            </Label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white/50" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                </svg>
+              </span>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={userData.email || ''}
+                className="w-full pl-10 px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white cursor-not-allowed opacity-70"
+                disabled
+              />
+            </div>
+          </div>
+
+          {/* Username */}
+          <div className="space-y-3">
+            <Label
+              htmlFor="username"
+              className="block text-sm font-medium text-white/70 mb-2"
+            >
+              Username
+            </Label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <UserIcon className="h-5 w-5 text-white/50" />
+              </span>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                value={userData.username || ''}
+                className="w-full pl-10 px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white cursor-not-allowed opacity-70"
+                required
+                disabled
+              />
+            </div>
           </div>
 
           {/* Name */}
-          <div>
-            <label
+          <div className="space-y-3">
+            <Label
               htmlFor="name"
               className="block text-sm font-medium text-white/70 mb-2"
             >
-              Name
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white"
-            />
+              Display Name
+            </Label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white/50" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={userData.name || ''}
+                onChange={(e) => 
+                  setUserData({ ...userData, name: e.target.value })
+                }
+                className="w-full pl-10 px-3 py-2 bg-white/5 border border-white/10 rounded-md text-white focus:ring-1 focus:ring-white/30 focus:border-white/30 transition duration-150"
+                required
+              />
+            </div>
           </div>
 
           {/* Submit Button */}

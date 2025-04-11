@@ -568,6 +568,7 @@ function SearchContent() {
                   {results.tracks.map((track) => (
                     <div
                       key={track.id}
+                      onClick={() => router.push(`/track/${track.id}`)}
                       className={`hidden md:block bg-white/5 p-4 rounded-lg group relative
                       ${
                         currentlyPlaying === track.id

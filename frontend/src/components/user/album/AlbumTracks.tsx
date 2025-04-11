@@ -43,7 +43,7 @@ export function AlbumTracks({
 
   return (
     <div>
-      {tracks.map((track) => (
+      {tracks.map((track, index) => (
         <div key={track.id}>
           {/* Desktop Layout */}
           <div
@@ -71,7 +71,7 @@ export function AlbumTracks({
                 {currentTrack?.id === track.id && isPlaying ? (
                   <Pause className="w-4 h-4" />
                 ) : (
-                  track.trackNumber
+                  <span className="font-medium">{index + 1}</span>
                 )}
               </div>
             </div>
@@ -92,7 +92,7 @@ export function AlbumTracks({
 
             <div className="flex flex-col justify-center min-w-0">
               <div
-                className={`truncate ${
+                className={`truncate cursor-pointer hover:underline underline-offset-2 ${
                   theme === 'light' ? 'text-gray-900' : 'text-white'
                 }`}
                 onClick={(event) => {
@@ -110,8 +110,20 @@ export function AlbumTracks({
                 >
                   feat.{' '}
                   {track.featuredArtists
-                    .map(({ artistProfile }) => artistProfile.artistName)
-                    .join(', ')}
+                    .map(({ artistProfile }, index) => (
+                      <span key={artistProfile.id}>
+                        {index > 0 && ', '}
+                        <span 
+                          className="cursor-pointer hover:underline underline-offset-2"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            router.push(`/artist/profile/${artistProfile.id}`);
+                          }}
+                        >
+                          {artistProfile.artistName}
+                        </span>
+                      </span>
+                    ))}
                 </div>
               )}
             </div>
@@ -200,7 +212,7 @@ export function AlbumTracks({
                   {currentTrack?.id === track.id && isPlaying ? (
                     <Pause className="w-4 h-4" />
                   ) : (
-                    track.trackNumber
+                    index + 1
                   )}
                 </div>
               </span>
@@ -221,20 +233,41 @@ export function AlbumTracks({
                     theme === 'light' ? 'text-gray-500' : 'text-white/60'
                   }`}
                 >
-                  {track.artist.artistName}
+                  <span
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      router.push(`/artist/profile/${track.artist.id}`);
+                    }}
+                    className="cursor-pointer hover:underline underline-offset-2"
+                  >
+                    {track.artist.artistName}
+                  </span>
+
                   {track.featuredArtists?.length > 0 && (
-                    <span
-                      className={
-                        theme === 'light' ? 'text-gray-400' : 'text-white/40'
-                      }
-                    >
-                      {' '}
-                      • feat.{' '}
-                      {track.featuredArtists
-                        .map(({ artistProfile }) => artistProfile.artistName)
-                        .join(', ')}
-                    </span>
-                  )}
+                  <span
+                    className={
+                    theme === 'light' ? 'text-gray-400' : 'text-white/40'
+                    }
+                  >
+                    {' '}
+                    • feat.{' '}
+                    {track.featuredArtists
+                    .map(({ artistProfile }, index) => (
+                      <span key={artistProfile.id}>
+                      {index > 0 && ', '}
+                        <span 
+                          className="cursor-pointer hover:underline underline-offset-2"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            router.push(`/artist/profile/${artistProfile.id}`);
+                          }}
+                        >
+                          {artistProfile.artistName}
+                        </span>
+                      </span>
+                    ))}
+                  </span>
+                )}
                 </div>
               </div>
               <div className="flex items-center gap-3">

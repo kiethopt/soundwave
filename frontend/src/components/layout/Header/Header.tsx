@@ -560,8 +560,16 @@ export default function Header({
                       <div className="relative shrink-0">
                         <div className="w-12 h-12 rounded-full overflow-hidden">
                           <Image
-                            src={userData?.avatar || '/images/default-avatar.jpg'}
-                            alt={userData?.name || 'User'}
+                            src={
+                              userData?.currentProfile === 'ARTIST' && userData?.artistProfile?.avatar
+                                ? userData.artistProfile.avatar
+                                : userData?.avatar || '/images/default-avatar.jpg'
+                            }
+                            alt={
+                              userData?.currentProfile === 'ARTIST'
+                                ? userData?.artistProfile?.artistName || 'Artist'
+                                : userData?.name || 'User'
+                            }
                             width={48}
                             height={48}
                             className="object-cover w-full h-full"
@@ -576,7 +584,10 @@ export default function Header({
                         <h2
                           className={`text-base font-semibold ${theme === 'light' ? 'text-zinc-900' : 'text-zinc-100'}`}
                         >
-                          {userData?.name || userData?.username || 'User'}
+                          {userData?.currentProfile === 'ARTIST' 
+                            ? userData?.artistProfile?.artistName || userData?.name
+                            : userData?.name || userData?.username || 'User'
+                          }
                         </h2>
                         <p
                           className={`text-sm ${theme === 'light' ? 'text-zinc-600' : 'text-zinc-400'}`}
