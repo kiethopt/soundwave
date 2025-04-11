@@ -640,9 +640,9 @@ export default function Header({
                           <ArrowLeft className="w-4 h-4" />
                         )}
                         <span className="text-sm font-medium">
-                          Switch to{' '}
+                          Go to {' '}
                           {userData.currentProfile === 'USER' ? 'Artist' : 'User'}{' '}
-                          Profile
+                          Dashboard
                         </span>
                       </button>
                     )}

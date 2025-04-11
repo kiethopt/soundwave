@@ -328,14 +328,14 @@ function SearchContent() {
                               event.stopPropagation();
                               handlePlay(artist);
                             }}
-                            className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute bottom-2 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             {currentTrack?.artist?.id === artist.id &&
                             queueType === 'artist' &&
                             isPlaying ? (
-                              <Pause className="w-6 h-6 text-white" />
+                              <Pause className="w-5 h-5 text-white" />
                             ) : (
-                              <Play className="w-6 h-6 text-white" />
+                              <Play className="w-5 h-5 text-white" />
                             )}
                           </button>
                         </div>
@@ -385,7 +385,7 @@ function SearchContent() {
                             event.stopPropagation();
                             handlePlay(album);
                           }}
-                          className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute bottom-2 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           {currentTrack &&
                           album.tracks.some(
@@ -393,9 +393,9 @@ function SearchContent() {
                           ) &&
                           isPlaying &&
                           queueType === 'album' ? (
-                            <Pause className="w-6 h-6 text-white" />
+                            <Pause className="w-5 h-5 text-white" />
                           ) : (
-                            <Play className="w-6 h-6 text-white" />
+                            <Play className="w-5 h-5 text-white" />
                           )}
                         </button>
                       </div>
@@ -408,7 +408,15 @@ function SearchContent() {
                       >
                         {album.title}
                       </h3>
-                      <p className="text-white/60 text-sm truncate">
+                      <p 
+                        className="text-white/60 text-sm truncate hover:text-white hover:underline cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (typeof album.artist !== 'string' && album.artist?.id) {
+                            router.push(`/artist/profile/${album.artist.id}`);
+                          }
+                        }}
+                      >
                         {typeof album.artist === 'string'
                           ? album.artist
                           : album.artist?.artistName || 'Unknown Artist'}
@@ -464,20 +472,48 @@ function SearchContent() {
                                 ? 'text-[#A57865]'
                                 : 'text-white'
                             }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/track/${track.id}`);
+                            }}
                           >
                             {track.title}
                           </h3>
                           <p className="text-white/60 text-sm truncate">
-                            {[
-                              track.artist
-                                ? typeof track.artist === 'string'
+                            {track.artist && (
+                              <span 
+                                className="hover:text-white hover:underline cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (typeof track.artist !== 'string' && track.artist?.id) {
+                                    router.push(`/artist/profile/${track.artist.id}`);
+                                  }
+                                }}
+                              >
+                                {typeof track.artist === 'string'
                                   ? track.artist
-                                  : track.artist.artistName
-                                : 'Unknown Artist',
-                              ...(track.featuredArtists?.map(
-                                (fa) => fa.artistProfile.artistName
-                              ) || []),
-                            ].join(', ')}
+                                  : track.artist.artistName || 'Unknown Artist'}
+                              </span>
+                            )}
+                            {track.featuredArtists && track.featuredArtists.length > 0 && (
+                              <>
+                                {track.artist ? ', ' : ''}
+                                {track.featuredArtists.map((fa, index) => (
+                                  <span key={fa.artistProfile.id}>
+                                    {index > 0 && ", "}
+                                    <span 
+                                      className="hover:text-white hover:underline cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/artist/profile/${fa.artistProfile.id}`);
+                                      }}
+                                    >
+                                      {fa.artistProfile.artistName}
+                                    </span>
+                                  </span>
+                                ))}
+                              </>
+                            )}
                           </p>
                         </div>
                         <DropdownMenu>
@@ -569,7 +605,7 @@ function SearchContent() {
                     <div
                       key={track.id}
                       onClick={() => router.push(`/track/${track.id}`)}
-                      className={`hidden md:block bg-white/5 p-4 rounded-lg group relative
+                      className={`hidden md:block bg-white/5 p-4 rounded-lg group relative cursor-pointer
                       ${
                         currentlyPlaying === track.id
                           ? 'bg-white/5'
@@ -583,16 +619,19 @@ function SearchContent() {
                           className="w-full aspect-square object-cover rounded-md mb-4"
                         />
                         <button
-                          onClick={() => handlePlay(track)}
-                          className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePlay(track);
+                          }}
+                          className="absolute bottom-2 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           {currentTrack &&
                           track.id === currentTrack.id &&
                           isPlaying &&
                           queueType === 'track' ? (
-                            <Pause className="w-6 h-6 text-white" />
+                            <Pause className="w-5 h-5 text-white" />
                           ) : (
-                            <Play className="w-6 h-6 text-white" />
+                            <Play className="w-5 h-5 text-white" />
                           )}
                         </button>
                       </div>
@@ -608,16 +647,40 @@ function SearchContent() {
                             {track.title}
                           </h3>
                           <p className="text-white/60 text-sm truncate">
-                            {[
-                              track.artist
-                                ? typeof track.artist === 'string'
+                            {track.artist && (
+                              <span 
+                                className="hover:text-white hover:underline cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (typeof track.artist !== 'string' && track.artist?.id) {
+                                    router.push(`/artist/profile/${track.artist.id}`);
+                                  }
+                                }}
+                              >
+                                {typeof track.artist === 'string'
                                   ? track.artist
-                                  : track.artist.artistName
-                                : 'Unknown Artist',
-                              ...(track.featuredArtists?.map(
-                                (fa) => fa.artistProfile.artistName
-                              ) || []),
-                            ].join(', ')}
+                                  : track.artist.artistName || 'Unknown Artist'}
+                              </span>
+                            )}
+                            {track.featuredArtists && track.featuredArtists.length > 0 && (
+                              <>
+                                {track.artist ? ', ' : ''}
+                                {track.featuredArtists.map((fa, index) => (
+                                  <span key={fa.artistProfile.id}>
+                                    {index > 0 && ", "}
+                                    <span 
+                                      className="hover:text-white hover:underline cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/artist/profile/${fa.artistProfile.id}`);
+                                      }}
+                                    >
+                                      {fa.artistProfile.artistName}
+                                    </span>
+                                  </span>
+                                ))}
+                              </>
+                            )}
                           </p>
                         </div>
                         <DropdownMenu>
