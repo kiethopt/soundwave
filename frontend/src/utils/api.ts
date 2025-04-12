@@ -752,7 +752,7 @@ export const api = {
   },
 
   tracks: {
-    getAll: async (
+    getTracks: async (
       token: string,
       page: number = 1,
       limit: number = 10,
@@ -997,7 +997,7 @@ export const api = {
     },
 
     // Get all albums - requires authentication
-    getAll: async (
+    getAlbums: async (
       token: string,
       page: number = 1,
       limit: number = 10,

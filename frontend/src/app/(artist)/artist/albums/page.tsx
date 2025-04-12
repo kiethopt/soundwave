@@ -21,6 +21,8 @@ import Link from 'next/link';
 import { getAlbumColumns } from '@/components/ui/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
 import { EditAlbumModal } from '@/components/ui/data-table/data-table-modals';
+import io from 'socket.io-client';
+
 
 export default function AlbumManagement() {
   const { theme } = useTheme();
@@ -44,10 +46,8 @@ export default function AlbumManagement() {
     updateQueryParam,
   } = useDataTable<Album>({
     fetchData: async (page, params) => {
-      const token = getAuthToken();
-      if (!token) throw new Error('Authentication token not found');
-
-      const response = await api.albums.getAll(
+      const token = localStorage.getItem('userToken') || '';
+      const response = await api.albums.getAlbums(
         token,
         page,
         limit,
@@ -149,7 +149,7 @@ export default function AlbumManagement() {
         ...(statusFilter.length === 1 && { status: statusFilter[0] }),
         ...(genreFilter.length > 0 && { genres: genreFilter.join(',') }),
       });
-      const response = await api.albums.getAll(
+      const response = await api.albums.getAlbums(
         token,
         currentPage,
         limit,
@@ -222,7 +222,7 @@ export default function AlbumManagement() {
         ...(statusFilter.length === 1 && { status: statusFilter[0] }),
         ...(genreFilter.length > 0 && { genres: genreFilter.join(',') }),
       });
-      const response = await api.albums.getAll(
+      const response = await api.albums.getAlbums(
         token,
         currentPage,
         limit,
@@ -279,7 +279,25 @@ export default function AlbumManagement() {
     pageCount: totalPages,
     manualPagination: true,
   });
+  useEffect(() => {
+    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
 
+    socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
+      console.log('[Artist] Album visibility changed via WebSocket:', data);
+      // Update the local state directly
+      setAlbums((currentAlbums) =>
+        currentAlbums.map((album) =>
+          album.id === data.albumId ? { ...album, isActive: data.isActive } : album
+        )
+      );
+    });
+
+    // Cleanup on component unmount
+    return () => {
+      socket.off('album:visibilityChanged');
+      socket.disconnect();
+    };
+  }, [setAlbums]);
   return (
     <div
       className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''

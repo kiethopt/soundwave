@@ -14,6 +14,8 @@ import {
 import type { Album, FetchDataResponse } from '@/types';
 import toast from 'react-hot-toast';
 import { EditAlbumModal, AlbumDetailModal } from '@/components/ui/data-table/data-table-modals';
+import io from 'socket.io-client';
+
 
 interface AlbumManagementProps {
   theme: 'light' | 'dark';
@@ -40,7 +42,7 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     ): Promise<FetchDataResponse<Album>> => {
       try {
         const token = localStorage.getItem('userToken') || '';
-        const response = await api.albums.getAll(
+        const response = await api.albums.getAlbums(
           token,
           page,
           10,
@@ -82,6 +84,7 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     loading: albumsLoading,
     updateQueryParam: updateAlbumQueryParam,
     refreshData: refreshAlbums,
+    setData: setAlbums,
   } = useDataTable<Album>({ fetchData: fetchAlbums, paramKeyPrefix: 'album_' });
 
   const fetchAvailableData = useCallback(async () => {
@@ -194,6 +197,24 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     },
     [refreshAlbums]
   );
+  const handleToggleVisibility = useCallback(
+    async (albumId: string, currentIsActive: boolean) => {
+      const action = currentIsActive ? 'hiding' : 'activating';
+      const optimisticAction = currentIsActive ? 'Hide' : 'Show';
+      const toastId = toast.loading(`${optimisticAction} album...`);
+      try {
+        const token = localStorage.getItem('userToken') || '';
+        // Assuming an endpoint exists like api.albums.toggleVisibility
+        await api.albums.toggleVisibility(albumId, token);
+        toast.success(`Album ${action === 'hiding' ? 'hidden' : 'activated'} successfully`, { id: toastId });
+        refreshAlbums(); // Refresh data after successful toggle
+      } catch (error) {
+        console.error(`Failed ${action} album:`, error);
+        toast.error(`Failed to ${action} album`, { id: toastId });
+      }
+    },
+    [refreshAlbums]
+  );
 
   const albumColumns = useMemo(
     () =>
@@ -201,9 +222,10 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
         theme,
         onEdit: handleEditAlbum,
         onDelete: handleDeleteAlbum,
+        onVisibilityChange: handleToggleVisibility,
         onViewDetails: handleViewAlbumDetails,
       }),
-    [theme, handleEditAlbum, handleDeleteAlbum, handleViewAlbumDetails]
+    [theme, handleEditAlbum, handleDeleteAlbum, handleViewAlbumDetails, handleToggleVisibility]
   );
 
   const albumTable = useReactTable({
@@ -232,6 +254,24 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     manualPagination: true,
     manualSorting: true,
   });
+  useEffect(() => {
+    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+
+    socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
+      console.log('[Admin] Album visibility changed via WebSocket:', data);
+      setAlbums((currentAlbums) =>
+        currentAlbums.map((album) =>
+          album.id === data.albumId ? { ...album, isActive: data.isActive } : album
+        )
+      );
+    });
+
+    // Cleanup on component unmount
+    return () => {
+      socket.off('album:visibilityChanged');
+      socket.disconnect();
+    };
+  }, [setAlbums]);
 
   return (
     <>

@@ -66,7 +66,7 @@ export const getHotAlbums = async (limit = 10) => {
   });
 };
 
-export const getAllAlbums = async (req: Request) => {
+export const getAlbums = async (req: Request) => {
   const { search, sortBy, sortOrder } = req.query;
   const user = req.user;
 
@@ -444,14 +444,18 @@ export const toggleAlbumVisibility = async (req: Request) => {
   });
 
   if (!album) throw new Error('Album not found');
+
+  const newIsActive = !album.isActive;
+
   if (!canManageAlbum(user, album.artistId)) throw new Error('You can only toggle your own albums');
 
   const updatedAlbum = await prisma.album.update({
     where: { id },
-    data: { isActive: !album.isActive },
+    data: { isActive: newIsActive },
     select: albumSelect,
   });
-
+  const io = getIO();
+  io.emit('album:visibilityChanged', { albumId: updatedAlbum.id, isActive: newIsActive });
   return {
     message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'} successfully`,
     album: updatedAlbum,
@@ -550,7 +554,7 @@ export const getAdminAllAlbums = async (req: Request) => {
 
   if (conditions.length > 0) whereClause.AND = conditions;
 
-  const result = await getAllAlbums(req);
+  const result = await getAlbums(req);
   return { albums: result.data, pagination: result.pagination };
 };
 

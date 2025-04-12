@@ -4,12 +4,21 @@ import cron from 'node-cron';
 async function checkAndUpdateAlbumStatus(client: any) {
   try {
     const now = new Date();
+    // Add a time threshold (e.g., 2 minutes ago)
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
 
-    // Tìm các album chưa active nhưng đã đến ngày phát hành
-    const albums = await client.album.findMany({
+    // Tìm các album chưa active, đã đến ngày phát hành, và chưa được cập nhật gần đây
+    const albumsToPublish = await client.album.findMany({
       where: {
         isActive: false,
-        releaseDate: { lte: now },
+        releaseDate: {
+          gte: twoMinutesAgo, // Only publish if release date was recent
+          lte: now,
+        },
+        // Only consider albums that haven't been updated recently
+        updatedAt: {
+          lt: twoMinutesAgo, // Less than 2 minutes ago
+        },
       },
       select: {
         id: true,
@@ -17,26 +26,28 @@ async function checkAndUpdateAlbumStatus(client: any) {
       },
     });
 
-    if (albums.length > 0) {
+    if (albumsToPublish.length > 0) {
+      const albumIds = albumsToPublish.map((album: any) => album.id);
+
       // Cập nhật trạng thái các album
       await client.album.updateMany({
         where: {
-          id: { in: albums.map((album: any) => album.id) },
+          id: { in: albumIds },
         },
         data: { isActive: true },
       });
 
-      // Cập nhật trạng thái các track thuộc album
+      // Cập nhật trạng thái các track thuộc album (chỉ những track đang false)
       await client.track.updateMany({
         where: {
-          albumId: { in: albums.map((album: any) => album.id) },
-          isActive: false,
+          albumId: { in: albumIds },
+          isActive: false, // Chỉ cập nhật track đang inactive trong album sắp publish
         },
         data: { isActive: true },
       });
 
       console.log(
-        `Auto published ${albums.length} albums: ${albums
+        `Auto published ${albumsToPublish.length} albums: ${albumsToPublish
           .map((a: any) => a.title)
           .join(', ')}`
       );
@@ -64,7 +75,11 @@ async function updateAlbumTotalTracks(client: any, albumId: string) {
 
 export const albumExtension = Prisma.defineExtension((client) => {
   // Thiết lập cron job để kiểm tra và cập nhật trạng thái album mỗi phút
-  cron.schedule('* * * * *', () => checkAndUpdateAlbumStatus(client));
+  // Thêm log để biết cron job đang chạy
+  cron.schedule('* * * * *', () => {
+    console.log('Running cron job to check and update album status...');
+    checkAndUpdateAlbumStatus(client);
+  });
 
   return client.$extends({
     query: {
@@ -77,16 +92,19 @@ export const albumExtension = Prisma.defineExtension((client) => {
         },
         async update({ args, query }) {
           // Kiểm tra và cập nhật isActive nếu có thay đổi releaseDate
-          if (typeof args.data === 'object' && 'releaseDate' in args.data) {
-            const releaseDate = new Date(args.data.releaseDate as string);
-            args.data.isActive = releaseDate <= new Date();
+          if (typeof args.data === 'object' && args.data !== null && 'releaseDate' in args.data && args.data.releaseDate !== undefined) {
+            const releaseDate = new Date(args.data.releaseDate as string | Date);
+            // Check if isActive is being explicitly set
+            if (!('isActive' in args.data)) {
+              args.data.isActive = releaseDate <= new Date();
+            }
           }
 
           const result = await query(args);
 
-          if (typeof args.data === 'object') {
+          if (typeof args.data === 'object' && args.data !== null) {
             // Cập nhật coverUrl cho tracks nếu có thay đổi
-            if ('coverUrl' in args.data) {
+            if ('coverUrl' in args.data && args.data.coverUrl !== undefined) {
               await client.track.updateMany({
                 where: { albumId: result.id },
                 data: { coverUrl: args.data.coverUrl as string },
@@ -94,17 +112,22 @@ export const albumExtension = Prisma.defineExtension((client) => {
             }
 
             // Cập nhật isActive và releaseDate cho tracks
-            if ('isActive' in args.data || 'releaseDate' in args.data) {
+            const trackUpdateData: Prisma.TrackUpdateManyMutationInput = {};
+            let shouldUpdateTracks = false;
+
+            if ('isActive' in args.data && args.data.isActive !== undefined) {
+              trackUpdateData.isActive = args.data.isActive as boolean;
+              shouldUpdateTracks = true;
+            }
+            if ('releaseDate' in args.data && args.data.releaseDate !== undefined) {
+              trackUpdateData.releaseDate = args.data.releaseDate as Date;
+              shouldUpdateTracks = true;
+            }
+
+            if (shouldUpdateTracks) {
               await client.track.updateMany({
                 where: { albumId: result.id },
-                data: {
-                  ...(args.data.isActive !== undefined && {
-                    isActive: args.data.isActive as boolean,
-                  }),
-                  ...(args.data.releaseDate && {
-                    releaseDate: args.data.releaseDate as Date,
-                  }),
-                },
+                data: trackUpdateData,
               });
             }
           }
@@ -116,29 +139,39 @@ export const albumExtension = Prisma.defineExtension((client) => {
         async create({ args, query }) {
           const data = args.data as Prisma.TrackCreateInput;
 
-          if (data.album) {
-            const albumId = (data.album as any).connect?.id;
-            if (albumId) {
-              const album = await client.album.findUnique({
-                where: { id: albumId },
-                select: { isActive: true, releaseDate: true },
-              });
+          if (data.album?.connect?.id) {
+            const albumId = data.album.connect.id;
+            const album = await client.album.findUnique({
+              where: { id: albumId },
+              select: { isActive: true, releaseDate: true },
+            });
 
-              if (album) {
-                args.data = {
-                  ...data,
-                  isActive: album.isActive,
-                  releaseDate: album.releaseDate,
-                };
-              }
+            if (album) {
+              args.data = {
+                ...data,
+                isActive: album.isActive,
+                releaseDate: album.releaseDate,
+              };
+            } else {
+              // Handle case where album doesn't exist? Or throw error?
+              console.warn(`Album with id ${albumId} not found when creating track.`);
+              // Fallback to track's releaseDate if album not found
+              const releaseDate = new Date(data.releaseDate);
+              args.data = {
+                ...data,
+                isActive: releaseDate <= new Date(),
+              };
             }
-          } else {
+          } else if (data.releaseDate) {
             // Track độc lập, set isActive dựa trên releaseDate
             const releaseDate = new Date(data.releaseDate);
             args.data = {
               ...data,
               isActive: releaseDate <= new Date(),
             };
+          } else {
+             // Track không có album và không có releaseDate? Set active?
+             args.data = { ...data, isActive: true };
           }
 
           const result = await query(args);
@@ -157,38 +190,59 @@ export const albumExtension = Prisma.defineExtension((client) => {
             select: { albumId: true },
           });
 
-          if (
-            data.album &&
-            typeof data.album === 'object' &&
-            'connect' in data.album
-          ) {
-            const newAlbumId = (data.album.connect as any)?.id;
-            if (newAlbumId && newAlbumId !== oldTrack?.albumId) {
-              const newAlbum = await client.album.findUnique({
-                where: { id: newAlbumId },
-                select: { isActive: true, releaseDate: true },
-              });
+          // Check if album connection is changing
+          let newAlbumId: string | undefined = undefined;
+          if (data.album?.connect?.id) {
+            newAlbumId = data.album.connect.id;
+          } else if (data.album && typeof data.album === 'string') {
+             newAlbumId = data.album;
+          }
 
-              if (newAlbum) {
-                args.data = {
-                  ...data,
-                  isActive: newAlbum.isActive,
-                  releaseDate: newAlbum.releaseDate,
-                };
-              }
+          if (newAlbumId && newAlbumId !== oldTrack?.albumId) {
+            const newAlbum = await client.album.findUnique({
+              where: { id: newAlbumId },
+              select: { isActive: true, releaseDate: true },
+            });
+
+            if (newAlbum) {
+              // If track moves to a new album, inherit its status unless explicitly set
+              args.data = {
+                ...data,
+                isActive: data.isActive !== undefined ? data.isActive as boolean : newAlbum.isActive,
+                releaseDate: data.releaseDate !== undefined ? data.releaseDate as Date : newAlbum.releaseDate,
+              };
+            } else {
+                console.warn(`New album with id ${newAlbumId} not found during track update.`);
+                // If new album not found, keep track's existing status/release or set based on track's releaseDate if provided
+                if (data.releaseDate) {
+                   const releaseDate = new Date(data.releaseDate as string | Date);
+                   args.data = {
+                       ...data,
+                       isActive: data.isActive !== undefined ? data.isActive as boolean : releaseDate <= new Date(),
+                   };
+                }
             }
+          } else if (data.releaseDate && !newAlbumId && !oldTrack?.albumId) {
+             // If track is standalone and releaseDate is updated
+             const releaseDate = new Date(data.releaseDate as string | Date);
+              // Only update isActive based on releaseDate if isActive is not explicitly set
+             if (data.isActive === undefined) {
+                args.data = {
+                    ...data,
+                    isActive: releaseDate <= new Date(),
+                };
+             }
           }
 
           const result = await query(args);
 
-          if (oldTrack?.albumId) {
+          // Update track count for old album if track moved away
+          if (oldTrack?.albumId && newAlbumId !== oldTrack.albumId) {
             await updateAlbumTotalTracks(client, oldTrack.albumId);
           }
-          if (
-            (result as any).albumId &&
-            (result as any).albumId !== oldTrack?.albumId
-          ) {
-            await updateAlbumTotalTracks(client, (result as any).albumId);
+          // Update track count for new album if track moved in or created in album
+          if (newAlbumId && newAlbumId !== oldTrack?.albumId) {
+            await updateAlbumTotalTracks(client, newAlbumId);
           }
 
           return result;

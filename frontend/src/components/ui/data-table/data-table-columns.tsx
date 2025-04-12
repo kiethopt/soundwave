@@ -390,10 +390,10 @@ export function getTrackColumns({
             const release = new Date(releaseDate);
 
             // Kiểm tra nếu vừa đến thời điểm phát hành và track chưa active
-            if (release <= now && !track.isActive) {
+           // if (release <= now && !track.isActive) {
               // Đơn giản nhất: reload trang
-              window.location.reload();
-            }
+            //  window.location.reload();
+           // }
 
             setTimeDisplay(calculateTimeRemaining());
           }, 1000);
@@ -653,10 +653,10 @@ export function getAlbumColumns({
             const release = new Date(releaseDate);
 
             // Kiểm tra nếu vừa đến thời điểm phát hành và album chưa active
-            if (release <= now && !album.isActive) {
-              // Đơn giản nhất: reload trang
-              window.location.reload();
-            }
+          //  if (release <= now && !album.isActive) {
+          //    // Đơn giản nhất: reload trang
+          //    window.location.reload();
+           // }
 
             setTimeDisplay(calculateTimeRemaining());
           }, 1000);

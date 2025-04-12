@@ -44,9 +44,8 @@ export default function TrackManagement() {
     refreshData,
   } = useDataTable<Track>({
     fetchData: async (page, params) => {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-      const response = await api.tracks.getAll(
+      const token = localStorage.getItem('userToken') || '';
+      const response = await api.tracks.getTracks(
         token,
         page,
         limit,

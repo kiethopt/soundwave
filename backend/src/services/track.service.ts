@@ -131,7 +131,7 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
 };
 
 // Lấy tất cả tracks
-export const getAllTracks = async (req: Request) => {
+export const getTracks = async (req: Request) => {
   const { search, sortBy, sortOrder } = req.query;
   const user = req.user;
 
@@ -580,12 +580,16 @@ export const toggleTrackVisibility = async (req: Request, id: string) => {
   if (!canManageTrack(user, track.artistId)) {
     throw new Error('You can only toggle visibility of your own tracks');
   }
+  const newIsActive = !track.isActive;
 
   const updatedTrack = await prisma.track.update({
     where: { id },
-    data: { isActive: !track.isActive },
+    data: { isActive: newIsActive },
     select: trackSelect,
   });
+    // Emit WebSocket event
+  const io = getIO();
+  io.emit('track:visibilityChanged', { trackId: updatedTrack.id, isActive: newIsActive });
 
   return {
     message: `Track ${updatedTrack.isActive ? 'activated' : 'hidden'} successfully`,
@@ -785,7 +789,7 @@ export const getAllTracksAdminArtist = async (req: Request) => {
     };
   }
 
-  const result = await getAllTracks(req);
+  const result = await getTracks(req);
   return {
     tracks: result.data,
     pagination: result.pagination,

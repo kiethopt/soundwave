@@ -10,10 +10,13 @@ import {
   getCoreRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  Table,
 } from '@tanstack/react-table';
 import type { Track, FetchDataResponse } from '@/types';
 import toast from 'react-hot-toast';
 import { EditTrackModal, TrackDetailModal } from '@/components/ui/data-table/data-table-modals';
+import io from 'socket.io-client';
+
 
 interface TrackManagementProps {
   theme: 'light' | 'dark';
@@ -46,7 +49,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
     ): Promise<FetchDataResponse<Track>> => {
       try {
         const token = localStorage.getItem('userToken') || '';
-        const response = await api.tracks.getAll(
+        const response = await api.tracks.getTracks(
           token,
           page,
           10,
@@ -88,6 +91,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
     loading: tracksLoading,
     updateQueryParam: updateTrackQueryParam,
     refreshData: refreshTracks,
+    setData,
   } = useDataTable<Track>({ fetchData: fetchTracks, paramKeyPrefix: 'track_' });
 
   const fetchAvailableData = useCallback(async () => {
@@ -207,6 +211,32 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
     },
     [refreshTracks]
   );
+  const handleToggleVisibility = useCallback(
+    async (trackId: string, currentIsActive: boolean) => {
+      const action = currentIsActive ? 'hiding' : 'activating';
+      const optimisticAction = currentIsActive ? 'Hide' : 'Show';
+      const toastId = toast.loading(`${optimisticAction} track...`);
+      try {
+        const token = localStorage.getItem('userToken') || '';
+        await api.tracks.toggleVisibility(trackId, token);
+        toast.success(`Track ${action === 'hiding' ? 'hidden' : 'activated'} successfully`, { id: toastId });
+        setData((currentTracks: Track[]) =>
+          currentTracks.map((track: Track) =>
+            track.id === trackId ? { ...track, isActive: !currentIsActive } : track
+          )
+        );
+      } catch (error) {
+        console.error(`Failed ${action} track:`, error);
+        toast.error(`Failed to ${action} track`, { id: toastId });
+        setData((currentTracks: Track[]) =>
+          currentTracks.map((track: Track) =>
+            track.id === trackId ? { ...track, isActive: currentIsActive } : track
+          )
+        );
+      }
+    },
+    [refreshTracks, setData]
+  );
 
   const handleTrackEditSubmit = useCallback(
     async (trackId: string, formData: FormData) => {
@@ -230,11 +260,30 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
         theme,
         onEdit: handleEditTrack,
         onDelete: handleDeleteTrack,
+        onVisibilityChange: handleToggleVisibility,
         onViewDetails: handleViewTrackDetails,
       }),
-    [theme, handleEditTrack, handleDeleteTrack, handleViewTrackDetails]
+    [theme, handleEditTrack, handleDeleteTrack, handleViewTrackDetails, handleToggleVisibility]
   );
 
+  useEffect(() => {
+    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+
+    socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
+      console.log('[Admin] Track visibility changed via WebSocket:', data);
+      setData((currentTracks: Track[]) =>
+        currentTracks.map((track: Track) =>
+          track.id === data.trackId ? { ...track, isActive: data.isActive } : track
+        )
+      );
+    });
+
+    // Cleanup on component unmount
+    return () => {
+      socket.off('track:visibilityChanged');
+      socket.disconnect();
+    };
+  }, [setData]);
   const trackTable = useReactTable({
     data: tracks || [],
     columns: trackColumns,
