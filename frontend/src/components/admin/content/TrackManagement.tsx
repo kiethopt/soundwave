@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-table';
 import type { Track, FetchDataResponse } from '@/types';
 import toast from 'react-hot-toast';
-import { EditTrackModal } from '@/components/ui/data-table/data-table-modals';
+import { EditTrackModal, TrackDetailModal } from '@/components/ui/data-table/data-table-modals';
 
 interface TrackManagementProps {
   theme: 'light' | 'dark';
@@ -21,6 +21,9 @@ interface TrackManagementProps {
 
 export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [trackForDetail, setTrackForDetail] = useState<Track | null>(null);
   const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<
     string[]
   >([]);
@@ -143,6 +146,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   const handleEditTrack = useCallback(
     (track: Track) => {
       setSelectedTrack(track);
+      setIsEditModalOpen(true);
 
       // Set featured artists
       if (track.featuredArtists) {
@@ -181,6 +185,11 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
     },
     [availableLabels]
   );
+
+  const handleViewTrackDetails = useCallback((track: Track) => {
+    setTrackForDetail(track);
+    setIsDetailModalOpen(true);
+  }, []);
 
   const handleDeleteTrack = useCallback(
     async (trackId: string | string[]) => {
@@ -221,8 +230,9 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
         theme,
         onEdit: handleEditTrack,
         onDelete: handleDeleteTrack,
+        onViewDetails: handleViewTrackDetails,
       }),
-    [theme, handleEditTrack, handleDeleteTrack]
+    [theme, handleEditTrack, handleDeleteTrack, handleViewTrackDetails]
   );
 
   const trackTable = useReactTable({
@@ -270,10 +280,13 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
         }}
       />
 
-      {selectedTrack && (
+      {isEditModalOpen && selectedTrack && (
         <EditTrackModal
           track={selectedTrack}
-          onClose={() => setSelectedTrack(null)}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedTrack(null);
+          }}
           onSubmit={handleTrackEditSubmit}
           availableArtists={availableArtists}
           selectedFeaturedArtists={selectedFeaturedArtists}
@@ -284,6 +297,18 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
           availableLabels={availableLabels}
           selectedLabelId={selectedLabelId}
           setSelectedLabelId={setSelectedLabelId}
+          theme={theme}
+        />
+      )}
+
+      {isDetailModalOpen && trackForDetail && (
+        <TrackDetailModal
+          track={trackForDetail}
+          isOpen={isDetailModalOpen}
+          onClose={() => {
+            setIsDetailModalOpen(false);
+            setTrackForDetail(null);
+          }}
           theme={theme}
         />
       )}

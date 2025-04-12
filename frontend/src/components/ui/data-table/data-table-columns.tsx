@@ -53,6 +53,7 @@ interface GetTrackColumnsOptions {
   onDelete?: (id: string | string[]) => Promise<void>;
   onEdit?: (track: Track) => void;
   formatReleaseTime?: (date: string) => string;
+  onViewDetails?: (track: Track) => void;
 }
 
 interface GetAlbumColumnsOptions {
@@ -61,6 +62,7 @@ interface GetAlbumColumnsOptions {
   onDelete?: (id: string | string[]) => Promise<void>;
   onEdit?: (album: Album) => void;
   formatReleaseTime?: (date: string) => string;
+  onViewDetails?: (album: Album) => void;
 }
 
 interface GetUserColumnsOptions {
@@ -114,6 +116,7 @@ export function getTrackColumns({
   onDelete,
   onEdit,
   formatReleaseTime,
+  onViewDetails,
 }: GetTrackColumnsOptions): ColumnDef<Track>[] {
   return [
     {
@@ -145,7 +148,10 @@ export function getTrackColumns({
       cell: ({ row }) => {
         const track = row.original;
         return (
-          <div className="flex items-center gap-3">
+          <div
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => onViewDetails?.(track)}
+          >
             <div
               className={`w-8 h-8 rounded overflow-hidden ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
                 }`}
@@ -166,13 +172,12 @@ export function getTrackColumns({
               )}
             </div>
             <div>
-              <Link
-                href={`/artist/tracks/${track.id}`}
-                className={`font-medium hover:underline ${theme === 'dark' ? 'text-white' : ''
+              <div
+                className={`font-medium ${theme === 'dark' ? 'text-white' : ''
                   }`}
               >
                 {track.title}
-              </Link>
+              </div>
             </div>
           </div>
         );
@@ -458,6 +463,7 @@ export function getAlbumColumns({
   onVisibilityChange,
   onDelete,
   onEdit,
+  onViewDetails,
 }: GetAlbumColumnsOptions): ColumnDef<Album>[] {
   return [
     {
@@ -489,7 +495,10 @@ export function getAlbumColumns({
       cell: ({ row }) => {
         const album = row.original;
         return (
-          <div className="flex items-center gap-3">
+          <div
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => onViewDetails?.(album)}
+          >
             <div
               className={`w-8 h-8 rounded overflow-hidden ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
                 }`}
@@ -510,13 +519,12 @@ export function getAlbumColumns({
               )}
             </div>
             <div>
-              <Link
-                href={`/artist/albums/${album.id}`}
-                className={`font-medium hover:underline ${theme === 'dark' ? 'text-white' : ''
+              <div
+                className={`font-medium ${theme === 'dark' ? 'text-white' : ''
                   }`}
               >
                 {album.title}
-              </Link>
+              </div>
             </div>
           </div>
         );

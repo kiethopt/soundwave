@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-table';
 import type { Album, FetchDataResponse } from '@/types';
 import toast from 'react-hot-toast';
-import { EditAlbumModal } from '@/components/ui/data-table/data-table-modals';
+import { EditAlbumModal, AlbumDetailModal } from '@/components/ui/data-table/data-table-modals';
 
 interface AlbumManagementProps {
   theme: 'light' | 'dark';
@@ -21,6 +21,9 @@ interface AlbumManagementProps {
 
 export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [albumForDetail, setAlbumForDetail] = useState<Album | null>(null);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
   const [availableGenres, setAvailableGenres] = useState<
@@ -124,6 +127,7 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
   const handleEditAlbum = useCallback(
     (album: Album) => {
       setSelectedAlbum(album);
+      setIsEditModalOpen(true);
 
       // Set genres
       if (album.genres) {
@@ -152,6 +156,11 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     },
     [availableLabels]
   );
+
+  const handleViewAlbumDetails = useCallback((album: Album) => {
+    setAlbumForDetail(album);
+    setIsDetailModalOpen(true);
+  }, []);
 
   const handleDeleteAlbum = useCallback(
     async (albumId: string | string[]) => {
@@ -192,8 +201,9 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
         theme,
         onEdit: handleEditAlbum,
         onDelete: handleDeleteAlbum,
+        onViewDetails: handleViewAlbumDetails,
       }),
-    [theme, handleEditAlbum, handleDeleteAlbum]
+    [theme, handleEditAlbum, handleDeleteAlbum, handleViewAlbumDetails]
   );
 
   const albumTable = useReactTable({
@@ -241,10 +251,13 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
         }}
       />
 
-      {selectedAlbum && (
+      {isEditModalOpen && selectedAlbum && (
         <EditAlbumModal
           album={selectedAlbum}
-          onClose={() => setSelectedAlbum(null)}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setSelectedAlbum(null);
+          }}
           onSubmit={handleAlbumEditSubmit}
           availableGenres={availableGenres}
           selectedGenres={selectedGenres}
@@ -255,6 +268,16 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
           theme={theme}
         />
       )}
+
+      <AlbumDetailModal
+        album={albumForDetail}
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setAlbumForDetail(null);
+        }}
+        theme={theme}
+      />
     </>
   );
 };

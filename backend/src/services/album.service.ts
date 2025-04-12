@@ -102,15 +102,20 @@ export const getAllAlbums = async (req: Request) => {
     include: {
       artist: { select: { id: true, artistName: true, avatar: true } },
       genres: { include: { genre: true } },
-      _count: { select: { tracks: true } },
+      tracks: { 
+        select: trackSelect,
+        orderBy: { trackNumber: 'asc' },
+      },
+      label: { select: { id: true, name: true, logoUrl: true } },
     },
     orderBy: orderByClause,
   });
 
   const formattedAlbums = result.data.map((album: any) => ({
     ...album,
-    totalTracks: album._count?.tracks ?? 0,
+    totalTracks: album.tracks?.length ?? 0,
     genres: album.genres,
+    tracks: album.tracks,
   }));
 
   return {
