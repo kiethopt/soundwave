@@ -21,12 +21,13 @@ import Link from 'next/link';
 import { getAlbumColumns } from '@/components/ui/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
 import { EditAlbumModal } from '@/components/ui/data-table/data-table-modals';
-import io from 'socket.io-client';
+import io, { Socket } from 'socket.io-client';
 
 
 export default function AlbumManagement() {
   const { theme } = useTheme();
   const limit = 10;
+  const [artistId, setArtistId] = useState<string | null>(null);
 
   const {
     data: albums,
@@ -44,6 +45,7 @@ export default function AlbumManagement() {
     selectedRows,
     setSelectedRows,
     updateQueryParam,
+    refreshData,
   } = useDataTable<Album>({
     fetchData: async (page, params) => {
       const token = localStorage.getItem('userToken') || '';
@@ -123,6 +125,110 @@ export default function AlbumManagement() {
       fetchMetadata();
     }
   }, [fetchMetadata, selectedAlbum]);
+
+  useEffect(() => {
+    // Fetch artistId from localStorage on mount
+    let id: string | null = null;
+    try {
+        const userDataString = localStorage.getItem('userData');
+        if (userDataString) {
+            const userData = JSON.parse(userDataString);
+            id = userData?.artistProfile?.id || null;
+        }
+    } catch (error) {
+        console.error("Error parsing userData from localStorage:", error);
+    }
+    setArtistId(id);
+  }, []);
+
+  // WebSocket listener for Album updates
+  useEffect(() => {
+    if (!artistId) return; // Only connect if artistId is known
+
+    let socket: Socket | null = null;
+    const connectTimer = setTimeout(() => {
+        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+
+        console.log(`[WebSocket] Connecting for Artist AlbumManagement (${artistId})...`);
+
+        socket.on('connect', () => {
+            console.log("[WebSocket] Connected for Artist AlbumManagement");
+        });
+        socket.on('disconnect', (reason: string) => {
+            console.log("[WebSocket] Disconnected from Artist AlbumManagement:", reason);
+        });
+        socket.on('connect_error', (error: Error) => {
+            console.error("[WebSocket] Connection Error for Artist AlbumManagement:", error);
+        });
+
+        // Listen for album creation by this artist
+        socket.on('album:created', (data: { album: Album }) => {
+            if (data.album.artist?.id === artistId) {
+                console.log('[WebSocket] Album created by this artist:', data.album);
+                // Add to the beginning of the list or refresh
+                setAlbums((currentAlbums: Album[]) => [data.album, ...currentAlbums]);
+                 // Or consider refreshData() if sorting/pagination is complex
+                 // refreshData(); 
+            }
+        });
+
+        // Listen for album updates for this artist
+        socket.on('album:updated', (data: { album: Album }) => {
+          if (data.album.artist?.id === artistId) {
+              console.log('[WebSocket] Album updated by this artist:', data.album);
+              setAlbums((currentAlbums: Album[]) =>
+                currentAlbums.map((album: Album) =>
+                  album.id === data.album.id ? { ...album, ...data.album } : album
+                )
+              );
+          }
+        });
+
+        // Listen for album deletions for this artist
+        socket.on('album:deleted', (data: { albumId: string }) => {
+           // Check if the deleted album belongs to the current artist before updating state
+           setAlbums((currentAlbums: Album[]) => {
+                const albumExists = currentAlbums.some(a => a.id === data.albumId && a.artist?.id === artistId);
+                if (albumExists) {
+                    console.log('[WebSocket] Album deleted by this artist:', data.albumId);
+                    return currentAlbums.filter((album: Album) => album.id !== data.albumId);
+                }
+                return currentAlbums; // No change if album doesn't belong to this artist or wasn't found
+           });
+        });
+
+         // Listen for album visibility changes for this artist
+        socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
+             // Check if the affected album belongs to the current artist
+             setAlbums((currentAlbums: Album[]) => {
+                const albumIndex = currentAlbums.findIndex(a => a.id === data.albumId);
+                if (albumIndex !== -1 && currentAlbums[albumIndex].artist?.id === artistId) {
+                    console.log('[WebSocket] Album visibility changed by this artist:', data);
+                    return currentAlbums.map((album: Album) =>
+                        album.id === data.albumId ? { ...album, isActive: data.isActive } : album
+                    );
+                }
+                return currentAlbums; // No change if album doesn't belong to this artist
+             });
+        });
+    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
+
+    // Cleanup on component unmount
+    return () => {
+      clearTimeout(connectTimer);
+      if (socket) {
+          console.log("[WebSocket] Disconnecting from Artist AlbumManagement...");
+          socket.off('connect');
+          socket.off('disconnect');
+          socket.off('connect_error');
+          socket.off('album:created');
+          socket.off('album:updated');
+          socket.off('album:deleted');
+          socket.off('album:visibilityChanged');
+          socket.disconnect();
+      }
+    };
+  }, [artistId, setAlbums]); // Add artistId and setAlbums as dependencies
 
   const handleEditAlbum = (album: Album) => {
     setSelectedAlbum(album);
@@ -279,25 +385,7 @@ export default function AlbumManagement() {
     pageCount: totalPages,
     manualPagination: true,
   });
-  useEffect(() => {
-    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
 
-    socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
-      console.log('[Artist] Album visibility changed via WebSocket:', data);
-      // Update the local state directly
-      setAlbums((currentAlbums) =>
-        currentAlbums.map((album) =>
-          album.id === data.albumId ? { ...album, isActive: data.isActive } : album
-        )
-      );
-    });
-
-    // Cleanup on component unmount
-    return () => {
-      socket.off('album:visibilityChanged');
-      socket.disconnect();
-    };
-  }, [setAlbums]);
   return (
     <div
       className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''

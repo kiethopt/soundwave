@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { useTrack } from '@/contexts/TrackContext';
 import { AlbumTracks } from '@/components/user/album/AlbumTracks';
+import io, { Socket } from 'socket.io-client'; // Import Socket
 
 export default function TrackDetailPage() {
   const params = useParams();
@@ -62,6 +63,95 @@ export default function TrackDetailPage() {
   useEffect(() => {
     fetchTrackDetails();
   }, [fetchTrackDetails]);
+
+  // WebSocket listener for real-time updates
+  useEffect(() => {
+    if (!trackId) return; // Don't connect if trackId is not available
+
+    let socket: Socket | null = null;
+    const connectTimer = setTimeout(() => {
+        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+
+        socket.on('connect', () => {
+            console.log(`[WebSocket] Connected for Track Detail: ${trackId}`);
+        });
+
+        socket.on('disconnect', (reason: string) => {
+            console.log(`[WebSocket] Disconnected from Track Detail ${trackId}:`, reason);
+        });
+
+        socket.on('connect_error', (error: Error) => {
+            console.error(`[WebSocket] Connection Error for Track Detail ${trackId}:`, error);
+        });
+
+        // Listener for track updates
+        socket.on('track:updated', (data: { track: Track }) => {
+            if (data.track.id === trackId) {
+                console.log(`[WebSocket] Track ${trackId} updated:`, data.track);
+                setTrack((prevTrack) => (prevTrack ? { ...prevTrack, ...data.track } : data.track));
+                setError(null); // Clear previous errors if track is updated
+            }
+        });
+
+        // Listener for track deletions
+        socket.on('track:deleted', (data: { trackId: string }) => {
+            if (data.trackId === trackId) {
+                console.log(`[WebSocket] Track ${trackId} deleted`);
+                setTrack(null);
+                setError('This track has been deleted.');
+            }
+        });
+
+        // Listener for visibility changes
+        socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
+            if (data.trackId === trackId) {
+                console.log(`[WebSocket] Track ${trackId} visibility changed to ${data.isActive}`);
+                setTrack((prevTrack) => {
+                    if (!prevTrack) return null; // Should not happen if track exists, but safety check
+
+                    let currentArtistId: string | null = null;
+                    try {
+                        const userDataString = localStorage.getItem('userData');
+                        if (userDataString) {
+                            const userData = JSON.parse(userDataString);
+                            currentArtistId = userData?.artistProfile?.id || null;
+                        }
+                    } catch (e) {
+                        console.error("Error parsing user data for visibility check:", e);
+                    }
+
+                    const isOwner = prevTrack.artistId === currentArtistId;
+
+                    if (!data.isActive && !isOwner) {
+                        // Track hidden and user is not the owner
+                        setError('This track is no longer available.');
+                        return null; // Hide the track details
+                    } else {
+                        // Track is now visible OR user is the owner (can see hidden tracks)
+                        setError(null); // Clear error if track becomes visible/accessible again
+                        return { ...prevTrack, isActive: data.isActive }; // Update isActive status
+                    }
+                });
+            }
+        });
+    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
+
+    // Cleanup function
+    return () => {
+        clearTimeout(connectTimer);
+        if (socket) {
+            console.log(`[WebSocket] Disconnecting from Track Detail ${trackId}...`);
+            socket.off('connect');
+            socket.off('disconnect');
+            socket.off('connect_error');
+            socket.off('track:updated');
+            socket.off('track:deleted');
+            socket.off('track:visibilityChanged');
+            socket.disconnect();
+        }
+    };
+
+  }, [trackId]); // Re-run effect if trackId changes
 
   const handleTrackPlay = (track: Track) => {
     // Check if user is authenticated before playing

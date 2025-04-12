@@ -31,6 +31,10 @@ export const deleteTrackById = async (id: string) => {
     throw new Error('Track not found');
   }
 
+  // Emit WebSocket event before deletion
+  const io = getIO();
+  io.emit('track:deleted', { trackId: id });
+
   return prisma.track.delete({
     where: { id },
   });
@@ -539,8 +543,20 @@ export const updateTrack = async (req: Request, id: string) => {
       }
     }
 
-    return updated;
+    const finalUpdatedTrack = await tx.track.findUnique({
+        where: { id },
+        select: trackSelect, // Ensure this includes genres and featuredArtists
+    });
+
+    if (!finalUpdatedTrack) {
+        throw new Error("Failed to re-fetch track after updating relations.");
+    }
+
+    return finalUpdatedTrack; // Return the track with updated relations from the transaction
   });
+
+  const io = getIO();
+  io.emit('track:updated', { track: updatedTrack }); // Use the result of the transaction
 
   return { message: 'Track updated successfully', track: updatedTrack };
 };

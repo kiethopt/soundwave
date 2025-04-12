@@ -14,6 +14,7 @@ import { useTrack } from '@/contexts/TrackContext';
 import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
 import { EditArtistProfileModal } from '@/components/ui/data-table/data-table-modals';
 import Image from 'next/image';
+import io, { Socket } from 'socket.io-client';
 
 function getBrightness(hexColor: string) {
   const r = parseInt(hexColor.substr(1, 2), 16);
@@ -160,6 +161,189 @@ export default function ArtistProfilePage({
 
     fetchData(); // Call the fetchData function
   }, [token, router, fetchData]);
+
+  // WebSocket listener for track list updates AND album list updates
+  useEffect(() => {
+    if (!id) return; // Don't connect if artist id is not available
+
+    let socket: Socket | null = null;
+    const connectTimer = setTimeout(() => {
+        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+
+        console.log(`[WebSocket] Attempting to connect for Artist Profile: ${id}`);
+
+        socket.on('connect', () => {
+            console.log(`[WebSocket] Connected for Artist Profile: ${id}`);
+        });
+
+        socket.on('disconnect', (reason: string) => {
+            console.log(`[WebSocket] Disconnected from Artist Profile ${id}:`, reason);
+        });
+
+        socket.on('connect_error', (error: Error) => {
+            console.error(`[WebSocket] Connection Error for Artist Profile ${id}:`, error);
+        });
+
+        // Update track in list
+        socket.on('track:updated', (data: { track: Track }) => {
+            // Check if the updated track belongs to the current artist profile
+            if (data.track.artistId === id) {
+                console.log(`[WebSocket] Track updated on Artist Profile ${id}:`, data.track);
+                setTracks((currentTracks) =>
+                    currentTracks.map((track) =>
+                        track.id === data.track.id ? { ...track, ...data.track } : track
+                    )
+                );
+                // Also update standaloneReleases if the track exists there
+                setStandaloneReleases((currentReleases) =>
+                    currentReleases.map((track) =>
+                        track.id === data.track.id ? { ...track, ...data.track } : track
+                    )
+                );
+            }
+        });
+
+        // Remove track from list if deleted
+        socket.on('track:deleted', (data: { trackId: string }) => {
+            // We need to check if the deleted track *was* part of this artist's list
+            setTracks((currentTracks) => {
+                const trackExists = currentTracks.some(t => t.id === data.trackId);
+                if (trackExists) {
+                    console.log(`[WebSocket] Track deleted from Artist Profile ${id}:`, data.trackId);
+                    return currentTracks.filter((track) => track.id !== data.trackId);
+                }
+                return currentTracks;
+            });
+            setStandaloneReleases((currentReleases) => {
+                const trackExists = currentReleases.some(t => t.id === data.trackId);
+                if (trackExists) {
+                    console.log(`[WebSocket] Track deleted from Standalone Releases ${id}:`, data.trackId);
+                    return currentReleases.filter((track) => track.id !== data.trackId);
+                }
+                return currentReleases;
+            });
+        });
+
+        // Remove track from list if hidden (profile pages shouldn't show hidden tracks)
+        socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
+            if (!data.isActive) { // Only act if track becomes hidden
+                setTracks((currentTracks) => {
+                    const trackExists = currentTracks.some(t => t.id === data.trackId);
+                    if (trackExists) {
+                        console.log(`[WebSocket] Track hidden on Artist Profile ${id}:`, data.trackId);
+                        return currentTracks.filter((track) => track.id !== data.trackId);
+                    }
+                    return currentTracks;
+                });
+                setStandaloneReleases((currentReleases) => {
+                    const trackExists = currentReleases.some(t => t.id === data.trackId);
+                    if (trackExists) {
+                        console.log(`[WebSocket] Track hidden from Standalone Releases ${id}:`, data.trackId);
+                        return currentReleases.filter((track) => track.id !== data.trackId);
+                    }
+                    return currentReleases;
+                });
+            }
+            // No need to add back if it becomes visible, fetchData handles initial load
+        });
+
+        // ---- Album Event Handling for Artist Profile ----
+
+        // Add newly created album to the list
+        socket.on('album:created', (data: { album: Album }) => {
+            if (data.album.artist?.id === id) {
+                console.log(`[WebSocket] Album created on Artist Profile ${id}:`, data.album);
+                setAlbums(prevAlbums => [data.album, ...prevAlbums]);
+                // Check if it's a single/EP based on type
+                if (data.album.type === 'SINGLE' || data.album.type === 'EP') { 
+                    setStandaloneReleases(prevReleases => [data.album as unknown as Track, ...prevReleases]);
+                }
+            }
+        });
+
+        // Update album in the list
+        socket.on('album:updated', (data: { album: Album }) => {
+            if (data.album.artist?.id === id) {
+                console.log(`[WebSocket] Album updated on Artist Profile ${id}:`, data.album);
+                setAlbums((prevAlbums) =>
+                    prevAlbums.map((album) =>
+                        album.id === data.album.id ? { ...album, ...data.album } : album
+                    )
+                );
+                // Update in standalone releases as well if applicable (check type)
+                if (data.album.type === 'SINGLE' || data.album.type === 'EP') {
+                    setStandaloneReleases((prevReleases) =>
+                        prevReleases.map((release) =>
+                            release.id === data.album.id ? { ...release, ...data.album as unknown as Track } : release
+                        )
+                    );
+                }
+            }
+        });
+
+        // Remove album from the list if deleted
+        socket.on('album:deleted', (data: { albumId: string }) => {
+            setAlbums(prevAlbums => {
+                const albumExists = prevAlbums.some(a => a.id === data.albumId && a.artist?.id === id);
+                if (albumExists) {
+                    console.log(`[WebSocket] Album deleted from Artist Profile ${id}:`, data.albumId);
+                    return prevAlbums.filter((album) => album.id !== data.albumId);
+                }
+                return prevAlbums;
+            });
+            setStandaloneReleases(prevReleases => {
+                const releaseExists = prevReleases.some(r => r.id === data.albumId);
+                if (releaseExists) {
+                    console.log(`[WebSocket] Standalone release deleted from Artist Profile ${id}:`, data.albumId);
+                    return prevReleases.filter((release) => release.id !== data.albumId);
+                }
+                return prevReleases;
+            });
+        });
+
+        // Remove album from the list if hidden
+        socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
+            if (!data.isActive) { // Only remove if hidden
+                setAlbums(prevAlbums => {
+                    const albumExists = prevAlbums.some(a => a.id === data.albumId && a.artist?.id === id);
+                    if (albumExists) {
+                        console.log(`[WebSocket] Album hidden on Artist Profile ${id}:`, data.albumId);
+                        return prevAlbums.filter((album) => album.id !== data.albumId);
+                    }
+                    return prevAlbums;
+                });
+                setStandaloneReleases(prevReleases => {
+                    const releaseExists = prevReleases.some(r => r.id === data.albumId);
+                    if (releaseExists) {
+                        console.log(`[WebSocket] Standalone release hidden on Artist Profile ${id}:`, data.albumId);
+                        return prevReleases.filter((release) => release.id !== data.albumId);
+                    }
+                    return prevReleases;
+                });
+            }
+            // If it becomes active again, it will be re-fetched on next load or could be added back here if needed
+        });
+    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
+
+    // Cleanup
+    return () => {
+        clearTimeout(connectTimer);
+        if (socket) {
+            console.log(`[WebSocket] Disconnecting from Artist Profile ${id}...`);
+            socket.off('connect');
+            socket.off('disconnect');
+            socket.off('connect_error');
+            socket.off('track:updated');
+            socket.off('track:deleted');
+            socket.off('track:visibilityChanged');
+            socket.off('album:created');
+            socket.off('album:updated');
+            socket.off('album:deleted');
+            socket.off('album:visibilityChanged');
+            socket.disconnect();
+        }
+    };
+  }, [id, setTracks, setStandaloneReleases, setAlbums]);
 
   const handleFollow = async () => {
     if (!token) {

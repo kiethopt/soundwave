@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/contexts/ThemeContext';
+import io, { Socket } from 'socket.io-client'; // Import Socket
 
 export default function AlbumDetailPage() {
   const params = useParams();
@@ -400,6 +401,122 @@ export default function AlbumDetailPage() {
       setTrackDetails(newTrackDetails);
     }
   };
+
+  // WebSocket listener for album updates
+  useEffect(() => {
+    if (!extractedAlbumId) return; // Don't connect if albumId is not available
+
+    let socket: Socket | null = null;
+    const connectTimer = setTimeout(() => {
+        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+
+        console.log(`[WebSocket] Connecting for Artist Album Detail: ${extractedAlbumId}`);
+
+        socket.on('connect', () => {
+            console.log(`[WebSocket] Connected for Artist Album Detail: ${extractedAlbumId}`);
+        });
+        socket.on('disconnect', (reason: string) => {
+            console.log(`[WebSocket] Disconnected from Artist Album Detail ${extractedAlbumId}:`, reason);
+        });
+        socket.on('connect_error', (error: Error) => {
+            console.error(`[WebSocket] Connection Error for Artist Album Detail ${extractedAlbumId}:`, error);
+        });
+
+        // Update album data
+        socket.on('album:updated', (data: { album: Album }) => {
+            if (data.album.id === extractedAlbumId) {
+                console.log(`[WebSocket] Artist Album ${extractedAlbumId} updated:`, data.album);
+                // Merge new data with existing data, especially preserving tracks if not included in update
+                setAlbum((prevAlbum) => (prevAlbum ? { ...prevAlbum, ...data.album } : data.album));
+                setError(null);
+            }
+        });
+
+        // Handle album deletion
+        socket.on('album:deleted', (data: { albumId: string }) => {
+            if (data.albumId === extractedAlbumId) {
+                console.log(`[WebSocket] Artist Album ${extractedAlbumId} deleted`);
+                setAlbum(null);
+                setError('This album has been deleted.');
+            }
+        });
+
+        // Handle visibility change (Artist can still see inactive albums)
+        socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
+            if (data.albumId === extractedAlbumId) {
+                console.log(`[WebSocket] Artist Album ${extractedAlbumId} visibility changed to ${data.isActive}`);
+                setAlbum((prevAlbum) => prevAlbum ? { ...prevAlbum, isActive: data.isActive } : prevAlbum);
+                setError(null); // Clear error in case it was previously set by other means
+            }
+        });
+
+         // ---- Track Event Handling within Album Detail ----
+        // Update track within the album's track list
+        socket.on('track:updated', (data: { track: Track }) => {
+            if (data.track.albumId === extractedAlbumId) {
+                console.log(`[WebSocket] Track ${data.track.id} in Artist Album ${extractedAlbumId} updated:`, data.track);
+                setAlbum(prevAlbum => {
+                    if (!prevAlbum) return null;
+                    const updatedTracks = prevAlbum.tracks.map(t => 
+                        t.id === data.track.id ? { ...t, ...data.track } : t
+                    );
+                    return { ...prevAlbum, tracks: updatedTracks };
+                });
+            }
+        });
+
+        // Remove track from the album's track list
+        socket.on('track:deleted', (data: { trackId: string }) => {
+            setAlbum(prevAlbum => {
+                if (!prevAlbum) return null;
+                const trackExists = prevAlbum.tracks.some(t => t.id === data.trackId);
+                if (trackExists) {
+                    console.log(`[WebSocket] Track ${data.trackId} deleted from Artist Album ${extractedAlbumId}`);
+                    const updatedTracks = prevAlbum.tracks.filter(t => t.id !== data.trackId);
+                     // Recalculate duration/totalTracks if necessary
+                     const totalDuration = updatedTracks.reduce((sum, track) => sum + (track.duration || 0), 0);
+                     const totalTracks = updatedTracks.length;
+                     return { ...prevAlbum, tracks: updatedTracks, duration: totalDuration, totalTracks: totalTracks };
+                }
+                return prevAlbum;
+            });
+        });
+
+        // Update track visibility within the album's track list
+        socket.on('track:visibilityChanged', (data: { trackId: string, isActive: boolean }) => {
+             setAlbum(prevAlbum => {
+                if (!prevAlbum) return null;
+                const trackIndex = prevAlbum.tracks.findIndex(t => t.id === data.trackId);
+                if (trackIndex !== -1) {
+                    console.log(`[WebSocket] Track ${data.trackId} visibility changed to ${data.isActive} in Artist Album ${extractedAlbumId}`);
+                    const updatedTracks = prevAlbum.tracks.map(t => 
+                        t.id === data.trackId ? { ...t, isActive: data.isActive } : t
+                    );
+                    return { ...prevAlbum, tracks: updatedTracks };
+                }
+                return prevAlbum;
+            });
+        });
+    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
+
+    // Cleanup
+    return () => {
+        clearTimeout(connectTimer);
+        if (socket) {
+            console.log(`[WebSocket] Disconnecting from Artist Album Detail ${extractedAlbumId}...`);
+            socket.off('connect');
+            socket.off('disconnect');
+            socket.off('connect_error');
+            socket.off('album:updated');
+            socket.off('album:deleted');
+            socket.off('album:visibilityChanged');
+            socket.off('track:updated');
+            socket.off('track:deleted');
+            socket.off('track:visibilityChanged');
+            socket.disconnect();
+        }
+    };
+  }, [extractedAlbumId, setAlbum]); // setAlbum is needed for track updates
 
   // Loading state
   if (isLoading) {

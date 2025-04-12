@@ -14,7 +14,7 @@ import {
 import type { Album, FetchDataResponse } from '@/types';
 import toast from 'react-hot-toast';
 import { EditAlbumModal, AlbumDetailModal } from '@/components/ui/data-table/data-table-modals';
-import io from 'socket.io-client';
+import io, { Socket } from 'socket.io-client';
 
 
 interface AlbumManagementProps {
@@ -173,13 +173,12 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
 
         await api.albums.delete(id, token);
         toast.success('Album deleted successfully');
-        refreshAlbums();
       } catch (error) {
         console.error('Failed to delete album:', error);
         toast.error('Failed to delete album');
       }
     },
-    [refreshAlbums]
+    []
   );
 
   const handleAlbumEditSubmit = useCallback(
@@ -189,13 +188,12 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
         await api.albums.update(albumId, formData, token);
         toast.success('Album updated successfully');
         setSelectedAlbum(null);
-        refreshAlbums();
       } catch (error) {
         console.error('Failed to update album:', error);
         toast.error('Failed to update album');
       }
     },
-    [refreshAlbums]
+    []
   );
   const handleToggleVisibility = useCallback(
     async (albumId: string, currentIsActive: boolean) => {
@@ -207,13 +205,17 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
         // Assuming an endpoint exists like api.albums.toggleVisibility
         await api.albums.toggleVisibility(albumId, token);
         toast.success(`Album ${action === 'hiding' ? 'hidden' : 'activated'} successfully`, { id: toastId });
-        refreshAlbums(); // Refresh data after successful toggle
+        setAlbums((currentAlbums: Album[]) =>
+            currentAlbums.map((album: Album) =>
+                album.id === albumId ? { ...album, isActive: !currentIsActive } : album
+            )
+        );
       } catch (error) {
         console.error(`Failed ${action} album:`, error);
         toast.error(`Failed to ${action} album`, { id: toastId });
       }
     },
-    [refreshAlbums]
+    [setAlbums]
   );
 
   const albumColumns = useMemo(
@@ -254,24 +256,81 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     manualPagination: true,
     manualSorting: true,
   });
-  useEffect(() => {
-    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
 
-    socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
-      console.log('[Admin] Album visibility changed via WebSocket:', data);
-      setAlbums((currentAlbums) =>
-        currentAlbums.map((album) =>
-          album.id === data.albumId ? { ...album, isActive: data.isActive } : album
-        )
-      );
-    });
+  // WebSocket listener for Album updates
+  useEffect(() => {
+    let socket: Socket | null = null;
+    const connectTimer = setTimeout(() => {
+        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+
+        console.log("[WebSocket] Connecting for Admin AlbumManagement...");
+
+        socket.on('connect', () => {
+            console.log("[WebSocket] Connected for Admin AlbumManagement");
+        });
+        socket.on('disconnect', (reason: string) => {
+            console.log("[WebSocket] Disconnected from Admin AlbumManagement:", reason);
+        });
+        socket.on('connect_error', (error: Error) => {
+            console.error("[WebSocket] Connection Error for Admin AlbumManagement:", error);
+        });
+
+        // Listen for album creation
+        socket.on('album:created', (data: { album: Album }) => {
+            console.log('[WebSocket] Album created:', data.album);
+            // Add to the beginning of the list for immediate visibility
+            // Note: This might not respect current sorting/filtering/pagination
+            // For a more robust solution, might need to refresh or re-evaluate filters/sort.
+            setAlbums((currentAlbums: Album[]) => [data.album, ...currentAlbums]);
+            // Or trigger a refresh if complex filtering/sorting is applied:
+            // refreshAlbums(); 
+        });
+
+        // Listen for album updates
+        socket.on('album:updated', (data: { album: Album }) => {
+          console.log('[WebSocket] Album updated:', data.album);
+          setAlbums((currentAlbums: Album[]) =>
+            currentAlbums.map((album: Album) =>
+              album.id === data.album.id ? { ...album, ...data.album } : album
+            )
+          );
+        });
+
+        // Listen for album deletions
+        socket.on('album:deleted', (data: { albumId: string }) => {
+          console.log('[WebSocket] Album deleted:', data.albumId);
+          setAlbums((currentAlbums: Album[]) =>
+            currentAlbums.filter((album: Album) => album.id !== data.albumId)
+          );
+        });
+
+         // Listen for album visibility changes
+        socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
+            console.log('[WebSocket] Album visibility changed:', data);
+            setAlbums((currentAlbums: Album[]) =>
+                currentAlbums.map((album: Album) =>
+                    album.id === data.albumId ? { ...album, isActive: data.isActive } : album
+                )
+            );
+        });
+    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
 
     // Cleanup on component unmount
     return () => {
-      socket.off('album:visibilityChanged');
-      socket.disconnect();
+        clearTimeout(connectTimer);
+        if (socket) {
+            console.log("[WebSocket] Disconnecting from Admin AlbumManagement...");
+            socket.off('connect');
+            socket.off('disconnect');
+            socket.off('connect_error');
+            socket.off('album:created');
+            socket.off('album:updated');
+            socket.off('album:deleted');
+            socket.off('album:visibilityChanged');
+            socket.disconnect();
+        }
     };
-  }, [setAlbums]);
+  }, [setAlbums]); // Add setAlbums as dependency
 
   return (
     <>

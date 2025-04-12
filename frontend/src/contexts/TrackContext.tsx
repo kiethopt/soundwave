@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { Track } from '@/types';
 import { api } from '@/utils/api';
+import io, { Socket } from 'socket.io-client'; // Import Socket type
 
 
 // Helper function to get initial volume from localStorage
@@ -93,29 +94,26 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const [loop, setLoop] = useState(false);
   const [duration, setDuration] = useState<number>(0);
   const [shuffle, setShuffle] = useState(false);
-  const [trackQueue, setTrackQueue] = useState<Track[]>([]);
+  const [trackQueue, setTrackQueue] = useState<Track[]>([]); // Main queue for playback logic
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [queueType, setQueueType] = useState<string>('track');
   const [playStartTime, setPlayStartTime] = useState<number | null>(null);
   const [lastSavedTime, setLastSavedTime] = useState<number>(0);
-  const [token, setToken] = useState<string | null>(null);
+  // Removed token state as it wasn't used after initialization
   const [showPlayer, setShowPlayer] = useState(false);
-  const [queue, setQueue] = useState<Track[]>([]);
+  const [queue, setQueue] = useState<Track[]>([]); // Queue for display/management UI
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackQueueRef = useRef<Track[]>([]);
   const tabId = useRef(Math.random().toString(36).substring(2, 15)).current;
   const broadcastChannel = useRef<BroadcastChannel | null>(null);
-
-  // Thêm một ref để theo dõi request hiện tại
   const currentPlayRequestRef = useRef<AbortController | null>(null);
 
   // Initialize audio and broadcast channel
   useEffect(() => {
     audioRef.current = new Audio();
     broadcastChannel.current = new BroadcastChannel('musicPlayback');
-    const token = localStorage.getItem('userToken');
-    if (token) setToken(token);
+    // Removed token setting as state wasn't used
 
     // Clean up function
     return () => {
@@ -398,26 +396,21 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentIndex, playTrack]);
 
-  const skipNext = useCallback(async () => {
-    if (!trackQueueRef.current.length) return;
-
-    try {
-      let nextIndex = currentIndex + 1;
-      if (nextIndex >= trackQueueRef.current.length) {
-        nextIndex = 0;
-      }
-
-      const nextTrack = trackQueueRef.current[nextIndex];
-      if (nextTrack) {
-        setCurrentIndex(nextIndex);
-        await playTrack(nextTrack);
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Error skipping to next track:', error);
-      }
+  const skipNext = useCallback(() => {
+    if (trackQueueRef.current.length === 0) return;
+    if (shuffle) {
+      skipRandom();
+      return;
     }
-  }, [currentIndex, playTrack]);
+    const nextIndex = (currentIndex + 1) % trackQueueRef.current.length;
+    if (trackQueueRef.current[nextIndex]) {
+        playTrack(trackQueueRef.current[nextIndex]);
+    } else {
+        // Handle case where queue might be empty or index out of bounds
+        pauseTrack();
+        setCurrentTrack(null);
+    }
+  }, [currentIndex, shuffle, playTrack, pauseTrack, skipRandom]);
 
   const skipPrevious = useCallback(async () => {
     if (!trackQueueRef.current.length) return;
@@ -644,6 +637,184 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     },
     [currentIndex]
   );
+
+  // WebSocket listener for TrackContext updates
+  useEffect(() => {
+    let socket: Socket | null = null;
+    const connectTimer = setTimeout(() => {
+        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+
+        socket.on('connect', () => {
+          console.log(`[WebSocket] TrackContext connected`);
+        });
+
+        socket.on('disconnect', (reason: string) => {
+          console.log(`[WebSocket] TrackContext disconnected:`, reason);
+        });
+
+        socket.on('connect_error', (error: Error) => {
+            console.error(`[WebSocket] TrackContext Connection Error:`, error);
+        });
+
+        // --- Track Updated --- 
+        socket.on('track:updated', (data: { track: Track }) => {
+          const updatedTrack = data.track;
+          console.log('[WebSocket] TrackContext received track:updated', updatedTrack);
+
+          // Update current track if it matches
+          setCurrentTrack(prevTrack => 
+            prevTrack?.id === updatedTrack.id ? { ...prevTrack, ...updatedTrack } : prevTrack
+          );
+
+          // Update track in the display queue
+          setQueue(prevQueue => 
+            prevQueue.map(t => t.id === updatedTrack.id ? { ...t, ...updatedTrack } : t)
+          );
+          // Update track in the playback queue (trackQueue)
+           setTrackQueue(prevPlaybackQueue => 
+            prevPlaybackQueue.map(t => t.id === updatedTrack.id ? { ...t, ...updatedTrack } : t)
+          );
+        });
+
+        // --- Track Deleted --- 
+        socket.on('track:deleted', (data: { trackId: string }) => {
+          const deletedTrackId = data.trackId;
+          console.log('[WebSocket] TrackContext received track:deleted', deletedTrackId);
+
+          // Check if the deleted track is the current track
+          if (currentTrack?.id === deletedTrackId) {
+            console.log('[WebSocket] Current track deleted, skipping next...');
+             // Stop playback and attempt to play the next track
+             if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.src = ''; // Clear source
+             }
+             setCurrentTrack(null);
+             setIsPlaying(false);
+             // Recalculate queue without the deleted track before skipping
+             const nextQueue = trackQueueRef.current.filter(t => t.id !== deletedTrackId);
+             setTrackQueue(nextQueue);
+             setQueue(nextQueue); // Update display queue as well
+             trackQueueRef.current = nextQueue;
+
+             if (nextQueue.length > 0) {
+                // Try to play the track at the current index (which might now be the next track)
+                // or wrap around if the deleted track was the last one.
+                const nextIndex = Math.min(currentIndex, nextQueue.length - 1);
+                 if (nextQueue[nextIndex]) {
+                     playTrack(nextQueue[nextIndex]);
+                 } else {
+                     setCurrentIndex(0); // Reset index if something went wrong
+                 }
+             } else {
+                setCurrentIndex(0); // No tracks left
+             }
+          } else {
+              // If not the current track, just remove from queues
+              const nextQueue = queue.filter(t => t.id !== deletedTrackId);
+              const nextPlaybackQueue = trackQueue.filter(t => t.id !== deletedTrackId);
+              
+              setQueue(nextQueue);
+              setTrackQueue(nextPlaybackQueue);
+              trackQueueRef.current = nextPlaybackQueue;
+              // Adjust currentIndex if a track before the current one was removed
+               const deletedIndex = trackQueue.findIndex(t => t.id === deletedTrackId);
+               if (deletedIndex !== -1 && deletedIndex < currentIndex) {
+                   setCurrentIndex(prev => Math.max(0, prev - 1));
+               }
+          }
+        });
+
+        // --- Track Visibility Changed --- 
+        socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
+          const { trackId, isActive } = data;
+          console.log(`[WebSocket] TrackContext received track:visibilityChanged for ${trackId}: ${isActive}`);
+
+           if (!isActive) { // Only act if track becomes hidden
+                let currentArtistId: string | null = null;
+                try {
+                    const userDataString = localStorage.getItem('userData');
+                    if (userDataString) {
+                        const userData = JSON.parse(userDataString);
+                        currentArtistId = userData?.artistProfile?.id || null;
+                    }
+                } catch (e) {
+                    console.error("Error parsing user data for visibility check:", e);
+                }
+
+                 // Check current track
+                 if (currentTrack?.id === trackId && currentTrack.artistId !== currentArtistId) {
+                    console.log('[WebSocket] Current track hidden and user is not owner, skipping next...');
+                     if (audioRef.current) {
+                        audioRef.current.pause();
+                        audioRef.current.src = '';
+                     }
+                     setCurrentTrack(null);
+                     setIsPlaying(false);
+                     // Recalculate queue without the hidden track before skipping
+                     const nextQueue = trackQueueRef.current.filter(t => t.id !== trackId);
+                     setTrackQueue(nextQueue);
+                     setQueue(nextQueue);
+                     trackQueueRef.current = nextQueue;
+
+                     if (nextQueue.length > 0) {
+                         const nextIndex = Math.min(currentIndex, nextQueue.length - 1);
+                         if (nextQueue[nextIndex]) {
+                             playTrack(nextQueue[nextIndex]);
+                         } else {
+                             setCurrentIndex(0);
+                         }
+                     } else {
+                         setCurrentIndex(0);
+                     }
+                 } else {
+                     // If not the current track (or user is owner), just remove from queues if not owner
+                     const nextQueue = queue.filter(t => t.id !== trackId || t.artistId === currentArtistId);
+                     const nextPlaybackQueue = trackQueue.filter(t => t.id !== trackId || t.artistId === currentArtistId);
+                     
+                     if (nextQueue.length !== queue.length) { // Check if filter actually removed something
+                        console.log('[WebSocket] Hidden track removed from queues (user not owner)');
+                        setQueue(nextQueue);
+                        setTrackQueue(nextPlaybackQueue);
+                        trackQueueRef.current = nextPlaybackQueue;
+                        // Adjust currentIndex if needed
+                         const hiddenIndex = trackQueue.findIndex(t => t.id === trackId);
+                        if (hiddenIndex !== -1 && hiddenIndex < currentIndex) {
+                            setCurrentIndex(prev => Math.max(0, prev - 1));
+                        }
+                     }
+                 }
+           } else {
+                // Track became active, update isActive status if it exists in the state
+                 setCurrentTrack(prevTrack => 
+                    prevTrack?.id === trackId ? { ...prevTrack, isActive: true } : prevTrack
+                 );
+                setQueue(prevQueue => 
+                    prevQueue.map(t => t.id === trackId ? { ...t, isActive: true } : t)
+                );
+                setTrackQueue(prevPlaybackQueue => 
+                    prevPlaybackQueue.map(t => t.id === trackId ? { ...t, isActive: true } : t)
+                );
+           }
+        });
+     // Only apply delay in development
+    }, process.env.NODE_ENV === 'development' ? 100 : 0);
+
+    // Cleanup
+    return () => {
+      clearTimeout(connectTimer); // Clear the timer if component unmounts before connection
+      if (socket) {
+          console.log(`[WebSocket] TrackContext disconnecting...`);
+          socket.off('connect');
+          socket.off('disconnect');
+          socket.off('connect_error');
+          socket.off('track:updated');
+          socket.off('track:deleted');
+          socket.off('track:visibilityChanged');
+          socket.disconnect();
+      }
+    };
+  }, [currentTrack?.id, currentIndex, queue, trackQueue, setCurrentTrack, setQueue, setTrackQueue, setIsPlaying, setCurrentIndex, playTrack, pauseTrack, skipNext]);
 
   return (
     <TrackContext.Provider

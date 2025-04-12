@@ -20,6 +20,7 @@ import { EditTrackModal } from '@/components/ui/data-table/data-table-modals';
 import { getTrackColumns } from '@/components/ui/data-table/data-table-columns';
 import { useDataTable } from '@/hooks/useDataTable';
 import type { Track, ArtistProfile, Genre, Label } from '@/types';
+import io, { Socket } from 'socket.io-client';
 
 export default function TrackManagement() {
   const { theme } = useTheme();
@@ -189,7 +190,6 @@ export default function TrackManagement() {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
       await Promise.all(idsToDelete.map((id) => api.tracks.delete(id, token)));
-      await refreshData();
       setRowSelection({});
       setSelectedRows([]);
       toast.success(
@@ -213,7 +213,6 @@ export default function TrackManagement() {
 
       // Đảm bảo labelId đã được thêm vào formData từ handleFormSubmit
       await api.tracks.update(trackId, formData, token);
-      await refreshData();
       setEditingTrack(null);
       toast.success('Track updated successfully');
     } catch (error) {
@@ -265,8 +264,95 @@ export default function TrackManagement() {
     },
     pageCount: totalPages,
     manualPagination: true,
+    manualSorting: true,
     debugTable: process.env.NODE_ENV === 'development',
   });
+
+  // Add useEffect for WebSocket updates
+  useEffect(() => {
+    let artistId: string | null = null;
+    try {
+        const userDataString = localStorage.getItem('userData');
+        if (userDataString) {
+            const userData = JSON.parse(userDataString);
+            artistId = userData?.artistProfile?.id || null;
+        }
+    } catch (error) {
+        console.error("Error parsing userData from localStorage:", error);
+    }
+
+    if (!artistId) {
+        console.warn("[WebSocket] Artist ID not found, WebSocket connection not established.");
+        return; // Don't connect if not an artist or ID not found
+    }
+
+    let socket: Socket | null = null;
+    const connectTimer = setTimeout(() => {
+        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+
+        socket.on('connect', () => {
+            console.log("[WebSocket] Connected for Artist Tracks");
+        });
+
+        socket.on('disconnect', (reason: string) => {
+            console.log("[WebSocket] Disconnected:", reason);
+        });
+
+        socket.on('connect_error', (error: Error) => {
+            console.error("[WebSocket] Connection Error:", error);
+        });
+
+        socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
+            setTracks((currentTracks) => {
+                const trackIndex = currentTracks.findIndex(t => t.id === data.trackId);
+                if (trackIndex !== -1 && currentTracks[trackIndex].artistId === artistId) {
+                    console.log('[Artist] Track visibility changed via WebSocket:', data);
+                    return currentTracks.map((track) =>
+                        track.id === data.trackId ? { ...track, isActive: data.isActive } : track
+                    );
+                }
+                return currentTracks;
+            });
+        });
+
+        socket.on('track:updated', (data: { track: Track }) => {
+            if (data.track.artistId === artistId) {
+                console.log('[Artist] Track updated via WebSocket:', data);
+                setTracks((currentTracks) =>
+                    currentTracks.map((track) =>
+                        track.id === data.track.id ? { ...track, ...data.track } : track
+                    )
+                );
+            }
+        });
+
+        socket.on('track:deleted', (data: { trackId: string }) => {
+            setTracks((currentTracks) => {
+                const trackExists = currentTracks.some(t => t.id === data.trackId && t.artistId === artistId);
+                if (trackExists) {
+                    console.log('[Artist] Track deleted via WebSocket:', data);
+                    return currentTracks.filter((track) => track.id !== data.trackId);
+                }
+                return currentTracks;
+            });
+        });
+    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
+
+    // Cleanup on component unmount
+    return () => {
+      clearTimeout(connectTimer);
+      if (socket) {
+          console.log("[WebSocket] Disconnecting for Artist Tracks...");
+          socket.off('connect');
+          socket.off('disconnect');
+          socket.off('connect_error');
+          socket.off('track:visibilityChanged');
+          socket.off('track:updated');
+          socket.off('track:deleted');
+          socket.disconnect();
+      }
+    };
+  }, [setTracks]); // Dependency array only needs setTracks
 
   // Add useEffect for auto-refresh when release dates pass
   useEffect(() => {
@@ -469,7 +555,7 @@ export default function TrackManagement() {
             setSelectedGenres([]);
             setSelectedLabelId(null);
           }}
-          onSubmit={handleUpdateTrack} // Truyền trực tiếp hàm với chữ ký đúng
+          onSubmit={handleUpdateTrack}
           availableArtists={availableArtists}
           availableGenres={availableGenres}
           availableLabels={availableLabels}

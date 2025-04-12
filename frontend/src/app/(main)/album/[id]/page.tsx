@@ -19,6 +19,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { AlbumTracks } from '@/components/user/album/AlbumTracks';
+import io, { Socket } from 'socket.io-client'; // Import Socket
 
 export default function AlbumDetailPage() {
   const params = useParams();
@@ -74,6 +75,81 @@ export default function AlbumDetailPage() {
       fetchAlbumDetails();
     }
   }, [albumId, fetchAlbumDetails]);
+
+  // WebSocket listener for album updates
+  useEffect(() => {
+    if (!albumId) return; // Don't connect if albumId is not available
+
+    let socket: Socket | null = null;
+    const connectTimer = setTimeout(() => {
+        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+
+        console.log(`[WebSocket] Connecting for Album Detail: ${albumId}`);
+
+        socket.on('connect', () => {
+            console.log(`[WebSocket] Connected for Album Detail: ${albumId}`);
+        });
+        socket.on('disconnect', (reason: string) => {
+            console.log(`[WebSocket] Disconnected from Album Detail ${albumId}:`, reason);
+        });
+        socket.on('connect_error', (error: Error) => {
+            console.error(`[WebSocket] Connection Error for Album Detail ${albumId}:`, error);
+        });
+
+        // Update album data
+        socket.on('album:updated', (data: { album: Album }) => {
+            if (data.album.id === albumId) {
+                console.log(`[WebSocket] Album ${albumId} updated:`, data.album);
+                // Merge new data with existing data, especially preserving tracks if not included in update
+                setAlbum((prevAlbum) => (prevAlbum ? { ...prevAlbum, ...data.album } : data.album));
+                setError(null);
+            }
+        });
+
+        // Handle album deletion
+        socket.on('album:deleted', (data: { albumId: string }) => {
+            if (data.albumId === albumId) {
+                console.log(`[WebSocket] Album ${albumId} deleted`);
+                setAlbum(null);
+                setError('This album has been deleted.');
+            }
+        });
+
+        // Handle visibility change
+        socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
+            if (data.albumId === albumId) {
+                console.log(`[WebSocket] Album ${albumId} visibility changed to ${data.isActive}`);
+                if (!data.isActive) {
+                    // User page should not show inactive albums
+                    setAlbum(null);
+                    setError('This album is no longer available.');
+                } else {
+                    // Album became active, refetch might be simplest if it wasn't loaded before
+                    // Or update state if it was already loaded but marked inactive (unlikely for user page)
+                    setAlbum((prevAlbum) => prevAlbum ? { ...prevAlbum, isActive: true } : prevAlbum);
+                    setError(null); // Clear any previous error
+                    // Consider refetching if the album was previously null due to inactivity
+                    // fetchAlbumDetails();
+                }
+            }
+        });
+    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
+
+    // Cleanup
+    return () => {
+        clearTimeout(connectTimer);
+        if (socket) {
+            console.log(`[WebSocket] Disconnecting from Album Detail ${albumId}...`);
+            socket.off('connect');
+            socket.off('disconnect');
+            socket.off('connect_error');
+            socket.off('album:updated');
+            socket.off('album:deleted');
+            socket.off('album:visibilityChanged');
+            socket.disconnect();
+        }
+    };
+  }, [albumId, fetchAlbumDetails]); // Add fetchAlbumDetails to dependencies if used inside effect
 
   const handleTrackPlay = (track: Track) => {
     // Check if user is authenticated before playing

@@ -37,6 +37,10 @@ export const deleteAlbumById = async (id: string) => {
     throw new Error('Album not found');
   }
 
+  // Emit WebSocket event before deletion
+  const io = getIO();
+  io.emit('album:deleted', { albumId: id });
+
   return prisma.album.delete({
     where: { id },
   });
@@ -242,6 +246,9 @@ export const createAlbum = async (req: Request) => {
     }
   }
 
+  // Emit WebSocket event after creation
+  io.emit('album:created', { album });
+
   return { message: 'Album created successfully', album };
 };
 
@@ -322,6 +329,10 @@ export const addTracksToAlbum = async (req: Request) => {
     data: { duration: totalDuration, totalTracks: tracks.length },
     select: albumSelect,
   });
+
+  // Emit event after updating album stats
+  const io = getIO();
+  io.emit('album:updated', { album: updatedAlbum });
 
   return { message: 'Tracks added to album successfully', album: updatedAlbum, tracks: createdTracks };
 };
@@ -411,6 +422,10 @@ export const updateAlbum = async (req: Request) => {
     select: albumSelect,
   });
 
+  // Emit WebSocket event after successful update
+  const io = getIO();
+  io.emit('album:updated', { album: updatedAlbum });
+
   return { message: 'Album updated successfully', album: updatedAlbum };
 };
 
@@ -454,10 +469,13 @@ export const toggleAlbumVisibility = async (req: Request) => {
     data: { isActive: newIsActive },
     select: albumSelect,
   });
+
+  // Emit WebSocket event
   const io = getIO();
   io.emit('album:visibilityChanged', { albumId: updatedAlbum.id, isActive: newIsActive });
+
   return {
-    message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'} successfully`,
+    message: `Album ${newIsActive ? 'activated' : 'hidden'} successfully`,
     album: updatedAlbum,
   };
 };

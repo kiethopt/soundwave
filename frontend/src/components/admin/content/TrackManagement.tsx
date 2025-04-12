@@ -15,7 +15,7 @@ import {
 import type { Track, FetchDataResponse } from '@/types';
 import toast from 'react-hot-toast';
 import { EditTrackModal, TrackDetailModal } from '@/components/ui/data-table/data-table-modals';
-import io from 'socket.io-client';
+import io, { Socket } from 'socket.io-client';
 
 
 interface TrackManagementProps {
@@ -203,13 +203,12 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
 
         await api.tracks.delete(id, token);
         toast.success('Track deleted successfully');
-        refreshTracks();
       } catch (error) {
         console.error('Failed to delete track:', error);
         toast.error('Failed to delete track');
       }
     },
-    [refreshTracks]
+    []
   );
   const handleToggleVisibility = useCallback(
     async (trackId: string, currentIsActive: boolean) => {
@@ -235,7 +234,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
         );
       }
     },
-    [refreshTracks, setData]
+    [setData]
   );
 
   const handleTrackEditSubmit = useCallback(
@@ -245,13 +244,12 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
         await api.tracks.update(trackId, formData, token);
         toast.success('Track updated successfully');
         setSelectedTrack(null);
-        refreshTracks();
       } catch (error) {
         console.error('Failed to update track:', error);
         toast.error('Failed to update track');
       }
     },
-    [refreshTracks]
+    []
   );
 
   const trackColumns = useMemo(
@@ -267,23 +265,50 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   );
 
   useEffect(() => {
-    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+    let socket: Socket | null = null;
+    const connectTimer = setTimeout(() => {
+        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
 
-    socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
-      console.log('[Admin] Track visibility changed via WebSocket:', data);
-      setData((currentTracks: Track[]) =>
-        currentTracks.map((track: Track) =>
-          track.id === data.trackId ? { ...track, isActive: data.isActive } : track
-        )
-      );
-    });
+        socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
+            console.log('[Admin] Track visibility changed via WebSocket:', data);
+            setData((currentTracks: Track[]) =>
+                currentTracks.map((track: Track) =>
+                    track.id === data.trackId ? { ...track, isActive: data.isActive } : track
+                )
+            );
+        });
+
+        // Listen for track updates
+        socket.on('track:updated', (data: { track: Track }) => {
+            console.log('[Admin] Track updated via WebSocket:', data);
+            setData((currentTracks: Track[]) =>
+                currentTracks.map((track: Track) =>
+                    track.id === data.track.id ? { ...track, ...data.track } : track // Merge updates
+                )
+            );
+        });
+
+        // Listen for track deletions
+        socket.on('track:deleted', (data: { trackId: string }) => {
+            console.log('[Admin] Track deleted via WebSocket:', data);
+            setData((currentTracks: Track[]) =>
+                currentTracks.filter((track: Track) => track.id !== data.trackId)
+            );
+        });
+    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
 
     // Cleanup on component unmount
     return () => {
-      socket.off('track:visibilityChanged');
-      socket.disconnect();
+      clearTimeout(connectTimer);
+      if (socket) {
+          socket.off('track:visibilityChanged');
+          socket.off('track:updated');
+          socket.off('track:deleted');
+          socket.disconnect();
+      }
     };
-  }, [setData]);
+  }, [setData]); // Keep setData dependency
+
   const trackTable = useReactTable({
     data: tracks || [],
     columns: trackColumns,
