@@ -3,17 +3,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateDefaultPlaylistForNewUser = exports.createAIGeneratedPlaylist = exports.generateAIPlaylist = exports.model = void 0;
+exports.analyzeAllVibeRewindPlaylists = exports.generateDefaultPlaylistForNewUser = exports.createAIGeneratedPlaylist = exports.generateAIPlaylist = exports.model = void 0;
 const generative_ai_1 = require("@google/generative-ai");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_1 = require("@prisma/client");
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY is not defined in environment variables');
+    throw new Error("GEMINI_API_KEY is not defined in environment variables");
 }
 const genAI = new generative_ai_1.GoogleGenerativeAI(GEMINI_API_KEY);
-const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const model = genAI.getGenerativeModel({
     model: modelName,
     systemInstruction: "You are an expert music curator specializing in personalization. Your primary goal is to create highly personalized playlists that closely match each user's demonstrated preferences. PRIORITIZE tracks from artists the user has already listened to or liked. Only include tracks from other artists if they are extremely similar in style and genre to the user's favorites. Analyze the provided listening history and liked tracks carefully, identifying patterns in genres, artists, and moods. Return ONLY a valid JSON array of track IDs, without any duplicates or explanations. The tracks should strongly reflect the user's taste, with at least 70% being from artists they've shown interest in.",
@@ -27,7 +27,7 @@ const generateAIPlaylist = async (userId, options = {}) => {
         const userHistory = await db_1.default.history.findMany({
             where: {
                 userId,
-                type: 'PLAY',
+                type: "PLAY",
             },
             include: {
                 track: {
@@ -35,13 +35,13 @@ const generateAIPlaylist = async (userId, options = {}) => {
                 },
             },
             orderBy: {
-                updatedAt: 'desc',
+                updatedAt: "desc",
             },
             take: 30,
         });
         if (userHistory.length === 0) {
             console.log(`[AI] User ${userId} has no listening history. Using default playlist.`);
-            return (0, exports.generateDefaultPlaylistForNewUser)(userId);
+            return (0, exports.generateDefaultPlaylistForNewUser)(userId, trackCount);
         }
         const userLikedTracks = await db_1.default.userLikeTrack.findMany({
             where: { userId },
@@ -51,7 +51,7 @@ const generateAIPlaylist = async (userId, options = {}) => {
                 },
             },
             orderBy: {
-                createdAt: 'desc',
+                createdAt: "desc",
             },
             take: 30,
         });
@@ -93,7 +93,7 @@ const generateAIPlaylist = async (userId, options = {}) => {
                 where: {
                     artistName: {
                         contains: options.basedOnArtist,
-                        mode: 'insensitive',
+                        mode: "insensitive",
                     },
                 },
                 select: { id: true },
@@ -103,13 +103,16 @@ const generateAIPlaylist = async (userId, options = {}) => {
                 sortedPreferredArtists.unshift(artistByName.id);
                 console.log(`[AI] Adding specified artist to preferences: ${options.basedOnArtist}`);
             }
+            else {
+                console.log(`[AI] Warning: Specified artist "${options.basedOnArtist}" not found in database`);
+            }
         }
         if (options.basedOnGenre) {
             const genreByName = await db_1.default.genre.findFirst({
                 where: {
                     name: {
                         contains: options.basedOnGenre,
-                        mode: 'insensitive',
+                        mode: "insensitive",
                     },
                 },
                 select: { id: true },
@@ -118,8 +121,13 @@ const generateAIPlaylist = async (userId, options = {}) => {
                 preferredGenreIds.add(genreByName.id);
                 console.log(`[AI] Adding specified genre to preferences: ${options.basedOnGenre}`);
             }
+            else {
+                console.log(`[AI] Warning: Specified genre "${options.basedOnGenre}" not found in database`);
+            }
         }
         const whereClause = { isActive: true };
+        let foundMatchingArtist = false;
+        let foundMatchingGenre = false;
         if (preferredArtistIds.size > 0 || preferredGenreIds.size > 0) {
             whereClause.OR = [];
             if (preferredArtistIds.size > 0) {
@@ -143,7 +151,7 @@ const generateAIPlaylist = async (userId, options = {}) => {
                     genre: {
                         name: {
                             contains: options.basedOnGenre,
-                            mode: 'insensitive',
+                            mode: "insensitive",
                         },
                     },
                 },
@@ -153,7 +161,7 @@ const generateAIPlaylist = async (userId, options = {}) => {
             whereClause.artist = {
                 artistName: {
                     contains: options.basedOnArtist,
-                    mode: 'insensitive',
+                    mode: "insensitive",
                 },
             };
         }
@@ -163,10 +171,10 @@ const generateAIPlaylist = async (userId, options = {}) => {
             orderBy: [
                 {
                     artist: {
-                        artistName: preferredArtistIds.size > 0 ? 'asc' : undefined,
+                        artistName: preferredArtistIds.size > 0 ? "asc" : undefined,
                     },
                 },
-                { playCount: 'desc' },
+                { playCount: "desc" },
             ],
             take: 150,
         });
@@ -220,28 +228,28 @@ const generateAIPlaylist = async (userId, options = {}) => {
         const promptText = `Tạo một danh sách phát cá nhân hóa cho người dùng này tập trung chủ yếu vào sở thích đã thể hiện của họ.
 
 Thông tin người dùng:
-- Nghệ sĩ ưa thích: ${Array.from(preferredArtistNames).join(', ') || 'Không có chỉ định'}
+- Nghệ sĩ ưa thích: ${Array.from(preferredArtistNames).join(", ") || "Không có chỉ định"}
 - Lịch sử nghe gần đây: ${userHistory
-            .map((h) => h.track?.title || '')
+            .map((h) => h.track?.title || "")
             .filter(Boolean)
-            .join(', ')}
+            .join(", ")}
 - Bài hát đã thích: ${userLikedTracks
-            .map((l) => l.track?.title || '')
+            .map((l) => l.track?.title || "")
             .filter(Boolean)
-            .join(', ')}
+            .join(", ")}
 
 Dữ liệu ngữ cảnh đầy đủ:
 ${JSON.stringify(context, null, 2)}
 
 Hướng dẫn quan trọng:
-1. PHẢI ưu tiên mạnh mẽ các bài hát từ nghệ sĩ mà người dùng đã nghe hoặc thích (${Array.from(preferredArtistNames).join(', ')}).
+1. PHẢI ưu tiên mạnh mẽ các bài hát từ nghệ sĩ mà người dùng đã nghe hoặc thích (${Array.from(preferredArtistNames).join(", ")}).
 2. Ít nhất 70% bài hát phải đến từ các nghệ sĩ mà người dùng đã thể hiện sự quan tâm.
 3. Chỉ bao gồm bài hát từ nghệ sĩ mà người dùng chưa thể hiện sự quan tâm nếu chúng rất giống với sở thích của người dùng.
-4. Xem xét sở thích của người dùng về tâm trạng (${options.basedOnMood || 'bất kỳ'}), thể loại (${options.basedOnGenre || 'bất kỳ'}), và nghệ sĩ (${options.basedOnArtist || 'dựa trên lịch sử'}).
+4. Xem xét sở thích của người dùng về tâm trạng (${options.basedOnMood || "bất kỳ"}), thể loại (${options.basedOnGenre || "bất kỳ"}), và nghệ sĩ (${options.basedOnArtist || "dựa trên lịch sử"}).
 5. Chọn chính xác ${trackCount} bài hát và chỉ trả về mảng ID bài hát JSON hợp lệ.`;
         console.log(`[AI] Gửi lời nhắc cải tiến đến model Gemini ${modelName}`);
         const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: promptText }] }],
+            contents: [{ role: "user", parts: [{ text: promptText }] }],
             generationConfig: {
                 temperature: 0.3,
                 topK: 40,
@@ -251,145 +259,72 @@ Hướng dẫn quan trọng:
         });
         const response = result.response;
         const responseText = response.text();
-        console.log('[AI] Raw response:', responseText);
+        console.log("[AI] Raw response:", responseText);
+        if (options.basedOnArtist) {
+            const artistTracks = availableTracks.filter((track) => track.artist?.artistName
+                ?.toLowerCase()
+                .includes(options.basedOnArtist.toLowerCase()));
+            foundMatchingArtist = artistTracks.length > 0;
+            if (!foundMatchingArtist) {
+                console.log(`[AI] No tracks found for artist "${options.basedOnArtist}"`);
+            }
+            else {
+                console.log(`[AI] Found ${artistTracks.length} tracks for artist "${options.basedOnArtist}"`);
+            }
+        }
+        if (options.basedOnGenre) {
+            const genreTracks = availableTracks.filter((track) => track.genres.some((g) => g.genre.name
+                .toLowerCase()
+                .includes(options.basedOnGenre.toLowerCase())));
+            foundMatchingGenre = genreTracks.length > 0;
+            if (!foundMatchingGenre) {
+                console.log(`[AI] No tracks found for genre "${options.basedOnGenre}"`);
+            }
+            else {
+                console.log(`[AI] Found ${genreTracks.length} tracks for genre "${options.basedOnGenre}"`);
+            }
+        }
+        if (options.basedOnArtist && !foundMatchingArtist) {
+            console.log(`[AI] Warning: Couldn't find any tracks for specified artist "${options.basedOnArtist}"`);
+        }
         let trackIds = [];
         try {
-            const cleanedResponse = responseText.replace(/```json|```/g, '').trim();
-            if (cleanedResponse &&
-                cleanedResponse.startsWith('[') &&
-                cleanedResponse.endsWith(']')) {
-                trackIds = JSON.parse(cleanedResponse);
-            }
-            else {
-                console.warn('[AI] Gemini response is empty or not a valid JSON array.');
-            }
-            if (trackIds.length > 0) {
-                const validTrackIds = await db_1.default.track.findMany({
-                    where: {
-                        id: { in: trackIds },
-                        isActive: true,
-                    },
-                    select: { id: true, artistId: true },
-                });
-                trackIds = validTrackIds.map((t) => t.id);
-            }
-            else {
-                console.log('[AI] No valid track IDs parsed from Gemini response.');
-            }
-            if (preferredArtistIds.size > 0) {
-                const tracksFromPreferredArtists = trackIds.filter((t) => preferredArtistIds.has(t)).length;
-                const preferredArtistPercentage = (tracksFromPreferredArtists / trackIds.length) * 100;
-                console.log(`[AI] Initial tracks from preferred artists: ${preferredArtistPercentage.toFixed(1)}%`);
-                if (preferredArtistPercentage < 70 && trackIds.length > 0) {
-                    console.log(`[AI] Need to increase preferred artist percentage (currently ${preferredArtistPercentage.toFixed(1)}%)`);
-                }
+            const cleanedResponse = responseText.replace(/```json|```/g, "").trim();
+            trackIds = JSON.parse(cleanedResponse);
+            if (!Array.isArray(trackIds)) {
+                console.error("[AI] Response is not a valid array:", cleanedResponse);
+                trackIds = [];
             }
         }
         catch (error) {
-            console.error('[AI] Error parsing Gemini response:', error);
-            console.error('[AI] Raw response:', responseText);
-            throw new Error('Failed to parse AI-generated playlist recommendations');
+            console.error("[AI] Error parsing AI response:", error);
+            console.error("[AI] Raw response:", responseText);
+            trackIds = [];
         }
-        if (trackIds.length < trackCount || preferredArtistIds.size > 0) {
-            console.log(`[AI] Adjusting playlist to ensure at least 70% from preferred artists`);
-            const currentTracks = await db_1.default.track.findMany({
-                where: {
-                    id: { in: trackIds },
-                    isActive: true,
-                },
-                select: {
-                    id: true,
-                    artistId: true,
-                    title: true,
-                    artist: {
-                        select: { artistName: true },
-                    },
-                },
-            });
-            const tracksFromPreferredArtists = currentTracks.filter((t) => preferredArtistIds.has(t.artistId));
-            const tracksFromOtherArtists = currentTracks.filter((t) => !preferredArtistIds.has(t.artistId));
-            const preferredArtistPercentage = (tracksFromPreferredArtists.length / (currentTracks.length || 1)) * 100;
-            if (preferredArtistPercentage < 70 && preferredArtistIds.size > 0) {
-                const desiredPreferredTracks = Math.ceil(trackCount * 0.7);
-                const additionalPreferredTracksNeeded = Math.max(0, desiredPreferredTracks - tracksFromPreferredArtists.length);
-                console.log(`[AI] Need ${additionalPreferredTracksNeeded} more tracks from preferred artists to reach 70%`);
-                if (additionalPreferredTracksNeeded > 0) {
-                    const additionalPreferredTracks = await db_1.default.track.findMany({
-                        where: {
-                            artistId: { in: sortedPreferredArtists },
-                            isActive: true,
-                            id: { notIn: trackIds },
-                        },
-                        orderBy: { playCount: 'desc' },
-                        take: additionalPreferredTracksNeeded * 2,
-                        select: { id: true, artistId: true },
-                    });
-                    const additionalTrackIds = additionalPreferredTracks
-                        .sort((a, b) => {
-                        const aIndex = sortedPreferredArtists.indexOf(a.artistId);
-                        const bIndex = sortedPreferredArtists.indexOf(b.artistId);
-                        return aIndex - bIndex;
-                    })
-                        .slice(0, additionalPreferredTracksNeeded)
-                        .map((t) => t.id);
-                    const remainingTracksNeeded = Math.max(0, trackCount - (trackIds.length + additionalTrackIds.length));
-                    const finalTrackIds = [
-                        ...tracksFromPreferredArtists.map((t) => t.id),
-                        ...additionalTrackIds,
-                        ...tracksFromOtherArtists.map((t) => t.id),
-                    ];
-                    trackIds = finalTrackIds;
-                    if (remainingTracksNeeded > 0) {
-                        const fallbackTracks = await db_1.default.track.findMany({
-                            where: {
-                                isActive: true,
-                                id: { notIn: trackIds },
-                            },
-                            orderBy: { playCount: 'desc' },
-                            take: remainingTracksNeeded,
-                            select: { id: true },
-                        });
-                        trackIds = [...trackIds, ...fallbackTracks.map((t) => t.id)];
-                    }
-                    const finalPreferredTracks = await db_1.default.track.findMany({
-                        where: {
-                            id: { in: trackIds },
-                            artistId: { in: Array.from(preferredArtistIds) },
-                        },
-                        select: { id: true },
-                    });
-                    const finalPercentage = (finalPreferredTracks.length / trackIds.length) * 100;
-                    console.log(`[AI] Final preferred artist percentage: ${finalPercentage.toFixed(1)}%`);
-                }
-            }
+        if (trackIds.length === 0 && availableTracks.length > 0) {
+            console.log("[AI] No valid recommendations from AI, using available tracks directly");
+            trackIds = availableTracks.slice(0, trackCount).map((t) => t.id);
+        }
+        if (trackIds.length === 0) {
+            console.log("[AI] No recommendations available, falling back to popular tracks");
+            trackIds = await (0, exports.generateDefaultPlaylistForNewUser)(userId, trackCount);
         }
         if (trackIds.length > trackCount) {
+            console.log(`[AI] Trimming recommendations from ${trackIds.length} to requested ${trackCount} tracks`);
             trackIds = trackIds.slice(0, trackCount);
         }
-        else if (trackIds.length < trackCount) {
-            const additionalTracks = await db_1.default.track.findMany({
-                where: {
-                    isActive: true,
-                    id: { notIn: trackIds },
-                },
-                orderBy: { playCount: 'desc' },
-                take: trackCount - trackIds.length,
-                select: { id: true },
-            });
-            trackIds = [...trackIds, ...additionalTracks.map((t) => t.id)];
-        }
-        console.log(`[AI] Successfully generated playlist with ${trackIds.length} tracks`);
+        console.log(`[AI] Generated playlist with ${trackIds.length} tracks`);
         return trackIds;
     }
     catch (error) {
-        console.error('[AI] Error generating playlist:', error);
-        throw error;
+        console.error("[AI] Error generating AI playlist:", error);
+        return (0, exports.generateDefaultPlaylistForNewUser)(userId, options.trackCount || 10);
     }
 };
 exports.generateAIPlaylist = generateAIPlaylist;
 const createAIGeneratedPlaylist = async (userId, options = {}) => {
     try {
-        const playlistName = options.name || 'Soundwave Discoveries';
+        const playlistName = options.name || "Soundwave Discoveries";
         const trackIds = await (0, exports.generateAIPlaylist)(userId, options);
         const tracks = await db_1.default.track.findMany({
             where: { id: { in: trackIds } },
@@ -423,8 +358,8 @@ const createAIGeneratedPlaylist = async (userId, options = {}) => {
             .map((id) => artistsInPlaylist.get(id))
             .filter(Boolean);
         const playlistDescription = options.description ||
-            `Curated selection featuring ${sortedArtistNames.slice(0, 3).join(', ')}${sortedArtistNames.length > 3 ? ' and more' : ''}. Refreshed regularly based on your listening patterns.`;
-        const defaultCoverUrl = 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png';
+            `Curated selection featuring ${sortedArtistNames.slice(0, 3).join(", ")}${sortedArtistNames.length > 3 ? " and more" : ""}. Refreshed regularly based on your listening patterns.`;
+        const defaultCoverUrl = "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
         let playlist = await db_1.default.playlist.findFirst({
             where: {
                 userId,
@@ -434,7 +369,7 @@ const createAIGeneratedPlaylist = async (userId, options = {}) => {
         });
         const playlistData = {
             description: playlistDescription,
-            coverUrl: options.coverUrl === null ? null : (options.coverUrl || defaultCoverUrl),
+            coverUrl: options.coverUrl === null ? null : options.coverUrl || defaultCoverUrl,
             totalTracks: trackIds.length,
             totalDuration,
             updatedAt: new Date(),
@@ -467,7 +402,7 @@ const createAIGeneratedPlaylist = async (userId, options = {}) => {
                     name: playlistName,
                     userId,
                     type: client_1.PlaylistType.SYSTEM,
-                    privacy: 'PRIVATE',
+                    privacy: "PRIVATE",
                     isAIGenerated: true,
                     ...playlistData,
                 },
@@ -477,20 +412,20 @@ const createAIGeneratedPlaylist = async (userId, options = {}) => {
         return playlist;
     }
     catch (error) {
-        console.error('[AI] Error creating/updating AI-generated playlist:', error);
+        console.error("[AI] Error creating/updating AI-generated playlist:", error);
         throw error;
     }
 };
 exports.createAIGeneratedPlaylist = createAIGeneratedPlaylist;
-const generateDefaultPlaylistForNewUser = async (userId) => {
+const generateDefaultPlaylistForNewUser = async (userId, trackCount = 10) => {
     try {
-        console.log(`[AI] Generating default playlist for new user ${userId}`);
+        console.log(`[AI] Generating default playlist for new user ${userId} with ${trackCount} tracks`);
         const popularTracks = await db_1.default.track.findMany({
             where: {
                 isActive: true,
             },
             orderBy: {
-                playCount: 'desc',
+                playCount: "desc",
             },
             select: {
                 id: true,
@@ -501,14 +436,14 @@ const generateDefaultPlaylistForNewUser = async (userId) => {
                     },
                 },
             },
-            take: 15,
+            take: trackCount,
         });
         console.log(`[AI] Found ${popularTracks.length} popular tracks for new user playlist`);
         if (popularTracks.length > 0) {
             const trackSample = popularTracks
                 .slice(0, 3)
-                .map((t) => `${t.title} by ${t.artist?.artistName || 'Unknown'}`);
-            console.log(`[AI] Sample tracks: ${trackSample.join(', ')}`);
+                .map((t) => `${t.title} by ${t.artist?.artistName || "Unknown"}`);
+            console.log(`[AI] Sample tracks: ${trackSample.join(", ")}`);
         }
         const trackIds = popularTracks.map((track) => track.id);
         if (trackIds.length === 0) {
@@ -520,17 +455,119 @@ const generateDefaultPlaylistForNewUser = async (userId) => {
                 select: {
                     id: true,
                 },
-                take: 15,
+                take: trackCount,
             });
             return randomTracks.map((track) => track.id);
         }
-        console.log(`[AI] Generated default playlist with ${trackIds.length} popular tracks`);
+        console.log(`[AI] Generated default playlist with ${trackIds.length} tracks`);
         return trackIds;
     }
     catch (error) {
-        console.error('[AI] Error generating default playlist:', error);
+        console.error("[AI] Error generating default playlist:", error);
         return [];
     }
 };
 exports.generateDefaultPlaylistForNewUser = generateDefaultPlaylistForNewUser;
+const analyzeAllVibeRewindPlaylists = async () => {
+    try {
+        console.log("[AI] Analyzing all Vibe Rewind playlists to determine popular trends");
+        const vibeRewindPlaylists = await db_1.default.playlist.findMany({
+            where: {
+                name: "Vibe Rewind",
+                type: "SYSTEM",
+            },
+            include: {
+                tracks: {
+                    include: {
+                        track: {
+                            include: {
+                                genres: {
+                                    include: {
+                                        genre: true,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            take: 100,
+        });
+        if (vibeRewindPlaylists.length === 0) {
+            console.log("[AI] No Vibe Rewind playlists found. Using default values.");
+            return {
+                mood: "energetic",
+                genres: ["Pop", "Rock", "Hip Hop"],
+            };
+        }
+        const allTracks = vibeRewindPlaylists.flatMap((playlist) => playlist.tracks.map((pt) => pt.track));
+        const genreCounts = {};
+        allTracks.forEach((track) => {
+            track.genres.forEach((genreRel) => {
+                const genreName = genreRel.genre.name;
+                genreCounts[genreName] = (genreCounts[genreName] || 0) + 1;
+            });
+        });
+        const sortedGenres = Object.entries(genreCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map((entry) => entry[0])
+            .slice(0, 3);
+        const moodContext = {
+            tracks: allTracks.map((track) => ({
+                title: track.title,
+                genres: track.genres.map((g) => g.genre.name),
+            })),
+        };
+        const analysisPrompt = `Phân tích danh sách bài hát từ tất cả người dùng và trả về:
+    1. Tâm trạng phổ biến nhất (mood): happy, sad, energetic, calm, nostalgic, romantic, focused, party
+    2. Top 3 thể loại nhạc phổ biến nhất (genres)
+    
+    Trả về dưới dạng JSON với format:
+    {
+      "mood": "tâm_trạng",
+      "genres": ["thể_loại_1", "thể_loại_2", "thể_loại_3"]
+    }
+    
+    Danh sách bài hát:
+    ${JSON.stringify(moodContext, null, 2)}`;
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts: [{ text: analysisPrompt }] }],
+            generationConfig: {
+                temperature: 0.3,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 1024,
+            },
+        });
+        const responseText = result.response.text();
+        const cleanedResponse = responseText.replace(/```json|```/g, "").trim();
+        let analysis;
+        try {
+            analysis = JSON.parse(cleanedResponse);
+        }
+        catch (error) {
+            console.error("[AI] Error parsing AI response:", error);
+            console.error("[AI] Raw response:", responseText);
+            return {
+                mood: "energetic",
+                genres: sortedGenres.length > 0 ? sortedGenres : ["Pop", "Rock", "Hip Hop"],
+            };
+        }
+        console.log(`[AI] Analyzed ${vibeRewindPlaylists.length} Vibe Rewind playlists with ${allTracks.length} tracks`);
+        console.log(`[AI] Most popular mood: ${analysis.mood}`);
+        console.log(`[AI] Most popular genres: ${analysis.genres.join(", ")}`);
+        return {
+            mood: analysis.mood,
+            genres: analysis.genres,
+        };
+    }
+    catch (error) {
+        console.error("[AI] Error analyzing Vibe Rewind playlists:", error);
+        return {
+            mood: "energetic",
+            genres: ["Pop", "Rock", "Hip Hop"],
+        };
+    }
+};
+exports.analyzeAllVibeRewindPlaylists = analyzeAllVibeRewindPlaylists;
 //# sourceMappingURL=ai.service.js.map

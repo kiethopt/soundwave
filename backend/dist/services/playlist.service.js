@@ -1,9 +1,42 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
+exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.createImprovedAIGeneratedPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const handle_utils_1 = require("../utils/handle-utils");
@@ -94,13 +127,20 @@ exports.updateBaseSystemPlaylist = updateBaseSystemPlaylist;
 const deleteBaseSystemPlaylist = async (playlistId) => {
     const playlist = await db_1.default.playlist.findUnique({
         where: { id: playlistId },
-        select: { type: true, userId: true },
+        select: { type: true, userId: true, name: true },
     });
     if (!playlist ||
         playlist.type !== client_1.PlaylistType.SYSTEM ||
         playlist.userId !== null) {
         throw new Error("Base system playlist not found.");
     }
+    await db_1.default.playlist.deleteMany({
+        where: {
+            name: playlist.name,
+            type: client_1.PlaylistType.SYSTEM,
+            userId: { not: null },
+        },
+    });
     return db_1.default.playlist.delete({
         where: { id: playlistId },
     });
@@ -151,34 +191,34 @@ const updateVibeRewindPlaylist = async (userId) => {
         const userHistory = await db_1.default.history.findMany({
             where: {
                 userId,
-                type: 'PLAY'
+                type: "PLAY",
             },
             include: {
                 track: {
                     include: {
                         genres: {
                             include: {
-                                genre: true
-                            }
-                        }
-                    }
-                }
+                                genre: true,
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
-                updatedAt: 'desc'
+                updatedAt: "desc",
             },
-            take: 30
+            take: 30,
         });
         if (userHistory.length === 0) {
             console.log(`[PlaylistService] User ${userId} has no listening history. Skipping Vibe Rewind playlist creation.`);
             return;
         }
         const moodAndGenreContext = {
-            tracks: userHistory.map(h => ({
+            tracks: userHistory.map((h) => ({
                 title: h.track?.title,
-                genres: h.track?.genres.map(g => g.genre.name),
-                playCount: h.playCount
-            }))
+                genres: h.track?.genres.map((g) => g.genre.name),
+                playCount: h.playCount,
+            })),
         };
         const analysisPrompt = `Phân tích lịch sử nghe nhạc của người dùng và trả về:
     1. Tâm trạng phổ biến nhất (mood): happy, sad, energetic, calm, nostalgic, romantic, focused, party
@@ -193,7 +233,7 @@ const updateVibeRewindPlaylist = async (userId) => {
     Lịch sử nghe nhạc:
     ${JSON.stringify(moodAndGenreContext, null, 2)}`;
         const result = await ai_service_1.model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: analysisPrompt }] }],
+            contents: [{ role: "user", parts: [{ text: analysisPrompt }] }],
             generationConfig: {
                 temperature: 0.3,
                 topK: 40,
@@ -203,21 +243,21 @@ const updateVibeRewindPlaylist = async (userId) => {
         });
         const responseText = result.response.text();
         const cleanedResponse = responseText
-            .replace(/```json|```/g, '')
+            .replace(/```json|```/g, "")
             .trim();
         let analysis;
         try {
             analysis = JSON.parse(cleanedResponse);
         }
         catch (error) {
-            console.error('[PlaylistService] Error parsing AI response:', error);
-            console.error('[PlaylistService] Raw response:', responseText);
-            throw new Error('Failed to parse AI analysis response');
+            console.error("[PlaylistService] Error parsing AI response:", error);
+            console.error("[PlaylistService] Raw response:", responseText);
+            throw new Error("Failed to parse AI analysis response");
         }
         const detectedMood = analysis.mood;
         const preferredGenres = analysis.genres;
         console.log(`[PlaylistService] Detected user mood: ${detectedMood}`);
-        console.log(`[PlaylistService] User's preferred genres: ${preferredGenres.join(', ')}`);
+        console.log(`[PlaylistService] User's preferred genres: ${preferredGenres.join(", ")}`);
         let vibeRewindPlaylist = await db_1.default.playlist.findFirst({
             where: { userId, name: "Vibe Rewind" },
         });
@@ -230,18 +270,19 @@ const updateVibeRewindPlaylist = async (userId) => {
                     privacy: "PRIVATE",
                     type: "SYSTEM",
                     userId,
-                    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1744453889/covers/qeyix0cmbv7mtdh1hedi.png'
+                    coverUrl: null,
                 },
             });
         }
         const playlist = await (0, ai_service_1.createAIGeneratedPlaylist)(userId, {
             name: "Vibe Rewind",
-            description: `Your personal time capsule - tracks matching your ${detectedMood} mood and favorite genres: ${preferredGenres.join(', ')}`,
+            description: `Your personal time capsule - tracks matching your ${detectedMood} mood and favorite genres: ${preferredGenres.join(", ")}`,
             trackCount: 10,
             basedOnMood: detectedMood,
             basedOnGenre: preferredGenres[0],
+            coverUrl: null,
         });
-        console.log(`[PlaylistService] Successfully updated Vibe Rewind playlist for user ${userId} with ${playlist.totalTracks} tracks based on ${detectedMood} mood and favorite genres: ${preferredGenres.join(', ')}`);
+        console.log(`[PlaylistService] Successfully updated Vibe Rewind playlist for user ${userId} with ${playlist.totalTracks} tracks based on ${detectedMood} mood and favorite genres: ${preferredGenres.join(", ")}`);
     }
     catch (error) {
         console.error(`[PlaylistService] Error updating Vibe Rewind playlist for user ${userId}:`, error);
@@ -383,9 +424,44 @@ const getUserSystemPlaylists = async (req) => {
     return formattedPlaylists;
 };
 exports.getUserSystemPlaylists = getUserSystemPlaylists;
+const createImprovedAIGeneratedPlaylist = async (userId, options) => {
+    console.log(`[PlaylistService] Creating AI playlist for user ${userId} with options:`, options);
+    try {
+        const { createAIGeneratedPlaylist } = await Promise.resolve().then(() => __importStar(require("./ai.service")));
+        const playlistData = await createAIGeneratedPlaylist(userId, {
+            ...options,
+            trackCount: options.trackCount || 10,
+        });
+        return playlistData;
+    }
+    catch (error) {
+        console.error(`[PlaylistService] Error creating AI playlist: ${error}`);
+        throw error;
+    }
+};
+exports.createImprovedAIGeneratedPlaylist = createImprovedAIGeneratedPlaylist;
 const generateAIPlaylist = async (userId, options) => {
     console.log(`[PlaylistService] Generating AI playlist for user ${userId} with options:`, options);
-    const playlist = await (0, ai_service_1.createAIGeneratedPlaylist)(userId, options);
+    if (!options.basedOnMood && !options.basedOnGenre && !options.basedOnArtist) {
+        console.log(`[PlaylistService] No specific parameters provided. Analyzing all Vibe Rewind playlists for trends.`);
+        try {
+            const { analyzeAllVibeRewindPlaylists } = await Promise.resolve().then(() => __importStar(require("./ai.service")));
+            const analysis = await analyzeAllVibeRewindPlaylists();
+            options = {
+                ...options,
+                basedOnMood: analysis.mood,
+                basedOnGenre: analysis.genres[0],
+                description: options.description ||
+                    `A curated playlist based on the most popular ${analysis.mood} mood and ${analysis.genres.join(", ")} genres from our community.`,
+                name: options.name || `Community ${analysis.mood} Vibes`,
+            };
+            console.log(`[PlaylistService] Using community trends: mood=${analysis.mood}, genres=${analysis.genres.join(", ")}`);
+        }
+        catch (error) {
+            console.error(`[PlaylistService] Error analyzing Vibe Rewind playlists:`, error);
+        }
+    }
+    const playlist = await (0, exports.createImprovedAIGeneratedPlaylist)(userId, options);
     const playlistWithTracks = await db_1.default.playlist.findUnique({
         where: { id: playlist.id },
         include: {
@@ -483,7 +559,7 @@ const updateAllSystemPlaylists = async () => {
                 }
                 const coverUrl = templatePlaylist.coverUrl ||
                     "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
-                await (0, ai_service_1.createAIGeneratedPlaylist)(user.id, {
+                await (0, exports.createImprovedAIGeneratedPlaylist)(user.id, {
                     name: templatePlaylist.name,
                     description: templatePlaylist.description || undefined,
                     coverUrl: coverUrl,

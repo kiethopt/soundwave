@@ -779,6 +779,7 @@ const generateAIPlaylist = async (req, res) => {
             return;
         }
         const { name, description, trackCount, basedOnMood, basedOnGenre, basedOnArtist, } = req.body;
+        const hasSpecificParams = basedOnMood || basedOnGenre || basedOnArtist;
         const playlistData = await playlistService.generateAIPlaylist(userId, {
             name,
             description,
@@ -787,9 +788,13 @@ const generateAIPlaylist = async (req, res) => {
             basedOnGenre,
             basedOnArtist,
         });
+        let message = `AI playlist generated successfully with ${playlistData.totalTracks} tracks from ${playlistData.artistCount} artists`;
+        if (!hasSpecificParams) {
+            message += " based on community trends";
+        }
         res.status(200).json({
             success: true,
-            message: `AI playlist generated successfully with ${playlistData.totalTracks} tracks from ${playlistData.artistCount} artists`,
+            message,
             data: playlistData,
         });
     }
