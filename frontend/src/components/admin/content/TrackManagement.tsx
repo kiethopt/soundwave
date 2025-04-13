@@ -265,10 +265,10 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   );
 
   useEffect(() => {
-    let socket: Socket | null = null;
-    const connectTimer = setTimeout(() => {
-        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+    // Initialize socket connection
+    const socket = io(process.env.NEXT_PUBLIC_API_URL!); // Remove fallback URL
 
+    socket.on('connect', () => {
         socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
             console.log('[Admin] Track visibility changed via WebSocket:', data);
             setData((currentTracks: Track[]) =>
@@ -295,17 +295,14 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                 currentTracks.filter((track: Track) => track.id !== data.trackId)
             );
         });
-    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
+    });
 
     // Cleanup on component unmount
     return () => {
-      clearTimeout(connectTimer);
-      if (socket) {
-          socket.off('track:visibilityChanged');
-          socket.off('track:updated');
-          socket.off('track:deleted');
-          socket.disconnect();
-      }
+      socket.off('track:visibilityChanged');
+      socket.off('track:updated');
+      socket.off('track:deleted');
+      socket.disconnect();
     };
   }, [setData]); // Keep setData dependency
 

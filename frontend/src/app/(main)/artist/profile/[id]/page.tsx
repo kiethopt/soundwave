@@ -168,7 +168,7 @@ export default function ArtistProfilePage({
 
     let socket: Socket | null = null;
     const connectTimer = setTimeout(() => {
-        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+        socket = io(process.env.NEXT_PUBLIC_API_URL!);
 
         console.log(`[WebSocket] Attempting to connect for Artist Profile: ${id}`);
 

@@ -261,7 +261,7 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
   useEffect(() => {
     let socket: Socket | null = null;
     const connectTimer = setTimeout(() => {
-        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+        socket = io(process.env.NEXT_PUBLIC_API_URL!);
 
         console.log("[WebSocket] Connecting for Admin AlbumManagement...");
 

@@ -12,6 +12,7 @@ import {
   HomeFilled,
   ProfileIcon,
   ArrowRight,
+  ArrowLeft,
 } from '@/components/ui/Icons';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -21,7 +22,7 @@ import pusher from '@/utils/pusher';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
-import { ArrowLeft, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 
@@ -304,6 +305,7 @@ export default function Header({
     }
   };
 
+  // Function to handle switching profiles
   const handleSwitchProfile = async () => {
     try {
       const canProceed = handleProtectedAction();
@@ -322,20 +324,16 @@ export default function Header({
       localStorage.setItem('userData', JSON.stringify(response.user));
       setUserData(response.user); // Update state immediately
 
-      // *** Re-fetch and filter notifications for the NEW profile ***
-      // Use a slight delay to ensure state update has propagated if needed,
-      // or rely on the useEffect dependency on `userData`.
-      // Calling fetchAndSetNotifications directly might be cleaner if useEffect handles it.
-      // Let's rely on the useEffect triggered by setUserData change.
-
+      // Fetch notifications for the new profile (handled by useEffect dependency)
       toast.success(`Switched to ${response.user.currentProfile} profile`);
-      setShowDropdown(false); // Close dropdown after switch
+      setShowDropdown(false); // Close dropdown if open
 
       // Redirect based on new profile using window.location.href for a full reload
+      // This ensures components remount with the correct profile data
       if (response.user.currentProfile === 'ARTIST') {
         window.location.href = '/artist/dashboard';
       } else {
-        window.location.href = '/';
+        window.location.href = '/'; // Redirect to home for USER profile
       }
     } catch (error) {
       console.error('Error switching profile:', error);
@@ -468,6 +466,33 @@ export default function Header({
       <div className="flex items-center gap-2 md:gap-4">
         {isAuthenticated ? (
           <>
+            {/* Bi-directional Artist/User Switch Button */}
+            {userData?.artistProfile?.isVerified && (
+               <button
+                 onClick={async () => {
+                   // handleSwitchProfile handles the logic for both directions
+                   await handleSwitchProfile();
+                 }}
+                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200 ${
+                   theme === 'light'
+                     ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                     : 'bg-white/10 text-white hover:bg-white/20'
+                 }`}
+               >
+                 {userData.currentProfile === 'USER' ? (
+                   <>
+                     <ArrowRight className="w-4 h-4" />
+                     <span>Artist Dashboard</span>
+                   </>
+                 ) : (
+                   <>
+                     <ArrowLeft className="w-4 h-4" />
+                     <span>Go to User</span>
+                   </>
+                 )}
+               </button>
+            )}
+
             <div className="relative" ref={notificationRef}>
               <button
                 className={`p-2 rounded-full relative cursor-pointer transition-colors duration-200 ease-in-out flex items-center justify-center ${theme === 'light' ? 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' : 'text-gray-400 hover:bg-white/10 hover:text-white'} ${notificationCount > 0 ? 'text-blue-500' : ''}`}
@@ -628,24 +653,6 @@ export default function Header({
                       <Settings className="w-4 h-4" />
                       <span className="text-sm font-medium">Settings</span>
                     </Link>
-
-                    {userData?.artistProfile?.isVerified && (
-                      <button
-                        onClick={handleSwitchProfile}
-                        className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 text-left ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}
-                      >
-                        {userData.currentProfile === 'USER' ? (
-                          <ArrowRight className="w-4 h-4" />
-                        ) : (
-                          <ArrowLeft className="w-4 h-4" />
-                        )}
-                        <span className="text-sm font-medium">
-                          Go to {' '}
-                          {userData.currentProfile === 'USER' ? 'Artist' : 'User'}{' '}
-                          Dashboard
-                        </span>
-                      </button>
-                    )}
 
                     {userData?.role === 'USER' && !userData?.artistProfile && (
                       <Link

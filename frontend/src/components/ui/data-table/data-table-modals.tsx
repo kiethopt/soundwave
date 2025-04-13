@@ -70,6 +70,8 @@ export function EditTrackModal({
 }: EditTrackModalProps) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Add state for genre validation error
+  const [genreError, setGenreError] = useState<string | null>(null);
 
   // Cập nhật preview khi track thay đổi (chỉ khi component được mount hoặc track prop thay đổi)
   useEffect(() => {
@@ -100,6 +102,14 @@ export function EditTrackModal({
     e.preventDefault();
     if (!track) return;
 
+    // **Inline Validation Check for Genres**
+    if (selectedGenres.length === 0) {
+      setGenreError('This field is required');
+      return; // Stop submission
+    } else {
+      setGenreError(null); // Clear error if validation passes
+    }
+
     const formData = new FormData(e.currentTarget);
 
     formData.delete('featuredArtists');
@@ -111,14 +121,13 @@ export function EditTrackModal({
       formData.append('featuredArtists', artistId);
     });
 
-    // Gửi genreIds (kể cả khi mảng rỗng)
-    if (selectedGenres.length === 0) {
-      formData.append('genreIds', JSON.stringify([])); // Gửi mảng rỗng dưới dạng chuỗi JSON
-    } else {
+    // Gửi genreIds
+    if (selectedGenres.length > 0) { // Validation ensures this
       selectedGenres.forEach((genreId) => {
-        formData.append('genreIds', genreId); // Gửi từng genreId
+        formData.append('genreIds', genreId);
       });
     }
+    // No need for else case, as validation prevents empty selection
 
     // Gửi labelId
     if (selectedLabelId) {
@@ -321,23 +330,22 @@ export function EditTrackModal({
             {/* Input ẩn không còn cần thiết vì ta tự append vào FormData */}
           </div>
 
-          {/* Genres */}
+          {/* Genres - Apply conditional styling and error message */}
           <div className="space-y-2">
-            <span
-              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                }`}
-            >
-              Genres
-            </span>
-            <SearchableSelect
-              options={availableGenres}
-              value={selectedGenres}
-              onChange={setSelectedGenres}
-              placeholder="Select genres..."
-              multiple={true}
-            // Không cần required nếu là optional
-            />
-            {/* Input ẩn không còn cần thiết */}
+            <span className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>Genres *</span>
+            {/* Wrap SearchableSelect for error styling */}
+            <div className={cn(genreError && 'rounded-md border border-red-500')}> 
+              <SearchableSelect
+                multiple
+                // Map to the expected type { id: string; name: string; }
+                options={availableGenres.map((g) => ({ id: g.id, name: g.name }))}
+                value={selectedGenres} // Pass selectedGenres to value prop
+                onChange={setSelectedGenres}
+                placeholder="Select genres..."
+              />
+            </div>
+            {/* Display error message */}            
+            {genreError && <p className="text-sm text-red-500 mt-1">{genreError}</p>}
           </div>
 
           {/* --- Thêm trường chọn Label --- */}

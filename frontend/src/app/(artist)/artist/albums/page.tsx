@@ -147,9 +147,9 @@ export default function AlbumManagement() {
 
     let socket: Socket | null = null;
     const connectTimer = setTimeout(() => {
-        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+        socket = io(process.env.NEXT_PUBLIC_API_URL!);
 
-        console.log(`[WebSocket] Connecting for Artist AlbumManagement (${artistId})...`);
+        console.log('[WebSocket] Connecting for Artist AlbumManagement...');
 
         socket.on('connect', () => {
             console.log("[WebSocket] Connected for Artist AlbumManagement");

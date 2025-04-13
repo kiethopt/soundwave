@@ -1,23 +1,22 @@
 import { Prisma } from '@prisma/client';
 import cron from 'node-cron';
+import { getIO } from '../../config/socket';
 
 async function checkAndUpdateAlbumStatus(client: any) {
   try {
     const now = new Date();
-    // Add a time threshold (e.g., 2 minutes ago)
-    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
 
-    // Tìm các album chưa active, đã đến ngày phát hành, và chưa được cập nhật gần đây
+    // Tìm các album chưa active, đã đến ngày phát hành, và updatedAt <= releaseDate
     const albumsToPublish = await client.album.findMany({
       where: {
         isActive: false,
         releaseDate: {
-          gte: twoMinutesAgo, // Only publish if release date was recent
-          lte: now,
+          lte: now, // Activate if releaseDate is now or in the past
         },
-        // Only consider albums that haven't been updated recently
+        // Only activate if the album wasn't updated AFTER its release date
+        // This implies it wasn't manually hidden after being released.
         updatedAt: {
-          lt: twoMinutesAgo, // Less than 2 minutes ago
+          lte: client.album.fields.releaseDate, // Compare updatedAt with releaseDate field
         },
       },
       select: {
@@ -45,6 +44,15 @@ async function checkAndUpdateAlbumStatus(client: any) {
         },
         data: { isActive: true },
       });
+
+      // Emit WebSocket event for each published album
+      const io = getIO();
+      for (const album of albumsToPublish) {
+        io.emit('album:visibilityChanged', { albumId: album.id, isActive: true });
+        // Hoặc có thể gửi cả album nếu cần:
+        // const publishedAlbum = await client.album.findUnique({ where: { id: album.id }, select: albumSelect }); // Cần import albumSelect
+        // if (publishedAlbum) io.emit('album:updated', { album: publishedAlbum });
+      }
 
       console.log(
         `Auto published ${albumsToPublish.length} albums: ${albumsToPublish
@@ -77,7 +85,7 @@ export const albumExtension = Prisma.defineExtension((client) => {
   // Thiết lập cron job để kiểm tra và cập nhật trạng thái album mỗi phút
   // Thêm log để biết cron job đang chạy
   cron.schedule('* * * * *', () => {
-    console.log('Running cron job to check and update album status...');
+   // console.log('Running cron job to check and update album status...');
     checkAndUpdateAlbumStatus(client);
   });
 

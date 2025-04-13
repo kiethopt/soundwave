@@ -288,7 +288,7 @@ export default function TrackManagement() {
 
     let socket: Socket | null = null;
     const connectTimer = setTimeout(() => {
-        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
+        socket = io(process.env.NEXT_PUBLIC_API_URL!);
 
         socket.on('connect', () => {
             console.log("[WebSocket] Connected for Artist Tracks");

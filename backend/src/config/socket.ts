@@ -15,7 +15,7 @@ export const initializeSocket = (server: http.Server): SocketIOServer => {
 
   // Handle new socket connections
   io.on('connection', (socket) => {
-    console.log(`🔌 Socket connected: ${socket.id}`);
+    // console.log(`🔌 Socket connected: ${socket.id}`); // Commented out connection log
 
     // Handle socket disconnection
     socket.on('disconnect', () => {

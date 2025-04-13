@@ -16,12 +16,12 @@ export const trackExtension = Prisma.defineExtension({
             where: {
               isActive: false,
               releaseDate: {
-                gte: twoMinutesAgo, // Only publish if release date was recent
-                lte: new Date(),
+                lte: new Date(), // Activate if releaseDate is now or in the past
               },
-              // Only consider tracks that haven't been updated recently
+              // Only activate if the track wasn't updated AFTER its release date
+              // This implies it wasn't manually hidden after being released.
               updatedAt: {
-                lt: twoMinutesAgo, // Less than 2 minutes ago
+                lte: prisma.track.fields.releaseDate, // Compare updatedAt with releaseDate field
               },
             },
           });
@@ -54,11 +54,9 @@ export const trackExtension = Prisma.defineExtension({
 
 // Cron job để tự động publish tracks
 cron.schedule('* * * * *', async () => {
-  console.log('Running cron job to auto-publish tracks...');
+  // console.log('Running cron job to auto-publish tracks...'); // Removed log message
   try {
-    // Explicitly call the extended method
-    // Assuming your extended prisma client is available
-    // If not, you might need to instantiate it here or import the extended client
+
     await (prisma as any).track.autoPublishTracks();
   } catch (error) {
     console.error('Cron job error:', error);
