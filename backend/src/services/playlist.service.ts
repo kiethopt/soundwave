@@ -132,7 +132,7 @@ export const deleteBaseSystemPlaylist = async (playlistId: string) => {
   // Check if the playlist exists and is a base system playlist
   const playlist = await prisma.playlist.findUnique({
     where: { id: playlistId },
-    select: { type: true, userId: true },
+    select: { type: true, userId: true, name: true },
   });
 
   if (
@@ -143,9 +143,16 @@ export const deleteBaseSystemPlaylist = async (playlistId: string) => {
     throw new Error("Base system playlist not found.");
   }
 
-  // Delete the base playlist
-  // Note: This does NOT delete the personalized versions for users.
-  // Handling cleanup of personalized versions could be a separate feature/process.
+  // First, delete all user-specific versions of this playlist
+  await prisma.playlist.deleteMany({
+    where: {
+      name: playlist.name,
+      type: PlaylistType.SYSTEM,
+      userId: { not: null }, // Only delete user-specific versions
+    },
+  });
+
+  // Then delete the base playlist
   return prisma.playlist.delete({
     where: { id: playlistId },
   });
