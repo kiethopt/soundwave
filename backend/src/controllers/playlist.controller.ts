@@ -147,6 +147,7 @@ export const getPlaylists: RequestHandler = async (
             privacy: "PRIVATE",
             type: "SYSTEM",
             userId,
+            coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1744453889/covers/qeyix0cmbv7mtdh1hedi.png'
           },
         });
 

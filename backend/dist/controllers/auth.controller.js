@@ -206,6 +206,7 @@ const register = async (req, res) => {
                         description: "A selection of popular tracks to start your journey on Soundwave.",
                         privacy: "PRIVATE",
                         type: "SYSTEM",
+                        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1744453889/covers/qeyix0cmbv7mtdh1hedi.png',
                         isAIGenerated: false,
                         userId: user.id,
                         totalTracks: orderedTrackIds.length,

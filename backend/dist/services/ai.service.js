@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateDefaultPlaylistForNewUser = exports.createAIGeneratedPlaylist = exports.generateAIPlaylist = void 0;
+exports.generateDefaultPlaylistForNewUser = exports.createAIGeneratedPlaylist = exports.generateAIPlaylist = exports.model = void 0;
 const generative_ai_1 = require("@google/generative-ai");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
@@ -18,6 +18,7 @@ const model = genAI.getGenerativeModel({
     model: modelName,
     systemInstruction: "You are an expert music curator specializing in personalization. Your primary goal is to create highly personalized playlists that closely match each user's demonstrated preferences. PRIORITIZE tracks from artists the user has already listened to or liked. Only include tracks from other artists if they are extremely similar in style and genre to the user's favorites. Analyze the provided listening history and liked tracks carefully, identifying patterns in genres, artists, and moods. Return ONLY a valid JSON array of track IDs, without any duplicates or explanations. The tracks should strongly reflect the user's taste, with at least 70% being from artists they've shown interest in.",
 });
+exports.model = model;
 console.log(`[AI] Using Gemini model: ${modelName}`);
 const generateAIPlaylist = async (userId, options = {}) => {
     try {
@@ -433,7 +434,7 @@ const createAIGeneratedPlaylist = async (userId, options = {}) => {
         });
         const playlistData = {
             description: playlistDescription,
-            coverUrl: options.coverUrl || defaultCoverUrl,
+            coverUrl: options.coverUrl === null ? null : (options.coverUrl || defaultCoverUrl),
             totalTracks: trackIds.length,
             totalDuration,
             updatedAt: new Date(),

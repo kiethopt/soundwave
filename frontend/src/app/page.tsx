@@ -425,7 +425,7 @@ export default function Home() {
                 <div className="flex flex-col space-y-2">
                   <div className="relative aspect-square overflow-hidden rounded-lg">
                     <Image
-                      src={playlist.coverUrl || '/images/default-playlist.png'}
+                      src={playlist.coverUrl || '/images/default-playlist.jpg'}
                       alt={playlist.name}
                       fill
                       className="object-cover"

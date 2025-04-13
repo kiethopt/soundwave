@@ -150,6 +150,7 @@ const getPlaylists = async (req, res, next) => {
                         privacy: "PRIVATE",
                         type: "SYSTEM",
                         userId,
+                        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1744453889/covers/qeyix0cmbv7mtdh1hedi.png'
                     },
                 });
                 try {
