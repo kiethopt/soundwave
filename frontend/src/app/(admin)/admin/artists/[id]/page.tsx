@@ -1,25 +1,25 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useMemo } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { api } from '@/utils/api';
-import type { ArtistProfile, Album, Track } from '@/types';
-import Image from 'next/image';
-import { Star, Search, MoreVertical } from 'lucide-react';
-import { useTheme } from '@/contexts/ThemeContext';
-import { ArrowLeft, Trash2 } from '@/components/ui/Icons';
+import { useEffect, useState, useMemo } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { api } from "@/utils/api";
+import type { ArtistProfile, Album, Track } from "@/types";
+import Image from "next/image";
+import { Star, Search, MoreVertical } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
+import { ArrowLeft, Trash2 } from "@/components/ui/Icons";
 import {
   EditArtistModal,
   AlbumDetailModal,
   TrackDetailModal,
-} from '@/components/ui/data-table/data-table-modals';
+} from "@/components/ui/data-table/data-table-modals";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import toast from 'react-hot-toast';
+} from "@/components/ui/dropdown-menu";
+import toast from "react-hot-toast";
 
 export default function ArtistDetail() {
   const params = useParams();
@@ -33,7 +33,7 @@ export default function ArtistDetail() {
   const [artist, setArtist] = useState<ArtistProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterText, setFilterText] = useState('');
+  const [filterText, setFilterText] = useState("");
   const [showAll, setShowAll] = useState({ albums: false, tracks: false });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
@@ -49,7 +49,7 @@ export default function ArtistDetail() {
   };
 
   useEffect(() => {
-    const albumId = safeGetParam('album');
+    const albumId = safeGetParam("album");
     if (albumId && artist && artist.albums) {
       const album = artist.albums.find((a) => {
         return a.id.toString() === albumId;
@@ -61,7 +61,7 @@ export default function ArtistDetail() {
     }
 
     // Handle track parameter
-    const trackId = safeGetParam('track');
+    const trackId = safeGetParam("track");
     if (trackId && artist) {
       const track = artist.tracks?.find((t) => t.id.toString() === trackId);
 
@@ -88,18 +88,18 @@ export default function ArtistDetail() {
     const fetchArtist = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem('userToken');
+        const token = localStorage.getItem("userToken");
         if (!token) {
-          throw new Error('Authentication token not found');
+          throw new Error("Authentication token not found");
         }
         if (!artistId) {
-          throw new Error('Artist ID is missing');
+          throw new Error("Artist ID is missing");
         }
         const data = await api.admin.getArtistById(artistId, token);
         setArtist(data);
       } catch (err) {
-        console.error('Error fetching artist:', err);
-        setError('Failed to load artist details');
+        console.error("Error fetching artist:", err);
+        setError("Failed to load artist details");
       } finally {
         setLoading(false);
       }
@@ -107,22 +107,22 @@ export default function ArtistDetail() {
 
     if (artistId) fetchArtist();
     else {
-      setError('Artist ID not found in URL');
+      setError("Artist ID not found in URL");
       setLoading(false);
     }
   }, [artistId]);
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+    new Date(dateString).toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     });
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   const filteredAlbums = useMemo(() => {
@@ -148,7 +148,7 @@ export default function ArtistDetail() {
     return (
       artist?.tracks?.filter(
         (track) =>
-          track.type === 'SINGLE' &&
+          track.type === "SINGLE" &&
           track.title.toLowerCase().includes(filterText.toLowerCase())
       ) || []
     );
@@ -177,21 +177,21 @@ export default function ArtistDetail() {
   const handleDeleteTrack = async (trackId: string) => {
     if (
       !confirm(
-        'Are you sure you want to delete this track? This action cannot be undone.'
+        "Are you sure you want to delete this track? This action cannot be undone."
       )
     ) {
       return;
     }
 
     try {
-      const token = localStorage.getItem('userToken');
+      const token = localStorage.getItem("userToken");
       if (!token) {
-        toast.error('Authentication token not found');
+        toast.error("Authentication token not found");
         return;
       }
 
       await api.tracks.delete(trackId, token);
-      toast.success('Track deleted successfully');
+      toast.success("Track deleted successfully");
 
       // Update the UI by removing the deleted track
       if (artist) {
@@ -201,29 +201,29 @@ export default function ArtistDetail() {
         });
       }
     } catch (error) {
-      console.error('Error deleting track:', error);
-      toast.error('Failed to delete track');
+      console.error("Error deleting track:", error);
+      toast.error("Failed to delete track");
     }
   };
 
   const handleDeleteAlbum = async (albumId: string) => {
     if (
       !confirm(
-        'Are you sure you want to delete this album? This action cannot be undone.'
+        "Are you sure you want to delete this album? This action cannot be undone."
       )
     ) {
       return;
     }
 
     try {
-      const token = localStorage.getItem('userToken');
+      const token = localStorage.getItem("userToken");
       if (!token) {
-        toast.error('Authentication token not found');
+        toast.error("Authentication token not found");
         return;
       }
 
       await api.albums.delete(albumId, token);
-      toast.success('Album deleted successfully');
+      toast.success("Album deleted successfully");
 
       // Update the UI by removing the deleted album
       if (artist) {
@@ -233,8 +233,8 @@ export default function ArtistDetail() {
         });
       }
     } catch (error) {
-      console.error('Error deleting album:', error);
-      toast.error('Failed to delete album');
+      console.error("Error deleting album:", error);
+      toast.error("Failed to delete album");
     }
   };
 
@@ -249,7 +249,7 @@ export default function ArtistDetail() {
   if (error || !artist) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="text-red-500">{error || 'Artist not found'}</div>
+        <div className="text-red-500">{error || "Artist not found"}</div>
       </div>
     );
   }
@@ -260,9 +260,9 @@ export default function ArtistDetail() {
         <button
           onClick={() => router.back()}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
-            theme === 'light'
-              ? 'bg-gray-100 hover:bg-gray-200 text-black'
-              : 'bg-white/10 hover:bg-white/15 text-white'
+            theme === "light"
+              ? "bg-gray-100 hover:bg-gray-200 text-black"
+              : "bg-white/10 hover:bg-white/15 text-white"
           }`}
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1" />
@@ -275,12 +275,12 @@ export default function ArtistDetail() {
         <div className="w-full md:w-1/3">
           <div
             className={`${
-              theme === 'light' ? 'bg-white' : 'bg-gray-800'
+              theme === "light" ? "bg-white" : "bg-gray-800"
             } rounded-lg shadow-md overflow-hidden mb-6`}
           >
             <div className="relative aspect-square">
               <Image
-                src={artist.avatar || '/placeholder.svg?height=300&width=300'}
+                src={artist.avatar || "/placeholder.svg?height=300&width=300"}
                 alt={artist.artistName}
                 fill
                 priority
@@ -291,25 +291,25 @@ export default function ArtistDetail() {
 
           <div
             className={`${
-              theme === 'light' ? 'bg-white' : 'bg-gray-800'
+              theme === "light" ? "bg-white" : "bg-gray-800"
             } rounded-lg shadow-md p-4`}
           >
             <div className="flex justify-between items-center mb-4">
               <h2
                 className={`text-lg font-bold ${
-                  theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                  theme === "light" ? "text-gray-900" : "text-gray-100"
                 }`}
               >
-                Top Songs
+                Top Tracks
               </h2>
               <div
                 className={`flex items-center text-sm ${
-                  theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                  theme === "light" ? "text-gray-900" : "text-gray-100"
                 }`}
               >
                 <span className="mr-2">Popularity</span>
                 <span className="text-xs">|</span>
-                <span className="ml-2 text-blue-500">Top songs</span>
+                <span className="ml-2 text-blue-500">Top tracks</span>
               </div>
             </div>
 
@@ -318,12 +318,12 @@ export default function ArtistDetail() {
                 <div
                   key={track.id}
                   className={`flex items-center py-2 border-b ${
-                    theme === 'light' ? 'border-gray-100' : 'border-gray-700'
+                    theme === "light" ? "border-gray-100" : "border-gray-700"
                   }`}
                 >
                   <div
                     className={`w-6 text-center ${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                      theme === "light" ? "text-gray-500" : "text-gray-400"
                     }`}
                   >
                     {index + 1}
@@ -331,22 +331,22 @@ export default function ArtistDetail() {
                   <div className="flex-1 ml-2">
                     <div
                       className={`font-medium ${
-                        theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                        theme === "light" ? "text-gray-900" : "text-gray-100"
                       }`}
                     >
                       {track.title}
                     </div>
                     <div
                       className={`text-xs ${
-                        theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                        theme === "light" ? "text-gray-500" : "text-gray-400"
                       }`}
                     >
-                      {track.album?.title || 'Single'}
+                      {track.album?.title || "Single"}
                     </div>
                   </div>
                   <div
                     className={`flex items-center gap-2 ${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                      theme === "light" ? "text-gray-500" : "text-gray-400"
                     } text-sm`}
                   >
                     <div className="flex items-center">
@@ -372,20 +372,20 @@ export default function ArtistDetail() {
           {/* Artist Info Card */}
           <div
             className={`${
-              theme === 'light' ? 'bg-white' : 'bg-gray-800'
+              theme === "light" ? "bg-white" : "bg-gray-800"
             } rounded-lg shadow-md p-6 mb-6`}
           >
             <div className="flex justify-between items-center mb-4">
               <h2
                 className={`text-3xl font-bold ${
-                  theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                  theme === "light" ? "text-gray-900" : "text-gray-100"
                 }`}
               >
                 {artist.artistName}
               </h2>
               <MoreVertical
                 className={`cursor-pointer ${
-                  theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                  theme === "light" ? "text-gray-900" : "text-gray-100"
                 }`}
                 onClick={() => setIsEditModalOpen(true)}
               />
@@ -395,14 +395,14 @@ export default function ArtistDetail() {
                 <div>
                   <span
                     className={`${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                      theme === "light" ? "text-gray-500" : "text-gray-400"
                     } text-sm`}
                   >
                     Name
                   </span>
                   <p
                     className={`${
-                      theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                      theme === "light" ? "text-gray-900" : "text-gray-100"
                     }`}
                   >
                     {artist.user.name}
@@ -413,14 +413,14 @@ export default function ArtistDetail() {
                 <div>
                   <span
                     className={`${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                      theme === "light" ? "text-gray-500" : "text-gray-400"
                     } text-sm`}
                   >
                     Email
                   </span>
                   <p
                     className={`${
-                      theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                      theme === "light" ? "text-gray-900" : "text-gray-100"
                     }`}
                   >
                     {artist.user.email}
@@ -431,14 +431,14 @@ export default function ArtistDetail() {
                 <div>
                   <span
                     className={`${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                      theme === "light" ? "text-gray-500" : "text-gray-400"
                     } text-sm`}
                   >
                     Monthly Listeners
                   </span>
                   <p
                     className={`${
-                      theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                      theme === "light" ? "text-gray-900" : "text-gray-100"
                     }`}
                   >
                     {artist.monthlyListeners.toLocaleString()}
@@ -449,17 +449,17 @@ export default function ArtistDetail() {
                 <div>
                   <span
                     className={`${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                      theme === "light" ? "text-gray-500" : "text-gray-400"
                     } text-sm`}
                   >
                     Verification Status
                   </span>
                   <p
                     className={
-                      artist.isVerified ? 'text-green-500' : 'text-red-500'
+                      artist.isVerified ? "text-green-500" : "text-red-500"
                     }
                   >
-                    {artist.isVerified ? 'Verified' : 'Not Verified'}
+                    {artist.isVerified ? "Verified" : "Not Verified"}
                   </p>
                 </div>
               )}
@@ -468,14 +468,14 @@ export default function ArtistDetail() {
               <div className="mb-4">
                 <span
                   className={`${
-                    theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                    theme === "light" ? "text-gray-500" : "text-gray-400"
                   } text-sm`}
                 >
                   Bio
                 </span>
                 <p
                   className={`mt-1 ${
-                    theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                    theme === "light" ? "text-gray-900" : "text-gray-100"
                   }`}
                 >
                   {artist.bio}
@@ -486,7 +486,7 @@ export default function ArtistDetail() {
               <div>
                 <span
                   className={`${
-                    theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                    theme === "light" ? "text-gray-500" : "text-gray-400"
                   } text-sm`}
                 >
                   Genres
@@ -496,9 +496,9 @@ export default function ArtistDetail() {
                     <span
                       key={genreItem.genre.id}
                       className={`px-2 py-1 rounded-full text-xs ${
-                        theme === 'light'
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'bg-gray-700 text-gray-100'
+                        theme === "light"
+                          ? "bg-gray-100 text-gray-900"
+                          : "bg-gray-700 text-gray-100"
                       }`}
                     >
                       {genreItem.genre.name}
@@ -512,19 +512,19 @@ export default function ArtistDetail() {
           {/* Discography Section */}
           <div
             className={`${
-              theme === 'light' ? 'bg-white' : 'bg-gray-800'
+              theme === "light" ? "bg-white" : "bg-gray-800"
             } rounded-lg shadow-md p-6`}
           >
             <div className="flex justify-between items-center mb-4">
               <h2
                 className={`text-lg font-bold ${
-                  theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                  theme === "light" ? "text-gray-900" : "text-gray-100"
                 }`}
               >
-                Discography{' '}
+                Discography{" "}
                 <span
                   className={`${
-                    theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                    theme === "light" ? "text-gray-500" : "text-gray-400"
                   } text-sm`}
                 >
                   {(filteredAlbums.length || 0) + (filteredSingles.length || 0)}
@@ -535,9 +535,9 @@ export default function ArtistDetail() {
                   type="text"
                   placeholder="Filter discography"
                   className={`pl-8 pr-4 py-1 rounded-full border ${
-                    theme === 'light'
-                      ? 'border-gray-300 text-gray-900 bg-white'
-                      : 'border-gray-600 text-gray-100 bg-gray-700'
+                    theme === "light"
+                      ? "border-gray-300 text-gray-900 bg-white"
+                      : "border-gray-600 text-gray-100 bg-gray-700"
                   }`}
                   value={filterText}
                   onChange={(e) => setFilterText(e.target.value)}
@@ -551,7 +551,7 @@ export default function ArtistDetail() {
               <div className="flex justify-between items-center mb-4">
                 <h3
                   className={`text-sm font-medium ${
-                    theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                    theme === "light" ? "text-gray-900" : "text-gray-100"
                   }`}
                 >
                   Albums ({filteredAlbums.length})
@@ -564,7 +564,7 @@ export default function ArtistDetail() {
                     className="text-sm text-blue-500 hover:underline"
                   >
                     {showAll.albums
-                      ? 'Collapse'
+                      ? "Collapse"
                       : `Showing all (${filteredAlbums.length})`}
                   </button>
                 )}
@@ -572,7 +572,7 @@ export default function ArtistDetail() {
               <div className="grid grid-cols-1 gap-4">
                 <div
                   className={`grid grid-cols-12 text-xs font-medium ${
-                    theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                    theme === "light" ? "text-gray-500" : "text-gray-400"
                   } border-b pb-2`}
                 >
                   <div className="col-span-6">Title</div>
@@ -585,9 +585,9 @@ export default function ArtistDetail() {
                   <div
                     key={album.id}
                     className={`grid grid-cols-12 text-sm items-center ${
-                      theme === 'light'
-                        ? 'hover:bg-gray-100'
-                        : 'hover:bg-gray-700'
+                      theme === "light"
+                        ? "hover:bg-gray-100"
+                        : "hover:bg-gray-700"
                     } cursor-pointer`}
                     onClick={() => {
                       setSelectedAlbum(album);
@@ -604,18 +604,18 @@ export default function ArtistDetail() {
                         <div>
                           <div
                             className={`font-medium ${
-                              theme === 'light'
-                                ? 'text-gray-900'
-                                : 'text-gray-100'
+                              theme === "light"
+                                ? "text-gray-900"
+                                : "text-gray-100"
                             }`}
                           >
                             {album.title}
                           </div>
                           <div
                             className={`text-xs ${
-                              theme === 'light'
-                                ? 'text-gray-500'
-                                : 'text-gray-400'
+                              theme === "light"
+                                ? "text-gray-500"
+                                : "text-gray-400"
                             }`}
                           >
                             {album.type}
@@ -625,21 +625,21 @@ export default function ArtistDetail() {
                     </div>
                     <div
                       className={`col-span-2 text-center ${
-                        theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                        theme === "light" ? "text-gray-900" : "text-gray-100"
                       }`}
                     >
                       {formatDate(album.releaseDate)}
                     </div>
                     <div
                       className={`col-span-2 text-center ${
-                        theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                        theme === "light" ? "text-gray-900" : "text-gray-100"
                       }`}
                     >
                       {formatDuration(album.duration)}
                     </div>
                     <div
                       className={`col-span-1 text-center ${
-                        theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                        theme === "light" ? "text-gray-900" : "text-gray-100"
                       }`}
                     >
                       {album.tracks
@@ -672,7 +672,7 @@ export default function ArtistDetail() {
               <div className="flex justify-between items-center mb-4">
                 <h3
                   className={`text-sm font-medium ${
-                    theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                    theme === "light" ? "text-gray-900" : "text-gray-100"
                   }`}
                 >
                   Singles ({filteredSingles.length})
@@ -685,7 +685,7 @@ export default function ArtistDetail() {
                     className="text-sm text-blue-500 hover:underline"
                   >
                     {showAll.tracks
-                      ? 'Collapse'
+                      ? "Collapse"
                       : `Showing all (${filteredSingles.length})`}
                   </button>
                 )}
@@ -693,7 +693,7 @@ export default function ArtistDetail() {
               <div className="grid grid-cols-1 gap-4">
                 <div
                   className={`grid grid-cols-12 text-xs font-medium ${
-                    theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                    theme === "light" ? "text-gray-500" : "text-gray-400"
                   } border-b pb-2`}
                 >
                   <div className="col-span-6">Title</div>
@@ -706,9 +706,9 @@ export default function ArtistDetail() {
                   <div
                     key={track.id}
                     className={`grid grid-cols-12 text-sm items-center ${
-                      theme === 'light'
-                        ? 'hover:bg-gray-50'
-                        : 'hover:bg-gray-700'
+                      theme === "light"
+                        ? "hover:bg-gray-50"
+                        : "hover:bg-gray-700"
                     } cursor-pointer`}
                     onClick={() => {
                       setSelectedTrack(track);
@@ -720,7 +720,7 @@ export default function ArtistDetail() {
                         <img
                           src={
                             track.coverUrl ||
-                            'https://placehold.co/150x150?text=No+Cover'
+                            "https://placehold.co/150x150?text=No+Cover"
                           }
                           alt={track.title}
                           className="w-10 h-10 object-cover rounded"
@@ -728,18 +728,18 @@ export default function ArtistDetail() {
                         <div>
                           <div
                             className={`font-medium ${
-                              theme === 'light'
-                                ? 'text-gray-900'
-                                : 'text-gray-100'
+                              theme === "light"
+                                ? "text-gray-900"
+                                : "text-gray-100"
                             }`}
                           >
                             {track.title}
                           </div>
                           <div
                             className={`text-xs ${
-                              theme === 'light'
-                                ? 'text-gray-500'
-                                : 'text-gray-400'
+                              theme === "light"
+                                ? "text-gray-500"
+                                : "text-gray-400"
                             }`}
                           >
                             Single
@@ -749,21 +749,21 @@ export default function ArtistDetail() {
                     </div>
                     <div
                       className={`col-span-2 text-center ${
-                        theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                        theme === "light" ? "text-gray-900" : "text-gray-100"
                       }`}
                     >
                       {formatDate(track.releaseDate)}
                     </div>
                     <div
                       className={`col-span-2 text-center ${
-                        theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                        theme === "light" ? "text-gray-900" : "text-gray-100"
                       }`}
                     >
                       {formatDuration(track.duration)}
                     </div>
                     <div
                       className={`col-span-1 text-center ${
-                        theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                        theme === "light" ? "text-gray-900" : "text-gray-100"
                       }`}
                     >
                       {track.playCount.toLocaleString()}
@@ -792,7 +792,7 @@ export default function ArtistDetail() {
             {filteredAlbums.length === 0 && filteredSingles.length === 0 && (
               <div
                 className={`text-center py-4 ${
-                  theme === 'light' ? 'text-gray-500' : 'text-gray-400'
+                  theme === "light" ? "text-gray-500" : "text-gray-400"
                 }`}
               >
                 No items found matching "{filterText}"

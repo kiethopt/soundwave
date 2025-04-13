@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useCallback, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
-import { api } from '@/utils/api';
-import { Eye, EyeOff } from 'lucide-react';
-import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
-import { FcGoogle } from 'react-icons/fc';
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { api } from "@/utils/api";
+import { Eye, EyeOff } from "lucide-react";
+import { GoogleOAuthProvider, useGoogleLogin } from "@react-oauth/google";
+import { FcGoogle } from "react-icons/fc";
 
 interface RegisterFormData {
   email: string;
@@ -20,17 +20,17 @@ interface RegisterFormData {
 function RegisterForm() {
   const router = useRouter();
   const [formData, setFormData] = useState<RegisterFormData>({
-    email: '',
-    username: '',
-    password: '',
-    confirmPassword: '',
-    name: '',
+    email: "",
+    username: "",
+    password: "",
+    confirmPassword: "",
+    name: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
   const [passwordMatch, setPasswordMatch] = useState<boolean | null>(null);
 
   const handleConfirmPasswordChange = (
@@ -61,7 +61,7 @@ function RegisterForm() {
       e.preventDefault();
 
       if (formData.password !== formData.confirmPassword) {
-        setError('Passwords do not match');
+        setError("Passwords do not match");
         return;
       }
 
@@ -69,12 +69,12 @@ function RegisterForm() {
         const response = await api.auth.register(formData);
 
         if (response.message) {
-          router.push('/login');
+          router.push("/login");
         } else {
-          setError(response.message || 'An error occurred');
+          setError(response.message || "An error occurred");
         }
       } catch (err: any) {
-        setError(err.message || 'An unexpected error occurred');
+        setError(err.message || "An unexpected error occurred");
       }
     },
     [formData, router]
@@ -143,7 +143,7 @@ function RegisterForm() {
           <div className="relative">
             <input
               id="password"
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               required
               value={formData.password}
               onChange={handlePasswordChange}
@@ -173,7 +173,7 @@ function RegisterForm() {
           <div className="relative">
             <input
               id="confirmPassword"
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               required
               value={formData.confirmPassword}
               onChange={handleConfirmPasswordChange}
@@ -195,12 +195,12 @@ function RegisterForm() {
           {formData.password && formData.confirmPassword && (
             <p
               className={`text-sm ${
-                passwordMatch ? 'text-green-400' : 'text-red-400'
+                passwordMatch ? "text-green-400" : "text-red-400"
               }`}
             >
               {passwordMatch
-                ? '✅ Passwords match'
-                : '❌ Passwords do not match'}
+                ? "✅ Passwords match"
+                : "❌ Passwords do not match"}
             </p>
           )}
         </div>
@@ -225,7 +225,7 @@ function RegisterForm() {
       </div>
 
       <div className="text-center text-sm text-white/70">
-        Already have an account?{' '}
+        Already have an account?{" "}
         <Link
           href="/login"
           className="text-white hover:underline underline-offset-4"
@@ -245,28 +245,34 @@ function GoogleRegisterButton() {
         const backendResponse = await api.auth.googleLogin({
           token: tokenResponse.access_token,
         });
-        console.log('Backend response:', backendResponse);
+        console.log("Backend response:", backendResponse);
 
         if (backendResponse.token && backendResponse.user) {
           // Lưu token và thông tin user
-          localStorage.setItem('userToken', backendResponse.token);
-          localStorage.setItem('userData', JSON.stringify(backendResponse.user));
+          localStorage.setItem("userToken", backendResponse.token);
+          localStorage.setItem(
+            "userData",
+            JSON.stringify(backendResponse.user)
+          );
 
           // Điều hướng đến trang tương ứng
-          if (backendResponse.user.role === 'ADMIN') {
-            window.location.href = '/admin/dashboard';
-          } else if (backendResponse.user.currentProfile === 'ARTIST' && backendResponse.user.artistProfile?.isVerified) {
-            window.location.href = '/artist/dashboard';
+          if (backendResponse.user.role === "ADMIN") {
+            window.location.href = "/admin/dashboard";
+          } else if (
+            backendResponse.user.currentProfile === "ARTIST" &&
+            backendResponse.user.artistProfile?.isVerified
+          ) {
+            window.location.href = "/artist/dashboard";
           } else {
-            window.location.href = '/';
+            window.location.href = "/";
           }
         }
       } catch (error) {
-        console.error('Error sending token to backend:', error);
+        console.error("Error sending token to backend:", error);
       }
     },
     onError: () => {
-      console.error('Google login failed');
+      console.error("Google login failed");
     },
   });
 
@@ -284,7 +290,9 @@ function GoogleRegisterButton() {
 
 export default function RegisterPage() {
   return (
-    <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
+    <GoogleOAuthProvider
+      clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
+    >
       <div className="grid min-h-svh lg:grid-cols-2">
         <div className="flex flex-col gap-4 p-6 md:p-10 bg-[#121212]">
           <div className="flex justify-center md:justify-start">
@@ -312,8 +320,8 @@ export default function RegisterPage() {
                 Join Soundwave Today
               </h2>
               <p className="text-white/70 max-w-md mx-auto">
-                Create an account to enjoy unlimited access to millions of songs
-                and albums. No credit card needed.
+                Create an account to enjoy unlimited access to millions of
+                tracks and albums. No credit card needed.
               </p>
             </div>
           </div>

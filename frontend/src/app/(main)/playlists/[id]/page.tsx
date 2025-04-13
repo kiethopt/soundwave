@@ -223,7 +223,7 @@ export default function PlaylistPage() {
             <p className="text-sm text-white/70">{playlist.description}</p>
           )}
           <div className="flex items-center gap-1 text-sm text-white/70">
-            <span>{playlist.tracks.length} songs</span>
+            <span>{playlist.tracks.length} tracks</span>
           </div>
           <div className="flex items-center gap-2 mt-2">
             {playlist.canEdit &&

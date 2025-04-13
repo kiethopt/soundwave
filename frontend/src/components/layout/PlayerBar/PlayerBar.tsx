@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Pause,
   Play,
@@ -12,14 +12,14 @@ import {
   Down,
   LikeOutline,
   LikeFilled,
-} from '@/components/ui/Icons';
-import { useTrack } from '@/contexts/TrackContext';
-import { ListMusic } from 'lucide-react';
-import { QueuePanel } from '@/components/user/player/QueuePanel';
-import { api } from '@/utils/api';
-import { toast } from 'react-hot-toast';
-import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
-import { useRouter } from 'next/navigation';
+} from "@/components/ui/Icons";
+import { useTrack } from "@/contexts/TrackContext";
+import { ListMusic } from "lucide-react";
+import { QueuePanel } from "@/components/user/player/QueuePanel";
+import { api } from "@/utils/api";
+import { toast } from "react-hot-toast";
+import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
+import { useRouter } from "next/navigation";
 
 export default function PlayerBar() {
   const [showMobileExpanded, setShowMobileExpanded] = useState(false);
@@ -51,7 +51,7 @@ export default function PlayerBar() {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
   const toggleMobileExpanded = () => {
@@ -65,7 +65,7 @@ export default function PlayerBar() {
 
     if (!currentTrack) return;
 
-    const token = localStorage.getItem('userToken');
+    const token = localStorage.getItem("userToken");
     if (!token) {
       // If user is not logged in, show auth dialog
       setShowAuthDialog(true);
@@ -77,16 +77,16 @@ export default function PlayerBar() {
         // Unlike the track
         await api.tracks.unlike(currentTrack.id, token);
         setIsLiked(false);
-        toast.success('Removed from your Liked Songs');
+        toast.success("Removed from your Liked Tracks");
       } else {
         // Like the track
         await api.tracks.like(currentTrack.id, token);
         setIsLiked(true);
-        toast.success('Added to your Liked Songs');
+        toast.success("Added to your Liked Tracks");
       }
     } catch (error) {
-      console.error('Error toggling like status:', error);
-      toast.error('There was an error updating your liked songs');
+      console.error("Error toggling like status:", error);
+      toast.error("There was an error updating your liked tracks");
     }
   };
 
@@ -94,7 +94,7 @@ export default function PlayerBar() {
     const checkLikeStatus = async () => {
       if (!currentTrack) return;
 
-      const token = localStorage.getItem('userToken');
+      const token = localStorage.getItem("userToken");
       if (!token) return;
 
       try {
@@ -102,7 +102,7 @@ export default function PlayerBar() {
         const data = await api.tracks.checkLiked(currentTrack.id, token);
         setIsLiked(!!data.isLiked);
       } catch (error) {
-        console.error('Failed to check like status:', error);
+        console.error("Failed to check like status:", error);
       }
     };
 
@@ -123,17 +123,21 @@ export default function PlayerBar() {
                 className="w-12 h-12 rounded"
               />
               <div className="ml-4 flex-1 overflow-hidden">
-                <h3 
+                <h3
                   className="text-white font-medium text-ellipsis overflow-hidden whitespace-nowrap hover:underline cursor-pointer underline-offset-2"
-                  onClick={() => {router.push(`/track/${currentTrack.id}`)}}
+                  onClick={() => {
+                    router.push(`/track/${currentTrack.id}`);
+                  }}
                 >
                   {currentTrack.title}
                 </h3>
-                <p 
+                <p
                   className="text-white/60 text-sm text-ellipsis overflow-hidden whitespace-nowrap hover:underline cursor-pointer underline-offset-2"
-                  onClick={() => {router.push(`/artist/profile/${currentTrack.artist.id}`)}}
+                  onClick={() => {
+                    router.push(`/artist/profile/${currentTrack.artist.id}`);
+                  }}
                 >
-                  {typeof currentTrack.artist === 'string'
+                  {typeof currentTrack.artist === "string"
                     ? currentTrack.artist
                     : currentTrack.artist.artistName}
                 </p>
@@ -162,7 +166,7 @@ export default function PlayerBar() {
             <button
               onClick={toggleShuffle}
               className={`p-2 rounded-full hover:bg-[#383838] transition-colors duration-200 ${
-                shuffle ? 'text-green-500' : 'text-white'
+                shuffle ? "text-green-500" : "text-white"
               }`}
             >
               <Shuffle className="w-5 h-5" />
@@ -204,7 +208,7 @@ export default function PlayerBar() {
             <button
               onClick={toggleLoop}
               className={`p-2 rounded-full hover:bg-[#383838] transition-colors duration-200 ${
-                loop ? 'text-green-500' : 'text-white'
+                loop ? "text-green-500" : "text-white"
               }`}
             >
               <Loop className="w-5 h-5" />
@@ -267,7 +271,7 @@ export default function PlayerBar() {
           <button
             onClick={() => setIsQueueOpen((prev) => !prev)}
             className={`relative p-2 rounded-full hover:bg-[#383838] transition-colors duration-200 ${
-              isQueueOpen ? 'text-[#A57865]' : 'text-white'
+              isQueueOpen ? "text-[#A57865]" : "text-white"
             }`}
           >
             <ListMusic className="w-5 h-5" />
@@ -343,7 +347,7 @@ export default function PlayerBar() {
                 {currentTrack.title}
               </h3>
               <p className="text-white/60 text-sm text-ellipsis overflow-hidden whitespace-nowrap">
-                {typeof currentTrack.artist === 'string'
+                {typeof currentTrack.artist === "string"
                   ? currentTrack.artist
                   : currentTrack.artist.artistName}
               </p>
@@ -398,7 +402,7 @@ export default function PlayerBar() {
                   {currentTrack.title.toUpperCase()}
                 </h1>
                 <p className="text-white/70 text-base text-center mb-6">
-                  {typeof currentTrack.artist === 'string'
+                  {typeof currentTrack.artist === "string"
                     ? currentTrack.artist
                     : currentTrack.artist.artistName}
                 </p>
@@ -450,7 +454,7 @@ export default function PlayerBar() {
                     <button
                       onClick={toggleShuffle}
                       className={`p-2 rounded-full transition-colors duration-200 ${
-                        shuffle ? 'text-green-500' : 'text-white'
+                        shuffle ? "text-green-500" : "text-white"
                       }`}
                     >
                       <Shuffle className="w-6 h-6" />
@@ -488,7 +492,7 @@ export default function PlayerBar() {
                     <button
                       onClick={toggleLoop}
                       className={`p-2 rounded-full transition-colors duration-200 ${
-                        loop ? 'text-green-500' : 'text-white'
+                        loop ? "text-green-500" : "text-white"
                       }`}
                     >
                       <Loop className="w-6 h-6" />
