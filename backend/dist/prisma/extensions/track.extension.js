@@ -13,20 +13,34 @@ exports.trackExtension = client_1.Prisma.defineExtension({
         track: {
             async autoPublishTracks() {
                 try {
-                    const tracks = await db_1.default.track.findMany({
+                    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+                    const tracksToPublish = await db_1.default.track.findMany({
                         where: {
                             isActive: false,
                             releaseDate: {
+                                gte: twoMinutesAgo,
                                 lte: new Date(),
+                            },
+                            updatedAt: {
+                                lt: twoMinutesAgo,
                             },
                         },
                     });
-                    for (const track of tracks) {
-                        await db_1.default.track.update({
-                            where: { id: track.id },
-                            data: { isActive: true },
-                        });
-                        console.log(`Auto published track: ${track.title}`);
+                    if (tracksToPublish.length === 0) {
+                        return;
+                    }
+                    console.log(`Found ${tracksToPublish.length} tracks to auto-publish.`);
+                    for (const track of tracksToPublish) {
+                        try {
+                            await db_1.default.track.update({
+                                where: { id: track.id },
+                                data: { isActive: true },
+                            });
+                            console.log(`Auto published track: ${track.title} (ID: ${track.id})`);
+                        }
+                        catch (updateError) {
+                            console.error(`Failed to auto-publish track ${track.id}:`, updateError);
+                        }
                     }
                 }
                 catch (error) {
@@ -37,6 +51,7 @@ exports.trackExtension = client_1.Prisma.defineExtension({
     },
 });
 node_cron_1.default.schedule('* * * * *', async () => {
+    console.log('Running cron job to auto-publish tracks...');
     try {
         await db_1.default.track.autoPublishTracks();
     }

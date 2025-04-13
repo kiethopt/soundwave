@@ -12,8 +12,11 @@ import { uploadFile } from './upload.service';
 import { paginate, toBooleanValue } from '../utils/handle-utils';
 import * as fs from 'fs';
 import * as path from 'path';
+import { SystemComponentStatus } from '../types/system.types';
+import { client as redisClient } from '../middleware/cache.middleware';
+import { transporter as nodemailerTransporter } from './email.service';
 
-// User management services
+// Lấy danh sách user
 export const getUsers = async (req: Request) => {
   const { search = '', status } = req.query;
 
@@ -47,6 +50,7 @@ export const getUsers = async (req: Request) => {
   };
 };
 
+// Lấy user theo ID
 export const getUserById = async (id: string) => {
   const user = await prisma.user.findUnique({
     where: { id },
@@ -60,7 +64,7 @@ export const getUserById = async (id: string) => {
   return user;
 };
 
-// Artist request services
+// Lấy yêu cầu trở thành nghệ sĩ
 export const getArtistRequests = async (req: Request) => {
   const { startDate, endDate, status, search } = req.query;
 
@@ -103,6 +107,7 @@ export const getArtistRequests = async (req: Request) => {
   };
 };
 
+// Lấy chi tiết yêu cầu trở thành nghệ sĩ
 export const getArtistRequestDetail = async (id: string) => {
   const request = await prisma.artistProfile.findUnique({
     where: { id },
@@ -116,7 +121,7 @@ export const getArtistRequestDetail = async (id: string) => {
   return request;
 };
 
-// User update services
+// Cập nhật thông tin user
 export const updateUserInfo = async (
   id: string,
   data: any,
@@ -202,7 +207,7 @@ export const updateUserInfo = async (
   return updatedUser;
 };
 
-// Artist update services
+// Cập nhật thông tin nghệ sĩ
 export const updateArtistInfo = async (
   id: string,
   data: any,
@@ -262,7 +267,7 @@ export const updateArtistInfo = async (
   return updatedArtist;
 };
 
-// Delete services
+// Xóa user theo ID
 export const deleteUserById = async (id: string) => {
   return prisma.user.delete({ where: { id } });
 };
@@ -271,7 +276,7 @@ export const deleteArtistById = async (id: string) => {
   return prisma.artistProfile.delete({ where: { id } });
 };
 
-// Artist listing services
+// Lấy danh sách nghệ sĩ
 export const getArtists = async (req: Request) => {
   const { search = '', status } = req.query;
 
@@ -307,6 +312,7 @@ export const getArtists = async (req: Request) => {
   };
 };
 
+// Lấy thông tin nghệ sĩ theo ID
 export const getArtistById = async (id: string) => {
   const artist = await prisma.artistProfile.findUnique({
     where: { id },
@@ -334,7 +340,7 @@ export const getArtistById = async (id: string) => {
   return artist;
 };
 
-// Genre management services
+// Lấy danh sách thể loại
 export const getGenres = async (req: Request) => {
   const { search = '' } = req.query;
 
@@ -361,6 +367,7 @@ export const getGenres = async (req: Request) => {
   };
 };
 
+// Tạo thể loại mới
 export const createNewGenre = async (name: string) => {
   const existingGenre = await prisma.genre.findFirst({
     where: { name },
@@ -373,6 +380,7 @@ export const createNewGenre = async (name: string) => {
   });
 };
 
+// Cập nhật thông tin thể loại
 export const updateGenreInfo = async (id: string, name: string) => {
   const existingGenre = await prisma.genre.findUnique({
     where: { id },
@@ -403,7 +411,7 @@ export const deleteGenreById = async (id: string) => {
   return prisma.genre.delete({ where: { id } });
 };
 
-// Artist request approval services
+// Xác nhận yêu cầu trở thành nghệ sĩ
 export const approveArtistRequest = async (requestId: string) => {
   const artistProfile = await prisma.artistProfile.findFirst({
     where: {
@@ -431,6 +439,7 @@ export const approveArtistRequest = async (requestId: string) => {
   });
 };
 
+// Từ chối yêu cầu trở thành nghệ sĩ
 export const rejectArtistRequest = async (requestId: string) => {
   const artistProfile = await prisma.artistProfile.findFirst({
     where: {
@@ -460,7 +469,7 @@ export const rejectArtistRequest = async (requestId: string) => {
   };
 };
 
-// Service function to delete an artist request without rejection logic
+// Xóa yêu cầu trở thành nghệ sĩ
 export const deleteArtistRequest = async (requestId: string) => {
   const artistProfile = await prisma.artistProfile.findFirst({
     where: {
@@ -474,17 +483,15 @@ export const deleteArtistRequest = async (requestId: string) => {
     throw new Error('Artist request not found or already verified/rejected');
   }
 
-  // Directly delete the profile
   await prisma.artistProfile.delete({
     where: { id: requestId },
   });
 
-  // No return value needed, or maybe return the deleted profile ID
   return { deletedRequestId: requestId };
 };
 
-// Stats services
-export const getSystemStats = async () => {
+// Lấy thống kê dashboard
+export const getDashboardStats = async () => {
   // Sử dụng Promise.all để thực hiện đồng thời các truy vấn
   const stats = await Promise.all([
     prisma.user.count({ where: { role: Role.USER } }),
@@ -540,7 +547,129 @@ export const getSystemStats = async () => {
   };
 };
 
-// System settings services
+// Kiểm tra trạng thái hệ thống
+export const getSystemStatus = async (): Promise<SystemComponentStatus[]> => {
+  const statuses: SystemComponentStatus[] = [];
+
+  // 1. Check Database (Prisma)
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    statuses.push({ name: 'Database (PostgreSQL)', status: 'Available' });
+  } catch (error) {
+    console.error('[System Status] Database check failed:', error);
+    statuses.push({
+      name: 'Database (PostgreSQL)',
+      status: 'Outage',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+
+  // 2. Check Redis Cache
+  const useRedis = process.env.USE_REDIS_CACHE === 'true';
+  if (useRedis) {
+    // Check 1: Kiểm tra xem có bị lỗi hay không
+    if (typeof redisClient.ping !== 'function') {
+      console.warn('[System Status] Redis check inconsistent: Cache enabled but using mock client (restart required).');
+      statuses.push({
+        name: 'Cache (Redis)',
+        status: 'Issue',
+        message: 'Inconsistent config: Cache enabled, but mock client active (restart needed).',
+      });
+    } else {
+      // Check 2: Kiểm tra xem client có kết nối hay không
+      if (!redisClient.isOpen) {
+         statuses.push({ name: 'Cache (Redis)', status: 'Outage', message: 'Client not connected' });
+      } else {
+        // Check 3: Kiểm tra xem có bị lỗi hay không
+        try {
+          await redisClient.ping();
+          statuses.push({ name: 'Cache (Redis)', status: 'Available' });
+        } catch (error) {
+          console.error('[System Status] Redis ping failed:', error);
+          statuses.push({
+            name: 'Cache (Redis)',
+            status: 'Issue', // Sử dụng 'Issue' cho vấn đề kết nối sau khi kết nối ban đầu
+            message: error instanceof Error ? error.message : 'Ping failed',
+          });
+        }
+      }
+    }
+  } else {
+    statuses.push({ name: 'Cache (Redis)', status: 'Disabled', message: 'USE_REDIS_CACHE is false' });
+  }
+
+  // 3. Check Cloudinary
+  try {
+    // Import Cloudinary locally
+    const cloudinary = (await import('cloudinary')).v2;
+    const pingResult = await cloudinary.api.ping();
+    if (pingResult?.status === 'ok') {
+       statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Available' });
+    } else {
+       statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Issue', message: 'Ping failed or unexpected status' });
+    }
+  } catch (error) {
+    console.error('[System Status] Cloudinary check failed:', error);
+    statuses.push({
+      name: 'Cloudinary (Media Storage)',
+      status: 'Outage',
+      message: error instanceof Error ? error.message : 'Connection or Auth failed',
+    });
+  }
+
+  // 4. Check Gemini AI
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (geminiApiKey) {
+    try {
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(geminiApiKey);
+      const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+
+      // Kiểm tra xem có bị lỗi hay không
+      const model = genAI.getGenerativeModel({ model: modelName });
+      await model.countTokens(""); // Gọi hàm countTokens để kiểm tra xem có bị lỗi hay không
+
+      statuses.push({ name: 'Gemini AI (Playlists)', status: 'Available', message: `API Key valid. Configured model: ${modelName}` });
+
+    } catch (error: any) {
+      console.error('[System Status] Gemini AI check failed:', error);
+      statuses.push({
+        name: 'Gemini AI (Playlists)',
+        status: 'Issue',
+        message: error.message || 'Failed to initialize or connect to Gemini',
+      });
+    }
+  } else {
+    statuses.push({ name: 'Gemini AI (Playlists)', status: 'Disabled', message: 'GEMINI_API_KEY not set' });
+  }
+
+  // 5. Check Nodemailer (Email Service)
+  if (nodemailerTransporter) {
+    try {
+      // Verify the connection
+      await nodemailerTransporter.verify();
+      statuses.push({ name: 'Email (Nodemailer)', status: 'Available' });
+    } catch (error: any) {
+      console.error('[System Status] Nodemailer verification failed:', error);
+      statuses.push({
+        name: 'Email (Nodemailer)',
+        status: 'Outage',
+        message: error.message || 'Verification failed',
+      });
+    }
+  } else {
+    // Transporter is null (likely due to missing config)
+    statuses.push({
+      name: 'Email (Nodemailer)',
+      status: 'Disabled',
+      message: 'SMTP configuration incomplete or verification failed',
+    });
+  }
+
+  return statuses;
+};
+
+// Cập nhật trạng thái cache
 export const updateCacheStatus = async (enabled: boolean) => {
   try {
     const envPath = path.resolve(__dirname, '../../.env');

@@ -436,6 +436,12 @@ export interface SystemSettings {
   supportedAIModels?: string[]; // Danh sách model được hỗ trợ
 }
 
+export interface SystemComponentStatus {
+  name: string;
+  status: 'Available' | 'Issue' | 'Outage' | 'Disabled';
+  message?: string;
+}
+
 export interface RecommendationMatrix {
   success: boolean;
   data: {

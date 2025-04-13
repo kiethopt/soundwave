@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.playAlbum = exports.getAlbumById = exports.getAdminAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = exports.getAllAlbums = exports.getHotAlbums = exports.getNewestAlbums = exports.deleteAlbumById = void 0;
+exports.playAlbum = exports.getAlbumById = exports.getAdminAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = exports.getAlbums = exports.getHotAlbums = exports.getNewestAlbums = exports.deleteAlbumById = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const upload_service_1 = require("./upload.service");
 const client_1 = require("@prisma/client");
@@ -71,6 +71,8 @@ const deleteAlbumById = async (id) => {
     if (!album) {
         throw new Error('Album not found');
     }
+    const io = (0, socket_1.getIO)();
+    io.emit('album:deleted', { albumId: id });
     return db_1.default.album.delete({
         where: { id },
     });
@@ -100,7 +102,7 @@ const getHotAlbums = async (limit = 10) => {
     });
 };
 exports.getHotAlbums = getHotAlbums;
-const getAllAlbums = async (req) => {
+const getAlbums = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
     const user = req.user;
     const whereClause = {};
@@ -153,7 +155,7 @@ const getAllAlbums = async (req) => {
         pagination: result.pagination,
     };
 };
-exports.getAllAlbums = getAllAlbums;
+exports.getAlbums = getAlbums;
 const createAlbum = async (req) => {
     const user = req.user;
     if (!user)
@@ -257,6 +259,7 @@ const createAlbum = async (req) => {
             await emailService.sendEmail(emailOptions);
         }
     }
+    io.emit('album:created', { album });
     return { message: 'Album created successfully', album };
 };
 exports.createAlbum = createAlbum;
@@ -328,6 +331,8 @@ const addTracksToAlbum = async (req) => {
         data: { duration: totalDuration, totalTracks: tracks.length },
         select: prisma_selects_1.albumSelect,
     });
+    const io = (0, socket_1.getIO)();
+    io.emit('album:updated', { album: updatedAlbum });
     return { message: 'Tracks added to album successfully', album: updatedAlbum, tracks: createdTracks };
 };
 exports.addTracksToAlbum = addTracksToAlbum;
@@ -408,6 +413,8 @@ const updateAlbum = async (req) => {
         data: updateData,
         select: prisma_selects_1.albumSelect,
     });
+    const io = (0, socket_1.getIO)();
+    io.emit('album:updated', { album: updatedAlbum });
     return { message: 'Album updated successfully', album: updatedAlbum };
 };
 exports.updateAlbum = updateAlbum;
@@ -439,15 +446,18 @@ const toggleAlbumVisibility = async (req) => {
     });
     if (!album)
         throw new Error('Album not found');
+    const newIsActive = !album.isActive;
     if (!canManageAlbum(user, album.artistId))
         throw new Error('You can only toggle your own albums');
     const updatedAlbum = await db_1.default.album.update({
         where: { id },
-        data: { isActive: !album.isActive },
+        data: { isActive: newIsActive },
         select: prisma_selects_1.albumSelect,
     });
+    const io = (0, socket_1.getIO)();
+    io.emit('album:visibilityChanged', { albumId: updatedAlbum.id, isActive: newIsActive });
     return {
-        message: `Album ${updatedAlbum.isActive ? 'activated' : 'hidden'} successfully`,
+        message: `Album ${newIsActive ? 'activated' : 'hidden'} successfully`,
         album: updatedAlbum,
     };
 };
@@ -536,7 +546,7 @@ const getAdminAllAlbums = async (req) => {
     }
     if (conditions.length > 0)
         whereClause.AND = conditions;
-    const result = await (0, exports.getAllAlbums)(req);
+    const result = await (0, exports.getAlbums)(req);
     return { albums: result.data, pagination: result.pagination };
 };
 exports.getAdminAllAlbums = getAdminAllAlbums;

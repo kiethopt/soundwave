@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkTrackLiked = exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracksAdminArtist = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = exports.getAllTracks = exports.unlikeTrack = exports.likeTrack = exports.deleteTrackById = exports.canManageTrack = void 0;
+exports.checkTrackLiked = exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracksAdminArtist = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = exports.getTracks = exports.unlikeTrack = exports.likeTrack = exports.deleteTrackById = exports.canManageTrack = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
@@ -64,6 +64,8 @@ const deleteTrackById = async (id) => {
     if (!track) {
         throw new Error('Track not found');
     }
+    const io = (0, socket_1.getIO)();
+    io.emit('track:deleted', { trackId: id });
     return db_1.default.track.delete({
         where: { id },
     });
@@ -150,7 +152,7 @@ const unlikeTrack = async (userId, trackId) => {
     });
 };
 exports.unlikeTrack = unlikeTrack;
-const getAllTracks = async (req) => {
+const getTracks = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
     const user = req.user;
     const whereClause = {};
@@ -230,7 +232,7 @@ const getAllTracks = async (req) => {
         pagination: result.pagination,
     };
 };
-exports.getAllTracks = getAllTracks;
+exports.getTracks = getTracks;
 const createTrack = async (req) => {
     const user = req.user;
     if (!user)
@@ -486,8 +488,17 @@ const updateTrack = async (req, id) => {
                 });
             }
         }
-        return updated;
+        const finalUpdatedTrack = await tx.track.findUnique({
+            where: { id },
+            select: prisma_selects_1.trackSelect,
+        });
+        if (!finalUpdatedTrack) {
+            throw new Error("Failed to re-fetch track after updating relations.");
+        }
+        return finalUpdatedTrack;
     });
+    const io = (0, socket_1.getIO)();
+    io.emit('track:updated', { track: updatedTrack });
     return { message: 'Track updated successfully', track: updatedTrack };
 };
 exports.updateTrack = updateTrack;
@@ -521,11 +532,14 @@ const toggleTrackVisibility = async (req, id) => {
     if (!(0, exports.canManageTrack)(user, track.artistId)) {
         throw new Error('You can only toggle visibility of your own tracks');
     }
+    const newIsActive = !track.isActive;
     const updatedTrack = await db_1.default.track.update({
         where: { id },
-        data: { isActive: !track.isActive },
+        data: { isActive: newIsActive },
         select: prisma_selects_1.trackSelect,
     });
+    const io = (0, socket_1.getIO)();
+    io.emit('track:visibilityChanged', { trackId: updatedTrack.id, isActive: newIsActive });
     return {
         message: `Track ${updatedTrack.isActive ? 'activated' : 'hidden'} successfully`,
         track: updatedTrack,
@@ -701,7 +715,7 @@ const getAllTracksAdminArtist = async (req) => {
             },
         };
     }
-    const result = await (0, exports.getAllTracks)(req);
+    const result = await (0, exports.getTracks)(req);
     return {
         tracks: result.data,
         pagination: result.pagination,

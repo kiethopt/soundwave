@@ -9,7 +9,7 @@ import {
   updateGenre,
   deleteGenre,
   approveArtistRequest,
-  getStats,
+  getDashboardStats,
   getArtistById,
   getAllArtistRequests,
   rejectArtistRequest,
@@ -20,6 +20,7 @@ import {
   handleCacheStatus,
   handleAIModelStatus,
   handleMaintenanceMode,
+  getSystemStatus,
 } from '../controllers/admin.controller';
 import * as genreController from '../controllers/genre.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
@@ -29,13 +30,13 @@ import upload from '../middleware/upload.middleware';
 
 const router = express.Router();
 
-// Thống kê
+// Thống kê Dashboard
 router.get(
-  '/stats',
+  '/dashboard-stats',
   authenticate,
   authorize([Role.ADMIN]),
   cacheMiddleware,
-  getStats
+  getDashboardStats
 );
 
 // Cập nhật trạng thái cache
@@ -155,5 +156,13 @@ router
   .route('/system/ai-model')
   .get(authenticate, authorize([Role.ADMIN]), handleAIModelStatus)
   .post(authenticate, authorize([Role.ADMIN]), handleAIModelStatus);
+
+// Lấy trạng thái hệ thống
+router.get(
+  '/system-status',
+  authenticate,
+  authorize([Role.ADMIN]),
+  getSystemStatus
+);
 
 export default router;

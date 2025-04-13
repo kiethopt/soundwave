@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createWelcomeEmail = exports.createPasswordResetEmail = exports.createAccountDeactivatedEmail = exports.createAccountActivatedEmail = exports.createNewReleaseEmail = exports.createArtistRequestRejectedEmail = exports.createArtistRequestApprovedEmail = exports.createNewFollowerEmail = exports.sendEmail = void 0;
+exports.transporter = exports.createWelcomeEmail = exports.createPasswordResetEmail = exports.createAccountDeactivatedEmail = exports.createAccountActivatedEmail = exports.createNewReleaseEmail = exports.createArtistRequestRejectedEmail = exports.createArtistRequestApprovedEmail = exports.createNewFollowerEmail = exports.sendEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
@@ -24,8 +24,9 @@ const TEXT_DARK = '#333333';
 const TEXT_MUTED = '#cccccc';
 const FONT_FAMILY = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
 let transporter = null;
+exports.transporter = transporter;
 if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
-    transporter = nodemailer_1.default.createTransport({
+    exports.transporter = transporter = nodemailer_1.default.createTransport({
         host: SMTP_HOST,
         port: SMTP_PORT,
         secure: SMTP_SECURE,
@@ -37,7 +38,7 @@ if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
     transporter.verify((error, success) => {
         if (error) {
             console.error('❌ Nodemailer transporter verification failed:', error);
-            transporter = null;
+            exports.transporter = transporter = null;
         }
         else {
             console.log('✅ Nodemailer transporter is ready to send emails.');

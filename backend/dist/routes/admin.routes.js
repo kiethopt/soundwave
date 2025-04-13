@@ -44,7 +44,7 @@ const client_1 = require("@prisma/client");
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const upload_middleware_1 = __importDefault(require("../middleware/upload.middleware"));
 const router = express_1.default.Router();
-router.get('/stats', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), cache_middleware_1.cacheMiddleware, admin_controller_1.getStats);
+router.get('/dashboard-stats', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), cache_middleware_1.cacheMiddleware, admin_controller_1.getDashboardStats);
 router
     .route('/system/cache')
     .get(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleCacheStatus)
@@ -74,5 +74,6 @@ router
     .route('/system/ai-model')
     .get(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleAIModelStatus)
     .post(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleAIModelStatus);
+router.get('/system-status', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getSystemStatus);
 exports.default = router;
 //# sourceMappingURL=admin.routes.js.map

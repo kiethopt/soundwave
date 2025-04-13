@@ -4,9 +4,7 @@ import { createClient, RedisClientType } from 'redis';
 class MockRedisClient {
   isOpen = false;
 
-  // Thêm phương thức on để giải quyết lỗi 1
   on(event: string, listener: (err: Error) => void): this {
-    // Không làm gì cả - chỉ là mock
     return this;
   }
 
@@ -26,7 +24,6 @@ class MockRedisClient {
     return null;
   }
 
-  // Sửa cách khai báo set để phù hợp với cách gọi ở hàm setCache
   async set(key: string, value: string, options?: any) {
     return 'OK';
   }
@@ -45,16 +42,15 @@ export const client =
   process.env.USE_REDIS_CACHE === 'true'
     ? createClient({
         username: 'default',
-        password: 'BAjFVLaluLLeQzEwR7IoOuKWUHSyJtas',
+        password: 'qJWaMTSdU0Di8xTYR50oskZc2Y61rUcF',
         socket: {
-          host: 'redis-12768.c1.ap-southeast-1-1.ec2.redns.redis-cloud.com',
-          port: 12768,
+          host: 'redis-13733.c292.ap-southeast-1-1.ec2.redns.redis-cloud.com',
+          port: 13733,
         },
       })
     : (new MockRedisClient() as unknown as RedisClientType);
 
 if (process.env.USE_REDIS_CACHE === 'true') {
-  // Đã được định danh kiểu rõ ràng tham số err
   client.on('error', (err: Error) => console.error('Redis error:', err));
   client.on('connect', () =>
     console.log('[Redis] Client connected successfully')

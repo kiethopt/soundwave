@@ -10,6 +10,11 @@ import {
   Server,
   Bot,
   AlertCircle,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  PowerOff,
+  HelpCircle,
 } from 'lucide-react';
 import {
   Card,
@@ -22,7 +27,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { SystemSettings } from '@/types';
+import { SystemSettings, SystemComponentStatus } from '@/types';
 import { api } from '@/utils/api';
 import {
   Select,
@@ -32,7 +37,23 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-export default function SystemPage() {
+// Helper function to get status icon and color
+const getStatusVisuals = (status: SystemComponentStatus['status']) => {
+  switch (status) {
+    case 'Available':
+      return { Icon: CheckCircle2, color: 'text-green-500' };
+    case 'Issue':
+      return { Icon: AlertTriangle, color: 'text-yellow-500' };
+    case 'Outage':
+      return { Icon: XCircle, color: 'text-red-500' };
+    case 'Disabled':
+      return { Icon: PowerOff, color: 'text-gray-500' };
+    default:
+      return { Icon: HelpCircle, color: 'text-gray-400' };
+  }
+};
+
+export default function SystemManagementPage() {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<string | null>(null);
@@ -45,22 +66,24 @@ export default function SystemPage() {
     aiModel: 'gemini-2.0-flash',
     supportedAIModels: [],
   });
+  const [systemStatuses, setSystemStatuses] = useState<SystemComponentStatus[]>([]);
 
-  // Load system settings
+  // Load system settings and status
   useEffect(() => {
     const initializeSystemSettings = async () => {
       try {
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        const [cacheResponse, aiModelResponse, maintenanceResponse] =
+        // Fetch settings and system status
+        const [cacheResponse, aiModelResponse, maintenanceResponse, statusResponse] =
           await Promise.all([
             api.admin.getCacheStatus(token),
             api.admin.getAIModelStatus(token),
             api.admin.getMaintenanceStatus(token),
+            api.admin.getSystemStatus(token),
           ]);
 
-        // Debug log
         console.log('AI Model Response:', aiModelResponse);
 
         setSettings((prev) => ({
@@ -77,6 +100,14 @@ export default function SystemPage() {
           ],
           maintenanceMode: maintenanceResponse.enabled || false,
         }));
+
+        // Set system statuses
+        if (statusResponse?.success && Array.isArray(statusResponse.data)) {
+          setSystemStatuses(statusResponse.data);
+        } else {
+          console.error('Failed to fetch or parse system status:', statusResponse);
+          toast.error('Could not load system component statuses.');
+        }
       } catch (error) {
         console.error('Failed to get system settings:', error);
         toast.error('Failed to load system settings');
@@ -150,6 +181,43 @@ export default function SystemPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* System Status Card - NEW */}
+          <Card
+            className={`md:col-span-2 ${theme === 'light' ? 'bg-white' : 'bg-zinc-900 border-zinc-700'}`}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Server className="h-5 w-5 text-indigo-500" />
+                System Status
+              </CardTitle>
+              <CardDescription>
+                Overview of core system components
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {systemStatuses.length > 0 ? (
+                systemStatuses.map((component) => {
+                  const { Icon, color } = getStatusVisuals(component.status);
+                  return (
+                    <div key={component.name} className="flex items-center justify-between text-sm border-b pb-2 last:border-b-0 last:pb-0 pt-1 first:pt-0 border-border/30">
+                      <span className="font-medium text-primary">{component.name}</span>
+                      <div className="flex items-center gap-2">
+                        <Icon className={`h-4 w-4 ${color}`} />
+                        <span className={`font-semibold ${color}`}>
+                          {component.status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+                  System status information is unavailable.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Cache Management Card */}
           <Card
             className={
@@ -183,6 +251,16 @@ export default function SystemPage() {
                     updateSetting('cacheEnabled', checked)
                   }
                 />
+              </div>
+
+              {/* Add Status Text */}
+              <div className="text-sm flex items-center gap-1.5">
+                <span className="font-medium">Status:</span>
+                <span
+                  className={settings.cacheEnabled ? 'text-green-600' : 'text-red-600'}
+                >
+                  {settings.cacheEnabled ? 'Enabled' : 'Disabled'}
+                </span>
               </div>
 
               <Separator
@@ -313,6 +391,16 @@ export default function SystemPage() {
                     updateSetting('maintenanceMode', checked)
                   }
                 />
+              </div>
+
+              {/* Add Status Text */}
+              <div className="text-sm flex items-center gap-1.5">
+                <span className="font-medium">Status:</span>
+                <span
+                  className={settings.maintenanceMode ? 'text-orange-600' : 'text-green-600'}
+                >
+                  {settings.maintenanceMode ? 'Maintenance Enabled' : 'Operational'}
+                </span>
               </div>
 
               <Separator

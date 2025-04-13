@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateMaintenanceMode = exports.updateAIModel = exports.updateCacheStatus = exports.getSystemStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.updateMaintenanceMode = exports.updateAIModel = exports.updateCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
@@ -44,6 +44,8 @@ const upload_service_1 = require("./upload.service");
 const handle_utils_1 = require("../utils/handle-utils");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const cache_middleware_1 = require("../middleware/cache.middleware");
+const email_service_1 = require("./email.service");
 const getUsers = async (req) => {
     const { search = '', status } = req.query;
     const where = {
@@ -418,7 +420,7 @@ const deleteArtistRequest = async (requestId) => {
     return { deletedRequestId: requestId };
 };
 exports.deleteArtistRequest = deleteArtistRequest;
-const getSystemStats = async () => {
+const getDashboardStats = async () => {
     const stats = await Promise.all([
         db_1.default.user.count({ where: { role: client_1.Role.USER } }),
         db_1.default.artistProfile.count({
@@ -464,7 +466,118 @@ const getSystemStats = async () => {
         updatedAt: new Date().toISOString(),
     };
 };
-exports.getSystemStats = getSystemStats;
+exports.getDashboardStats = getDashboardStats;
+const getSystemStatus = async () => {
+    const statuses = [];
+    try {
+        await db_1.default.$queryRaw `SELECT 1`;
+        statuses.push({ name: 'Database (PostgreSQL)', status: 'Available' });
+    }
+    catch (error) {
+        console.error('[System Status] Database check failed:', error);
+        statuses.push({
+            name: 'Database (PostgreSQL)',
+            status: 'Outage',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
+    const useRedis = process.env.USE_REDIS_CACHE === 'true';
+    if (useRedis) {
+        if (typeof cache_middleware_1.client.ping !== 'function') {
+            console.warn('[System Status] Redis check inconsistent: Cache enabled but using mock client (restart required).');
+            statuses.push({
+                name: 'Cache (Redis)',
+                status: 'Issue',
+                message: 'Inconsistent config: Cache enabled, but mock client active (restart needed).',
+            });
+        }
+        else {
+            if (!cache_middleware_1.client.isOpen) {
+                statuses.push({ name: 'Cache (Redis)', status: 'Outage', message: 'Client not connected' });
+            }
+            else {
+                try {
+                    await cache_middleware_1.client.ping();
+                    statuses.push({ name: 'Cache (Redis)', status: 'Available' });
+                }
+                catch (error) {
+                    console.error('[System Status] Redis ping failed:', error);
+                    statuses.push({
+                        name: 'Cache (Redis)',
+                        status: 'Issue',
+                        message: error instanceof Error ? error.message : 'Ping failed',
+                    });
+                }
+            }
+        }
+    }
+    else {
+        statuses.push({ name: 'Cache (Redis)', status: 'Disabled', message: 'USE_REDIS_CACHE is false' });
+    }
+    try {
+        const cloudinary = (await Promise.resolve().then(() => __importStar(require('cloudinary')))).v2;
+        const pingResult = await cloudinary.api.ping();
+        if (pingResult?.status === 'ok') {
+            statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Available' });
+        }
+        else {
+            statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Issue', message: 'Ping failed or unexpected status' });
+        }
+    }
+    catch (error) {
+        console.error('[System Status] Cloudinary check failed:', error);
+        statuses.push({
+            name: 'Cloudinary (Media Storage)',
+            status: 'Outage',
+            message: error instanceof Error ? error.message : 'Connection or Auth failed',
+        });
+    }
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (geminiApiKey) {
+        try {
+            const { GoogleGenerativeAI } = await Promise.resolve().then(() => __importStar(require('@google/generative-ai')));
+            const genAI = new GoogleGenerativeAI(geminiApiKey);
+            const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+            const model = genAI.getGenerativeModel({ model: modelName });
+            await model.countTokens("");
+            statuses.push({ name: 'Gemini AI (Playlists)', status: 'Available', message: `API Key valid. Configured model: ${modelName}` });
+        }
+        catch (error) {
+            console.error('[System Status] Gemini AI check failed:', error);
+            statuses.push({
+                name: 'Gemini AI (Playlists)',
+                status: 'Issue',
+                message: error.message || 'Failed to initialize or connect to Gemini',
+            });
+        }
+    }
+    else {
+        statuses.push({ name: 'Gemini AI (Playlists)', status: 'Disabled', message: 'GEMINI_API_KEY not set' });
+    }
+    if (email_service_1.transporter) {
+        try {
+            await email_service_1.transporter.verify();
+            statuses.push({ name: 'Email (Nodemailer)', status: 'Available' });
+        }
+        catch (error) {
+            console.error('[System Status] Nodemailer verification failed:', error);
+            statuses.push({
+                name: 'Email (Nodemailer)',
+                status: 'Outage',
+                message: error.message || 'Verification failed',
+            });
+        }
+    }
+    else {
+        statuses.push({
+            name: 'Email (Nodemailer)',
+            status: 'Disabled',
+            message: 'SMTP configuration incomplete or verification failed',
+        });
+    }
+    return statuses;
+};
+exports.getSystemStatus = getSystemStatus;
 const updateCacheStatus = async (enabled) => {
     try {
         const envPath = path.resolve(__dirname, '../../.env');

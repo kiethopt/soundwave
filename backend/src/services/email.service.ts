@@ -3,8 +3,6 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-// const EMAIL_USER = process.env.EMAIL_USER;
 const FRONTEND_URL =
   process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
 
@@ -60,10 +58,6 @@ if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
     'SMTP configuration is incomplete (HOST, USER, or PASS missing). Email notifications will be disabled.'
   );
 }
-
-// Remove SendGrid specific checks
-// if (!SENDGRID_API_KEY) { ... }
-// if (!EMAIL_USER) { ... }
 
 // Define type for email options
 interface EmailOptions {
@@ -416,3 +410,5 @@ export const createWelcomeEmail = (
 };
 
 
+
+export { transporter };

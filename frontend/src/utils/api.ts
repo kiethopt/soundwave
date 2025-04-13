@@ -484,6 +484,15 @@ export const api = {
         method: 'DELETE',
       }, token);
     },
+
+    // Get System Status - NEW
+    getSystemStatus: async (token: string) => {
+      return fetchWithAuth(
+        `/api/admin/system-status`,
+        { method: "GET" },
+        token
+      );
+    },
   },
 
   user: {
@@ -1116,8 +1125,8 @@ export const api = {
   },
 
   dashboard: {
-    getStats: async (token: string) =>
-      fetchWithAuth("/api/admin/stats", { method: "GET" }, token),
+    getDashboardStats: async (token: string) =>
+      fetchWithAuth("/api/admin/dashboard-stats", { method: "GET" }, token),
   },
 
   notifications: {

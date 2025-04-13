@@ -35,10 +35,10 @@ class MockRedisClient {
 exports.client = process.env.USE_REDIS_CACHE === 'true'
     ? (0, redis_1.createClient)({
         username: 'default',
-        password: 'BAjFVLaluLLeQzEwR7IoOuKWUHSyJtas',
+        password: 'qJWaMTSdU0Di8xTYR50oskZc2Y61rUcF',
         socket: {
-            host: 'redis-12768.c1.ap-southeast-1-1.ec2.redns.redis-cloud.com',
-            port: 12768,
+            host: 'redis-13733.c292.ap-southeast-1-1.ec2.redns.redis-cloud.com',
+            port: 13733,
         },
     })
     : new MockRedisClient();

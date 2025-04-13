@@ -146,7 +146,7 @@ export default function AdminDashboard() {
         if (!token) {
           throw new Error('No authentication token found');
         }
-        const data = await api.dashboard.getStats(token);
+        const data = await api.dashboard.getDashboardStats(token);
         setStats(data);
       } catch (err) {
         console.error('Error fetching stats:', err);

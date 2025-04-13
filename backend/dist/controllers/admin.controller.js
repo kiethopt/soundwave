@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleAIModelStatus = exports.handleMaintenanceMode = exports.handleCacheStatus = exports.getStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.getSystemStatus = exports.handleAIModelStatus = exports.handleMaintenanceMode = exports.handleCacheStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const db_1 = __importDefault(require("../config/db"));
 const adminService = __importStar(require("../services/admin.service"));
@@ -533,16 +533,16 @@ const deleteArtistRequest = async (req, res) => {
     }
 };
 exports.deleteArtistRequest = deleteArtistRequest;
-const getStats = async (req, res) => {
+const getDashboardStats = async (req, res) => {
     try {
-        const statsData = await adminService.getSystemStats();
+        const statsData = await adminService.getDashboardStats();
         res.json(statsData);
     }
     catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Get stats');
+        (0, handle_utils_1.handleError)(res, error, 'Get dashboard stats');
     }
 };
-exports.getStats = getStats;
+exports.getDashboardStats = getDashboardStats;
 const handleCacheStatus = async (req, res) => {
     try {
         const { enabled } = req.method === 'POST' ? req.body : {};
@@ -597,4 +597,14 @@ const handleAIModelStatus = async (req, res) => {
     }
 };
 exports.handleAIModelStatus = handleAIModelStatus;
+const getSystemStatus = async (req, res) => {
+    try {
+        const statuses = await adminService.getSystemStatus();
+        res.json({ success: true, data: statuses });
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Get system status');
+    }
+};
+exports.getSystemStatus = getSystemStatus;
 //# sourceMappingURL=admin.controller.js.map

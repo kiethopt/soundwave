@@ -687,12 +687,12 @@ export const deleteArtistRequest = async (
 };
 
 // Lấy thông số tổng quan để thống kê - ADMIN only
-export const getStats = async (req: Request, res: Response): Promise<void> => {
+export const getDashboardStats = async (req: Request, res: Response): Promise<void> => {
   try {
-    const statsData = await adminService.getSystemStats();
+    const statsData = await adminService.getDashboardStats();
     res.json(statsData);
   } catch (error) {
-    handleError(res, error, 'Get stats');
+    handleError(res, error, 'Get dashboard stats');
   }
 };
 
@@ -762,5 +762,18 @@ export const handleAIModelStatus = async (
       message: 'Failed to update AI model settings',
       error: error instanceof Error ? error.message : String(error),
     });
+  }
+};
+
+// Lấy trạng thái hệ thống - ADMIN only
+export const getSystemStatus = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const statuses = await adminService.getSystemStatus();
+    res.json({ success: true, data: statuses });
+  } catch (error) {
+    handleError(res, error, 'Get system status');
   }
 };

@@ -9,31 +9,39 @@ const node_cron_1 = __importDefault(require("node-cron"));
 async function checkAndUpdateAlbumStatus(client) {
     try {
         const now = new Date();
-        const albums = await client.album.findMany({
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+        const albumsToPublish = await client.album.findMany({
             where: {
                 isActive: false,
-                releaseDate: { lte: now },
+                releaseDate: {
+                    gte: twoMinutesAgo,
+                    lte: now,
+                },
+                updatedAt: {
+                    lt: twoMinutesAgo,
+                },
             },
             select: {
                 id: true,
                 title: true,
             },
         });
-        if (albums.length > 0) {
+        if (albumsToPublish.length > 0) {
+            const albumIds = albumsToPublish.map((album) => album.id);
             await client.album.updateMany({
                 where: {
-                    id: { in: albums.map((album) => album.id) },
+                    id: { in: albumIds },
                 },
                 data: { isActive: true },
             });
             await client.track.updateMany({
                 where: {
-                    albumId: { in: albums.map((album) => album.id) },
+                    albumId: { in: albumIds },
                     isActive: false,
                 },
                 data: { isActive: true },
             });
-            console.log(`Auto published ${albums.length} albums: ${albums
+            console.log(`Auto published ${albumsToPublish.length} albums: ${albumsToPublish
                 .map((a) => a.title)
                 .join(', ')}`);
         }
@@ -58,7 +66,10 @@ async function updateAlbumTotalTracks(client, albumId) {
     }
 }
 exports.albumExtension = client_1.Prisma.defineExtension((client) => {
-    node_cron_1.default.schedule('* * * * *', () => checkAndUpdateAlbumStatus(client));
+    node_cron_1.default.schedule('* * * * *', () => {
+        console.log('Running cron job to check and update album status...');
+        checkAndUpdateAlbumStatus(client);
+    });
     return client.$extends({
         query: {
             album: {
@@ -68,29 +79,34 @@ exports.albumExtension = client_1.Prisma.defineExtension((client) => {
                     return query(args);
                 },
                 async update({ args, query }) {
-                    if (typeof args.data === 'object' && 'releaseDate' in args.data) {
+                    if (typeof args.data === 'object' && args.data !== null && 'releaseDate' in args.data && args.data.releaseDate !== undefined) {
                         const releaseDate = new Date(args.data.releaseDate);
-                        args.data.isActive = releaseDate <= new Date();
+                        if (!('isActive' in args.data)) {
+                            args.data.isActive = releaseDate <= new Date();
+                        }
                     }
                     const result = await query(args);
-                    if (typeof args.data === 'object') {
-                        if ('coverUrl' in args.data) {
+                    if (typeof args.data === 'object' && args.data !== null) {
+                        if ('coverUrl' in args.data && args.data.coverUrl !== undefined) {
                             await client.track.updateMany({
                                 where: { albumId: result.id },
                                 data: { coverUrl: args.data.coverUrl },
                             });
                         }
-                        if ('isActive' in args.data || 'releaseDate' in args.data) {
+                        const trackUpdateData = {};
+                        let shouldUpdateTracks = false;
+                        if ('isActive' in args.data && args.data.isActive !== undefined) {
+                            trackUpdateData.isActive = args.data.isActive;
+                            shouldUpdateTracks = true;
+                        }
+                        if ('releaseDate' in args.data && args.data.releaseDate !== undefined) {
+                            trackUpdateData.releaseDate = args.data.releaseDate;
+                            shouldUpdateTracks = true;
+                        }
+                        if (shouldUpdateTracks) {
                             await client.track.updateMany({
                                 where: { albumId: result.id },
-                                data: {
-                                    ...(args.data.isActive !== undefined && {
-                                        isActive: args.data.isActive,
-                                    }),
-                                    ...(args.data.releaseDate && {
-                                        releaseDate: args.data.releaseDate,
-                                    }),
-                                },
+                                data: trackUpdateData,
                             });
                         }
                     }
@@ -100,28 +116,37 @@ exports.albumExtension = client_1.Prisma.defineExtension((client) => {
             track: {
                 async create({ args, query }) {
                     const data = args.data;
-                    if (data.album) {
-                        const albumId = data.album.connect?.id;
-                        if (albumId) {
-                            const album = await client.album.findUnique({
-                                where: { id: albumId },
-                                select: { isActive: true, releaseDate: true },
-                            });
-                            if (album) {
-                                args.data = {
-                                    ...data,
-                                    isActive: album.isActive,
-                                    releaseDate: album.releaseDate,
-                                };
-                            }
+                    if (data.album?.connect?.id) {
+                        const albumId = data.album.connect.id;
+                        const album = await client.album.findUnique({
+                            where: { id: albumId },
+                            select: { isActive: true, releaseDate: true },
+                        });
+                        if (album) {
+                            args.data = {
+                                ...data,
+                                isActive: album.isActive,
+                                releaseDate: album.releaseDate,
+                            };
+                        }
+                        else {
+                            console.warn(`Album with id ${albumId} not found when creating track.`);
+                            const releaseDate = new Date(data.releaseDate);
+                            args.data = {
+                                ...data,
+                                isActive: releaseDate <= new Date(),
+                            };
                         }
                     }
-                    else {
+                    else if (data.releaseDate) {
                         const releaseDate = new Date(data.releaseDate);
                         args.data = {
                             ...data,
                             isActive: releaseDate <= new Date(),
                         };
+                    }
+                    else {
+                        args.data = { ...data, isActive: true };
                     }
                     const result = await query(args);
                     if (result.albumId) {
@@ -135,31 +160,51 @@ exports.albumExtension = client_1.Prisma.defineExtension((client) => {
                         where: args.where,
                         select: { albumId: true },
                     });
-                    if (data.album &&
-                        typeof data.album === 'object' &&
-                        'connect' in data.album) {
-                        const newAlbumId = data.album.connect?.id;
-                        if (newAlbumId && newAlbumId !== oldTrack?.albumId) {
-                            const newAlbum = await client.album.findUnique({
-                                where: { id: newAlbumId },
-                                select: { isActive: true, releaseDate: true },
-                            });
-                            if (newAlbum) {
+                    let newAlbumId = undefined;
+                    if (data.album?.connect?.id) {
+                        newAlbumId = data.album.connect.id;
+                    }
+                    else if (data.album && typeof data.album === 'string') {
+                        newAlbumId = data.album;
+                    }
+                    if (newAlbumId && newAlbumId !== oldTrack?.albumId) {
+                        const newAlbum = await client.album.findUnique({
+                            where: { id: newAlbumId },
+                            select: { isActive: true, releaseDate: true },
+                        });
+                        if (newAlbum) {
+                            args.data = {
+                                ...data,
+                                isActive: data.isActive !== undefined ? data.isActive : newAlbum.isActive,
+                                releaseDate: data.releaseDate !== undefined ? data.releaseDate : newAlbum.releaseDate,
+                            };
+                        }
+                        else {
+                            console.warn(`New album with id ${newAlbumId} not found during track update.`);
+                            if (data.releaseDate) {
+                                const releaseDate = new Date(data.releaseDate);
                                 args.data = {
                                     ...data,
-                                    isActive: newAlbum.isActive,
-                                    releaseDate: newAlbum.releaseDate,
+                                    isActive: data.isActive !== undefined ? data.isActive : releaseDate <= new Date(),
                                 };
                             }
                         }
                     }
+                    else if (data.releaseDate && !newAlbumId && !oldTrack?.albumId) {
+                        const releaseDate = new Date(data.releaseDate);
+                        if (data.isActive === undefined) {
+                            args.data = {
+                                ...data,
+                                isActive: releaseDate <= new Date(),
+                            };
+                        }
+                    }
                     const result = await query(args);
-                    if (oldTrack?.albumId) {
+                    if (oldTrack?.albumId && newAlbumId !== oldTrack.albumId) {
                         await updateAlbumTotalTracks(client, oldTrack.albumId);
                     }
-                    if (result.albumId &&
-                        result.albumId !== oldTrack?.albumId) {
-                        await updateAlbumTotalTracks(client, result.albumId);
+                    if (newAlbumId && newAlbumId !== oldTrack?.albumId) {
+                        await updateAlbumTotalTracks(client, newAlbumId);
                     }
                     return result;
                 },
