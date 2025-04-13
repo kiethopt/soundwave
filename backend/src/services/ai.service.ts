@@ -20,6 +20,8 @@ const model = genAI.getGenerativeModel({
 });
 console.log(`[AI] Using Gemini model: ${modelName}`);
 
+export { model };
+
 // Export the interface
 export interface PlaylistGenerationOptions {
   name?: string;
@@ -28,7 +30,7 @@ export interface PlaylistGenerationOptions {
   basedOnMood?: string;
   basedOnGenre?: string;
   basedOnArtist?: string;
-  coverUrl?: string;
+  coverUrl?: string | null;
 }
 
 /**
@@ -666,7 +668,7 @@ export const createAIGeneratedPlaylist = async (
 
     const playlistData = {
       description: playlistDescription,
-      coverUrl: options.coverUrl || defaultCoverUrl, // Use cover from options or default
+      coverUrl: options.coverUrl === null ? null : (options.coverUrl || defaultCoverUrl), 
       totalTracks: trackIds.length,
       totalDuration,
       updatedAt: new Date(),
