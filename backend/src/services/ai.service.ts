@@ -808,3 +808,136 @@ export const generateDefaultPlaylistForNewUser = async (
     return [];
   }
 };
+
+/**
+ * Analyzes all Vibe Rewind playlists from users to determine the most popular moods and genres
+ * @returns A Promise resolving to an object with the most popular mood and genres
+ */
+export const analyzeAllVibeRewindPlaylists = async (): Promise<{
+  mood: string;
+  genres: string[];
+}> => {
+  try {
+    console.log('[AI] Analyzing all Vibe Rewind playlists to determine popular trends');
+    
+    // Get all Vibe Rewind playlists
+    const vibeRewindPlaylists = await prisma.playlist.findMany({
+      where: {
+        name: "Vibe Rewind",
+        type: "SYSTEM",
+      },
+      include: {
+        tracks: {
+          include: {
+            track: {
+              include: {
+                genres: {
+                  include: {
+                    genre: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      take: 100 // Limit to 100 playlists to avoid performance issues
+    });
+
+    if (vibeRewindPlaylists.length === 0) {
+      console.log('[AI] No Vibe Rewind playlists found. Using default values.');
+      return {
+        mood: "energetic",
+        genres: ["Pop", "Rock", "Hip Hop"]
+      };
+    }
+
+    // Extract all tracks from all Vibe Rewind playlists
+    const allTracks = vibeRewindPlaylists.flatMap(playlist => 
+      playlist.tracks.map(pt => pt.track)
+    );
+
+    // Count genres
+    const genreCounts: Record<string, number> = {};
+    allTracks.forEach(track => {
+      track.genres.forEach(genreRel => {
+        const genreName = genreRel.genre.name;
+        genreCounts[genreName] = (genreCounts[genreName] || 0) + 1;
+      });
+    });
+
+    // Sort genres by count
+    const sortedGenres = Object.entries(genreCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(entry => entry[0])
+      .slice(0, 3); // Get top 3 genres
+
+    // Prepare context for mood analysis
+    const moodContext = {
+      tracks: allTracks.map(track => ({
+        title: track.title,
+        genres: track.genres.map(g => g.genre.name)
+      }))
+    };
+
+    // Use AI to analyze the overall mood
+    const analysisPrompt = `Phân tích danh sách bài hát từ tất cả người dùng và trả về:
+    1. Tâm trạng phổ biến nhất (mood): happy, sad, energetic, calm, nostalgic, romantic, focused, party
+    2. Top 3 thể loại nhạc phổ biến nhất (genres)
+    
+    Trả về dưới dạng JSON với format:
+    {
+      "mood": "tâm_trạng",
+      "genres": ["thể_loại_1", "thể_loại_2", "thể_loại_3"]
+    }
+    
+    Danh sách bài hát:
+    ${JSON.stringify(moodContext, null, 2)}`;
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: analysisPrompt }] }],
+      generationConfig: {
+        temperature: 0.3,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 1024,
+      },
+    });
+
+    // Clean the response
+    const responseText = result.response.text();
+    const cleanedResponse = responseText
+      .replace(/```json|```/g, '')
+      .trim();
+
+    let analysis;
+    try {
+      analysis = JSON.parse(cleanedResponse);
+    } catch (error) {
+      console.error('[AI] Error parsing AI response:', error);
+      console.error('[AI] Raw response:', responseText);
+      
+      // Fallback to our own analysis if AI fails
+      return {
+        mood: "energetic",
+        genres: sortedGenres.length > 0 ? sortedGenres : ["Pop", "Rock", "Hip Hop"]
+      };
+    }
+
+    console.log(`[AI] Analyzed ${vibeRewindPlaylists.length} Vibe Rewind playlists with ${allTracks.length} tracks`);
+    console.log(`[AI] Most popular mood: ${analysis.mood}`);
+    console.log(`[AI] Most popular genres: ${analysis.genres.join(', ')}`);
+
+    return {
+      mood: analysis.mood,
+      genres: analysis.genres
+    };
+  } catch (error) {
+    console.error('[AI] Error analyzing Vibe Rewind playlists:', error);
+    // Return default values in case of error
+    return {
+      mood: "energetic",
+      genres: ["Pop", "Rock", "Hip Hop"]
+    };
+  }
+};

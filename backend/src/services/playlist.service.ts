@@ -311,7 +311,7 @@ export const updateVibeRewindPlaylist = async (
           privacy: "PRIVATE",
           type: "SYSTEM",
           userId,
-          coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1744453889/covers/qeyix0cmbv7mtdh1hedi.png'
+          coverUrl: null
         },
       });
     }
@@ -323,6 +323,7 @@ export const updateVibeRewindPlaylist = async (
       trackCount: 10,
       basedOnMood: detectedMood,
       basedOnGenre: preferredGenres[0], // Sử dụng thể loại được nghe nhiều nhất
+      coverUrl: null,
     });
 
     console.log(
@@ -505,6 +506,40 @@ export const generateAIPlaylist = async (
     `[PlaylistService] Generating AI playlist for user ${userId} with options:`,
     options
   );
+
+  // If no parameters are provided, analyze all Vibe Rewind playlists to determine popular trends
+  if (!options.basedOnMood && !options.basedOnGenre && !options.basedOnArtist) {
+    console.log(
+      `[PlaylistService] No specific parameters provided. Analyzing all Vibe Rewind playlists for trends.`
+    );
+    
+    try {
+      // Import the analyzeAllVibeRewindPlaylists function
+      const { analyzeAllVibeRewindPlaylists } = await import('./ai.service');
+      
+      // Analyze all Vibe Rewind playlists
+      const analysis = await analyzeAllVibeRewindPlaylists();
+      
+      // Update options with the analysis results
+      options = {
+        ...options,
+        basedOnMood: analysis.mood,
+        basedOnGenre: analysis.genres[0], // Use the most popular genre
+        description: options.description || `A curated playlist based on the most popular ${analysis.mood} mood and ${analysis.genres.join(', ')} genres from our community.`,
+        name: options.name || `Community ${analysis.mood} Vibes`
+      };
+      
+      console.log(
+        `[PlaylistService] Using community trends: mood=${analysis.mood}, genres=${analysis.genres.join(', ')}`
+      );
+    } catch (error) {
+      console.error(
+        `[PlaylistService] Error analyzing Vibe Rewind playlists:`,
+        error
+      );
+      // Continue with default options if analysis fails
+    }
+  }
 
   // Create playlist using AI service
   const playlist = await createAIGeneratedPlaylistFromAIService(

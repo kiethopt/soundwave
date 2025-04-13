@@ -933,6 +933,9 @@ export const generateAIPlaylist: RequestHandler = async (
       basedOnArtist,
     } = req.body;
 
+    // Check if any specific parameters are provided
+    const hasSpecificParams = basedOnMood || basedOnGenre || basedOnArtist;
+    
     // Call the service function
     const playlistData = await playlistService.generateAIPlaylist(userId, {
       name,
@@ -943,9 +946,16 @@ export const generateAIPlaylist: RequestHandler = async (
       basedOnArtist,
     });
 
+    // Determine the message based on whether specific parameters were provided
+    let message = `AI playlist generated successfully with ${playlistData.totalTracks} tracks from ${playlistData.artistCount} artists`;
+    
+    if (!hasSpecificParams) {
+      message += " based on community trends";
+    }
+
     res.status(200).json({
       success: true,
-      message: `AI playlist generated successfully with ${playlistData.totalTracks} tracks from ${playlistData.artistCount} artists`,
+      message,
       data: playlistData,
     });
   } catch (error) {
