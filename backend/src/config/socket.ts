@@ -19,7 +19,7 @@ export const initializeSocket = (server: http.Server): SocketIOServer => {
 
     // Handle socket disconnection
     socket.on('disconnect', () => {
-      console.log(`🔌 Socket disconnected: ${socket.id}`);
+      // console.log(`🔌 Socket disconnected: ${socket.id}`);
       // Clean up user associations if necessary
     });
   });

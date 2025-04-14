@@ -34,7 +34,7 @@ export const deleteAllNotifications = async (req: Request, res: Response) => {
       },
     });
 
-    console.log(`Deleted ${deleteResult.count} notifications for user ${user.id}`);
+    // console.log(`Deleted ${deleteResult.count} notifications for user ${user.id}`);
 
     res.status(200).json({
       message: 'All notifications deleted successfully',
@@ -57,11 +57,11 @@ export const deleteReadNotifications = async (req: Request, res: Response): Prom
     }
 
     // Log thông tin để debug
-    console.log('Deleting read notifications for user:', {
-      id: user.id,
-      role: user.role,
-      artistProfile: user.artistProfile,
-    });
+    // console.log('Deleting read notifications for user:', {
+    //   id: user.id,
+    //   role: user.role,
+    //   artistProfile: user.artistProfile,
+    // });
 
     // Tạo điều kiện where để xóa thông báo đã đọc
     const whereConditions: Prisma.NotificationWhereInput[] = [
@@ -89,9 +89,8 @@ export const deleteReadNotifications = async (req: Request, res: Response): Prom
     });
 
     // Log kết quả
-    console.log(`Deleted ${deleteResult.count} read notifications for user ${user.id}`);
+    // console.log(`Deleted ${deleteResult.count} read notifications for user ${user.id}`);
 
-    // Trả về phản hồi thành công
     res.status(200).json({
       message: 'Read notifications deleted successfully',
       deletedCount: deleteResult.count,
@@ -201,8 +200,15 @@ export const markNotificationAsRead = async (
       return;
     }
 
-    console.log('Notification:', notification);
-    console.log('User:', { id: user.id, role: user.role, artistProfile: user.artistProfile });
+    // Log thông tin notification để debug
+    // console.log('Notification:', notification);
+    // Log thông tin user để debug
+    // console.log('User:', {
+    //   id: user.id,
+    //   role: user.role,
+    //   artistProfile: user.artistProfile,
+    //   currentProfile: user.currentProfile,
+    // });
 
     let canMark = false;
     if (notification.recipientType === RecipientType.ARTIST) {
@@ -212,11 +218,11 @@ export const markNotificationAsRead = async (
       }
     } else if (notification.recipientType === RecipientType.USER) {
       canMark = notification.userId === user.id;
-      console.log('USER check:', { canMark, notificationUserId: notification.userId, userId: user.id });
+      // console.log('USER check:', { canMark, notificationUserId: notification.userId, userId: user.id });
     }
 
     if (!canMark) {
-      console.log('Permission denied: User cannot mark this notification');
+      // console.log('Permission denied: User cannot mark this notification');
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
@@ -244,13 +250,12 @@ export const markAllNotificationsAsRead = async (
       return;
     }
 
-    // Log thông tin user để debug
-    console.log('User:', {
-      id: user.id,
-      role: user.role,
-      artistProfile: user.artistProfile,
-      currentProfile: user.currentProfile,
-    });
+    // Log thông tin để debug
+    // console.log('Marking all notifications as read for user:', {
+    //   id: user.id,
+    //   role: user.role,
+    //   artistProfile: user.artistProfile,
+    // });
 
     // Tạo điều kiện where để lấy thông báo của user và artist (nếu có)
     const whereConditions: Prisma.NotificationWhereInput[] = [
@@ -281,7 +286,7 @@ export const markAllNotificationsAsRead = async (
     });
 
     // Log số lượng thông báo đã được đánh dấu
-    console.log(`Marked ${updateResult.count} notifications as read for user ${user.id}`);
+    // console.log(`Marked ${updateResult.count} notifications as read for user ${user.id}`);
 
     res.json({
       message: 'All notifications marked as read',
