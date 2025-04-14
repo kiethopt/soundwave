@@ -16,6 +16,7 @@ import { SystemComponentStatus } from '../types/system.types';
 import { client as redisClient } from '../middleware/cache.middleware';
 import { transporter as nodemailerTransporter } from './email.service';
 import { Prisma } from '@prisma/client';
+import { ArtistProfile } from '@prisma/client';
 
 // Lấy danh sách user
 export const getUsers = async (req: Request) => {
@@ -65,46 +66,81 @@ export const getUserById = async (id: string) => {
   return user;
 };
 
-// Lấy yêu cầu trở thành nghệ sĩ
+// Lấy tất cả request yêu cầu trở thành Artist từ User - ADMIN only
 export const getArtistRequests = async (req: Request) => {
-  const { startDate, endDate, status, search } = req.query;
+  const { search, status, startDate, endDate } = req.query;
 
-  const where = {
-    verificationRequestedAt: { not: null }, // Chỉ lấy các request đã được gửi
-    ...(status === 'pending' ? { isVerified: false } : {}),
-    ...(startDate && endDate
-      ? {
-          verificationRequestedAt: {
-            gte: new Date(String(startDate)),
-            lte: new Date(String(endDate)),
-          },
-        }
-      : {}),
-    ...(search
-      ? {
-          OR: [
-            { artistName: { contains: String(search), mode: 'insensitive' } },
-            {
-              user: {
-                email: { contains: String(search), mode: 'insensitive' },
-              },
-            },
-          ],
-        }
-      : {}),
+  const where: Prisma.ArtistProfileWhereInput = {
+    verificationRequestedAt: { not: null },
+    user: {
+      isActive: true,
+    },
+    AND: [],
   };
 
-  const options = {
+  // Search filter (applies to artistName and user's name/email)
+  if (typeof search === 'string' && search.trim()) {
+    const trimmedSearch = search.trim();
+    // Explicitly check if where.AND is an array before push
+    if (Array.isArray(where.AND)) {
+      where.AND.push({
+        OR: [
+          { artistName: { contains: trimmedSearch, mode: 'insensitive' } },
+          { user: { name: { contains: trimmedSearch, mode: 'insensitive' } } },
+          {
+            user: { email: { contains: trimmedSearch, mode: 'insensitive' } },
+          },
+        ],
+      });
+    }
+  }
+
+  // Status filter (isVerified)
+  const isVerified = toBooleanValue(status);
+  if (isVerified !== undefined) {
+    if (Array.isArray(where.AND)) {
+      where.AND.push({ isVerified: isVerified });
+    }
+  }
+
+  // Date range filter for verificationRequestedAt
+  const dateFilter: Prisma.ArtistProfileWhereInput = {};
+  const parsedStartDate = startDate ? new Date(startDate as string) : null;
+  const parsedEndDate = endDate ? new Date(endDate as string) : null;
+
+  if (parsedStartDate && !isNaN(parsedStartDate.getTime())) {
+    if (parsedEndDate && !isNaN(parsedEndDate.getTime())) {
+      // Ensure endDate includes the whole day
+      const endOfDay = new Date(parsedEndDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      // Use 'lte' (less than or equal to) for end date
+      dateFilter.verificationRequestedAt = {
+        gte: parsedStartDate,
+        lte: endOfDay,
+      };
+    } else {
+      // Only startDate is provided, filter from start date onwards
+      dateFilter.verificationRequestedAt = {
+        gte: parsedStartDate,
+      };
+    }
+    // Explicitly check if where.AND is an array before push
+    if (Array.isArray(where.AND)) {
+      where.AND.push(dateFilter);
+    }
+  }
+  // If only endDate is provided, we could potentially filter up to that date, but it's less common.
+  // Current logic requires startDate to be present for date filtering.
+
+  const paginationResult = await paginate<ArtistProfile>(prisma.artistProfile, req, {
     where,
     select: artistRequestSelect,
-    orderBy: { verificationRequestedAt: 'desc' },
-  };
-
-  const result = await paginate(prisma.artistProfile, req, options);
+    orderBy: { verificationRequestedAt: 'desc' }, // Default sort by request date
+  });
 
   return {
-    requests: result.data,
-    pagination: result.pagination,
+    requests: paginationResult.data,
+    pagination: paginationResult.pagination,
   };
 };
 

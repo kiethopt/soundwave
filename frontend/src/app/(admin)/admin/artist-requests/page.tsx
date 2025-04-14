@@ -88,14 +88,10 @@ export default function ArtistRequestManagement() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
-  const [startDate, setStartDate] = useState<string>(safeGetParam('startDate'));
-  const [endDate, setEndDate] = useState<string>(safeGetParam('endDate'));
-
-  // Effect to sync local state with URL changes (e.g., back/forward)
-  useEffect(() => {
-    setStartDate(safeGetParam('startDate'));
-    setEndDate(safeGetParam('endDate'));
-  }, [searchParams, safeGetParam]);
+  
+  // Derive startDate and endDate directly from searchParams for the picker
+  const currentStartDate = safeGetParam('startDate');
+  const currentEndDate = safeGetParam('endDate');
 
   // Action handlers
   const handleApprove = async (requestId: string) => {
@@ -225,6 +221,15 @@ export default function ArtistRequestManagement() {
     manualPagination: true,
   });
 
+  // Xử lý khi người dùng thay đổi ngày
+  const handleDateChange = (dates: { startDate: string; endDate: string }) => {
+    updateQueryParam({
+      startDate: dates.startDate || null,
+      endDate: dates.endDate || null,
+      page: 1,
+    });
+  };
+
   return (
     <div
       className={`container mx-auto space-y-4 p-4 pb-20 ${
@@ -250,24 +255,9 @@ export default function ArtistRequestManagement() {
 
       <div className="w-full">
         <DateRangePicker
-          startDate={startDate}
-          endDate={endDate}
-          onStartDateChange={(date) => {
-            setStartDate(date);
-            updateQueryParam({ 
-              startDate: date || null,
-              endDate: endDate || null,
-              page: 1
-            });
-          }}
-          onEndDateChange={(date) => {
-            setEndDate(date);
-            updateQueryParam({ 
-              startDate: startDate || null,
-              endDate: date || null,
-              page: 1
-            });
-          }}
+          startDate={currentStartDate}
+          endDate={currentEndDate}
+          onChange={handleDateChange}
         />
       </div>
 

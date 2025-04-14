@@ -87,40 +87,63 @@ const getUserById = async (id) => {
 };
 exports.getUserById = getUserById;
 const getArtistRequests = async (req) => {
-    const { startDate, endDate, status, search } = req.query;
+    const { search, status, startDate, endDate } = req.query;
     const where = {
         verificationRequestedAt: { not: null },
-        ...(status === 'pending' ? { isVerified: false } : {}),
-        ...(startDate && endDate
-            ? {
-                verificationRequestedAt: {
-                    gte: new Date(String(startDate)),
-                    lte: new Date(String(endDate)),
-                },
-            }
-            : {}),
-        ...(search
-            ? {
+        user: {
+            isActive: true,
+        },
+        AND: [],
+    };
+    if (typeof search === 'string' && search.trim()) {
+        const trimmedSearch = search.trim();
+        if (Array.isArray(where.AND)) {
+            where.AND.push({
                 OR: [
-                    { artistName: { contains: String(search), mode: 'insensitive' } },
+                    { artistName: { contains: trimmedSearch, mode: 'insensitive' } },
+                    { user: { name: { contains: trimmedSearch, mode: 'insensitive' } } },
                     {
-                        user: {
-                            email: { contains: String(search), mode: 'insensitive' },
-                        },
+                        user: { email: { contains: trimmedSearch, mode: 'insensitive' } },
                     },
                 ],
-            }
-            : {}),
-    };
-    const options = {
+            });
+        }
+    }
+    const isVerified = (0, handle_utils_1.toBooleanValue)(status);
+    if (isVerified !== undefined) {
+        if (Array.isArray(where.AND)) {
+            where.AND.push({ isVerified: isVerified });
+        }
+    }
+    const dateFilter = {};
+    const parsedStartDate = startDate ? new Date(startDate) : null;
+    const parsedEndDate = endDate ? new Date(endDate) : null;
+    if (parsedStartDate && !isNaN(parsedStartDate.getTime())) {
+        if (parsedEndDate && !isNaN(parsedEndDate.getTime())) {
+            const endOfDay = new Date(parsedEndDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            dateFilter.verificationRequestedAt = {
+                gte: parsedStartDate,
+                lte: endOfDay,
+            };
+        }
+        else {
+            dateFilter.verificationRequestedAt = {
+                gte: parsedStartDate,
+            };
+        }
+        if (Array.isArray(where.AND)) {
+            where.AND.push(dateFilter);
+        }
+    }
+    const paginationResult = await (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, {
         where,
         select: prisma_selects_1.artistRequestSelect,
         orderBy: { verificationRequestedAt: 'desc' },
-    };
-    const result = await (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, options);
+    });
     return {
-        requests: result.data,
-        pagination: result.pagination,
+        requests: paginationResult.data,
+        pagination: paginationResult.pagination,
     };
 };
 exports.getArtistRequests = getArtistRequests;

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
@@ -15,47 +15,63 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface DateRangePickerProps {
+  onChange: (dates: { startDate: string; endDate: string }) => void;
   startDate: string;
   endDate: string;
-  onStartDateChange: (date: string) => void;
-  onEndDateChange: (date: string) => void;
   className?: string;
 }
 
 export function DateRangePicker({
   startDate,
   endDate,
-  onStartDateChange,
-  onEndDateChange,
+  onChange,
   className,
 }: DateRangePickerProps) {
   const { theme } = useTheme();
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: startDate ? new Date(startDate) : undefined,
-    to: endDate ? new Date(endDate) : undefined,
+  const [date, setDate] = React.useState<DateRange | undefined>(() => {
+    const initialFrom = startDate && isValid(new Date(startDate)) ? new Date(startDate) : undefined;
+    const initialTo = endDate && isValid(new Date(endDate)) ? new Date(endDate) : undefined;
+    if (initialFrom || initialTo) {
+      return { from: initialFrom, to: initialTo };
+    }
+    return undefined;
   });
+
+  React.useEffect(() => {
+    const propFrom = startDate && isValid(new Date(startDate)) ? new Date(startDate) : undefined;
+    const propTo = endDate && isValid(new Date(endDate)) ? new Date(endDate) : undefined;
+    
+    if (
+      (propFrom?.getTime() !== date?.from?.getTime()) ||
+      (propTo?.getTime() !== date?.to?.getTime())
+    ) {
+        if (propFrom || propTo) {
+            setDate({ from: propFrom, to: propTo });
+        } else {
+            setDate(undefined);
+        }
+    }
+  }, [startDate, endDate]);
 
   const handleSelect = (range: DateRange | undefined) => {
     setDate(range);
 
-    // Reset both dates if range is cleared
-    if (!range?.from) {
-      onStartDateChange('');
-      onEndDateChange('');
-      return;
-    }
+    let newStartDate = '';
+    let newEndDate = '';
 
-    // Update start date
-    const formattedStart = format(range.from, 'yyyy-MM-dd');
-    onStartDateChange(formattedStart);
-
-    // Update or clear end date
-    if (range.to) {
-      const formattedEnd = format(range.to, 'yyyy-MM-dd');
-      onEndDateChange(formattedEnd);
+    if (range?.from && isValid(range.from)) {
+      newStartDate = format(range.from, 'yyyy-MM-dd');
+      if (range.to && isValid(range.to)) {
+        newEndDate = format(range.to, 'yyyy-MM-dd');
+      } else {
+        newEndDate = '';
+      }
     } else {
-      onEndDateChange('');
+      newStartDate = '';
+      newEndDate = '';
     }
+    
+    onChange({ startDate: newStartDate, endDate: newEndDate });
   };
 
   return (
