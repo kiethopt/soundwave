@@ -200,7 +200,7 @@ const updateArtistInfo = async (id, data, avatarFile) => {
     if (!existingArtist) {
         throw new Error('Artist not found');
     }
-    const { artistName, bio, isActive } = data;
+    const { artistName, bio, isActive, isVerified, socialMediaLinks } = data;
     let validatedArtistName = undefined;
     if (artistName && artistName !== existingArtist.artistName) {
         const nameExists = await db_1.default.artistProfile.findFirst({
@@ -219,13 +219,36 @@ const updateArtistInfo = async (id, data, avatarFile) => {
         const result = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artists/avatars', 'image');
         avatarUrl = result.secure_url;
     }
+    let socialMediaLinksUpdate = existingArtist.socialMediaLinks;
+    if (socialMediaLinks) {
+        try {
+            const parsedLinks = typeof socialMediaLinks === 'string' ? JSON.parse(socialMediaLinks) : socialMediaLinks;
+            if (typeof parsedLinks === 'object' && parsedLinks !== null) {
+                socialMediaLinksUpdate = parsedLinks;
+            }
+            else {
+                console.warn('Invalid socialMediaLinks format received:', socialMediaLinks);
+            }
+        }
+        catch (error) {
+            console.error('Error parsing socialMediaLinks JSON:', error);
+        }
+    }
+    else if (socialMediaLinks === null || socialMediaLinks === '') {
+        socialMediaLinksUpdate = null;
+    }
     const updatedArtist = await db_1.default.artistProfile.update({
         where: { id },
         data: {
             ...(validatedArtistName && { artistName: validatedArtistName }),
             ...(bio !== undefined && { bio }),
             ...(isActive !== undefined && { isActive: (0, handle_utils_1.toBooleanValue)(isActive) }),
+            ...(isVerified !== undefined && {
+                isVerified: (0, handle_utils_1.toBooleanValue)(isVerified),
+                verifiedAt: (0, handle_utils_1.toBooleanValue)(isVerified) ? new Date() : null,
+            }),
             ...(avatarUrl && { avatar: avatarUrl }),
+            ...(socialMediaLinks !== undefined && { socialMediaLinks: socialMediaLinksUpdate }),
         },
         select: prisma_selects_1.artistProfileSelect,
     });
@@ -241,10 +264,11 @@ const deleteArtistById = async (id) => {
 };
 exports.deleteArtistById = deleteArtistById;
 const getArtists = async (req) => {
-    const { search = '', status } = req.query;
+    const { search = '', status, isVerified } = req.query;
     const where = {
         role: client_1.Role.ARTIST,
-        isVerified: true,
+        verificationRequestedAt: null,
+        ...(isVerified !== undefined && { isVerified: isVerified === 'true' }),
         ...(search
             ? {
                 OR: [

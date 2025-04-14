@@ -35,6 +35,10 @@ interface DataTableToolbarProps {
     onChange: (value: string[]) => void;
     options: { value: string; label: string }[];
   };
+  verifiedFilter?: {
+    value: string[];
+    onChange: (value: string[]) => void;
+  };
   table: any;
   theme?: 'light' | 'dark';
   searchPlaceholder?: string;
@@ -97,6 +101,7 @@ export function DataTableToolbar({
   exportData,
   statusFilter,
   genreFilter,
+  verifiedFilter,
   table,
   theme = 'light',
   searchPlaceholder = 'Search...',
@@ -148,7 +153,8 @@ export function DataTableToolbar({
   // Kiểm tra xem có bất kỳ bộ lọc nào đang được áp dụng không
   const hasActiveFilters =
     (statusFilter && statusFilter.value.length > 0) ||
-    (genreFilter && genreFilter.value.length > 0);
+    (genreFilter && genreFilter.value.length > 0) ||
+    (verifiedFilter && verifiedFilter.value.length > 0);
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto">
@@ -209,6 +215,19 @@ export function DataTableToolbar({
           />
         )}
 
+        {verifiedFilter && (
+          <DataTableFilter
+            title="Verification"
+            options={[
+              { label: 'Verified', value: 'true' },
+              { label: 'Not Verified', value: 'false' },
+            ]}
+            value={verifiedFilter.value}
+            onChange={verifiedFilter.onChange}
+            theme={theme}
+          />
+        )}
+
         {hasActiveFilters && (
           <Button
             variant="outline"
@@ -219,6 +238,9 @@ export function DataTableToolbar({
               }
               if (genreFilter && genreFilter.value.length > 0) {
                 genreFilter.onChange([]);
+              }
+              if (verifiedFilter && verifiedFilter.value.length > 0) {
+                verifiedFilter.onChange([]);
               }
             }}
             className={`h-9 px-2 ${

@@ -195,7 +195,7 @@ const updateArtist = async (req, res) => {
     try {
         const { id } = req.params;
         const avatarFile = req.file;
-        const { isActive, reason, ...artistData } = req.body;
+        const { isActive, reason, isVerified, socialMediaLinks, ...artistData } = req.body;
         const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
         if (isStatusUpdate) {
             const isActiveBool = isActive === 'true' || isActive === true ? true : false;
@@ -272,7 +272,16 @@ const updateArtist = async (req, res) => {
                 return;
             }
         }
-        const updatedArtist = await adminService.updateArtistInfo(id, artistData, avatarFile);
+        const dataForService = {
+            ...artistData,
+        };
+        if (isVerified !== undefined) {
+            dataForService.isVerified = isVerified;
+        }
+        if (socialMediaLinks !== undefined) {
+            dataForService.socialMediaLinks = socialMediaLinks;
+        }
+        const updatedArtist = await adminService.updateArtistInfo(id, dataForService, avatarFile);
         res.json({
             message: 'Artist updated successfully',
             artist: updatedArtist,

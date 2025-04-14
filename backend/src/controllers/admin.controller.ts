@@ -223,7 +223,7 @@ export const updateArtist = async (
   try {
     const { id } = req.params;
     const avatarFile = req.file;
-    const { isActive, reason, ...artistData } = req.body;
+    const { isActive, reason, isVerified, socialMediaLinks, ...artistData } = req.body;
 
     // Check if we're updating isActive status (activating/deactivating)
     const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
@@ -335,9 +335,20 @@ export const updateArtist = async (
     }
 
     // Regular artist update (not status change)
+    // Construct the data object for the service, including new fields
+    const dataForService: any = {
+      ...artistData,
+    };
+    if (isVerified !== undefined) {
+      dataForService.isVerified = isVerified;
+    }
+    if (socialMediaLinks !== undefined) {
+      dataForService.socialMediaLinks = socialMediaLinks;
+    }
+
     const updatedArtist = await adminService.updateArtistInfo(
       id,
-      artistData,
+      dataForService, // Pass the combined data
       avatarFile
     );
 

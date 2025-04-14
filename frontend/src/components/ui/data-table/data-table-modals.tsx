@@ -47,9 +47,9 @@ interface EditTrackModalProps {
   availableGenres: Array<{ id: string; name: string }>;
   selectedGenres: string[];
   setSelectedGenres: (genres: string[]) => void;
-  availableLabels: { id: string; name: string }[]; // Thêm prop này
-  selectedLabelId: string | null; // Thêm prop này
-  setSelectedLabelId: (id: string | null) => void; // Thêm prop này
+  availableLabels: { id: string; name: string }[];
+  selectedLabelId: string | null;
+  setSelectedLabelId: (id: string | null) => void;
   theme?: 'light' | 'dark';
 }
 
@@ -978,6 +978,60 @@ export function EditArtistModal({
               id="bio"
               name="bio"
               defaultValue={artist.bio || ''}
+              className={theme === 'dark' ? 'bg-[#3a3a3a] text-white' : ''}
+            />
+          </div>
+
+          {/* Verification Status */}
+          <div className="space-y-2">
+            <label
+              htmlFor="isVerified"
+              className={theme === 'dark' ? 'text-white' : 'text-gray-700'}
+            >
+              Verification Status
+            </label>
+            <select
+              id="isVerified"
+              name="isVerified"
+              defaultValue={artist.isVerified ? 'true' : 'false'}
+              className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${theme === 'dark'
+                ? 'bg-[#3a3a3a] text-white border-gray-600'
+                : 'border-gray-300'
+                }`}
+            >
+              <option value="true">Verified</option>
+              <option value="false">Not Verified</option>
+            </select>
+          </div>
+
+           {/* Social Media Links */}
+          <div className="space-y-2">
+            <label
+              htmlFor="facebookLink"
+              className={theme === 'dark' ? 'text-white' : 'text-gray-700'}
+            >
+              Facebook Link
+            </label>
+            <Input
+              id="facebookLink"
+              name="socialMediaLinks[facebook]" // Use nested name for FormData parsing
+              defaultValue={artist.socialMediaLinks?.facebook || ''}
+              placeholder="https://www.facebook.com/your_page"
+              className={theme === 'dark' ? 'bg-[#3a3a3a] text-white' : ''}
+            />
+          </div>
+          <div className="space-y-2">
+            <label
+              htmlFor="instagramLink"
+              className={theme === 'dark' ? 'text-white' : 'text-gray-700'}
+            >
+              Instagram Link
+            </label>
+            <Input
+              id="instagramLink"
+              name="socialMediaLinks[instagram]"
+              defaultValue={artist.socialMediaLinks?.instagram || ''}
+              placeholder="https://www.instagram.com/your_profile"
               className={theme === 'dark' ? 'bg-[#3a3a3a] text-white' : ''}
             />
           </div>

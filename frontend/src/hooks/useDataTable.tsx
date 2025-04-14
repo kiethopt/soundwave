@@ -59,6 +59,9 @@ export function useDataTable<T>({
   const [genreFilter, setGenreFilter] = useState<string[]>(
     safeGetAllParams(getKey('genres'))
   );
+  const [verifiedFilter, setVerifiedFilter] = useState<string[]>(
+    safeGetAllParams(getKey('isVerified')) // New state for verification filter
+  );
   const [sorting, setSorting] = useState<SortingState>(() => {
     const sortBy = safeGetParam(getKey('sortBy'));
     const sortOrder = safeGetParam(getKey('sortOrder'));
@@ -81,6 +84,7 @@ export function useDataTable<T>({
     sorting,
     startDate: safeGetParam(getKey('startDate')), 
     endDate: safeGetParam(getKey('endDate')), 
+    verifiedFilter: safeGetAllParams(getKey('isVerified')), // Track previous verified filter
   });
 
   // --- Fetching Logic --- //
@@ -115,6 +119,10 @@ export function useDataTable<T>({
         const currentGenreValues = paramsToFetch.getAll(getKey('genres'));
         if (currentGenreValues.length > 0) {
           currentGenreValues.forEach((g) => paramsForApi.append('genres', g));
+        }
+        const currentVerifiedValues = paramsToFetch.getAll(getKey('isVerified')); // Read verified filter
+        if (currentVerifiedValues.length > 0) {
+          currentVerifiedValues.forEach((v) => paramsForApi.append('isVerified', v)); // Append to API params
         }
 
         // 4. Set sorting parameters from the prefixed URL keys in paramsToFetch
@@ -199,7 +207,6 @@ export function useDataTable<T>({
       // Get current URL parameters to selectively keep parameters from other tabs
       const currentParams = new URLSearchParams(safeParamsToString());
       currentParams.forEach((value, key) => {
-        // Keep parameters that DO NOT start with the current instance's prefix
         if (!key.startsWith(paramKeyPrefix)) {
           newParams.append(key, value);
         }
@@ -211,14 +218,12 @@ export function useDataTable<T>({
 
         // Special handling for page parameter when it's 1 (default)
         if (key === 'page' && (value === 1 || value === '1')) {
-          // Remove the page parameter if it exists in newParams
           if (newParams.has(prefixedKey)) {
             newParams.delete(prefixedKey);
             changed = true;
           }
 
-          // Mark as changed if the parameter exists in current URL
-          // This ensures we update the URL even when just removing a parameter
+         
           if (currentParams.has(prefixedKey)) {
             changed = true;
           }
@@ -233,9 +238,13 @@ export function useDataTable<T>({
         const currentValueInNew = newParams.getAll(prefixedKey);
 
         if (Array.isArray(value)) {
-          // Handle array values (e.g., filters)
-          newParams.delete(prefixedKey); // Remove existing before adding new
-          if (value.length > 0) {
+          if (value === null || (Array.isArray(value) && value.length === 0)) {
+              if (newParams.has(prefixedKey) || currentParams.has(prefixedKey)) {
+                  newParams.delete(prefixedKey);
+                  changed = true;
+              }
+          } else if (Array.isArray(value)) {
+            newParams.delete(prefixedKey);
             value.forEach((v) => newParams.append(prefixedKey, v.toString()));
             if (
               JSON.stringify(value.sort()) !==
@@ -243,15 +252,9 @@ export function useDataTable<T>({
             ) {
               changed = true;
             }
-          } else if (currentValueInNew.length > 0) {
-            // If new value is empty array and old one wasn't
-            changed = true;
           }
         } else {
-          // Handle single values (e.g., search, page, sort)
-          // CRITICAL FIX: Properly handle null, empty strings and undefined
           if (value === null || value === '' || value === undefined) {
-            // Check if the parameter exists in either newParams or currentParams
             if (newParams.has(prefixedKey) || currentParams.has(prefixedKey)) {
               newParams.delete(prefixedKey);
               changed = true;
@@ -313,7 +316,7 @@ export function useDataTable<T>({
       JSON.stringify(statusFilter) !==
       JSON.stringify(prevDeps.current.statusFilter)
     ) {
-      updates.status = statusFilter; // Pass array directly
+      updates.status = statusFilter.length > 0 ? statusFilter : null; // Pass null if empty
       stateChanged = true;
       resetPage = true;
     }
@@ -321,7 +324,15 @@ export function useDataTable<T>({
       JSON.stringify(genreFilter) !==
       JSON.stringify(prevDeps.current.genreFilter)
     ) {
-      updates.genres = genreFilter; // Pass array directly
+      updates.genres = genreFilter.length > 0 ? genreFilter : null; // Pass null if empty
+      stateChanged = true;
+      resetPage = true;
+    }
+    if (
+      JSON.stringify(verifiedFilter) !== // Check if verified filter changed
+      JSON.stringify(prevDeps.current.verifiedFilter)
+    ) {
+      updates.isVerified = verifiedFilter.length > 0 ? verifiedFilter : null; // Pass null if empty
       stateChanged = true;
       resetPage = true;
     }
@@ -386,12 +397,14 @@ export function useDataTable<T>({
         sorting,
         startDate: safeGetParam(getKey('startDate')), // Update previous startDate
         endDate: safeGetParam(getKey('endDate')), // Update previous endDate
+        verifiedFilter, // Update previous verified filter
       };
     }
   }, [
     searchInput,
     statusFilter,
     genreFilter,
+    verifiedFilter,
     sorting,
     updateUrlParams,
     debouncedFetch,
@@ -407,6 +420,7 @@ export function useDataTable<T>({
     const urlSearch = safeGetParam(getKey('q'));
     const urlStatus = safeGetAllParams(getKey('status'));
     const urlGenres = safeGetAllParams(getKey('genres'));
+    const urlVerified = safeGetAllParams(getKey('isVerified')); // Read verified from URL
     const urlSortBy = safeGetParam(getKey('sortBy'));
     const urlSortOrder = safeGetParam(getKey('sortOrder'));
     const urlSorting = urlSortBy
@@ -425,7 +439,8 @@ export function useDataTable<T>({
         JSON.stringify(prevDeps.current.genreFilter) ||
       JSON.stringify(urlSorting) !== JSON.stringify(prevDeps.current.sorting) ||
       urlStartDate !== prevDeps.current.startDate || // Compare startDate
-      urlEndDate !== prevDeps.current.endDate; // Compare endDate
+      urlEndDate !== prevDeps.current.endDate || // Compare endDate
+      JSON.stringify(urlVerified) !== JSON.stringify(prevDeps.current.verifiedFilter); // Compare verified filter
 
     // console.log(`Effect 2: Initial Load: ${initialLoad.current}, URL State Differs: ${urlStateDiffers}`);
 
@@ -438,6 +453,7 @@ export function useDataTable<T>({
       setStatusFilter(urlStatus);
       setGenreFilter(urlGenres);
       setSorting(urlSorting);
+      setVerifiedFilter(urlVerified); // Sync verified filter state
       // Note: currentPage is derived directly from searchParams, so no separate state update needed
 
       // Fetch data immediately based on URL state
@@ -454,6 +470,7 @@ export function useDataTable<T>({
         sorting: urlSorting,
         startDate: urlStartDate, // Update previous startDate
         endDate: urlEndDate, // Update previous endDate
+        verifiedFilter: urlVerified, // Update previous verified filter
       };
 
       if (initialLoad.current) {
@@ -487,6 +504,8 @@ export function useDataTable<T>({
     setStatusFilter, // Expose setter
     genreFilter, // Expose state
     setGenreFilter, // Expose setter
+    verifiedFilter, // Expose state
+    setVerifiedFilter, // Expose setter
     selectedRows,
     setSelectedRows,
     sorting, // Expose state

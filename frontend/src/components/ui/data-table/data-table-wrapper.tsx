@@ -41,6 +41,10 @@ interface DataTableWrapperProps<TData> {
       onChange: (value: string[]) => void;
       options: { value: string; label: string }[];
     };
+    verifiedFilter?: {
+      value: string[];
+      onChange: (value: string[]) => void;
+    };
   };
 }
 
@@ -81,6 +85,7 @@ export function DataTableWrapper<TData>({
           searchPlaceholder={toolbar.searchPlaceholder}
           statusFilter={toolbar.statusFilter}
           genreFilter={toolbar.genreFilter}
+          verifiedFilter={toolbar.verifiedFilter}
         />
       )}
 

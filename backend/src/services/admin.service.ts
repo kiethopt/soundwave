@@ -15,6 +15,7 @@ import * as path from 'path';
 import { SystemComponentStatus } from '../types/system.types';
 import { client as redisClient } from '../middleware/cache.middleware';
 import { transporter as nodemailerTransporter } from './email.service';
+import { Prisma } from '@prisma/client';
 
 // Lấy danh sách user
 export const getUsers = async (req: Request) => {
@@ -222,7 +223,7 @@ export const updateArtistInfo = async (
     throw new Error('Artist not found');
   }
 
-  const { artistName, bio, isActive } = data;
+  const { artistName, bio, isActive, isVerified, socialMediaLinks } = data;
 
   // Kiểm tra tên nghệ sĩ nếu có thay đổi
   let validatedArtistName = undefined;
@@ -252,6 +253,28 @@ export const updateArtistInfo = async (
     avatarUrl = result.secure_url;
   }
 
+  // Prepare social media links update (ensure it's a valid JSON or null)
+  let socialMediaLinksUpdate = existingArtist.socialMediaLinks;
+  if (socialMediaLinks) {
+    try {
+      // Assuming socialMediaLinks is passed as a JSON string from FormData
+      const parsedLinks = typeof socialMediaLinks === 'string' ? JSON.parse(socialMediaLinks) : socialMediaLinks;
+      // Simple validation: ensure it's an object
+      if (typeof parsedLinks === 'object' && parsedLinks !== null) {
+        socialMediaLinksUpdate = parsedLinks;
+      } else {
+        console.warn('Invalid socialMediaLinks format received:', socialMediaLinks);
+        // Keep existing links if parsing fails or format is wrong
+      }
+    } catch (error) {
+      console.error('Error parsing socialMediaLinks JSON:', error);
+      // Keep existing links if parsing fails
+    }
+  } else if (socialMediaLinks === null || socialMediaLinks === '') {
+    // Allow clearing social media links
+    socialMediaLinksUpdate = null;
+  }
+
   // Cập nhật artist trực tiếp với các trường đã gửi
   const updatedArtist = await prisma.artistProfile.update({
     where: { id },
@@ -259,7 +282,13 @@ export const updateArtistInfo = async (
       ...(validatedArtistName && { artistName: validatedArtistName }),
       ...(bio !== undefined && { bio }),
       ...(isActive !== undefined && { isActive: toBooleanValue(isActive) }),
+      ...(isVerified !== undefined && {
+        isVerified: toBooleanValue(isVerified),
+        // Optionally update verifiedAt based on isVerified status
+        verifiedAt: toBooleanValue(isVerified) ? new Date() : null,
+      }),
       ...(avatarUrl && { avatar: avatarUrl }),
+      ...(socialMediaLinks !== undefined && { socialMediaLinks: socialMediaLinksUpdate }), // Update social media links
     },
     select: artistProfileSelect,
   });
@@ -278,11 +307,12 @@ export const deleteArtistById = async (id: string) => {
 
 // Lấy danh sách nghệ sĩ
 export const getArtists = async (req: Request) => {
-  const { search = '', status } = req.query;
+  const { search = '', status, isVerified } = req.query;
 
-  const where = {
+  const where: Prisma.ArtistProfileWhereInput = {
     role: Role.ARTIST,
-    isVerified: true,
+    verificationRequestedAt: null, // Luôn loại bỏ các ArtistProfile đang pending
+    ...(isVerified !== undefined && { isVerified: isVerified === 'true' }),
     ...(search
       ? {
           OR: [

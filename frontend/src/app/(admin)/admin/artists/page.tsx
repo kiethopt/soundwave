@@ -39,6 +39,8 @@ export default function ArtistManagement() {
     selectedRows,
     setSelectedRows,
     updateQueryParam,
+    verifiedFilter,
+    setVerifiedFilter,
   } = useDataTable<ArtistProfile>({
     fetchData: async (page, params) => {
       const token = localStorage.getItem('userToken');
@@ -374,6 +376,10 @@ export default function ArtistManagement() {
           statusFilter: {
             value: statusFilter,
             onChange: setStatusFilter,
+          },
+          verifiedFilter: {
+            value: verifiedFilter,
+            onChange: setVerifiedFilter,
           },
         }}
       />
