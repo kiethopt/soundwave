@@ -7,7 +7,8 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import toast from 'react-hot-toast';
-import pusher from '@/utils/pusher';
+import { getSocket } from '@/utils/socket';
+import type { User } from '@/types';
 
 export default function RequestArtistPage() {
   const router = useRouter();
@@ -31,53 +32,65 @@ export default function RequestArtistPage() {
     setHasPendingRequest(storedValue ? JSON.parse(storedValue) : false);
   }, []);
 
+  // Lắng nghe sự kiện Socket.IO
   useEffect(() => {
-    const userDataStr = localStorage.getItem('userData');
-    if (!userDataStr) return;
-
-    const userData = JSON.parse(userDataStr);
-    const userId = userData.id;
-
-    // Subscribe to Pusher channel
-    const channel = pusher.subscribe(`user-${userId}`);
-    console.log('Subscribed to Pusher channel:', `user-${userId}`);
+    const socket = getSocket();
 
     // Listen for artist request status updates
-    channel.bind(
-      'artist-request-status',
-      (data: { type: string; message: string; hasPendingRequest: boolean }) => {
-        console.log('Received Pusher event:', data);
-        if (
-          data.type === 'REQUEST_REJECTED' ||
-          data.type === 'REQUEST_APPROVED'
-        ) {
-          setHasPendingRequest(false);
-          localStorage.setItem('hasPendingRequest', JSON.stringify(false));
+    const handleArtistRequestStatus = (
+      data: { type: string; message: string; hasPendingRequest?: boolean; userId?: string }
+    ) => {
+      console.log('Received artist-request-status event via Socket.IO:', data);
 
-          // Tăng số thông báo
-          const currentCount = Number(
-            localStorage.getItem('notificationCount') || '0'
-          );
-          localStorage.setItem('notificationCount', String(currentCount + 1));
+      if (
+        data.type === 'REQUEST_REJECTED' ||
+        data.type === 'REQUEST_APPROVED'
+      ) {
+        const newPendingStatus = typeof data.hasPendingRequest === 'boolean' ? data.hasPendingRequest : false;
+        setHasPendingRequest(newPendingStatus);
+        localStorage.setItem('hasPendingRequest', JSON.stringify(newPendingStatus));
 
-          toast(data.message);
-        }
+        toast(data.message);
       }
-    );
+    };
 
+    socket.on('artist-request-status', handleArtistRequestStatus);
+
+    // Cleanup listener
     return () => {
-      channel.unbind('artist-request-status');
-      pusher.unsubscribe(`user-${userId}`);
+      console.log('Cleaning up Request Artist page socket listener');
+      socket.off('artist-request-status', handleArtistRequestStatus);
     };
   }, []);
 
   // Kiểm tra xem người dùng đã có yêu cầu trở thành Artist chưa
   useEffect(() => {
     const checkPendingRequest = async () => {
+      let user: User | null = null;
       try {
+        const userDataStr = localStorage.getItem('userData');
+        if (userDataStr) {
+          try {
+            user = JSON.parse(userDataStr);
+          } catch (parseError) {
+            console.error('Lỗi parse userData trong checkPendingRequest:', parseError);
+            localStorage.removeItem('userData');
+          }
+        }
+
+        // Sửa lỗi linter: Kiểm tra sự tồn tại và trạng thái active của artistProfile
+        if (user && user.artistProfile && user.artistProfile.isActive) {
+            console.log('User đã là Artist active, chuyển hướng...');
+            router.push(`/artist/profile/${user.artistProfile.id}`); // Chuyển hướng đến trang artist profile
+            return;
+        }
+
+        // Chỉ kiểm tra request nếu chưa phải là artist active
         const token = localStorage.getItem('userToken');
         if (!token) {
-          throw new Error('No authentication token found');
+          // Không cần throw lỗi ở đây, chỉ đơn giản là không kiểm tra được
+          console.warn('Không tìm thấy token để kiểm tra artist request.');
+          return;
         }
 
         const response = await api.user.checkArtistRequest(token);
@@ -89,16 +102,9 @@ export default function RequestArtistPage() {
           JSON.stringify(response.hasPendingRequest)
         );
 
-        const userDataStr = localStorage.getItem('userData');
-        if (userDataStr) {
-          const user = JSON.parse(userDataStr);
-          if (user.role === 'ARTIST') {
-            router.push('/profile');
-            return;
-          }
-        }
       } catch (err) {
         console.error('Error checking pending request:', err);
+        // Có thể thêm xử lý lỗi cụ thể hơn nếu cần
       }
     };
 
@@ -126,15 +132,29 @@ export default function RequestArtistPage() {
     setIsSubmitting(true);
     setError(null);
 
+    let userData: User | null = null;
     try {
       const token = localStorage.getItem('userToken');
       const userDataStr = localStorage.getItem('userData');
 
-      if (!token || !userDataStr) {
-        throw new Error('No authentication token or user data found');
+      if (!token) {
+        throw new Error('Authentication token not found. Please log in again.');
       }
 
-      const userData = JSON.parse(userDataStr);
+      if (userDataStr) {
+          try {
+              userData = JSON.parse(userDataStr);
+          } catch (parseError) {
+              console.error('Lỗi parse userData trong handleSubmit:', parseError);
+              throw new Error('User data is corrupted. Please log in again.');
+          }
+      } else {
+          throw new Error('User data not found. Please log in again.');
+      }
+
+      if (!userData) { // Kiểm tra lại userData sau khi parse
+          throw new Error('Failed to load user data.');
+      }
 
       if (formData.avatarFile && formData.avatarFile.size > 5 * 1024 * 1024) {
         throw new Error('File size exceeds the limit of 5MB');
@@ -166,25 +186,26 @@ export default function RequestArtistPage() {
 
       await api.user.requestArtistRole(token, submitFormData);
 
-      // Cập nhật trạng thái ngay lập tức
       setHasPendingRequest(true);
       localStorage.setItem('hasPendingRequest', JSON.stringify(true));
+      toast.success('Your request has been submitted successfully!', { duration: 2000 });
 
-      // Hiển thị thông báo thành công
-      toast.success('Your request has been submitted successfully!', {
-        duration: 2000,
-      });
+      // Sửa lỗi linter: Lưu userId vào biến trước khi dùng trong setTimeout
+      if (userData?.id) {
+        const userId = userData.id; // Lưu id vào biến
+        setTimeout(() => {
+          // Sử dụng biến userId đã được kiểm tra
+          router.push(`/profile/${userId}`);
+        }, 2000);
+      } else {
+        console.warn('Không tìm thấy userData.id để chuyển hướng sau khi request artist.');
+      }
 
-      // Trì hoãn chuyển trang sau khi thông báo được hiển thị
-      setTimeout(() => {
-        router.push(`/profile/${userData.id}`); // Chuyển hướng đến trang profile của user
-      }, 2000);
     } catch (error: any) {
       console.error('Error requesting artist role:', error);
-      setError(
-        error instanceof Error ? error.message : 'Failed to request artist role'
-      );
-      toast.error(error.message || 'Failed to request artist role');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to request artist role';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

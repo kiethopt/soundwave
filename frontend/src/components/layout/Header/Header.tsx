@@ -18,7 +18,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { User } from '@/types';
-import pusher from '@/utils/pusher';
+import { getSocket, disconnectSocket } from '@/utils/socket';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -90,37 +90,22 @@ export default function Header({
     }
   }, [isAuthenticated, userData]); // Add userData dependency
 
-  // Handle Pusher subscription
+  // Handle Socket.IO connection and events
   useEffect(() => {
-    if (!userData?.id) return; // Ensure userData.id exists
+    if (!userData?.id || !isAuthenticated) return;
 
-    const userId = userData.id;
-    const currentProfile = userData.currentProfile; // Capture current profile for the closure
+    const socket = getSocket();
 
-    const channel = pusher.subscribe(`user-${userId}`);
-    console.log('Subscribed to Pusher channel:', `user-${userId}`);
-
-    const handleNewNotification = (data: {
-      id: string;
-      type: string;
-      message: string;
-      isRead: boolean;
-      createdAt: string;
-      recipientType: string;
-      [key: string]: any;
-    }) => {
-      console.log('Received new notification event:', data);
-      // *** Filter based on current profile ***
-      if (data.recipientType !== currentProfile) {
-          console.log(`Ignoring notification for ${data.recipientType} profile while viewing ${currentProfile}`);
-          return;
+    const handleNewNotification = (data: any) => {
+      console.log('Received new notification event via Socket.IO:', data);
+      if (data.recipientType !== userData.currentProfile) {
+        console.log(`Ignoring notification for ${data.recipientType} profile while viewing ${userData.currentProfile}`);
+        return;
       }
-
       setNotifications((prev) => {
         if (prev.some((n) => n.id === data.id)) return prev;
         return [data, ...prev];
       });
-
       if (!data.isRead) {
         setNotificationCount((prev) => {
           const newCount = prev + 1;
@@ -128,8 +113,6 @@ export default function Header({
           return newCount;
         });
       }
-
-      // --- Fetch updated user data and update localStorage ---
       const fetchAndUpdateUserData = async () => {
         const token = localStorage.getItem('userToken');
         if (!token) return
@@ -145,27 +128,41 @@ export default function Header({
           console.error('Failed to fetch updated user data after notification:', error);
         }
       };
-
       fetchAndUpdateUserData();
     };
 
-    const handleArtistRequestStatus = (data: { type: string }) => {
-      console.log('Received artist request status event:', data);
+    const handleArtistRequestStatus = (data: any) => {
+      console.log('Received artist request status event via Socket.IO:', data);
+      const fetchAndUpdateUserData = async () => {
+        const token = localStorage.getItem('userToken');
+        if (!token) return
+        try {
+          const newUserData = await api.auth.getMe(token);
+          if (newUserData) {
+            localStorage.setItem('userData', JSON.stringify(newUserData));
+            setUserData(newUserData);
+          } else {
+            console.warn('Received null user data after status update');
+          }
+        } catch (error) {
+          console.error('Failed to fetch updated user data after status update:', error);
+        }
+      };
+      fetchAndUpdateUserData();
     };
 
-    channel.bind('notification', handleNewNotification);
-    channel.bind('artist-request-status', handleArtistRequestStatus);
+    socket.on('notification', handleNewNotification);
+    socket.on('artist-request-status', handleArtistRequestStatus);
 
-    // Set initial count from localStorage (might be slightly out of sync until fetch completes)
     const savedCount = Number(localStorage.getItem('notificationCount') || '0');
     setNotificationCount(savedCount);
 
     return () => {
-      channel.unbind('notification', handleNewNotification);
-      channel.unbind('artist-request-status', handleArtistRequestStatus);
-      pusher.unsubscribe(`user-${userId}`);
+      console.log('Cleaning up Header socket listeners');
+      socket.off('notification', handleNewNotification);
+      socket.off('artist-request-status', handleArtistRequestStatus);
     };
-  }, [userData]); // Depend on userData to resubscribe if user changes
+  }, [userData, isAuthenticated]);
 
   // Handle click outside
   useEffect(() => {
@@ -245,25 +242,32 @@ export default function Header({
       const sessionId = localStorage.getItem('sessionId');
 
       if (token && sessionId) {
+        // Chỉ gọi API logout, không làm gì khác ở đây
         await api.auth.logout(token);
-        pusher.disconnect();
       }
+    } catch (error) {
+      // Chỉ log lỗi
+      console.error('Logout error:', error);
+    } finally {
+      // Luôn thực hiện các hành động sau trong finally
+      disconnectSocket(); // Ngắt kết nối Socket.IO
 
+      // Dọn dẹp local storage
       localStorage.removeItem('userToken');
       localStorage.removeItem('sessionId');
       localStorage.removeItem('userData');
+      localStorage.removeItem('notificationCount');
+      localStorage.removeItem('hasPendingRequest'); // Optional: tùy thuộc vào logic của bạn
 
+      // Reset state của component Header
       setIsAuthenticated(false);
       setUserData(null);
+      setNotificationCount(0);
+      setNotifications([]);
+      setShowDropdown(false);
 
-      window.location.href = '/login';
-    } catch (error) {
-      console.error('Logout error:', error);
-      pusher.disconnect();
-      localStorage.removeItem('userToken');
-      localStorage.removeItem('sessionId');
-      localStorage.removeItem('userData');
-      window.location.href = '/login';
+      // Chuyển hướng về trang chủ
+      router.push('/');
     }
   };
 

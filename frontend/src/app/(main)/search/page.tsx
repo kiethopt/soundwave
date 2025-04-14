@@ -17,7 +17,7 @@ import {
   DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
 import { Heart, ListMusic, MoreHorizontal, Share2 } from 'lucide-react';
-import pusher from '@/utils/pusher';
+import { getSocket } from '@/utils/socket';
 import toast from 'react-hot-toast';
 import { useTrack } from '@/contexts/TrackContext';
 
@@ -139,31 +139,29 @@ function SearchContent() {
     fetchResults();
   }, [query, router]);
 
+  // Lắng nghe sự kiện Socket.IO
   useEffect(() => {
-    const userDataStr = localStorage.getItem('userData');
-    if (userDataStr) {
-      const user = JSON.parse(userDataStr);
+    const socket = getSocket();
 
-      // Subscribe vào channel của user
-      const channel = pusher.subscribe(`user-${user.id}`);
-
-      // Lắng nghe sự kiện audio-control
-      channel.bind('audio-control', (data: any) => {
-        if (data.type === 'STOP_OTHER_SESSIONS') {
-          // Dừng phát nhạc nếu đang phát
-          if (audioRef.current) {
-            audioRef.current.pause();
-            setCurrentlyPlaying(null);
-          }
+    const handleAudioControl = (data: any) => {
+      if (data.type === 'STOP_OTHER_SESSIONS') {
+        console.log('Received STOP_OTHER_SESSIONS via Socket.IO');
+        // Dừng phát nhạc nếu đang phát (logic giữ nguyên)
+        if (audioRef.current && isPlaying) { // Chỉ dừng nếu đang phát
+          pauseTrack(); // Sử dụng pauseTrack từ context
+          // Không cần setCurrentlyPlaying(null) vì context sẽ xử lý
         }
-      });
+      }
+    };
 
-      return () => {
-        channel.unbind('audio-control');
-        pusher.unsubscribe(`user-${user.id}`);
-      };
-    }
-  }, []);
+    socket.on('audio-control', handleAudioControl);
+
+    // Cleanup listener
+    return () => {
+      console.log('Cleaning up Search page socket listener');
+      socket.off('audio-control', handleAudioControl);
+    };
+  }, [isPlaying, pauseTrack]); // Thêm dependencies để đảm bảo hàm xử lý luôn đúng
 
   useEffect(() => {
     if (currentTrack && queueType !== 'album' && queueType !== 'artist') {
