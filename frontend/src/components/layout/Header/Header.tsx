@@ -46,6 +46,10 @@ export default function Header({
   const [notifications, setNotifications] = useState<any[]>([]);
   const notificationRef = useRef<HTMLDivElement>(null);
 
+  // --- Add state for logging out --- //
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  // --- End add state for logging out --- //
+
   const { theme } = useTheme();
   const router = useRouter();
   const { dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
@@ -68,7 +72,7 @@ export default function Header({
   const fetchAndSetNotifications = async () => {
     try {
       const token = localStorage.getItem('userToken');
-      if (!token || !userData) return; // Ensure userData is available
+      if (!token || !userData) return;
 
       const allNotificationsData = await api.notifications.getList(token);
       const relevantNotifications = filterNotificationsByProfile(allNotificationsData);
@@ -223,7 +227,7 @@ export default function Header({
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
 
-  }, [router]); // Runs once on mount
+  }, [router]);
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -237,37 +241,29 @@ export default function Header({
   };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
+
     try {
       const token = localStorage.getItem('userToken');
       const sessionId = localStorage.getItem('sessionId');
 
       if (token && sessionId) {
-        // Chỉ gọi API logout, không làm gì khác ở đây
         await api.auth.logout(token);
       }
     } catch (error) {
-      // Chỉ log lỗi
       console.error('Logout error:', error);
     } finally {
-      // Luôn thực hiện các hành động sau trong finally
-      disconnectSocket(); // Ngắt kết nối Socket.IO
+      disconnectSocket();
 
-      // Dọn dẹp local storage
+      // Dọn dẹp local storage (State reset is now done above)
       localStorage.removeItem('userToken');
       localStorage.removeItem('sessionId');
       localStorage.removeItem('userData');
       localStorage.removeItem('notificationCount');
-      localStorage.removeItem('hasPendingRequest'); // Optional: tùy thuộc vào logic của bạn
+      localStorage.removeItem('hasPendingRequest');
 
-      // Reset state của component Header
-      setIsAuthenticated(false);
-      setUserData(null);
-      setNotificationCount(0);
-      setNotifications([]);
-      setShowDropdown(false);
-
-      // Chuyển hướng về trang chủ
-      router.push('/');
+      // Chuyển hướng về trang đăng nhập bằng reload
+      window.location.href = '/login';
     }
   };
 
@@ -468,7 +464,10 @@ export default function Header({
 
       {/* Right Side */}
       <div className="flex items-center gap-2 md:gap-4">
-        {isAuthenticated ? (
+        {isLoggingOut ? (
+          // Render nothing or a spinner while logging out
+          <div className="w-8 h-8"></div> // Placeholder to maintain layout spacing
+        ) : isAuthenticated ? (
           <>
             {/* Bi-directional Artist/User Switch Button */}
             {userData?.artistProfile?.isVerified && (

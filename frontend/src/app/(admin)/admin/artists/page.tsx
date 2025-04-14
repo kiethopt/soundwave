@@ -73,36 +73,35 @@ export default function ArtistManagement() {
   // Action handlers
   const handleArtistStatus = async (artistId: string, isActive: boolean) => {
     if (isActive) {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) throw new Error('No authentication token found');
+
+        setActionLoading(artistId);
+
+        await api.admin.updateArtist(artistId, { isActive: true }, token);
+
+        setArtists((prev) =>
+          prev.map((artist) =>
+            artist.id === artistId ? { ...artist, isActive: true } : artist
+          )
+        );
+
+        toast.success('Artist activated successfully');
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : 'Failed to activate artist'
+        );
+      } finally {
+        setActionLoading(null);
+      }
+    } else {
       setArtistIdToDeactivate(artistId);
       setIsDeactivateModalOpen(true);
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-
-      setActionLoading(artistId);
-
-      await api.admin.updateArtist(artistId, { isActive: true }, token);
-
-      setArtists((prev) =>
-        prev.map((artist) =>
-          artist.id === artistId ? { ...artist, isActive: true } : artist
-        )
-      );
-
-      toast.success('Artist activated successfully');
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to activate artist'
-      );
-    } finally {
-      setActionLoading(null);
     }
   };
 
-  // Add function to handle deactivation with reason
+  // Modify handleDeactivateConfirm to handle bulk actions
   const handleDeactivateConfirm = async (reason: string) => {
     try {
       const token = localStorage.getItem('userToken');
@@ -114,8 +113,20 @@ export default function ArtistManagement() {
         // Bulk deactivation
         setActionLoading('bulk');
 
+        // Filter out already inactive artists
+        const artistsToDeactivate = selectedRows.filter((artist) => artist.isActive);
+
+        if (artistsToDeactivate.length === 0) {
+          toast('All selected artists are already inactive.');
+          setIsBulkDeactivating(false);
+          setActionLoading(null);
+          setSelectedRows([]);
+          setRowSelection({});
+          return;
+        }
+
         await Promise.all(
-          selectedRows.map((artist) =>
+          artistsToDeactivate.map((artist) =>
             api.admin.updateArtist(
               artist.id,
               { isActive: false, reason },
@@ -124,20 +135,30 @@ export default function ArtistManagement() {
           )
         );
 
+        // Update local state
+        const updatedArtistIds = artistsToDeactivate.map((artist) => artist.id);
         setArtists((prev) =>
           prev.map((artist) =>
-            selectedRows.some((selected) => selected.id === artist.id)
+            updatedArtistIds.includes(artist.id)
               ? { ...artist, isActive: false }
               : artist
           )
         );
 
         toast.success(
-          `${selectedRows.length} artists deactivated successfully`
+          `${artistsToDeactivate.length} artists deactivated successfully`
         );
         setSelectedRows([]);
+        setRowSelection({});
       } else if (artistIdToDeactivate) {
         // Single artist deactivation
+        const artistToDeactivate = artists.find(a => a.id === artistIdToDeactivate);
+        if (!artistToDeactivate || !artistToDeactivate.isActive) {
+            toast('Artist is already inactive.');
+            setArtistIdToDeactivate(null);
+            return;
+        }
+
         setActionLoading(artistIdToDeactivate);
 
         await api.admin.updateArtist(
@@ -168,12 +189,17 @@ export default function ArtistManagement() {
   };
 
   // Modify handleBulkDeactivate to use modal
-  const handleBulkDeactivate = async () => {
-    if (
-      !selectedRows.length ||
-      !confirm(`Deactivate ${selectedRows.length} selected artists?`)
-    )
+  const handleBulkDeactivate = () => {
+    if (!selectedRows.length) return;
+
+    const artistsToDeactivate = selectedRows.filter((artist) => artist.isActive);
+
+    if (artistsToDeactivate.length === 0) {
+      toast('All selected artists are already inactive.');
       return;
+    }
+
+    if (!confirm(`Deactivate ${artistsToDeactivate.length} selected artists?`)) return;
 
     setIsBulkDeactivating(true);
     setIsDeactivateModalOpen(true);
@@ -239,6 +265,8 @@ export default function ArtistManagement() {
       );
 
       toast.success('Artists activated successfully');
+      setSelectedRows([]); // Clear selection after activation
+      setRowSelection({}); // Clear selection state in table
     } catch (error) {
       toast.error('Failed to activate artists');
     } finally {

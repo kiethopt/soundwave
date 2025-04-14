@@ -76,6 +76,7 @@ export default function UserManagement() {
     null
   );
   const [isBulkDeactivating, setIsBulkDeactivating] = useState(false);
+  const [isBulkActivating, setIsBulkActivating] = useState(false);
 
   // Action handlers
   const handleUpdateUser = async (userId: string, data: FormData) => {
@@ -210,7 +211,7 @@ export default function UserManagement() {
     }
   };
 
-  // Add function to handle deactivation with reason
+  // Modify handleDeactivateConfirm to handle bulk actions
   const handleDeactivateConfirm = async (reason: string) => {
     try {
       const token = localStorage.getItem('userToken');
@@ -219,30 +220,49 @@ export default function UserManagement() {
       setIsDeactivateModalOpen(false);
 
       if (isBulkDeactivating && selectedRows.length > 0) {
-        // Xử lý deactivate hàng loạt
+        // Bulk deactivation
         setActionLoading('bulk');
-        const responses = await Promise.all(
-          selectedRows.map((user) =>
+
+        // Filter out already inactive users
+        const usersToDeactivate = selectedRows.filter((user) => user.isActive);
+
+        if (usersToDeactivate.length === 0) {
+          toast('All selected users are already inactive.');
+          setIsBulkDeactivating(false);
+          setActionLoading(null);
+          setSelectedRows([]);
+          setRowSelection({});
+          return;
+        }
+
+        await Promise.all(
+          usersToDeactivate.map((user) =>
             api.admin.updateUser(user.id, { isActive: false, reason }, token)
           )
         );
 
-        // Cập nhật state dựa trên responses
-        const updatedUserIds = selectedRows.map((user) => user.id);
-        setUsers(
-          users.map((user) => {
-            if (updatedUserIds.includes(user.id)) {
-              return { ...user, isActive: false };
-            }
-            return user;
-          })
+        // Update local state
+        const updatedUserIds = usersToDeactivate.map((user) => user.id);
+        setUsers((prev) =>
+          prev.map((user) =>
+            updatedUserIds.includes(user.id)
+              ? { ...user, isActive: false }
+              : user
+          )
         );
 
-        toast.success(`Deactivated ${selectedRows.length} users successfully`);
+        toast.success(`Deactivated ${usersToDeactivate.length} users successfully`);
         setSelectedRows([]);
         setRowSelection({});
       } else if (userIdToDeactivate) {
-        // Xử lý deactivate một người dùng
+        // Single user deactivation
+        const userToDeactivate = users.find(u => u.id === userIdToDeactivate);
+        if (!userToDeactivate || !userToDeactivate.isActive) {
+          toast('User is already inactive.');
+          setUserIdToDeactivate(null);
+          return;
+        }
+
         setActionLoading(userIdToDeactivate);
         const response = await api.admin.updateUser(
           userIdToDeactivate,
@@ -250,7 +270,6 @@ export default function UserManagement() {
           token
         );
 
-        // Cập nhật state với response từ API
         if (response && response.user) {
           setUsers(
             users.map((user) =>
@@ -260,7 +279,6 @@ export default function UserManagement() {
             )
           );
         } else {
-          // Fallback nếu response không như mong đợi
           setUsers(
             users.map((user) =>
               user.id === userIdToDeactivate
@@ -282,6 +300,74 @@ export default function UserManagement() {
       setUserIdToDeactivate(null);
       setActionLoading(null);
     }
+  };
+
+  // Add function to handle bulk activation
+  const handleBulkActivate = async () => {
+    if (!selectedRows.length) return;
+
+    const confirmMessage = `Activate ${selectedRows.length} selected users?`;
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      // Only target inactive users
+      const usersToActivate = selectedRows.filter((user) => !user.isActive);
+
+      if (usersToActivate.length === 0) {
+        toast('All selected users are already active.');
+        return;
+      }
+
+      setActionLoading('bulk');
+      setIsBulkActivating(true);
+
+      await Promise.all(
+        usersToActivate.map((user) =>
+          api.admin.updateUser(user.id, { isActive: true }, token)
+        )
+      );
+
+      // Update local state
+      const activatedUserIds = usersToActivate.map((user) => user.id);
+      setUsers((prev) =>
+        prev.map((user) =>
+          activatedUserIds.includes(user.id)
+            ? { ...user, isActive: true }
+            : user
+        )
+      );
+
+      toast.success(`Activated ${usersToActivate.length} users successfully`);
+      setSelectedRows([]);
+      setRowSelection({});
+    } catch (error) {
+      console.error('Activation error:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to activate user(s)'
+      );
+    } finally {
+      setActionLoading(null);
+      setIsBulkActivating(false);
+    }
+  };
+
+  // Modify handleBulkDeactivate to open the modal
+  const handleBulkDeactivate = () => {
+    if (!selectedRows.length) return;
+    const usersToDeactivate = selectedRows.filter((user) => user.isActive);
+
+    if (usersToDeactivate.length === 0) {
+        toast('All selected users are already inactive.');
+        return;
+    }
+
+    if (!confirm(`Deactivate ${usersToDeactivate.length} selected users?`)) return;
+
+    setIsBulkDeactivating(true);
+    setIsDeactivateModalOpen(true);
   };
 
   // Table configuration
@@ -363,6 +449,8 @@ export default function UserManagement() {
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
           onDelete: () => handleDeleteUsers(selectedRows.map((row) => row.id)),
+          onActivate: handleBulkActivate,
+          onDeactivate: handleBulkDeactivate,
           showExport: true,
           exportData: {
             data: users,

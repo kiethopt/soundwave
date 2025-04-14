@@ -18,11 +18,10 @@ exports.trackExtension = client_1.Prisma.defineExtension({
                         where: {
                             isActive: false,
                             releaseDate: {
-                                gte: twoMinutesAgo,
                                 lte: new Date(),
                             },
                             updatedAt: {
-                                lt: twoMinutesAgo,
+                                lte: db_1.default.track.fields.releaseDate,
                             },
                         },
                     });
@@ -51,7 +50,6 @@ exports.trackExtension = client_1.Prisma.defineExtension({
     },
 });
 node_cron_1.default.schedule('* * * * *', async () => {
-    console.log('Running cron job to auto-publish tracks...');
     try {
         await db_1.default.track.autoPublishTracks();
     }

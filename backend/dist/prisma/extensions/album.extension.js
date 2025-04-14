@@ -6,19 +6,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.albumExtension = void 0;
 const client_1 = require("@prisma/client");
 const node_cron_1 = __importDefault(require("node-cron"));
+const socket_1 = require("../../config/socket");
 async function checkAndUpdateAlbumStatus(client) {
     try {
         const now = new Date();
-        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
         const albumsToPublish = await client.album.findMany({
             where: {
                 isActive: false,
                 releaseDate: {
-                    gte: twoMinutesAgo,
                     lte: now,
                 },
                 updatedAt: {
-                    lt: twoMinutesAgo,
+                    lte: client.album.fields.releaseDate,
                 },
             },
             select: {
@@ -41,6 +40,10 @@ async function checkAndUpdateAlbumStatus(client) {
                 },
                 data: { isActive: true },
             });
+            const io = (0, socket_1.getIO)();
+            for (const album of albumsToPublish) {
+                io.emit('album:visibilityChanged', { albumId: album.id, isActive: true });
+            }
             console.log(`Auto published ${albumsToPublish.length} albums: ${albumsToPublish
                 .map((a) => a.title)
                 .join(', ')}`);
@@ -67,7 +70,6 @@ async function updateAlbumTotalTracks(client, albumId) {
 }
 exports.albumExtension = client_1.Prisma.defineExtension((client) => {
     node_cron_1.default.schedule('* * * * *', () => {
-        console.log('Running cron job to check and update album status...');
         checkAndUpdateAlbumStatus(client);
     });
     return client.$extends({

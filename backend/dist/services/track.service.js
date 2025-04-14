@@ -460,33 +460,38 @@ const updateTrack = async (req, id) => {
                 }
                 else if (typeof genreIds === 'string') {
                     try {
-                        genresArray = JSON.parse(genreIds);
-                        if (!Array.isArray(genresArray))
-                            genresArray = [genreIds];
+                        const parsed = JSON.parse(genreIds);
+                        if (Array.isArray(parsed)) {
+                            genresArray = parsed.map(String);
+                        }
+                        else {
+                            genresArray = [String(genreIds)];
+                        }
                     }
                     catch {
                         genresArray = [genreIds];
                     }
                 }
             }
-            if (genresArray.length > 0) {
-                const existingGenres = await tx.genre.findMany({
-                    where: { id: { in: genresArray } },
-                    select: { id: true },
-                });
-                const validGenreIds = existingGenres.map((genre) => genre.id);
-                const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
-                if (invalidGenreIds.length > 0) {
-                    throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
-                }
-                await tx.trackGenre.createMany({
-                    data: genresArray.map((genreId) => ({
-                        trackId: id,
-                        genreId: genreId.trim(),
-                    })),
-                    skipDuplicates: true,
-                });
+            if (genresArray.length === 0) {
+                throw new Error("At least one genre is required when updating genres.");
             }
+            const existingGenres = await tx.genre.findMany({
+                where: { id: { in: genresArray } },
+                select: { id: true },
+            });
+            const validGenreIds = existingGenres.map((genre) => genre.id);
+            const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
+            if (invalidGenreIds.length > 0) {
+                throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
+            }
+            await tx.trackGenre.createMany({
+                data: genresArray.map((genreId) => ({
+                    trackId: id,
+                    genreId: genreId.trim(),
+                })),
+                skipDuplicates: true,
+            });
         }
         const finalUpdatedTrack = await tx.track.findUnique({
             where: { id },

@@ -1,4 +1,3 @@
-// Updated by tuankietttt17@gmail.com
 import Link from "next/link";
 import Image from "next/image";
 import {

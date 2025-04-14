@@ -242,7 +242,7 @@ export function DataTableToolbar({
                 onClick={onActivate}
                 className={`flex-shrink-0 ${
                   theme === 'dark'
-                    ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                    ? 'bg-green-500/20 hover:bg-green-500/30 text-green-400 border-green-500/30'
                     : 'text-green-600 border-green-200 bg-green-50 hover:bg-green-100'
                 }`}
               >
@@ -256,7 +256,7 @@ export function DataTableToolbar({
                 onClick={onDeactivate}
                 className={`flex-shrink-0 ${
                   theme === 'dark'
-                    ? 'bg-orange-500/20 hover:bg-orange-500/30 text-orange-400'
+                    ? 'bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border-orange-500/30'
                     : 'text-orange-600 border-orange-200 bg-orange-50 hover:bg-orange-100'
                 }`}
               >

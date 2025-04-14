@@ -30,7 +30,6 @@ const deleteAllNotifications = async (req, res) => {
                 OR: whereConditions,
             },
         });
-        console.log(`Deleted ${deleteResult.count} notifications for user ${user.id}`);
         res.status(200).json({
             message: 'All notifications deleted successfully',
             deletedCount: deleteResult.count,
@@ -49,11 +48,6 @@ const deleteReadNotifications = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        console.log('Deleting read notifications for user:', {
-            id: user.id,
-            role: user.role,
-            artistProfile: user.artistProfile,
-        });
         const whereConditions = [
             {
                 userId: user.id,
@@ -73,7 +67,6 @@ const deleteReadNotifications = async (req, res) => {
                 OR: whereConditions,
             },
         });
-        console.log(`Deleted ${deleteResult.count} read notifications for user ${user.id}`);
         res.status(200).json({
             message: 'Read notifications deleted successfully',
             deletedCount: deleteResult.count,
@@ -164,8 +157,6 @@ const markNotificationAsRead = async (req, res) => {
             res.status(404).json({ message: 'Notification not found' });
             return;
         }
-        console.log('Notification:', notification);
-        console.log('User:', { id: user.id, role: user.role, artistProfile: user.artistProfile });
         let canMark = false;
         if (notification.recipientType === client_1.RecipientType.ARTIST) {
             if (user.artistProfile && notification.artistId === user.artistProfile.id) {
@@ -174,10 +165,8 @@ const markNotificationAsRead = async (req, res) => {
         }
         else if (notification.recipientType === client_1.RecipientType.USER) {
             canMark = notification.userId === user.id;
-            console.log('USER check:', { canMark, notificationUserId: notification.userId, userId: user.id });
         }
         if (!canMark) {
-            console.log('Permission denied: User cannot mark this notification');
             res.status(403).json({ message: 'Forbidden' });
             return;
         }
@@ -200,12 +189,6 @@ const markAllNotificationsAsRead = async (req, res) => {
             res.status(401).json({ message: 'Unauthorized' });
             return;
         }
-        console.log('User:', {
-            id: user.id,
-            role: user.role,
-            artistProfile: user.artistProfile,
-            currentProfile: user.currentProfile,
-        });
         const whereConditions = [
             {
                 recipientType: client_1.RecipientType.USER,
@@ -228,7 +211,6 @@ const markAllNotificationsAsRead = async (req, res) => {
                 isRead: true,
             },
         });
-        console.log(`Marked ${updateResult.count} notifications as read for user ${user.id}`);
         res.json({
             message: 'All notifications marked as read',
             count: updateResult.count,
