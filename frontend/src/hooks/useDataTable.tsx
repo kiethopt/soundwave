@@ -144,13 +144,8 @@ export function useDataTable<T>({
         if (currentEndDate) {
           paramsForApi.set('endDate', currentEndDate);
         }
-
-        // console.log(`Fetching data with API params: ${paramsForApi.toString()}`);
-
-        // Call the provided fetchData function with the clean API params
         const response = await fetchData(pageToFetch, paramsForApi);
 
-        // Validate response structure
         if (
           response &&
           Array.isArray(response.data) &&
@@ -165,68 +160,43 @@ export function useDataTable<T>({
             response
           );
           toast.error('Received invalid data structure from server.');
-          // Reset data to avoid inconsistent state
           setData([]);
           setTotalPages(1);
         }
       } catch (error) {
         console.error('Fetch data error:', error);
         toast.error((error as Error)?.message ?? 'Failed to fetch data');
-        // Optionally reset state on error
-        // setData([]);
-        // setTotalPages(1);
       } finally {
         if (showLoading) {
           setLoading(false);
         }
       }
     },
-    // Dependencies simplified: only rely on fetchData, limit, and getKey
     [fetchData, limit, getKey]
   );
 
   const debouncedFetch = useRef(
     debounce((page: number, params: URLSearchParams) => {
-      // The params passed here are intended for the URL,
-      // fetchDataInternal will extract the necessary info for the API call.
       fetchDataInternal(page, params);
-    }, 300) // Adjust debounce timing if needed
+    }, 300)
   ).current;
-
-  // --- URL Update Logic --- //
 
   const updateUrlParams = useCallback(
     (
       updates: Record<string, string | number | string[] | null>,
-      replace: boolean = false // Use replace for non-user-initiated changes
+      replace: boolean = false 
     ) => {
-      // **Start with a clean slate for the new URL parameters**
-      const newParams = new URLSearchParams();
+      const newParams = new URLSearchParams(safeParamsToString());
       let changed = false;
 
-      // Get current URL parameters to selectively keep parameters from other tabs
-      const currentParams = new URLSearchParams(safeParamsToString());
-      currentParams.forEach((value, key) => {
-        if (!key.startsWith(paramKeyPrefix)) {
-          newParams.append(key, value);
-        }
-      });
-
-      // Apply updates relevant to this instance
       Object.entries(updates).forEach(([key, value]) => {
         const prefixedKey = getKey(key);
+        const currentValueInNew = newParams.getAll(prefixedKey);
 
-        // Special handling for page parameter when it's 1 (default)
+        newParams.delete(prefixedKey);
+
         if (key === 'page' && (value === 1 || value === '1')) {
-          if (newParams.has(prefixedKey)) {
-            newParams.delete(prefixedKey);
-            changed = true;
-          }
-
-         
-          if (currentParams.has(prefixedKey)) {
-            changed = true;
-          }
+          if (currentValueInNew.length > 0) changed = true;
           return;
         }
 
@@ -234,44 +204,45 @@ export function useDataTable<T>({
           value = Math.max(1, Number(value) || 1);
         }
 
-        // Compare with current value in the newParams
-        const currentValueInNew = newParams.getAll(prefixedKey);
+        let valueChanged = false;
 
         if (Array.isArray(value)) {
-          if (value === null || (Array.isArray(value) && value.length === 0)) {
-              if (newParams.has(prefixedKey) || currentParams.has(prefixedKey)) {
-                  newParams.delete(prefixedKey);
-                  changed = true;
-              }
-          } else if (Array.isArray(value)) {
-            newParams.delete(prefixedKey);
+          if (value.length > 0) {
             value.forEach((v) => newParams.append(prefixedKey, v.toString()));
             if (
-              JSON.stringify(value.sort()) !==
-              JSON.stringify(currentValueInNew.sort())
+              JSON.stringify(value.slice().sort()) !==
+              JSON.stringify(currentValueInNew.slice().sort())
             ) {
-              changed = true;
+              valueChanged = true;
+            }
+          } else {
+            if (currentValueInNew.length > 0) {
+              valueChanged = true;
             }
           }
         } else {
-          if (value === null || value === '' || value === undefined) {
-            if (newParams.has(prefixedKey) || currentParams.has(prefixedKey)) {
-              newParams.delete(prefixedKey);
-              changed = true;
+          if (value !== null && value !== '' && value !== undefined) {
+            const stringValue = value.toString();
+            newParams.set(prefixedKey, stringValue);
+            if (
+              currentValueInNew.length !== 1 ||
+              currentValueInNew[0] !== stringValue
+            ) {
+              valueChanged = true;
             }
           } else {
-            const stringValue = value.toString();
-            const currentSingleValueInNew = newParams.get(prefixedKey);
-
-            if (stringValue !== currentSingleValueInNew) {
-              newParams.set(prefixedKey, stringValue);
-              changed = true;
+            // Value is null/empty string/undefined, meaning remove the parameter
+            if (currentValueInNew.length > 0) {
+              valueChanged = true; // It changed if it existed before
             }
           }
         }
+        if (valueChanged) {
+          changed = true;
+        }
       });
 
-      // Only push/replace URL if changes occurred for this instance
+      // Only push/replace URL if changes occurred
       if (changed) {
         const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
         const targetUrl = pathname + queryStr;
@@ -284,7 +255,7 @@ export function useDataTable<T>({
       }
     },
     // updateUrlParams depends on searchParams to read other tabs' params
-    [router, searchParams, pathname, getKey, paramKeyPrefix, safeParamsToString]
+    [router, searchParams, pathname, getKey, safeParamsToString] // Removed paramKeyPrefix dependency
   );
 
   // --- Effects for State and URL Synchronization --- //
