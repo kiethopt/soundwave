@@ -356,7 +356,7 @@ export default function TrackDetailPage() {
               <div></div>
             </div>
 
-             <div
+            <div
               className={`divide-y ${
                 theme === 'light' ? 'divide-gray-200/70' : 'divide-white/10'
               }`}
@@ -368,8 +368,16 @@ export default function TrackDetailPage() {
                 isPlaying={isPlaying}
                 requiresAuth={!isAuthenticated}
               />
-            </div>
+            </div>        
           </div>
+
+          {track.label && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className={`text-xs font-medium ${theme === 'light' ? 'text-gray-500' : 'text-white/60'}`}>
+                © {track.label.name}
+              </span>
+            </div>
+          )}
         </div>    
           
         

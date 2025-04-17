@@ -384,6 +384,14 @@ export default function AlbumDetailPage() {
                 />
               </div>
             </div>
+
+            {album.label && (
+              <div className="flex items-center gap-2 mt-2">
+                <span className={`text-xs font-medium ${theme === 'light' ? 'text-gray-500' : 'text-white/60'}`}>
+                  © {album.label.name}
+                </span>
+              </div>
+            )}
           </div>
         )}
 

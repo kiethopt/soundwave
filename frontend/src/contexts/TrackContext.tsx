@@ -226,9 +226,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         setShowPlayer(true);
 
         if (currentTrack?.id === trackToPlay.id) {
-          if (isPlaying) {
-            return;
-          } else {
+          if (audioRef.current.paused) {
             try {
               await audioRef.current.play();
               setIsPlaying(true);
@@ -238,8 +236,19 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
                 setIsPlaying(false);
               }
             }
-            return;
+          } else {
+            audioRef.current.currentTime = 0;
+            try {
+              await audioRef.current.play();
+              setIsPlaying(true);
+            } catch (error) {
+              if (error instanceof Error && error.name !== 'AbortError') {
+                console.error('Resume playback error:', error);
+                setIsPlaying(false);
+              }
+            }
           }
+          return;
         }
 
         setPlayStartTime(Date.now());
@@ -404,11 +413,11 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     }
     const nextIndex = (currentIndex + 1) % trackQueueRef.current.length;
     if (trackQueueRef.current[nextIndex]) {
-        playTrack(trackQueueRef.current[nextIndex]);
+      playTrack(trackQueueRef.current[nextIndex]);
     } else {
-        // Handle case where queue might be empty or index out of bounds
-        pauseTrack();
-        setCurrentTrack(null);
+      // Handle case where queue might be empty or index out of bounds
+      pauseTrack();
+      setCurrentTrack(null);
     }
   }, [currentIndex, shuffle, playTrack, pauseTrack, skipRandom]);
 
@@ -475,7 +484,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (loop) {
-        setIsPlaying(false);
         loopTrack();
       } else if (shuffle) {
         setIsPlaying(false);
