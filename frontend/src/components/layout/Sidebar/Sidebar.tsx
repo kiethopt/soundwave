@@ -17,7 +17,6 @@ import {
   ChartIcon,
   Tags,
   LayoutGrid,
-  TrendingUp,
 } from "@/components/ui/Icons";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -30,7 +29,19 @@ import { PlaylistIcon } from "@/components/user/playlist/PlaylistIcon";
 import { BsFillPinAngleFill } from "react-icons/bs";
 import { BsStars } from "react-icons/bs";
 import { Playlist } from "@/types";
-import { Loader2, RefreshCw } from "lucide-react";
+
+const getInitialCollapsedState = (): boolean => {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return false;
+  }
+  try {
+    const savedState = localStorage.getItem("sidebarCollapsed");
+    return savedState !== null ? JSON.parse(savedState) : false;
+  } catch (error) {
+    console.error("Error reading sidebarCollapsed state from localStorage:", error);
+    return false;
+  }
+};
 
 export default function Sidebar({
   isOpen,
@@ -46,7 +57,7 @@ export default function Sidebar({
   const [currentProfile, setCurrentProfile] = useState<"USER" | "ARTIST">(
     "USER"
   );
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(getInitialCollapsedState);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { theme } = useTheme();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -64,17 +75,14 @@ export default function Sidebar({
   const [playlistAI, setPlaylistAI] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isUpdatingVibeRewind, setIsUpdatingVibeRewind] = useState(false);
+  const [isAuthenticatedSidebar, setIsAuthenticatedSidebar] = useState(false);
 
   useEffect(() => {
-    const savedCollapsedState = localStorage.getItem("sidebarCollapsed");
-    if (savedCollapsedState) {
-      setIsCollapsed(JSON.parse(savedCollapsedState));
+    try {
+       localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
+    } catch (error) {
+      console.error("Error writing sidebarCollapsed state to localStorage:", error);
     }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
   }, [isCollapsed]);
 
   useEffect(() => {
@@ -89,6 +97,23 @@ export default function Sidebar({
     } else {
       setIsAuthenticated(false);
     }
+
+    const checkAuthStatus = () => {
+      const token = localStorage.getItem('userToken');
+      setIsAuthenticatedSidebar(!!token);
+    };
+    checkAuthStatus();
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'userToken') {
+        checkAuthStatus();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const fetchPlaylists = async () => {
@@ -206,7 +231,7 @@ export default function Sidebar({
           }
         `}
       >
-        <div className="h-full flex flex-col">
+        <div className={`h-full flex flex-col ${isAuthenticatedSidebar ? 'pb-[90px]' : ''}`}>
           <div
             className={`md:hidden p-4 ${
               isCollapsed ? "flex justify-center" : "flex justify-end"
@@ -307,7 +332,7 @@ export default function Sidebar({
                   </div>
 
                   <div
-                    className={`mt-2 px-2 ${
+                    className={`mt-2 ${
                       isCollapsed
                         ? "space-y-2 flex flex-col items-center"
                         : "space-y-1"
@@ -408,7 +433,6 @@ export default function Sidebar({
                       </div>
                     )}
 
-                    {/* Divider after Favorite playlist */}
                     {favoritePlaylist &&
                       (vibeRewindPlaylist || welcomeMixPlaylist) && (
                         <div
@@ -418,7 +442,6 @@ export default function Sidebar({
                         />
                       )}
 
-                    {/* Auto-updated Playlists Section */}
                     {(vibeRewindPlaylist || welcomeMixPlaylist) && (
                       <div
                         className={`${
@@ -723,7 +746,6 @@ export default function Sidebar({
                       </div>
                     )}
 
-                    {/* Divider before normal playlists */}
                     {playlists.length > 0 && (
                       <div
                         className={`${
@@ -732,7 +754,6 @@ export default function Sidebar({
                       />
                     )}
 
-                    {/* User Playlists Section */}
                     <div
                       className={`${
                         isCollapsed

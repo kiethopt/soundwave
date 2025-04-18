@@ -906,54 +906,30 @@ export const api = {
   },
 
   history: {
-    getPlayHistory: async (token: string) =>
-      fetchWithAuth("/api/history/play", { method: "GET" }, token),
-
-    getSearchHistory: async (token: string) =>
-      fetchWithAuth("/api/history/search", { method: "GET" }, token),
-
-    getAllHistory: async (token: string) =>
-      fetchWithAuth("/api/history", { method: "GET" }, token),
-
-    savePlayHistory: async (
-      data: { trackId: string; duration: number; completed: boolean },
-      token: string
-    ) =>
-      fetchWithAuth(
-        "/api/history/play",
-        {
-          method: "POST",
-          body: JSON.stringify(data),
-        },
-        token
-      ),
-
-    saveSearchHistory: async (query: string, token: string) =>
-      fetchWithAuth(
-        "/api/history/search",
-        {
-          method: "POST",
-          body: JSON.stringify({ query }),
-        },
-        token
-      ),
-
-    // Get system playlists specifically for the Admin view
-    getSystemPlaylistsForAdmin: async (token: string) => {
-      try {
-        return await fetchWithAuth(
-          "/api/playlists/system-all",
-          { method: "GET" },
-          token
-        );
-      } catch (error) {
-        console.error("Error fetching system playlists for admin:", error);
-        return {
-          success: false,
-          data: [],
-          message: "Failed to fetch system playlists",
-        };
-      }
+    getList: (token: string, type?: 'play' | 'search', page = 1, limit = 10) => {
+      const typeParam = type ? `/${type}` : '';
+      const url = `/api/history${typeParam}?page=${page}&limit=${limit}`;
+      return fetchWithAuth(url, {}, token);
+    },
+    savePlay: (token: string, data: { trackId: string, duration?: number, completed?: boolean }) => {
+      return fetchWithAuth('/api/history/play', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }, token);
+    },
+    saveSearch: (token: string, query: string) => {
+      return fetchWithAuth('/api/history/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      }, token);
+    },
+    getSuggestions: (token: string, limit = 5) => {
+      return fetchWithAuth(`/api/history/suggestions?limit=${limit}`, {}, token);
+    },
+    deleteSearchHistory: (token: string) => {
+      return fetchWithAuth('/api/history/search', { method: 'DELETE' }, token);
     },
   },
 

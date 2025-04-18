@@ -23,6 +23,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const { currentTrack } = useTrack();
   const { isMaintenanceMode, isLoading } = useMaintenance();
   const { backgroundStyle } = useBackground();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const isAuthPage = useMemo(
     () =>
@@ -35,7 +36,9 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    const token = localStorage.getItem('userToken');
+    setIsAuthenticated(!!token);
+  }, [pathname]);
 
   if (!mounted) {
     return null;
@@ -76,7 +79,12 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 <Header />
               </div>
 
-              <main className="flex-1 relative" suppressHydrationWarning>
+              <main
+                className={`flex-1 relative ${
+                  isAuthenticated ? 'pb-[90px]' : ''
+                }`}
+                suppressHydrationWarning
+              >
                 <div
                   className="absolute inset-0 overflow-y-auto"
                   suppressHydrationWarning
@@ -97,10 +105,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {currentTrack && (
-            <div className={currentTrack ? 'mt-[90px]' : ''}>
-              <PlayerBar />
-            </div>
+          {isAuthenticated && (
+            <PlayerBar />
           )}
         </div>
       )}

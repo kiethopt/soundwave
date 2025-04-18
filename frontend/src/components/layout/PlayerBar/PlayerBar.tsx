@@ -12,6 +12,7 @@ import {
   Down,
   LikeOutline,
   LikeFilled,
+  Music,
 } from "@/components/ui/Icons";
 import { useTrack } from "@/contexts/TrackContext";
 import { ListMusic } from "lucide-react";
@@ -27,6 +28,7 @@ export default function PlayerBar() {
   const [isLiked, setIsLiked] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const {
     currentTrack,
@@ -48,6 +50,18 @@ export default function PlayerBar() {
     queue,
   } = useTrack();
 
+  useEffect(() => {
+    const token = localStorage.getItem('userToken');
+    setIsAuthenticated(!!token);
+    const handleStorageChange = (event: StorageEvent) => {
+        if (event.key === 'userToken') {
+            setIsAuthenticated(!!localStorage.getItem('userToken'));
+        }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -67,19 +81,16 @@ export default function PlayerBar() {
 
     const token = localStorage.getItem("userToken");
     if (!token) {
-      // If user is not logged in, show auth dialog
       setShowAuthDialog(true);
       return;
     }
 
     try {
       if (isLiked) {
-        // Unlike the track
         await api.tracks.unlike(currentTrack.id, token);
         setIsLiked(false);
         toast.success("Removed from your Liked Tracks");
       } else {
-        // Like the track
         await api.tracks.like(currentTrack.id, token);
         setIsLiked(true);
         toast.success("Added to your Liked Tracks");
@@ -98,7 +109,6 @@ export default function PlayerBar() {
       if (!token) return;
 
       try {
-        // Using the API endpoint from your backend
         const data = await api.tracks.checkLiked(currentTrack.id, token);
         setIsLiked(!!data.isLiked);
       } catch (error) {
@@ -107,12 +117,22 @@ export default function PlayerBar() {
     };
 
     checkLikeStatus();
-  }, [currentTrack?.id]); // Only re-run when the track ID changes
+  }, [currentTrack?.id]);
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <>
       {/* Desktop & Tablet Player Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#1c1c1c] p-3 px-4 grid-cols-5 gap-4 items-center w-full hidden md:grid">
+      <div
+        className={`fixed bottom-0 left-0 right-0 z-50 p-3 px-4 grid-cols-5 gap-4 items-center w-full hidden md:grid transition-colors duration-300 ${
+          !currentTrack
+            ? 'bg-[#111111] opacity-80'
+            : 'bg-[#1c1c1c]'
+        }`}
+      >
         {/* Track Info */}
         <div className="flex items-center col-span-1 overflow-hidden">
           {currentTrack && (
@@ -158,8 +178,12 @@ export default function PlayerBar() {
           )}
         </div>
 
-        {/* Track Controls */}
-        <div className="flex flex-col items-center justify-center col-span-3 space-y-2">
+        {/* Track Controls - Dim controls if no track */}
+        <div
+          className={`flex flex-col items-center justify-center col-span-3 space-y-2 ${
+            !currentTrack ? 'opacity-50 pointer-events-none' : ''
+          }`}
+        >
           {/* Track Controls */}
           <div className="flex items-center space-x-4">
             {/* Shuffle Button */}
@@ -218,7 +242,7 @@ export default function PlayerBar() {
           {/* Progress Bar */}
           <div className="flex w-full items-center justify-between max-w-2xl space-x-4">
             <span className="text-white text-sm min-w-fit">
-              {formatTime((progress / 100) * duration)}
+              {currentTrack ? formatTime((progress / 100) * duration) : '0:00'}
             </span>
             <div className="relative w-full flex items-center group">
               {/* Background bar */}
@@ -260,13 +284,17 @@ export default function PlayerBar() {
               />
             </div>
             <span className="text-white text-sm min-w-fit">
-              {formatTime(duration)}
+              {currentTrack ? formatTime(duration) : '0:00'}
             </span>
           </div>
         </div>
 
-        {/* Volume Control & Queue */}
-        <div className="flex items-center justify-end space-x-4 col-span-1">
+        {/* Volume Control & Queue - Dim controls if no track */}
+        <div
+          className={`flex items-center justify-end space-x-4 col-span-1 ${
+            !currentTrack ? 'opacity-50 pointer-events-none' : ''
+          }`}
+        >
           {/* Queue Button */}
           <button
             onClick={() => setIsQueueOpen((prev) => !prev)}
@@ -328,21 +356,31 @@ export default function PlayerBar() {
       </div>
 
       {/* Mobile Player Bar */}
-      {currentTrack && (
-        <>
-          <div
-            onClick={toggleMobileExpanded}
-            className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#1c1c1c] border-t border-[#383838] px-4 py-6 flex items-center w-full cursor-pointer"
-          >
-            {/* Track Image */}
-            <img
-              src={currentTrack.coverUrl}
-              alt={currentTrack.title}
-              className="w-14 h-14 rounded shadow-md"
-            />
+      <div
+        onClick={!currentTrack ? undefined : toggleMobileExpanded}
+        className={`md:hidden fixed bottom-0 left-0 right-0 z-50 border-t px-4 py-6 flex items-center w-full transition-colors duration-300 ${
+          !currentTrack
+            ? 'bg-[#111111] opacity-80 cursor-default'
+            : 'bg-[#1c1c1c] border-[#383838] cursor-pointer'
+        }`}
+      >
+        {/* Track Image / Placeholder */}
+        {currentTrack ? (
+          <img
+            src={currentTrack.coverUrl}
+            alt={currentTrack.title}
+            className="w-14 h-14 rounded shadow-md"
+          />
+        ) : (
+          <div className="w-14 h-14 rounded bg-neutral-700 flex items-center justify-center">
+            <Music className="w-6 h-6 text-neutral-400" />
+          </div>
+        )}
 
-            {/* Track Info */}
-            <div className="ml-3 flex-1 overflow-hidden">
+        {/* Track Info / Placeholder */}
+        <div className="ml-3 flex-1 overflow-hidden">
+          {currentTrack ? (
+            <>
               <h3 className="text-white text-base font-medium text-ellipsis overflow-hidden whitespace-nowrap">
                 {currentTrack.title}
               </h3>
@@ -351,172 +389,179 @@ export default function PlayerBar() {
                   ? currentTrack.artist
                   : currentTrack.artist.artistName}
               </p>
+            </>
+          ) : (
+            <h3 className="text-neutral-400 text-base font-medium">No track playing</h3>
+          )}
+        </div>
+
+        {/* Control Buttons - Dim controls if no track */}
+        <div
+          className={`flex items-center ${
+            !currentTrack ? 'opacity-50 pointer-events-none' : ''
+          }`}
+        >
+          {/* Play/Pause Button */}
+          <button
+            onClick={(e) => {
+              if (!currentTrack) return;
+              e.stopPropagation();
+              isPlaying
+                ? pauseTrack()
+                : currentTrack && playTrack(currentTrack);
+            }}
+            className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200 ml-2"
+          >
+            {isPlaying ? (
+              <Pause className="w-6 h-6 text-white" />
+            ) : (
+              <Play className="w-6 h-6 text-white" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded Mobile Player - Render only if a track is playing */}
+      {currentTrack && showMobileExpanded && (
+        <div className="md:hidden fixed inset-0 z-[60] bg-[#1c1c1c] flex flex-col p-4">
+          {/* Header with close button */}
+          <div className="flex items-center justify-between p-4">
+            <button
+              onClick={toggleMobileExpanded}
+              className="text-white p-2"
+            >
+              <Down className="w-6 h-6" />
+            </button>
+            <h2 className="text-white text-lg font-medium">Now Playing</h2>
+            <div className="w-10"></div>
+          </div>
+
+          {/* Track Info */}
+          <div className="flex-grow flex flex-col items-start justify-center px-6">
+            <img
+              src={currentTrack.coverUrl}
+              alt={currentTrack.title}
+              className="w-full rounded-md shadow-2xl mb-4"
+            />
+
+            {/* Track Title */}
+            <h1 className="text-white text-lg font-bold text-center mb-2">
+              {currentTrack.title.toUpperCase()}
+            </h1>
+            <p className="text-white/70 text-base text-center mb-6">
+              {typeof currentTrack.artist === "string"
+                ? currentTrack.artist
+                : currentTrack.artist.artistName}
+            </p>
+
+            {/* Progress Bar */}
+            <div className="w-full max-w-md mb-4">
+              <div className="flex w-full items-center justify-between space-x-4 mb-4">
+                <span className="text-white text-sm">
+                  {formatTime((progress / 100) * duration)}
+                </span>
+                <span className="text-white text-sm">
+                  {formatTime(duration)}
+                </span>
+              </div>
+
+              <div className="relative w-full h-1 bg-[#383838] rounded-lg items-center flex group">
+                <div
+                  className="absolute h-1 bg-white rounded-lg"
+                  style={{ width: `${progress ? progress : 0}%` }}
+                />
+                <input
+                  type="range"
+                  value={isNaN(progress) ? 0 : progress}
+                  onChange={(e) => seekTrack(parseFloat(e.target.value))}
+                  className="absolute w-full appearance-none cursor-pointer bg-transparent
+                    [&::-webkit-slider-thumb]:appearance-none
+                    [&::-webkit-slider-thumb]:w-3
+                    [&::-webkit-slider-thumb]:h-3
+                    [&::-webkit-slider-thumb]:rounded-full
+                    [&::-webkit-slider-thumb]:bg-white
+                    [&::-webkit-slider-thumb]:border-none
+                    [&::-webkit-slider-thumb]:z-20
+                    [&::-moz-range-thumb]:w-3
+                    [&::-moz-range-thumb]:h-3
+                    [&::-moz-range-thumb]:rounded-full
+                    [&::-moz-range-thumb]:bg-white
+                    [&::-moz-range-thumb]:border-none
+                    [&::-moz-range-thumb]:z-20"
+                  min="0"
+                  max="100"
+                />
+              </div>
             </div>
 
-            {/* Control Buttons */}
-            <div className="flex items-center">
-              {/* Play/Pause Button */}
+            {/* Controls */}
+            <div className="flex items-center my-6 w-full">
+              {/* Main Controls */}
+              <div className="flex items-center justify-center space-x-4 w-full">
+                <button
+                  onClick={toggleShuffle}
+                  className={`p-2 rounded-full transition-colors duration-200 ${
+                    shuffle ? "text-green-500" : "text-white"
+                  }`}
+                >
+                  <Shuffle className="w-6 h-6" />
+                </button>
+
+                <button
+                  onClick={shuffle ? skipRandom : skipPrevious}
+                  className="p-2 text-white"
+                >
+                  <Prev className="w-8 h-8" />
+                </button>
+
+                <button
+                  onClick={
+                    isPlaying
+                      ? pauseTrack
+                      : () => currentTrack && playTrack(currentTrack)
+                  }
+                  className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200"
+                >
+                  {isPlaying ? (
+                    <Pause className="w-10 h-10 text-white" />
+                  ) : (
+                    <Play className="w-10 h-10 text-white" />
+                  )}
+                </button>
+
+                <button
+                  onClick={shuffle ? skipRandom : skipNext}
+                  className="p-2 text-white"
+                >
+                  <Next className="w-8 h-8" />
+                </button>
+
+                <button
+                  onClick={toggleLoop}
+                  className={`p-2 rounded-full transition-colors duration-200 ${
+                    loop ? "text-green-500" : "text-white"
+                  }`}
+                >
+                  <Loop className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Like Button */}
+            <div className="flex justify-center w-full mb-6">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  isPlaying
-                    ? pauseTrack()
-                    : currentTrack && playTrack(currentTrack);
-                }}
-                className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200 ml-2"
+                onClick={handleLike}
+                className="p-3 rounded-full hover:bg-[#383838] transition-colors duration-200"
               >
-                {isPlaying ? (
-                  <Pause className="w-6 h-6 text-white" />
+                {isLiked ? (
+                  <LikeFilled className="w-8 h-8 text-[#A57865]" />
                 ) : (
-                  <Play className="w-6 h-6 text-white" />
+                  <LikeOutline className="w-8 h-8 text-white" />
                 )}
               </button>
             </div>
           </div>
-
-          {/* Expanded Mobile Player */}
-          {showMobileExpanded && (
-            <div className="md:hidden fixed inset-0 z-[60] bg-[#1c1c1c] flex flex-col p-4">
-              {/* Header with close button */}
-              <div className="flex items-center justify-between p-4">
-                <button
-                  onClick={toggleMobileExpanded}
-                  className="text-white p-2"
-                >
-                  <Down className="w-6 h-6" />
-                </button>
-                <h2 className="text-white text-lg font-medium">Now Playing</h2>
-                <div className="w-10"></div>
-              </div>
-
-              {/* Track Info */}
-              <div className="flex-grow flex flex-col items-start justify-center px-6">
-                <img
-                  src={currentTrack.coverUrl}
-                  alt={currentTrack.title}
-                  className="w-full rounded-md shadow-2xl mb-4"
-                />
-
-                {/* Track Title */}
-                <h1 className="text-white text-lg font-bold text-center mb-2">
-                  {currentTrack.title.toUpperCase()}
-                </h1>
-                <p className="text-white/70 text-base text-center mb-6">
-                  {typeof currentTrack.artist === "string"
-                    ? currentTrack.artist
-                    : currentTrack.artist.artistName}
-                </p>
-
-                {/* Progress Bar */}
-                <div className="w-full max-w-md mb-4">
-                  <div className="flex w-full items-center justify-between space-x-4 mb-4">
-                    <span className="text-white text-sm">
-                      {formatTime((progress / 100) * duration)}
-                    </span>
-                    <span className="text-white text-sm">
-                      {formatTime(duration)}
-                    </span>
-                  </div>
-
-                  <div className="relative w-full h-1 bg-[#383838] rounded-lg items-center flex group">
-                    <div
-                      className="absolute h-1 bg-white rounded-lg"
-                      style={{ width: `${progress ? progress : 0}%` }}
-                    />
-                    <input
-                      type="range"
-                      value={isNaN(progress) ? 0 : progress}
-                      onChange={(e) => seekTrack(parseFloat(e.target.value))}
-                      className="absolute w-full appearance-none cursor-pointer bg-transparent
-                        [&::-webkit-slider-thumb]:appearance-none
-                        [&::-webkit-slider-thumb]:w-3
-                        [&::-webkit-slider-thumb]:h-3
-                        [&::-webkit-slider-thumb]:rounded-full
-                        [&::-webkit-slider-thumb]:bg-white
-                        [&::-webkit-slider-thumb]:border-none
-                        [&::-webkit-slider-thumb]:z-20
-                        [&::-moz-range-thumb]:w-3
-                        [&::-moz-range-thumb]:h-3
-                        [&::-moz-range-thumb]:rounded-full
-                        [&::-moz-range-thumb]:bg-white
-                        [&::-moz-range-thumb]:border-none
-                        [&::-moz-range-thumb]:z-20"
-                      min="0"
-                      max="100"
-                    />
-                  </div>
-                </div>
-
-                {/* Controls */}
-                <div className="flex items-center my-6 w-full">
-                  {/* Main Controls */}
-                  <div className="flex items-center justify-center space-x-4 w-full">
-                    <button
-                      onClick={toggleShuffle}
-                      className={`p-2 rounded-full transition-colors duration-200 ${
-                        shuffle ? "text-green-500" : "text-white"
-                      }`}
-                    >
-                      <Shuffle className="w-6 h-6" />
-                    </button>
-
-                    <button
-                      onClick={shuffle ? skipRandom : skipPrevious}
-                      className="p-2 text-white"
-                    >
-                      <Prev className="w-8 h-8" />
-                    </button>
-
-                    <button
-                      onClick={
-                        isPlaying
-                          ? pauseTrack
-                          : () => currentTrack && playTrack(currentTrack)
-                      }
-                      className="p-3 rounded-full bg-[#A57865] hover:bg-[#8a5f4d] transition-colors duration-200"
-                    >
-                      {isPlaying ? (
-                        <Pause className="w-10 h-10 text-white" />
-                      ) : (
-                        <Play className="w-10 h-10 text-white" />
-                      )}
-                    </button>
-
-                    <button
-                      onClick={shuffle ? skipRandom : skipNext}
-                      className="p-2 text-white"
-                    >
-                      <Next className="w-8 h-8" />
-                    </button>
-
-                    <button
-                      onClick={toggleLoop}
-                      className={`p-2 rounded-full transition-colors duration-200 ${
-                        loop ? "text-green-500" : "text-white"
-                      }`}
-                    >
-                      <Loop className="w-6 h-6" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Like Button */}
-                <div className="flex justify-center w-full mb-6">
-                  <button
-                    onClick={handleLike}
-                    className="p-3 rounded-full hover:bg-[#383838] transition-colors duration-200"
-                  >
-                    {isLiked ? (
-                      <LikeFilled className="w-8 h-8 text-[#A57865]" />
-                    ) : (
-                      <LikeOutline className="w-8 h-8 text-white" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
 
       {/* Queue panel overlay */}

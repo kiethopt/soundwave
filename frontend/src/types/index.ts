@@ -502,3 +502,19 @@ export interface LabelInfoCardProps {
   theme: 'light' | 'dark';
   formatDate: (dateString: string) => string;
 }
+
+// Type for search suggestions
+export interface SearchSuggestion {
+  type: 'Artist' | 'Track' | 'Album';
+  data: {
+    id: string;
+    title?: string; // For Track/Album
+    artistName?: string; // For Artist
+    coverUrl?: string; // For Track/Album
+    avatar?: string; // For Artist
+    artist?: { // Nested artist for Track/Album
+      id: string;
+      artistName: string;
+    };
+  };
+}

@@ -138,9 +138,9 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       if (!currentToken) return;
 
       try {
-        await api.history.savePlayHistory(
-          { trackId, duration, completed },
-          currentToken
+        await api.history.savePlay(
+          currentToken,
+          { trackId, duration, completed }
         );
       } catch (error) {
         console.error('Failed to save play history:', error);

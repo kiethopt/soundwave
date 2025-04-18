@@ -17,12 +17,12 @@ import {
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { User } from '@/types';
+import type { User, SearchSuggestion } from '@/types';
 import { getSocket, disconnectSocket } from '@/utils/socket';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
-import { LogOut } from 'lucide-react';
+import { LogOut, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 
@@ -41,14 +41,18 @@ export default function Header({
   const isActive = (path: string) => pathname === path;
   const [notificationCount, setNotificationCount] = useState(0);
 
-  // New notifications handling
+  // Notifications handling
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const notificationRef = useRef<HTMLDivElement>(null);
 
-  // --- Add state for logging out --- //
+  // Search suggestions handling
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  // --- End add state for logging out --- //
 
   const { theme } = useTheme();
   const router = useRouter();
@@ -57,7 +61,6 @@ export default function Header({
   const isAdminOrArtist =
     userData?.role === 'ADMIN' || userData?.currentProfile === 'ARTIST';
 
-  // Helper function to filter notifications based on current profile
   const filterNotificationsByProfile = (allNotifications: any[]) => {
     if (!userData) return [];
     return allNotifications.filter(
@@ -65,10 +68,8 @@ export default function Header({
     );
   };
 
-  // Calculate unread count based on currently relevant notifications
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  // Function to fetch, filter, and update notifications state
   const fetchAndSetNotifications = async () => {
     try {
       const token = localStorage.getItem('userToken');
@@ -87,14 +88,12 @@ export default function Header({
     }
   };
 
-  // Fetch initial notifications based on current profile
   useEffect(() => {
-    if (isAuthenticated && userData) { // Depend on userData
+    if (isAuthenticated && userData) {
       fetchAndSetNotifications();
     }
-  }, [isAuthenticated, userData]); // Add userData dependency
+  }, [isAuthenticated, userData]);
 
-  // Handle Socket.IO connection and events
   useEffect(() => {
     if (!userData?.id || !isAuthenticated) return;
 
@@ -107,8 +106,8 @@ export default function Header({
         return;
       }
       setNotifications((prev) => {
-        if (prev.some((n) => n.id === data.id)) return prev;
-        return [data, ...prev];
+        if (prev.some(n => n.id === data.id)) return prev;
+        return [data, ...prev].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       });
       if (!data.isRead) {
         setNotificationCount((prev) => {
@@ -117,22 +116,6 @@ export default function Header({
           return newCount;
         });
       }
-      const fetchAndUpdateUserData = async () => {
-        const token = localStorage.getItem('userToken');
-        if (!token) return
-        try {
-          const newUserData = await api.auth.getMe(token);
-          if (newUserData) {
-            localStorage.setItem('userData', JSON.stringify(newUserData));
-            setUserData(newUserData);
-          } else {
-            console.warn('Received null user data after notification');
-          }
-        } catch (error) {
-          console.error('Failed to fetch updated user data after notification:', error);
-        }
-      };
-      fetchAndUpdateUserData();
     };
 
     const handleArtistRequestStatus = (data: any) => {
@@ -145,6 +128,7 @@ export default function Header({
           if (newUserData) {
             localStorage.setItem('userData', JSON.stringify(newUserData));
             setUserData(newUserData);
+            fetchAndSetNotifications();
           } else {
             console.warn('Received null user data after status update');
           }
@@ -168,7 +152,6 @@ export default function Header({
     };
   }, [userData, isAuthenticated]);
 
-  // Handle click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -177,64 +160,96 @@ export default function Header({
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
       }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchSuggestions(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Check authentication and set initial userData
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('userToken');
-      if (!token) {
-          setIsAuthenticated(false);
-          setUserData(null);
-          return;
-      }
+      const storedUserData = localStorage.getItem('userData');
 
-      try {
-          const fetchedUserData = await api.auth.getMe(token);
-          
-          if (fetchedUserData) {
-              setIsAuthenticated(true);
-              setUserData(fetchedUserData);
-              localStorage.setItem('userData', JSON.stringify(fetchedUserData));
+      if (token && storedUserData) {
+        try {
+          const parsedUserData = JSON.parse(storedUserData);
+          if (parsedUserData && parsedUserData.id) {
+            setIsAuthenticated(true);
+            setUserData(parsedUserData);
           } else {
-              console.warn("Couldn't fetch user data with existing token.");
-              localStorage.removeItem('userToken');
-              localStorage.removeItem('sessionId');
-              localStorage.removeItem('userData');
-              setIsAuthenticated(false);
-              setUserData(null);
+            localStorage.removeItem('userToken');
+            localStorage.removeItem('sessionId');
+            localStorage.removeItem('userData');
+            setIsAuthenticated(false);
+            setUserData(null);
           }
-      } catch (e) {
-          console.error("Failed to fetch user data:", e);
+        } catch (e) {
+          console.error('Error parsing stored user data:', e);
           localStorage.removeItem('userToken');
           localStorage.removeItem('sessionId');
           localStorage.removeItem('userData');
           setIsAuthenticated(false);
           setUserData(null);
+        }
+      } else if (token) {
+        try {
+            const fetchedUserData = await api.auth.getMe(token);
+            if (fetchedUserData) {
+                setIsAuthenticated(true);
+                setUserData(fetchedUserData);
+                localStorage.setItem('userData', JSON.stringify(fetchedUserData));
+            } else {
+                console.warn("Couldn't fetch user data with existing token.");
+                localStorage.removeItem('userToken');
+                localStorage.removeItem('sessionId');
+                localStorage.removeItem('userData');
+                setIsAuthenticated(false);
+                setUserData(null);
+            }
+        } catch (e) {
+            console.error("Failed to fetch user data with token:", e);
+            localStorage.removeItem('userToken');
+            localStorage.removeItem('sessionId');
+            localStorage.removeItem('userData');
+            setIsAuthenticated(false);
+            setUserData(null);
+        }
+      } else {
+        setIsAuthenticated(false);
+        setUserData(null);
       }
     };
+
     checkAuth();
-    // Add listener for storage changes to sync across tabs/windows
+
     const handleStorageChange = (event: StorageEvent) => {
         if (event.key === 'userData' || event.key === 'userToken') {
             checkAuth();
+            fetchAndSetNotifications();
         }
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
 
-  }, [router]);
+  }, []);
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (searchQuery.trim()) {
+     const token = localStorage.getItem('userToken');
+      if (token) {
+        api.history.saveSearch(token, searchQuery.trim())
+          .catch(err => console.error("Failed to save search history:", err));
+      }
+
       const canProceed = handleProtectedAction();
       if (canProceed) {
         router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+        setShowSearchSuggestions(false);
         setSearchQuery('');
       }
     }
@@ -254,15 +269,17 @@ export default function Header({
       console.error('Logout error:', error);
     } finally {
       disconnectSocket();
-
-      // Dọn dẹp local storage (State reset is now done above)
       localStorage.removeItem('userToken');
       localStorage.removeItem('sessionId');
       localStorage.removeItem('userData');
       localStorage.removeItem('notificationCount');
       localStorage.removeItem('hasPendingRequest');
-
-      // Chuyển hướng về trang đăng nhập bằng reload
+      setIsAuthenticated(false);
+      setUserData(null);
+      setNotifications([]);
+      setNotificationCount(0);
+      setSearchSuggestions([]);
+      setShowSearchSuggestions(false);
       window.location.href = '/login';
     }
   };
@@ -270,42 +287,36 @@ export default function Header({
   const handleBellClick = async () => {
     try {
       const canProceed = handleProtectedAction();
-      if (!canProceed || !userData) return; // Check userData
+      if (!canProceed || !userData) return;
 
+      const opening = !showNotifications;
       setShowNotifications((prev) => !prev);
 
-      if (!showNotifications) { // Only fetch/update if opening the dropdown
+      if (opening) {
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        // Fetch, filter based on CURRENT profile, and update state/count
         const allNotificationsData = await api.notifications.getList(token);
         console.log('Fetched notifications on bell click:', allNotificationsData);
         const relevantNotifications = filterNotificationsByProfile(allNotificationsData);
 
-        // Merge new relevant notifications with existing relevant ones, preventing duplicates
         setNotifications((prevRelevant) => {
             const existingIds = new Set(prevRelevant.map(n => n.id));
             const newRelevantToAdd = relevantNotifications.filter(n => !existingIds.has(n.id));
-            // Combine and sort (optional, most recent first)
             return [...newRelevantToAdd, ...prevRelevant].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         });
 
-        // Reset visual count and storage count for the current profile's notifications
         const currentUnreadCount = relevantNotifications.filter(n => !n.isRead).length;
         setNotificationCount(currentUnreadCount);
-        localStorage.setItem('notificationCount', String(currentUnreadCount));
-
-        // Consider marking relevant unread notifications as read on the backend *if* that's the desired UX
-        // This requires iterating `relevantNotifications` and calling `api.notifications.markAsRead`
-        // For now, just updating the display count.
+        if (String(currentUnreadCount) !== localStorage.getItem('notificationCount')) {
+          localStorage.setItem('notificationCount', String(currentUnreadCount));
+        }
       }
     } catch (err) {
       console.error('Fetch/filter notifications error on bell click:', err);
     }
   };
 
-  // Function to handle switching profiles
   const handleSwitchProfile = async () => {
     try {
       const canProceed = handleProtectedAction();
@@ -316,24 +327,20 @@ export default function Header({
 
       const response = await api.auth.switchProfile(token);
 
-      if (response.user.artistProfile && !response.user.artistProfile.isActive) {
+      if (response.user.currentProfile === 'ARTIST' && !response.user.artistProfile?.isActive) {
         toast.error('Your artist account has been deactivated');
         return;
       }
 
       localStorage.setItem('userData', JSON.stringify(response.user));
-      setUserData(response.user); // Update state immediately
-
-      // Fetch notifications for the new profile (handled by useEffect dependency)
+      setUserData(response.user);
       toast.success(`Switched to ${response.user.currentProfile} profile`);
-      setShowDropdown(false); // Close dropdown if open
+      setShowDropdown(false);
 
-      // Redirect based on new profile using window.location.href for a full reload
-      // This ensures components remount with the correct profile data
       if (response.user.currentProfile === 'ARTIST') {
         window.location.href = '/artist/dashboard';
       } else {
-        window.location.href = '/'; // Redirect to home for USER profile
+        window.location.href = '/';
       }
     } catch (error) {
       console.error('Error switching profile:', error);
@@ -351,42 +358,103 @@ export default function Header({
       const token = localStorage.getItem('userToken');
       if (!token) return;
 
-      await api.notifications.markAsRead(notification.id, token);
-
-      // Update state locally
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notification.id ? { ...n, isRead: true } : n
-        )
-      );
-
-      // Decrement the visual unread count if it was unread
       if (!notification.isRead) {
+        await api.notifications.markAsRead(notification.id, token);
+
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notification.id ? { ...n, isRead: true } : n
+          )
+        );
+
         setNotificationCount((prev) => {
           const newCount = Math.max(prev - 1, 0);
-          // Update localStorage count as well (optional, fetchAndSetNotifications handles it mostly)
-          // localStorage.setItem('notificationCount', String(newCount));
+          localStorage.setItem('notificationCount', String(newCount));
           return newCount;
         });
       }
 
-      // Optional: Navigate based on notification type
-      // if (notification.type === 'NEW_FOLLOW') { router.push(...) }
+      setShowNotifications(false);
 
     } catch (error) {
       console.error('Error marking notification as read:', error);
       const err = error as Error;
       if (err.message === 'Forbidden') {
-        toast.error('You do not have permission to mark this notification as read');
+        toast.error('Permission denied');
       } else {
-        toast.error('Failed to mark notification as read');
+        toast.error('Failed to update notification');
       }
     }
   };
 
+  const fetchSearchSuggestions = async () => {
+    const token = localStorage.getItem('userToken');
+    if (!token) return;
+
+    setIsLoadingSuggestions(true);
+    try {
+      const suggestions = await api.history.getSuggestions(token, 5);
+      setSearchSuggestions(suggestions || []);
+    } catch (error) {
+      console.error('Error fetching search suggestions:', error);
+      setSearchSuggestions([]);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  const handleSearchFocus = () => {
+    if (isAuthenticated) {
+       setShowSearchSuggestions(true);
+       fetchSearchSuggestions();
+    }
+  };
+
+  const handleClearSuggestions = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      // Silently return or log if needed, user shouldn't see toast here.
+      console.warn("Attempted to clear history without authentication.");
+      return;
+    }
+
+    try {
+      await api.history.deleteSearchHistory(token);
+      setSearchSuggestions([]);
+      // toast.success(response.message || "Search history cleared."); // Removed toast
+    } catch (error) {
+      console.error("Error clearing search history:", error);
+      // Optionally show an error toast if clearing fails, but not on success.
+      // toast.error("Failed to clear search history."); 
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: SearchSuggestion) => {
+    setShowSearchSuggestions(false);
+    setSearchQuery('');
+     switch (suggestion.type) {
+      case 'Artist':
+        router.push(`/artist/profile/${suggestion.data.id}`);
+        break;
+      case 'Track':
+        router.push(`/track/${suggestion.data.id}`);
+        break;
+      case 'Album':
+        router.push(`/album/${suggestion.data.id}`);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
   return (
     <header
-      className={`h-[72px] flex items-center justify-between px-2 md:px-4 lg:px-6 border-b ${theme === 'light'
+      className={`h-[72px] flex items-center justify-between px-2 md:px-4 lg:px-6 border-b sticky top-0 z-40 ${theme === 'light'
         ? 'bg-white border-gray-200'
         : 'bg-[#1c1c1c] border-white/10'
         }`}
@@ -407,7 +475,7 @@ export default function Header({
           <div className="hidden md:flex items-center gap-4 lg:gap-6">
             <Link
               href="/"
-              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${isActive('/')
+              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md transition-colors ${isActive('/')
                 ? theme === 'light'
                   ? 'text-gray-900 bg-gray-200'
                   : 'text-white bg-[#282828]'
@@ -426,7 +494,7 @@ export default function Header({
 
             <Link
               href="/discover"
-              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md ${isActive('/discover')
+              className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md transition-colors ${isActive('/discover')
                 ? theme === 'light'
                   ? 'text-gray-900 bg-gray-200'
                   : 'text-white bg-[#282828]'
@@ -443,21 +511,81 @@ export default function Header({
               <span className="hidden lg:inline">Discover</span>
             </Link>
 
-            <form onSubmit={handleSearch} className="relative w-[400px]">
-              <Search
-                className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${theme === 'light' ? 'text-gray-400' : 'text-white/40'}`}
-              />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search"
-                className={`w-full rounded-md py-1.5 md:py-2 pl-10 pr-4 text-sm focus:outline-none ${theme === 'light'
-                  ? 'bg-gray-100 text-gray-900 placeholder:text-gray-500 focus:bg-gray-200'
-                  : 'bg-white/10 text-white placeholder:text-white/40 focus:bg-white/20'
-                  }`}
-              />
-            </form>
+            <div className="relative w-[400px]" ref={searchRef}>
+              <form onSubmit={handleSearch} className="relative">
+                <Search
+                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none ${theme === 'light' ? 'text-gray-400' : 'text-white/40'}`}
+                />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={handleSearchInputChange}
+                  onFocus={handleSearchFocus}
+                  placeholder="Search Artists, Tracks, Albums"
+                  className={`w-full rounded-md py-1.5 md:py-2 pl-10 pr-4 text-sm focus:outline-none ${theme === 'light'
+                    ? 'bg-gray-100 text-gray-900 placeholder:text-gray-500 focus:bg-gray-200'
+                    : 'bg-white/10 text-white placeholder:text-white/40 focus:bg-white/20'
+                    }`}
+                  aria-haspopup="listbox"
+                  aria-expanded={showSearchSuggestions}
+                  autoComplete="off"
+                />
+              </form>
+
+              {showSearchSuggestions && isAuthenticated && (
+                <div
+                  className={`absolute mt-1 w-full rounded-md shadow-lg max-h-60 overflow-y-auto z-50 border ${theme === 'light' ? 'bg-white border-gray-200' : 'bg-[#282828] border-white/10'}`}
+                  role="listbox"
+                >
+                  {isLoadingSuggestions ? (
+                    <div className={`px-4 py-3 text-sm text-center ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Loading suggestions...</div>
+                  ) : searchSuggestions.length > 0 ? (
+                    searchSuggestions.map((suggestion, index) => (
+                      <button
+                        key={`${suggestion.type}-${suggestion.data.id}-${index}`}
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-150 ease-in-out border-b last:border-b-0 ${theme === 'light' ? 'hover:bg-gray-100 border-gray-100' : 'hover:bg-white/10 border-white/10'}`}
+                        role="option"
+                        aria-selected="false"
+                      >
+                        <Clock className={`w-4 h-4 shrink-0 ${theme === 'light' ? 'text-gray-400' : 'text-white/50'}`} />
+                        <Image
+                          src={suggestion.type === 'Artist'
+                            ? suggestion.data.avatar || '/images/default-avatar.jpg'
+                            : suggestion.data.coverUrl || '/images/default-cover.png'}
+                          alt={suggestion.type === 'Artist' ? suggestion.data.artistName || 'Artist' : suggestion.data.title || 'Media'}
+                          width={32}
+                          height={32}
+                          className="w-8 h-8 rounded object-cover shrink-0"
+                        />
+                        <div className="flex-1 overflow-hidden">
+                          <p className={`text-sm font-medium truncate ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
+                            {suggestion.type === 'Artist' ? suggestion.data.artistName : suggestion.data.title}
+                          </p>
+                          <p className={`text-xs truncate ${theme === 'light' ? 'text-gray-500' : 'text-white/60'}`}>
+                            {suggestion.type}
+                            {suggestion.type !== 'Artist' && suggestion.data.artist && ` • ${suggestion.data.artist.artistName}`}
+                          </p>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className={`px-4 py-3 text-sm text-center ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>No recent searches found.</div>
+                  )}
+                  {/* Clear Button */}
+                  {!isLoadingSuggestions && searchSuggestions.length > 0 && (
+                     <div className={`sticky bottom-0 px-3 py-2 ${theme === 'light' ? 'bg-white/95 backdrop-blur-sm' : 'bg-[#282828]/95 backdrop-blur-sm'} border-t ${theme === 'light' ? 'border-gray-200' : 'border-white/10'}`}>
+                       <button
+                         onClick={handleClearSuggestions}
+                         className={`w-full text-center text-sm py-1.5 rounded-md transition-colors duration-200 ${theme === 'light' ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                       >
+                         Clear recent searches
+                       </button>
+                     </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -465,19 +593,13 @@ export default function Header({
       {/* Right Side */}
       <div className="flex items-center gap-2 md:gap-4">
         {isLoggingOut ? (
-          // Render nothing or a spinner while logging out
-          <div className="w-8 h-8"></div> // Placeholder to maintain layout spacing
+          <div className="w-8 h-8"></div>
         ) : isAuthenticated ? (
           <>
-            {/* Bi-directional Artist/User Switch Button */}
             {userData?.artistProfile?.isVerified && (
                <button
-                 onClick={async () => {
-                   // handleSwitchProfile handles the logic for both directions
-                   await handleSwitchProfile();
-                 }}
-                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200 ${
-                   theme === 'light'
+                 onClick={handleSwitchProfile}
+                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200 ${theme === 'light'
                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                      : 'bg-white/10 text-white hover:bg-white/20'
                  }`}
@@ -498,9 +620,9 @@ export default function Header({
 
             <div className="relative" ref={notificationRef}>
               <button
-                className={`p-2 rounded-full relative cursor-pointer transition-colors duration-200 ease-in-out flex items-center justify-center ${theme === 'light' ? 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' : 'text-gray-400 hover:bg-white/10 hover:text-white'} ${notificationCount > 0 ? 'text-blue-500' : ''}`}
+                className={`p-2 rounded-full relative cursor-pointer transition-colors duration-200 ease-in-out flex items-center justify-center ${theme === 'light' ? 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' : 'text-gray-400 hover:bg-white/10 hover:text-white'} ${notificationCount > 0 ? 'text-[#A57865]' : ''}`}
                 onClick={handleBellClick}
-                aria-label="Notifications"
+                aria-label={`Notifications (${notificationCount} unread)`}
               >
                 <Notifications
                     className={`w-5 h-5 transition-colors ${notificationCount > 0 ? 'text-[#A57865]' : ''}`}
@@ -508,6 +630,7 @@ export default function Header({
                   {notificationCount > 0 && (
                     <span
                        className="absolute top-0 right-0 -mt-1 -mr-1 flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full"
+                       aria-hidden="true"
                     >
                       {notificationCount > 9 ? '9+' : notificationCount}
                     </span>
@@ -560,20 +683,20 @@ export default function Header({
               )}
             </div>
 
-            {/* User Avatar Button */}
             <div className="relative" ref={dropdownRef}>
               <button
-                className="flex items-center justify-center w-8 h-8 rounded-full overflow-hidden cursor-pointer border-2 border-transparent hover:border-gray-300 transition-all duration-200"
+                className="flex items-center justify-center w-8 h-8 rounded-full overflow-hidden cursor-pointer border-2 border-transparent hover:border-gray-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#A57865]"
                 onClick={() => setShowDropdown(!showDropdown)}
+                aria-haspopup="true"
+                aria-expanded={showDropdown}
               >
-                <div className="relative w-8 h-8 rounded-full overflow-hidden">
+                <div className="relative w-full h-full rounded-full overflow-hidden">
                   <Image
                     src={userData?.avatar || '/images/default-avatar.jpg'}
                     alt="User avatar"
-                    width={32}
-                    height={32}
-                    className="object-cover w-full h-full"
-                    style={{ objectFit: 'cover' }}
+                    fill
+                    sizes="32px"
+                    className="object-cover"
                     priority
                   />
                 </div>
@@ -582,6 +705,9 @@ export default function Header({
               {showDropdown && (
                 <div
                   className={`absolute right-0 mt-2 w-64 rounded-2xl shadow-lg overflow-hidden z-50 border ${theme === 'light' ? 'bg-white border-zinc-200' : 'bg-[#111111] border-zinc-800'}`}
+                  role="menu"
+                  aria-orientation="vertical"
+                  aria-labelledby="user-menu-button"
                 >
                   <div className="px-6 pt-6 pb-4">
                     <div className="flex items-center gap-4 mb-4">
@@ -606,13 +732,14 @@ export default function Header({
                         </div>
                         <div
                           className={`absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ${theme === 'light' ? 'ring-white' : 'ring-zinc-900'}`}
+                          aria-label="Online status"
                         />
                       </div>
                       <div className="flex-1">
                         <h2
-                          className={`text-base font-semibold ${theme === 'light' ? 'text-zinc-900' : 'text-zinc-100'}`}
+                          className={`text-base font-semibold truncate ${theme === 'light' ? 'text-zinc-900' : 'text-zinc-100'}`}
                         >
-                          {userData?.currentProfile === 'ARTIST' 
+                          {userData?.currentProfile === 'ARTIST'
                             ? userData?.artistProfile?.artistName || userData?.name
                             : userData?.name || userData?.username || 'User'
                           }
@@ -632,7 +759,7 @@ export default function Header({
 
                   <div className={`h-px ${theme === 'light' ? 'bg-zinc-200' : 'bg-zinc-800'}`} />
 
-                  <div className="p-2">
+                  <div className="p-2" role="none">
                     <Link
                       href={
                         userData?.role === 'ADMIN'
@@ -643,6 +770,7 @@ export default function Header({
                       }
                       className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}
                       onClick={() => setShowDropdown(false)}
+                      role="menuitem"
                     >
                       <ProfileIcon className="w-4 h-4" />
                       <span className="text-sm font-medium">Profile</span>
@@ -652,6 +780,7 @@ export default function Header({
                       href="/settings"
                       className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}
                       onClick={() => setShowDropdown(false)}
+                      role="menuitem"
                     >
                       <Settings className="w-4 h-4" />
                       <span className="text-sm font-medium">Settings</span>
@@ -662,20 +791,10 @@ export default function Header({
                         href="/request-artist"
                         className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}
                         onClick={() => setShowDropdown(false)}
+                        role="menuitem"
                       >
-                        <svg
-                          className="w-4 h-4"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M12 5V19M5 12H19"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                         <span className="text-sm font-medium">
                           Become an Artist
@@ -689,6 +808,7 @@ export default function Header({
                         setShowDropdown(false);
                       }}
                       className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 text-left ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}
+                      role="menuitem"
                     >
                       <LogOut className="w-4 h-4" />
                       <span className="text-sm font-medium">Logout</span>

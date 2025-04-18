@@ -5,6 +5,8 @@ import {
   getPlayHistory,
   getSearchHistory,
   getAllHistory,
+  getSearchSuggestions,
+  deleteSearchHistory,
 } from '../controllers/history.controller';
 import { authenticate } from '../middleware/auth.middleware';
 
@@ -24,5 +26,11 @@ router.get('/search', authenticate, getSearchHistory);
 
 // Lấy tất cả lịch sử (nghe nhạc và tìm kiếm) của người dùng
 router.get('/', authenticate, getAllHistory);
+
+// Lấy gợi ý tìm kiếm dựa trên lịch sử
+router.get('/suggestions', authenticate, getSearchSuggestions);
+
+// Xóa lịch sử tìm kiếm của người dùng
+router.delete('/search', authenticate, deleteSearchHistory);
 
 export default router;

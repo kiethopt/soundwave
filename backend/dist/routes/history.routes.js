@@ -12,5 +12,7 @@ router.post('/search', auth_middleware_1.authenticate, history_controller_1.save
 router.get('/play', auth_middleware_1.authenticate, history_controller_1.getPlayHistory);
 router.get('/search', auth_middleware_1.authenticate, history_controller_1.getSearchHistory);
 router.get('/', auth_middleware_1.authenticate, history_controller_1.getAllHistory);
+router.get('/suggestions', auth_middleware_1.authenticate, history_controller_1.getSearchSuggestions);
+router.delete('/search', auth_middleware_1.authenticate, history_controller_1.deleteSearchHistory);
 exports.default = router;
 //# sourceMappingURL=history.routes.js.map
