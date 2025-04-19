@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api } from '@/utils/api';
 import type { User } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
+import Link from 'next/link';
 
 export type NotificationType = {
   id: string;
@@ -32,6 +33,7 @@ export default function NotificationsPage() {
   const [hoveredNotification, setHoveredNotification] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const { theme } = useTheme();
+  const router = useRouter();
 
   const filterNotificationsByProfile = (allNotifications: NotificationType[], user: User | null) => {
     if (!user) return [];
@@ -187,6 +189,40 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleNotificationClick = async (notification: NotificationType) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      return;
+    }
+
+    const path = notification.type === 'NEW_FOLLOW' && notification.senderId
+      ? `/profile/${notification.senderId}`
+      : `/notification/${notification.id}`;
+
+    let markedAsReadSuccess = true; // Flag to track success
+    if (!notification.isRead) {
+      try {
+        await api.notifications.markAsRead(notification.id, token);
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notification.id ? { ...n, isRead: true } : n
+          )
+        );
+      } catch (error) {
+        markedAsReadSuccess = false; // Mark as failed
+        console.error('Error marking notification as read:', error);
+        toast.error('Failed to mark notification as read');
+        return;
+      }
+    }
+
+    // Only navigate if marking as read was successful (or not needed)
+    if (markedAsReadSuccess) {
+       router.push(path);
+    }
+  };
+
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center pt-[72px] ${theme === 'light' ? 'bg-gray-100' : 'bg-[#111111]'}`}>
@@ -198,38 +234,38 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className={`min-h-screen py-8 px-6 pt-[72px] ${theme === 'light' ? 'bg-gray-50' : 'bg-[#111111]'}`}>
-      <div className="max-w-4xl mx-auto pb-8">
-        <div className="mb-6 flex justify-between items-center animate-fade-in">
-          <div>
-            <h1 className={`text-2xl font-bold inline-block ${theme === 'light' ? 'text-gray-900' : 'text-primary'}`}>
-              Notifications
-            </h1>
-            <span className={`ml-2 text-sm ${theme === 'light' ? 'text-gray-600' : 'text-secondary'}`}>
-              ({notifications.length})
-            </span>
-          </div>
-          <div className="space-x-2">
-            {notifications.length > 0 &&
-              notifications.some((n) => !n.isRead) && (
-                <button 
-                  onClick={handleMarkAllAsRead} 
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${theme === 'light' ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' : 'bg-white/10 text-white hover:bg-white/20'}`}>
-                  Mark all as read
-                </button>
-              )}
-            {notifications.length > 0 && (
-              <button
-                onClick={handleDeleteNotifications}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${theme === 'light' ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-red-600 text-white hover:bg-red-700'}`}>
-                Delete notifications
+    <div className={`min-h-screen py-8 px-3 pt-[72px] flex flex-col ${theme === 'light' ? 'bg-gray-50' : 'bg-[#111111]'}`}>
+      <div className="w-full mb-6 flex items-center animate-fade-in px-6">
+        <div>
+          <h1 className={`text-2xl font-bold inline-block ${theme === 'light' ? 'text-gray-900' : 'text-primary'}`}>
+            Notifications
+          </h1>
+          <span className={`ml-2 text-sm ${theme === 'light' ? 'text-gray-600' : 'text-secondary'}`}>
+            ({notifications.length})
+          </span>
+        </div>
+        <div className="space-x-2 ml-auto">
+          {notifications.length > 0 &&
+            notifications.some((n) => !n.isRead) && (
+              <button 
+                onClick={handleMarkAllAsRead} 
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${theme === 'light' ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                Mark all as read
               </button>
             )}
-          </div>
+          {notifications.length > 0 && (
+            <button
+              onClick={handleDeleteNotifications}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${theme === 'light' ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-red-600 text-white hover:bg-red-700'}`}>
+              Delete notifications
+            </button>
+          )}
         </div>
+      </div>
 
+      <div className="max-w-4xl mx-auto pb-8 flex flex-col flex-grow w-full">
         {notifications.length === 0 ? (
-          <div className="text-center py-12 animate-fade-in">
+          <div className="flex-grow flex flex-col items-center justify-center text-center animate-fade-in">
             <p className={`text-lg ${theme === 'light' ? 'text-gray-500' : 'text-secondary'}`}>
               No relevant notifications for your {currentUser?.currentProfile || 'current'} profile.
             </p>
@@ -241,70 +277,66 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {notifications.map((notification, index) => (
-              <div key={notification.id} className="animate-slide-up">
-                <Link
-                  href={
-                    notification.type === 'NEW_FOLLOW' && notification.senderId
-                      ? `/profile/${notification.senderId}`
-                      : `/notification/${notification.id}`
-                  }
+            {notifications.map((notification) => (
+              <div 
+                key={notification.id} 
+                className="animate-slide-up cursor-pointer group"
+                onClick={() => handleNotificationClick(notification)}
+                onMouseEnter={() => setHoveredNotification(notification.id)}
+                onMouseLeave={() => setHoveredNotification(null)}
+              >
+                <div
+                  className={`flex items-center p-4 transition-all duration-300 rounded-lg border ${ 
+                    theme === 'light' 
+                      ? 'bg-white border-gray-200 group-hover:shadow-md'
+                      : 'bg-[#1c1c1c] border-white/10 group-hover:bg-[#282828]'
+                    } ${notification.isRead
+                      ? 'opacity-80'
+                      : theme === 'light' ? 'border-l-4 border-blue-500' : 'border-l-4 border-[#A57865]'
+                    } ${hoveredNotification === notification.id
+                      ? 'scale-[1.01] shadow-lg'
+                      : 'scale-100'
+                    }`}
                 >
-                  <div
-                    className={`flex items-center p-4 transition-all duration-300 rounded-lg border ${ 
-                      theme === 'light' 
-                        ? 'bg-white border-gray-200 hover:shadow-md' 
-                        : 'bg-[#1c1c1c] border-white/10 hover:bg-[#282828]'
-                      } ${notification.isRead
-                        ? 'opacity-80'
-                        : theme === 'light' ? 'border-l-4 border-blue-500' : 'border-l-4 border-[#A57865]'
-                      } ${hoveredNotification === notification.id
-                        ? 'scale-[1.01] shadow-lg'
-                        : 'scale-100'
-                      }`}
-                    onMouseEnter={() => setHoveredNotification(notification.id)}
-                    onMouseLeave={() => setHoveredNotification(null)}
-                  >
-                    <div className="w-14 h-14 relative rounded-md overflow-hidden mr-4 flex-shrink-0">
-                      <Image
-                        src={
-                          notification.coverUrl ||
-                          (notification.type === 'NEW_ALBUM'
-                            ? '/images/default-album.jpg'
-                            : notification.type === 'NEW_FOLLOW'
-                              ? '/images/default-avatar.jpg'
-                              : '/images/default-track.jpg')
-                        }
-                        alt={notification.title || 'Notification cover'}
-                        fill
-                        style={{ objectFit: 'cover' }}
-                        className="transition-transform duration-300 group-hover:scale-110"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <h2
-                        className={`text-lg font-semibold transition-colors duration-200 ${notification.isRead
-                          ? (theme === 'light' ? 'text-gray-600' : 'text-secondary')
-                          : (theme === 'light' ? 'text-blue-600' : 'text-[#A57865]')
-                          }`}
-                      >
-                        {notification.title || notification.message}
-                      </h2>
-                      <p className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-secondary'}`}>
-                        {new Date(notification.createdAt).toLocaleString()}
-                      </p>
-                      <p className="text-xs mt-1">
-                        {notification.isRead ? (
-                          <span className={`${theme === 'light' ? 'text-green-600' : 'text-green-400'}`}>Read</span>
-                        ) : (
-                          <span className={`${theme === 'light' ? 'text-red-600' : 'text-red-400'} font-medium animate-pulse`}>
-                            Unread
-                          </span>
-                        )}
-                      </p>
-                    </div>
+                  <div className="w-14 h-14 relative rounded-md overflow-hidden mr-4 flex-shrink-0">
+                    <Image
+                      src={
+                        notification.coverUrl ||
+                        (notification.type === 'NEW_ALBUM'
+                          ? '/images/default-album.jpg'
+                          : notification.type === 'NEW_FOLLOW'
+                            ? '/images/default-avatar.jpg'
+                            : '/images/default-track.jpg')
+                      }
+                      alt={notification.title || 'Notification cover'}
+                      fill
+                      style={{ objectFit: 'cover' }}
+                      className="transition-transform duration-300 group-hover:scale-110"
+                    />
                   </div>
-                </Link>
+                  <div className="flex-1">
+                    <h2
+                      className={`text-lg font-semibold transition-colors duration-200 ${notification.isRead
+                        ? (theme === 'light' ? 'text-gray-600' : 'text-secondary')
+                        : (theme === 'light' ? 'text-blue-600' : 'text-[#A57865]')
+                        }`}
+                    >
+                      {notification.title || notification.message}
+                    </h2>
+                    <p className={`text-sm ${theme === 'light' ? 'text-gray-500' : 'text-secondary'}`}>
+                      {new Date(notification.createdAt).toLocaleString()}
+                    </p>
+                    <p className="text-xs mt-1">
+                      {notification.isRead ? (
+                        <span className={`${theme === 'light' ? 'text-green-600' : 'text-green-400'}`}>Read</span>
+                      ) : (
+                        <span className={`${theme === 'light' ? 'text-red-600' : 'text-red-400'} font-medium animate-pulse`}>
+                          Unread
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
