@@ -106,7 +106,9 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           </div>
 
           {isAuthenticated && (
-            <PlayerBar />
+            <div className={`${isAuthenticated ? 'mt-[90px]' : ''}`} >
+              <PlayerBar />
+            </div>
           )}
         </div>
       )}

@@ -1093,7 +1093,7 @@ export const Verified = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-export const Volume = (props: React.SVGProps<SVGSVGElement>) => (
+export const VolumeFull = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -1117,6 +1117,56 @@ export const Volume = (props: React.SVGProps<SVGSVGElement>) => (
       stroke="currentColor"
     />
   </svg>
+);
+
+export const VolumeMedium = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M6.67712 14.6416C3.69862 13.1524 3.69862 8.90185 6.67712 7.41265L15.4096 3.04648C15.8574 2.82256 16.3843 3.14824 16.3843 3.64891L16.3843 18.4054C16.3843 18.9061 15.8574 19.2318 15.4096 19.0079L6.67712 14.6416Z"
+      stroke="currentColor"
+      strokeWidth="2"
+      fill="none"
+    />
+    <path
+      d="M20.7622 13.5784C21.2510 13.4332 21.6804 13.1359 22.0116 12.6905C22.4736 12.1189 22.7297 11.4011 22.7297 11.027C22.7297 10.653 22.4736 9.93517 22.0116 9.36357C21.6804 8.91812 21.2510 8.62084 20.7622 8.47565"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <path
+      d="M19.9203 10.5158C19.9203 10.3332 20.0737 10.1794 20.2424 10.2492C20.3446 10.2916 20.4374 10.3536 20.5156 10.4317C20.5937 10.5099 20.6558 10.6027 20.6981 10.7049C20.7404 10.807 20.7622 10.9165 20.7622 11.0271C20.7622 11.1376 20.7404 11.2471 20.6981 11.3492C20.6558 11.4514 20.5937 11.5442 20.5156 11.6224C20.4374 11.7005 20.3446 11.7625 20.2424 11.8049C20.0737 11.8747 19.9203 11.7209 19.9203 11.5383L19.9203 11.0271L19.9203 10.5158Z"
+      fill="currentColor"
+      stroke="currentColor"
+    />
+  </svg>
+);
+
+export const VolumeOff = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path 
+      d="M6.67712 14.6416C3.69862 13.1524 3.69862 8.90185 6.67712 7.41265L15.4096 3.04648C15.8574 2.82256 16.3843 3.14824 16.3843 3.64891V18.4054C16.3843 18.9061 15.8574 19.2318 15.4096 19.0079L6.67712 14.6416Z" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      fill="none"
+    />
+
+    <path 
+      d="M19 9L23 13M23 9L19 13" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round"
+    />
+</svg>
 );
 
 export function MagicWand(props: React.SVGProps<SVGSVGElement>) {

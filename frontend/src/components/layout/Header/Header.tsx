@@ -207,6 +207,8 @@ export default function Header({
                 localStorage.removeItem('userToken');
                 localStorage.removeItem('sessionId');
                 localStorage.removeItem('userData');
+                localStorage.removeItem('prevUserVolume');
+                localStorage.removeItem('userVolume');
                 setIsAuthenticated(false);
                 setUserData(null);
             }

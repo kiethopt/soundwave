@@ -3171,10 +3171,6 @@ export function MusicAuthDialog({ open, onOpenChange }: MusicAuthDialogProps) {
                 <span className="mr-2 text-[#A57865]">•</span>
                 Create your own playlists
               </li>
-              <li className="flex items-center">
-                <span className="mr-2 text-[#A57865]">•</span>
-                Listen offline
-              </li>
             </ul>
           </div>
 

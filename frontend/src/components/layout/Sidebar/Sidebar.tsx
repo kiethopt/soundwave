@@ -76,6 +76,7 @@ export default function Sidebar({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticatedSidebar, setIsAuthenticatedSidebar] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -94,8 +95,10 @@ export default function Sidebar({
       setHasArtistProfile(!!user.artistProfile);
       setIsArtistVerified(user.artistProfile?.isVerified || false);
       setIsAuthenticated(true);
+      setUserId(user.id);
     } else {
       setIsAuthenticated(false);
+      setUserId(null);
     }
 
     const checkAuthStatus = () => {
@@ -745,6 +748,30 @@ export default function Sidebar({
                         )}
                       </div>
                     )}
+
+                    { !isCollapsed && playlists.filter((p) => p.userId === userId).length === 0 && (
+                        <div className="w-full my-2 border-t border-[#333333]">
+                          <div className={`my-2 p-4 rounded-lg `} 
+                            style={{ background: theme === 'light' ? '#fff' : '#232323' }}>
+                            <div className="font-bold text-sm mb-1 text-white" style={{color: theme === 'light' ? '#222' : '#fff', textAlign: 'left'}}>
+                              Create your first playlist
+                            </div>
+                            <div className="text-xs mb-4" style={{color: theme === 'light' ? '#444' : '#ccc', textAlign: 'left'}}>
+                              It's easy, we'll help you
+                            </div>
+                            <button
+                              className="px-4 py-2 rounded font-semibold bg-gray-200 text-gray-800 hover:bg-gray-300 transition text-xs shadow"
+                              style={{textAlign: 'left', display: 'block'}}
+                              onClick={() => 
+                                isAuthenticated ? setIsCreateDialogOpen(true) : setDialogOpen(true)
+                              }
+                            >
+                              Create playlist
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    }
 
                     {playlists.length > 0 && (
                       <div

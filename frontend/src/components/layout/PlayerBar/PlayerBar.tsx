@@ -1,18 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Pause,
   Play,
   Shuffle,
   Loop,
-  Volume,
   Prev,
   Next,
   Down,
   LikeOutline,
   LikeFilled,
   Music,
+  VolumeOff,
+  VolumeMedium,
+  VolumeFull,
 } from "@/components/ui/Icons";
 import { useTrack } from "@/contexts/TrackContext";
 import { ListMusic } from "lucide-react";
@@ -49,6 +51,8 @@ export default function PlayerBar() {
     skipRandom,
     queue,
   } = useTrack();
+
+  const prevVolumeRef = useRef(volume);
 
   useEffect(() => {
     const token = localStorage.getItem('userToken');
@@ -118,6 +122,23 @@ export default function PlayerBar() {
 
     checkLikeStatus();
   }, [currentTrack?.id]);
+
+  const getVolumeIcon = () => {
+    if (volume === 0) return <VolumeOff className="w-5 h-5 text-white" />;
+    if (volume > 0 && volume <= 0.66) return <VolumeMedium className="w-5 h-5 text-white" />;
+    return <VolumeFull className="w-5 h-5 text-white" />;
+  };
+
+  const handleVolumeIconClick = () => {
+    if (volume === 0) {
+      const prev = localStorage.getItem('prevUserVolume');
+      setVolume(prev ? parseFloat(prev) : 0.5);
+    } else {
+      prevVolumeRef.current = volume;
+      localStorage.setItem('prevUserVolume', volume.toString());
+      setVolume(0);
+    }
+  };
 
   if (!isAuthenticated) {
     return null;
@@ -311,7 +332,13 @@ export default function PlayerBar() {
           </button>
 
           {/* Volume Icon */}
-          <Volume className="w-5 h-5 text-white" />
+          <button
+            onClick={handleVolumeIconClick}
+            type="button"
+            className="p-2 rounded-full hover:bg-[#383838] transition-colors duration-200"
+          >
+            {getVolumeIcon()}
+          </button>
 
           {/* Volume Slider Container */}
           <div className="relative w-24 flex items-center">
