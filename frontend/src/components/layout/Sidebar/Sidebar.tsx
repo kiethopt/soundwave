@@ -46,9 +46,11 @@ const getInitialCollapsedState = (): boolean => {
 export default function Sidebar({
   isOpen,
   onClose,
+  isPlayerBarVisible,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  isPlayerBarVisible: boolean;
 }) {
   const pathname = usePathname();
   const [userRole, setUserRole] = useState<"USER" | "ADMIN">("USER");
@@ -75,7 +77,6 @@ export default function Sidebar({
   const [playlistAI, setPlaylistAI] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAuthenticatedSidebar, setIsAuthenticatedSidebar] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,23 +101,6 @@ export default function Sidebar({
       setIsAuthenticated(false);
       setUserId(null);
     }
-
-    const checkAuthStatus = () => {
-      const token = localStorage.getItem('userToken');
-      setIsAuthenticatedSidebar(!!token);
-    };
-    checkAuthStatus();
-
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'userToken') {
-        checkAuthStatus();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
   }, []);
 
   const fetchPlaylists = async () => {
@@ -234,7 +218,7 @@ export default function Sidebar({
           }
         `}
       >
-        <div className={`h-full flex flex-col ${isAuthenticatedSidebar ? 'pb-[90px]' : ''}`}>
+        <div className={`h-full flex flex-col ${isPlayerBarVisible ? 'pb-[90px]' : ''}`}>
           <div
             className={`md:hidden p-4 ${
               isCollapsed ? "flex justify-center" : "flex justify-end"
@@ -1200,7 +1184,7 @@ export default function Sidebar({
                 userRole === ("ADMIN" as "USER" | "ADMIN")
                   ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
                   : theme === "light"
-                  ? "bg-gray-200 hover:bg-gray-200 text-gray-600"
+                  ? "bg-gray-200 hover:bg-gray-300 text-gray-600"
                   : "bg-neutral-800 hover:bg-[#333333] text-white shadow-md transition-all duration-200"
               }`}
             >

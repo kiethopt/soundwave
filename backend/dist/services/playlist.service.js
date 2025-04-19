@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -66,6 +33,22 @@ const createBaseSystemPlaylist = async (data, coverFile) => {
     if (existing) {
         throw new Error(`A system playlist named "${data.name}" already exists.`);
     }
+    let aiParams = {};
+    if (data.description && data.description.includes("<!--AI_PARAMS:")) {
+        const match = data.description.match(/<!--AI_PARAMS:(.*?)-->/s);
+        if (match && match[1]) {
+            try {
+                aiParams = JSON.parse(match[1]);
+            }
+            catch (e) {
+                throw new Error(`Invalid AI parameters format: ${e instanceof Error ? e.message : String(e)}`);
+            }
+        }
+    }
+    const { basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime } = aiParams;
+    if (!basedOnMood && !basedOnGenre && !basedOnArtist && !basedOnSongLength && !basedOnReleaseTime) {
+        throw new Error("At least one AI parameter (mood, genre, artist, song length, or release time) is required to create a base system playlist.");
+    }
     let coverUrl = undefined;
     if (coverFile) {
         const uploadResult = await (0, upload_service_1.uploadFile)(coverFile.buffer, "playlists/covers");
@@ -86,7 +69,7 @@ exports.createBaseSystemPlaylist = createBaseSystemPlaylist;
 const updateBaseSystemPlaylist = async (playlistId, data, coverFile) => {
     const playlist = await db_1.default.playlist.findUnique({
         where: { id: playlistId },
-        select: { type: true, userId: true, name: true },
+        select: { type: true, userId: true, name: true, description: true },
     });
     if (!playlist ||
         playlist.type !== client_1.PlaylistType.SYSTEM ||
@@ -105,6 +88,23 @@ const updateBaseSystemPlaylist = async (playlistId, data, coverFile) => {
         if (existing) {
             throw new Error(`Another system playlist named "${data.name}" already exists.`);
         }
+    }
+    let aiParams = {};
+    const descriptionToCheck = data.description || playlist.description || "";
+    if (descriptionToCheck.includes("<!--AI_PARAMS:")) {
+        const match = descriptionToCheck.match(/<!--AI_PARAMS:(.*?)-->/s);
+        if (match && match[1]) {
+            try {
+                aiParams = JSON.parse(match[1]);
+            }
+            catch (e) {
+                throw new Error(`Invalid AI parameters format: ${e instanceof Error ? e.message : String(e)}`);
+            }
+        }
+    }
+    const { basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime } = aiParams;
+    if (!basedOnMood && !basedOnGenre && !basedOnArtist && !basedOnSongLength && !basedOnReleaseTime) {
+        throw new Error("At least one AI parameter (mood, genre, artist, song length, or release time) is required for a base system playlist.");
     }
     let coverUrl = undefined;
     if (coverFile) {
@@ -181,83 +181,32 @@ const getAllBaseSystemPlaylists = async (req) => {
                 }
             }
         }
-        return parsedPlaylist;
+        return {
+            ...parsedPlaylist,
+            id: parsedPlaylist.id || "",
+            name: parsedPlaylist.name || "",
+            description: parsedPlaylist.description || "",
+            coverUrl: parsedPlaylist.coverUrl || null,
+            privacy: parsedPlaylist.privacy || "PUBLIC",
+            type: parsedPlaylist.type || client_1.PlaylistType.SYSTEM,
+            isAIGenerated: parsedPlaylist.isAIGenerated || false,
+            totalTracks: parsedPlaylist.totalTracks || 0,
+            totalDuration: parsedPlaylist.totalDuration || 0,
+            createdAt: parsedPlaylist.createdAt || new Date(),
+            updatedAt: parsedPlaylist.updatedAt || new Date(),
+            basedOnMood: parsedPlaylist.basedOnMood || null,
+            basedOnGenre: parsedPlaylist.basedOnGenre || null,
+            basedOnArtist: parsedPlaylist.basedOnArtist || null,
+            basedOnSongLength: parsedPlaylist.basedOnSongLength || null,
+            basedOnReleaseTime: parsedPlaylist.basedOnReleaseTime || null,
+            trackCount: parsedPlaylist.trackCount || 10,
+        };
     });
     return result;
 };
 exports.getAllBaseSystemPlaylists = getAllBaseSystemPlaylists;
 const updateVibeRewindPlaylist = async (userId) => {
     try {
-        const userHistory = await db_1.default.history.findMany({
-            where: {
-                userId,
-                type: 'PLAY'
-            },
-            include: {
-                track: {
-                    include: {
-                        genres: {
-                            include: {
-                                genre: true
-                            }
-                        }
-                    }
-                }
-            },
-            orderBy: {
-                updatedAt: 'desc'
-            },
-            take: 30
-        });
-        if (userHistory.length === 0) {
-            console.log(`[PlaylistService] User ${userId} has no listening history. Skipping Vibe Rewind playlist creation.`);
-            return;
-        }
-        const moodAndGenreContext = {
-            tracks: userHistory.map(h => ({
-                title: h.track?.title,
-                genres: h.track?.genres.map(g => g.genre.name),
-                playCount: h.playCount
-            }))
-        };
-        const analysisPrompt = `Phân tích lịch sử nghe nhạc của người dùng và trả về:
-    1. Tâm trạng phổ biến nhất (mood): happy, sad, energetic, calm, nostalgic, romantic, focused, party
-    2. Top 3 thể loại nhạc được nghe nhiều nhất (genres)
-    
-    Trả về dưới dạng JSON với format:
-    {
-      "mood": "tâm_trạng",
-      "genres": ["thể_loại_1", "thể_loại_2", "thể_loại_3"]
-    }
-    
-    Lịch sử nghe nhạc:
-    ${JSON.stringify(moodAndGenreContext, null, 2)}`;
-        const result = await ai_service_1.model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: analysisPrompt }] }],
-            generationConfig: {
-                temperature: 0.3,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 1024,
-            },
-        });
-        const responseText = result.response.text();
-        const cleanedResponse = responseText
-            .replace(/```json|```/g, '')
-            .trim();
-        let analysis;
-        try {
-            analysis = JSON.parse(cleanedResponse);
-        }
-        catch (error) {
-            console.error('[PlaylistService] Error parsing AI response:', error);
-            console.error('[PlaylistService] Raw response:', responseText);
-            throw new Error('Failed to parse AI analysis response');
-        }
-        const detectedMood = analysis.mood;
-        const preferredGenres = analysis.genres;
-        console.log(`[PlaylistService] Detected user mood: ${detectedMood}`);
-        console.log(`[PlaylistService] User's preferred genres: ${preferredGenres.join(', ')}`);
         let vibeRewindPlaylist = await db_1.default.playlist.findFirst({
             where: { userId, name: "Vibe Rewind" },
         });
@@ -270,22 +219,126 @@ const updateVibeRewindPlaylist = async (userId) => {
                     privacy: "PRIVATE",
                     type: "SYSTEM",
                     userId,
-                    coverUrl: null
                 },
             });
         }
-        const playlist = await (0, ai_service_1.createAIGeneratedPlaylist)(userId, {
-            name: "Vibe Rewind",
-            description: `Your personal time capsule - tracks matching your ${detectedMood} mood and favorite genres: ${preferredGenres.join(', ')}`,
-            trackCount: 10,
-            basedOnMood: detectedMood,
-            basedOnGenre: preferredGenres[0],
-            coverUrl: null,
+        const userHistory = await db_1.default.history.findMany({
+            where: { userId, type: "PLAY", playCount: { gt: 2 } },
+            include: {
+                track: {
+                    include: { artist: true, genres: { include: { genre: true } } },
+                },
+            },
         });
-        console.log(`[PlaylistService] Successfully updated Vibe Rewind playlist for user ${userId} with ${playlist.totalTracks} tracks based on ${detectedMood} mood and favorite genres: ${preferredGenres.join(', ')}`);
+        if (userHistory.length === 0) {
+            console.log(`[PlaylistService] No history found for user ${userId}`);
+            return;
+        }
+        const topPlayedTracks = await db_1.default.history.findMany({
+            where: { userId, playCount: { gt: 5 } },
+            include: { track: true },
+            orderBy: { playCount: "desc" },
+            take: 10,
+        });
+        console.log(`[PlaylistService] Found ${topPlayedTracks.length} frequently played tracks for user ${userId}`);
+        const genreCounts = new Map();
+        const artistCounts = new Map();
+        userHistory.forEach((history) => {
+            const track = history.track;
+            if (track) {
+                track.genres.forEach((genreRel) => {
+                    const genreId = genreRel.genre.id;
+                    genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
+                });
+                const artistId = track.artist?.id;
+                if (artistId) {
+                    artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
+                }
+            }
+        });
+        const topGenres = [...genreCounts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map((entry) => entry[0]);
+        const topArtists = [...artistCounts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map((entry) => entry[0]);
+        console.log(`[PlaylistService] Top genres: ${topGenres}`);
+        console.log(`[PlaylistService] Top artists: ${topArtists}`);
+        const recommendedTracks = await db_1.default.track.findMany({
+            where: {
+                OR: [
+                    { genres: { some: { genreId: { in: topGenres } } } },
+                    { artistId: { in: topArtists } },
+                ],
+                isActive: true,
+            },
+            include: { artist: true, album: true },
+            orderBy: { playCount: "desc" },
+            take: 10,
+        });
+        console.log(`[PlaylistService] Found ${recommendedTracks.length} content-based tracks`);
+        const similarUsers = await db_1.default.history.findMany({
+            where: {
+                trackId: {
+                    in: userHistory
+                        .map((h) => h.trackId)
+                        .filter((id) => id !== null),
+                },
+                userId: { not: userId },
+            },
+            select: { userId: true },
+            distinct: ["userId"],
+        });
+        const similarUserIds = similarUsers.map((u) => u.userId);
+        console.log(`[PlaylistService] Found ${similarUserIds.length} similar users`);
+        const collaborativeTracks = await db_1.default.history.findMany({
+            where: { userId: { in: similarUserIds } },
+            include: { track: true },
+            orderBy: { playCount: "desc" },
+            take: 10,
+        });
+        console.log(`[PlaylistService] Found ${collaborativeTracks.length} collaborative filtering tracks`);
+        const finalRecommendedTracks = [
+            ...new Set([
+                ...topPlayedTracks.map((t) => t.track),
+                ...recommendedTracks,
+                ...collaborativeTracks.map((t) => t.track),
+            ]),
+        ].slice(0, 10);
+        if (finalRecommendedTracks.length === 0) {
+            console.log(`[PlaylistService] No tracks found to update in Vibe Rewind for user ${userId}`);
+            return;
+        }
+        await db_1.default.playlistTrack.deleteMany({
+            where: {
+                playlistId: vibeRewindPlaylist.id,
+            },
+        });
+        const playlistTrackData = finalRecommendedTracks
+            .filter((track) => track?.id !== undefined)
+            .map((track, index) => ({
+            playlistId: vibeRewindPlaylist.id,
+            trackId: track.id,
+            trackOrder: index,
+        }));
+        await db_1.default.$transaction([
+            db_1.default.playlistTrack.createMany({
+                data: playlistTrackData.filter((track, index, self) => self.findIndex((t) => t.playlistId === track.playlistId && t.trackId === track.trackId) === index),
+            }),
+            db_1.default.playlist.update({
+                where: { id: vibeRewindPlaylist.id },
+                data: {
+                    totalTracks: finalRecommendedTracks.length,
+                    totalDuration: finalRecommendedTracks.reduce((sum, track) => sum + (track?.duration || 0), 0),
+                },
+            }),
+        ]);
+        console.log(`[PlaylistService] Successfully updated tracks for Vibe Rewind for user ${userId}`);
     }
     catch (error) {
-        console.error(`[PlaylistService] Error updating Vibe Rewind playlist for user ${userId}:`, error);
+        console.error(`[PlaylistService] Error updating tracks for Vibe Rewind for user ${userId}:`, error);
         throw error;
     }
 };
@@ -426,67 +479,55 @@ const getUserSystemPlaylists = async (req) => {
 exports.getUserSystemPlaylists = getUserSystemPlaylists;
 const generateAIPlaylist = async (userId, options) => {
     console.log(`[PlaylistService] Generating AI playlist for user ${userId} with options:`, options);
-    if (!options.basedOnMood && !options.basedOnGenre && !options.basedOnArtist) {
-        console.log(`[PlaylistService] No specific parameters provided. Analyzing all Vibe Rewind playlists for trends.`);
-        try {
-            const { analyzeAllVibeRewindPlaylists } = await Promise.resolve().then(() => __importStar(require('./ai.service')));
-            const analysis = await analyzeAllVibeRewindPlaylists();
-            options = {
-                ...options,
-                basedOnMood: analysis.mood,
-                basedOnGenre: analysis.genres[0],
-                description: options.description || `A curated playlist based on the most popular ${analysis.mood} mood and ${analysis.genres.join(', ')} genres from our community.`,
-                name: options.name || `Community ${analysis.mood} Vibes`
-            };
-            console.log(`[PlaylistService] Using community trends: mood=${analysis.mood}, genres=${analysis.genres.join(', ')}`);
-        }
-        catch (error) {
-            console.error(`[PlaylistService] Error analyzing Vibe Rewind playlists:`, error);
-        }
-    }
-    const playlist = await (0, ai_service_1.createAIGeneratedPlaylist)(userId, options);
-    const playlistWithTracks = await db_1.default.playlist.findUnique({
-        where: { id: playlist.id },
-        include: {
-            tracks: {
-                include: {
-                    track: {
-                        include: {
-                            artist: {
-                                select: {
-                                    id: true,
-                                    artistName: true,
-                                    avatar: true,
+    try {
+        const playlist = await (0, ai_service_1.createAIGeneratedPlaylist)(userId, options);
+        const playlistWithTracks = await db_1.default.playlist.findUnique({
+            where: { id: playlist.id },
+            include: {
+                tracks: {
+                    include: {
+                        track: {
+                            include: {
+                                artist: {
+                                    select: {
+                                        id: true,
+                                        artistName: true,
+                                        avatar: true,
+                                    },
                                 },
                             },
                         },
                     },
-                },
-                orderBy: {
-                    trackOrder: "asc",
+                    orderBy: {
+                        trackOrder: "asc",
+                    },
                 },
             },
-        },
-    });
-    if (!playlistWithTracks) {
-        throw new Error("Failed to retrieve created playlist details");
-    }
-    const artistsInPlaylist = new Set();
-    playlistWithTracks.tracks.forEach((pt) => {
-        if (pt.track.artist) {
-            artistsInPlaylist.add(pt.track.artist.artistName);
+        });
+        if (!playlistWithTracks) {
+            throw new Error("Failed to retrieve created playlist details");
         }
-    });
-    return {
-        ...playlist,
-        artistCount: artistsInPlaylist.size,
-        previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => ({
-            id: pt.track.id,
-            title: pt.track.title,
-            artist: pt.track.artist?.artistName,
-        })),
-        totalTracks: playlistWithTracks.tracks.length,
-    };
+        const artistsInPlaylist = new Set();
+        playlistWithTracks.tracks.forEach((pt) => {
+            if (pt.track.artist) {
+                artistsInPlaylist.add(pt.track.artist.artistName);
+            }
+        });
+        return {
+            ...playlist,
+            artistCount: artistsInPlaylist.size,
+            previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => ({
+                id: pt.track.id,
+                title: pt.track.title,
+                artist: pt.track.artist?.artistName,
+            })),
+            totalTracks: playlistWithTracks.tracks.length,
+        };
+    }
+    catch (error) {
+        console.error(`[PlaylistService] Error in generateAIPlaylist:`, error);
+        throw error;
+    }
 };
 exports.generateAIPlaylist = generateAIPlaylist;
 const updateAllSystemPlaylists = async () => {
@@ -497,7 +538,7 @@ const updateAllSystemPlaylists = async () => {
         });
         const baseSystemPlaylists = await db_1.default.playlist.findMany({
             where: { type: "SYSTEM", userId: null },
-            select: { name: true },
+            select: { name: true, description: true },
         });
         if (baseSystemPlaylists.length === 0) {
             console.log("[PlaylistService] No base system playlists found to update.");
@@ -505,7 +546,7 @@ const updateAllSystemPlaylists = async () => {
         }
         console.log(`[PlaylistService] Updating ${baseSystemPlaylists.length} system playlists for ${users.length} users...`);
         const errors = [];
-        const updatePromises = users.flatMap((user) => baseSystemPlaylists.map((playlistTemplate) => (async () => {
+        const updatePromises = users.flatMap((user) => baseSystemPlaylists.map(async (playlistTemplate) => {
             try {
                 const templatePlaylist = await db_1.default.playlist.findFirst({
                     where: {
@@ -540,6 +581,62 @@ const updateAllSystemPlaylists = async () => {
                         }
                     }
                 }
+                const hasMoodParam = !!aiOptions.basedOnMood;
+                const hasGenreParam = !!aiOptions.basedOnGenre;
+                const hasArtistParam = !!aiOptions.basedOnArtist;
+                const hasSongLengthParam = !!aiOptions.basedOnSongLength;
+                const hasReleaseTimeParam = !!aiOptions.basedOnReleaseTime;
+                const hasAnyParam = hasMoodParam || hasGenreParam || hasArtistParam ||
+                    hasSongLengthParam || hasReleaseTimeParam;
+                if (!hasAnyParam) {
+                    const userHistory = await db_1.default.history.findMany({
+                        where: {
+                            userId: user.id,
+                            type: "PLAY",
+                        },
+                        include: {
+                            track: {
+                                include: {
+                                    genres: {
+                                        include: {
+                                            genre: true,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        orderBy: {
+                            updatedAt: "desc",
+                        },
+                        take: 50,
+                    });
+                    if (userHistory.length > 0) {
+                        const genreCounts = {};
+                        userHistory.forEach(history => {
+                            if (history.track) {
+                                history.track.genres.forEach(genreRel => {
+                                    const genreName = genreRel.genre.name;
+                                    genreCounts[genreName] = (genreCounts[genreName] || 0) + 1;
+                                });
+                            }
+                        });
+                        if (Object.keys(genreCounts).length > 0) {
+                            const topGenre = Object.entries(genreCounts)
+                                .sort(([, a], [, b]) => b - a)
+                                .map(([genre]) => genre)[0];
+                            aiOptions.basedOnGenre = topGenre;
+                            console.log(`[PlaylistService] Adding default genre parameter for user ${user.id}: ${topGenre}`);
+                        }
+                        else {
+                            aiOptions.basedOnMood = "energetic";
+                            console.log(`[PlaylistService] Adding default mood parameter for user ${user.id}: energetic`);
+                        }
+                    }
+                    else {
+                        aiOptions.basedOnMood = "energetic";
+                        console.log(`[PlaylistService] No history found. Adding default mood parameter for user ${user.id}: energetic`);
+                    }
+                }
                 const coverUrl = templatePlaylist.coverUrl ||
                     "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
                 await (0, ai_service_1.createAIGeneratedPlaylist)(user.id, {
@@ -558,7 +655,7 @@ const updateAllSystemPlaylists = async () => {
                     error: errorMessage,
                 });
             }
-        })()));
+        }));
         await Promise.allSettled(updatePromises);
         if (errors.length === 0) {
             console.log(`[PlaylistService] Successfully finished updating all system playlists.`);

@@ -3,11 +3,34 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.analyzeAllVibeRewindPlaylists = exports.generateDefaultPlaylistForNewUser = exports.createAIGeneratedPlaylist = exports.generateAIPlaylist = exports.model = void 0;
+exports.generateDefaultPlaylistForNewUser = exports.createAIGeneratedPlaylist = exports.generateAIPlaylist = exports.model = void 0;
 const generative_ai_1 = require("@google/generative-ai");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_1 = require("@prisma/client");
+const client_2 = require("@prisma/client");
+const spotify_web_api_node_1 = __importDefault(require("spotify-web-api-node"));
+const spotifyApi = new spotify_web_api_node_1.default({
+    clientId: process.env.SPOTIFY_CLIENT_ID,
+    clientSecret: process.env.SPOTIFY_CLIENT_SECRET
+});
+async function refreshSpotifyToken() {
+    try {
+        const data = await spotifyApi.clientCredentialsGrant();
+        spotifyApi.setAccessToken(data.body['access_token']);
+        console.log('[AI] Spotify API token refreshed');
+        setTimeout(refreshSpotifyToken, (data.body['expires_in'] - 60) * 1000);
+    }
+    catch (error) {
+        console.error('[AI] Error refreshing Spotify token:', error);
+    }
+}
+if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
+    refreshSpotifyToken();
+}
+else {
+    console.warn('[AI] Spotify credentials not found, advanced audio analysis will be limited');
+}
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is not defined in environment variables");
@@ -63,66 +86,42 @@ const generateAIPlaylist = async (userId, options = {}) => {
         userHistory.forEach((history) => {
             if (history.track?.artistId) {
                 preferredArtistIds.add(history.track.artistId);
-                const daysAgo = Math.max(1, Math.floor((Date.now() - new Date(history.updatedAt).getTime()) /
-                    (1000 * 60 * 60 * 24)));
-                const recencyWeight = Math.max(0.5, 1 - daysAgo / 30);
-                const artistId = history.track.artistId;
-                artistPlayCounts[artistId] =
-                    (artistPlayCounts[artistId] || 0) +
-                        (history.playCount || 1) * recencyWeight;
+                artistPlayCounts[history.track.artistId] =
+                    (artistPlayCounts[history.track.artistId] || 0) + 1;
             }
-            history.track?.genres.forEach((genreRel) => {
-                preferredGenreIds.add(genreRel.genre.id);
-                const genreId = genreRel.genre.id;
-                genreCounts[genreId] =
-                    (genreCounts[genreId] || 0) + (history.playCount || 1);
-            });
+            if (history.track?.genres) {
+                history.track.genres.forEach((genreRel) => {
+                    if (genreRel.genreId) {
+                        preferredGenreIds.add(genreRel.genreId);
+                        genreCounts[genreRel.genreId] = (genreCounts[genreRel.genreId] || 0) + 1;
+                    }
+                });
+            }
         });
         userLikedTracks.forEach((like) => {
             if (like.track?.artistId) {
                 preferredArtistIds.add(like.track.artistId);
-                const daysAgo = Math.max(1, Math.floor((Date.now() - new Date(like.createdAt).getTime()) /
-                    (1000 * 60 * 60 * 24)));
-                const recencyWeight = Math.max(0.5, 1 - daysAgo / 30);
-                const artistId = like.track.artistId;
-                artistLikeCounts[artistId] =
-                    (artistLikeCounts[artistId] || 0) + 2 * recencyWeight;
+                artistLikeCounts[like.track.artistId] =
+                    (artistLikeCounts[like.track.artistId] || 0) + 1;
             }
-            like.track?.genres.forEach((genreRel) => {
-                preferredGenreIds.add(genreRel.genre.id);
-                const genreId = genreRel.genre.id;
-                genreCounts[genreId] = (genreCounts[genreId] || 0) + 2;
-            });
+            if (like.track?.genres) {
+                like.track.genres.forEach((genreRel) => {
+                    if (genreRel.genreId) {
+                        preferredGenreIds.add(genreRel.genreId);
+                        genreCounts[genreRel.genreId] = (genreCounts[genreRel.genreId] || 0) + 3;
+                    }
+                });
+            }
         });
         const artistPreferenceScore = {};
-        const sortedPreferredGenres = Object.entries(genreCounts)
-            .sort((a, b) => b[1] - a[1])
-            .map((entry) => entry[0]);
-        Array.from(preferredArtistIds).forEach((artistId) => {
-            artistPreferenceScore[artistId] =
-                (artistPlayCounts[artistId] || 0) +
-                    (artistLikeCounts[artistId] || 0) * 2;
-        });
-        const sortedPreferredArtists = Array.from(preferredArtistIds).sort((a, b) => (artistPreferenceScore[b] || 0) - (artistPreferenceScore[a] || 0));
-        console.log(`[AI] User has shown interest in ${preferredArtistIds.size} artists and ${preferredGenreIds.size} genres`);
-        if (options.basedOnArtist) {
-            const artistByName = await db_1.default.artistProfile.findFirst({
-                where: {
-                    artistName: {
-                        contains: options.basedOnArtist,
-                        mode: "insensitive",
-                    },
-                },
-                select: { id: true },
-            });
-            if (artistByName) {
-                preferredArtistIds.add(artistByName.id);
-                sortedPreferredArtists.unshift(artistByName.id);
-                artistPreferenceScore[artistByName.id] =
-                    (artistPreferenceScore[artistByName.id] || 0) + 100;
-                console.log(`[AI] Adding specified artist to preferences: ${options.basedOnArtist}`);
-            }
+        for (const artistId of preferredArtistIds) {
+            const playScore = artistPlayCounts[artistId] || 0;
+            const likeScore = (artistLikeCounts[artistId] || 0) * 3;
+            artistPreferenceScore[artistId] = playScore + likeScore;
         }
+        const sortedPreferredGenres = Object.entries(genreCounts)
+            .sort(([, a], [, b]) => b - a)
+            .map(([id]) => id);
         let selectedGenreId = null;
         if (options.basedOnGenre) {
             const genreByName = await db_1.default.genre.findFirst({
@@ -147,28 +146,220 @@ const generateAIPlaylist = async (userId, options = {}) => {
         }
         const whereClause = { isActive: true };
         let trackIds = [];
+        if (options.basedOnReleaseTime) {
+            const currentYear = new Date().getFullYear();
+            const releaseTimeValue = String(options.basedOnReleaseTime).toLowerCase();
+            const yearValue = Number(options.basedOnReleaseTime);
+            if (!isNaN(yearValue) && yearValue > 1900 && yearValue <= currentYear) {
+                const startDate = new Date(yearValue, 0, 1);
+                const endDate = new Date(yearValue, 11, 31, 23, 59, 59);
+                whereClause.releaseDate = {
+                    gte: startDate,
+                    lte: endDate
+                };
+                console.log(`[AI] Filtering for tracks released in ${yearValue}`);
+            }
+            else {
+                switch (releaseTimeValue) {
+                    case 'new':
+                    case 'newest':
+                    case 'recent':
+                        whereClause.releaseDate = {
+                            gte: new Date(currentYear, 0, 1)
+                        };
+                        console.log('[AI] Filtering for new tracks released this year');
+                        break;
+                    case 'last year':
+                        whereClause.releaseDate = {
+                            gte: new Date(currentYear - 1, 0, 1),
+                            lt: new Date(currentYear, 0, 1)
+                        };
+                        console.log('[AI] Filtering for tracks released last year');
+                        break;
+                    case 'recent years':
+                    case 'last 5 years':
+                        whereClause.releaseDate = {
+                            gte: new Date(currentYear - 5, 0, 1)
+                        };
+                        console.log('[AI] Filtering for tracks released in the last 5 years');
+                        break;
+                    case 'decade':
+                    case 'last decade':
+                        whereClause.releaseDate = {
+                            gte: new Date(currentYear - 10, 0, 1)
+                        };
+                        console.log('[AI] Filtering for tracks released in the last decade');
+                        break;
+                    case 'classics':
+                    case 'classic':
+                    case 'old':
+                        whereClause.releaseDate = {
+                            lt: new Date(currentYear - 20, 0, 1)
+                        };
+                        console.log('[AI] Filtering for classic tracks (over 20 years old)');
+                        break;
+                    default:
+                        if (releaseTimeValue.includes('s') || releaseTimeValue.includes('\'s')) {
+                            const decade = parseInt(releaseTimeValue.replace(/[^0-9]/g, ''), 10);
+                            if (!isNaN(decade) && decade >= 0 && decade <= 90) {
+                                const fullDecade = decade < 100 ? 1900 + decade : decade;
+                                whereClause.releaseDate = {
+                                    gte: new Date(fullDecade, 0, 1),
+                                    lt: new Date(fullDecade + 10, 0, 1)
+                                };
+                                console.log(`[AI] Filtering for tracks from the ${decade}s`);
+                            }
+                            else {
+                                console.log(`[AI] Unrecognized decade format: ${releaseTimeValue}`);
+                            }
+                        }
+                        else {
+                            console.log(`[AI] Unknown release time filter: ${options.basedOnReleaseTime}`);
+                        }
+                }
+            }
+        }
+        if (options.basedOnSongLength) {
+            const lengthValue = Number(options.basedOnSongLength);
+            if (!isNaN(lengthValue)) {
+                whereClause.duration = {
+                    lte: lengthValue
+                };
+                console.log(`[AI] Filtering for tracks with duration <= ${lengthValue} seconds`);
+            }
+            else {
+                const songLengthValue = String(options.basedOnSongLength).toLowerCase();
+                switch (songLengthValue) {
+                    case 'short':
+                        whereClause.duration = { lte: 180 };
+                        console.log('[AI] Filtering for short tracks (under 3 minutes)');
+                        break;
+                    case 'medium':
+                        whereClause.duration = {
+                            gte: 180,
+                            lte: 300
+                        };
+                        console.log('[AI] Filtering for medium-length tracks (3-5 minutes)');
+                        break;
+                    case 'long':
+                        whereClause.duration = { gte: 300 };
+                        console.log('[AI] Filtering for longer tracks (over 5 minutes)');
+                        break;
+                    default:
+                        console.log(`[AI] Unknown song length filter: ${options.basedOnSongLength}`);
+                }
+            }
+        }
+        if (options.basedOnDecade) {
+            const decadeStart = typeof options.basedOnDecade === 'string'
+                ? parseInt(options.basedOnDecade, 10)
+                : options.basedOnDecade;
+            whereClause.releaseDate = {
+                gte: new Date(decadeStart, 0, 1),
+                lt: new Date(decadeStart + 10, 0, 1),
+            };
+        }
+        else if (options.basedOnYearRange) {
+            const { start, end } = options.basedOnYearRange;
+            whereClause.releaseDate = {
+                gte: new Date(start, 0, 1),
+                lt: new Date(end + 1, 0, 1),
+            };
+        }
         const hasArtistParam = options.basedOnArtist ? true : false;
         const hasGenreParam = options.basedOnGenre ? true : false;
         const hasMoodParam = options.basedOnMood ? true : false;
+        const hasSongLengthParam = options.basedOnSongLength ? true : false;
+        const hasReleaseTimeParam = options.basedOnReleaseTime ? true : false;
         let artistRatio = 0.5;
         let genreRatio = 0.3;
         let popularRatio = 0.2;
-        if (hasArtistParam && hasGenreParam) {
-            artistRatio = 0.8;
-            genreRatio = 0.15;
-            popularRatio = 0.05;
+        if (hasMoodParam && !hasGenreParam && !hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.4;
+            genreRatio = 0.4;
+            popularRatio = 0.2;
         }
-        else if (hasArtistParam) {
-            artistRatio = 0.7;
-            genreRatio = 0.2;
+        else if (hasMoodParam && hasGenreParam && !hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.3;
+            genreRatio = 0.5;
+            popularRatio = 0.2;
+        }
+        else if (hasMoodParam && !hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.6;
+            genreRatio = 0.3;
             popularRatio = 0.1;
         }
-        else if (hasGenreParam) {
+        else if (hasMoodParam && !hasGenreParam && !hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.4;
+            genreRatio = 0.4;
+            popularRatio = 0.2;
+        }
+        else if (hasMoodParam && !hasGenreParam && !hasArtistParam && !hasSongLengthParam && hasReleaseTimeParam) {
+            artistRatio = 0.4;
+            genreRatio = 0.4;
+            popularRatio = 0.2;
+        }
+        else if (hasMoodParam && hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.6;
+            genreRatio = 0.3;
+            popularRatio = 0.1;
+        }
+        else if (hasMoodParam && hasGenreParam && hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.5;
+            genreRatio = 0.4;
+            popularRatio = 0.1;
+        }
+        else if (hasMoodParam && hasGenreParam && hasArtistParam && hasSongLengthParam && hasReleaseTimeParam) {
+            artistRatio = 0.5;
+            genreRatio = 0.3;
+            popularRatio = 0.2;
+        }
+        else if (!hasMoodParam && hasGenreParam && !hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
             artistRatio = 0.3;
             genreRatio = 0.6;
             popularRatio = 0.1;
         }
-        else if (hasMoodParam) {
+        else if (!hasMoodParam && hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.6;
+            genreRatio = 0.3;
+            popularRatio = 0.1;
+        }
+        else if (!hasMoodParam && hasGenreParam && hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.5;
+            genreRatio = 0.4;
+            popularRatio = 0.1;
+        }
+        else if (!hasMoodParam && hasGenreParam && hasArtistParam && hasSongLengthParam && hasReleaseTimeParam) {
+            artistRatio = 0.5;
+            genreRatio = 0.3;
+            popularRatio = 0.2;
+        }
+        else if (!hasMoodParam && !hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.7;
+            genreRatio = 0.2;
+            popularRatio = 0.1;
+        }
+        else if (!hasMoodParam && !hasGenreParam && hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.6;
+            genreRatio = 0.3;
+            popularRatio = 0.1;
+        }
+        else if (!hasMoodParam && !hasGenreParam && hasArtistParam && hasSongLengthParam && hasReleaseTimeParam) {
+            artistRatio = 0.6;
+            genreRatio = 0.2;
+            popularRatio = 0.2;
+        }
+        else if (!hasMoodParam && !hasGenreParam && !hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
+            artistRatio = 0.4;
+            genreRatio = 0.4;
+            popularRatio = 0.2;
+        }
+        else if (!hasMoodParam && !hasGenreParam && !hasArtistParam && hasSongLengthParam && hasReleaseTimeParam) {
+            artistRatio = 0.4;
+            genreRatio = 0.4;
+            popularRatio = 0.2;
+        }
+        else if (!hasMoodParam && !hasGenreParam && !hasArtistParam && !hasSongLengthParam && hasReleaseTimeParam) {
             artistRatio = 0.4;
             genreRatio = 0.4;
             popularRatio = 0.2;
@@ -182,11 +373,21 @@ const generateAIPlaylist = async (userId, options = {}) => {
             const moodFilter = options.basedOnMood
                 ? await getMoodFilter(options.basedOnMood)
                 : {};
+            const artistFilter = options.basedOnArtist
+                ? {
+                    artist: {
+                        artistName: {
+                            contains: options.basedOnArtist,
+                            mode: "insensitive",
+                        },
+                    },
+                }
+                : { artistId: { in: Array.from(preferredArtistIds) } };
             const artistTracksQuery = {
                 where: {
                     isActive: true,
-                    artistId: { in: Array.from(preferredArtistIds) },
-                    ...(selectedGenreId
+                    ...artistFilter,
+                    ...(selectedGenreId && options.basedOnArtist
                         ? {
                             genres: {
                                 some: {
@@ -195,25 +396,24 @@ const generateAIPlaylist = async (userId, options = {}) => {
                             },
                         }
                         : {}),
+                    ...whereClause,
                     ...moodFilter,
                 },
                 orderBy: [
-                    { createdAt: "desc" },
-                    { playCount: "desc" },
+                    { createdAt: client_2.Prisma.SortOrder.desc },
+                    { playCount: client_2.Prisma.SortOrder.desc },
                 ],
                 take: artistTrackCount * 2,
             };
             artistTracks = await db_1.default.track.findMany(artistTracksQuery);
-            const scoredArtistTracks = artistTracks
-                .map((track) => {
+            const scoredArtistTracks = artistTracks.map(track => {
                 return {
                     ...track,
-                    score: artistPreferenceScore[track.artistId || ""] || 0,
+                    score: artistPreferenceScore[track.artistId] || 0
                 };
-            })
-                .sort((a, b) => b.score - a.score);
+            }).sort((a, b) => b.score - a.score);
             const selectedArtistTracks = scoredArtistTracks.slice(0, artistTrackCount);
-            trackIds = selectedArtistTracks.map((track) => track.id);
+            trackIds = selectedArtistTracks.map(track => track.id);
         }
         if (preferredGenreIds.size > 0 && genreTrackCount > 0) {
             const targetGenreIds = selectedGenreId
@@ -231,6 +431,7 @@ const generateAIPlaylist = async (userId, options = {}) => {
                             genreId: { in: targetGenreIds },
                         },
                     },
+                    ...whereClause,
                     ...moodFilter,
                     ...(hasArtistParam && hasGenreParam
                         ? {
@@ -246,8 +447,8 @@ const generateAIPlaylist = async (userId, options = {}) => {
                                 ? {
                                     artistId: {
                                         notIn: Array.from(new Set(trackIds
-                                            .map((id) => {
-                                            const track = artistTracks.find((t) => t.id === id);
+                                            .map(id => {
+                                            const track = artistTracks.find(t => t.id === id);
                                             return track?.artistId;
                                         })
                                             .filter(Boolean))),
@@ -255,11 +456,29 @@ const generateAIPlaylist = async (userId, options = {}) => {
                                 }
                                 : {}),
                 },
-                orderBy: [{ playCount: "desc" }, { createdAt: "desc" }],
-                take: genreTrackCount,
+                orderBy: [{ playCount: client_2.Prisma.SortOrder.desc }, { createdAt: client_2.Prisma.SortOrder.desc }],
+                take: genreTrackCount * 2,
             };
             const genreTracks = await db_1.default.track.findMany(genreTracksQuery);
-            trackIds = [...trackIds, ...genreTracks.map((t) => t.id)];
+            const scoredGenreTracks = genreTracks.map(track => {
+                let genreRelevanceScore = 0;
+                track.genres?.forEach((genreRel) => {
+                    const genreIndex = sortedPreferredGenres.indexOf(genreRel.genreId);
+                    if (genreIndex !== -1) {
+                        genreRelevanceScore += Math.max(0.2, 1 - (genreIndex / sortedPreferredGenres.length));
+                    }
+                });
+                const popularityScore = Math.min(1, (track.playCount || 0) / 1000);
+                const trackAgeDays = Math.max(1, Math.floor((Date.now() - new Date(track.createdAt).getTime()) / (1000 * 60 * 60 * 24)));
+                const recencyScore = Math.exp(-trackAgeDays / 365);
+                const finalScore = (genreRelevanceScore * 0.5) + (popularityScore * 0.3) + (recencyScore * 0.2);
+                return {
+                    ...track,
+                    score: finalScore
+                };
+            }).sort((a, b) => b.score - a.score);
+            const selectedGenreTracks = scoredGenreTracks.slice(0, genreTrackCount);
+            trackIds = [...trackIds, ...selectedGenreTracks.map(t => t.id)];
         }
         if (trackIds.length < trackCount && popularTrackCount > 0) {
             const remainingNeeded = trackCount - trackIds.length;
@@ -270,13 +489,14 @@ const generateAIPlaylist = async (userId, options = {}) => {
                 where: {
                     isActive: true,
                     id: { notIn: trackIds },
+                    ...whereClause,
                     ...moodFilter,
                 },
-                orderBy: { playCount: "desc" },
+                orderBy: { playCount: client_2.Prisma.SortOrder.desc },
                 take: remainingNeeded,
             };
             const popularTracks = await db_1.default.track.findMany(popularTracksQuery);
-            trackIds = [...trackIds, ...popularTracks.map((t) => t.id)];
+            trackIds = [...trackIds, ...popularTracks.map(t => t.id)];
         }
         if (trackIds.length > trackCount) {
             trackIds = trackIds.slice(0, trackCount);
@@ -325,7 +545,7 @@ const createAIGeneratedPlaylist = async (userId, options = {}) => {
         const sortedArtistNames = sortedArtistIds
             .map((id) => artistsInPlaylist.get(id))
             .filter(Boolean);
-        const playlistDescription = options.description ||
+        let playlistDescription = options.description ||
             `Curated selection featuring ${sortedArtistNames.slice(0, 3).join(", ")}${sortedArtistNames.length > 3 ? " and more" : ""}. Refreshed regularly based on your listening patterns.`;
         const defaultCoverUrl = "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
         let playlist = await db_1.default.playlist.findFirst({
@@ -436,124 +656,130 @@ const generateDefaultPlaylistForNewUser = async (userId) => {
     }
 };
 exports.generateDefaultPlaylistForNewUser = generateDefaultPlaylistForNewUser;
-const analyzeAllVibeRewindPlaylists = async () => {
-    try {
-        console.log("[AI] Analyzing all Vibe Rewind playlists to determine popular trends");
-        const vibeRewindPlaylists = await db_1.default.playlist.findMany({
-            where: {
-                name: "Vibe Rewind",
-                type: "SYSTEM",
-            },
-            include: {
-                tracks: {
-                    include: {
-                        track: {
-                            include: {
-                                genres: {
-                                    include: {
-                                        genre: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-            take: 100,
-        });
-        if (vibeRewindPlaylists.length === 0) {
-            console.log("[AI] No Vibe Rewind playlists found. Using default values.");
-            return {
-                mood: "energetic",
-                genres: ["Pop", "Rock", "Hip Hop"],
-            };
-        }
-        const allTracks = vibeRewindPlaylists.flatMap((playlist) => playlist.tracks.map((pt) => pt.track));
-        const genreCounts = {};
-        allTracks.forEach((track) => {
-            track.genres.forEach((genreRel) => {
-                const genreName = genreRel.genre.name;
-                genreCounts[genreName] = (genreCounts[genreName] || 0) + 1;
-            });
-        });
-        const sortedGenres = Object.entries(genreCounts)
-            .sort((a, b) => b[1] - a[1])
-            .map((entry) => entry[0])
-            .slice(0, 3);
-        const moodContext = {
-            tracks: allTracks.map((track) => ({
-                title: track.title,
-                genres: track.genres.map((g) => g.genre.name),
-            })),
-        };
-        const analysisPrompt = `Phân tích danh sách bài hát từ tất cả người dùng và trả về:
-    1. Tâm trạng phổ biến nhất (mood): happy, sad, energetic, calm, nostalgic, romantic, focused, party
-    2. Top 3 thể loại nhạc phổ biến nhất (genres)
-    
-    Trả về dưới dạng JSON với format:
-    {
-      "mood": "tâm_trạng",
-      "genres": ["thể_loại_1", "thể_loại_2", "thể_loại_3"]
-    }
-    
-    Danh sách bài hát:
-    ${JSON.stringify(moodContext, null, 2)}`;
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: analysisPrompt }] }],
-            generationConfig: {
-                temperature: 0.3,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 1024,
-            },
-        });
-        const responseText = result.response.text();
-        const cleanedResponse = responseText.replace(/```json|```/g, "").trim();
-        let analysis;
-        try {
-            analysis = JSON.parse(cleanedResponse);
-        }
-        catch (error) {
-            console.error("[AI] Error parsing AI response:", error);
-            console.error("[AI] Raw response:", responseText);
-            return {
-                mood: "energetic",
-                genres: sortedGenres.length > 0 ? sortedGenres : ["Pop", "Rock", "Hip Hop"],
-            };
-        }
-        console.log(`[AI] Analyzed ${vibeRewindPlaylists.length} Vibe Rewind playlists with ${allTracks.length} tracks`);
-        console.log(`[AI] Most popular mood: ${analysis.mood}`);
-        console.log(`[AI] Most popular genres: ${analysis.genres.join(", ")}`);
-        return {
-            mood: analysis.mood,
-            genres: analysis.genres,
-        };
-    }
-    catch (error) {
-        console.error("[AI] Error analyzing Vibe Rewind playlists:", error);
-        return {
-            mood: "energetic",
-            genres: ["Pop", "Rock", "Hip Hop"],
-        };
-    }
-};
-exports.analyzeAllVibeRewindPlaylists = analyzeAllVibeRewindPlaylists;
 async function getMoodFilter(mood) {
     const moodToGenreMap = {
-        energetic: ["Pop", "EDM", "Rock", "Dance", "Electronic", "Hip Hop"],
-        calm: ["Acoustic", "Jazz", "Classical", "Ambient", "Lo-fi"],
-        happy: ["Pop", "Dance", "Funk", "Disco", "R&B"],
-        sad: ["Ballad", "Blues", "Soul", "Acoustic", "Indie"],
-        nostalgic: ["Oldies", "Classic Rock", "Classic", "80s", "90s"],
-        romantic: ["R&B", "Soul", "Ballad", "Jazz", "Acoustic"],
-        focused: ["Classical", "Lo-fi", "Ambient", "Instrumental", "Jazz"],
-        party: ["Dance", "EDM", "Hip Hop", "Pop", "Disco", "Rap"],
+        energetic: ["Pop", "EDM", "Rock", "Dance", "Electronic", "Hip Hop", "Punk", "Metal", "Trap"],
+        calm: ["Acoustic", "Jazz", "Classical", "Ambient", "Lo-fi", "Folk", "New Age", "Chillout", "Instrumental"],
+        happy: ["Pop", "Dance", "Funk", "Disco", "R&B", "Indie Pop", "Synthpop", "K-Pop", "J-Pop", "Upbeat"],
+        sad: ["Ballad", "Blues", "Soul", "Acoustic", "Indie", "Alternative", "Emo", "R&B", "Singer-Songwriter"],
+        nostalgic: ["Oldies", "Classic Rock", "Classic", "80s", "90s", "Retro", "Vintage", "Golden Oldies", "Throwback"],
+        romantic: ["R&B", "Soul", "Ballad", "Jazz", "Acoustic", "Pop Ballad", "Bolero", "Love Songs", "Soft Rock"],
+        focused: ["Classical", "Lo-fi", "Ambient", "Instrumental", "Jazz", "Post-Rock", "Minimal", "Electronic", "Study"],
+        party: ["Dance", "EDM", "Hip Hop", "Pop", "Disco", "Rap", "Reggaeton", "House", "Trap", "Club"],
+        intense: ["Rock", "Metal", "Hardcore", "Punk", "Industrial", "Drum and Bass", "Dubstep", "Heavy Metal", "Grunge"],
+        relaxed: ["Reggae", "Chill", "Bossa Nova", "Lounge", "Smooth Jazz", "Downtempo", "Trip-Hop", "Easy Listening"],
+        melancholic: ["Alternative", "Indie", "Post-Rock", "Shoegaze", "Dream Pop", "Ambient", "Contemporary Classical"],
+        uplifting: ["Gospel", "Worship", "Inspirational", "Motivational", "Positive", "Upbeat", "Feel Good"],
+        dreamy: ["Dream Pop", "Shoegaze", "Ambient", "Chillwave", "Psychedelic", "Ethereal", "Space Music"],
+        dramatic: ["Soundtrack", "Orchestral", "Cinematic", "Epic", "Trailer Music", "Film Score"],
     };
-    const normalizedMood = mood.toLowerCase();
-    const relevantGenres = moodToGenreMap[normalizedMood] || [];
-    if (relevantGenres.length === 0) {
+    const activityToGenreMap = {
+        workout: ["EDM", "Hip Hop", "Rock", "Electronic", "Pop", "Metal", "Trap"],
+        study: ["Classical", "Lo-fi", "Ambient", "Jazz", "Instrumental", "Acoustic"],
+        sleep: ["Ambient", "Classical", "New Age", "Lo-fi", "Chillout", "Instrumental"],
+        driving: ["Rock", "Pop", "Electronic", "Hip Hop", "Country", "R&B"],
+        meditation: ["Ambient", "New Age", "Classical", "World", "Instrumental", "Lo-fi"],
+        gaming: ["Electronic", "Rock", "Metal", "Dubstep", "Soundtrack", "Lo-fi"],
+        cooking: ["Jazz", "Pop", "Soul", "Funk", "Acoustic", "Latin"],
+        reading: ["Classical", "Ambient", "Jazz", "Lo-fi", "Acoustic", "Instrumental"],
+        party: ["Dance", "Hip Hop", "Pop", "Electronic", "Reggaeton", "R&B", "Latin"],
+        focus: ["Classical", "Lo-fi", "Ambient", "Post-Rock", "Instrumental", "Electronic"],
+    };
+    const moodToAudioCharacteristics = {
+        energetic: { tempo: { gte: 120 }, energy: { gte: 0.7 }, valence: { gte: 0.4 } },
+        calm: { tempo: { lte: 100 }, energy: { lte: 0.5 }, acousticness: { gte: 0.5 } },
+        happy: { valence: { gte: 0.6 }, energy: { gte: 0.4 } },
+        sad: { valence: { lte: 0.4 }, tempo: { lte: 110 } },
+        intense: { energy: { gte: 0.8 }, loudness: { gte: -8 }, tempo: { gte: 100 } },
+        relaxed: { tempo: { lte: 95 }, energy: { lte: 0.4 }, acousticness: { gte: 0.5 }, instrumentalness: { gte: 0.2 } },
+        focused: { instrumentalness: { gte: 0.5 }, speechiness: { lte: 0.1 }, energy: { between: [0.3, 0.7] } },
+        party: { danceability: { gte: 0.7 }, energy: { gte: 0.6 }, tempo: { gte: 100 } },
+        nostalgic: { acousticness: { gte: 0.3 } },
+        romantic: { valence: { between: [0.3, 0.7] }, tempo: { lte: 110 }, acousticness: { gte: 0.2 } },
+        melancholic: { valence: { lte: 0.3 }, energy: { lte: 0.6 }, tempo: { lte: 100 } },
+        uplifting: { valence: { gte: 0.6 }, energy: { gte: 0.5 } },
+        dreamy: { instrumentalness: { gte: 0.3 }, tempo: { lte: 110 }, acousticness: { gte: 0.3 } },
+        dramatic: { energy: { gte: 0.6 }, loudness: { gte: -10 }, tempo: { between: [70, 130] } },
+    };
+    const activityToAudioCharacteristics = {
+        workout: { energy: { gte: 0.7 }, tempo: { gte: 120 }, danceability: { gte: 0.6 } },
+        study: { instrumentalness: { gte: 0.3 }, energy: { between: [0.3, 0.6] }, speechiness: { lte: 0.1 } },
+        sleep: { energy: { lte: 0.4 }, tempo: { lte: 80 }, acousticness: { gte: 0.5 }, loudness: { lte: -12 } },
+        driving: { energy: { gte: 0.5 }, danceability: { gte: 0.5 }, tempo: { gte: 100 } },
+        meditation: { instrumentalness: { gte: 0.7 }, energy: { lte: 0.3 }, tempo: { lte: 70 } },
+        gaming: { energy: { gte: 0.6 }, tempo: { gte: 110 } },
+        cooking: { valence: { gte: 0.5 }, energy: { between: [0.4, 0.7] } },
+        reading: { instrumentalness: { gte: 0.4 }, energy: { lte: 0.5 }, tempo: { lte: 100 } },
+        party: { danceability: { gte: 0.7 }, energy: { gte: 0.7 }, speechiness: { gte: 0.1 } },
+        focus: { instrumentalness: { gte: 0.4 }, energy: { between: [0.3, 0.6] }, speechiness: { lte: 0.1 } },
+    };
+    const normalizedInput = mood.toLowerCase().trim();
+    console.log(`[AI] Processing mood/activity: "${normalizedInput}"`);
+    const allMoods = Object.keys(moodToGenreMap);
+    const allActivities = Object.keys(activityToAudioCharacteristics);
+    let matchedTerm = '';
+    if (moodToGenreMap[normalizedInput]) {
+        matchedTerm = normalizedInput;
+        console.log(`[AI] Exact mood match found: ${matchedTerm}`);
+    }
+    else if (activityToAudioCharacteristics[normalizedInput] || activityToGenreMap[normalizedInput]) {
+        matchedTerm = normalizedInput;
+        console.log(`[AI] Exact activity match found: ${matchedTerm}`);
+    }
+    else {
+        const possibleMoods = allMoods.filter(m => normalizedInput.includes(m) || m.includes(normalizedInput));
+        if (possibleMoods.length > 0) {
+            matchedTerm = possibleMoods[0];
+            console.log(`[AI] Similar mood match found: ${matchedTerm} for input "${normalizedInput}"`);
+        }
+        else {
+            const possibleActivities = allActivities.filter(a => normalizedInput.includes(a) || a.includes(normalizedInput));
+            if (possibleActivities.length > 0) {
+                matchedTerm = possibleActivities[0];
+                console.log(`[AI] Similar activity match found: ${matchedTerm} for input "${normalizedInput}"`);
+            }
+            else {
+                console.log(`[AI] No match found for: "${normalizedInput}"`);
+                return {};
+            }
+        }
+    }
+    let audioCharacteristics = {};
+    let relevantGenres = [];
+    if (moodToGenreMap[matchedTerm]) {
+        relevantGenres = moodToGenreMap[matchedTerm] || [];
+        audioCharacteristics = moodToAudioCharacteristics[matchedTerm] || {};
+        console.log(`[AI] Using mood: ${matchedTerm} with ${relevantGenres.length} genres`);
+    }
+    else if (activityToGenreMap[matchedTerm]) {
+        relevantGenres = activityToGenreMap[matchedTerm] || [];
+        audioCharacteristics = activityToAudioCharacteristics[matchedTerm] || {};
+        console.log(`[AI] Using activity: ${matchedTerm} with ${relevantGenres.length} genres`);
+    }
+    else if (activityToAudioCharacteristics[matchedTerm]) {
+        audioCharacteristics = activityToAudioCharacteristics[matchedTerm];
+        console.log(`[AI] Using activity: ${matchedTerm} with audio characteristics only`);
+    }
+    else {
+        console.log(`[AI] Logic error - matched term ${matchedTerm} not found in maps`);
         return {};
     }
+    const filter = {};
+    const genreCondition = relevantGenres.length > 0 ? await createGenreCondition(relevantGenres) : null;
+    const audioCondition = Object.keys(audioCharacteristics).length > 0 ? createAudioCondition(audioCharacteristics) : null;
+    console.log(`[AI] Filter conditions: genres=${!!genreCondition}, audio=${!!audioCondition}`);
+    if (genreCondition && audioCondition) {
+        filter.AND = [genreCondition, audioCondition];
+    }
+    else if (genreCondition) {
+        return genreCondition;
+    }
+    else if (audioCondition) {
+        return audioCondition;
+    }
+    return filter;
+}
+async function createGenreCondition(relevantGenres) {
     const genreIds = await db_1.default.genre.findMany({
         where: {
             name: {
@@ -574,6 +800,227 @@ async function getMoodFilter(mood) {
             },
         };
     }
-    return {};
+    return null;
+}
+function createAudioCondition(audioCharacteristics) {
+    console.log("[AI] Audio characteristics filtering is not supported directly in database queries");
+    return null;
+}
+async function getSpotifyAudioFeatures(trackName, artistName) {
+    try {
+        if (!spotifyApi.getAccessToken()) {
+            await refreshSpotifyToken();
+        }
+        const searchResult = await spotifyApi.searchTracks(`track:${trackName} artist:${artistName}`, { limit: 1 });
+        if (searchResult.body.tracks && searchResult.body.tracks.items.length > 0) {
+            const trackId = searchResult.body.tracks.items[0].id;
+            const featuresResult = await spotifyApi.getAudioFeaturesForTrack(trackId);
+            if (featuresResult.body) {
+                console.log(`[AI] Found Spotify audio features for "${trackName}" by ${artistName}`);
+                return featuresResult.body;
+            }
+        }
+        console.log(`[AI] No Spotify results found for "${trackName}" by ${artistName}`);
+        return null;
+    }
+    catch (error) {
+        console.error('[AI] Error getting Spotify audio features:', error);
+        return null;
+    }
+}
+function analyzeMood(audioFeatures) {
+    const moods = {};
+    if (audioFeatures.valence > 0.8) {
+        moods.happy = moods.happy || 0 + 0.8;
+        moods.energetic = moods.energetic || 0 + 0.4;
+    }
+    else if (audioFeatures.valence > 0.6) {
+        moods.happy = moods.happy || 0 + 0.6;
+        moods.uplifting = moods.uplifting || 0 + 0.5;
+    }
+    else if (audioFeatures.valence < 0.3) {
+        moods.sad = moods.sad || 0 + 0.7;
+        moods.melancholic = moods.melancholic || 0 + 0.6;
+    }
+    else if (audioFeatures.valence < 0.4) {
+        moods.sad = moods.sad || 0 + 0.5;
+        moods.nostalgic = moods.nostalgic || 0 + 0.4;
+    }
+    if (audioFeatures.energy > 0.8) {
+        moods.energetic = moods.energetic || 0 + 0.9;
+        moods.intense = moods.intense || 0 + 0.8;
+        moods.party = moods.party || 0 + 0.7;
+    }
+    else if (audioFeatures.energy > 0.6) {
+        moods.energetic = moods.energetic || 0 + 0.7;
+        moods.uplifting = moods.uplifting || 0 + 0.5;
+    }
+    else if (audioFeatures.energy < 0.4) {
+        moods.calm = moods.calm || 0 + 0.8;
+        moods.relaxed = moods.relaxed || 0 + 0.7;
+    }
+    else if (audioFeatures.energy < 0.3) {
+        moods.calm = moods.calm || 0 + 0.9;
+        moods.relaxed = moods.relaxed || 0 + 0.8;
+        moods.dreamy = moods.dreamy || 0 + 0.6;
+    }
+    if (audioFeatures.acousticness > 0.7) {
+        moods.calm = moods.calm || 0 + 0.6;
+        moods.romantic = moods.romantic || 0 + 0.5;
+        moods.nostalgic = moods.nostalgic || 0 + 0.4;
+    }
+    if (audioFeatures.danceability > 0.7) {
+        moods.party = moods.party || 0 + 0.8;
+        moods.energetic = moods.energetic || 0 + 0.6;
+        moods.happy = moods.happy || 0 + 0.5;
+    }
+    else if (audioFeatures.danceability > 0.5) {
+        moods.uplifting = moods.uplifting || 0 + 0.5;
+    }
+    if (audioFeatures.instrumentalness > 0.7) {
+        moods.focused = moods.focused || 0 + 0.8;
+        moods.dreamy = moods.dreamy || 0 + 0.6;
+        moods.calm = moods.calm || 0 + 0.5;
+    }
+    else if (audioFeatures.instrumentalness > 0.4) {
+        moods.focused = moods.focused || 0 + 0.6;
+    }
+    if (audioFeatures.tempo > 140) {
+        moods.energetic = moods.energetic || 0 + 0.7;
+        moods.intense = moods.intense || 0 + 0.6;
+        moods.party = moods.party || 0 + 0.5;
+    }
+    else if (audioFeatures.tempo > 120) {
+        moods.energetic = moods.energetic || 0 + 0.6;
+        moods.uplifting = moods.uplifting || 0 + 0.5;
+    }
+    else if (audioFeatures.tempo < 80) {
+        moods.calm = moods.calm || 0 + 0.7;
+        moods.relaxed = moods.relaxed || 0 + 0.6;
+        moods.dreamy = moods.dreamy || 0 + 0.5;
+    }
+    else if (audioFeatures.tempo < 100) {
+        moods.relaxed = moods.relaxed || 0 + 0.5;
+    }
+    if (audioFeatures.loudness > -5) {
+        moods.intense = moods.intense || 0 + 0.6;
+        moods.energetic = moods.energetic || 0 + 0.5;
+    }
+    else if (audioFeatures.loudness < -10) {
+        moods.calm = moods.calm || 0 + 0.5;
+        moods.intimate = moods.intimate || 0 + 0.7;
+    }
+    if (audioFeatures.mode === 1) {
+        moods.happy = moods.happy || 0 + 0.5;
+        moods.uplifting = moods.uplifting || 0 + 0.4;
+    }
+    else {
+        moods.melancholic = moods.melancholic || 0 + 0.5;
+        moods.dramatic = moods.dramatic || 0 + 0.4;
+    }
+    if (audioFeatures.valence < 0.4 && audioFeatures.energy > 0.7) {
+        moods.angry = moods.angry || 0 + 0.8;
+        moods.intense = moods.intense || 0 + 0.7;
+    }
+    if (audioFeatures.valence > 0.6 && audioFeatures.tempo < 100 && audioFeatures.acousticness > 0.5) {
+        moods.peaceful = moods.peaceful || 0 + 0.8;
+        moods.content = moods.content || 0 + 0.7;
+    }
+    if (audioFeatures.valence < 0.3 && audioFeatures.energy < 0.4 && audioFeatures.acousticness > 0.6) {
+        moods.somber = moods.somber || 0 + 0.9;
+        moods.heartbroken = moods.heartbroken || 0 + 0.8;
+    }
+    const sortedMoods = Object.entries(moods)
+        .sort(([, a], [, b]) => b - a)
+        .map(([mood]) => mood);
+    return sortedMoods.slice(0, 3);
+}
+function analyzeActivity(audioFeatures) {
+    const activities = {};
+    if (audioFeatures.tempo > 120 && audioFeatures.energy > 0.7) {
+        activities.workout = 0.9;
+        activities.running = 0.8;
+    }
+    else if (audioFeatures.tempo > 100 && audioFeatures.energy > 0.6) {
+        activities.workout = 0.6;
+        activities.jogging = 0.7;
+    }
+    if (audioFeatures.instrumentalness > 0.6 && audioFeatures.energy < 0.7) {
+        activities.study = 0.9;
+        activities.focus = 0.9;
+        activities.work = 0.8;
+    }
+    else if (audioFeatures.speechiness < 0.1 && audioFeatures.energy > 0.3 && audioFeatures.energy < 0.6) {
+        activities.study = 0.7;
+        activities.focus = 0.7;
+        activities.work = 0.6;
+    }
+    if (audioFeatures.energy < 0.3 && audioFeatures.tempo < 80) {
+        activities.sleep = 0.9;
+        activities.meditation = 0.8;
+        activities.relaxation = 0.9;
+    }
+    else if (audioFeatures.energy < 0.4 && audioFeatures.acousticness > 0.6) {
+        activities.sleep = 0.7;
+        activities.meditation = 0.6;
+        activities.relaxation = 0.8;
+    }
+    if (audioFeatures.energy > 0.5 && audioFeatures.danceability > 0.5) {
+        activities.driving = 0.8;
+        activities.roadtrip = 0.7;
+    }
+    else if (audioFeatures.energy > 0.7 && audioFeatures.tempo > 100) {
+        activities.driving = 0.7;
+        activities.commuting = 0.6;
+    }
+    if (audioFeatures.danceability > 0.7 && audioFeatures.energy > 0.7) {
+        activities.party = 0.9;
+        activities.dancing = 0.9;
+        activities.clubbing = 0.8;
+    }
+    else if (audioFeatures.danceability > 0.6 && audioFeatures.energy > 0.6) {
+        activities.party = 0.7;
+        activities.socializing = 0.8;
+    }
+    if (audioFeatures.instrumentalness > 0.5 && audioFeatures.energy < 0.5) {
+        activities.reading = 0.8;
+    }
+    else if (audioFeatures.acousticness > 0.6 && audioFeatures.energy < 0.4) {
+        activities.reading = 0.7;
+    }
+    if (audioFeatures.valence > 0.5 && audioFeatures.energy > 0.4 && audioFeatures.energy < 0.7) {
+        activities.cooking = 0.7;
+        activities.baking = 0.6;
+    }
+    else if (audioFeatures.danceability > 0.5 && audioFeatures.valence > 0.6) {
+        activities.cooking = 0.6;
+        activities.housework = 0.7;
+    }
+    if (audioFeatures.energy > 0.7 && audioFeatures.tempo > 110) {
+        activities.gaming = 0.8;
+        activities.competitive = 0.7;
+    }
+    else if (audioFeatures.energy > 0.6 && audioFeatures.tempo > 100) {
+        activities.gaming = 0.6;
+        activities.casual_gaming = 0.7;
+    }
+    if (audioFeatures.energy > 0.6 && audioFeatures.valence > 0.6) {
+        activities.hiking = 0.7;
+        activities.beach = 0.7;
+        activities.outdoor = 0.8;
+    }
+    if (audioFeatures.tempo < 90 && audioFeatures.energy < 0.5 && audioFeatures.instrumentalness > 0.4) {
+        activities.yoga = 0.9;
+        activities.stretching = 0.8;
+    }
+    if (audioFeatures.energy > 0.4 && audioFeatures.energy < 0.7 && audioFeatures.instrumentalness > 0.3) {
+        activities.creative_work = 0.8;
+        activities.art = 0.7;
+        activities.writing = 0.7;
+    }
+    const sortedActivities = Object.entries(activities)
+        .sort(([, a], [, b]) => b - a)
+        .map(([activity]) => activity);
+    return sortedActivities.slice(0, 3);
 }
 //# sourceMappingURL=ai.service.js.map

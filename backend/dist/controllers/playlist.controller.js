@@ -150,7 +150,6 @@ const getPlaylists = async (req, res, next) => {
                         privacy: "PRIVATE",
                         type: "SYSTEM",
                         userId,
-                        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1744453889/covers/qeyix0cmbv7mtdh1hedi.png'
                     },
                 });
                 try {
@@ -778,8 +777,15 @@ const generateAIPlaylist = async (req, res) => {
             });
             return;
         }
-        const { name, description, trackCount, basedOnMood, basedOnGenre, basedOnArtist, } = req.body;
-        const hasSpecificParams = basedOnMood || basedOnGenre || basedOnArtist;
+        const { name, description, trackCount, basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime, } = req.body;
+        const hasSpecificParams = basedOnMood || basedOnGenre || basedOnArtist || basedOnSongLength || basedOnReleaseTime;
+        if (!hasSpecificParams) {
+            res.status(400).json({
+                success: false,
+                message: "At least one parameter (mood, genre, artist, song length, or release time) is required to generate a playlist.",
+            });
+            return;
+        }
         const playlistData = await playlistService.generateAIPlaylist(userId, {
             name,
             description,
@@ -787,11 +793,10 @@ const generateAIPlaylist = async (req, res) => {
             basedOnMood,
             basedOnGenre,
             basedOnArtist,
+            basedOnSongLength,
+            basedOnReleaseTime,
         });
         let message = `AI playlist generated successfully with ${playlistData.totalTracks} tracks from ${playlistData.artistCount} artists`;
-        if (!hasSpecificParams) {
-            message += " based on community trends";
-        }
         res.status(200).json({
             success: true,
             message,
@@ -800,10 +805,13 @@ const generateAIPlaylist = async (req, res) => {
     }
     catch (error) {
         console.error("Error generating AI playlist:", error);
-        res.status(500).json({
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isValidationError = errorMessage.includes("required to generate") ||
+            errorMessage.includes("parameter is required");
+        res.status(isValidationError ? 400 : 500).json({
             success: false,
-            message: "Failed to generate AI playlist",
-            error: error instanceof Error ? error.message : String(error),
+            message: isValidationError ? errorMessage : "Failed to generate AI playlist",
+            error: errorMessage,
         });
     }
 };
@@ -841,7 +849,7 @@ const updateAllSystemPlaylists = async (req, res) => {
 exports.updateAllSystemPlaylists = updateAllSystemPlaylists;
 const createBaseSystemPlaylist = async (req, res) => {
     try {
-        const { name, description, privacy, basedOnMood, basedOnGenre, basedOnArtist, trackCount, } = req.body;
+        const { name, description, privacy, basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime, trackCount, } = req.body;
         const coverFile = req.file;
         if (!name) {
             res
@@ -857,6 +865,10 @@ const createBaseSystemPlaylist = async (req, res) => {
             aiParams.basedOnGenre = basedOnGenre;
         if (basedOnArtist)
             aiParams.basedOnArtist = basedOnArtist;
+        if (basedOnSongLength)
+            aiParams.basedOnSongLength = basedOnSongLength;
+        if (basedOnReleaseTime)
+            aiParams.basedOnReleaseTime = basedOnReleaseTime;
         if (trackCount)
             aiParams.trackCount = Number(trackCount);
         if (Object.keys(aiParams).length > 0) {
@@ -883,7 +895,7 @@ exports.createBaseSystemPlaylist = createBaseSystemPlaylist;
 const updateBaseSystemPlaylist = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, privacy, basedOnMood, basedOnGenre, basedOnArtist, trackCount, } = req.body;
+        const { name, description, privacy, basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime, trackCount, } = req.body;
         const coverFile = req.file;
         let finalDescription = description || "";
         const aiParams = {};
@@ -893,6 +905,10 @@ const updateBaseSystemPlaylist = async (req, res) => {
             aiParams.basedOnGenre = basedOnGenre;
         if (basedOnArtist)
             aiParams.basedOnArtist = basedOnArtist;
+        if (basedOnSongLength)
+            aiParams.basedOnSongLength = basedOnSongLength;
+        if (basedOnReleaseTime)
+            aiParams.basedOnReleaseTime = basedOnReleaseTime;
         if (trackCount)
             aiParams.trackCount = Number(trackCount);
         finalDescription = finalDescription

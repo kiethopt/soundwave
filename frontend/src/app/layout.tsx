@@ -14,6 +14,7 @@ import { MaintenanceProvider } from '@/contexts/MaintenanceContext';
 import { MaintenanceBanner } from '@/components/ui/MaintenanceBanner';
 import { useMaintenance } from '@/contexts/MaintenanceContext';
 import { BackgroundProvider, useBackground } from '@/contexts/BackgroundContext';
+import type { User } from '@/types';
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -24,6 +25,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const { isMaintenanceMode, isLoading } = useMaintenance();
   const { backgroundStyle } = useBackground();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userData, setUserData] = useState<User | null>(null);
 
   const isAuthPage = useMemo(
     () =>
@@ -37,12 +39,49 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMounted(true);
     const token = localStorage.getItem('userToken');
+    const storedUserData = localStorage.getItem('userData');
     setIsAuthenticated(!!token);
+    
+    if (storedUserData) {
+      try {
+        setUserData(JSON.parse(storedUserData));
+      } catch (e) {
+        console.error("Error parsing user data in layout:", e);
+        setUserData(null);
+      }
+    } else {
+      setUserData(null);
+    }
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'userToken') {
+        setIsAuthenticated(!!localStorage.getItem('userToken'));
+      }
+      if (event.key === 'userData') {
+        const newUserData = localStorage.getItem('userData');
+        if (newUserData) {
+           try {
+             setUserData(JSON.parse(newUserData));
+           } catch (e) {
+             console.error("Error parsing updated user data in layout:", e);
+             setUserData(null);
+           }
+        } else {
+          setUserData(null);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+
   }, [pathname]);
 
   if (!mounted) {
     return null;
   }
+
+  const showPlayerBar = isAuthenticated && userData?.role !== 'ADMIN' && userData?.currentProfile === 'USER';
 
   return (
     <div suppressHydrationWarning>
@@ -51,9 +90,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       ) : (
         <div
           suppressHydrationWarning
-          className={`flex flex-col h-screen ${
-            theme === 'light' ? 'text-gray-900' : 'text-white'
-          }`}
+          className={`flex flex-col h-screen ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}
         >
           {isMaintenanceMode && !isLoading && (
             <div className="h-8" aria-hidden="true"></div>
@@ -66,10 +103,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             />
           </div>
 
-          <div className="flex flex-1" suppressHydrationWarning>
+          <div className="flex flex-1 overflow-hidden" suppressHydrationWarning>
             <Sidebar
               isOpen={isSidebarOpen}
               onClose={() => setIsSidebarOpen(false)}
+              isPlayerBarVisible={showPlayerBar}
             />
             <div
               className="flex-1 flex flex-col min-h-0"
@@ -80,9 +118,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
               </div>
 
               <main
-                className={`flex-1 relative ${
-                  isAuthenticated ? 'pb-[90px]' : ''
-                }`}
+                className={`flex-1 relative ${showPlayerBar ? 'pb-[90px]' : ''}`}
                 suppressHydrationWarning
               >
                 <div
@@ -91,10 +127,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 >
                   <div
                     suppressHydrationWarning
-                    className={`min-h-full p-2 ${
-                      theme === 'light' ? 'bg-gray-50' : ''
-                    }
-                    ${isAuthenticated ? 'mb-[80px]' : ''}
+                    className={`min-h-full p-2 ${theme === 'light' ? 'bg-gray-50' : ''}
+                    ${showPlayerBar ? 'mb-[80px]' : ''}
                     `}
                     style={{
                       background: theme === 'dark' ? backgroundStyle : undefined,
@@ -107,7 +141,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {isAuthenticated && (
+          {showPlayerBar && (
             <PlayerBar />
           )}
         </div>
