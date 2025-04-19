@@ -340,6 +340,8 @@ export interface Playlist {
   basedOnMood?: string;
   basedOnGenre?: string;
   basedOnArtist?: string;
+  basedOnSongLength?: number;
+  basedOnReleaseTime?: string;
   trackCount?: number;
 }
 

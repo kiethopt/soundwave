@@ -147,7 +147,7 @@ export const getPlaylists: RequestHandler = async (
             privacy: "PRIVATE",
             type: "SYSTEM",
             userId,
-            coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1744453889/covers/qeyix0cmbv7mtdh1hedi.png'
+            
           },
         });
 
@@ -879,7 +879,7 @@ export const getUserSystemPlaylists: RequestHandler = async (
   }
 };
 
-// Update the Vibe Rewind playlist (tracks user has listened to)
+  // Update the Vibe Rewind playlist (tracks user has listened to)
 export const updateVibeRewindPlaylist: RequestHandler = async (
   req,
   res,
@@ -906,7 +906,7 @@ export const updateVibeRewindPlaylist: RequestHandler = async (
       message: "Failed to update Vibe Rewind playlist",
     });
   }
-};
+};  
 
 // Generating AI playlists
 export const generateAIPlaylist: RequestHandler = async (
@@ -931,10 +931,21 @@ export const generateAIPlaylist: RequestHandler = async (
       basedOnMood,
       basedOnGenre,
       basedOnArtist,
+      basedOnSongLength, 
+      basedOnReleaseTime,
     } = req.body;
 
     // Check if any specific parameters are provided
-    const hasSpecificParams = basedOnMood || basedOnGenre || basedOnArtist;
+    const hasSpecificParams = basedOnMood || basedOnGenre || basedOnArtist || basedOnSongLength || basedOnReleaseTime;
+
+    // Case 19: If no parameters are provided, return an error
+    if (!hasSpecificParams) {
+      res.status(400).json({
+        success: false,
+        message: "At least one parameter (mood, genre, artist, song length, or release time) is required to generate a playlist.",
+      });
+      return;
+    }
     
     // Call the service function
     const playlistData = await playlistService.generateAIPlaylist(userId, {
@@ -944,15 +955,13 @@ export const generateAIPlaylist: RequestHandler = async (
       basedOnMood,
       basedOnGenre,
       basedOnArtist,
+      basedOnSongLength,
+      basedOnReleaseTime,
     });
 
-    // Determine the message based on whether specific parameters were provided
+    // Determine the message based on parameters
     let message = `AI playlist generated successfully with ${playlistData.totalTracks} tracks from ${playlistData.artistCount} artists`;
     
-    if (!hasSpecificParams) {
-      message += " based on community trends";
-    }
-
     res.status(200).json({
       success: true,
       message,
@@ -960,10 +969,16 @@ export const generateAIPlaylist: RequestHandler = async (
     });
   } catch (error) {
     console.error("Error generating AI playlist:", error);
-    res.status(500).json({
+    
+    // Use appropriate status code based on error type
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isValidationError = errorMessage.includes("required to generate") || 
+                             errorMessage.includes("parameter is required");
+    
+    res.status(isValidationError ? 400 : 500).json({
       success: false,
-      message: "Failed to generate AI playlist",
-      error: error instanceof Error ? error.message : String(error),
+      message: isValidationError ? errorMessage : "Failed to generate AI playlist",
+      error: errorMessage,
     });
   }
 };
@@ -1028,9 +1043,11 @@ export const createBaseSystemPlaylist: RequestHandler = async (
       name,
       description,
       privacy,
-      basedOnMood,
+      basedOnMood,  
       basedOnGenre,
       basedOnArtist,
+      basedOnSongLength,
+      basedOnReleaseTime,
       trackCount,
     } = req.body;
     const coverFile = req.file;
@@ -1049,6 +1066,8 @@ export const createBaseSystemPlaylist: RequestHandler = async (
     if (basedOnMood) aiParams.basedOnMood = basedOnMood;
     if (basedOnGenre) aiParams.basedOnGenre = basedOnGenre;
     if (basedOnArtist) aiParams.basedOnArtist = basedOnArtist;
+    if (basedOnSongLength) aiParams.basedOnSongLength = basedOnSongLength;
+    if (basedOnReleaseTime) aiParams.basedOnReleaseTime = basedOnReleaseTime;
     if (trackCount) aiParams.trackCount = Number(trackCount); // Ensure trackCount is a number
 
     // Thêm metadata AI nếu có bất kỳ tham số AI nào
@@ -1090,9 +1109,11 @@ export const updateBaseSystemPlaylist: RequestHandler = async (
       name,
       description,
       privacy,
-      basedOnMood,
+      basedOnMood,  
       basedOnGenre,
       basedOnArtist,
+      basedOnSongLength,
+      basedOnReleaseTime,
       trackCount,
     } = req.body;
     const coverFile = req.file;
@@ -1103,6 +1124,8 @@ export const updateBaseSystemPlaylist: RequestHandler = async (
     if (basedOnMood) aiParams.basedOnMood = basedOnMood;
     if (basedOnGenre) aiParams.basedOnGenre = basedOnGenre;
     if (basedOnArtist) aiParams.basedOnArtist = basedOnArtist;
+    if (basedOnSongLength) aiParams.basedOnSongLength = basedOnSongLength;
+    if (basedOnReleaseTime) aiParams.basedOnReleaseTime = basedOnReleaseTime;
     if (trackCount) aiParams.trackCount = Number(trackCount); // Ensure trackCount is a number
 
     // Xóa metadata cũ nếu có

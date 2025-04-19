@@ -46,6 +46,27 @@ export const createBaseSystemPlaylist = async (
     throw new Error(`A system playlist named "${data.name}" already exists.`);
   }
 
+  // Parse AI parameters from description if present
+  let aiParams: PlaylistGenerationOptions = {};
+  if (data.description && data.description.includes("<!--AI_PARAMS:")) {
+    const match = data.description.match(/<!--AI_PARAMS:(.*?)-->/s);
+    if (match && match[1]) {
+      try {
+        aiParams = JSON.parse(match[1]);
+      } catch (e) {
+        throw new Error(`Invalid AI parameters format: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
+
+  // Validate that at least one required parameter is present
+  const { basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime } = aiParams;
+  if (!basedOnMood && !basedOnGenre && !basedOnArtist && !basedOnSongLength && !basedOnReleaseTime) {
+    throw new Error(
+      "At least one AI parameter (mood, genre, artist, song length, or release time) is required to create a base system playlist."
+    );
+  }
+
   let coverUrl = undefined;
   if (coverFile) {
     // Upload cover image if provided
@@ -78,7 +99,7 @@ export const updateBaseSystemPlaylist = async (
   // Check if the playlist exists and is a base system playlist
   const playlist = await prisma.playlist.findUnique({
     where: { id: playlistId },
-    select: { type: true, userId: true, name: true },
+    select: { type: true, userId: true, name: true, description: true },
   });
 
   if (
@@ -104,6 +125,29 @@ export const updateBaseSystemPlaylist = async (
         `Another system playlist named "${data.name}" already exists.`
       );
     }
+  }
+
+  // Parse AI parameters from description if present, either from the new description or the existing one
+  let aiParams: PlaylistGenerationOptions = {};
+  const descriptionToCheck = data.description || playlist.description || "";
+  
+  if (descriptionToCheck.includes("<!--AI_PARAMS:")) {
+    const match = descriptionToCheck.match(/<!--AI_PARAMS:(.*?)-->/s);
+    if (match && match[1]) {
+      try {
+        aiParams = JSON.parse(match[1]);
+      } catch (e) {
+        throw new Error(`Invalid AI parameters format: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
+
+  // Validate that at least one required parameter is present
+  const { basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime } = aiParams;
+  if (!basedOnMood && !basedOnGenre && !basedOnArtist && !basedOnSongLength && !basedOnReleaseTime) {
+    throw new Error(
+      "At least one AI parameter (mood, genre, artist, song length, or release time) is required for a base system playlist."
+    );
   }
 
   let coverUrl = undefined;
@@ -206,7 +250,28 @@ export const getAllBaseSystemPlaylists = async (req: Request) => {
       }
     }
 
-    return parsedPlaylist; // Return the modified or original playlist object
+    // Ensure all required fields are present
+    return {
+      ...parsedPlaylist,
+      id: parsedPlaylist.id || "",
+      name: parsedPlaylist.name || "",
+      description: parsedPlaylist.description || "",
+      coverUrl: parsedPlaylist.coverUrl || null,
+      privacy: parsedPlaylist.privacy || "PUBLIC",
+      type: parsedPlaylist.type || PlaylistType.SYSTEM,
+      isAIGenerated: parsedPlaylist.isAIGenerated || false,
+      totalTracks: parsedPlaylist.totalTracks || 0,
+      totalDuration: parsedPlaylist.totalDuration || 0,
+      createdAt: parsedPlaylist.createdAt || new Date(),
+      updatedAt: parsedPlaylist.updatedAt || new Date(),
+      // AI parameters
+      basedOnMood: parsedPlaylist.basedOnMood || null,
+      basedOnGenre: parsedPlaylist.basedOnGenre || null,
+      basedOnArtist: parsedPlaylist.basedOnArtist || null,
+      basedOnSongLength: parsedPlaylist.basedOnSongLength || null,
+      basedOnReleaseTime: parsedPlaylist.basedOnReleaseTime || null,
+      trackCount: parsedPlaylist.trackCount || 10,
+    };
   });
 
   return result; // Returns { data: playlists, pagination: ... }
@@ -217,90 +282,6 @@ export const updateVibeRewindPlaylist = async (
   userId: string
 ): Promise<void> => {
   try {
-    // Kiểm tra xem người dùng đã có lịch sử nghe nhạc chưa
-    const userHistory = await prisma.history.findMany({
-      where: { 
-        userId,
-        type: 'PLAY'
-      },
-      include: {
-        track: {
-          include: {
-            genres: {
-              include: {
-                genre: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        updatedAt: 'desc'
-      },
-      take: 30 // Lấy 30 bài hát gần nhất
-    });
-
-    if (userHistory.length === 0) {
-      console.log(
-        `[PlaylistService] User ${userId} has no listening history. Skipping Vibe Rewind playlist creation.`
-      );
-      return;
-    }
-
-    // Phân tích tâm trạng và thể loại từ lịch sử nghe nhạc
-    const moodAndGenreContext = {
-      tracks: userHistory.map(h => ({
-        title: h.track?.title,
-        genres: h.track?.genres.map(g => g.genre.name),
-        playCount: h.playCount
-      }))
-    };
-
-    // Gọi Gemini AI để phân tích tâm trạng và thể loại
-    const analysisPrompt = `Phân tích lịch sử nghe nhạc của người dùng và trả về:
-    1. Tâm trạng phổ biến nhất (mood): happy, sad, energetic, calm, nostalgic, romantic, focused, party
-    2. Top 3 thể loại nhạc được nghe nhiều nhất (genres)
-    
-    Trả về dưới dạng JSON với format:
-    {
-      "mood": "tâm_trạng",
-      "genres": ["thể_loại_1", "thể_loại_2", "thể_loại_3"]
-    }
-    
-    Lịch sử nghe nhạc:
-    ${JSON.stringify(moodAndGenreContext, null, 2)}`;
-
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: analysisPrompt }] }],
-      generationConfig: {
-        temperature: 0.3,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 1024,
-      },
-    });
-
-    // Clean the response by removing markdown code blocks and whitespace
-    const responseText = result.response.text();
-    const cleanedResponse = responseText
-      .replace(/```json|```/g, '') // Remove markdown code blocks
-      .trim(); // Remove leading/trailing whitespace
-
-    let analysis;
-    try {
-      analysis = JSON.parse(cleanedResponse);
-    } catch (error) {
-      console.error('[PlaylistService] Error parsing AI response:', error);
-      console.error('[PlaylistService] Raw response:', responseText);
-      throw new Error('Failed to parse AI analysis response');
-    }
-
-    const detectedMood = analysis.mood;
-    const preferredGenres = analysis.genres;
-    
-    console.log(`[PlaylistService] Detected user mood: ${detectedMood}`);
-    console.log(`[PlaylistService] User's preferred genres: ${preferredGenres.join(', ')}`);
-
     // Tìm hoặc tạo playlist "Vibe Rewind"
     let vibeRewindPlaylist = await prisma.playlist.findFirst({
       where: { userId, name: "Vibe Rewind" },
@@ -318,32 +299,186 @@ export const updateVibeRewindPlaylist = async (
           privacy: "PRIVATE",
           type: "SYSTEM",
           userId,
-          coverUrl: null
         },
       });
     }
 
-    // Sử dụng AI service để tạo playlist với tâm trạng và thể loại đã phân tích
-    const playlist = await createAIGeneratedPlaylistFromAIService(userId, {
-      name: "Vibe Rewind",
-      description: `Your personal time capsule - tracks matching your ${detectedMood} mood and favorite genres: ${preferredGenres.join(', ')}`,
-      trackCount: 10,
-      basedOnMood: detectedMood,
-      basedOnGenre: preferredGenres[0], // Sử dụng thể loại được nghe nhiều nhất
-      coverUrl: null,
+    // Lấy lịch sử nghe nhạc của người dùng (bài có playCount > 2)
+    const userHistory = await prisma.history.findMany({
+      where: { userId, type: "PLAY", playCount: { gt: 2 } },
+      include: {
+        track: {
+          include: { artist: true, genres: { include: { genre: true } } },
+        },
+      },
+    });
+
+    if (userHistory.length === 0) {
+      console.log(`[PlaylistService] No history found for user ${userId}`);
+      return;
+    }
+
+    // Lấy bài hát mà người dùng nghe nhiều nhất (playCount > 5)
+    const topPlayedTracks = await prisma.history.findMany({
+      where: { userId, playCount: { gt: 5 } },
+      include: { track: true },
+      orderBy: { playCount: "desc" },
+      take: 10, // Giới hạn số lượng bài hát phổ biến
     });
 
     console.log(
-      `[PlaylistService] Successfully updated Vibe Rewind playlist for user ${userId} with ${playlist.totalTracks} tracks based on ${detectedMood} mood and favorite genres: ${preferredGenres.join(', ')}`
+      `[PlaylistService] Found ${topPlayedTracks.length} frequently played tracks for user ${userId}`
+    );
+
+    // Xác định thể loại & nghệ sĩ yêu thích
+    const genreCounts = new Map<string, number>();
+    const artistCounts = new Map<string, number>();
+
+    userHistory.forEach((history) => {
+      const track = history.track;
+      if (track) {
+        // Null check for track
+        track.genres.forEach((genreRel) => {
+          const genreId = genreRel.genre.id;
+          genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
+        });
+
+        const artistId = track.artist?.id;
+        if (artistId) {
+          artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
+        }
+      }
+    });
+
+    const topGenres = [...genreCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map((entry) => entry[0]);
+    const topArtists = [...artistCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map((entry) => entry[0]);
+
+    console.log(`[PlaylistService] Top genres: ${topGenres}`);
+    console.log(`[PlaylistService] Top artists: ${topArtists}`);
+
+    // Tìm bài hát dựa trên Content-Based Filtering
+    const recommendedTracks = await prisma.track.findMany({
+      where: {
+        OR: [
+          { genres: { some: { genreId: { in: topGenres } } } },
+          { artistId: { in: topArtists } },
+        ],
+        isActive: true,
+      },
+      include: { artist: true, album: true },
+      orderBy: { playCount: "desc" },
+      take: 10,
+    });
+
+    console.log(
+      `[PlaylistService] Found ${recommendedTracks.length} content-based tracks`
+    );
+
+    // Collaborative Filtering - Tìm người dùng có sở thích giống nhau
+    const similarUsers = await prisma.history.findMany({
+      where: {
+        trackId: {
+          in: userHistory
+            .map((h) => h.trackId)
+            .filter((id): id is string => id !== null),
+        },
+        userId: { not: userId },
+      },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+
+    const similarUserIds = similarUsers.map((u) => u.userId);
+    console.log(
+      `[PlaylistService] Found ${similarUserIds.length} similar users`
+    );
+
+    // Lấy bài hát từ người dùng có sở thích tương tự
+    const collaborativeTracks = await prisma.history.findMany({
+      where: { userId: { in: similarUserIds } },
+      include: { track: true },
+      orderBy: { playCount: "desc" },
+      take: 10,
+    });
+
+    console.log(
+      `[PlaylistService] Found ${collaborativeTracks.length} collaborative filtering tracks`
+    );
+
+    // Gộp kết quả từ cả ba phương pháp
+    const finalRecommendedTracks = [
+      ...new Set([
+        ...topPlayedTracks.map((t) => t.track), // Ưu tiên bài hát được nghe nhiều nhất
+        ...recommendedTracks,
+        ...collaborativeTracks.map((t) => t.track),
+      ]),
+    ].slice(0, 10); // Giữ tối đa 10 bài hát duy nhất
+
+    if (finalRecommendedTracks.length === 0) {
+      console.log(
+        `[PlaylistService] No tracks found to update in Vibe Rewind for user ${userId}`
+      );
+      return;
+    }
+
+    // Clear existing tracks in the playlist
+    await prisma.playlistTrack.deleteMany({
+      where: {
+        playlistId: vibeRewindPlaylist.id,
+      },
+    });
+
+    // Add new tracks to the playlist
+    const playlistTrackData = finalRecommendedTracks
+      .filter(
+        (track): track is NonNullable<typeof track> => track?.id !== undefined
+      )
+      .map((track, index) => ({
+        playlistId: vibeRewindPlaylist.id,
+        trackId: track.id,
+        trackOrder: index,
+      }));
+
+    await prisma.$transaction([
+      prisma.playlistTrack.createMany({
+        data: playlistTrackData.filter(
+          (track, index, self) =>
+            self.findIndex(
+              (t) =>
+                t.playlistId === track.playlistId && t.trackId === track.trackId
+            ) === index
+        ),
+      }),
+      prisma.playlist.update({
+        where: { id: vibeRewindPlaylist.id },
+        data: {
+          totalTracks: finalRecommendedTracks.length,
+          totalDuration: finalRecommendedTracks.reduce(
+            (sum, track) => sum + (track?.duration || 0),
+            0
+          ),
+        },
+      }),
+    ]);
+
+    console.log(
+      `[PlaylistService] Successfully updated tracks for Vibe Rewind for user ${userId}`
     );
   } catch (error) {
     console.error(
-      `[PlaylistService] Error updating Vibe Rewind playlist for user ${userId}:`,
+      `[PlaylistService] Error updating tracks for Vibe Rewind for user ${userId}:`,
       error
     );
     throw error;
   }
 };
+
 
 // Lấy các system playlist (cho admin view, với phân trang, tìm kiếm, sắp xếp)
 export const getSystemPlaylists = async (req: Request) => {
@@ -513,94 +648,66 @@ export const generateAIPlaylist = async (
     `[PlaylistService] Generating AI playlist for user ${userId} with options:`,
     options
   );
-
-  // If no parameters are provided, analyze all Vibe Rewind playlists to determine popular trends
-  if (!options.basedOnMood && !options.basedOnGenre && !options.basedOnArtist) {
-    console.log(
-      `[PlaylistService] No specific parameters provided. Analyzing all Vibe Rewind playlists for trends.`
+  
+  try {
+    // Create playlist using AI service
+    const playlist = await createAIGeneratedPlaylistFromAIService(
+      userId,
+      options
     );
-    
-    try {
-      // Import the analyzeAllVibeRewindPlaylists function
-      const { analyzeAllVibeRewindPlaylists } = await import('./ai.service');
-      
-      // Analyze all Vibe Rewind playlists
-      const analysis = await analyzeAllVibeRewindPlaylists();
-      
-      // Update options with the analysis results
-      options = {
-        ...options,
-        basedOnMood: analysis.mood,
-        basedOnGenre: analysis.genres[0], // Use the most popular genre
-        description: options.description || `A curated playlist based on the most popular ${analysis.mood} mood and ${analysis.genres.join(', ')} genres from our community.`,
-        name: options.name || `Community ${analysis.mood} Vibes`
-      };
-      
-      console.log(
-        `[PlaylistService] Using community trends: mood=${analysis.mood}, genres=${analysis.genres.join(', ')}`
-      );
-    } catch (error) {
-      console.error(
-        `[PlaylistService] Error analyzing Vibe Rewind playlists:`,
-        error
-      );
-      // Continue with default options if analysis fails
-    }
-  }
 
-  // Create playlist using AI service
-  const playlist = await createAIGeneratedPlaylistFromAIService(
-    userId,
-    options
-  );
-
-  // Get additional playlist details for the response
-  const playlistWithTracks = await prisma.playlist.findUnique({
-    where: { id: playlist.id },
-    include: {
-      tracks: {
-        include: {
-          track: {
-            include: {
-              artist: {
-                select: {
-                  id: true,
-                  artistName: true,
-                  avatar: true,
+    // Get additional playlist details for the response
+    const playlistWithTracks = await prisma.playlist.findUnique({
+      where: { id: playlist.id },
+      include: {
+        tracks: {
+          include: {
+            track: {
+              include: {
+                artist: {
+                  select: {
+                    id: true,
+                    artistName: true,
+                    avatar: true,
+                  },
                 },
               },
             },
           },
-        },
-        orderBy: {
-          trackOrder: "asc",
+          orderBy: {
+            trackOrder: "asc",
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!playlistWithTracks) {
-    throw new Error("Failed to retrieve created playlist details");
-  }
-
-  // Count artists in the playlist
-  const artistsInPlaylist = new Set();
-  playlistWithTracks.tracks.forEach((pt) => {
-    if (pt.track.artist) {
-      artistsInPlaylist.add(pt.track.artist.artistName);
+    if (!playlistWithTracks) {
+      throw new Error("Failed to retrieve created playlist details");
     }
-  });
 
-  return {
-    ...playlist,
-    artistCount: artistsInPlaylist.size,
-    previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => ({
-      id: pt.track.id,
-      title: pt.track.title,
-      artist: pt.track.artist?.artistName,
-    })),
-    totalTracks: playlistWithTracks.tracks.length, // Ensure totalTracks is accurate
-  };
+    // Count artists in the playlist
+    const artistsInPlaylist = new Set();
+    playlistWithTracks.tracks.forEach((pt) => {
+      if (pt.track.artist) {
+        artistsInPlaylist.add(pt.track.artist.artistName);
+      }
+    });
+
+    return {
+      ...playlist,
+      artistCount: artistsInPlaylist.size,
+      previewTracks: playlistWithTracks.tracks.slice(0, 3).map((pt) => ({
+        id: pt.track.id,
+        title: pt.track.title,
+        artist: pt.track.artist?.artistName,
+      })),
+      totalTracks: playlistWithTracks.tracks.length, // Ensure totalTracks is accurate
+    };
+  } catch (error) {
+    console.error(`[PlaylistService] Error in generateAIPlaylist:`, error);
+    // Re-throw the error to be handled by the controller
+    throw error;
+  }
 };
 
 // Cập nhật tất cả system playlists cho tất cả user
@@ -609,123 +716,170 @@ export const updateAllSystemPlaylists = async (): Promise<{
   errors: any[];
 }> => {
   try {
-    // Lấy danh sách tất cả users
+    // Lấy danh sách tất cả người dùng đang hoạt động
     const users = await prisma.user.findMany({
       where: { isActive: true },
       select: { id: true },
     });
 
-    // Lấy danh sách base system playlists (templates)
+    // Lấy tất cả playlist hệ thống gốc làm mẫu
     const baseSystemPlaylists = await prisma.playlist.findMany({
       where: { type: "SYSTEM", userId: null },
-      select: { name: true }, // Only need the name to trigger the update
+      select: { name: true, description: true },
     });
 
     if (baseSystemPlaylists.length === 0) {
-      console.log(
-        "[PlaylistService] No base system playlists found to update."
-      );
+      console.log("[PlaylistService] No base system playlists found to update.");
       return { success: true, errors: [] };
     }
 
-    console.log(
-      `[PlaylistService] Updating ${baseSystemPlaylists.length} system playlists for ${users.length} users...`
-    );
+    console.log(`[PlaylistService] Updating ${baseSystemPlaylists.length} system playlists for ${users.length} users...`);
 
-    const errors: Array<{
-      userId: string;
-      playlistName: string;
-      error: string;
-    }> = [];
+    const errors: any[] = [];
 
-    // Use Promise.allSettled for better performance and error handling
+    // Xử lý tất cả người dùng theo lô
     const updatePromises = users.flatMap((user) =>
-      baseSystemPlaylists.map((playlistTemplate) =>
-        // Inline the logic from the removed updateSystemPlaylistForUser function
-        (async () => {
-          try {
-            // Find the base system playlist template (userId is null)
-            const templatePlaylist = await prisma.playlist.findFirst({
-              where: {
-                name: playlistTemplate.name, // Use name from the map iteration
-                type: "SYSTEM",
-                userId: null,
-              },
-              select: {
-                id: true,
-                name: true,
-                description: true,
-                coverUrl: true,
-                privacy: true,
-              },
-            });
+      baseSystemPlaylists.map(async (playlistTemplate) => {
+        try {
+          // Lấy thông tin chi tiết của template playlist
+          const templatePlaylist = await prisma.playlist.findFirst({
+            where: {
+              name: playlistTemplate.name,
+              type: "SYSTEM",
+              userId: null,
+            },
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              coverUrl: true,
+              privacy: true,
+            },
+          });
 
-            if (!templatePlaylist) {
-              throw new Error(
-                `Base template "${playlistTemplate.name}" not found.`
-              ); // Throw error to be caught below
-            }
+          if (!templatePlaylist) {
+            throw new Error(`Base template "${playlistTemplate.name}" not found.`);
+          }
 
-            // --- START: Parse AI Params from Description ---
-            let aiOptions: PlaylistGenerationOptions = {}; // Define interface if not already done
-            if (
-              templatePlaylist.description &&
-              templatePlaylist.description.includes("<!--AI_PARAMS:")
-            ) {
-              const match = templatePlaylist.description.match(
-                /<!--AI_PARAMS:(.*?)-->/s
-              );
-              if (match && match[1]) {
-                try {
-                  aiOptions = JSON.parse(match[1]);
-                  // Clean the description before passing it if needed
-                  templatePlaylist.description = templatePlaylist.description
-                    .replace(/\n\n<!--AI_PARAMS:.*?-->/s, "")
-                    .trim();
-                } catch (e) {
-                  console.error(
-                    `[PlaylistService] Error parsing AI params for template ${templatePlaylist.name}:`,
-                    e
-                  );
-                  // Proceed without AI params if parsing fails
-                }
+          // Phân tích tham số AI từ mô tả (nếu có)
+          let aiOptions: Record<string, any> = {};
+          if (
+            templatePlaylist.description &&
+            templatePlaylist.description.includes("<!--AI_PARAMS:")
+          ) {
+            const match = templatePlaylist.description.match(
+              /<!--AI_PARAMS:(.*?)-->/s
+            );
+            if (match && match[1]) {
+              try {
+                aiOptions = JSON.parse(match[1]);
+                templatePlaylist.description = templatePlaylist.description
+                  .replace(/\n\n<!--AI_PARAMS:.*?-->/s, "")
+                  .trim();
+              } catch (e) {
+                console.error(
+                  `[PlaylistService] Error parsing AI params for template ${templatePlaylist.name}:`,
+                  e
+                );
               }
             }
-            // --- END: Parse AI Params from Description ---
-
-            // Default cover if the template doesn't have one
-            const coverUrl =
-              templatePlaylist.coverUrl ||
-              "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
-
-            // Call the AI service to create/update the user's personalized version
-            // **Pass parsed aiOptions explicitly**
-            await createAIGeneratedPlaylistFromAIService(user.id, {
-              name: templatePlaylist.name,
-              description: templatePlaylist.description || undefined, // Pass cleaned description
-              coverUrl: coverUrl,
-              ...aiOptions, // Spread the parsed AI options here
-            });
-          } catch (error: unknown) {
-            // Add type annotation here
-            // This catch block handles errors for a single user/playlist update
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            console.error(
-              `[PlaylistService] Error updating ${playlistTemplate.name} for user ${user.id}: ${errorMessage}`
-            );
-            // Push the error details into the shared errors array
-            errors.push({
-              userId: user.id,
-              playlistName: playlistTemplate.name,
-              error: errorMessage,
-            });
-            // Don't rethrow here, let Promise.allSettled handle it
           }
-        })()
-      )
+          
+          // Kiểm tra tham số AI
+          const hasMoodParam = !!aiOptions.basedOnMood;
+          const hasGenreParam = !!aiOptions.basedOnGenre;
+          const hasArtistParam = !!aiOptions.basedOnArtist;
+          const hasSongLengthParam = !!aiOptions.basedOnSongLength;
+          const hasReleaseTimeParam = !!aiOptions.basedOnReleaseTime;
+          
+          // Phải có ít nhất một tham số AI để tạo playlist có ý nghĩa
+          const hasAnyParam = hasMoodParam || hasGenreParam || hasArtistParam || 
+                             hasSongLengthParam || hasReleaseTimeParam;
+                             
+          if (!hasAnyParam) {
+            // Nếu không có tham số nào, thêm một số tham số mặc định
+            // Phân tích lịch sử nghe của người dùng nếu có thể
+            const userHistory = await prisma.history.findMany({
+              where: {
+                userId: user.id,
+                type: "PLAY",
+              },
+              include: {
+                track: {
+                  include: {
+                    genres: {
+                      include: {
+                        genre: true,
+                      },
+                    },
+                  },
+                },
+              },
+              orderBy: {
+                updatedAt: "desc",
+              },
+              take: 50,
+            });
+            
+            if (userHistory.length > 0) {
+              // Tạo bản đồ đếm thể loại
+              const genreCounts: Record<string, number> = {};
+              userHistory.forEach(history => {
+                if (history.track) {
+                  history.track.genres.forEach(genreRel => {
+                    const genreName = genreRel.genre.name;
+                    genreCounts[genreName] = (genreCounts[genreName] || 0) + 1;
+                  });
+                }
+              });
+              
+              // Lấy thể loại phổ biến nhất
+              if (Object.keys(genreCounts).length > 0) {
+                const topGenre = Object.entries(genreCounts)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([genre]) => genre)[0];
+                  
+                aiOptions.basedOnGenre = topGenre;
+                console.log(`[PlaylistService] Adding default genre parameter for user ${user.id}: ${topGenre}`);
+              } else {
+                // Nếu không tìm thấy thể loại, sử dụng tâm trạng mặc định
+                aiOptions.basedOnMood = "energetic";
+                console.log(`[PlaylistService] Adding default mood parameter for user ${user.id}: energetic`);
+              }
+            } else {
+              // Nếu không có lịch sử, sử dụng tham số mặc định
+              aiOptions.basedOnMood = "energetic";
+              console.log(`[PlaylistService] No history found. Adding default mood parameter for user ${user.id}: energetic`);
+            }
+          }
+
+          // Sử dụng URL ảnh bìa mặc định nếu không có sẵn
+          const coverUrl =
+            templatePlaylist.coverUrl ||
+            "https://res.cloudinary.com/dsw1dm5ka/image/upload/v1742393277/jrkkqvephm8d8ozqajvp.png";
+
+          // Tạo hoặc cập nhật playlist hệ thống được cá nhân hóa cho người dùng
+          await createAIGeneratedPlaylistFromAIService(user.id, {
+            name: templatePlaylist.name,
+            description: templatePlaylist.description || undefined,
+            coverUrl: coverUrl,
+            ...aiOptions,
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error(
+            `[PlaylistService] Error updating ${playlistTemplate.name} for user ${user.id}: ${errorMessage}`
+          );
+          errors.push({
+            userId: user.id,
+            playlistName: playlistTemplate.name,
+            error: errorMessage,
+          });
+        }
+      })
     );
 
+    // Đợi tất cả các tác vụ hoàn thành
     await Promise.allSettled(updatePromises);
 
     if (errors.length === 0) {

@@ -3213,6 +3213,8 @@ interface SystemPlaylistModalProps {
     basedOnMood?: string;
     basedOnGenre?: string;
     basedOnArtist?: string;
+    basedOnSongLength?: string;
+    basedOnReleaseTime?: string;
     trackCount?: number;
   };
   theme?: 'light' | 'dark';
@@ -3240,12 +3242,10 @@ export function SystemPlaylistModal({
   // AI generation parameters - Initialize from initialData
   const [isAIGenerated, setIsAIGenerated] = useState(true);
   const [basedOnMood, setBasedOnMood] = useState(initialData.basedOnMood || '');
-  const [basedOnGenre, setBasedOnGenre] = useState(
-    initialData.basedOnGenre || ''
-  );
-  const [basedOnArtist, setBasedOnArtist] = useState(
-    initialData.basedOnArtist || ''
-  );
+  const [basedOnGenre, setBasedOnGenre] = useState(initialData.basedOnGenre || '');
+  const [basedOnArtist, setBasedOnArtist] = useState(initialData.basedOnArtist || '');
+  const [basedOnSongLength, setBasedOnSongLength] = useState(initialData.basedOnSongLength || '');
+  const [basedOnReleaseTime, setBasedOnReleaseTime] = useState(initialData.basedOnReleaseTime || '');
   const [trackCount, setTrackCount] = useState(initialData.trackCount || 10);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -3292,9 +3292,10 @@ export function SystemPlaylistModal({
       if (basedOnMood) formData.append('basedOnMood', basedOnMood);
       if (basedOnGenre) formData.append('basedOnGenre', basedOnGenre);
       if (basedOnArtist) formData.append('basedOnArtist', basedOnArtist);
+      if (basedOnSongLength) formData.append('basedOnSongLength', basedOnSongLength);
+      if (basedOnReleaseTime) formData.append('basedOnReleaseTime', basedOnReleaseTime);
       formData.append('trackCount', String(trackCount));
     }
-
     try {
       await onSubmit(formData);
       onClose();
@@ -3446,11 +3447,6 @@ export function SystemPlaylistModal({
           {/* AI Generation Options */}
           <div className="space-y-3">
             <div className="flex items-center space-x-2">
-              <Switch
-                id="isAIGenerated"
-                checked={isAIGenerated}
-                onCheckedChange={setIsAIGenerated}
-              />
               <InputLabel
                 htmlFor="isAIGenerated"
                 className={theme === 'dark' ? 'text-white' : ''}
@@ -3519,6 +3515,58 @@ export function SystemPlaylistModal({
                         : ''
                     }
                   />
+                </div>
+
+                <div>
+                  <InputLabel
+                    htmlFor="basedOnSongLength"
+                    className={theme === 'dark' ? 'text-white' : ''}
+                  >
+                    Based on Song Length (optional)
+                  </InputLabel>
+                  <Input
+                    id="basedOnSongLength"
+                    value={basedOnSongLength}
+                    onChange={(e) => setBasedOnSongLength(e.target.value)}
+                    placeholder="Enter length category or seconds"
+                    className={
+                      theme === 'dark'
+                        ? 'bg-white/[0.07] text-white border-white/[0.1]'
+                        : ''
+                    }
+                  />
+                  <p
+                    className={`text-xs mt-1 ${theme === 'dark' ? 'text-white/50' : 'text-gray-500'
+                      }`}
+                  >
+                    Enter "short" (&lt; 3min), "medium" (3-5min), "long" (&gt; 5min) or specific seconds
+                  </p>
+                </div>
+
+                <div>
+                  <InputLabel
+                    htmlFor="basedOnReleaseTime"
+                    className={theme === 'dark' ? 'text-white' : ''}
+                  >
+                    Based on Release Time (optional)
+                  </InputLabel>
+                  <Input
+                    id="basedOnReleaseTime"
+                    value={basedOnReleaseTime}
+                    onChange={(e) => setBasedOnReleaseTime(e.target.value)}
+                    placeholder="Enter a year (e.g., 2022) or keyword"
+                    className={
+                      theme === 'dark'
+                        ? 'bg-white/[0.07] text-white border-white/[0.1]'
+                        : ''
+                    }
+                  />
+                  <p
+                    className={`text-xs mt-1 ${theme === 'dark' ? 'text-white/50' : 'text-gray-500'
+                      }`}
+                  >
+                    Enter a specific year (1900-present) or use "new", "recent", "classics"
+                  </p>
                 </div>
 
                 <div>

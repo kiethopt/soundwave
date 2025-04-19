@@ -329,6 +329,8 @@ export const SystemPlaylistManagement: React.FC<
             basedOnArtist: (editPlaylist as any).basedOnArtist || '',
             basedOnMood: (editPlaylist as any).basedOnMood || '',
             basedOnGenre: (editPlaylist as any).basedOnGenre || '',
+            basedOnSongLength: (editPlaylist as any).basedOnSongLength || '',
+            basedOnReleaseTime: (editPlaylist as any).basedOnReleaseTime || '',
             trackCount: (editPlaylist as any).trackCount || 10,
           }}
           theme={theme}

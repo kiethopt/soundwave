@@ -290,7 +290,7 @@ export default function TrackDetailPage() {
                 >
                   <Calendar className="w-5 h-5" />
                   <span>
-                    {new Date(track.createdAt).toLocaleDateString('en-US', {
+                    {new Date(track.releaseDate).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric',
