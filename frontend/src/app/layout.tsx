@@ -93,7 +93,9 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                     suppressHydrationWarning
                     className={`min-h-full p-2 ${
                       theme === 'light' ? 'bg-gray-50' : ''
-                    }`}
+                    }
+                    ${isAuthenticated ? 'mb-[80px]' : ''}
+                    `}
                     style={{
                       background: theme === 'dark' ? backgroundStyle : undefined,
                     }}
@@ -106,9 +108,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           </div>
 
           {isAuthenticated && (
-            <div className={`${isAuthenticated ? 'mt-[90px]' : ''}`} >
-              <PlayerBar />
-            </div>
+            <PlayerBar />
           )}
         </div>
       )}
