@@ -51,8 +51,7 @@ export default function NotificationsPage() {
         const storedUserData = localStorage.getItem('userData');
 
         if (!token) {
-          toast.error('You need to log in to view notifications!');
-          setLoading(false);
+          router.replace('/login');
           return;
         }
 

@@ -450,6 +450,14 @@ export default function Header({
     }
   };
 
+  const handleDiscoverClick = () => {
+    if (isAuthenticated) {
+      router.push('/discover');
+    } else {
+      setDialogOpen(true);
+    }
+  };
+
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   };
@@ -494,8 +502,8 @@ export default function Header({
               <span className="hidden lg:inline">Home</span>
             </Link>
 
-            <Link
-              href="/discover"
+            <button
+              onClick={handleDiscoverClick}
               className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md transition-colors ${isActive('/discover')
                 ? theme === 'light'
                   ? 'text-gray-900 bg-gray-200'
@@ -511,7 +519,7 @@ export default function Header({
                 <DiscoverOutline className="w-5 h-5" />
               )}
               <span className="hidden lg:inline">Discover</span>
-            </Link>
+            </button>
 
             <div className="relative w-[400px]" ref={searchRef}>
               <form onSubmit={handleSearch} className="relative">

@@ -463,7 +463,11 @@ export default function Sidebar({
                             <div
                               className={`${
                                 isCollapsed ? "w-8 h-px" : "w-full"
-                              } border-t border-[#333333] mb-2`}
+                              } mb-2 ${
+                                favoritePlaylist 
+                                  ? "border-t border-[#333333]"
+                                  : ""
+                              }`}
                             />
                           )}
                         

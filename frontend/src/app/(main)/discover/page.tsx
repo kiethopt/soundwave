@@ -7,18 +7,33 @@ import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { api } from '@/utils/api';
 import { getDominantHexColor } from '@/utils/tailwind-color-map';
+import { useRouter } from 'next/navigation';
 
 export default function DiscoveryPage() {
   const { theme, updateGenreData } = useTheme();
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
 
   useEffect(() => {
+    const token = localStorage.getItem('userToken') || '';
+    if (!token) {
+      router.replace('/login');
+    }
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      router.replace('/login'); 
+      return;
+    }
+
     const fetchGenres = async () => {
       try {
         setLoading(true);
-        const token = localStorage.getItem('userToken') || '';        
         const response = await api.user.getAllGenres(token);
         
         if (response && response.genres && response.genres.length > 0) {
@@ -39,7 +54,7 @@ export default function DiscoveryPage() {
     };
 
     fetchGenres();
-  }, []);
+  }, [router]);
 
   // Helper function to get a color for a genre
   const getGenreColor = (genreName: string) => {

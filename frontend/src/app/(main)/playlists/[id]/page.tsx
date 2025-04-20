@@ -57,6 +57,13 @@ export default function PlaylistPage() {
     playlist?.name !== "Welcome Mix";
 
   useEffect(() => {
+    // Check if user is authenticated
+    const token = localStorage.getItem("userToken");
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+
     const fetchPlaylist = async () => {
       try {
         setLoading(true);
