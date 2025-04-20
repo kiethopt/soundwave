@@ -11,6 +11,7 @@ import { getSocket } from '@/utils/socket';
 import type { User as UserType } from '@/types';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 const SectionHeading = ({ icon: Icon, title }: { icon: React.ElementType, title: string }) => (
   <div className="flex items-center gap-3 mb-4">
@@ -147,17 +148,10 @@ export default function RequestArtistPage() {
 
     // --- Genre Validation --- 
     if (formData.genres.length === 0) {
-        // setError('Please select at least one genre.'); // Optional: Show general error message - REMOVE THIS
         setGenreError('This field is required'); // Set specific genre error message
-        // Don't set isSubmitting to true yet, or reset it if already set
-        // setIsSubmitting(false); // Not needed if we return
         toast.error('Please select at least one genre.');
         return; // Stop submission
     } 
-    // Remove the else block - reset happens at the start now
-    // else {
-    //     setFormErrors({ ...formErrors, genres: false }); // Clear error only if validation passes
-    // }
     // --- End Genre Validation ---
 
     setIsSubmitting(true); // Set submitting state only if validation passes
@@ -244,48 +238,57 @@ export default function RequestArtistPage() {
   // If already has pending request, show message
   if (hasPendingRequest) {
     return (
-      <div className="container mx-auto p-6 space-y-8">
-        <div className="flex items-center justify-between mb-6">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Back to Home</span>
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Request to Become an Artist
-          </h1>
-        </div>
+      <div className="min-h-screen p-6 space-y-8 bg-gradient-to-b from-[#2c2c2c] to-[#121212] text-white">
+        <div className="bg-black/20 border border-white/10 rounded-lg overflow-hidden backdrop-blur-sm p-8 max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <Button variant="ghost" asChild>
+              <Link
+                href="/"
+                className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span>Back to Home</span>
+              </Link>
+            </Button>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Request to Become an Artist
+            </h1>
+          </div>
 
-        <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] p-6">
-          <p className="text-center text-white">
-            You have already submitted a request to become an artist. Please
-            wait for admin approval.
-          </p>
+          <div className="bg-black/20 border border-white/10 rounded-lg overflow-hidden backdrop-blur-sm p-8 max-w-lg mx-auto">
+            <p className="text-center text-white">
+              You have already submitted a request to become an artist. Please
+              wait for admin approval.
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      <div className="flex items-center justify-between mb-6">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Back to Home</span>
-        </Link>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Request to Become an Artist
-        </h1>
-      </div>
+    <div className="min-h-screen space-y-8 bg-gradient-to-b from-[#2c2c2c] to-[#121212] text-white">
+      <div className="bg-black/20 border border-white/10 rounded-lg overflow-hidden backdrop-blur-sm p-8">
+        <div className="flex items-center justify-between mb-6">
+          <Button 
+            variant="secondary" 
+            asChild 
+            className="bg-neutral-700 hover:bg-neutral-600 text-neutral-100"
+          >
+            <Link
+              href="/"
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Back to Home</span>
+            </Link>
+          </Button>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Request to Become an Artist
+          </h1>
+        </div>
 
-      <div className="bg-[#121212] rounded-lg overflow-hidden border border-white/[0.08] p-8">
         <form onSubmit={handleSubmit} className="space-y-8">
-
           {/* Integrated Avatar Preview & Upload */}
           <div className="flex flex-col items-center justify-center mb-6 space-y-2">
             <label
@@ -349,7 +352,6 @@ export default function RequestArtistPage() {
             <p className="text-xs text-muted-foreground pt-1">Upload a profile picture (JPG, PNG, GIF - max 5MB).</p>
           </div>
           <hr className="border-white/[0.1]" />
-
 
           <div className="space-y-6">
             <SectionHeading icon={User} title="Artist Details" />
@@ -480,23 +482,23 @@ export default function RequestArtistPage() {
           )}
 
           <div className="flex justify-end gap-4 pt-4">
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => router.back()}
-              className="px-5 py-2.5 bg-white/10 text-white/80 rounded-lg hover:bg-white/20 transition-colors text-sm font-medium flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#121212] focus:ring-white/50"
+              className="flex items-center gap-2"
             >
               <X className="w-4 h-4" />
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              // Removed genre check from disabled attribute
               disabled={isSubmitting || !formData.artistName || !formData.bio || !formData.avatarFile}
-              className="px-5 py-2.5 bg-white text-[#121212] rounded-lg hover:bg-white/90 transition-all duration-200 font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#121212] focus:ring-white flex items-center gap-2"
+              className="flex items-center gap-2"
             >
               {isSubmitting ? (
                   <div className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-4 w-4 text-[#121212]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
@@ -508,7 +510,7 @@ export default function RequestArtistPage() {
                   Submit Request
                  </>
               )}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

@@ -51,7 +51,8 @@ export default function NotificationsPage() {
         const storedUserData = localStorage.getItem('userData');
 
         if (!token) {
-          router.replace('/login');
+          toast.error('You need to log in to view notifications!');
+          setLoading(false);
           return;
         }
 
@@ -233,7 +234,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className={`min-h-screen py-8 px-3 pt-[72px] flex flex-col ${theme === 'light' ? 'bg-gray-50' : 'bg-[#111111]'}`}>
+    <div className={`min-h-screen py-8 px-3 pt-[20px] flex flex-col ${theme === 'light' ? 'bg-gray-50' : 'bg-[#111111]'}`}>
       <div className="w-full mb-6 flex items-center animate-fade-in px-6">
         <div>
           <h1 className={`text-2xl font-bold inline-block ${theme === 'light' ? 'text-gray-900' : 'text-primary'}`}>
