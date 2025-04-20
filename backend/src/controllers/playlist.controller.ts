@@ -1,6 +1,7 @@
 import { RequestHandler } from "express";
 import * as playlistService from "../services/playlist.service";
 import * as albumService from "../services/album.service";
+import * as userService from "../services/user.service";
 import { handleError } from "../utils/handle-utils"; // Import error handler
 import { PrismaClient, Prisma } from "@prisma/client";
 import prisma from "../config/db"; // Import configured prisma instance
@@ -1168,43 +1169,79 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
     const userId = req.user?.id;
     const isAuthenticated = !!userId;
 
-    // Get albums data
-    const [newestAlbums, hotAlbums] = await Promise.all([
-      albumService.getNewestAlbums(8),
-      albumService.getHotAlbums(8),
+    // Get albums data and top tracks/artists
+    const [newestAlbums, hotAlbums, topTracks, topArtists] = await Promise.all([
+      albumService.getNewestAlbums(20),
+      albumService.getHotAlbums(20),
+      userService.getTopTracks(),
+      userService.getTopArtists(),
     ]);
 
     // Prepare the response data object
     const responseData: any = {
       newestAlbums,
       hotAlbums,
+      topTracks,
+      topArtists,
       systemPlaylists: [],
     };
 
     // For authenticated users, get personalized system playlists and user playlists
     if (isAuthenticated && userId) {
       try {
-        const systemPlaylists = await prisma.playlist.findMany({
-          where: {
-            type: "SYSTEM",
-            privacy: "PUBLIC",
-          },
-          include: {
-            tracks: {
-              select: {
-                track: {
-                  include: {
-                    artist: true,
+        const [systemPlaylists, userSystemPlaylists, userPlaylists, userTopTracks, userTopArtists] = await Promise.all([
+          prisma.playlist.findMany({
+            where: {
+              type: "SYSTEM",
+              privacy: "PUBLIC",
+            },
+            include: {
+              tracks: {
+                select: {
+                  track: {
+                    include: {
+                      artist: true,
+                    },
                   },
+                  trackOrder: true,
                 },
-                trackOrder: true,
-              },
-              orderBy: {
-                trackOrder: "asc",
+                orderBy: {
+                  trackOrder: "asc",
+                },
               },
             },
-          },
-        });
+          }),
+          prisma.playlist.findMany({
+            where: {
+              userId,
+              type: "SYSTEM",
+            },
+            include: {
+              _count: {
+                select: {
+                  tracks: true,
+                },
+              },
+            },
+          }),
+          prisma.playlist.findMany({
+            where: {
+              userId,
+              type: {
+                not: "SYSTEM",
+              },
+            },
+            include: {
+              _count: {
+                select: {
+                  tracks: true,
+                },
+              },
+            },
+          }),
+          userService.getUserTopTracks(req.user),
+          userService.getUserTopArtists(req.user),
+        ]);
 
         // Transform the data to match the expected format
         responseData.systemPlaylists = systemPlaylists.map((playlist) => ({
@@ -1214,38 +1251,6 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
             trackOrder: pt.trackOrder,
           })),
         }));
-
-        // Get personalized playlists for the user
-        const userSystemPlaylists = await prisma.playlist.findMany({
-          where: {
-            userId,
-            type: "SYSTEM",
-          },
-          include: {
-            _count: {
-              select: {
-                tracks: true,
-              },
-            },
-          },
-        });
-
-        // Get user's own playlists
-        const userPlaylists = await prisma.playlist.findMany({
-          where: {
-            userId,
-            type: {
-              not: "SYSTEM",
-            },
-          },
-          include: {
-            _count: {
-              select: {
-                tracks: true,
-              },
-            },
-          },
-        });
 
         // Add to response data
         responseData.personalizedSystemPlaylists = userSystemPlaylists.map(
@@ -1259,9 +1264,11 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
           ...playlist,
           totalTracks: playlist._count.tracks,
         }));
+
+        responseData.userTopTracks = userTopTracks;
+        responseData.userTopArtists = userTopArtists;
       } catch (error: any) {
         console.error("Error fetching user playlist data:", error);
-        // Continue with partial data rather than failing completely
       }
     }
 

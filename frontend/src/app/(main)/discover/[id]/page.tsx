@@ -184,7 +184,7 @@ export default function DiscoveryGenrePage({
   }
 
   const isArtistPlaying = (artistId: string, type: 'topArtist') => {
-    return isPlaying && currentTrack?.id === artistId && queueType === type;
+    return isPlaying && currentTrack?.artist.id === artistId && queueType === type;
   };
 
   const isTrackPlaying = (trackId: string) => {
@@ -192,10 +192,8 @@ export default function DiscoveryGenrePage({
   };
 
   const isAlbumPlaying = (albumId: string) => {
-    return isPlaying && currentTrack?.id === albumId && queueType === 'album';
+    return isPlaying && currentTrack?.album?.id === albumId && queueType === 'album';
   };
-
-  console.log('Top Tracks:', topAlbums);
   
   return (
     <div
