@@ -5,24 +5,6 @@ import { handleError } from "../utils/handle-utils"; // Import error handler
 import { PrismaClient, Prisma } from "@prisma/client";
 import prisma from "../config/db"; // Import configured prisma instance
 
-// Tạo playlist FAVORITE (mặc định khi tạo tài khoản sẽ có 1 cái playlist này)
-export const createFavoritePlaylist = async (userId: string): Promise<void> => {
-  try {
-    await prisma.playlist.create({
-      data: {
-        name: "Favorites",
-        description: "List of your favorite songs",
-        privacy: "PRIVATE",
-        type: "FAVORITE",
-        userId,
-      },
-    });
-  } catch (error) {
-    console.error("Error creating favorite playlist:", error);
-    throw error;
-  }
-};
-
 // Tạo playlist mới
 export const createPlaylist: RequestHandler = async (
   req,
@@ -106,30 +88,9 @@ export const getPlaylists: RequestHandler = async (
     const filterType = req.header("X-Filter-Type");
     const isSystemFilter = filterType === "system";
 
-    // Create favorite playlist if it doesn't exist (for all non-system requests)
+    // Create system playlists if they don't exist (for all non-system requests)
     if (!isSystemFilter) {
-      // Kiểm tra xem có playlist yêu thích chưa
-      let favoritePlaylist = await prisma.playlist.findFirst({
-        where: {
-          userId,
-          type: "FAVORITE",
-        },
-      });
-
-      // Nếu chưa có, tạo mới playlist yêu thích
-      if (!favoritePlaylist) {
-        favoritePlaylist = await prisma.playlist.create({
-          data: {
-            name: "Favorites",
-            description: "List of your favorite songs",
-            privacy: "PRIVATE",
-            type: "FAVORITE",
-            userId,
-          },
-        });
-      }
-
-      // Also check for Vibe Rewind playlist
+      // Check for Vibe Rewind playlist
       let vibeRewindPlaylist = await prisma.playlist.findFirst({
         where: {
           userId,

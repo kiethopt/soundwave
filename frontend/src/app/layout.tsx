@@ -15,6 +15,8 @@ import { MaintenanceBanner } from '@/components/ui/MaintenanceBanner';
 import { useMaintenance } from '@/contexts/MaintenanceContext';
 import { BackgroundProvider, useBackground } from '@/contexts/BackgroundContext';
 import type { User } from '@/types';
+import { SessionProvider } from "@/contexts/SessionContext";
+import { SocketProvider } from "@/contexts/SocketContext";
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -158,17 +160,21 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <ThemeProvider>
-        <MaintenanceProvider>
+        <SessionProvider>
           <TrackProvider>
-            <BackgroundProvider>
-              <body className="bg-[#111]" suppressHydrationWarning>
-                <MaintenanceBanner />
-                <LayoutContent>{children}</LayoutContent>
-                <Toaster position="top-center" />
-              </body>
-            </BackgroundProvider>
+            <MaintenanceProvider>
+              <SocketProvider>
+                <BackgroundProvider>
+                  <body className="bg-[#111]" suppressHydrationWarning>
+                    <MaintenanceBanner />
+                    <LayoutContent>{children}</LayoutContent>
+                    <Toaster position="top-center" />
+                  </body>
+                </BackgroundProvider>
+              </SocketProvider>
+            </MaintenanceProvider>
           </TrackProvider>
-        </MaintenanceProvider>
+        </SessionProvider>
       </ThemeProvider>
     </html>
   );

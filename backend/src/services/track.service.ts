@@ -73,30 +73,51 @@ export const likeTrack = async (userId: string, trackId: string) => {
     },
   });
 
-  const favoritePlaylist = await prisma.playlist.findFirst({
+  // Check if the Favorites playlist exists for this user
+  let favoritePlaylist = await prisma.playlist.findFirst({
     where: {
       userId,
       type: 'FAVORITE',
     },
   });
 
+  // If Favorites playlist doesn't exist, create it
   if (!favoritePlaylist) {
-    throw new Error('Favorite playlist not found');
+    
+    favoritePlaylist = await prisma.playlist.create({
+      data: {
+        name: "Favorites",
+        description: "List of your favorite songs",
+        privacy: "PRIVATE",
+        type: "FAVORITE",
+        userId,
+      },
+    });
   }
 
+  // Add track to the Favorites playlist
   const tracksCount = await prisma.playlistTrack.count({
     where: {
       playlistId: favoritePlaylist.id,
     },
   });
 
-  return prisma.playlistTrack.create({
+  await prisma.playlistTrack.create({
     data: {
       playlistId: favoritePlaylist.id,
       trackId,
       trackOrder: tracksCount + 1,
     },
   });
+
+  // Emit WebSocket event to notify clients that the Favorites playlist was updated
+  const io = getIO();
+  io.emit('playlist-updated');
+  // Also emit a personalized event for this user
+  io.to(`user-${userId}`).emit('favorites-updated', { action: 'added', trackId });
+  
+
+  return { message: 'Track liked successfully' };
 };
 
 // Unlike a track
@@ -114,6 +135,36 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
     throw new Error('Track not liked');
   }
 
+  // First, find the Favorites playlist
+  const favoritePlaylist = await prisma.playlist.findFirst({
+    where: {
+      userId,
+      type: 'FAVORITE',
+    },
+    include: {
+      _count: {
+        select: {
+          tracks: true
+        }
+      }
+    }
+  });
+
+  if (!favoritePlaylist) {
+    // Just delete the like if there's no Favorites playlist
+    await prisma.userLikeTrack.delete({
+      where: {
+        userId_trackId: {
+          userId,
+          trackId,
+        },
+      },
+    });
+    
+    return { message: 'Track unliked successfully' };
+  }
+
+  // Delete the like
   await prisma.userLikeTrack.delete({
     where: {
       userId_trackId: {
@@ -123,7 +174,8 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
     },
   });
 
-  return prisma.playlistTrack.deleteMany({
+  // Remove track from the Favorites playlist
+  await prisma.playlistTrack.deleteMany({
     where: {
       playlist: {
         userId,
@@ -132,6 +184,35 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
       trackId,
     },
   });
+
+  // Get the IO instance for WebSocket communication
+  const io = getIO();
+
+  // Check if this was the last track in the playlist
+  // If favoritePlaylist._count.tracks is 1, that means after deletion it will be empty
+  if (favoritePlaylist._count.tracks === 1) {
+    
+    // Delete the entire Favorites playlist since it's now empty
+    await prisma.playlist.delete({
+      where: {
+        id: favoritePlaylist.id
+      }
+    });
+    
+    // Emit WebSocket event to notify clients that the Favorites playlist was deleted
+    io.emit('playlist-updated');
+    io.to(`user-${userId}`).emit('favorites-updated', { action: 'deleted', playlistId: favoritePlaylist.id });
+    
+    
+    return { message: 'Track unliked and empty Favorites playlist removed' };
+  }
+
+  // Emit WebSocket event to notify clients that the Favorites playlist was updated
+  io.emit('playlist-updated');
+  io.to(`user-${userId}`).emit('favorites-updated', { action: 'removed', trackId });
+  
+
+  return { message: 'Track unliked successfully' };
 };
 
 // Lấy tất cả tracks

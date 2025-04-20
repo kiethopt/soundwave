@@ -316,7 +316,7 @@ export const generateAIPlaylist  = async (
                 console.log(`[AI] Unrecognized decade format: ${releaseTimeValue}`);
               }
             } else {
-              console.log(`[AI] Unknown release time filter: ${options.basedOnReleaseTime}`);
+            console.log(`[AI] Unknown release time filter: ${options.basedOnReleaseTime}`);
             }
         }
       }
@@ -564,8 +564,8 @@ export const generateAIPlaylist  = async (
 
       // Tính điểm cho mỗi bài hát dựa trên mức độ ưa thích nghệ sĩ
       const scoredArtistTracks = artistTracks.map(track => {
-        return {
-          ...track,
+          return {
+            ...track,
           score: artistPreferenceScore[track.artistId] || 0
         };
       }).sort((a, b) => b.score - a.score);
@@ -614,22 +614,22 @@ export const generateAIPlaylist  = async (
               }
             : 
               // Nếu chỉ có thể loại và có bài hát từ nghệ sĩ, loại trừ các nghệ sĩ đã có bài hát
-              hasGenreParam && !hasArtistParam && trackIds.length > 0
-                ? {
-                    artistId: {
-                      notIn: Array.from(
-                        new Set(
-                          trackIds
+            hasGenreParam && !hasArtistParam && trackIds.length > 0
+            ? {
+                artistId: {
+                  notIn: Array.from(
+                    new Set(
+                      trackIds
                             .map(id => {
                               const track = artistTracks.find(t => t.id === id);
-                              return track?.artistId;
-                            })
-                            .filter(Boolean) as string[]
-                        )
-                      ),
-                    },
-                  }
-                : {}),
+                          return track?.artistId;
+                        })
+                        .filter(Boolean) as string[]
+                    )
+                  ),
+                },
+              }
+            : {}),
         },
         orderBy: [{ playCount: Prisma.SortOrder.desc }, { createdAt: Prisma.SortOrder.desc }],
         take: genreTrackCount * 2, // Lấy nhiều hơn để có thể lọc và sắp xếp tốt hơn
@@ -675,7 +675,6 @@ export const generateAIPlaylist  = async (
     // 3. Thêm các bài hát phổ biến nếu chưa đủ số lượng
     if (trackIds.length < trackCount && popularTrackCount > 0) {
       const remainingNeeded = trackCount - trackIds.length;
-      
       // Lọc theo tâm trạng nếu được chỉ định
       const moodFilter = options.basedOnMood
         ? await getMoodFilter(options.basedOnMood)

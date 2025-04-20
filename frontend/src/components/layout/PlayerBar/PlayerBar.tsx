@@ -94,10 +94,16 @@ export default function PlayerBar() {
         await api.tracks.unlike(currentTrack.id, token);
         setIsLiked(false);
         toast.success("Removed from your Liked Tracks");
+        
+        // Trigger manual event to update sidebar
+        window.dispatchEvent(new CustomEvent("favorites-changed"));
       } else {
         await api.tracks.like(currentTrack.id, token);
         setIsLiked(true);
         toast.success("Added to your Liked Tracks");
+        
+        // Trigger manual event to update sidebar
+        window.dispatchEvent(new CustomEvent("favorites-changed"));
       }
     } catch (error) {
       console.error("Error toggling like status:", error);

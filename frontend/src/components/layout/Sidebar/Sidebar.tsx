@@ -29,6 +29,7 @@ import { PlaylistIcon } from "@/components/user/playlist/PlaylistIcon";
 import { BsFillPinAngleFill } from "react-icons/bs";
 import { BsStars } from "react-icons/bs";
 import { Playlist } from "@/types";
+import { useSocket } from "@/contexts/SocketContext";
 
 const getInitialCollapsedState = (): boolean => {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -78,6 +79,7 @@ export default function Sidebar({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const { socket } = useSocket();
 
   useEffect(() => {
     try {
@@ -185,12 +187,46 @@ export default function Sidebar({
       fetchPlaylists();
     };
 
+    const handleFavoritesChanged = () => {
+      console.log("Favorites changed event received, refreshing playlists");
+      fetchPlaylists();
+    };
+
     window.addEventListener("playlist-updated", handlePlaylistUpdate);
+    window.addEventListener("favorites-changed", handleFavoritesChanged);
+
+    // Socket event listeners for real-time updates
+    if (socket && userId) {
+      console.log(`[Socket] Setting up listeners for user ${userId}`);
+      
+      // Listen for global playlist updates
+      socket.on('playlist-updated', () => {
+        console.log('[Socket] Global playlist update received');
+        fetchPlaylists();
+      });
+
+      // Listen for user-specific favorites updates
+      socket.on('favorites-updated', (data) => {
+        console.log(`[Socket] Favorites update received for user ${userId}: ${data.action} - ${data.trackId || data.playlistId}`);
+        fetchPlaylists();
+      });
+
+      // Ensure user is in their room for targeted events
+      socket.emit('join-room', `user-${userId}`);
+    }
 
     return () => {
       window.removeEventListener("playlist-updated", handlePlaylistUpdate);
+      window.removeEventListener("favorites-changed", handleFavoritesChanged);
+      
+      // Clean up socket listeners
+      if (socket) {
+        console.log('[Socket] Cleaning up listeners');
+        socket.off('playlist-updated');
+        socket.off('favorites-updated');
+      }
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, socket, userId]);
 
   const isActive = (path: string) => pathname === path;
 
@@ -419,322 +455,18 @@ export default function Sidebar({
                         </Link>
                       </div>
                     )}
-
-                    {favoritePlaylist &&
-                      (vibeRewindPlaylist || welcomeMixPlaylist) && (
-                        <div
-                          className={`${
-                            isCollapsed ? "w-8 h-px my-2" : "w-full my-2"
-                          } border-t border-[#333333]`}
-                        />
-                      )}
-
-                    {(vibeRewindPlaylist || welcomeMixPlaylist) && (
-                      <div
-                        className={`${
-                          isCollapsed
-                            ? "w-full flex flex-col items-center space-y-2"
-                            : ""
-                        }`}
-                      >
-                        {vibeRewindPlaylist && (
-                          <div
-                            className={`relative ${
-                              isCollapsed
-                                ? "flex justify-center"
-                                : "flex flex-col mb-1"
-                            }`}
-                          >
-                            <Link
-                              href={`/playlists/${vibeRewindPlaylist.id}`}
-                              className={`flex ${
-                                isCollapsed
-                                  ? "items-center justify-center py-1"
-                                  : `items-center px-3 py-2 rounded-md ${
-                                      pathname ===
-                                      `/playlists/${vibeRewindPlaylist.id}`
-                                        ? theme === "light"
-                                          ? "bg-gray-200 text-gray-900"
-                                          : "bg-[#A57865]/30 text-white"
-                                        : theme === "light"
-                                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                                    }`
-                              }`}
-                            >
-                              {isCollapsed ? (
-                                <div
-                                  className={`p-1.5 rounded-lg ${
-                                    isActive(
-                                      `/playlists/${vibeRewindPlaylist.id}`
-                                    )
-                                      ? "bg-[#A57865]/30"
-                                      : "bg-neutral-800"
-                                  } flex items-center justify-center w-10 h-10 relative group shadow-md transition-all duration-200 hover:scale-105 hover:bg-[#333333]`}
-                                >
-                                  <PlaylistIcon
-                                    coverUrl={vibeRewindPlaylist.coverUrl}
-                                    name={vibeRewindPlaylist.name}
-                                    type={vibeRewindPlaylist.type}
-                                    isAIGenerated={
-                                      vibeRewindPlaylist.isAIGenerated
-                                    }
-                                    size={28}
-                                    className="rounded object-cover text-emerald-500"
-                                  />
-                                  <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
-                                    <div className="font-medium">
-                                      {vibeRewindPlaylist.name}
-                                    </div>
-                                    <div className="text-white/50">
-                                      Private •{" "}
-                                      {vibeRewindPlaylist.totalTracks || 0}{" "}
-                                      tracks
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex items-center w-full gap-2">
-                                  <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
-                                    {vibeRewindPlaylist.coverUrl ? (
-                                      <Image
-                                        src={vibeRewindPlaylist.coverUrl}
-                                        alt={vibeRewindPlaylist.name}
-                                        width={40}
-                                        height={40}
-                                        className="object-cover w-full h-full"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-emerald-500">
-                                        <PlaylistIcon
-                                          name={vibeRewindPlaylist.name}
-                                          type={vibeRewindPlaylist.type}
-                                          isAIGenerated={
-                                            vibeRewindPlaylist.isAIGenerated
-                                          }
-                                          size={24}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col min-w-0 flex-1">
-                                    <div className="flex items-center gap-1">
-                                      <BsFillPinAngleFill className="w-3 h-3 text-emerald-500 flex-shrink-0" />
-                                      <span className="truncate font-medium text-sm leading-tight">
-                                        {vibeRewindPlaylist.name}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center text-xs text-white/50 mt-0.5">
-                                      <span className="truncate">
-                                        Private •{" "}
-                                        {vibeRewindPlaylist.totalTracks || 0}{" "}
-                                        tracks
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </Link>
-                          </div>
-                        )}
-
-                        {welcomeMixPlaylist && (
-                          <div
-                            className={
-                              isCollapsed ? "flex justify-center" : "mt-1"
-                            }
-                          >
-                            <Link
-                              key={welcomeMixPlaylist.id}
-                              href={`/playlists/${welcomeMixPlaylist.id}`}
-                              className={`flex ${
-                                isCollapsed
-                                  ? "items-center justify-center py-1"
-                                  : `items-center px-3 py-2 rounded-md ${
-                                      pathname ===
-                                      `/playlists/${welcomeMixPlaylist.id}`
-                                        ? theme === "light"
-                                          ? "bg-gray-200 text-gray-900"
-                                          : "bg-[#A57865]/30 text-white"
-                                        : theme === "light"
-                                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                                    }`
-                              }`}
-                            >
-                              {isCollapsed ? (
-                                <div
-                                  className={`p-1.5 rounded-lg ${
-                                    isActive(
-                                      `/playlists/${welcomeMixPlaylist.id}`
-                                    )
-                                      ? "bg-[#A57865]/30"
-                                      : "bg-neutral-800"
-                                  } flex items-center justify-center w-10 h-10 relative group shadow-md transition-all duration-200 hover:scale-105 hover:bg-[#333333]`}
-                                >
-                                  <PlaylistIcon
-                                    coverUrl={welcomeMixPlaylist.coverUrl}
-                                    name={welcomeMixPlaylist.name}
-                                    type={welcomeMixPlaylist.type}
-                                    isAIGenerated={
-                                      welcomeMixPlaylist.isAIGenerated
-                                    }
-                                    size={28}
-                                    className="rounded object-cover text-violet-500"
-                                  />
-                                  <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
-                                    <div className="font-medium">
-                                      {welcomeMixPlaylist.name}
-                                    </div>
-                                    <div className="text-white/50">
-                                      Private •{" "}
-                                      {welcomeMixPlaylist.totalTracks || 0}{" "}
-                                      tracks
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex items-center w-full gap-2">
-                                  <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
-                                    {welcomeMixPlaylist.coverUrl ? (
-                                      <Image
-                                        src={welcomeMixPlaylist.coverUrl}
-                                        alt={welcomeMixPlaylist.name}
-                                        width={40}
-                                        height={40}
-                                        className="object-cover w-full h-full"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-violet-500">
-                                        <PlaylistIcon
-                                          name={welcomeMixPlaylist.name}
-                                          type={welcomeMixPlaylist.type}
-                                          isAIGenerated={
-                                            welcomeMixPlaylist.isAIGenerated
-                                          }
-                                          size={24}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col min-w-0 flex-1">
-                                    <div className="flex items-center gap-1">
-                                      <BsFillPinAngleFill className="w-3 h-3 text-violet-500 flex-shrink-0" />
-                                      <span className="truncate font-medium text-sm leading-tight">
-                                        {welcomeMixPlaylist.name}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center text-xs text-white/50 mt-0.5">
-                                      <span className="truncate">
-                                        Private •{" "}
-                                        {welcomeMixPlaylist.totalTracks || 0}{" "}
-                                        tracks
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </Link>
-                          </div>
-                        )}
-
-                        {playlistAI && (
-                          <div
-                            className={
-                              isCollapsed ? "flex justify-center" : "mt-1"
-                            }
-                          >
-                            <Link
-                              key={playlistAI.id}
-                              href={`/playlists/${playlistAI.id}`}
-                              className={`flex ${
-                                isCollapsed
-                                  ? "items-center justify-center py-1"
-                                  : `items-center px-3 py-2 rounded-md ${
-                                      pathname === `/playlists/${playlistAI.id}`
-                                        ? theme === "light"
-                                          ? "bg-gray-200 text-gray-900"
-                                          : "bg-[#A57865]/30 text-white"
-                                        : theme === "light"
-                                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                                    }`
-                              }`}
-                            >
-                              {isCollapsed ? (
-                                <div
-                                  className={`p-1.5 rounded-lg ${
-                                    isActive(`/playlists/${playlistAI.id}`)
-                                      ? "bg-[#A57865]/30"
-                                      : "bg-neutral-800"
-                                  } flex items-center justify-center w-10 h-10 relative group shadow-md transition-all duration-200 hover:scale-105 hover:bg-[#333333]`}
-                                >
-                                  <PlaylistIcon
-                                    coverUrl={playlistAI.coverUrl}
-                                    name={playlistAI.name}
-                                    type={playlistAI.type}
-                                    isAIGenerated={playlistAI.isAIGenerated}
-                                    size={28}
-                                    className="rounded object-cover text-blue-500"
-                                  />
-                                  <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
-                                    <div className="font-medium">
-                                      {playlistAI.name}
-                                    </div>
-                                    <div className="text-white/50">
-                                      Private • {playlistAI.totalTracks || 0}{" "}
-                                      tracks
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex items-center w-full gap-2">
-                                  <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
-                                    {playlistAI.coverUrl ? (
-                                      <Image
-                                        src={playlistAI.coverUrl}
-                                        alt={playlistAI.name}
-                                        width={40}
-                                        height={40}
-                                        className="object-cover w-full h-full"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center bg-neutral-800 text-blue-500">
-                                        <PlaylistIcon
-                                          name={playlistAI.name}
-                                          type={playlistAI.type}
-                                          isAIGenerated={
-                                            playlistAI.isAIGenerated
-                                          }
-                                          size={24}
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col min-w-0 flex-1">
-                                    <div className="flex items-center gap-1">
-                                      <BsStars className="w-3 h-3 text-yellow-400 flex-shrink-0" />
-                                      <span className="truncate font-medium text-sm leading-tight">
-                                        {playlistAI.name}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center text-xs text-white/50 mt-0.5">
-                                      <span className="truncate">
-                                        Private • {playlistAI.totalTracks || 0}{" "}
-                                        tracks
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </Link>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
+                    
+                    
                     { !isCollapsed && playlists.filter((p) => p.userId === userId).length === 0 && (
-                        <div className="w-full my-2 border-t border-[#333333]">
+                        <div className="w-full my-2 ">
+                          {(favoritePlaylist || vibeRewindPlaylist || welcomeMixPlaylist || playlistAI) && (
+                            <div
+                              className={`${
+                                isCollapsed ? "w-8 h-px" : "w-full"
+                              } border-t border-[#333333] mb-2`}
+                            />
+                          )}
+                        
                           <div className={`my-2 p-4 rounded-lg `} 
                             style={{ background: theme === 'light' ? '#fff' : '#232323' }}>
                             <div className="font-bold text-sm mb-1 text-white" style={{color: theme === 'light' ? '#222' : '#fff', textAlign: 'left'}}>
@@ -757,7 +489,7 @@ export default function Sidebar({
                       )
                     }
 
-                    {playlists.length > 0 && (
+                    {playlists.length > 0 && !(!isCollapsed && playlists.filter((p) => p.userId === userId).length === 0) && (
                       <div
                         className={`${
                           isCollapsed ? "w-8 h-px my-2" : "w-full my-2"
