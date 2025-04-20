@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { TrackList } from "@/components/user/track/TrackList";
 import { EditPlaylistDialog } from "@/components/user/playlist/EditPlaylistDialog";
@@ -12,7 +12,6 @@ import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
 import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation";
 import { PlaylistIcon } from "@/components/user/playlist/PlaylistIcon";
 
 // Khai báo event bus đơn giản để gọi fetchPlaylists từ sidebar
@@ -20,6 +19,7 @@ const playlistUpdateEvent = new CustomEvent("playlist-updated");
 
 export default function PlaylistPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id
     ? Array.isArray(params.id)
       ? params.id[0]
@@ -32,7 +32,6 @@ export default function PlaylistPage() {
   const [error, setError] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const router = useRouter();
 
   // Check if this is a special system playlist
   const isVibeRewindPlaylist =
@@ -132,10 +131,14 @@ export default function PlaylistPage() {
         toast.success("Playlist deleted successfully");
 
         // Wait a bit for the delete operation to complete
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        // Navigate to home page
-        window.location.href = "/";
+        // Dispatch event for Sidebar to update
+        window.dispatchEvent(new CustomEvent("playlist-updated"));
+
+        // Navigate to home page instead of reloading
+        // window.location.href = "/";
+        router.push("/");
       } catch (error: any) {
         console.error("Error deleting playlist:", error);
         const errorMessage =
