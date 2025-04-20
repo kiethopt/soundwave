@@ -22,12 +22,17 @@ import bcrypt from 'bcrypt'; // Import bcrypt
 // Explicitly type User to include adminLevel for this file's scope
 type User = PrismaUser & { adminLevel?: number | null };
 
-// Lấy danh sách user
-export const getUsers = async (req: Request) => {
-  const { search = '', status } = req.query;
+// Updated getUsers function to accept requestingUser
+export const getUsers = async (req: Request, requestingUser: User) => {
+  const { search = '', status, role } = req.query;
 
   const where: Prisma.UserWhereInput = {
-    role: Role.USER, // Ensure only users are fetched
+    ...(requestingUser.adminLevel !== 1
+      ? { role: Role.USER } // Level 2+ Admins only see USER role
+      : role && typeof role === 'string' && Object.values(Role).includes(role.toUpperCase() as Role)
+      ? { role: role.toUpperCase() as Role } // Apply role filter if valid and provided by Lvl 1
+      : {} // Lvl 1 sees all roles if no specific role filter is applied
+    ),
     ...(search
       ? {
           OR: [
@@ -42,10 +47,11 @@ export const getUsers = async (req: Request) => {
 
   const options = {
     where,
-    select: userSelect, // Use standard select for consistency
+    select: userSelect,
     orderBy: { createdAt: 'desc' },
   };
 
+  // Pass the modified where clause to paginate
   const result = await paginate<User>(prisma.user, req, options);
 
   return {

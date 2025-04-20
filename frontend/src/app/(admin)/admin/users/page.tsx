@@ -23,9 +23,12 @@ import {
   DeactivateModal,
   MakeAdminModal,
 } from '@/components/ui/data-table/data-table-modals';
+import { useSession } from '@/contexts/SessionContext';
+import React from 'react';
 
 export default function UserManagement() {
   const { theme } = useTheme();
+  const { user: loggedInUser } = useSession();
   const limit = 10;
 
   const {
@@ -39,6 +42,8 @@ export default function UserManagement() {
     setSearchInput,
     statusFilter,
     setStatusFilter,
+    roleFilter,
+    setRoleFilter,
     selectedRows,
     setSelectedRows,
     updateQueryParam,
@@ -60,6 +65,7 @@ export default function UserManagement() {
       };
     },
     limit,
+    loggedInAdminLevel: loggedInUser?.adminLevel,
   });
 
   // Table state
@@ -349,14 +355,19 @@ export default function UserManagement() {
   };
 
   // Table configuration
-  const columns = getUserColumns({
-    theme,
-    onDelete: handleDeleteUsers,
-    onEdit: setUpdatingUser,
-    onView: setViewingUser,
-    onStatusChange: handleStatusChange,
-    onMakeAdmin: setUserToMakeAdmin,
-  });
+  const columns = React.useMemo(
+    () =>
+      getUserColumns({
+        theme,
+        onDelete: handleDeleteUsers,
+        onEdit: setUpdatingUser,
+        onView: setViewingUser,
+        onStatusChange: handleStatusChange,
+        onMakeAdmin: setUserToMakeAdmin,
+        loggedInAdminLevel: loggedInUser?.adminLevel,
+      }),
+    [theme, loggedInUser?.adminLevel]
+  );
 
   const table = useReactTable({
     data: users,
@@ -466,6 +477,12 @@ export default function UserManagement() {
             value: statusFilter,
             onChange: setStatusFilter,
           },
+          ...(loggedInUser?.adminLevel === 1 && {
+            roleFilter: {
+              value: roleFilter,
+              onChange: setRoleFilter,
+            },
+          }),
         }}
       />
 

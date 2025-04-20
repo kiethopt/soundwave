@@ -1,4 +1,4 @@
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, Row } from '@tanstack/react-table';
 import {
   Track,
   Album,
@@ -70,6 +70,7 @@ interface GetUserColumnsOptions {
   onEdit?: (user: User) => void;
   onView?: (user: User) => void;
   onMakeAdmin?: (user: User) => void;
+  loggedInAdminLevel?: number | null;
 }
 
 interface GetGenreColumnsOptions {
@@ -733,8 +734,9 @@ export function getUserColumns({
   onView,
   onStatusChange,
   onMakeAdmin,
+  loggedInAdminLevel,
 }: GetUserColumnsOptions): ColumnDef<User>[] {
-  return [
+  const columns: ColumnDef<User>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -909,6 +911,47 @@ export function getUserColumns({
       },
     },
   ];
+
+  // Insert Admin Level column after User info if applicable
+  if (loggedInAdminLevel === 1) {
+    columns.splice(3, 0, { // Splice inserts at index 3 (after name, username, email)
+      accessorKey: 'adminLevel',
+      header: 'Admin Level',
+      cell: ({ row }: { row: Row<User> }) => {
+        const user = row.original;
+        const level = user.adminLevel;
+        const role = user.role;
+
+        if (role !== 'ADMIN' || level === null || level === undefined) {
+          return <span className={theme === 'dark' ? "text-gray-400" : "text-gray-500"}>N/A</span>;
+        }
+
+        let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' = 'secondary';
+        let badgeText = `Level ${level}`;
+
+        switch (level) {
+          case 1:
+            badgeVariant = 'destructive';
+            break;
+          case 2:
+            badgeVariant = 'outline';
+            break;
+          // Add more cases if needed
+          default:
+            badgeVariant = 'outline';
+            badgeText = `Level ${level}`;
+        }
+
+        return (
+          <Badge variant={badgeVariant} className="text-xs">
+            {badgeText}
+          </Badge>
+        );
+      },
+    } as ColumnDef<User>);
+  }
+
+  return columns;
 }
 
 export function getGenreColumns({

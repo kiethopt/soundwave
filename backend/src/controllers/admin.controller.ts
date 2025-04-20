@@ -18,7 +18,11 @@ export const getAllUsers = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { users, pagination } = await adminService.getUsers(req);
+    if (!req.user) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    const { users, pagination } = await adminService.getUsers(req, req.user as UserWithAdminLevel);
     res.json({ users, pagination });
   } catch (error) {
     handleError(res, error, 'Get all users');
