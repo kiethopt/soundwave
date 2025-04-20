@@ -731,28 +731,6 @@ export default function Sidebar({
                 </Link>
 
                 <Link
-                  href="/admin/analytics"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/analytics")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {isCollapsed ? (
-                    <ChartIcon className="w-6 h-6 mx-auto" />
-                  ) : (
-                    <>
-                      <div className="min-w-[32px] flex justify-center">
-                        <ChartIcon className="w-5 h-5" />
-                      </div>
-                      <span className="ml-3 font-medium text-sm">
-                        Analytics
-                      </span>
-                    </>
-                  )}
-                </Link>
-
-                <Link
                   href="/admin/artist-requests"
                   className={`flex items-center px-3 py-2.5 ${
                     pathname && pathname.startsWith("/admin/artist-requests")
