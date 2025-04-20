@@ -88,7 +88,7 @@ export default function Sidebar({
 
   useEffect(() => {
     try {
-      localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
+       localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
     } catch (error) {
       console.error(
         "Error writing sidebarCollapsed state to localStorage:",
@@ -206,7 +206,7 @@ export default function Sidebar({
     // Socket event listeners for real-time updates
     if (socket && userId) {
       console.log(`[Socket] Setting up listeners for user ${userId}`);
-
+      
       // Listen for global playlist updates
       socket.on("playlist-updated", () => {
         console.log("[Socket] Global playlist update received");
@@ -230,7 +230,7 @@ export default function Sidebar({
     return () => {
       window.removeEventListener("playlist-updated", handlePlaylistUpdate);
       window.removeEventListener("favorites-changed", handleFavoritesChanged);
-
+      
       // Clean up socket listeners
       if (socket) {
         console.log("[Socket] Cleaning up listeners");
@@ -471,7 +471,7 @@ export default function Sidebar({
                         </Link>
                       </div>
                     )}
-
+                    
                     {favoritePlaylist &&
                       (vibeRewindPlaylist || welcomeMixPlaylist) && (
                         <div
@@ -482,12 +482,12 @@ export default function Sidebar({
                       )}
 
                     {vibeRewindPlaylist && (
-                      <div
-                        className={`${
+                            <div
+                              className={`${
                           isCollapsed
                             ? "w-full flex items-center justify-center"
-                            : ""
-                        }`}
+                                  : ""
+                              }`}
                       >
                         <Link
                           href={`/playlists/${vibeRewindPlaylist.id}`}
@@ -620,11 +620,11 @@ export default function Sidebar({
                               <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
                                 <div className="font-medium">
                                   {welcomeMixPlaylist.name}
-                                </div>
+                            </div>
                                 <div className="text-white/50">
                                   Private •{" "}
                                   {welcomeMixPlaylist.totalTracks || 0} tracks
-                                </div>
+                            </div>
                               </div>
                             </div>
                           ) : (
@@ -723,10 +723,10 @@ export default function Sidebar({
                               <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
                                 <div className="font-medium">
                                   {playlistAI.name}
-                                </div>
+                          </div>
                                 <div className="text-white/50">
                                   Private • {playlistAI.totalTracks || 0} tracks
-                                </div>
+                        </div>
                               </div>
                             </div>
                           ) : (
@@ -776,12 +776,12 @@ export default function Sidebar({
                       welcomeMixPlaylist ||
                       playlistAI) &&
                       playlists.length > 0 && (
-                        <div
-                          className={`${
-                            isCollapsed ? "w-8 h-px my-2" : "w-full my-2"
-                          } border-t border-[#333333]`}
-                        />
-                      )}
+                      <div
+                        className={`${
+                          isCollapsed ? "w-8 h-px my-2" : "w-full my-2"
+                        } border-t border-[#333333]`}
+                      />
+                    )}
 
                     <div
                       className={`${

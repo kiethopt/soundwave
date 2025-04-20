@@ -98,27 +98,39 @@ const likeTrack = async (userId, trackId) => {
             trackId,
         },
     });
-    const favoritePlaylist = await db_1.default.playlist.findFirst({
+    let favoritePlaylist = await db_1.default.playlist.findFirst({
         where: {
             userId,
             type: 'FAVORITE',
         },
     });
     if (!favoritePlaylist) {
-        throw new Error('Favorite playlist not found');
+        favoritePlaylist = await db_1.default.playlist.create({
+            data: {
+                name: "Favorites",
+                description: "List of your favorite songs",
+                privacy: "PRIVATE",
+                type: "FAVORITE",
+                userId,
+            },
+        });
     }
     const tracksCount = await db_1.default.playlistTrack.count({
         where: {
             playlistId: favoritePlaylist.id,
         },
     });
-    return db_1.default.playlistTrack.create({
+    await db_1.default.playlistTrack.create({
         data: {
             playlistId: favoritePlaylist.id,
             trackId,
             trackOrder: tracksCount + 1,
         },
     });
+    const io = (0, socket_1.getIO)();
+    io.emit('playlist-updated');
+    io.to(`user-${userId}`).emit('favorites-updated', { action: 'added', trackId });
+    return { message: 'Track liked successfully' };
 };
 exports.likeTrack = likeTrack;
 const unlikeTrack = async (userId, trackId) => {
@@ -133,6 +145,30 @@ const unlikeTrack = async (userId, trackId) => {
     if (!existingLike) {
         throw new Error('Track not liked');
     }
+    const favoritePlaylist = await db_1.default.playlist.findFirst({
+        where: {
+            userId,
+            type: 'FAVORITE',
+        },
+        include: {
+            _count: {
+                select: {
+                    tracks: true
+                }
+            }
+        }
+    });
+    if (!favoritePlaylist) {
+        await db_1.default.userLikeTrack.delete({
+            where: {
+                userId_trackId: {
+                    userId,
+                    trackId,
+                },
+            },
+        });
+        return { message: 'Track unliked successfully' };
+    }
     await db_1.default.userLikeTrack.delete({
         where: {
             userId_trackId: {
@@ -141,7 +177,7 @@ const unlikeTrack = async (userId, trackId) => {
             },
         },
     });
-    return db_1.default.playlistTrack.deleteMany({
+    await db_1.default.playlistTrack.deleteMany({
         where: {
             playlist: {
                 userId,
@@ -150,6 +186,20 @@ const unlikeTrack = async (userId, trackId) => {
             trackId,
         },
     });
+    const io = (0, socket_1.getIO)();
+    if (favoritePlaylist._count.tracks === 1) {
+        await db_1.default.playlist.delete({
+            where: {
+                id: favoritePlaylist.id
+            }
+        });
+        io.emit('playlist-updated');
+        io.to(`user-${userId}`).emit('favorites-updated', { action: 'deleted', playlistId: favoritePlaylist.id });
+        return { message: 'Track unliked and empty Favorites playlist removed' };
+    }
+    io.emit('playlist-updated');
+    io.to(`user-${userId}`).emit('favorites-updated', { action: 'removed', trackId });
+    return { message: 'Track unliked successfully' };
 };
 exports.unlikeTrack = unlikeTrack;
 const getTracks = async (req) => {

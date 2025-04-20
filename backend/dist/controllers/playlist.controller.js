@@ -36,30 +36,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = exports.createFavoritePlaylist = void 0;
+exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
 const playlistService = __importStar(require("../services/playlist.service"));
 const albumService = __importStar(require("../services/album.service"));
+const userService = __importStar(require("../services/user.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
-const createFavoritePlaylist = async (userId) => {
-    try {
-        await db_1.default.playlist.create({
-            data: {
-                name: "Favorites",
-                description: "List of your favorite songs",
-                privacy: "PRIVATE",
-                type: "FAVORITE",
-                userId,
-            },
-        });
-    }
-    catch (error) {
-        console.error("Error creating favorite playlist:", error);
-        throw error;
-    }
-};
-exports.createFavoritePlaylist = createFavoritePlaylist;
 const createPlaylist = async (req, res, next) => {
     try {
         const userId = req.user?.id;
@@ -778,7 +761,11 @@ const generateAIPlaylist = async (req, res) => {
             return;
         }
         const { name, description, trackCount, basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime, } = req.body;
-        const hasSpecificParams = basedOnMood || basedOnGenre || basedOnArtist || basedOnSongLength || basedOnReleaseTime;
+        const hasSpecificParams = basedOnMood ||
+            basedOnGenre ||
+            basedOnArtist ||
+            basedOnSongLength ||
+            basedOnReleaseTime;
         if (!hasSpecificParams) {
             res.status(400).json({
                 success: false,
@@ -810,7 +797,9 @@ const generateAIPlaylist = async (req, res) => {
             errorMessage.includes("parameter is required");
         res.status(isValidationError ? 400 : 500).json({
             success: false,
-            message: isValidationError ? errorMessage : "Failed to generate AI playlist",
+            message: isValidationError
+                ? errorMessage
+                : "Failed to generate AI playlist",
             error: errorMessage,
         });
     }
@@ -976,38 +965,74 @@ const getHomePageData = async (req, res, next) => {
     try {
         const userId = req.user?.id;
         const isAuthenticated = !!userId;
-        const [newestAlbums, hotAlbums] = await Promise.all([
-            albumService.getNewestAlbums(8),
-            albumService.getHotAlbums(8),
+        const [newestAlbums, hotAlbums, topTracks, topArtists] = await Promise.all([
+            albumService.getNewestAlbums(20),
+            albumService.getHotAlbums(20),
+            userService.getTopTracks(),
+            userService.getTopArtists(),
         ]);
         const responseData = {
             newestAlbums,
             hotAlbums,
+            topTracks,
+            topArtists,
             systemPlaylists: [],
         };
         if (isAuthenticated && userId) {
             try {
-                const systemPlaylists = await db_1.default.playlist.findMany({
-                    where: {
-                        type: "SYSTEM",
-                        privacy: "PUBLIC",
-                    },
-                    include: {
-                        tracks: {
-                            select: {
-                                track: {
-                                    include: {
-                                        artist: true,
+                const [systemPlaylists, userSystemPlaylists, userPlaylists, userTopTracks, userTopArtists,] = await Promise.all([
+                    db_1.default.playlist.findMany({
+                        where: {
+                            type: "SYSTEM",
+                            privacy: "PUBLIC",
+                        },
+                        include: {
+                            tracks: {
+                                select: {
+                                    track: {
+                                        include: {
+                                            artist: true,
+                                        },
                                     },
+                                    trackOrder: true,
                                 },
-                                trackOrder: true,
-                            },
-                            orderBy: {
-                                trackOrder: "asc",
+                                orderBy: {
+                                    trackOrder: "asc",
+                                },
                             },
                         },
-                    },
-                });
+                    }),
+                    db_1.default.playlist.findMany({
+                        where: {
+                            userId,
+                            type: "SYSTEM",
+                        },
+                        include: {
+                            _count: {
+                                select: {
+                                    tracks: true,
+                                },
+                            },
+                        },
+                    }),
+                    db_1.default.playlist.findMany({
+                        where: {
+                            userId,
+                            type: {
+                                not: "SYSTEM",
+                            },
+                        },
+                        include: {
+                            _count: {
+                                select: {
+                                    tracks: true,
+                                },
+                            },
+                        },
+                    }),
+                    userService.getUserTopTracks(req.user),
+                    userService.getUserTopArtists(req.user),
+                ]);
                 responseData.systemPlaylists = systemPlaylists.map((playlist) => ({
                     ...playlist,
                     tracks: playlist.tracks.map((pt) => ({
@@ -1015,34 +1040,6 @@ const getHomePageData = async (req, res, next) => {
                         trackOrder: pt.trackOrder,
                     })),
                 }));
-                const userSystemPlaylists = await db_1.default.playlist.findMany({
-                    where: {
-                        userId,
-                        type: "SYSTEM",
-                    },
-                    include: {
-                        _count: {
-                            select: {
-                                tracks: true,
-                            },
-                        },
-                    },
-                });
-                const userPlaylists = await db_1.default.playlist.findMany({
-                    where: {
-                        userId,
-                        type: {
-                            not: "SYSTEM",
-                        },
-                    },
-                    include: {
-                        _count: {
-                            select: {
-                                tracks: true,
-                            },
-                        },
-                    },
-                });
                 responseData.personalizedSystemPlaylists = userSystemPlaylists.map((playlist) => ({
                     ...playlist,
                     totalTracks: playlist._count.tracks,
@@ -1051,6 +1048,8 @@ const getHomePageData = async (req, res, next) => {
                     ...playlist,
                     totalTracks: playlist._count.tracks,
                 }));
+                responseData.userTopTracks = userTopTracks;
+                responseData.userTopArtists = userTopArtists;
             }
             catch (error) {
                 console.error("Error fetching user playlist data:", error);

@@ -294,7 +294,6 @@ export default function UserProfilePage({
                 </h1>
                 {isOwner && (
                   <div>
-                    <span>• </span>
                     <span
                       className="text-sm font-semibold hover:underline cursor-pointer"
                       onClick={(e) => {

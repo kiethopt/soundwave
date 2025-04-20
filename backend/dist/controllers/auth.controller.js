@@ -191,6 +191,18 @@ const register = async (req, res) => {
             select: prisma_selects_1.userSelect,
         });
         try {
+            const welcomeMixPlaylist = await db_1.default.playlist.create({
+                data: {
+                    name: "Welcome Mix",
+                    description: "A selection of popular tracks to start your journey on Soundwave.",
+                    privacy: "PRIVATE",
+                    type: "SYSTEM",
+                    isAIGenerated: false,
+                    userId: user.id,
+                    totalTracks: 0,
+                    totalDuration: 0,
+                },
+            });
             const defaultTrackIds = await aiService.generateDefaultPlaylistForNewUser(user.id);
             if (defaultTrackIds.length > 0) {
                 const tracksInfo = await db_1.default.track.findMany({
@@ -200,17 +212,11 @@ const register = async (req, res) => {
                 const totalDuration = tracksInfo.reduce((sum, track) => sum + track.duration, 0);
                 const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
                 const orderedTrackIds = defaultTrackIds.filter((id) => trackIdMap.has(id));
-                await db_1.default.playlist.create({
+                await db_1.default.playlist.update({
+                    where: { id: welcomeMixPlaylist.id },
                     data: {
-                        name: "Welcome Mix",
-                        description: "A selection of popular tracks to start your journey on Soundwave.",
-                        privacy: "PRIVATE",
-                        type: "SYSTEM",
-                        coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1744453889/covers/qeyix0cmbv7mtdh1hedi.png',
-                        isAIGenerated: false,
-                        userId: user.id,
                         totalTracks: orderedTrackIds.length,
-                        totalDuration: totalDuration,
+                        totalDuration,
                         tracks: {
                             createMany: {
                                 data: orderedTrackIds.map((trackId, index) => ({
@@ -221,14 +227,10 @@ const register = async (req, res) => {
                         },
                     },
                 });
-                console.log(`[Register] Created Welcome Mix for new user ${user.id} with ${orderedTrackIds.length} popular tracks.`);
-            }
-            else {
-                console.log(`[Register] No popular tracks found to create Welcome Mix for user ${user.id}.`);
             }
         }
         catch (playlistError) {
-            console.error(`[Register] Error creating initial playlists for user ${user.id}:`, playlistError);
+            console.error(`Error creating Welcome Mix playlist for user ${user.id}:`, playlistError);
         }
         try {
             const emailOptions = emailService.createWelcomeEmail(user.email, user.name || user.username || "there");

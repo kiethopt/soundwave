@@ -45,8 +45,12 @@ const createBaseSystemPlaylist = async (data, coverFile) => {
             }
         }
     }
-    const { basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime } = aiParams;
-    if (!basedOnMood && !basedOnGenre && !basedOnArtist && !basedOnSongLength && !basedOnReleaseTime) {
+    const { basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime, } = aiParams;
+    if (!basedOnMood &&
+        !basedOnGenre &&
+        !basedOnArtist &&
+        !basedOnSongLength &&
+        !basedOnReleaseTime) {
         throw new Error("At least one AI parameter (mood, genre, artist, song length, or release time) is required to create a base system playlist.");
     }
     let coverUrl = undefined;
@@ -102,8 +106,12 @@ const updateBaseSystemPlaylist = async (playlistId, data, coverFile) => {
             }
         }
     }
-    const { basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime } = aiParams;
-    if (!basedOnMood && !basedOnGenre && !basedOnArtist && !basedOnSongLength && !basedOnReleaseTime) {
+    const { basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime, } = aiParams;
+    if (!basedOnMood &&
+        !basedOnGenre &&
+        !basedOnArtist &&
+        !basedOnSongLength &&
+        !basedOnReleaseTime) {
         throw new Error("At least one AI parameter (mood, genre, artist, song length, or release time) is required for a base system playlist.");
     }
     let coverUrl = undefined;
@@ -208,10 +216,12 @@ exports.getAllBaseSystemPlaylists = getAllBaseSystemPlaylists;
 const updateVibeRewindPlaylist = async (userId) => {
     try {
         let vibeRewindPlaylist = await db_1.default.playlist.findFirst({
-            where: { userId, name: "Vibe Rewind" },
+            where: {
+                userId,
+                name: "Vibe Rewind",
+            },
         });
         if (!vibeRewindPlaylist) {
-            console.log(`[PlaylistService] Creating new Vibe Rewind playlist for user ${userId}...`);
             vibeRewindPlaylist = await db_1.default.playlist.create({
                 data: {
                     name: "Vibe Rewind",
@@ -219,126 +229,67 @@ const updateVibeRewindPlaylist = async (userId) => {
                     privacy: "PRIVATE",
                     type: "SYSTEM",
                     userId,
+                    totalTracks: 0,
+                    totalDuration: 0,
                 },
             });
         }
-        const userHistory = await db_1.default.history.findMany({
-            where: { userId, type: "PLAY", playCount: { gt: 2 } },
-            include: {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentTracks = (await db_1.default.history.findMany({
+            where: {
+                userId,
+                type: "PLAY",
+                trackId: { not: null },
+                createdAt: {
+                    gte: thirtyDaysAgo,
+                },
+            },
+            select: {
+                trackId: true,
                 track: {
-                    include: { artist: true, genres: { include: { genre: true } } },
+                    select: {
+                        id: true,
+                        duration: true,
+                    },
                 },
             },
-        });
-        if (userHistory.length === 0) {
-            console.log(`[PlaylistService] No history found for user ${userId}`);
-            return;
-        }
-        const topPlayedTracks = await db_1.default.history.findMany({
-            where: { userId, playCount: { gt: 5 } },
-            include: { track: true },
-            orderBy: { playCount: "desc" },
-            take: 10,
-        });
-        console.log(`[PlaylistService] Found ${topPlayedTracks.length} frequently played tracks for user ${userId}`);
-        const genreCounts = new Map();
-        const artistCounts = new Map();
-        userHistory.forEach((history) => {
-            const track = history.track;
-            if (track) {
-                track.genres.forEach((genreRel) => {
-                    const genreId = genreRel.genre.id;
-                    genreCounts.set(genreId, (genreCounts.get(genreId) || 0) + 1);
-                });
-                const artistId = track.artist?.id;
-                if (artistId) {
-                    artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
-                }
-            }
-        });
-        const topGenres = [...genreCounts.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map((entry) => entry[0]);
-        const topArtists = [...artistCounts.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map((entry) => entry[0]);
-        console.log(`[PlaylistService] Top genres: ${topGenres}`);
-        console.log(`[PlaylistService] Top artists: ${topArtists}`);
-        const recommendedTracks = await db_1.default.track.findMany({
-            where: {
-                OR: [
-                    { genres: { some: { genreId: { in: topGenres } } } },
-                    { artistId: { in: topArtists } },
-                ],
-                isActive: true,
+            orderBy: {
+                createdAt: "desc",
             },
-            include: { artist: true, album: true },
-            orderBy: { playCount: "desc" },
-            take: 10,
-        });
-        console.log(`[PlaylistService] Found ${recommendedTracks.length} content-based tracks`);
-        const similarUsers = await db_1.default.history.findMany({
-            where: {
-                trackId: {
-                    in: userHistory
-                        .map((h) => h.trackId)
-                        .filter((id) => id !== null),
-                },
-                userId: { not: userId },
-            },
-            select: { userId: true },
-            distinct: ["userId"],
-        });
-        const similarUserIds = similarUsers.map((u) => u.userId);
-        console.log(`[PlaylistService] Found ${similarUserIds.length} similar users`);
-        const collaborativeTracks = await db_1.default.history.findMany({
-            where: { userId: { in: similarUserIds } },
-            include: { track: true },
-            orderBy: { playCount: "desc" },
-            take: 10,
-        });
-        console.log(`[PlaylistService] Found ${collaborativeTracks.length} collaborative filtering tracks`);
-        const finalRecommendedTracks = [
-            ...new Set([
-                ...topPlayedTracks.map((t) => t.track),
-                ...recommendedTracks,
-                ...collaborativeTracks.map((t) => t.track),
-            ]),
-        ].slice(0, 10);
-        if (finalRecommendedTracks.length === 0) {
-            console.log(`[PlaylistService] No tracks found to update in Vibe Rewind for user ${userId}`);
-            return;
-        }
-        await db_1.default.playlistTrack.deleteMany({
-            where: {
-                playlistId: vibeRewindPlaylist.id,
-            },
-        });
-        const playlistTrackData = finalRecommendedTracks
-            .filter((track) => track?.id !== undefined)
-            .map((track, index) => ({
-            playlistId: vibeRewindPlaylist.id,
-            trackId: track.id,
-            trackOrder: index,
+            distinct: ["trackId"],
+            take: 30,
         }));
-        await db_1.default.$transaction([
-            db_1.default.playlistTrack.createMany({
-                data: playlistTrackData.filter((track, index, self) => self.findIndex((t) => t.playlistId === track.playlistId && t.trackId === track.trackId) === index),
-            }),
-            db_1.default.playlist.update({
-                where: { id: vibeRewindPlaylist.id },
-                data: {
-                    totalTracks: finalRecommendedTracks.length,
-                    totalDuration: finalRecommendedTracks.reduce((sum, track) => sum + (track?.duration || 0), 0),
+        if (recentTracks.length > 0) {
+            const validTracks = recentTracks.filter((track) => track.trackId !== null);
+            const totalDuration = validTracks.reduce((sum, { track }) => sum + (track?.duration || 0), 0);
+            await db_1.default.playlistTrack.deleteMany({
+                where: {
+                    playlistId: vibeRewindPlaylist.id,
                 },
-            }),
-        ]);
-        console.log(`[PlaylistService] Successfully updated tracks for Vibe Rewind for user ${userId}`);
+            });
+            await db_1.default.playlist.update({
+                where: {
+                    id: vibeRewindPlaylist.id,
+                },
+                data: {
+                    totalTracks: validTracks.length,
+                    totalDuration,
+                    tracks: {
+                        createMany: {
+                            data: validTracks.map((track, index) => ({
+                                trackId: track.trackId,
+                                trackOrder: index,
+                            })),
+                        },
+                    },
+                },
+            });
+        }
+        return vibeRewindPlaylist;
     }
     catch (error) {
-        console.error(`[PlaylistService] Error updating tracks for Vibe Rewind for user ${userId}:`, error);
+        console.error("Error updating Vibe Rewind playlist:", error);
         throw error;
     }
 };
@@ -586,8 +537,11 @@ const updateAllSystemPlaylists = async () => {
                 const hasArtistParam = !!aiOptions.basedOnArtist;
                 const hasSongLengthParam = !!aiOptions.basedOnSongLength;
                 const hasReleaseTimeParam = !!aiOptions.basedOnReleaseTime;
-                const hasAnyParam = hasMoodParam || hasGenreParam || hasArtistParam ||
-                    hasSongLengthParam || hasReleaseTimeParam;
+                const hasAnyParam = hasMoodParam ||
+                    hasGenreParam ||
+                    hasArtistParam ||
+                    hasSongLengthParam ||
+                    hasReleaseTimeParam;
                 if (!hasAnyParam) {
                     const userHistory = await db_1.default.history.findMany({
                         where: {
@@ -612,9 +566,9 @@ const updateAllSystemPlaylists = async () => {
                     });
                     if (userHistory.length > 0) {
                         const genreCounts = {};
-                        userHistory.forEach(history => {
+                        userHistory.forEach((history) => {
                             if (history.track) {
-                                history.track.genres.forEach(genreRel => {
+                                history.track.genres.forEach((genreRel) => {
                                     const genreName = genreRel.genre.name;
                                     genreCounts[genreName] = (genreCounts[genreName] || 0) + 1;
                                 });
