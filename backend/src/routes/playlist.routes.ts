@@ -23,7 +23,7 @@ import {
   deleteBaseSystemPlaylist,
   getAllBaseSystemPlaylists,
   getHomePageData,
-  getUserSystemPlaylists
+  getUserSystemPlaylists,
 } from "../controllers/playlist.controller";
 import { Role } from "@prisma/client";
 import upload from "../middleware/upload.middleware";

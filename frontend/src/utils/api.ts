@@ -473,9 +473,13 @@ export const api = {
 
     // Delete an artist request
     deleteArtistRequest: async (requestId: string, token: string) => {
-      return fetchWithAuth(`/api/admin/artist-requests/${requestId}`, {
-        method: 'DELETE',
-      }, token);
+      return fetchWithAuth(
+        `/api/admin/artist-requests/${requestId}`,
+        {
+          method: "DELETE",
+        },
+        token
+      );
     },
 
     // Get System Status - NEW
@@ -876,7 +880,8 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/tracks/search?${queryParams || `q=${query}&page=${page}&limit=${limit}`
+        `/api/tracks/search?${
+          queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
         { method: "GET" },
         token
@@ -899,30 +904,50 @@ export const api = {
   },
 
   history: {
-    getList: (token: string, type?: 'play' | 'search', page = 1, limit = 10) => {
-      const typeParam = type ? `/${type}` : '';
+    getList: (
+      token: string,
+      type?: "play" | "search",
+      page = 1,
+      limit = 10
+    ) => {
+      const typeParam = type ? `/${type}` : "";
       const url = `/api/history${typeParam}?page=${page}&limit=${limit}`;
       return fetchWithAuth(url, {}, token);
     },
-    savePlay: (token: string, data: { trackId: string, duration?: number, completed?: boolean }) => {
-      return fetchWithAuth('/api/history/play', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      }, token);
+    savePlay: (
+      token: string,
+      data: { trackId: string; duration?: number; completed?: boolean }
+    ) => {
+      return fetchWithAuth(
+        "/api/history/play",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        },
+        token
+      );
     },
     saveSearch: (token: string, query: string) => {
-      return fetchWithAuth('/api/history/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-      }, token);
+      return fetchWithAuth(
+        "/api/history/search",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query }),
+        },
+        token
+      );
     },
     getSuggestions: (token: string, limit = 5) => {
-      return fetchWithAuth(`/api/history/suggestions?limit=${limit}`, {}, token);
+      return fetchWithAuth(
+        `/api/history/suggestions?limit=${limit}`,
+        {},
+        token
+      );
     },
     deleteSearchHistory: (token: string) => {
-      return fetchWithAuth('/api/history/search', { method: 'DELETE' }, token);
+      return fetchWithAuth("/api/history/search", { method: "DELETE" }, token);
     },
   },
 
@@ -1029,7 +1054,8 @@ export const api = {
       queryParams?: string
     ) =>
       fetchWithAuth(
-        `/api/albums/search?${queryParams || `q=${query}&page=${page}&limit=${limit}`
+        `/api/albums/search?${
+          queryParams || `q=${query}&page=${page}&limit=${limit}`
         }`,
         { method: "GET" },
         token
@@ -1196,6 +1222,27 @@ export const api = {
         );
       } catch (error) {
         console.error(`Error updating playlist ${playlistId}:`, error);
+        throw error;
+      }
+    },
+
+    updateCover: async (
+      playlistId: string,
+      formData: FormData,
+      token: string
+    ) => {
+      // Ensure this uses the main PATCH endpoint and backend handles FormData
+      try {
+        return await fetchWithAuth(
+          `/api/playlists/${playlistId}`, // Use the main PATCH route
+          {
+            method: "PATCH",
+            body: formData,
+          },
+          token
+        );
+      } catch (error) {
+        console.error(`Error updating playlist ${playlistId} cover:`, error);
         throw error;
       }
     },

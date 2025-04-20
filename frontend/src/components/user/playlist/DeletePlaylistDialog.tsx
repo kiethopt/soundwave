@@ -48,24 +48,10 @@ export function DeletePlaylistDialog({
         </DialogHeader>
         <DialogFooter>
           <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className={
-              theme === "light"
-                ? "hover:bg-gray-100"
-                : "hover:bg-neutral-800 text-white"
-            }
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
             onClick={onConfirm}
-            className={
-              theme === "light"
-                ? "bg-red-500 text-white hover:bg-red-600"
-                : "bg-red-500 text-white hover:bg-red-600"
-            }
+            className={`bg-[#A57865] text-white hover:bg-[#A57865]/90 ${
+              theme === "light" ? "" : ""
+            }`}
           >
             Delete
           </Button>

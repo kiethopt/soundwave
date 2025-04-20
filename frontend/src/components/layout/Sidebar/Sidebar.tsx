@@ -18,10 +18,9 @@ import {
   Tags,
   LayoutGrid,
 } from "@/components/ui/Icons";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
-import { CreatePlaylistDialog } from "@/components/user/playlist/CreatePlaylistDialog";
 import { api } from "@/utils/api";
 import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
@@ -30,6 +29,13 @@ import { BsFillPinAngleFill } from "react-icons/bs";
 import { BsStars } from "react-icons/bs";
 import { Playlist } from "@/types";
 import { useSocket } from "@/contexts/SocketContext";
+import { toast } from "react-hot-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const getInitialCollapsedState = (): boolean => {
   if (typeof window === "undefined" || !window.localStorage) {
@@ -57,6 +63,7 @@ export default function Sidebar({
   isPlayerBarVisible: boolean;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [userRole, setUserRole] = useState<"USER" | "ADMIN">("USER");
   const [hasArtistProfile, setHasArtistProfile] = useState(false);
   const [isArtistVerified, setIsArtistVerified] = useState(false);
@@ -68,8 +75,8 @@ export default function Sidebar({
   );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { theme } = useTheme();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [allUserPlaylists, setAllUserPlaylists] = useState<Playlist[]>([]);
   const { dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
   const [favoritePlaylist, setFavoritePlaylist] = useState<Playlist | null>(
     null
@@ -85,10 +92,11 @@ export default function Sidebar({
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const { socket } = useSocket();
+  const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
 
   useEffect(() => {
     try {
-      localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
+       localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
     } catch (error) {
       console.error(
         "Error writing sidebarCollapsed state to localStorage:",
@@ -121,6 +129,7 @@ export default function Sidebar({
     setWelcomeMixPlaylist(null);
     setPlaylistAI(null);
     setPlaylists([]);
+    setAllUserPlaylists([]);
 
     const token = localStorage.getItem("userToken");
 
@@ -133,24 +142,25 @@ export default function Sidebar({
       const response = await api.playlists.getAll(token);
 
       if (response.success) {
-        const allPlaylists: Playlist[] = response.data || [];
+        const fetchedPlaylists: Playlist[] = response.data || [];
+        setAllUserPlaylists(fetchedPlaylists);
 
         const fav =
-          allPlaylists.find((p: Playlist) => p.type === "FAVORITE") || null;
+          fetchedPlaylists.find((p: Playlist) => p.type === "FAVORITE") || null;
         const vibe =
-          allPlaylists.find(
+          fetchedPlaylists.find(
             (p: Playlist) =>
               p.name === "Vibe Rewind" ||
               (p.type === "SYSTEM" && p.name === "Vibe Rewind")
           ) || null;
         const welcome =
-          allPlaylists.find(
+          fetchedPlaylists.find(
             (p: Playlist) =>
               p.name === "Welcome Mix" ||
               (p.type === "SYSTEM" && p.name === "Welcome Mix")
           ) || null;
         const ai =
-          allPlaylists.find(
+          fetchedPlaylists.find(
             (p: Playlist) =>
               p.name === "AI Playlist" ||
               p.name.includes("AI Playlist") ||
@@ -162,7 +172,7 @@ export default function Sidebar({
         setWelcomeMixPlaylist(welcome);
         setPlaylistAI(ai);
 
-        const normal = allPlaylists.filter(
+        const normal = fetchedPlaylists.filter(
           (p: Playlist) =>
             p.type !== "FAVORITE" &&
             p.name !== "Vibe Rewind" &&
@@ -206,7 +216,7 @@ export default function Sidebar({
     // Socket event listeners for real-time updates
     if (socket && userId) {
       console.log(`[Socket] Setting up listeners for user ${userId}`);
-
+      
       // Listen for global playlist updates
       socket.on("playlist-updated", () => {
         console.log("[Socket] Global playlist update received");
@@ -230,7 +240,7 @@ export default function Sidebar({
     return () => {
       window.removeEventListener("playlist-updated", handlePlaylistUpdate);
       window.removeEventListener("favorites-changed", handleFavoritesChanged);
-
+      
       // Clean up socket listeners
       if (socket) {
         console.log("[Socket] Cleaning up listeners");
@@ -239,6 +249,49 @@ export default function Sidebar({
       }
     };
   }, [isAuthenticated, socket, userId]);
+
+  const handleCreateInstantPlaylist = async () => {
+    if (isCreatingPlaylist) return;
+
+    const canProceed = handleProtectedAction();
+    if (!canProceed) return;
+
+    setIsCreatingPlaylist(true);
+    const token = localStorage.getItem("userToken");
+    if (!token) {
+      toast.error("Authentication required.");
+      setIsCreatingPlaylist(false);
+      return;
+    }
+
+    const playlistCount = allUserPlaylists.filter(
+      (p) => p.type !== "SYSTEM" && p.type !== "FAVORITE"
+    ).length;
+    const newPlaylistName = `My Playlist #${playlistCount + 1}`;
+
+    try {
+      const response = await api.playlists.create(
+        { name: newPlaylistName, description: "", privacy: "PRIVATE" },
+        token
+      );
+
+      if (response.success && response.data) {
+        const newPlaylistId = response.data.id;
+        toast.success(`Playlist "${newPlaylistName}" created!`);
+
+        window.dispatchEvent(new CustomEvent("playlist-updated"));
+
+        router.push(`/playlists/${newPlaylistId}`);
+      } else {
+        toast.error(response.message || "Failed to create playlist.");
+      }
+    } catch (error: any) {
+      console.error("Error creating playlist:", error);
+      toast.error("An error occurred while creating the playlist.");
+    } finally {
+      setIsCreatingPlaylist(false);
+    }
+  };
 
   const isActive = (path: string) => pathname === path;
 
@@ -251,6 +304,7 @@ export default function Sidebar({
         />
       )}
 
+      <TooltipProvider delayDuration={0}>
       <div
         className={`
           fixed md:static inset-y-0 left-0 z-50
@@ -321,24 +375,26 @@ export default function Sidebar({
                   <div className="h-[72px] -mx-4 border-b border-white/10">
                     <div className="h-full flex items-center gap-4 px-7">
                       {isCollapsed ? (
-                        <div className="group">
-                          <LibraryOutline
-                            className={`w-7 h-7 ${
-                              theme === "light"
-                                ? "text-gray-600 group-hover:hidden"
-                                : "text-white/70 group-hover:hidden"
-                            }`}
-                          />
-                          <LibraryFilled
-                            className={`w-7 h-7 hidden group-hover:block ${
-                              theme === "light" ? "text-gray-900" : "text-white"
-                            }`}
-                          />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="w-full flex justify-center py-1 group">
+                                <div className="relative p-1.5 rounded-lg bg-neutral-800 flex items-center justify-center w-10 h-10 shadow-md cursor-pointer">
+                                  <LibraryOutline className="w-7 h-7 text-white/70 group-hover:hidden" />
+                                  <LibraryFilled className="w-7 h-7 text-white hidden group-hover:block" />
                         </div>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="right"
+                              className="bg-[#282828] border-none text-white"
+                            >
+                              <p>Your Library</p>
+                            </TooltipContent>
+                          </Tooltip>
                       ) : (
                         <>
                           <div
-                            className={`flex items-center gap-3 group ${
+                              className={`flex items-center gap-3 group cursor-pointer ${
                               theme === "light"
                                 ? "text-gray-600 hover:text-gray-900"
                                 : "text-white/70 hover:text-white"
@@ -352,32 +408,56 @@ export default function Sidebar({
                               Your Library
                             </span>
                           </div>
+                            <button
+                              onClick={handleCreateInstantPlaylist}
+                              disabled={isCreatingPlaylist}
+                              className={`ml-auto p-1 rounded-md ${
+                                theme === "light"
+                                  ? "bg-gray-100 hover:bg-gray-200"
+                                  : "bg-neutral-800 hover:bg-white/10"
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
                           <AddSimple
-                            className={`w-6 h-6 ml-auto hover:text-white cursor-pointer ${
+                                className={`w-6 h-6 ${
                               theme === "light"
-                                ? "text-gray-600 hover:text-gray-900"
-                                : "text-white/70 hover:text-white"
-                            }`}
-                            onClick={() => {
-                              const canProceed = handleProtectedAction();
-                              if (canProceed) {
-                                setIsCreateDialogOpen(true);
-                              }
-                            }}
-                          />
+                                    ? "text-gray-600 group-hover:text-gray-900"
+                                    : "text-white/70 group-hover:text-white"
+                                }`}
+                              />
+                            </button>
                         </>
                       )}
                     </div>
                   </div>
 
                   <div
-                    className={`mt-2 ${
+                      className={`mt-2 overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-700 scrollbar-track-transparent pr-1 ${
                       isCollapsed
-                        ? "space-y-2 flex flex-col items-center"
+                          ? "space-y-2 flex flex-col items-center pt-2"
                         : "space-y-1"
                     }`}
                   >
-                    {favoritePlaylist && favoritePlaylist.totalTracks > 0 && (
+                      {isCollapsed && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={handleCreateInstantPlaylist}
+                              disabled={isCreatingPlaylist}
+                              className={`flex items-center justify-center w-10 h-10 p-1.5 rounded-lg bg-neutral-800 text-white/70 hover:text-white hover:bg-[#333333] transition-colors duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              <AddSimple className="w-6 h-6" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="right"
+                            className="bg-[#282828] border-none text-white"
+                          >
+                            <p>Create playlist</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+
+                      {favoritePlaylist && favoritePlaylist.totalTracks > 0 && (
                       <div
                         className={`${
                           isCollapsed
@@ -390,9 +470,10 @@ export default function Sidebar({
                           className={`flex ${
                             isCollapsed
                               ? "items-center justify-center py-1"
-                              : `items-center px-3 py-2 rounded-md ${
-                                  pathname ===
+                                : `items-center px-3 py-2.5 rounded-md ${
+                                    isActive(
                                   `/playlists/${favoritePlaylist.id}`
+                                    )
                                     ? theme === "light"
                                       ? "bg-gray-200 text-gray-900"
                                       : "bg-[#A57865]/30 text-white"
@@ -403,31 +484,42 @@ export default function Sidebar({
                           }`}
                         >
                           {isCollapsed ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
                             <div
                               className={`p-1.5 rounded-lg ${
-                                isActive(`/playlists/${favoritePlaylist.id}`)
+                                      isActive(
+                                        `/playlists/${favoritePlaylist.id}`
+                                      )
                                   ? "bg-[#A57865]/30"
                                   : "bg-neutral-800"
-                              } flex items-center justify-center w-10 h-10 relative group shadow-md transition-all duration-200 hover:scale-105 hover:bg-[#333333]`}
+                                    } flex items-center justify-center w-10 h-10 shadow-md transition-all duration-200 hover:scale-105 hover:bg-[#333333]`}
                             >
                               <PlaylistIcon
                                 coverUrl={favoritePlaylist.coverUrl}
                                 name={favoritePlaylist.name}
                                 type={favoritePlaylist.type}
-                                isAIGenerated={favoritePlaylist.isAIGenerated}
+                                      isAIGenerated={
+                                        favoritePlaylist.isAIGenerated
+                                      }
                                 size={28}
                                 className="rounded object-cover"
                               />
-                              <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
-                                <div className="font-medium">
-                                  {favoritePlaylist.name}
                                 </div>
-                                <div className="text-white/50">
-                                  Private • {favoritePlaylist.totalTracks || 0}{" "}
-                                  tracks
-                                </div>
-                              </div>
-                            </div>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="right"
+                                  className="bg-[#282828] border-none text-white"
+                                >
+                                  <p className="font-semibold">
+                                    {favoritePlaylist.name}
+                                  </p>
+                                  <p className="text-neutral-400 text-xs">
+                                    Playlist •{" "}
+                                    {favoritePlaylist.totalTracks || 0} bài hát
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
                           ) : (
                             <div className="flex items-center w-full gap-2">
                               <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
@@ -471,45 +563,42 @@ export default function Sidebar({
                         </Link>
                       </div>
                     )}
-
-                    {/* Show prompt only if loading is finished and there are no normal playlists */}
-                    {!loading && playlists.length === 0 && (
-                      <div
-                        className={`p-4 rounded-lg mt-4 ${
-                          theme === "light" ? "bg-gray-100" : "bg-[#242424]"
-                        }`}
-                      >
-                        <h3
-                          className={`font-bold text-base ${
-                            theme === "light" ? "text-gray-900" : "text-white"
+                    
+                      {!loading && playlists.length === 0 && (
+                        <div
+                          className={`p-4 rounded-lg mt-4 ${
+                            theme === "light" ? "bg-gray-100" : "bg-[#242424]"
                           }`}
                         >
-                          Create your first playlist
-                        </h3>
-                        <p
-                          className={`text-sm mt-1 ${
-                            theme === "light"
-                              ? "text-gray-600"
-                              : "text-white/70"
-                          }`}
-                        >
-                          It's easy! We'll help you
-                        </p>
-                        <button
-                          onClick={() => {
-                            const canProceed = handleProtectedAction();
-                            if (canProceed) {
-                              setIsCreateDialogOpen(true);
-                            }
-                          }}
-                          className={`mt-4 px-4 py-1.5 rounded-full font-semibold text-sm ${
-                            theme === "light"
-                              ? "bg-black text-white hover:bg-gray-800"
-                              : "bg-white text-black hover:bg-gray-200"
-                          }`}
-                        >
-                          Create playlist
-                        </button>
+                          <h3
+                            className={`font-bold text-base ${
+                              theme === "light" ? "text-gray-900" : "text-white"
+                            }`}
+                          >
+                            Create your first playlist
+                          </h3>
+                          <p
+                            className={`text-sm mt-1 ${
+                              theme === "light"
+                                ? "text-gray-600"
+                                : "text-white/70"
+                            }`}
+                          >
+                            It's easy! We'll help you
+                          </p>
+                          <button
+                            onClick={handleCreateInstantPlaylist}
+                            disabled={isCreatingPlaylist}
+                            className={`mt-4 px-4 py-1.5 rounded-full font-semibold text-sm ${
+                              theme === "light"
+                                ? "bg-black text-white hover:bg-gray-800"
+                                : "bg-white text-black hover:bg-gray-200"
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {isCreatingPlaylist
+                              ? "Creating..."
+                              : "Create playlist"}
+                          </button>
                       </div>
                     )}
 
@@ -527,8 +616,8 @@ export default function Sidebar({
                           className={`flex ${
                             isCollapsed
                               ? "items-center justify-center py-1"
-                              : `items-center px-3 py-2 ${
-                                  index > 0 ? "-mt-1" : ""
+                                : `items-center px-3 py-2.5 ${
+                                    index > 0 ? "mt-1" : ""
                                 } rounded-md ${
                                   isActive(`/playlists/${playlist.id}`)
                                     ? theme === "light"
@@ -541,12 +630,14 @@ export default function Sidebar({
                           }`}
                         >
                           {isCollapsed ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
                             <div
                               className={`p-1.5 rounded-lg ${
                                 isActive(`/playlists/${playlist.id}`)
                                   ? "bg-[#A57865]/30"
                                   : "bg-neutral-800"
-                              } flex items-center justify-center w-10 h-10 relative group shadow-md transition-all duration-200 hover:scale-105 hover:bg-[#333333]`}
+                                    } flex items-center justify-center w-10 h-10 shadow-md transition-all duration-200 hover:scale-105 hover:bg-[#333333]`}
                             >
                               <PlaylistIcon
                                 coverUrl={playlist.coverUrl}
@@ -556,18 +647,21 @@ export default function Sidebar({
                                 size={28}
                                 className="rounded object-cover"
                               />
-                              <div className="absolute left-full ml-2 px-2 py-1 bg-neutral-800 rounded text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
-                                <div className="font-medium">
-                                  {playlist.name}
                                 </div>
-                                <div className="text-white/50">
-                                  {playlist.privacy === "PRIVATE"
-                                    ? "Private"
-                                    : "Public"}{" "}
-                                  • {playlist.totalTracks || 0} tracks
-                                </div>
-                              </div>
-                            </div>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="right"
+                                  className="bg-[#282828] border-none text-white"
+                                >
+                                  <p className="font-semibold">
+                                    {playlist.name}
+                                  </p>
+                                  <p className="text-neutral-400 text-xs">
+                                    Playlist • {playlist.totalTracks || 0} bài
+                                    hát
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
                           ) : (
                             <div className="flex items-center w-full gap-2">
                               <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
@@ -638,7 +732,7 @@ export default function Sidebar({
                     }`}
                   >
                     {isCollapsed ? (
-                      <HomeOutline className="w-6 h-6 mx-auto" />
+                        <HomeOutline className="w-6 h-6" />
                     ) : (
                       <>
                         <HomeOutline className="w-6 h-6" />
@@ -659,7 +753,7 @@ export default function Sidebar({
                     }`}
                   >
                     {isCollapsed ? (
-                      <Album className="w-6 h-6 mx-auto" />
+                        <Album className="w-6 h-6" />
                     ) : (
                       <>
                         <Album className="w-6 h-6" />
@@ -680,7 +774,7 @@ export default function Sidebar({
                     }`}
                   >
                     {isCollapsed ? (
-                      <Music className="w-6 h-6 mx-auto" />
+                        <Music className="w-6 h-6" />
                     ) : (
                       <>
                         <Music className="w-6 h-6" />
@@ -701,7 +795,7 @@ export default function Sidebar({
                     }`}
                   >
                     {isCollapsed ? (
-                      <ChartIcon className="w-6 h-6 mx-auto" />
+                        <ChartIcon className="w-6 h-6" />
                     ) : (
                       <>
                         <ChartIcon className="w-6 h-6" />
@@ -729,7 +823,7 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
-                    <HomeOutline className="w-6 h-6 mx-auto" />
+                      <HomeOutline className="w-6 h-6" />
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
@@ -779,7 +873,7 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
-                    <Users className="w-6 h-6 mx-auto" />
+                      <Users className="w-6 h-6" />
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
@@ -799,13 +893,15 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
-                    <Users className="w-6 h-6 mx-auto" />
+                      <Users className="w-6 h-6" />
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
                         <Users className="w-5 h-5" />
                       </div>
-                      <span className="ml-3 font-medium text-sm">Artists</span>
+                        <span className="ml-3 font-medium text-sm">
+                          Artists
+                        </span>
                     </>
                   )}
                 </Link>
@@ -865,7 +961,9 @@ export default function Sidebar({
                       <div className="min-w-[32px] flex justify-center">
                         <LayoutGrid className="w-5 h-5" />
                       </div>
-                      <span className="ml-3 font-medium text-sm">Content</span>
+                        <span className="ml-3 font-medium text-sm">
+                          Content
+                        </span>
                     </>
                   )}
                 </Link>
@@ -923,15 +1021,8 @@ export default function Sidebar({
           </div>
         </div>
       </div>
+      </TooltipProvider>
 
-      <CreatePlaylistDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        onSuccess={() => {
-          fetchPlaylists();
-          setIsCreateDialogOpen(false);
-        }}
-      />
       <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </>
   );

@@ -1,21 +1,54 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { TrackList } from "@/components/user/track/TrackList";
 import { EditPlaylistDialog } from "@/components/user/playlist/EditPlaylistDialog";
 import { DeletePlaylistDialog } from "@/components/user/playlist/DeletePlaylistDialog";
 import { api } from "@/utils/api";
-import { Playlist } from "@/types";
+import { Playlist, PlaylistPrivacy } from "@/types";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
 import { toast } from "react-hot-toast";
 import { PlaylistIcon } from "@/components/user/playlist/PlaylistIcon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, Pencil, Trash2, Lock, Globe } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 // Khai báo event bus đơn giản để gọi fetchPlaylists từ sidebar
 const playlistUpdateEvent = new CustomEvent("playlist-updated");
+
+// Helper function to format duration (seconds) into "X phút Y giây"
+const formatDuration = (totalSeconds: number): string => {
+  if (!totalSeconds || totalSeconds === 0) {
+    return "0 giây";
+  }
+  totalSeconds = Math.round(totalSeconds);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  let formattedString = "";
+  if (hours > 0) {
+    formattedString += `${hours} giờ `;
+  }
+  if (minutes > 0) {
+    formattedString += `${minutes} phút `;
+  }
+  // Always show seconds if total duration is less than a minute, or if there are remaining seconds
+  if (totalSeconds < 60 || seconds > 0) {
+    formattedString += `${seconds} giây`;
+  }
+
+  return formattedString.trim(); // Trim trailing space if only hours/minutes shown
+};
 
 export default function PlaylistPage() {
   const params = useParams();
@@ -32,6 +65,9 @@ export default function PlaylistPage() {
   const [error, setError] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   // Check if this is a special system playlist
   const isVibeRewindPlaylist =
@@ -54,6 +90,8 @@ export default function PlaylistPage() {
     playlist?.type !== "SYSTEM" &&
     playlist?.name !== "Vibe Rewind" &&
     playlist?.name !== "Welcome Mix";
+
+  const canEditPlaylist = playlist?.canEdit && playlist?.type === "NORMAL";
 
   useEffect(() => {
     // Check if user is authenticated
@@ -95,6 +133,61 @@ export default function PlaylistPage() {
     }
   }, [id]);
 
+  const handleCoverClick = () => {
+    if (!canEditPlaylist || isUploadingCover) return;
+    coverInputRef.current?.click();
+  };
+
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!id || !canEditPlaylist) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const token = localStorage.getItem("userToken");
+    if (!token) {
+      toast.error("Authentication required.");
+      return;
+    }
+
+    setIsUploadingCover(true);
+    const formData = new FormData();
+    formData.append("cover", file);
+
+    const originalCoverUrl = playlist?.coverUrl;
+    const tempCoverUrl = URL.createObjectURL(file);
+    setPlaylist((prev) => (prev ? { ...prev, coverUrl: tempCoverUrl } : null));
+
+    try {
+      const response = await api.playlists.updateCover(id, formData, token);
+      if (response.success && response.data?.coverUrl) {
+        toast.success("Playlist cover updated!");
+        setPlaylist((prev) =>
+          prev ? { ...prev, coverUrl: response.data.coverUrl } : null
+        );
+        window.dispatchEvent(new CustomEvent("playlist-updated"));
+        if (tempCoverUrl) URL.revokeObjectURL(tempCoverUrl);
+      } else {
+        toast.error(response.message || "Failed to update cover.");
+        setPlaylist((prev) =>
+          prev ? { ...prev, coverUrl: originalCoverUrl } : null
+        );
+        if (tempCoverUrl) URL.revokeObjectURL(tempCoverUrl);
+      }
+    } catch (error: any) {
+      console.error("Error updating cover:", error);
+      toast.error("An error occurred while updating the cover.");
+      setPlaylist((prev) =>
+        prev ? { ...prev, coverUrl: originalCoverUrl } : null
+      );
+      if (tempCoverUrl) URL.revokeObjectURL(tempCoverUrl);
+    } finally {
+      setIsUploadingCover(false);
+      if (coverInputRef.current) {
+        coverInputRef.current.value = "";
+      }
+    }
+  };
+
   const handleRemoveTrack = async (trackId: string) => {
     handleProtectedAction(async () => {
       try {
@@ -130,14 +223,10 @@ export default function PlaylistPage() {
         // Show success message
         toast.success("Playlist deleted successfully");
 
-        // Wait a bit for the delete operation to complete
-        // await new Promise((resolve) => setTimeout(resolve, 1000));
-
         // Dispatch event for Sidebar to update
         window.dispatchEvent(new CustomEvent("playlist-updated"));
 
         // Navigate to home page instead of reloading
-        // window.location.href = "/";
         router.push("/");
       } catch (error: any) {
         console.error("Error deleting playlist:", error);
@@ -149,15 +238,76 @@ export default function PlaylistPage() {
     });
   };
 
+  // Re-implement handleUpdatePlaylist focused on privacy
+  const handleUpdatePlaylist = useCallback(
+    async (field: keyof Playlist, value: any) => {
+      if (!id || !playlist || !canEditPlaylist) return;
+
+      const token = localStorage.getItem("userToken");
+      if (!token) {
+        toast.error("Authentication required.");
+        return;
+      }
+
+      const updateData = { [field]: value };
+      const originalValue = playlist[field];
+
+      // Optimistic update
+      setPlaylist((prev) => (prev ? { ...prev, ...updateData } : null));
+
+      try {
+        // Use the existing api.playlists.update for PATCH
+        const response = await api.playlists.update(id, updateData, token);
+        if (response.success) {
+          toast.success(`Playlist ${field} updated!`);
+          // Update local state with potentially more complete data from backend
+          setPlaylist((prev) => (prev ? { ...prev, ...response.data } : null));
+          window.dispatchEvent(new CustomEvent("playlist-updated"));
+        } else {
+          toast.error(response.message || `Failed to update ${field}.`);
+          setPlaylist((prev) =>
+            prev ? { ...prev, [field]: originalValue } : null
+          );
+        }
+      } catch (error: any) {
+        console.error(`Error updating playlist ${field}:`, error);
+        toast.error(`An error occurred while updating ${field}.`);
+        setPlaylist((prev) =>
+          prev ? { ...prev, [field]: originalValue } : null
+        );
+      }
+    },
+    [id, playlist, canEditPlaylist]
+  );
+
+  // Handler to toggle privacy
+  const handleTogglePrivacy = () => {
+    if (!playlist || !canEditPlaylist) return;
+    const currentPrivacy = playlist.privacy;
+    const newPrivacy = currentPrivacy === "PRIVATE" ? "PUBLIC" : "PRIVATE";
+    handleUpdatePlaylist("privacy", newPrivacy);
+  };
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
   if (!playlist) return <div>Playlist not found</div>;
 
+  // Use the existing totalDuration field and format it
+  const formattedDuration = formatDuration(playlist.totalDuration || 0);
+
   return (
     <div className="flex flex-col">
       {/* Header */}
-      <div className="flex items-end gap-6 p-6 bg-gradient-to-b from-[#A57865]/30">
-        <div className="w-[232px] h-[232px] flex-shrink-0 relative">
+      <div
+        className={`flex items-end gap-6 p-6 bg-gradient-to-b from-[#A57865]/30`}
+      >
+        <div
+          className={`w-[232px] h-[232px] flex-shrink-0 relative group ${
+            canEditPlaylist ? "cursor-pointer" : ""
+          }`}
+          onClick={handleCoverClick}
+          title={canEditPlaylist ? "Click to change cover image" : undefined}
+        >
           {playlist.coverUrl ? (
             <>
               <Image
@@ -167,6 +317,12 @@ export default function PlaylistPage() {
                 height={232}
                 className="w-full h-full object-cover shadow-lg rounded-md"
               />
+              {canEditPlaylist && (
+                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-md">
+                  <Pencil className="w-12 h-12 text-white mb-2" />
+                  <span className="text-white font-semibold">Choose photo</span>
+                </div>
+              )}
               {playlist.isAIGenerated && (
                 <div className="absolute top-3 right-3 bg-black/40 rounded-full p-1">
                   <Image
@@ -189,101 +345,143 @@ export default function PlaylistPage() {
                   size={64}
                 />
               </div>
+              {canEditPlaylist && (
+                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-md">
+                  <Pencil className="w-12 h-12 text-white mb-2" />
+                  <span className="text-white font-semibold">Choose photo</span>
+                </div>
+              )}
             </div>
           )}
+          {isUploadingCover && (
+            <div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded-md">
+              <span className="text-white">Uploading...</span>{" "}
+              {/* Add a spinner later */}
+            </div>
+          )}
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleCoverChange}
+            className="hidden"
+            disabled={isUploadingCover || !canEditPlaylist}
+          />
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="text-sm font-medium text-white/70">
-            {playlist.privacy === "PRIVATE"
-              ? "Private Playlist"
-              : "Public Playlist"}
-          </div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-[2rem] font-bold leading-tight">
+          {!isSpecialPlaylist && !playlist.isAIGenerated && (
+            <Badge
+              variant="secondary"
+              className={`text-xs font-medium rounded-full px-2 py-0.5 w-fit ${
+                playlist.privacy === "PRIVATE"
+                  ? "bg-neutral-700 text-neutral-300"
+                  : "bg-blue-500/20 text-blue-300"
+              }`}
+            >
+              {playlist.privacy === "PRIVATE" ? "Private" : "Public"}
+            </Badge>
+          )}
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1
+              className={`text-[2rem] font-bold leading-tight ${
+                canEditPlaylist ? "cursor-pointer" : ""
+              }`}
+              onClick={
+                canEditPlaylist
+                  ? () => handleProtectedAction(() => setIsEditOpen(true))
+                  : undefined
+              }
+              title={canEditPlaylist ? "Edit details" : undefined}
+            >
               {playlist.name}
+              {playlist.isAIGenerated && (
+                <Badge
+                  variant="outline"
+                  className="ml-2 bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 border-none text-white text-xs px-1.5 py-0.5 font-bold"
+                >
+                  AI
+                </Badge>
+              )}
             </h1>
-            {isVibeRewindPlaylist && (
-              <span className="px-2 py-1 text-xs font-medium rounded-full bg-emerald-500/20 text-emerald-400">
-                Auto-Updated
-              </span>
-            )}
-            {isFavoritePlaylist && (
-              <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-500/20 text-red-400">
-                Favorites
-              </span>
-            )}
-            {playlist.isAIGenerated && (
-              <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-500/20 text-purple-400 flex items-center gap-1">
-                <span>Personalized</span>
-              </span>
-            )}
-            {!isFavoritePlaylist && playlist.privacy === "PRIVATE" && (
-              <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-500/20 text-gray-300">
-                Private
-              </span>
-            )}
-            {playlist.privacy === "PUBLIC" && (
-              <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-500/20 text-blue-400">
-                Public
-              </span>
-            )}
+
+            {isVibeRewindPlaylist && <Badge>Auto-Updated</Badge>}
+            {isWelcomeMixPlaylist && <Badge>Welcome Mix</Badge>}
+            {playlist.isAIGenerated && <Badge>Personalized</Badge>}
           </div>
+
           {playlist.description && (
             <p className="text-sm text-white/70">{playlist.description}</p>
           )}
-          <div className="flex items-center gap-1 text-sm text-white/70">
-            <span>{playlist.tracks.length} tracks</span>
-          </div>
-          <div className="flex items-center gap-2 mt-2">
-            {playlist.canEdit &&
-              playlist.type === "NORMAL" &&
-              playlist.name !== "Vibe Rewind" &&
-              playlist.name !== "Welcome Mix" && (
-                <>
-                  <Button
-                    onClick={() =>
-                      handleProtectedAction(() => setIsEditOpen(true))
-                    }
-                  >
-                    Edit playlist
-                  </Button>
-                  <Button
-                    onClick={() => setIsDeleteOpen(true)}
-                    variant="destructive"
-                    className="ml-2"
-                  >
-                    Delete playlist
-                  </Button>
-                </>
-              )}
-            {isVibeRewindPlaylist && (
-              <Button
-                onClick={() =>
-                  handleProtectedAction(async () => {
-                    try {
-                      const token = localStorage.getItem("userToken");
-                      if (!token) return;
 
-                      await api.playlists.updateVibeRewindPlaylist(token);
-
-                      // Refresh the page to show updated playlist
-                      window.location.reload();
-                    } catch (error) {
-                      console.error("Error updating Vibe Rewind:", error);
-                    }
-                  })
-                }
-                variant="outline"
-              >
-                Update Now
-              </Button>
+          {/* Updated Metadata Line - Only show track count and duration */}
+          <div className="flex items-center gap-1.5 text-sm text-white/70 flex-wrap mt-1">
+            {/* Remove user section as data is not available */}
+            {playlist.totalTracks > 0 && (
+              <>
+                <span>{playlist.totalTracks} bài hát,</span>
+                <span className="ml-1 text-white/50">{formattedDuration}</span>
+              </>
+            )}
+            {playlist.totalTracks === 0 && (
+              <span className="text-white/50">0 bài hát</span>
             )}
           </div>
+
+          {canEditPlaylist && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-white/70 hover:text-white hover:bg-white/10 mt-1 rounded-full h-8 w-8 -ml-2"
+                  title="More options"
+                >
+                  <MoreHorizontal className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem
+                  onSelect={() =>
+                    handleProtectedAction(() => setIsEditOpen(true))
+                  }
+                  className="cursor-pointer"
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit details
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => handleProtectedAction(handleTogglePrivacy)}
+                  className="cursor-pointer"
+                >
+                  {playlist.privacy === "PRIVATE" ? (
+                    <>
+                      <Globe className="w-4 h-4 mr-2" />
+                      Make public
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 mr-2" />
+                      Make private
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    handleProtectedAction(() => setIsDeleteOpen(true))
+                  }
+                  className="text-red-500 focus:text-red-500 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete playlist
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
-      {/* Track List */}
       <div className="p-6">
         <div className="mb-4 border-b border-white/10">
           <div className="grid grid-cols-[16px_4fr_3fr_2fr_minmax(120px,1fr)] gap-4 px-4 py-2 text-sm text-white/70">
@@ -305,38 +503,20 @@ export default function PlaylistPage() {
         />
       </div>
 
-      <EditPlaylistDialog
-        playlist={playlist}
-        open={isEditOpen}
-        onOpenChange={setIsEditOpen}
-        isSpecialPlaylist={isSpecialPlaylist}
-        onPlaylistUpdated={(updatedPlaylist) => {
-          // Cập nhật state playlist với dữ liệu mới
-          // Đảm bảo giữ lại thuộc tính canEdit nếu không có trong dữ liệu mới
-          const updatedTracks = updatedPlaylist.tracks || [];
-
-          // Format tracks đúng nếu cần thiết
-          let formattedTracks = updatedTracks;
-
-          // Kiểm tra nếu tracks được trả về dưới dạng PlaylistTrack thay vì Track
-          if (updatedTracks.length > 0 && "track" in updatedTracks[0]) {
-            // Giữ lại tracks hiện tại thay vì cố gắng chuyển đổi dữ liệu không đầy đủ
-            formattedTracks = playlist.tracks;
-          }
-
-          setPlaylist({
-            ...updatedPlaylist,
-            canEdit:
-              updatedPlaylist.canEdit !== undefined
-                ? updatedPlaylist.canEdit
-                : playlist.canEdit,
-            tracks: formattedTracks,
-          });
-
-          // Phát sự kiện để sidebar biết cần cập nhật playlists
-          window.dispatchEvent(playlistUpdateEvent);
-        }}
-      />
+      {playlist && (
+        <EditPlaylistDialog
+          playlist={playlist}
+          open={isEditOpen}
+          onOpenChange={setIsEditOpen}
+          isSpecialPlaylist={isSpecialPlaylist}
+          onPlaylistUpdated={(updatedPlaylistData) => {
+            setPlaylist((prev) =>
+              prev ? { ...prev, ...updatedPlaylistData } : null
+            );
+            window.dispatchEvent(new CustomEvent("playlist-updated"));
+          }}
+        />
+      )}
 
       <DeletePlaylistDialog
         open={isDeleteOpen}

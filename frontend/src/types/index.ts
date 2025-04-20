@@ -62,8 +62,8 @@ export interface User {
   password?: string;
   name?: string;
   avatar?: string;
-  role: 'USER' | 'ADMIN'; // Chỉ có USER và ADMIN
-  currentProfile: 'USER' | 'ARTIST';
+  role: "USER" | "ADMIN"; // Chỉ có USER và ADMIN
+  currentProfile: "USER" | "ARTIST";
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -85,7 +85,7 @@ export interface ArtistProfile {
   bio?: string;
   avatar?: string;
   artistBanner?: string;
-  role: 'ARTIST';
+  role: "ARTIST";
   socialMediaLinks?: {
     facebook?: string;
     instagram?: string;
@@ -113,7 +113,7 @@ export interface UserFollow {
   followerId: string;
   followingUserId?: string; // ID của User được follow (nếu followingType là USER)
   followingArtistId?: string; // ID của ArtistProfile được follow (nếu followingType là ARTIST)
-  followingType: 'USER' | 'ARTIST';
+  followingType: "USER" | "ARTIST";
   createdAt: string;
   follower: User;
   followingUser?: User; // User được follow (nếu followingType là USER)
@@ -179,7 +179,7 @@ export interface Label {
     title: string;
     coverUrl?: string | null;
     releaseDate: string;
-    type: 'ALBUM' | 'EP' | 'SINGLE';
+    type: "ALBUM" | "EP" | "SINGLE";
     totalTracks: number;
     artist: {
       id: string;
@@ -223,7 +223,7 @@ export interface Album {
   releaseDate: string;
   duration: number;
   totalTracks: number;
-  type: 'ALBUM' | 'EP' | 'SINGLE';
+  type: "ALBUM" | "EP" | "SINGLE";
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -257,7 +257,7 @@ export interface Track {
   coverUrl?: string;
   audioUrl: string;
   playCount: number;
-  type: 'ALBUM' | 'EP' | 'SINGLE';
+  type: "ALBUM" | "EP" | "SINGLE";
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -268,7 +268,7 @@ export interface Track {
     id: string;
     title: string;
     coverUrl?: string;
-    type: 'ALBUM' | 'EP' | 'SINGLE';
+    type: "ALBUM" | "EP" | "SINGLE";
   };
   artist: {
     id: string;
@@ -290,7 +290,8 @@ export interface Track {
       name: string;
     };
   }[];
-  label?: { // Giữ optional, nhưng có thể không cần nếu API không trả về
+  label?: {
+    // Giữ optional, nhưng có thể không cần nếu API không trả về
     id: string;
     name: string;
     logoUrl?: string | null;
@@ -309,7 +310,7 @@ export interface Genre {
 
 export interface History {
   id: string;
-  type: 'SEARCH' | 'PLAY';
+  type: "SEARCH" | "PLAY";
   query?: string;
   duration?: number;
   completed?: boolean;
@@ -322,11 +323,14 @@ export interface History {
   userId: string;
 }
 
+// Define and export PlaylistPrivacy type
+export type PlaylistPrivacy = "PUBLIC" | "PRIVATE";
+
 export interface Playlist {
   id: string;
   name: string;
   description?: string;
-  privacy: 'PUBLIC' | 'PRIVATE';
+  privacy: PlaylistPrivacy; // Use the exported type
   type: string;
   isAIGenerated: boolean;
   totalTracks: number;
@@ -348,17 +352,17 @@ export interface Playlist {
 export interface Notification {
   id: string;
   type:
-  | 'NEW_TRACK'
-  | 'NEW_ALBUM'
-  | 'EVENT_REMINDER'
-  | 'NEW_FOLLOW'
-  | 'ARTIST_REQUEST_APPROVE'
-  | 'ARTIST_REQUEST_REJECT'
-  | 'ACCOUNT_ACTIVATED'
-  | 'ACCOUNT_DEACTIVATED';
+    | "NEW_TRACK"
+    | "NEW_ALBUM"
+    | "EVENT_REMINDER"
+    | "NEW_FOLLOW"
+    | "ARTIST_REQUEST_APPROVE"
+    | "ARTIST_REQUEST_REJECT"
+    | "ACCOUNT_ACTIVATED"
+    | "ACCOUNT_DEACTIVATED";
   message: string;
   isRead: boolean;
-  recipientType: 'USER' | 'ARTIST'; // Loại người nhận (USER hoặc ARTIST)
+  recipientType: "USER" | "ARTIST"; // Loại người nhận (USER hoặc ARTIST)
   recipientId: string; // ID của người nhận (User hoặc ArtistProfile)
   senderId?: string; // ID của người gửi thông báo (nếu có)
   count?: number; // Số lượng hành động trong thông báo nhóm
@@ -411,8 +415,8 @@ export interface TrackEditForm {
 export interface CreatePlaylistData {
   name: string;
   description?: string;
-  privacy?: 'PUBLIC' | 'PRIVATE';
-  type?: 'FAVORITE' | 'NORMAL';
+  privacy?: "PUBLIC" | "PRIVATE";
+  type?: "FAVORITE" | "NORMAL";
 }
 
 export interface ApiResponse<T> {
@@ -440,26 +444,26 @@ export interface SystemSettings {
 
 export interface SystemComponentStatus {
   name: string;
-  status: 'Available' | 'Issue' | 'Outage' | 'Disabled';
+  status: "Available" | "Issue" | "Outage" | "Disabled";
   message?: string;
 }
 
 export enum AlbumType {
-  ALBUM = 'ALBUM',
-  EP = 'EP',
-  SINGLE = 'SINGLE',
+  ALBUM = "ALBUM",
+  EP = "EP",
+  SINGLE = "SINGLE",
 }
 
 export interface LabelTabsProps {
-  theme: 'light' | 'dark';
-  activeTab: 'artists' | 'albums' | 'tracks';
-  setActiveTab: (tab: 'artists' | 'albums' | 'tracks') => void;
-  displayedArtists: Label['artists'];
-  displayedAlbums: Label['albums'];
-  displayedTracks: Label['tracks'];
-  filteredArtists: Label['artists'];
-  filteredAlbums: Label['albums'];
-  filteredTracks: Label['tracks'];
+  theme: "light" | "dark";
+  activeTab: "artists" | "albums" | "tracks";
+  setActiveTab: (tab: "artists" | "albums" | "tracks") => void;
+  displayedArtists: Label["artists"];
+  displayedAlbums: Label["albums"];
+  displayedTracks: Label["tracks"];
+  filteredArtists: Label["artists"];
+  filteredAlbums: Label["albums"];
+  filteredTracks: Label["tracks"];
   handleAlbumClick: (albumId: string) => void;
   handleTrackClick: (trackId: string) => void;
   formatDate: (dateString: string) => string;
@@ -468,20 +472,21 @@ export interface LabelTabsProps {
 
 export interface LabelInfoCardProps {
   label: Label;
-  theme: 'light' | 'dark';
+  theme: "light" | "dark";
   formatDate: (dateString: string) => string;
 }
 
 // Type for search suggestions
 export interface SearchSuggestion {
-  type: 'Artist' | 'Track' | 'Album';
+  type: "Artist" | "Track" | "Album";
   data: {
     id: string;
     title?: string; // For Track/Album
     artistName?: string; // For Artist
     coverUrl?: string; // For Track/Album
     avatar?: string; // For Artist
-    artist?: { // Nested artist for Track/Album
+    artist?: {
+      // Nested artist for Track/Album
       id: string;
       artistName: string;
     };
