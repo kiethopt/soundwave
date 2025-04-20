@@ -200,39 +200,47 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Tạo playlist mặc định cho người dùng mới
     try {
-      // Tạo "Welcome Mix" bằng các bài hát phổ biến
+      // Create Welcome Mix playlist first
+      const welcomeMixPlaylist = await prisma.playlist.create({
+        data: {
+          name: "Welcome Mix",
+          description:
+            "A selection of popular tracks to start your journey on Soundwave.",
+          privacy: "PRIVATE",
+          type: "SYSTEM",
+          isAIGenerated: false,
+          userId: user.id,
+          totalTracks: 0,
+          totalDuration: 0,
+        },
+      });
+
+      // Then try to get default tracks
       const defaultTrackIds = await aiService.generateDefaultPlaylistForNewUser(
         user.id
-      ); // Lấy danh sách track IDs phổ biến
+      );
 
       if (defaultTrackIds.length > 0) {
-        // Lấy thông tin tracks để tính duration (tùy chọn, có thể bỏ qua nếu không cần chính xác ngay)
         const tracksInfo = await prisma.track.findMany({
           where: { id: { in: defaultTrackIds } },
           select: { id: true, duration: true },
         });
+
         const totalDuration = tracksInfo.reduce(
           (sum, track) => sum + track.duration,
           0
         );
         const trackIdMap = new Map(tracksInfo.map((t) => [t.id, t]));
-
-        // Sắp xếp lại trackIds theo thứ tự trả về từ generateDefaultPlaylistForNewUser
         const orderedTrackIds = defaultTrackIds.filter((id) =>
           trackIdMap.has(id)
         );
 
-        await prisma.playlist.create({
+        // Update Welcome Mix with tracks
+        await prisma.playlist.update({
+          where: { id: welcomeMixPlaylist.id },
           data: {
-            name: "Welcome Mix",
-            description:
-              "A selection of popular tracks to start your journey on Soundwave.",
-            privacy: "PRIVATE",
-            type: "SYSTEM",
-            isAIGenerated: false,
-            userId: user.id, // Playlist này thuộc về người dùng
             totalTracks: orderedTrackIds.length,
-            totalDuration: totalDuration,
+            totalDuration,
             tracks: {
               createMany: {
                 data: orderedTrackIds.map((trackId, index) => ({
@@ -243,21 +251,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
             },
           },
         });
-        // Log này để test, sau khi ổn thì xóa đi
-        console.log(
-          `[Register] Created Welcome Mix for new user ${user.id} with ${orderedTrackIds.length} popular tracks.`
-        );
-      } else {
-        console.log(
-          `[Register] No popular tracks found to create Welcome Mix for user ${user.id}.`
-        );
       }
     } catch (playlistError) {
-      // Log lỗi nhưng không làm gián đoạn quá trình đăng ký
       console.error(
-        `[Register] Error creating initial playlists for user ${user.id}:`,
+        `Error creating Welcome Mix playlist for user ${user.id}:`,
         playlistError
       );
+      // Continue registration process even if playlist creation fails
     }
 
     // Gửi email chào mừng

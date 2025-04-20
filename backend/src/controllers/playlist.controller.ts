@@ -91,6 +91,27 @@ export const getPlaylists: RequestHandler = async (
 
     // Create system playlists if they don't exist (for all non-system requests)
     if (!isSystemFilter) {
+      // Check for Favorites playlist
+      let favoritePlaylist = await prisma.playlist.findFirst({
+        where: {
+          userId,
+          type: "FAVORITE",
+        },
+      });
+
+      // Create Favorites playlist if it doesn't exist
+      if (!favoritePlaylist) {
+        favoritePlaylist = await prisma.playlist.create({
+          data: {
+            name: "Favorites",
+            description: "List of your favorite songs",
+            privacy: "PRIVATE",
+            type: "FAVORITE",
+            userId,
+          },
+        });
+      }
+
       // Check for Vibe Rewind playlist
       let vibeRewindPlaylist = await prisma.playlist.findFirst({
         where: {
@@ -109,7 +130,6 @@ export const getPlaylists: RequestHandler = async (
             privacy: "PRIVATE",
             type: "SYSTEM",
             userId,
-            
           },
         });
 
@@ -841,7 +861,7 @@ export const getUserSystemPlaylists: RequestHandler = async (
   }
 };
 
-  // Update the Vibe Rewind playlist (tracks user has listened to)
+// Update the Vibe Rewind playlist (tracks user has listened to)
 export const updateVibeRewindPlaylist: RequestHandler = async (
   req,
   res,
@@ -868,7 +888,7 @@ export const updateVibeRewindPlaylist: RequestHandler = async (
       message: "Failed to update Vibe Rewind playlist",
     });
   }
-};  
+};
 
 // Generating AI playlists
 export const generateAIPlaylist: RequestHandler = async (
@@ -893,22 +913,28 @@ export const generateAIPlaylist: RequestHandler = async (
       basedOnMood,
       basedOnGenre,
       basedOnArtist,
-      basedOnSongLength, 
+      basedOnSongLength,
       basedOnReleaseTime,
     } = req.body;
 
     // Check if any specific parameters are provided
-    const hasSpecificParams = basedOnMood || basedOnGenre || basedOnArtist || basedOnSongLength || basedOnReleaseTime;
+    const hasSpecificParams =
+      basedOnMood ||
+      basedOnGenre ||
+      basedOnArtist ||
+      basedOnSongLength ||
+      basedOnReleaseTime;
 
     // Case 19: If no parameters are provided, return an error
     if (!hasSpecificParams) {
       res.status(400).json({
         success: false,
-        message: "At least one parameter (mood, genre, artist, song length, or release time) is required to generate a playlist.",
+        message:
+          "At least one parameter (mood, genre, artist, song length, or release time) is required to generate a playlist.",
       });
       return;
     }
-    
+
     // Call the service function
     const playlistData = await playlistService.generateAIPlaylist(userId, {
       name,
@@ -923,7 +949,7 @@ export const generateAIPlaylist: RequestHandler = async (
 
     // Determine the message based on parameters
     let message = `AI playlist generated successfully with ${playlistData.totalTracks} tracks from ${playlistData.artistCount} artists`;
-    
+
     res.status(200).json({
       success: true,
       message,
@@ -931,15 +957,18 @@ export const generateAIPlaylist: RequestHandler = async (
     });
   } catch (error) {
     console.error("Error generating AI playlist:", error);
-    
+
     // Use appropriate status code based on error type
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const isValidationError = errorMessage.includes("required to generate") || 
-                             errorMessage.includes("parameter is required");
-    
+    const isValidationError =
+      errorMessage.includes("required to generate") ||
+      errorMessage.includes("parameter is required");
+
     res.status(isValidationError ? 400 : 500).json({
       success: false,
-      message: isValidationError ? errorMessage : "Failed to generate AI playlist",
+      message: isValidationError
+        ? errorMessage
+        : "Failed to generate AI playlist",
       error: errorMessage,
     });
   }
@@ -1005,7 +1034,7 @@ export const createBaseSystemPlaylist: RequestHandler = async (
       name,
       description,
       privacy,
-      basedOnMood,  
+      basedOnMood,
       basedOnGenre,
       basedOnArtist,
       basedOnSongLength,
@@ -1071,7 +1100,7 @@ export const updateBaseSystemPlaylist: RequestHandler = async (
       name,
       description,
       privacy,
-      basedOnMood,  
+      basedOnMood,
       basedOnGenre,
       basedOnArtist,
       basedOnSongLength,
@@ -1189,7 +1218,13 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
     // For authenticated users, get personalized system playlists and user playlists
     if (isAuthenticated && userId) {
       try {
-        const [systemPlaylists, userSystemPlaylists, userPlaylists, userTopTracks, userTopArtists] = await Promise.all([
+        const [
+          systemPlaylists,
+          userSystemPlaylists,
+          userPlaylists,
+          userTopTracks,
+          userTopArtists,
+        ] = await Promise.all([
           prisma.playlist.findMany({
             where: {
               type: "SYSTEM",
