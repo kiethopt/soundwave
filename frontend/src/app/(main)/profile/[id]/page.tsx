@@ -34,6 +34,7 @@ export default function UserProfilePage({
   const [isOwner, setIsOwner] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [following, setFollowing] = useState<User[]>([]);
+  const [followers, setFollowers] = useState<User[]>([]);
   const [followingArtists, setFollowingArtists] = useState<ArtistProfile[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [topArtists, setTopArtists] = useState<ArtistProfile[]>([]);
@@ -70,13 +71,18 @@ export default function UserProfilePage({
 
     const fetchUserData = async () => {
       try {
-        const [userResponse, followingResponse] = await Promise.all([
+        const [userResponse, followingResponse, followersResponse] = await Promise.all([
           api.user.getUserById(id, storedToken),
           api.user.getFollowing(storedToken),
+          api.user.getFollowers(storedToken)
         ]);
 
         if (userResponse) {
           setUser(userResponse);
+        }
+
+        if (followersResponse && followersResponse.followers) {
+          setFollowers(followersResponse.followers);
         }
 
         if (isOwner) {
@@ -292,19 +298,27 @@ export default function UserProfilePage({
                 >
                   {user?.name || user?.username || 'User'}
                 </h1>
-                {isOwner && (
-                  <div>
-                    <span
-                      className="text-sm font-semibold hover:underline cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/profile/${id}/following`);
-                      }}
-                    >
-                      {following.length} Following
-                    </span>
-                  </div>
-                )}
+                <div>
+                <span
+                    className="text-sm font-semibold hover:underline cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/profile/${id}/followers`);
+                    }}
+                  >
+                    {followers.length} Followers
+                  </span>
+                  <span className="text-xs font-semibold mx-1.5">•</span>
+                  <span
+                    className="text-sm font-semibold hover:underline cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/profile/${id}/following`);
+                    }}
+                  >
+                    {following.length} Following
+                  </span>
+                </div>
               </div>
             </div>
           </div>
