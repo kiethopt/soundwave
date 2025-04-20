@@ -401,13 +401,6 @@ export const api = {
         token
       ),
 
-    getRecommendationMatrix: async (limit: number, token: string) =>
-      fetchWithAuth(
-        `/api/admin/analytics/matrix?limit=${limit}`,
-        { method: "GET" },
-        token
-      ),
-
     updateGlobalPlaylist: async (token: string) =>
       fetchWithAuth(
         "/api/admin/playlists/global/update",

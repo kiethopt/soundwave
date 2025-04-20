@@ -444,39 +444,6 @@ export interface SystemComponentStatus {
   message?: string;
 }
 
-export interface RecommendationMatrix {
-  success: boolean;
-  data: {
-    users: Array<{
-      id: string;
-      name: string;
-      username: string;
-      email: string;
-      avatar: string | null;
-    }>;
-    tracks: Array<{
-      id: string;
-      title: string;
-      artistId: string;
-      artist: {
-        artistName: string;
-      };
-      playCount: number;
-      coverUrl: string | null;
-    }>;
-    matrix: number[][];
-    normalizedMatrix: number[][];
-    itemSimilarityMatrix: number[][];
-    stats: {
-      userCount: number;
-      trackCount: number;
-      totalInteractions: number;
-      sparsity: number;
-    };
-  };
-  message?: string;
-}
-
 export enum AlbumType {
   ALBUM = 'ALBUM',
   EP = 'EP',
