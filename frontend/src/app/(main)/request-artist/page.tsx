@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import Link from 'next/link';
-import { ArrowLeft, User, Image as ImageIcon, Music, Link2, Save, X, Info } from 'lucide-react';
+import { ArrowLeft, User, Image as ImageIcon, Music, Link2, Save, X, Info, Clock } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import toast from 'react-hot-toast';
 import { getSocket } from '@/utils/socket';
@@ -38,10 +38,13 @@ export default function RequestArtistPage() {
   >([]);
   const [hasPendingRequest, setHasPendingRequest] = useState<boolean>(false);
   const [genreError, setGenreError] = useState<string | null>(null); // New state for genre error
+  const [submissionTimestamp, setSubmissionTimestamp] = useState<number | null>(null); // Add state for timestamp
 
   useEffect(() => {
-    const storedValue = localStorage.getItem('hasPendingRequest');
-    setHasPendingRequest(storedValue ? JSON.parse(storedValue) : false);
+    const storedPending = localStorage.getItem('hasPendingRequest');
+    const storedTimestamp = localStorage.getItem('submissionTimestamp'); // Read timestamp
+    setHasPendingRequest(storedPending ? JSON.parse(storedPending) : false);
+    setSubmissionTimestamp(storedTimestamp ? JSON.parse(storedTimestamp) : null); // Set timestamp state
   }, []);
 
   // Lắng nghe sự kiện Socket.IO
@@ -210,8 +213,11 @@ export default function RequestArtistPage() {
 
       await api.user.requestArtistRole(token, submitFormData);
 
+      const timestamp = Date.now(); // Get current timestamp
       setHasPendingRequest(true);
+      setSubmissionTimestamp(timestamp); // Set timestamp state
       localStorage.setItem('hasPendingRequest', JSON.stringify(true));
+      localStorage.setItem('submissionTimestamp', JSON.stringify(timestamp)); // Store timestamp
       toast.success('Your request has been submitted successfully!', { duration: 2000 });
 
       // Sửa lỗi linter: Lưu userId vào biến trước khi dùng trong setTimeout
@@ -235,16 +241,19 @@ export default function RequestArtistPage() {
     }
   };
 
-  // If already has pending request, show message
   if (hasPendingRequest) {
     return (
-      <div className="min-h-screen p-6 space-y-8 bg-gradient-to-b from-[#2c2c2c] to-[#121212] text-white">
-        <div className="bg-black/20 border border-white/10 rounded-lg overflow-hidden backdrop-blur-sm p-8 max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <Button variant="ghost" asChild>
+      <div className="min-h-screen space-y-8 bg-gradient-to-b from-[#2c2c2c] to-[#121212] text-white flex">
+        <div className="bg-black/20 border border-white/10 rounded-lg overflow-hidden backdrop-blur-sm p-8 flex flex-col flex-grow w-full">
+          <div className="flex items-center justify-between mb-6 flex-shrink-0">
+            <Button
+              variant="secondary"
+              asChild
+              className="bg-neutral-700 hover:bg-neutral-600 text-neutral-100"
+            >
               <Link
                 href="/"
-                className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+                className="flex items-center gap-2"
               >
                 <ArrowLeft className="w-5 h-5" />
                 <span>Back to Home</span>
@@ -255,11 +264,27 @@ export default function RequestArtistPage() {
             </h1>
           </div>
 
-          <div className="bg-black/20 border border-white/10 rounded-lg overflow-hidden backdrop-blur-sm p-8 max-w-lg mx-auto">
-            <p className="text-center text-white">
-              You have already submitted a request to become an artist. Please
-              wait for admin approval.
-            </p>
+          <div className="flex flex-grow items-center justify-center p-8">
+            <div className="flex flex-col items-center gap-4 text-white text-center text-xl">
+              <Clock className="w-12 h-12 text-white/50" />
+              <span>
+                You have already submitted a request to become an artist. Please
+                wait for admin approval.
+              </span>
+              {/* Display submission time if available */}
+              {submissionTimestamp && (
+                <span className="text-base text-white/60 mt-2">
+                  Submitted on:{' '}
+                  {new Date(submissionTimestamp).toLocaleString('en-US', { 
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -270,9 +295,9 @@ export default function RequestArtistPage() {
     <div className="min-h-screen space-y-8 bg-gradient-to-b from-[#2c2c2c] to-[#121212] text-white">
       <div className="bg-black/20 border border-white/10 rounded-lg overflow-hidden backdrop-blur-sm p-8">
         <div className="flex items-center justify-between mb-6">
-          <Button 
-            variant="secondary" 
-            asChild 
+          <Button
+            variant="secondary"
+            asChild
             className="bg-neutral-700 hover:bg-neutral-600 text-neutral-100"
           >
             <Link
