@@ -84,10 +84,107 @@ export interface PlaylistGenerationOptions {
   basedOnGenre?: string;
   basedOnArtist?: string;
   coverUrl?: string | null;
-  basedOnDecade?: string | number;
-  basedOnYearRange?: { start: number; end: number };
   basedOnSongLength?: number | null;
   basedOnReleaseTime?: string | null;
+}
+
+/**
+ * Tạo điều kiện lọc Prisma nâng cao cho thể loại
+ * @param genreInput Tên thể loại người dùng nhập
+ * @returns Object chứa điều kiện truy vấn Prisma
+ */
+async function createEnhancedGenreFilter(genreInput: string): Promise<any> {
+  try {
+    // Phân tích thể loại để tìm thể loại chính và thể loại liên quan
+    const { mainGenreId, relatedGenres, subGenres, parentGenres } = await analyzeGenre(genreInput);
+    
+    // Các IDs thể loại phân theo nhóm
+    const allMainGenreIds = mainGenreId ? [mainGenreId] : [];
+    const allSubGenreIds = subGenres.map(g => g.id);
+    const allRelatedGenreIds = relatedGenres.map(g => g.id);
+    const allParentGenreIds = parentGenres.map(g => g.id);
+    
+    console.log(`[AI] Genre distribution for "${genreInput}":`);
+    if (allMainGenreIds.length > 0) console.log(`[AI] - Main: ${allMainGenreIds.length} genres`);
+    if (allSubGenreIds.length > 0) console.log(`[AI] - Sub: ${allSubGenreIds.length} genres`);
+    if (allRelatedGenreIds.length > 0) console.log(`[AI] - Related: ${allRelatedGenreIds.length} genres`);
+    if (allParentGenreIds.length > 0) console.log(`[AI] - Parent: ${allParentGenreIds.length} genres`);
+    
+    // Tạo danh sách IDs thể loại theo độ ưu tiên
+    const prioritizedGenreIds = [
+      ...allMainGenreIds,  // Higher weight by appearing first
+      ...allSubGenreIds,
+      ...allParentGenreIds,
+      ...allRelatedGenreIds
+    ];
+    
+    // Nếu không tìm thấy thể loại nào, thử tìm kiếm miễn là tên thể loại có chứa chuỗi đầu vào
+    if (prioritizedGenreIds.length === 0) {
+      console.log(`[AI] No exact genre matches found, searching by name`);
+      const fallbackGenres = await prisma.genre.findMany({
+        where: {
+          name: {
+            contains: genreInput,
+            mode: 'insensitive'
+          }
+        },
+        select: { id: true }
+      });
+      
+      if (fallbackGenres.length > 0) {
+        return {
+          genres: {
+            some: {
+              genreId: {
+                in: fallbackGenres.map(g => g.id)
+              }
+            }
+          }
+        };
+      }
+      
+      // Vẫn không tìm thấy, trả về lọc cơ bản
+      return {
+        genres: {
+          some: {
+            genre: {
+              name: {
+                contains: genreInput,
+                mode: 'insensitive'
+              }
+            }
+          }
+        }
+      };
+    }
+    
+    // Tạo bộ lọc phức tạp dựa trên độ ưu tiên thể loại
+    return {
+      genres: {
+        some: {
+          genreId: {
+            in: prioritizedGenreIds
+          }
+        }
+      }
+    };
+  } catch (error) {
+    console.error('[AI] Error creating enhanced genre filter:', error);
+    
+    // Trả về lọc cơ bản nếu có lỗi
+    return {
+      genres: {
+        some: {
+          genre: {
+            name: {
+              contains: genreInput,
+              mode: 'insensitive'
+            }
+          }
+        }
+      }
+    };
+  }
 }
 
 /**
@@ -204,8 +301,14 @@ export const generateAIPlaylist  = async (
 
     // Xác định thể loại cụ thể nếu người dùng đã chỉ định
     let selectedGenreId: string | null = null;
+    let enhancedGenreFilter: any = {};
 
     if (options.basedOnGenre) {
+      // Use enhanced genre filter instead of simple matching
+      enhancedGenreFilter = await createEnhancedGenreFilter(options.basedOnGenre);
+      console.log(`[AI] Using enhanced genre filter for: ${options.basedOnGenre}`);
+      
+      // For backward compatibility, still get the selectedGenreId
       const genreByName = await prisma.genre.findFirst({
         where: {
           name: {
@@ -362,24 +465,6 @@ export const generateAIPlaylist  = async (
       }
     }
 
-    // Xử lý lọc theo thập kỷ và phạm vi năm
-    if (options.basedOnDecade) {
-      const decadeStart =
-        typeof options.basedOnDecade === 'string'
-          ? parseInt(options.basedOnDecade, 10)
-          : options.basedOnDecade;
-      whereClause.releaseDate = {
-        gte: new Date(decadeStart, 0, 1),
-        lt: new Date(decadeStart + 10, 0, 1),
-      };
-    } else if (options.basedOnYearRange) {
-      const { start, end } = options.basedOnYearRange;
-      whereClause.releaseDate = {
-        gte: new Date(start, 0, 1),
-        lt: new Date(end + 1, 0, 1),
-      };
-    }
-
     // Đọc tham số và quyết định tỷ lệ cho mỗi nguồn bài hát
     const hasArtistParam = options.basedOnArtist ? true : false;
     const hasGenreParam = options.basedOnGenre ? true : false;
@@ -388,15 +473,15 @@ export const generateAIPlaylist  = async (
     const hasReleaseTimeParam = options.basedOnReleaseTime ? true : false;
 
     // Thiết lập tỷ lệ mặc định cho các nguồn bài hát
-    let artistRatio = 0.5;  // Tỷ lệ bài hát từ nghệ sĩ ưa thích
-    let genreRatio = 0.3;   // Tỷ lệ bài hát từ thể loại ưa thích
+    let artistRatio = 0.55;  // Tỷ lệ bài hát từ nghệ sĩ ưa thích
+    let genreRatio = 0.25;   // Tỷ lệ bài hát từ thể loại ưa thích
     let popularRatio = 0.2; // Tỷ lệ bài hát phổ biến
 
     // Điều chỉnh tỷ lệ dựa trên tham số được cung cấp
     // Case 1: Only basedOnMood
     if (hasMoodParam && !hasGenreParam && !hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
-      artistRatio = 0.4;
-      genreRatio = 0.4;
+      artistRatio = 0.7;
+      genreRatio = 0.1;
       popularRatio = 0.2;
     }
     // Case 2: basedOnMood and basedOnGenre
@@ -443,9 +528,9 @@ export const generateAIPlaylist  = async (
     }
     // Case 9: Only basedOnGenre
     else if (!hasMoodParam && hasGenreParam && !hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
-      artistRatio = 0.3;
-      genreRatio = 0.6;
-      popularRatio = 0.1;
+      artistRatio = 0;
+      genreRatio = 1;
+      popularRatio = 0;
     }
     // Case 10: basedOnGenre and basedOnArtist
     else if (!hasMoodParam && hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
@@ -467,9 +552,9 @@ export const generateAIPlaylist  = async (
     }
     // Case 13: Only basedOnArtist
     else if (!hasMoodParam && !hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
-      artistRatio = 0.7;
-      genreRatio = 0.2;
-      popularRatio = 0.1;
+      artistRatio = 1;
+      genreRatio = 0;
+      popularRatio = 0;
     }
     // Case 14: basedOnArtist and basedOnSongLength
     else if (!hasMoodParam && !hasGenreParam && hasArtistParam && hasSongLengthParam && !hasReleaseTimeParam) {
@@ -537,7 +622,7 @@ export const generateAIPlaylist  = async (
           isActive: true,
           ...artistFilter,
           // Lọc theo thể loại nếu chỉ định cả nghệ sĩ và thể loại
-          ...(selectedGenreId && options.basedOnArtist
+          ...(selectedGenreId && options.basedOnArtist && !enhancedGenreFilter
             ? {
                 genres: {
                   some: {
@@ -545,6 +630,10 @@ export const generateAIPlaylist  = async (
                   },
                 },
               }
+            : {}),
+          // Use enhanced genre filter if available
+          ...(options.basedOnGenre && options.basedOnArtist && enhancedGenreFilter 
+            ? enhancedGenreFilter 
             : {}),
           // Kết hợp với các điều kiện lọc khác
           ...whereClause,
@@ -593,12 +682,14 @@ export const generateAIPlaylist  = async (
           isActive: true,
           // Loại trừ các bài hát đã được chọn
           id: { notIn: trackIds },
-          // Lọc theo thể loại
+          // Lọc theo thể loại - sử dụng bộ lọc nâng cao nếu có
+          ...(options.basedOnGenre ? enhancedGenreFilter : {
           genres: {
             some: {
               genreId: { in: targetGenreIds },
             },
           },
+          }),
           // Kết hợp với các điều kiện lọc khác
           ...whereClause,
           ...moodFilter,
@@ -686,6 +777,8 @@ export const generateAIPlaylist  = async (
           isActive: true,
           // Loại bỏ các bài hát đã chọn
           id: { notIn: trackIds },
+          // Use enhanced genre filter if available
+          ...(options.basedOnGenre && enhancedGenreFilter ? enhancedGenreFilter : {}),
           // Kết hợp với các điều kiện lọc khác
           ...whereClause,
           ...moodFilter,
@@ -710,6 +803,7 @@ export const generateAIPlaylist  = async (
     console.error("[AI] Error generating playlist:", error);
     throw error;
   }
+  
 };
 
 /**
@@ -953,38 +1047,41 @@ export const generateDefaultPlaylistForNewUser = async (
 async function getMoodFilter(mood: string): Promise<any> {
   // Enhanced mood to genre mapping with more nuanced categorizations
   const moodToGenreMap: Record<string, string[]> = {
-    energetic: ["Pop", "EDM", "Rock", "Dance", "Electronic", "Hip Hop", "Punk", "Metal", "Trap"],
-    calm: ["Acoustic", "Jazz", "Classical", "Ambient", "Lo-fi", "Folk", "New Age", "Chillout", "Instrumental"],
-    happy: ["Pop", "Dance", "Funk", "Disco", "R&B", "Indie Pop", "Synthpop", "K-Pop", "J-Pop", "Upbeat"],
-    sad: ["Ballad", "Blues", "Soul", "Acoustic", "Indie", "Alternative", "Emo", "R&B", "Singer-Songwriter"],
-    nostalgic: ["Oldies", "Classic Rock", "Classic", "80s", "90s", "Retro", "Vintage", "Golden Oldies", "Throwback"],
-    romantic: ["R&B", "Soul", "Ballad", "Jazz", "Acoustic", "Pop Ballad", "Bolero", "Love Songs", "Soft Rock"],
-    focused: ["Classical", "Lo-fi", "Ambient", "Instrumental", "Jazz", "Post-Rock", "Minimal", "Electronic", "Study"],
-    party: ["Dance", "EDM", "Hip Hop", "Pop", "Disco", "Rap", "Reggaeton", "House", "Trap", "Club"],
-    intense: ["Rock", "Metal", "Hardcore", "Punk", "Industrial", "Drum and Bass", "Dubstep", "Heavy Metal", "Grunge"],
-    relaxed: ["Reggae", "Chill", "Bossa Nova", "Lounge", "Smooth Jazz", "Downtempo", "Trip-Hop", "Easy Listening"],
-    melancholic: ["Alternative", "Indie", "Post-Rock", "Shoegaze", "Dream Pop", "Ambient", "Contemporary Classical"],
-    uplifting: ["Gospel", "Worship", "Inspirational", "Motivational", "Positive", "Upbeat", "Feel Good"],
-    dreamy: ["Dream Pop", "Shoegaze", "Ambient", "Chillwave", "Psychedelic", "Ethereal", "Space Music"],
-    dramatic: ["Soundtrack", "Orchestral", "Cinematic", "Epic", "Trailer Music", "Film Score"],
+    // Existing moods
+    energetic: ["Pop", "EDM", "Rock", "Dance", "Electronic", "Hip Hop", "Punk", "Metal", "Trap", "Drum and Bass", "Techno"],
+    calm: ["Acoustic", "Jazz", "Classical", "Ambient", "Lo-fi", "Folk", "New Age", "Chillout", "Instrumental", "Piano", "Meditation"],
+    happy: ["Pop", "Dance", "Funk", "Disco", "R&B", "Indie Pop", "Synthpop", "K-Pop", "J-Pop", "Upbeat", "Sunshine Pop", "Tropical House"],
+    sad: ["Ballad", "Blues", "Soul", "Acoustic", "Indie", "Alternative", "Emo", "R&B", "Singer-Songwriter", "Dark Ambient", "Slowcore"],
+    nostalgic: ["Oldies", "Classic Rock", "Classic", "80s", "90s", "Retro", "Vintage", "Golden Oldies", "Throwback", "Synthwave", "Vaporwave"],
+    romantic: ["R&B", "Soul", "Ballad", "Jazz", "Acoustic", "Pop Ballad", "Bolero", "Love Songs", "Soft Rock", "Bossa Nova", "Neo Soul"],
+    focused: ["Classical", "Lo-fi", "Ambient", "Instrumental", "Jazz", "Post-Rock", "Minimal", "Electronic", "Study", "Concentration", "Deep Focus"],
+    party: ["Dance", "EDM", "Hip Hop", "Pop", "Disco", "Rap", "Reggaeton", "House", "Trap", "Club", "Latin", "Dancehall"],
+    intense: ["Rock", "Metal", "Hardcore", "Punk", "Industrial", "Drum and Bass", "Dubstep", "Heavy Metal", "Grunge", "Thrash", "Death Metal"],
+    relaxed: ["Reggae", "Chill", "Bossa Nova", "Lounge", "Smooth Jazz", "Downtempo", "Trip-Hop", "Easy Listening", "Soft Rock", "Indie Folk"],
+    melancholic: ["Alternative", "Indie", "Post-Rock", "Shoegaze", "Dream Pop", "Ambient", "Contemporary Classical", "Dark Folk", "Neo-Classical"],
+    uplifting: ["Gospel", "Worship", "Inspirational", "Motivational", "Positive", "Upbeat", "Feel Good", "Anthem", "Orchestral", "Power Pop"],
+    dreamy: ["Dream Pop", "Shoegaze", "Ambient", "Chillwave", "Psychedelic", "Ethereal", "Space Music", "Atmospheric", "Bedroom Pop"],
+    dramatic: ["Soundtrack", "Orchestral", "Cinematic", "Epic", "Trailer Music", "Film Score", "Opera", "Baroque", "Symphonic"],
+    angry: ["Metal", "Hardcore", "Punk", "Industrial", "Rap", "Grindcore", "Thrash Metal", "Death Metal", "Metalcore", "Rage"],
+    empowering: ["Hip Hop", "Rock", "Pop", "R&B", "Electronic", "Motivational", "Anthem", "Power Pop", "Dance"],
+    reflective: ["Indie Folk", "Acoustic", "Singer-Songwriter", "Piano", "Ambient", "Jazz", "Contemporary Classical", "Post-Rock"],
+    anxious: ["IDM", "Glitch", "Experimental", "Industrial", "Noise", "Avant-garde", "Breakcore", "Dark Ambient"],
+    peaceful: ["Ambient", "New Age", "Classical", "Acoustic", "Folk", "Piano", "Meditation", "Nature Sounds", "Minimal"],
+    ethereal: ["Ambient", "Dream Pop", "Shoegaze", "Post-Rock", "New Age", "Space Music", "Ethereal Wave", "Dreampunk"],
+    groovy: ["Funk", "Disco", "Soul", "R&B", "Motown", "Boogie", "Acid Jazz", "House", "Deep House", "Nu-Disco"],
+    
+    // New detailed moods
+    euphoric: ["Trance", "Progressive House", "Uplifting Trance", "EDM", "Dance", "Electronic", "Festival", "Big Room", "Melodic House"],
+    bittersweet: ["Indie", "Alternative", "Folk", "Singer-Songwriter", "Acoustic", "Emo", "Post-Rock", "Dream Pop", "Chamber Pop"],
+    triumphant: ["Orchestral", "Soundtrack", "Epic", "Trailer Music", "Power Metal", "Symphonic Metal", "Classical", "Cinematic"],
+    mysterious: ["Dark Ambient", "Experimental", "Drone", "Minimal", "Atmospheric", "Post-Rock", "Neo-Classical", "Avant-garde"],
+    sensual: ["R&B", "Soul", "Neo Soul", "Jazz", "Blues", "Smooth Jazz", "Lounge", "Downtempo", "Trip-Hop"],
+    rebellious: ["Punk", "Rock", "Alternative", "Grunge", "Metal", "Hardcore", "Industrial", "Noise Rock", "Garage Rock"],
+    whimsical: ["Indie Pop", "Folk", "Acoustic", "Chamber Pop", "Baroque Pop", "Twee Pop", "Bubblegum Pop", "Indie Folk"],
+    cathartic: ["Post-Rock", "Progressive Rock", "Experimental", "Ambient", "Drone", "Minimal", "Contemporary Classical"],
+    contemplative: ["Ambient", "Minimal", "Drone", "Contemporary Classical", "Post-Rock", "Experimental", "Neo-Classical"]
   };
 
-  // Activities associated with specific genres
-  const activityToGenreMap: Record<string, string[]> = {
-    workout: ["EDM", "Hip Hop", "Rock", "Electronic", "Pop", "Metal", "Trap"],
-    study: ["Classical", "Lo-fi", "Ambient", "Jazz", "Instrumental", "Acoustic"],
-    sleep: ["Ambient", "Classical", "New Age", "Lo-fi", "Chillout", "Instrumental"],
-    driving: ["Rock", "Pop", "Electronic", "Hip Hop", "Country", "R&B"],
-    meditation: ["Ambient", "New Age", "Classical", "World", "Instrumental", "Lo-fi"],
-    gaming: ["Electronic", "Rock", "Metal", "Dubstep", "Soundtrack", "Lo-fi"],
-    cooking: ["Jazz", "Pop", "Soul", "Funk", "Acoustic", "Latin"],
-    reading: ["Classical", "Ambient", "Jazz", "Lo-fi", "Acoustic", "Instrumental"],
-    party: ["Dance", "Hip Hop", "Pop", "Electronic", "Reggaeton", "R&B", "Latin"],
-    focus: ["Classical", "Lo-fi", "Ambient", "Post-Rock", "Instrumental", "Electronic"],
-  };
-
-  // Audio characteristics associated with different moods for more precise filtering
-  // Refined based on Spotify audio features research
   const moodToAudioCharacteristics: Record<string, any> = {
     energetic: { tempo: { gte: 120 }, energy: { gte: 0.7 }, valence: { gte: 0.4 } },
     calm: { tempo: { lte: 100 }, energy: { lte: 0.5 }, acousticness: { gte: 0.5 } },
@@ -1000,9 +1097,15 @@ async function getMoodFilter(mood: string): Promise<any> {
     uplifting: { valence: { gte: 0.6 }, energy: { gte: 0.5 } },
     dreamy: { instrumentalness: { gte: 0.3 }, tempo: { lte: 110 }, acousticness: { gte: 0.3 } },
     dramatic: { energy: { gte: 0.6 }, loudness: { gte: -10 }, tempo: { between: [70, 130] } },
+    angry: { energy: { gte: 0.8 }, valence: { lte: 0.4 }, loudness: { gte: -7 } },
+    empowering: { energy: { gte: 0.6 }, valence: { gte: 0.5 }, loudness: { gte: -9 } },
+    reflective: { valence: { between: [0.3, 0.6] }, energy: { lte: 0.6 }, acousticness: { gte: 0.4 } },
+    anxious: { energy: { between: [0.5, 0.8] }, valence: { lte: 0.4 }, tempo: { gte: 100 } },
+    peaceful: { energy: { lte: 0.4 }, valence: { gte: 0.5 }, acousticness: { gte: 0.5 }, tempo: { lte: 90 } },
+    ethereal: { instrumentalness: { gte: 0.5 }, acousticness: { gte: 0.3 }, energy: { lte: 0.5 } },
+    groovy: { danceability: { gte: 0.7 }, energy: { between: [0.6, 0.8] }, valence: { gte: 0.5 } }
   };
 
-  // Activities associated with specific audio characteristics
   const activityToAudioCharacteristics: Record<string, any> = {
     workout: { energy: { gte: 0.7 }, tempo: { gte: 120 }, danceability: { gte: 0.6 } },
     study: { instrumentalness: { gte: 0.3 }, energy: { between: [0.3, 0.6] }, speechiness: { lte: 0.1 } },
@@ -1014,6 +1117,81 @@ async function getMoodFilter(mood: string): Promise<any> {
     reading: { instrumentalness: { gte: 0.4 }, energy: { lte: 0.5 }, tempo: { lte: 100 } },
     party: { danceability: { gte: 0.7 }, energy: { gte: 0.7 }, speechiness: { gte: 0.1 } },
     focus: { instrumentalness: { gte: 0.4 }, energy: { between: [0.3, 0.6] }, speechiness: { lte: 0.1 } },
+    running: { energy: { gte: 0.7 }, tempo: { gte: 140 }, danceability: { gte: 0.5 } },
+    relaxation: { energy: { lte: 0.4 }, tempo: { lte: 85 }, acousticness: { gte: 0.5 } },
+    morning: { valence: { gte: 0.5 }, energy: { between: [0.4, 0.7] }, tempo: { between: [90, 120] } },
+    evening: { energy: { lte: 0.6 }, acousticness: { gte: 0.3 }, valence: { between: [0.3, 0.7] } },
+    social: { danceability: { gte: 0.6 }, energy: { gte: 0.5 }, valence: { gte: 0.5 } },
+    creative: { instrumentalness: { gte: 0.4 }, complexity: { gte: 0.5 }, energy: { between: [0.3, 0.7] } },
+    yoga: { instrumentalness: { gte: 0.6 }, energy: { lte: 0.4 }, tempo: { lte: 90 } },
+    travel: { energy: { between: [0.4, 0.8] }, valence: { gte: 0.5 } },
+    commute: { energy: { between: [0.5, 0.8] }, danceability: { gte: 0.5 }, complexity: { lte: 0.7 } },
+    shopping: { energy: { between: [0.5, 0.8] }, danceability: { gte: 0.6 }, valence: { gte: 0.5 } }
+  };
+
+  // Activities associated with specific audio characteristics
+  const activityToGenreMap: Record<string, string[]> = {
+    workout: ["EDM", "Hip Hop", "Rock", "Electronic", "Pop", "Metal", "Trap", "Drum and Bass", "Techno", "Dubstep", "House", "Dancehall"],
+    study: ["Classical", "Lo-fi", "Ambient", "Jazz", "Instrumental", "Acoustic", "Post-Rock", "Piano", "Minimal", "Contemporary Classical"],
+    sleep: ["Ambient", "Classical", "New Age", "Lo-fi", "Chillout", "Instrumental", "Piano", "Meditation", "Nature Sounds", "Minimal"],
+    driving: ["Rock", "Pop", "Electronic", "Hip Hop", "Country", "R&B", "Classic Rock", "Indie", "Alternative", "Road Trip"],
+    meditation: ["Ambient", "New Age", "Classical", "World", "Instrumental", "Lo-fi", "Meditation", "Nature Sounds", "Minimal", "Yoga"],
+    gaming: ["Electronic", "Rock", "Metal", "Dubstep", "Soundtrack", "Lo-fi", "Synthwave", "Trap", "EDM", "Drum and Bass"],
+    cooking: ["Jazz", "Pop", "Soul", "Funk", "Acoustic", "Latin", "Bossa Nova", "French", "Indie", "World"],
+    reading: ["Classical", "Ambient", "Jazz", "Lo-fi", "Acoustic", "Instrumental", "Piano", "Post-Rock", "Chamber Music", "Minimal"],
+    party: ["Dance", "Hip Hop", "Pop", "Electronic", "Reggaeton", "R&B", "Latin", "House", "Disco", "Trap", "Club", "Dancehall"],
+    focus: ["Concentration", "Attention", "Productivity", "Work", "Deep Work", "Flow", "Mental Clarity", "Mindfulness", "Attentiveness", "Diligence"],
+    running: ["EDM", "Rock", "Pop", "Hip Hop", "Electronic", "House", "Drum and Bass", "Motivation", "Techno", "Trap"],
+    relaxation: ["Ambient", "New Age", "Classical", "Acoustic", "Lo-fi", "Jazz", "Chillout", "Nature Sounds", "Meditation", "Spa"],
+    morning: ["Pop", "Indie", "Folk", "Jazz", "Classical", "Acoustic", "Electronic", "Positive", "Upbeat", "Sunrise"],
+    evening: ["Jazz", "Soul", "Blues", "Lo-fi", "Chill", "Ambient", "Trip-Hop", "Downtempo", "Smooth Jazz", "Dim Lights"],
+    social: ["Pop", "Dance", "Hip Hop", "Latin", "Reggaeton", "R&B", "Indie", "Rock", "Electronic", "Alternative"],
+    creative: ["Ambient", "Jazz", "Classical", "Electronic", "Lo-fi", "Experimental", "Post-Rock", "Minimal", "Instrumental"],
+    yoga: ["Ambient", "World", "New Age", "Meditation", "Classical", "Instrumental", "Minimal", "Nature Sounds", "Ethereal"],
+    travel: ["World", "Pop", "Electronic", "Indie", "Folk", "Jazz", "Alternative", "Global", "Upbeat", "Chill"],
+    commute: ["Pop", "Rock", "Hip Hop", "Podcast", "Audiobook", "Alternative", "Electronic", "Indie", "Jazz", "Classical"],
+    shopping: ["Pop", "Electronic", "Indie Pop", "R&B", "Dance", "Lounge", "Disco", "Funk", "House", "Upbeat"]
+  };
+
+  // Activity synonyms for better matching
+  const activitySynonyms: Record<string, string[]> = {
+    workout: ["exercise", "fitness", "training", "gym", "cardio", "lifting", "aerobics", "sport", "athletics", "physical activity"],
+    study: ["learning", "homework", "research", "reading", "concentration", "academics", "school", "college", "university", "education"],
+    sleep: ["rest", "slumber", "nap", "bedtime", "doze", "snooze", "night", "relaxation", "dream", "deep sleep"],
+    driving: ["road", "car", "travel", "commute", "journey", "trip", "ride", "highway", "road trip", "transportation"],
+    meditation: ["mindfulness", "reflection", "zen", "spiritual", "contemplation", "focus", "breathing", "yoga", "calm", "inner peace"],
+    gaming: ["video games", "esports", "play", "console", "pc gaming", "rpg", "fps", "action", "adventure", "strategy"],
+    cooking: ["baking", "kitchen", "food", "culinary", "meal prep", "chef", "home cooking", "recipe", "gastronomy", "food preparation"],
+    reading: ["books", "literature", "stories", "novels", "magazines", "articles", "texts", "ebooks", "publications", "kindle"],
+    party: ["celebration", "event", "gathering", "social", "festivity", "get-together", "fiesta", "bash", "hangout", "shindig"],
+    focus: ["concentration", "attention", "productivity", "work", "deep work", "flow", "mental clarity", "mindfulness", "attentiveness", "diligence"]
+  };
+
+  // Mood synonyms for better matching
+  const moodSynonyms: Record<string, string[]> = {
+    happy: ["joyful", "cheerful", "upbeat", "excited", "elated", "jubilant", "delighted", "pleased", "content", "blissful"],
+    calm: ["peaceful", "serene", "tranquil", "soothing", "gentle", "quiet", "mellow", "soft", "still", "placid"],
+    energetic: ["lively", "vigorous", "active", "dynamic", "spirited", "vibrant", "powerful", "pumped", "high-energy", "upbeat"],
+    sad: ["sorrowful", "unhappy", "depressed", "gloomy", "melancholy", "downcast", "blue", "down", "heartbroken", "tearful"],
+    nostalgic: ["reminiscent", "sentimental", "wistful", "yearning", "retrospective", "memory", "throwback", "bygone", "retro", "classic"],
+    romantic: ["passionate", "amorous", "loving", "sentimental", "intimate", "tender", "affectionate", "warm", "heartfelt", "dreamy"],
+    focused: ["concentrated", "attentive", "intent", "alert", "dedicated", "mindful", "absorbed", "engaged", "undistracted", "zeroed-in"],
+    party: ["festive", "celebratory", "exuberant", "lively", "wild", "fun", "social", "exciting", "upbeat", "animated"],
+    intense: ["powerful", "strong", "fierce", "passionate", "extreme", "forceful", "vigorous", "fervent", "deep", "heavy"],
+    relaxed: ["chilled", "laid-back", "easy-going", "mellow", "untroubled", "comfortable", "loose", "unwound", "rested", "content"],
+    melancholic: ["plaintive", "solemn", "wistful", "pensive", "sorrowful", "introspective", "blue", "mournful", "bittersweet", "somber"],
+    uplifting: ["inspiring", "encouraging", "heartening", "cheering", "hopeful", "motivating", "positive", "elevating", "optimistic", "rousing"],
+    dreamy: ["ethereal", "fantastical", "wistful", "surreal", "trance-like", "gauzy", "otherworldly", "reverie", "floating", "airy"],
+    dramatic: ["theatrical", "powerful", "moving", "stirring", "emotional", "passionate", "intense", "epic", "grand", "gripping"],
+    euphoric: ["ecstatic", "exhilarated", "elated", "blissful", "exuberant", "jubilant", "rapturous", "overjoyed", "thrilled", "exalted"],
+    bittersweet: ["nostalgic", "poignant", "touching", "moving", "emotional", "tender", "melancholy", "wistful", "yearning", "sentimental"],
+    triumphant: ["victorious", "successful", "achieving", "conquering", "winning", "prevailing", "dominant", "ascendant", "glorious", "celebratory"],
+    mysterious: ["enigmatic", "cryptic", "puzzling", "perplexing", "intriguing", "curious", "uncanny", "eerie", "strange", "unusual"],
+    sensual: ["erotic", "passionate", "intimate", "tactile", "physical", "pleasurable", "arousing", "stimulating", "provocative", "alluring"],
+    rebellious: ["defiant", "insubordinate", "unruly", "disobedient", "resistant", "revolutionary", "nonconformist", "unconventional", "radical", "subversive"],
+    whimsical: ["playful", "fanciful", "quirky", "eccentric", "capricious", "unpredictable", "imaginative", "creative", "unconventional", "offbeat"],
+    cathartic: ["cleansing", "purifying", "releasing", "liberating", "healing", "therapeutic", "transformative", "renewing", "restorative", "rejuvenating"],
+    contemplative: ["thoughtful", "reflective", "meditative", "introspective", "pensive", "ruminative", "philosophical", "deep", "serious", "pondering"]
   };
 
   // Chuẩn hóa mood (chuyển thành lowercase và xử lý khoảng trắng)
@@ -1023,7 +1201,7 @@ async function getMoodFilter(mood: string): Promise<any> {
   
   // Danh sách đầy đủ để tìm kiếm gần đúng
   const allMoods = Object.keys(moodToGenreMap);
-  const allActivities = Object.keys(activityToAudioCharacteristics);
+  const allActivities = Object.keys(activityToGenreMap);
   
   // Tìm trong danh sách mood và activity
   let matchedTerm = '';
@@ -1032,31 +1210,76 @@ async function getMoodFilter(mood: string): Promise<any> {
   if (moodToGenreMap[normalizedInput]) {
     matchedTerm = normalizedInput;
     console.log(`[AI] Exact mood match found: ${matchedTerm}`);
-  } else if (activityToAudioCharacteristics[normalizedInput] || activityToGenreMap[normalizedInput]) {
+  } else if (activityToGenreMap[normalizedInput] || activityToAudioCharacteristics[normalizedInput]) {
     matchedTerm = normalizedInput;
     console.log(`[AI] Exact activity match found: ${matchedTerm}`);
   } else {
-    // Tìm khớp một phần nếu không có khớp chính xác
-    // Kiểm tra xem chuỗi nhập có chứa bất kỳ mood nào không
-    const possibleMoods = allMoods.filter(m => 
-      normalizedInput.includes(m) || m.includes(normalizedInput)
-    );
+    // Tìm khớp trong từ đồng nghĩa
+    let foundInSynonyms = false;
     
-    if (possibleMoods.length > 0) {
-      matchedTerm = possibleMoods[0]; // Lấy mood đầu tiên khớp
-      console.log(`[AI] Similar mood match found: ${matchedTerm} for input "${normalizedInput}"`);
-    } else {
-      // Kiểm tra activity tương tự
-      const possibleActivities = allActivities.filter(a => 
-        normalizedInput.includes(a) || a.includes(normalizedInput)
+    // Kiểm tra trong từ đồng nghĩa của mood
+    for (const [mood, synonyms] of Object.entries(moodSynonyms)) {
+      if (synonyms.includes(normalizedInput)) {
+        matchedTerm = mood;
+        foundInSynonyms = true;
+        console.log(`[AI] Found in mood synonyms: ${normalizedInput} → ${matchedTerm}`);
+        break;
+      }
+    }
+    
+    // Nếu không tìm thấy trong mood synonyms, kiểm tra activity synonyms
+    if (!foundInSynonyms) {
+      for (const [activity, synonyms] of Object.entries(activitySynonyms)) {
+        if (synonyms.includes(normalizedInput)) {
+          matchedTerm = activity;
+          foundInSynonyms = true;
+          console.log(`[AI] Found in activity synonyms: ${normalizedInput} → ${matchedTerm}`);
+          break;
+        }
+      }
+    }
+    
+    // Nếu vẫn không tìm thấy, tìm khớp một phần
+    if (!foundInSynonyms) {
+      // Kiểm tra xem chuỗi nhập có chứa bất kỳ mood nào không
+      const possibleMoods = allMoods.filter(m => 
+        normalizedInput.includes(m) || m.includes(normalizedInput)
       );
       
-      if (possibleActivities.length > 0) {
-        matchedTerm = possibleActivities[0];
-        console.log(`[AI] Similar activity match found: ${matchedTerm} for input "${normalizedInput}"`);
+      if (possibleMoods.length > 0) {
+        matchedTerm = possibleMoods[0]; // Lấy mood đầu tiên khớp
+        console.log(`[AI] Similar mood match found: ${matchedTerm} for input "${normalizedInput}"`);
       } else {
-        console.log(`[AI] No match found for: "${normalizedInput}"`);
-        return {}; // Không tìm thấy khớp nào
+        // Kiểm tra activity tương tự
+        const possibleActivities = allActivities.filter(a => 
+          normalizedInput.includes(a) || a.includes(normalizedInput)
+        );
+        
+        if (possibleActivities.length > 0) {
+          matchedTerm = possibleActivities[0];
+          console.log(`[AI] Similar activity match found: ${matchedTerm} for input "${normalizedInput}"`);
+        } else {
+          // Xử lý trường hợp không tìm thấy khớp - thử tìm kiếm dựa trên khoảng cách Levenshtein
+          const allTerms = [...allMoods, ...allActivities];
+          let bestMatch = '';
+          let lowestDistance = Number.MAX_SAFE_INTEGER;
+          
+          for (const term of allTerms) {
+            const distance = levenshteinDistance(normalizedInput, term);
+            if (distance < lowestDistance && distance <= 3) { // Threshold of 3 edits
+              lowestDistance = distance;
+              bestMatch = term;
+            }
+          }
+          
+          if (bestMatch) {
+            matchedTerm = bestMatch;
+            console.log(`[AI] Approximate match found using edit distance: ${matchedTerm} for input "${normalizedInput}" (distance: ${lowestDistance})`);
+          } else {
+            console.log(`[AI] No match found for: "${normalizedInput}"`);
+            return {}; // Không tìm thấy khớp nào
+          }
+        }
       }
     }
   }
@@ -1108,6 +1331,38 @@ async function getMoodFilter(mood: string): Promise<any> {
   }
 
   return filter;
+}
+
+// Helper function to calculate Levenshtein distance (edit distance) between two strings
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+
+  // Initialize the matrix
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Fill in the rest of the matrix
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          Math.min(
+            matrix[i][j - 1] + 1, // insertion
+            matrix[i - 1][j] + 1 // deletion
+          )
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
 }
 
 // Hàm trợ giúp tạo điều kiện lọc thể loại
@@ -1186,114 +1441,152 @@ async function getSpotifyAudioFeatures(trackName: string, artistName: string): P
  * @returns Array of mood tags sorted by relevance
  */
 function analyzeMood(audioFeatures: any): string[] {
-  // Mapping dựa trên valence (positivity) và energy
   const moods: Record<string, number> = {};
   
-  // Valence mapping (positivity)
-  if (audioFeatures.valence > 0.8) {
-    moods.happy = moods.happy || 0 + 0.8;
-    moods.energetic = moods.energetic || 0 + 0.4;
-  } else if (audioFeatures.valence > 0.6) {
-    moods.happy = moods.happy || 0 + 0.6;
-    moods.uplifting = moods.uplifting || 0 + 0.5;
-  } else if (audioFeatures.valence < 0.3) {
-    moods.sad = moods.sad || 0 + 0.7;
-    moods.melancholic = moods.melancholic || 0 + 0.6;
+  // Enhanced valence analysis
+  if (audioFeatures.valence > 0.85) {
+    moods.euphoric = (moods.euphoric || 0) + 0.9;
+    moods.happy = (moods.happy || 0) + 0.8;
+    moods.energetic = (moods.energetic || 0) + 0.6;
+  } else if (audioFeatures.valence > 0.7) {
+    moods.happy = (moods.happy || 0) + 0.7;
+    moods.uplifting = (moods.uplifting || 0) + 0.6;
+    moods.energetic = (moods.energetic || 0) + 0.5;
+  } else if (audioFeatures.valence < 0.25) {
+    moods.sad = (moods.sad || 0) + 0.8;
+    moods.melancholic = (moods.melancholic || 0) + 0.7;
+    moods.bittersweet = (moods.bittersweet || 0) + 0.6;
   } else if (audioFeatures.valence < 0.4) {
-    moods.sad = moods.sad || 0 + 0.5;
-    moods.nostalgic = moods.nostalgic || 0 + 0.4;
+    moods.sad = (moods.sad || 0) + 0.6;
+    moods.nostalgic = (moods.nostalgic || 0) + 0.5;
+    moods.bittersweet = (moods.bittersweet || 0) + 0.4;
   }
   
-  // Energy mapping
-  if (audioFeatures.energy > 0.8) {
-    moods.energetic = moods.energetic || 0 + 0.9;
-    moods.intense = moods.intense || 0 + 0.8;
-    moods.party = moods.party || 0 + 0.7;
-  } else if (audioFeatures.energy > 0.6) {
-    moods.energetic = moods.energetic || 0 + 0.7;
-    moods.uplifting = moods.uplifting || 0 + 0.5;
-  } else if (audioFeatures.energy < 0.4) {
-    moods.calm = moods.calm || 0 + 0.8;
-    moods.relaxed = moods.relaxed || 0 + 0.7;
+  // Enhanced energy analysis
+  if (audioFeatures.energy > 0.85) {
+    moods.energetic = (moods.energetic || 0) + 0.9;
+    moods.intense = (moods.intense || 0) + 0.8;
+    moods.party = (moods.party || 0) + 0.7;
+    moods.triumphant = (moods.triumphant || 0) + 0.6;
+  } else if (audioFeatures.energy > 0.7) {
+    moods.energetic = (moods.energetic || 0) + 0.7;
+    moods.uplifting = (moods.uplifting || 0) + 0.6;
+    moods.empowering = (moods.empowering || 0) + 0.5;
   } else if (audioFeatures.energy < 0.3) {
-    moods.calm = moods.calm || 0 + 0.9;
-    moods.relaxed = moods.relaxed || 0 + 0.8;
-    moods.dreamy = moods.dreamy || 0 + 0.6;
+    moods.calm = (moods.calm || 0) + 0.8;
+    moods.relaxed = (moods.relaxed || 0) + 0.7;
+    moods.contemplative = (moods.contemplative || 0) + 0.6;
+  } else if (audioFeatures.energy < 0.4) {
+    moods.calm = (moods.calm || 0) + 0.7;
+    moods.relaxed = (moods.relaxed || 0) + 0.6;
+    moods.dreamy = (moods.dreamy || 0) + 0.5;
   }
   
-  // Acousticness mapping
-  if (audioFeatures.acousticness > 0.7) {
-    moods.calm = moods.calm || 0 + 0.6;
-    moods.romantic = moods.romantic || 0 + 0.5;
-    moods.nostalgic = moods.nostalgic || 0 + 0.4;
+  // Enhanced acousticness analysis
+  if (audioFeatures.acousticness > 0.8) {
+    moods.calm = (moods.calm || 0) + 0.7;
+    moods.romantic = (moods.romantic || 0) + 0.6;
+    moods.nostalgic = (moods.nostalgic || 0) + 0.5;
+    moods.contemplative = (moods.contemplative || 0) + 0.4;
+  } else if (audioFeatures.acousticness > 0.6) {
+    moods.calm = (moods.calm || 0) + 0.6;
+    moods.romantic = (moods.romantic || 0) + 0.5;
+    moods.bittersweet = (moods.bittersweet || 0) + 0.4;
   }
   
-  // Danceability mapping
-  if (audioFeatures.danceability > 0.7) {
-    moods.party = moods.party || 0 + 0.8;
-    moods.energetic = moods.energetic || 0 + 0.6;
-    moods.happy = moods.happy || 0 + 0.5;
-  } else if (audioFeatures.danceability > 0.5) {
-    moods.uplifting = moods.uplifting || 0 + 0.5;
+  // Enhanced danceability analysis
+  if (audioFeatures.danceability > 0.8) {
+    moods.party = (moods.party || 0) + 0.9;
+    moods.energetic = (moods.energetic || 0) + 0.7;
+    moods.happy = (moods.happy || 0) + 0.6;
+    moods.groovy = (moods.groovy || 0) + 0.5;
+  } else if (audioFeatures.danceability > 0.6) {
+    moods.uplifting = (moods.uplifting || 0) + 0.6;
+    moods.sensual = (moods.sensual || 0) + 0.5;
   }
   
-  // Instrumentalness mapping
-  if (audioFeatures.instrumentalness > 0.7) {
-    moods.focused = moods.focused || 0 + 0.8;
-    moods.dreamy = moods.dreamy || 0 + 0.6;
-    moods.calm = moods.calm || 0 + 0.5;
-  } else if (audioFeatures.instrumentalness > 0.4) {
-    moods.focused = moods.focused || 0 + 0.6;
+  // Enhanced instrumentalness analysis
+  if (audioFeatures.instrumentalness > 0.8) {
+    moods.focused = (moods.focused || 0) + 0.9;
+    moods.dreamy = (moods.dreamy || 0) + 0.7;
+    moods.calm = (moods.calm || 0) + 0.6;
+    moods.contemplative = (moods.contemplative || 0) + 0.5;
+  } else if (audioFeatures.instrumentalness > 0.5) {
+    moods.focused = (moods.focused || 0) + 0.7;
+    moods.mysterious = (moods.mysterious || 0) + 0.5;
   }
   
-  // Tempo mapping
-  if (audioFeatures.tempo > 140) {
-    moods.energetic = moods.energetic || 0 + 0.7;
-    moods.intense = moods.intense || 0 + 0.6;
-    moods.party = moods.party || 0 + 0.5;
-  } else if (audioFeatures.tempo > 120) {
-    moods.energetic = moods.energetic || 0 + 0.6;
-    moods.uplifting = moods.uplifting || 0 + 0.5;
-  } else if (audioFeatures.tempo < 80) {
-    moods.calm = moods.calm || 0 + 0.7;
-    moods.relaxed = moods.relaxed || 0 + 0.6;
-    moods.dreamy = moods.dreamy || 0 + 0.5;
-  } else if (audioFeatures.tempo < 100) {
-    moods.relaxed = moods.relaxed || 0 + 0.5;
+  // Enhanced tempo analysis
+  if (audioFeatures.tempo > 150) {
+    moods.energetic = (moods.energetic || 0) + 0.8;
+    moods.intense = (moods.intense || 0) + 0.7;
+    moods.party = (moods.party || 0) + 0.6;
+    moods.euphoric = (moods.euphoric || 0) + 0.5;
+  } else if (audioFeatures.tempo > 130) {
+    moods.energetic = (moods.energetic || 0) + 0.7;
+    moods.uplifting = (moods.uplifting || 0) + 0.6;
+    moods.triumphant = (moods.triumphant || 0) + 0.5;
+  } else if (audioFeatures.tempo < 70) {
+    moods.calm = (moods.calm || 0) + 0.8;
+    moods.relaxed = (moods.relaxed || 0) + 0.7;
+    moods.dreamy = (moods.dreamy || 0) + 0.6;
+    moods.contemplative = (moods.contemplative || 0) + 0.5;
+  } else if (audioFeatures.tempo < 90) {
+    moods.relaxed = (moods.relaxed || 0) + 0.6;
+    moods.bittersweet = (moods.bittersweet || 0) + 0.5;
   }
   
-  // Loudness mapping
+  // Enhanced loudness analysis
   if (audioFeatures.loudness > -5) {
-    moods.intense = moods.intense || 0 + 0.6;
-    moods.energetic = moods.energetic || 0 + 0.5;
-  } else if (audioFeatures.loudness < -10) {
-    moods.calm = moods.calm || 0 + 0.5;
-    moods.intimate = moods.intimate || 0 + 0.7;
+    moods.intense = (moods.intense || 0) + 0.7;
+    moods.energetic = (moods.energetic || 0) + 0.6;
+    moods.triumphant = (moods.triumphant || 0) + 0.5;
+  } else if (audioFeatures.loudness < -12) {
+    moods.calm = (moods.calm || 0) + 0.6;
+    moods.intimate = (moods.intimate || 0) + 0.7;
+    moods.mysterious = (moods.mysterious || 0) + 0.5;
   }
   
-  // Mode mapping (major/minor)
+  // Enhanced mode analysis
   if (audioFeatures.mode === 1) { // Major key
-    moods.happy = moods.happy || 0 + 0.5;
-    moods.uplifting = moods.uplifting || 0 + 0.4;
+    moods.happy = (moods.happy || 0) + 0.6;
+    moods.uplifting = (moods.uplifting || 0) + 0.5;
+    moods.euphoric = (moods.euphoric || 0) + 0.4;
   } else { // Minor key
-    moods.melancholic = moods.melancholic || 0 + 0.5;
-    moods.dramatic = moods.dramatic || 0 + 0.4;
+    moods.melancholic = (moods.melancholic || 0) + 0.6;
+    moods.dramatic = (moods.dramatic || 0) + 0.5;
+    moods.bittersweet = (moods.bittersweet || 0) + 0.4;
   }
   
   // Complex combinations
-  if (audioFeatures.valence < 0.4 && audioFeatures.energy > 0.7) {
-    moods.angry = moods.angry || 0 + 0.8;
-    moods.intense = moods.intense || 0 + 0.7;
+  if (audioFeatures.valence < 0.3 && audioFeatures.energy > 0.7) {
+    moods.angry = (moods.angry || 0) + 0.9;
+    moods.intense = (moods.intense || 0) + 0.8;
+    moods.rebellious = (moods.rebellious || 0) + 0.7;
   }
   
-  if (audioFeatures.valence > 0.6 && audioFeatures.tempo < 100 && audioFeatures.acousticness > 0.5) {
-    moods.peaceful = moods.peaceful || 0 + 0.8;
-    moods.content = moods.content || 0 + 0.7;
+  if (audioFeatures.valence > 0.7 && audioFeatures.tempo < 100 && audioFeatures.acousticness > 0.6) {
+    moods.peaceful = (moods.peaceful || 0) + 0.9;
+    moods.content = (moods.content || 0) + 0.8;
+    moods.contemplative = (moods.contemplative || 0) + 0.7;
   }
   
-  if (audioFeatures.valence < 0.3 && audioFeatures.energy < 0.4 && audioFeatures.acousticness > 0.6) {
-    moods.somber = moods.somber || 0 + 0.9;
-    moods.heartbroken = moods.heartbroken || 0 + 0.8;
+  if (audioFeatures.valence < 0.3 && audioFeatures.energy < 0.4 && audioFeatures.acousticness > 0.7) {
+    moods.somber = (moods.somber || 0) + 0.9;
+    moods.heartbroken = (moods.heartbroken || 0) + 0.8;
+    moods.bittersweet = (moods.bittersweet || 0) + 0.7;
+  }
+  
+  if (audioFeatures.danceability > 0.7 && audioFeatures.energy > 0.7 && audioFeatures.valence > 0.7) {
+    moods.euphoric = (moods.euphoric || 0) + 0.9;
+    moods.party = (moods.party || 0) + 0.8;
+    moods.happy = (moods.happy || 0) + 0.7;
+  }
+  
+  if (audioFeatures.instrumentalness > 0.7 && audioFeatures.acousticness > 0.6 && audioFeatures.energy < 0.4) {
+    moods.contemplative = (moods.contemplative || 0) + 0.9;
+    moods.mysterious = (moods.mysterious || 0) + 0.8;
+    moods.dreamy = (moods.dreamy || 0) + 0.7;
   }
   
   // Sort moods by score
@@ -1414,3 +1707,578 @@ function analyzeActivity(audioFeatures: any): string[] {
   
   return sortedActivities.slice(0, 3); // Return top 3 activities
 }
+
+/**
+ * Phân tích bài hát dựa trên nghệ sĩ và tìm các nghệ sĩ tương tự
+ * @param artistName Tên nghệ sĩ
+ * @returns Object chứa thông tin về nghệ sĩ tương tự và thể loại liên quan
+ */
+async function analyzeArtist(artistName: string): Promise<{similarArtists: string[], relatedGenres: string[]}> {
+  try {
+    console.log(`[AI] Analyzing artist: ${artistName}`);
+    
+    // Chuẩn hóa tên nghệ sĩ
+    const normalizedArtistName = artistName.toLowerCase().trim();
+    
+    // Tìm nghệ sĩ trong database
+    const artist = await prisma.artistProfile.findFirst({
+      where: {
+        artistName: {
+          contains: normalizedArtistName,
+          mode: 'insensitive'
+        },
+        isActive: true
+      },
+      include: {
+        tracks: {
+          where: { isActive: true },
+          include: {
+            genres: {
+              include: {
+                genre: true
+              }
+            }
+          },
+          take: 20
+        }
+      }
+    });
+    
+    if (!artist) {
+      console.log(`[AI] Artist "${artistName}" not found in database, trying Spotify lookup`);
+      // Không tìm thấy nghệ sĩ trong database, thử tìm trên Spotify
+      return await findSimilarArtistsViaSpotify(normalizedArtistName);
+    }
+    
+    // Phân tích thể loại từ các bài hát của nghệ sĩ
+    const genreCounts: Record<string, number> = {};
+    artist.tracks.forEach(track => {
+      track.genres.forEach(genreRelation => {
+        if (genreRelation.genre) {
+          const genreName = genreRelation.genre.name;
+          genreCounts[genreName] = (genreCounts[genreName] || 0) + 1;
+        }
+      });
+    });
+    
+    
+    // Sắp xếp thể loại theo số lần xuất hiện
+    const sortedGenres = Object.entries(genreCounts)
+      .sort(([, countA], [, countB]) => countB - countA)
+      .map(([genre]) => genre);
+      
+    const dominantGenres = sortedGenres.slice(0, 3);
+    console.log(`[AI] Dominant genres for ${artistName}: ${dominantGenres.join(', ')}`);
+    
+    // Tìm nghệ sĩ tương tự dựa trên thể loại tương đồng
+    const similarArtists = await findSimilarArtistsByGenres(dominantGenres, artist.id);
+    
+    return {
+      similarArtists: similarArtists.map(a => a.artistName),
+      relatedGenres: dominantGenres
+    };
+  } catch (error) {
+    console.error('[AI] Error analyzing artist:', error);
+    return { similarArtists: [], relatedGenres: [] };
+  }
+}
+
+/**
+ * Tìm các nghệ sĩ tương tự dựa trên thể loại
+ * @param genres Danh sách thể loại
+ * @param excludeArtistId ID nghệ sĩ cần loại trừ
+ * @returns Danh sách nghệ sĩ tương tự
+ */
+async function findSimilarArtistsByGenres(genres: string[], excludeArtistId: string): Promise<{id: string, artistName: string}[]> {
+  try {
+    // Tìm các genre IDs từ tên thể loại
+    const genreEntities = await prisma.genre.findMany({
+      where: {
+        name: {
+          in: genres,
+          mode: 'insensitive'
+        }
+      },
+      select: { id: true }
+    });
+    
+    const genreIds = genreEntities.map(g => g.id);
+    
+    if (genreIds.length === 0) {
+      return [];
+    }
+    
+    // Tìm các nghệ sĩ có bài hát thuộc các thể loại tương tự
+    const artistsWithSimilarGenres = await prisma.artistProfile.findMany({
+      where: {
+        id: { not: excludeArtistId },
+        isActive: true,
+        tracks: {
+          some: {
+            isActive: true,
+            genres: {
+              some: {
+                genreId: { in: genreIds }
+              }
+            }
+          }
+        }
+      },
+      select: {
+        id: true,
+        artistName: true,
+        tracks: {
+          where: {
+            genres: {
+              some: {
+                genreId: { in: genreIds }
+              }
+            }
+          },
+          select: { id: true }
+        }
+      },
+      orderBy: {
+        tracks: { _count: 'desc' }
+      },
+      take: 10
+    });
+    
+    // Sắp xếp nghệ sĩ theo số lượng bài hát có thể loại tương tự
+    const sortedArtists = artistsWithSimilarGenres
+      .map(artist => ({
+        id: artist.id,
+        artistName: artist.artistName,
+        trackCount: artist.tracks.length
+      }))
+      .sort((a, b) => b.trackCount - a.trackCount)
+      .map(({ id, artistName }) => ({ id, artistName }));
+    
+    return sortedArtists;
+  } catch (error) {
+    console.error('[AI] Error finding similar artists by genres:', error);
+    return [];
+  }
+}
+
+/**
+ * Tìm nghệ sĩ tương tự thông qua Spotify API
+ * @param artistName Tên nghệ sĩ
+ * @returns Danh sách nghệ sĩ tương tự và thể loại liên quan
+ */
+async function findSimilarArtistsViaSpotify(artistName: string): Promise<{similarArtists: string[], relatedGenres: string[]}> {
+  try {
+    if (!spotifyApi.getAccessToken()) {
+      await refreshSpotifyToken();
+    }
+    
+    // Tìm kiếm nghệ sĩ trên Spotify
+    const searchResult = await spotifyApi.searchArtists(artistName, { limit: 1 });
+    
+    if (!searchResult.body.artists || !searchResult.body.artists.items.length) {
+      console.log(`[AI] Artist "${artistName}" not found on Spotify`);
+      return { similarArtists: [], relatedGenres: [] };
+    }
+    
+    const artist = searchResult.body.artists.items[0];
+    const artistId = artist.id;
+    
+    // Lấy danh sách nghệ sĩ liên quan từ Spotify
+    const relatedArtistsResult = await spotifyApi.getArtistRelatedArtists(artistId);
+    const relatedArtists = relatedArtistsResult.body.artists || [];
+    
+    // Lấy thông tin chi tiết về nghệ sĩ
+    const artistInfo = await spotifyApi.getArtist(artistId);
+    const genres = artistInfo.body.genres || [];
+    
+    console.log(`[AI] Found ${relatedArtists.length} similar artists and ${genres.length} genres for "${artistName}" via Spotify`);
+    
+    return {
+      similarArtists: relatedArtists.slice(0, 10).map(a => a.name),
+      relatedGenres: genres.slice(0, 5)
+    };
+  } catch (error) {
+    console.error('[AI] Error finding similar artists via Spotify:', error);
+    return { similarArtists: [], relatedGenres: [] };
+  }
+}
+
+/**
+ * Cải thiện truy vấn tìm bài hát dựa trên nghệ sĩ
+ * @param artistName Tên nghệ sĩ
+ * @returns Object chứa điều kiện truy vấn Prisma
+ */
+async function createEnhancedArtistFilter(artistName: string): Promise<any> {
+  try {
+    // Phân tích nghệ sĩ để tìm nghệ sĩ tương tự và thể loại liên quan
+    const { similarArtists, relatedGenres } = await analyzeArtist(artistName);
+    
+    console.log(`[AI] Enhanced artist filter for "${artistName}"`);
+    console.log(`[AI] Similar artists: ${similarArtists.slice(0, 5).join(', ')}${similarArtists.length > 5 ? '...' : ''}`);
+    console.log(`[AI] Related genres: ${relatedGenres.join(', ')}`);
+    
+    // Nếu không tìm thấy thông tin về nghệ sĩ, trả về lọc cơ bản
+    if (similarArtists.length === 0 && relatedGenres.length === 0) {
+      return {
+        artist: {
+          artistName: {
+            contains: artistName,
+            mode: 'insensitive'
+          }
+        }
+      };
+    }
+    
+    // Tạo điều kiện lọc nâng cao bao gồm cả nghệ sĩ tương tự
+    const filter: any = {
+      OR: [
+        // Bài hát của nghệ sĩ chính
+        {
+          artist: {
+            artistName: {
+              contains: artistName,
+              mode: 'insensitive'
+            }
+          }
+        }
+      ]
+    };
+    
+    // Thêm điều kiện lọc cho các nghệ sĩ tương tự
+    similarArtists.slice(0, 5).forEach(similarArtist => {
+      filter.OR.push({
+        artist: {
+          artistName: {
+            contains: similarArtist,
+            mode: 'insensitive'
+          }
+        }
+      });
+      
+      filter.OR.push({
+        featuredArtists: {
+          some: {
+            artistProfile: {
+              artistName: {
+                contains: similarArtist,
+                mode: 'insensitive'
+              }
+            }
+          }
+        }
+      });
+    });
+    
+    // Nếu có thể loại liên quan, thêm điều kiện lọc thể loại
+    if (relatedGenres.length > 0) {
+      const genreIds = await prisma.genre.findMany({
+        where: {
+          name: {
+            in: relatedGenres,
+            mode: 'insensitive'
+          }
+        },
+        select: { id: true }
+      });
+      
+      if (genreIds.length > 0) {
+        filter.OR.push({
+          genres: {
+            some: {
+              genreId: {
+                in: genreIds.map(g => g.id)
+              }
+            }
+          }
+        });
+      }
+    }
+    
+    return filter;
+  } catch (error) {
+    console.error('[AI] Error creating enhanced artist filter:', error);
+    
+    // Trả về lọc cơ bản nếu có lỗi
+    return {
+      artist: {
+        artistName: {
+          contains: artistName,
+          mode: 'insensitive'
+        }
+      }
+    };
+  }
+}
+
+/**
+ * Phân tích và tìm thể loại nhạc dựa trên đầu vào của người dùng
+ * @param genreInput Tên thể loại người dùng nhập
+ * @returns Object chứa thông tin về thể loại và thể loại liên quan
+ */
+async function analyzeGenre(genreInput: string): Promise<{
+  mainGenre: string | null;
+  mainGenreId: string | null;
+  relatedGenres: {id: string, name: string}[];
+  subGenres: {id: string, name: string}[];
+  parentGenres: {id: string, name: string}[];
+}> {
+  console.log(`[AI] Analyzing genre: "${genreInput}"`);
+  
+  // Normalize input string
+  const normalizedInput = genreInput.trim().toLowerCase();
+  console.log(`[AI] Normalized input: "${normalizedInput}"`);
+  
+  // Genre dictionary and subgenres remain the same
+  // ... existing genre dictionaries ...
+  
+  let mainGenre: string | null = null;
+  let mainGenreId: string | null = null;
+  const foundSubGenres: { id: string; name: string }[] = [];
+  const foundRelatedGenres: { id: string; name: string }[] = [];
+  const foundParentGenres: { id: string; name: string }[] = [];
+  
+  // Step 1: Try exact match first
+  const exactGenre = await prisma.genre.findFirst({
+    where: {
+      name: {
+        equals: normalizedInput,
+        mode: 'insensitive'
+      }
+    }
+  });
+  
+  if (exactGenre) {
+    console.log(`[AI] Found exact genre match: ${exactGenre.name}`);
+    mainGenre = exactGenre.name;
+    mainGenreId = exactGenre.id;
+  } else {
+    // Step 2: Try synonym matching
+    for (const [genre, synonyms] of Object.entries(genreSynonyms)) {
+      if (genre.toLowerCase() === normalizedInput || synonyms.some(s => s.toLowerCase() === normalizedInput)) {
+        console.log(`[AI] Found genre from synonyms: ${genre}`);
+        
+        const dbGenre = await prisma.genre.findFirst({
+          where: {
+            name: {
+              equals: genre,
+              mode: 'insensitive'
+            }
+          }
+        });
+        
+        if (dbGenre) {
+          mainGenre = dbGenre.name;
+          mainGenreId = dbGenre.id;
+          break;
+        }
+      }
+    }
+    
+    // Step 3: Try fuzzy matching if still no match
+    if (!mainGenre) {
+      const fuzzyResults = await prisma.genre.findMany({
+        where: {
+          name: {
+            contains: normalizedInput,
+            mode: 'insensitive'
+          }
+        },
+        take: 5
+      });
+      
+      if (fuzzyResults.length > 0) {
+        // Find the closest match using Levenshtein distance
+        let closestMatch = fuzzyResults[0];
+        let minDistance = levenshteinDistance(normalizedInput, closestMatch.name.toLowerCase());
+        
+        for (const result of fuzzyResults) {
+          const distance = levenshteinDistance(normalizedInput, result.name.toLowerCase());
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestMatch = result;
+          }
+        }
+        
+        // Only use fuzzy match if it's reasonably close (distance < 3)
+        if (minDistance < 3) {
+          console.log(`[AI] Found fuzzy match: ${closestMatch.name} (distance: ${minDistance})`);
+          mainGenre = closestMatch.name;
+          mainGenreId = closestMatch.id;
+        }
+      }
+    }
+  }
+  
+  // If we found a main genre, populate related genres
+  if (mainGenre) {
+    // Find sub-genres
+    const subGenres = genreHierarchy[mainGenre.toLowerCase()] || [];
+    for (const subGenre of subGenres) {
+      const dbSubGenre = await prisma.genre.findFirst({
+        where: {
+          name: {
+            equals: subGenre,
+            mode: 'insensitive'
+          }
+        }
+      });
+      
+      if (dbSubGenre) {
+        foundSubGenres.push({
+          id: dbSubGenre.id,
+          name: dbSubGenre.name
+        });
+      }
+    }
+    
+    // Find related genres
+    const related = relatedGenres[mainGenre.toLowerCase()] || [];
+    for (const relatedGenre of related) {
+      const dbRelatedGenre = await prisma.genre.findFirst({
+        where: {
+          name: {
+            equals: relatedGenre,
+            mode: 'insensitive'
+          }
+        }
+      });
+      
+      if (dbRelatedGenre) {
+        foundRelatedGenres.push({
+          id: dbRelatedGenre.id,
+          name: dbRelatedGenre.name
+        });
+      }
+    }
+    
+    // Find parent genres
+    for (const [parent, children] of Object.entries(genreHierarchy)) {
+      if (children.some(child => child.toLowerCase() === mainGenre.toLowerCase())) {
+        const dbParentGenre = await prisma.genre.findFirst({
+          where: {
+            name: {
+              equals: parent,
+              mode: 'insensitive'
+            }
+          }
+        });
+        
+        if (dbParentGenre) {
+          foundParentGenres.push({
+            id: dbParentGenre.id,
+            name: dbParentGenre.name
+          });
+        }
+      }
+    }
+  }
+  
+  console.log(`[AI] Analysis results:`, {
+    mainGenre,
+    mainGenreId,
+    subGenres: foundSubGenres.length,
+    relatedGenres: foundRelatedGenres.length,
+    parentGenres: foundParentGenres.length
+  });
+  
+  return {
+    mainGenre,
+    mainGenreId,
+    relatedGenres: foundRelatedGenres,
+    subGenres: foundSubGenres,
+    parentGenres: foundParentGenres
+  };
+}
+
+// Genre dictionaries and type definitions
+const genreHierarchy: Record<string, string[]> = {
+  'rock': ['alternative rock', 'classic rock', 'hard rock', 'indie rock', 'progressive rock', 'punk rock', 'psychedelic rock', 'soft rock', 'blues rock', 'folk rock', 'garage rock', 'grunge', 'metal'],
+  'pop': ['dance pop', 'electropop', 'indie pop', 'k-pop', 'synth-pop', 'art pop', 'baroque pop', 'dream pop', 'j-pop', 'power pop', 'teen pop'],
+  'hip hop': ['trap', 'rap', 'drill', 'old school hip hop', 'alternative hip hop', 'conscious hip hop', 'east coast hip hop', 'west coast hip hop', 'southern hip hop', 'gangsta rap', 'abstract hip hop', 'boom bap', 'trip hop'],
+  'r&b': ['soul', 'funk', 'contemporary r&b', 'neo soul', 'quiet storm', 'new jack swing', 'motown', 'disco'],
+  'electronic': ['techno', 'house', 'edm', 'ambient', 'drum and bass', 'dubstep', 'trance', 'idm', 'electro', 'breakbeat', 'downtempo', 'electronica'],
+  'jazz': ['bebop', 'swing', 'smooth jazz', 'cool jazz', 'hard bop', 'fusion', 'modal jazz', 'free jazz', 'jazz funk', 'big band'],
+  'classical': ['baroque', 'romantic', 'modern classical', 'orchestral', 'chamber music', 'opera', 'symphony', 'concerto', 'sonata', 'minimalism'],
+  'folk': ['americana', 'traditional folk', 'folk rock', 'contemporary folk', 'celtic', 'bluegrass', 'singer-songwriter', 'folk pop'],
+  'country': ['alternative country', 'traditional country', 'outlaw country', 'country pop', 'country rock', 'bluegrass', 'americana', 'honky tonk', 'nashville sound'],
+  'metal': ['heavy metal', 'thrash metal', 'death metal', 'black metal', 'power metal', 'doom metal', 'progressive metal', 'nu metal', 'metalcore', 'folk metal', 'symphonic metal'],
+  'blues': ['chicago blues', 'delta blues', 'electric blues', 'country blues', 'jump blues', 'rhythm and blues', 'soul blues'],
+  'reggae': ['dancehall', 'dub', 'roots reggae', 'ska', 'rocksteady', 'reggaeton', "lover's rock"],
+  'punk': ['hardcore punk', 'post-punk', 'pop punk', 'anarcho-punk', 'skate punk', 'garage punk', 'emo'],
+  'world': ['afrobeat', 'latin', 'bossa nova', 'salsa', 'samba', 'flamenco', 'fado', 'reggaeton', 'k-pop', 'j-pop', 'bollywood'],
+  'funk': ['p-funk', 'go-go', 'funk rock', 'funk metal', 'afrofunk', 'deep funk', 'soul funk', 'electro funk'],
+  'latin': ['salsa', 'bossa nova', 'samba', 'tango', 'bachata', 'reggaeton', 'latin pop', 'latin jazz', 'cumbia', 'merengue'],
+  'alternative': ['indie', 'alternative rock', 'post-punk', 'new wave', 'college rock', 'alt-country', 'grunge', 'britpop', 'shoegaze', 'dream pop', 'industrial'],
+  'indie': ['indie rock', 'indie pop', 'indie folk', 'indie electronic', 'lo-fi', 'bedroom pop', 'shoegaze', 'dream pop', 'post-punk revival'],
+  'edm': ['house', 'techno', 'trance', 'dubstep', 'trap', 'drum and bass', 'future bass', 'big room', 'progressive house', 'hardstyle']
+};
+
+const genreSynonyms: Record<string, string[]> = {
+  'rock': ['rock and roll', 'rock n roll', 'rock & roll', 'rockn roll'],
+  'hip hop': ['hiphop', 'hip-hop', 'rap'],
+  'r&b': ['rnb', 'rhythm and blues', 'rhythm & blues'],
+  'electronic': ['electronica', 'electro', 'electronic dance music', 'edm'],
+  'classical': ['orchestra', 'orchestral', 'symphony', 'classic'],
+  'alternative': ['alt', 'alt rock', 'alternative music'],
+  'indie': ['independent', 'indie music'],
+  'edm': ['electronic dance music', 'electronic dance', 'dance music', 'club'],
+  'metal': ['heavy', 'headbanger', 'metalhead'],
+  'funk': ['funky', 'funk music'],
+  'disco': ['70s dance', 'discotheque'],
+  'house': ['deep house', 'house music', 'club house'],
+  'trance': ['trance music', 'psytrance'],
+  'techno': ['techno music', 'detroit techno'],
+  'ambient': ['ambient music', 'atmospheric', 'chill'],
+  'jazz': ['jazzy', 'jazz music']
+};
+
+const relatedGenres: Record<string, string[]> = {
+  'rock': ['punk', 'metal', 'alternative', 'indie', 'blues'],
+  'pop': ['dance pop', 'r&b', 'indie pop', 'electropop', 'hip hop'],
+  'hip hop': ['r&b', 'trap', 'pop', 'electronic', 'funk'],
+  'r&b': ['soul', 'hip hop', 'funk', 'jazz', 'pop'],
+  'electronic': ['edm', 'ambient', 'techno', 'house', 'pop'],
+  'jazz': ['blues', 'funk', 'soul', 'r&b', 'classical'],
+  'classical': ['soundtrack', 'opera', 'jazz', 'ambient', 'folk'],
+  'folk': ['country', 'acoustic', 'indie folk', 'singer-songwriter', 'americana'],
+  'country': ['folk', 'americana', 'bluegrass', 'country rock', 'country pop'],
+  'metal': ['rock', 'hard rock', 'punk', 'alternative', 'progressive'],
+  'blues': ['rock', 'jazz', 'r&b', 'soul', 'folk'],
+  'reggae': ['dancehall', 'ska', 'world', 'dub', 'hip hop'],
+  'punk': ['rock', 'hardcore', 'alternative', 'post-punk', 'indie'],
+  'world': ['latin', 'reggae', 'afrobeat', 'folk', 'traditional'],
+  'funk': ['r&b', 'soul', 'disco', 'jazz', 'hip hop'],
+  'latin': ['salsa', 'reggaeton', 'pop', 'world', 'dance'],
+  'alternative': ['indie', 'rock', 'post-punk', 'grunge', 'shoegaze'],
+  'indie': ['alternative', 'rock', 'indie pop', 'indie rock', 'indie folk'],
+  'edm': ['electronic', 'house', 'techno', 'trance', 'dubstep']
+};
+
+// Genre mappings for common variations
+const genreVariations: Record<string, string[]> = {
+  'rock': ['rock music', 'rock and roll', 'rocks'],
+  'pop': ['popular', 'pop music'],
+  'hip hop': ['hiphop', 'rap', 'hip-hop'],
+  'electronic': ['electronica', 'electronic music', 'edm'],
+  'classical': ['classic', 'orchestra', 'orchestral'],
+  'ambient': ['ambient music', 'atmospheric', 'chill'],
+  'jazz': ['jazzy', 'jazz music']
+};
+
+// Function to find the closest genre match
+function findClosestGenre(input: string, genres: string[]): string | null {
+  let closestMatch = null;
+  let minDistance = Infinity;
+
+  for (const genre of genres) {
+    const distance = levenshteinDistance(input.toLowerCase(), genre.toLowerCase());
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestMatch = genre;
+    }
+  }
+
+  // Only return a match if the distance is reasonably small
+  return minDistance <= 3 ? closestMatch : null;
+}
+
