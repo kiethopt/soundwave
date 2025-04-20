@@ -15,15 +15,24 @@ import * as path from 'path';
 import { SystemComponentStatus } from '../types/system.types';
 import { client as redisClient } from '../middleware/cache.middleware';
 import { transporter as nodemailerTransporter } from './email.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, User as PrismaUser } from '@prisma/client';
 import { ArtistProfile } from '@prisma/client';
+import bcrypt from 'bcrypt'; // Import bcrypt
 
-// Lấy danh sách user
-export const getUsers = async (req: Request) => {
-  const { search = '', status } = req.query;
+// Explicitly type User to include adminLevel for this file's scope
+type User = PrismaUser & { adminLevel?: number | null };
 
-  const where = {
-    role: 'USER',
+// Updated getUsers function to accept requestingUser
+export const getUsers = async (req: Request, requestingUser: User) => {
+  const { search = '', status, role } = req.query;
+
+  const where: Prisma.UserWhereInput = {
+    ...(requestingUser.adminLevel !== 1
+      ? { role: Role.USER } // Level 2+ Admins only see USER role
+      : role && typeof role === 'string' && Object.values(Role).includes(role.toUpperCase() as Role)
+      ? { role: role.toUpperCase() as Role } // Apply role filter if valid and provided by Lvl 1
+      : {} // Lvl 1 sees all roles if no specific role filter is applied
+    ),
     ...(search
       ? {
           OR: [
@@ -33,18 +42,17 @@ export const getUsers = async (req: Request) => {
           ],
         }
       : {}),
-    ...(status !== undefined ? { isActive: status === 'true' } : {}),
+    ...(status !== undefined ? { isActive: toBooleanValue(status) } : {}),
   };
 
   const options = {
     where,
-    include: {
-      artistProfile: true,
-    },
+    select: userSelect,
     orderBy: { createdAt: 'desc' },
   };
 
-  const result = await paginate(prisma.user, req, options);
+  // Pass the modified where clause to paginate
+  const result = await paginate<User>(prisma.user, req, options);
 
   return {
     users: result.data,
@@ -95,12 +103,10 @@ export const getArtistRequests = async (req: Request) => {
     }
   }
 
-  // Status filter (isVerified)
-  const isVerified = toBooleanValue(status);
-  if (isVerified !== undefined) {
-    if (Array.isArray(where.AND)) {
-      where.AND.push({ isVerified: isVerified });
-    }
+  // Status filter for isVerified (assuming status param means isVerified for requests)
+  const isVerifiedFilter = toBooleanValue(status);
+  if (isVerifiedFilter !== undefined && Array.isArray(where.AND)) {
+    where.AND.push({ isVerified: isVerifiedFilter });
   }
 
   // Date range filter for verificationRequestedAt
@@ -113,24 +119,17 @@ export const getArtistRequests = async (req: Request) => {
       // Ensure endDate includes the whole day
       const endOfDay = new Date(parsedEndDate);
       endOfDay.setHours(23, 59, 59, 999);
-      // Use 'lte' (less than or equal to) for end date
       dateFilter.verificationRequestedAt = {
         gte: parsedStartDate,
         lte: endOfDay,
       };
     } else {
-      // Only startDate is provided, filter from start date onwards
-      dateFilter.verificationRequestedAt = {
-        gte: parsedStartDate,
-      };
+      dateFilter.verificationRequestedAt = { gte: parsedStartDate };
     }
-    // Explicitly check if where.AND is an array before push
     if (Array.isArray(where.AND)) {
       where.AND.push(dateFilter);
     }
   }
-  // If only endDate is provided, we could potentially filter up to that date, but it's less common.
-  // Current logic requires startDate to be present for date filtering.
 
   const paginationResult = await paginate<ArtistProfile>(prisma.artistProfile, req, {
     where,
@@ -158,86 +157,91 @@ export const getArtistRequestDetail = async (id: string) => {
   return request;
 };
 
-// Cập nhật thông tin user
+// --- REWRITTEN updateUserInfo Function ---
 export const updateUserInfo = async (
   id: string,
   data: any,
   avatarFile?: Express.Multer.File
 ) => {
-  // Kiểm tra user tồn tại
-  const currentUser = await prisma.user.findUnique({
+  const targetUser = await prisma.user.findUnique({
     where: { id },
-    select: { ...userSelect, password: true },
+    select: { id: true, email: true, username: true, password: true, avatar: true, role: true, adminLevel: true }
   });
 
-  if (!currentUser) {
+  if (!targetUser) {
     throw new Error('User not found');
   }
 
-  const { name, email, username, isActive, role, password, currentPassword } =
-    data;
-  let passwordHash;
+  const { name, email, username, isActive, password, role, adminLevel } = data;
+  const updateData: Prisma.UserUpdateInput = {};
+
+  // Handle potential role/level promotion/change if provided
+  if (role && Object.values(Role).includes(role)) {
+    updateData.role = role as Role;
+  }
+  if (adminLevel !== undefined && adminLevel !== null && !isNaN(Number(adminLevel))) {
+    // Allow setting level only if role is ADMIN (or becoming ADMIN)
+    if (updateData.role === Role.ADMIN || (targetUser.role === Role.ADMIN && !updateData.role)) {
+       updateData.adminLevel = Number(adminLevel);
+    } else if (role === Role.ADMIN) { // Explicitly promoting
+        updateData.adminLevel = Number(adminLevel);
+    } else {
+        // If setting level but not ADMIN, remove adminLevel (or set to null)
+        updateData.adminLevel = null;
+    }
+  } else if (updateData.role && updateData.role !== Role.ADMIN) {
+    // If role is changed to non-admin, ensure level is nullified
+    updateData.adminLevel = null;
+  }
+
+  // Name
+  if (name !== undefined) updateData.name = name;
+
+  // Email (check uniqueness if changed)
+  if (email !== undefined && email !== targetUser.email) {
+    const existingEmail = await prisma.user.findFirst({ where: { email, NOT: { id } } });
+    if (existingEmail) throw new Error('Email already exists');
+    updateData.email = email;
+  }
+
+  // Username (check uniqueness if changed)
+  if (username !== undefined && username !== targetUser.username) {
+    const existingUsername = await prisma.user.findFirst({ where: { username, NOT: { id } } });
+    if (existingUsername) throw new Error('Username already exists');
+    updateData.username = username;
+  }
+
+  // isActive status
+  if (isActive !== undefined) {
+    // Deactivation of Level 1 Admin should be prevented in middleware
+    updateData.isActive = toBooleanValue(isActive);
+  }
+
+  // Password (Admin sets directly - length validation)
   if (password) {
-    const bcrypt = require('bcrypt');
-
-    // Kiểm tra mk hiện tại người dùng nhập có phải là mk cũ không
-    if (currentPassword) {
-      const isPasswordValid = await bcrypt.compare(
-        currentPassword,
-        currentUser.password
-      );
-      if (!isPasswordValid) {
-        throw new Error('Current password is incorrect');
-      }
-
-      // Mã hóa mk mới
-      passwordHash = await bcrypt.hash(password, 10);
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long.');
     }
+    updateData.password = await bcrypt.hash(password, 10);
   }
 
-  // Kiểm tra trùng lặp email nếu có thay đổi
-  if (email && email !== currentUser.email) {
-    const existingEmail = await prisma.user.findFirst({
-      where: { email, NOT: { id } },
-    });
-    if (existingEmail) {
-      throw new Error('Email already exists');
-    }
-  }
-
-  // Kiểm tra trùng lặp username nếu có thay đổi
-  if (username && username !== currentUser.username) {
-    const existingUsername = await prisma.user.findFirst({
-      where: { username, NOT: { id } },
-    });
-    if (existingUsername) {
-      throw new Error('Username already exists');
-    }
-  }
-
-  // Xử lý avatar nếu có
-  let avatarUrl = currentUser.avatar;
+  // Avatar
   if (avatarFile) {
     const uploadResult = await uploadFile(avatarFile.buffer, 'users/avatars');
-    avatarUrl = uploadResult.secure_url;
+    updateData.avatar = uploadResult.secure_url;
+  } else if (data.avatar === null && targetUser.avatar) {
+    // Handle explicit avatar removal if `avatar: null` is passed
+    updateData.avatar = null;
   }
 
-  // Chuyển đổi isActive thành boolean nếu có
-  const isActiveBool =
-    isActive !== undefined ? toBooleanValue(isActive) : undefined;
+  // Perform Update if there are changes
+  if (Object.keys(updateData).length === 0 && !avatarFile && !(data.avatar === null && targetUser.avatar)) {
+      throw new Error("No valid data provided for update.");
+  }
 
-  // Cập nhật user với các trường đã gửi
   const updatedUser = await prisma.user.update({
     where: { id },
-    data: {
-      ...(name !== undefined && { name }),
-      ...(email !== undefined && { email }),
-      ...(username !== undefined && { username }),
-      ...(avatarUrl !== currentUser.avatar && { avatar: avatarUrl }),
-      ...(isActiveBool !== undefined && { isActive: isActiveBool }),
-      ...(role !== undefined && { role }),
-      ...(passwordHash && { password: passwordHash }),
-    },
+    data: updateData,
     select: userSelect,
   });
 
@@ -291,32 +295,35 @@ export const updateArtistInfo = async (
 
   // Prepare social media links update (ensure it's a valid JSON or null)
   let socialMediaLinksUpdate = existingArtist.socialMediaLinks;
-  if (socialMediaLinks) {
+  if (socialMediaLinks !== undefined) { // Allow updating even if empty string/null is passed
     try {
-      // Assuming socialMediaLinks is passed as a JSON string from FormData
-      const parsedLinks = typeof socialMediaLinks === 'string' ? JSON.parse(socialMediaLinks) : socialMediaLinks;
-      // Simple validation: ensure it's an object
-      if (typeof parsedLinks === 'object' && parsedLinks !== null) {
-        socialMediaLinksUpdate = parsedLinks;
-      } else {
-        console.warn('Invalid socialMediaLinks format received:', socialMediaLinks);
-        // Keep existing links if parsing fails or format is wrong
-      }
+        // If it's an empty string or explicitly null, set to null
+        if (socialMediaLinks === '' || socialMediaLinks === null) {
+             socialMediaLinksUpdate = null;
+        } else {
+             // Assuming socialMediaLinks is passed as a JSON string from FormData
+             const parsedLinks = typeof socialMediaLinks === 'string' ? JSON.parse(socialMediaLinks) : socialMediaLinks;
+             // Simple validation: ensure it's an object
+             if (typeof parsedLinks === 'object' && parsedLinks !== null) {
+                 socialMediaLinksUpdate = parsedLinks;
+             } else {
+                 console.warn('Invalid socialMediaLinks format received:', socialMediaLinks);
+                 // Keep existing links if parsing fails or format is wrong
+             }
+        }
     } catch (error) {
-      console.error('Error parsing socialMediaLinks JSON:', error);
+      console.error('Error processing socialMediaLinks JSON:', error);
       // Keep existing links if parsing fails
     }
-  } else if (socialMediaLinks === null || socialMediaLinks === '') {
-    // Allow clearing social media links
-    socialMediaLinksUpdate = null;
   }
+
 
   // Cập nhật artist trực tiếp với các trường đã gửi
   const updatedArtist = await prisma.artistProfile.update({
     where: { id },
     data: {
       ...(validatedArtistName && { artistName: validatedArtistName }),
-      ...(bio !== undefined && { bio }),
+      ...(bio !== undefined && { bio }), // Allow empty string for bio
       ...(isActive !== undefined && { isActive: toBooleanValue(isActive) }),
       ...(isVerified !== undefined && {
         isVerified: toBooleanValue(isVerified),
@@ -324,7 +331,8 @@ export const updateArtistInfo = async (
         verifiedAt: toBooleanValue(isVerified) ? new Date() : null,
       }),
       ...(avatarUrl && { avatar: avatarUrl }),
-      ...(socialMediaLinks !== undefined && { socialMediaLinks: socialMediaLinksUpdate }), // Update social media links
+      // Update social media links only if it was present in the request data
+      ...(socialMediaLinks !== undefined && { socialMediaLinks: socialMediaLinksUpdate }),
     },
     select: artistProfileSelect,
   });
@@ -333,8 +341,31 @@ export const updateArtistInfo = async (
 };
 
 // Xóa user theo ID
-export const deleteUserById = async (id: string) => {
-  return prisma.user.delete({ where: { id } });
+export const deleteUserById = async (id: string, requestingUser: User) => {
+  const userToDelete = await prisma.user.findUnique({
+    where: { id },
+    select: { role: true, adminLevel: true }, // Also select adminLevel
+  });
+
+  if (!userToDelete) {
+     // User already deleted or never existed, return success or specific indicator
+     console.log(`User with ID ${id} not found for deletion.`);
+     return { message: `User ${id} not found.` }; // Indicate user not found
+  }
+
+  // Add check for Level 1 Admin deletion
+  if (userToDelete.role === Role.ADMIN && userToDelete.adminLevel === 1) {
+    throw new Error('Permission denied: Level 1 Admins cannot be deleted.');
+  }
+
+  // Allow Level 1 Admin to delete other Admins (Level 2)
+  if (userToDelete.role === Role.ADMIN && (!requestingUser || requestingUser.role !== Role.ADMIN || requestingUser.adminLevel !== 1)) {
+     throw new Error('Permission denied: Only Level 1 Admins can delete other Admins.');
+  }
+
+  // If we reach here, deletion is permitted (either a USER or an ADMIN being deleted by Level 1)
+  await prisma.user.delete({ where: { id } });
+  return { message: `User ${id} deleted successfully.`}; // Indicate success
 };
 
 export const deleteArtistById = async (id: string) => {
@@ -356,6 +387,11 @@ export const getArtists = async (req: Request) => {
             {
               user: {
                 email: { contains: String(search), mode: 'insensitive' },
+              },
+            },
+            { // Also search user name for artists
+              user: {
+                name: { contains: String(search), mode: 'insensitive' },
               },
             },
           ],
@@ -436,7 +472,7 @@ export const getGenres = async (req: Request) => {
 // Tạo thể loại mới
 export const createNewGenre = async (name: string) => {
   const existingGenre = await prisma.genre.findFirst({
-    where: { name },
+    where: { name: { equals: name, mode: 'insensitive' } }, // Case-insensitive check
   });
   if (existingGenre) {
     throw new Error('Genre name already exists');
@@ -456,10 +492,13 @@ export const updateGenreInfo = async (id: string, name: string) => {
     throw new Error('Genre not found');
   }
 
-  // Kiểm tra trùng lặp tên
-  if (name !== existingGenre.name) {
+  // Kiểm tra trùng lặp tên (case-insensitive)
+  if (name.toLowerCase() !== existingGenre.name.toLowerCase()) {
     const existingGenreWithName = await prisma.genre.findFirst({
-      where: { name, NOT: { id } },
+      where: {
+         name: { equals: name, mode: 'insensitive' },
+         NOT: { id }
+      },
     });
     if (existingGenreWithName) {
       throw new Error('Genre name already exists');
@@ -483,26 +522,43 @@ export const approveArtistRequest = async (requestId: string) => {
     where: {
       id: requestId,
       verificationRequestedAt: { not: null },
-      isVerified: false,
+      isVerified: false, // Ensure it's not already verified
     },
+    // Include user to get email later
+    include: {
+      user: { select: { id: true, email: true, name: true, username: true } }
+    }
   });
 
   if (!artistProfile) {
-    throw new Error('Artist request not found or already verified');
+    throw new Error('Artist request not found, already verified, or rejected.');
   }
 
-  return prisma.artistProfile.update({
-    where: { id: requestId },
-    data: {
-      role: Role.ARTIST,
-      isVerified: true,
-      verifiedAt: new Date(),
-      verificationRequestedAt: null,
-    },
-    include: {
-      user: { select: userSelect },
-    },
+  // Use transaction to update profile and user role atomically
+  const updatedProfile = await prisma.$transaction(async (tx) => {
+     // Update ArtistProfile
+     const profile = await tx.artistProfile.update({
+         where: { id: requestId },
+         data: {
+             role: Role.ARTIST, // Ensure role is set on profile
+             isVerified: true,
+             verifiedAt: new Date(),
+             verificationRequestedAt: null, // Clear the request timestamp
+         },
+         include: { user: { select: userSelect }} // Select user data needed for response/email
+     });
+
+     // Update associated User's role (important!)
+     await tx.user.update({
+        where: { id: profile.userId },
+        data: { role: Role.ARTIST } // Update user role to ARTIST
+     });
+
+     return profile;
   });
+
+
+  return updatedProfile; // Return profile which includes nested user data
 };
 
 // Từ chối yêu cầu trở thành nghệ sĩ
@@ -511,44 +567,48 @@ export const rejectArtistRequest = async (requestId: string) => {
     where: {
       id: requestId,
       verificationRequestedAt: { not: null },
-      isVerified: false,
+      isVerified: false, // Ensure it's not already verified or rejected (by deletion)
     },
     include: {
-      // **Sửa ở đây: Sử dụng userSelect thay vì select thủ công**
-      user: { select: userSelect },
+      user: { select: userSelect }, // Select necessary user fields
     },
   });
 
   if (!artistProfile) {
-    throw new Error('Artist request not found or already verified');
+    throw new Error('Artist request not found, already verified, or rejected.');
   }
 
-  // Xóa artist profile khi từ chối
+  // Just delete the artist profile on rejection
   await prisma.artistProfile.delete({
     where: { id: requestId },
   });
 
-  // Trả về thông tin user đã được select bởi userSelect (bao gồm cả username)
+  // Return the user data and indication that there's no longer a pending request
   return {
-    user: artistProfile.user,
+    user: artistProfile.user, // Return the user data selected earlier
     hasPendingRequest: false,
   };
 };
 
 // Xóa yêu cầu trở thành nghệ sĩ
 export const deleteArtistRequest = async (requestId: string) => {
+  // Find the request first to ensure it exists and meets criteria
   const artistProfile = await prisma.artistProfile.findFirst({
     where: {
       id: requestId,
-      verificationRequestedAt: { not: null },
-      isVerified: false,
+      verificationRequestedAt: { not: null }, // Must be a pending request
+      // No isVerified check here, allow deletion even if rejected (profile deleted)
     },
   });
 
   if (!artistProfile) {
-    throw new Error('Artist request not found or already verified/rejected');
+    // If not found, it might have been approved, rejected, or never existed.
+    // Consider if throwing an error or returning success is better.
+    // Let's throw an error for clarity that the target wasn't a deletable request.
+    throw new Error('Artist request not found or not in a deletable state (e.g., approved).');
   }
 
+  // Delete the artist profile associated with the request
   await prisma.artistProfile.delete({
     where: { id: requestId },
   });
@@ -560,7 +620,7 @@ export const deleteArtistRequest = async (requestId: string) => {
 export const getDashboardStats = async () => {
   // Sử dụng Promise.all để thực hiện đồng thời các truy vấn
   const stats = await Promise.all([
-    prisma.user.count({ where: { role: Role.USER } }),
+    prisma.user.count({ where: { role: { not: Role.ADMIN } } }), // Count non-admin users
     prisma.artistProfile.count({
       where: {
         role: Role.ARTIST,
@@ -633,32 +693,31 @@ export const getSystemStatus = async (): Promise<SystemComponentStatus[]> => {
   // 2. Check Redis Cache
   const useRedis = process.env.USE_REDIS_CACHE === 'true';
   if (useRedis) {
-    // Check 1: Kiểm tra xem có bị lỗi hay không
-    if (typeof redisClient.ping !== 'function') {
-      console.warn('[System Status] Redis check inconsistent: Cache enabled but using mock client (restart required).');
+    // Ensure redisClient exists and has the ping method
+    if (redisClient && typeof redisClient.ping === 'function') {
+      try {
+         // Check connection state before pinging
+         if (!redisClient.isOpen) {
+            statuses.push({ name: 'Cache (Redis)', status: 'Outage', message: 'Client not connected' });
+         } else {
+            await redisClient.ping();
+            statuses.push({ name: 'Cache (Redis)', status: 'Available' });
+         }
+      } catch (error) {
+        console.error('[System Status] Redis ping failed:', error);
+        statuses.push({
+          name: 'Cache (Redis)',
+          status: 'Issue', // Use 'Issue' for problems after initial connection attempt
+          message: error instanceof Error ? error.message : 'Ping failed',
+        });
+      }
+    } else {
+      console.warn('[System Status] Redis client seems uninitialized or mock.');
       statuses.push({
         name: 'Cache (Redis)',
         status: 'Issue',
-        message: 'Inconsistent config: Cache enabled, but mock client active (restart needed).',
+        message: 'Redis client not properly initialized or is a mock.',
       });
-    } else {
-      // Check 2: Kiểm tra xem client có kết nối hay không
-      if (!redisClient.isOpen) {
-         statuses.push({ name: 'Cache (Redis)', status: 'Outage', message: 'Client not connected' });
-      } else {
-        // Check 3: Kiểm tra xem có bị lỗi hay không
-        try {
-          await redisClient.ping();
-          statuses.push({ name: 'Cache (Redis)', status: 'Available' });
-        } catch (error) {
-          console.error('[System Status] Redis ping failed:', error);
-          statuses.push({
-            name: 'Cache (Redis)',
-            status: 'Issue', // Sử dụng 'Issue' cho vấn đề kết nối sau khi kết nối ban đầu
-            message: error instanceof Error ? error.message : 'Ping failed',
-          });
-        }
-      }
     }
   } else {
     statuses.push({ name: 'Cache (Redis)', status: 'Disabled', message: 'USE_REDIS_CACHE is false' });
@@ -666,13 +725,12 @@ export const getSystemStatus = async (): Promise<SystemComponentStatus[]> => {
 
   // 3. Check Cloudinary
   try {
-    // Import Cloudinary locally
     const cloudinary = (await import('cloudinary')).v2;
     const pingResult = await cloudinary.api.ping();
     if (pingResult?.status === 'ok') {
        statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Available' });
     } else {
-       statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Issue', message: 'Ping failed or unexpected status' });
+       statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Issue', message: `Ping failed or unexpected status: ${pingResult?.status}` });
     }
   } catch (error) {
     console.error('[System Status] Cloudinary check failed:', error);
@@ -689,11 +747,12 @@ export const getSystemStatus = async (): Promise<SystemComponentStatus[]> => {
     try {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(geminiApiKey);
-      const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+      const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash'; // Default model name
 
-      // Kiểm tra xem có bị lỗi hay không
+      // Attempt to get the model - throws error if invalid key/config
       const model = genAI.getGenerativeModel({ model: modelName });
-      await model.countTokens(""); // Gọi hàm countTokens để kiểm tra xem có bị lỗi hay không
+      // Optional: Make a light request like counting tokens to verify further
+      await model.countTokens("test");
 
       statuses.push({ name: 'Gemini AI (Playlists)', status: 'Available', message: `API Key valid. Configured model: ${modelName}` });
 
@@ -712,9 +771,12 @@ export const getSystemStatus = async (): Promise<SystemComponentStatus[]> => {
   // 5. Check Nodemailer (Email Service)
   if (nodemailerTransporter) {
     try {
-      // Verify the connection
-      await nodemailerTransporter.verify();
-      statuses.push({ name: 'Email (Nodemailer)', status: 'Available' });
+      const verified = await nodemailerTransporter.verify();
+      if (verified) {
+        statuses.push({ name: 'Email (Nodemailer)', status: 'Available' });
+      } else {
+         statuses.push({ name: 'Email (Nodemailer)', status: 'Issue', message: 'Verification returned false' });
+      }
     } catch (error: any) {
       console.error('[System Status] Nodemailer verification failed:', error);
       statuses.push({
@@ -724,11 +786,10 @@ export const getSystemStatus = async (): Promise<SystemComponentStatus[]> => {
       });
     }
   } else {
-    // Transporter is null (likely due to missing config)
     statuses.push({
       name: 'Email (Nodemailer)',
       status: 'Disabled',
-      message: 'SMTP configuration incomplete or verification failed',
+      message: 'SMTP configuration incomplete or transporter not initialized',
     });
   }
 
@@ -736,43 +797,75 @@ export const getSystemStatus = async (): Promise<SystemComponentStatus[]> => {
 };
 
 // Cập nhật trạng thái cache
-export const updateCacheStatus = async (enabled: boolean) => {
+export const updateCacheStatus = async (enabled?: boolean): Promise<{ enabled: boolean }> => {
   try {
-    const envPath = path.resolve(__dirname, '../../.env');
-    const envContent = fs.readFileSync(envPath, 'utf8');
+      // Determine the correct path to .env file
+      const envPath = process.env.NODE_ENV === 'production'
+          ? path.resolve(process.cwd(), '../.env') // Adjust if your production structure differs
+          : path.resolve(process.cwd(), '.env'); // Development path
 
-    if (enabled === undefined) {
+      if (!fs.existsSync(envPath)) {
+          console.error(`.env file not found at ${envPath}`);
+          throw new Error('Environment file not found.');
+      }
+
       const currentStatus = process.env.USE_REDIS_CACHE === 'true';
-      return { enabled: currentStatus };
-    }
 
-    // Update USE_REDIS_CACHE
-    const updatedContent = envContent.replace(
-      /USE_REDIS_CACHE=.*/,
-      `USE_REDIS_CACHE=${enabled}`
-    );
+      // If enabled is undefined, just return the current status
+      if (enabled === undefined) {
+          return { enabled: currentStatus };
+      }
 
-    fs.writeFileSync(envPath, updatedContent);
+      // If the requested status is the same as current, do nothing
+      if (enabled === currentStatus) {
+          console.log(`[Redis] Cache status already ${enabled ? 'enabled' : 'disabled'}. No change needed.`);
+          return { enabled };
+      }
 
-    // Cập nhật biến môi trường và xử lý kết nối Redis
-    const previousStatus = process.env.USE_REDIS_CACHE === 'true';
-    process.env.USE_REDIS_CACHE = String(enabled);
+      // Update .env file content
+      let envContent = fs.readFileSync(envPath, 'utf8');
+      const regex = /USE_REDIS_CACHE=.*/;
+      const newLine = `USE_REDIS_CACHE=${enabled}`;
 
-    console.log(`[Redis] Cache ${enabled ? 'enabled' : 'disabled'}`);
+      if (envContent.match(regex)) {
+          envContent = envContent.replace(regex, newLine);
+      } else {
+          envContent += `
+${newLine}`; // Add if not found
+      }
+      fs.writeFileSync(envPath, envContent);
 
-    // Xử lý kết nối Redis dựa trên trạng thái mới
-    const { client } = require('../middleware/cache.middleware');
+      // Update process.env for the current running instance
+      process.env.USE_REDIS_CACHE = String(enabled);
+      console.log(`[Redis] Cache ${enabled ? 'enabled' : 'disabled'}. Restart might be required for full effect.`);
 
-    if (enabled && !previousStatus && !client.isOpen) {
-      await client.connect();
-    } else if (!enabled && previousStatus && client.isOpen) {
-      await client.disconnect();
-    }
+      // Handle Redis connection based on the new status
+      // Re-require or import client logic might be necessary depending on setup
+      const { client: dynamicRedisClient } = require('../middleware/cache.middleware');
 
-    return { enabled };
+      if (enabled && dynamicRedisClient && !dynamicRedisClient.isOpen) {
+          try {
+              await dynamicRedisClient.connect();
+              console.log('[Redis] Connected successfully.');
+          } catch (connectError) {
+              console.error('[Redis] Failed to connect after enabling:', connectError);
+              // Optionally revert the .env change or notify admin
+          }
+      } else if (!enabled && dynamicRedisClient && dynamicRedisClient.isOpen) {
+          try {
+              await dynamicRedisClient.disconnect();
+              console.log('[Redis] Disconnected successfully.');
+          } catch (disconnectError) {
+              console.error('[Redis] Failed to disconnect after disabling:', disconnectError);
+          }
+      }
+
+      return { enabled };
   } catch (error) {
-    console.error('Error updating cache status', error);
-    throw new Error('Failed to update cache status');
+      console.error('Error updating cache status:', error);
+      // Determine current status again in case of error during update
+      const currentStatusAfterError = process.env.USE_REDIS_CACHE === 'true';
+      throw new Error(`Failed to update cache status. Current status: ${currentStatusAfterError}`);
   }
 };
 
@@ -789,14 +882,17 @@ export const updateAIModel = async (model?: string) => {
       'gemini-1.5-pro', // Older but more complex reasoning
     ];
 
+    const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash'; // Get current before potentially changing
+    const isEnabled = !!process.env.GEMINI_API_KEY;
+
     // If no model is specified in the request, return current settings
-    if (!model) {
+    if (model === undefined) { // Check for undefined instead of !model to allow empty string if needed
       return {
         success: true,
         message: 'Current AI model settings retrieved',
         data: {
-          model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
-          enabled: !!process.env.GEMINI_API_KEY,
+          model: currentModel,
+          enabled: isEnabled,
           validModels,
         },
       };
@@ -809,34 +905,30 @@ export const updateAIModel = async (model?: string) => {
       );
     }
 
-    let envPath;
-    // In development, modify .env file
-    if (process.env.NODE_ENV === 'development') {
-      envPath = path.join(process.cwd(), '.env');
-    } else {
-      // In production, assume it's one directory up from the current working directory
-      envPath = path.join(process.cwd(), '..', '.env');
-    }
+    // Determine .env path based on environment
+    const envPath = process.env.NODE_ENV === 'production'
+        ? path.resolve(process.cwd(), '../.env') // Adjust if needed for prod structure
+        : path.resolve(process.cwd(), '.env');
 
     if (!fs.existsSync(envPath)) {
       throw new Error(`.env file not found at ${envPath}`);
     }
 
     let envContent = fs.readFileSync(envPath, 'utf8');
+    const regex = /GEMINI_MODEL=.*/;
+    const newLine = `GEMINI_MODEL=${model}`;
 
     // Update GEMINI_MODEL in .env file
-    if (envContent.includes('GEMINI_MODEL=')) {
-      envContent = envContent.replace(
-        /GEMINI_MODEL=.*/,
-        `GEMINI_MODEL=${model}`
-      );
+    if (envContent.match(regex)) {
+      envContent = envContent.replace(regex, newLine);
     } else {
-      envContent += `\nGEMINI_MODEL=${model}`;
+      envContent += `
+${newLine}`; // Append if it doesn't exist
     }
 
     fs.writeFileSync(envPath, envContent);
 
-    // Update environment variable for current process
+    // Update environment variable for the currently running process
     process.env.GEMINI_MODEL = model;
 
     console.log(`[Admin] AI model changed to: ${model}`);
@@ -846,48 +938,72 @@ export const updateAIModel = async (model?: string) => {
       message: `AI model settings updated to ${model}`,
       data: {
         model,
-        enabled: true,
+        enabled: isEnabled, // Enabled status doesn't change here, only model
         validModels,
       },
     };
   } catch (error) {
     console.error('[Admin] Error updating AI model:', error);
-    throw error;
+    // Return a consistent error structure if possible
+    return {
+       success: false,
+       message: error instanceof Error ? error.message : 'Failed to update AI model',
+       error: true, // Indicate an error occurred
+    }
+    // Or re-throw if the controller should handle it
+    // throw error;
   }
 };
 
 // Cập nhật trạng thái bảo trì
-export const updateMaintenanceMode = async (enabled?: boolean) => {
-  try {
-    const envPath = path.resolve(__dirname, '../../.env');
-    const envContent = fs.readFileSync(envPath, 'utf8');
+export const updateMaintenanceMode = async (enabled?: boolean): Promise<{enabled: boolean}> => {
+    try {
+        const envPath = process.env.NODE_ENV === 'production'
+            ? path.resolve(process.cwd(), '../.env')
+            : path.resolve(process.cwd(), '.env');
 
-    if (enabled === undefined) {
-      const currentStatus = process.env.MAINTENANCE_MODE === 'true';
-      return { enabled: currentStatus };
+        if (!fs.existsSync(envPath)) {
+            throw new Error(`.env file not found at ${envPath}`);
+        }
+
+        const currentStatus = process.env.MAINTENANCE_MODE === 'true';
+
+        // If enabled is undefined, return current status
+        if (enabled === undefined) {
+            return { enabled: currentStatus };
+        }
+
+        // If status isn't changing, do nothing
+        if (enabled === currentStatus) {
+             console.log(`[System] Maintenance mode already ${enabled ? 'enabled' : 'disabled'}.`);
+             return { enabled };
+        }
+
+        // Update .env file
+        let envContent = fs.readFileSync(envPath, 'utf8');
+        const regex = /MAINTENANCE_MODE=.*/;
+        const newLine = `MAINTENANCE_MODE=${enabled}`;
+
+        if (envContent.match(regex)) {
+            envContent = envContent.replace(regex, newLine);
+        } else {
+            envContent += `
+${newLine}`;
+        }
+        fs.writeFileSync(envPath, envContent);
+
+        // Update current process environment variable
+        process.env.MAINTENANCE_MODE = String(enabled);
+
+        console.log(
+            `[System] Maintenance mode ${enabled ? 'enabled' : 'disabled'}.`
+        );
+
+        return { enabled };
+    } catch (error) {
+        console.error('Error updating maintenance mode:', error);
+        // Return current status in case of error
+        const currentStatusAfterError = process.env.MAINTENANCE_MODE === 'true';
+        throw new Error(`Failed to update maintenance mode. Current status: ${currentStatusAfterError}`);
     }
-
-    // Update MAINTENANCE_MODE trong file .env
-    if (envContent.includes('MAINTENANCE_MODE=')) {
-      const updatedContent = envContent.replace(
-        /MAINTENANCE_MODE=.*/,
-        `MAINTENANCE_MODE=${enabled}`
-      );
-      fs.writeFileSync(envPath, updatedContent);
-    } else {
-      // Nếu env không có thì thêm vào
-      fs.writeFileSync(envPath, `${envContent}\nMAINTENANCE_MODE=${enabled}`);
-    }
-
-    process.env.MAINTENANCE_MODE = String(enabled);
-
-    console.log(
-      `[System] Maintenance mode ${enabled ? 'enabled' : 'disabled'}`
-    );
-
-    return { enabled };
-  } catch (error) {
-    console.error('Error updating maintenance mode', error);
-    throw new Error('Failed to update maintenance mode');
-  }
 };

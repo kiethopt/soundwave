@@ -39,6 +39,10 @@ interface DataTableToolbarProps {
     value: string[];
     onChange: (value: string[]) => void;
   };
+  roleFilter?: {
+    value: string[];
+    onChange: (value: string[]) => void;
+  };
   table: any;
   theme?: 'light' | 'dark';
   searchPlaceholder?: string;
@@ -102,6 +106,7 @@ export function DataTableToolbar({
   statusFilter,
   genreFilter,
   verifiedFilter,
+  roleFilter,
   table,
   theme = 'light',
   searchPlaceholder = 'Search...',
@@ -154,7 +159,8 @@ export function DataTableToolbar({
   const hasActiveFilters =
     (statusFilter && statusFilter.value.length > 0) ||
     (genreFilter && genreFilter.value.length > 0) ||
-    (verifiedFilter && verifiedFilter.value.length > 0);
+    (verifiedFilter && verifiedFilter.value.length > 0) ||
+    (roleFilter && roleFilter.value.length > 0);
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto">
@@ -228,6 +234,19 @@ export function DataTableToolbar({
           />
         )}
 
+        {roleFilter && (
+          <DataTableFilter
+            title="Role"
+            options={[
+              { label: 'Admin', value: 'ADMIN' },
+              { label: 'User', value: 'USER' },
+            ]}
+            value={roleFilter.value}
+            onChange={roleFilter.onChange}
+            theme={theme}
+          />
+        )}
+
         {hasActiveFilters && (
           <Button
             variant="outline"
@@ -241,6 +260,9 @@ export function DataTableToolbar({
               }
               if (verifiedFilter && verifiedFilter.value.length > 0) {
                 verifiedFilter.onChange([]);
+              }
+              if (roleFilter && roleFilter.value.length > 0) {
+                roleFilter.onChange([]);
               }
             }}
             className={`h-9 px-2 ${

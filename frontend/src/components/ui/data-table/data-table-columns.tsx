@@ -1,4 +1,4 @@
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, Row } from '@tanstack/react-table';
 import {
   Track,
   Album,
@@ -24,9 +24,9 @@ import {
   CheckCircle,
   Trash,
   Tags,
-  Twitter,
-  Facebook,
-  Instagram,
+  ShieldCheck,
+  XCircle,
+  View,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -40,12 +40,10 @@ import Link from 'next/link';
 import React, { Fragment, useEffect, useState } from 'react';
 import { api } from '@/utils/api';
 import { ArtistInfoModal } from './data-table-modals';
-import { AddSimple, Edit, UserIcon } from '@/components/ui/Icons';
+import { AddSimple, UserIcon, Edit } from '@/components/ui/Icons';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/Icons';
 import { Badge } from '@/components/ui/badge';
-import { format, formatDistance } from 'date-fns';
-import { Verified } from '@/components/ui/Icons';
 
 interface GetTrackColumnsOptions {
   theme?: 'light' | 'dark';
@@ -71,6 +69,8 @@ interface GetUserColumnsOptions {
   onDelete?: (id: string | string[]) => Promise<void>;
   onEdit?: (user: User) => void;
   onView?: (user: User) => void;
+  onMakeAdmin?: (user: User) => void;
+  loggedInAdminLevel?: number | null;
 }
 
 interface GetGenreColumnsOptions {
@@ -733,8 +733,10 @@ export function getUserColumns({
   onDelete,
   onView,
   onStatusChange,
+  onMakeAdmin,
+  loggedInAdminLevel,
 }: GetUserColumnsOptions): ColumnDef<User>[] {
-  return [
+  const columns: ColumnDef<User>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -848,53 +850,108 @@ export function getUserColumns({
     },
     {
       id: 'actions',
+      header: () => <div className="text-right">Actions</div>,
       cell: ({ row }) => {
         const user = row.original;
+        const menuItemClass = theme === 'dark' ? 'text-white focus:bg-white/10 cursor-pointer' : 'cursor-pointer';
+
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger onClick={(e) => e.stopPropagation()}>
-              <MoreHorizontal className="h-4 w-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onView && onView(user)}>
-                <Eye className="w-4 h-4 mr-2" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit && onEdit(user)}>
-                <Pencil className="w-4 h-4 mr-2" />
-                Edit User
-              </DropdownMenuItem>
-              {onStatusChange && (
+          <div className="text-right">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040]' : ''}>
                 <DropdownMenuItem
-                  onClick={() => onStatusChange(user.id, !user.isActive)}
+                  onSelect={() => onView?.(user)}
+                  className={menuItemClass}
                 >
-                  {user.isActive ? (
-                    <>
-                      <Ban className="w-4 h-4 mr-2 text-orange-500" />
-                      <span className="text-orange-500">Deactivate</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                      <span className="text-green-500">Activate</span>
-                    </>
-                  )}
+                  <View className="mr-2 h-4 w-4" /> View Details
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onDelete && onDelete(user.id)}
-                className="text-red-600 focus:text-red-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuItem
+                  onSelect={() => onEdit?.(user)}
+                  className={menuItemClass}
+                >
+                  <Edit className="mr-2 h-4 w-4" /> Edit
+                </DropdownMenuItem>
+                {user.role === 'USER' && onMakeAdmin && (
+                  <DropdownMenuItem
+                    onSelect={() => onMakeAdmin(user)}
+                    className={menuItemClass}
+                  >
+                    <ShieldCheck className="mr-2 h-4 w-4" /> Make Admin
+                  </DropdownMenuItem>
+                )}
+                {onStatusChange && (
+                   <DropdownMenuItem
+                     onSelect={() => onStatusChange(user.id, !user.isActive)}
+                     className={menuItemClass}
+                   >
+                     {user.isActive ? (
+                       <><XCircle className="mr-2 h-4 w-4 text-orange-500" /> Deactivate</>
+                     ) : (
+                       <><CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Activate</>
+                     )}
+                   </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator className={theme === 'dark' ? 'bg-white/10' : ''} />
+                <DropdownMenuItem
+                  onSelect={() => onDelete?.(user.id)}
+                  className={`text-red-600 focus:text-red-600 ${menuItemClass}`}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },
   ];
+
+  // Insert Admin Level column after User info if applicable
+  if (loggedInAdminLevel === 1) {
+    columns.splice(3, 0, { // Splice inserts at index 3 (after name, username, email)
+      accessorKey: 'adminLevel',
+      header: 'Admin Level',
+      cell: ({ row }: { row: Row<User> }) => {
+        const user = row.original;
+        const level = user.adminLevel;
+        const role = user.role;
+
+        if (role !== 'ADMIN' || level === null || level === undefined) {
+          return <span className={theme === 'dark' ? "text-gray-400" : "text-gray-500"}>N/A</span>;
+        }
+
+        let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' = 'secondary';
+        let badgeText = `Level ${level}`;
+
+        switch (level) {
+          case 1:
+            badgeVariant = 'destructive';
+            break;
+          case 2:
+            badgeVariant = 'outline';
+            break;
+          // Add more cases if needed
+          default:
+            badgeVariant = 'outline';
+            badgeText = `Level ${level}`;
+        }
+
+        return (
+          <Badge variant={badgeVariant} className="text-xs">
+            {badgeText}
+          </Badge>
+        );
+      },
+    } as ColumnDef<User>);
+  }
+
+  return columns;
 }
 
 export function getGenreColumns({
@@ -1146,7 +1203,9 @@ export function getArtistColumns({
                     window.location.href = `/admin/artists/${artist.id}`;
                   }}
                   className={
-                    theme === 'dark' ? 'hover:bg-white/10 text-white' : ''
+                    theme === 'dark'
+                      ? 'hover:bg-white/10 text-white'
+                      : ''
                   }
                 >
                   <Eye className="mr-2 h-4 w-4" />
@@ -1597,7 +1656,7 @@ export function getSystemPlaylistColumns({
                       : 'cursor-pointer'
                   }
                 >
-                  <Pencil className="mr-2 h-4 w-4" />
+                  <Edit className="mr-2 h-4 w-4" />
                   <span>Edit</span>
                 </DropdownMenuItem>
               )}

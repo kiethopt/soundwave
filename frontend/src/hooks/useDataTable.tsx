@@ -17,12 +17,14 @@ interface UseDataTableOptions<T> {
   ) => Promise<FetchDataResponse<T>>; // Use the defined interface
   limit?: number;
   paramKeyPrefix?: string; // Optional prefix for URL params (e.g., 'album_', 'track_')
+  loggedInAdminLevel?: number | null;
 }
 
 export function useDataTable<T>({
   fetchData,
   limit = 10,
-  paramKeyPrefix = '', // Default to no prefix
+  paramKeyPrefix = '',
+  loggedInAdminLevel,
 }: UseDataTableOptions<T>) {
   const router = useRouter();
   const pathname = usePathname();
@@ -62,6 +64,7 @@ export function useDataTable<T>({
   const [verifiedFilter, setVerifiedFilter] = useState<string[]>(
     safeGetAllParams(getKey('isVerified')) // New state for verification filter
   );
+  const [roleFilter, setRoleFilter] = useState<string[]>(safeGetAllParams(getKey('role')));
   const [sorting, setSorting] = useState<SortingState>(() => {
     const sortBy = safeGetParam(getKey('sortBy'));
     const sortOrder = safeGetParam(getKey('sortOrder'));
@@ -85,6 +88,7 @@ export function useDataTable<T>({
     startDate: safeGetParam(getKey('startDate')), 
     endDate: safeGetParam(getKey('endDate')), 
     verifiedFilter: safeGetAllParams(getKey('isVerified')), // Track previous verified filter
+    roleFilter: safeGetAllParams(getKey('role')), // Track previous role filter
   });
 
   // --- Fetching Logic --- //
@@ -123,6 +127,10 @@ export function useDataTable<T>({
         const currentVerifiedValues = paramsToFetch.getAll(getKey('isVerified')); // Read verified filter
         if (currentVerifiedValues.length > 0) {
           currentVerifiedValues.forEach((v) => paramsForApi.append('isVerified', v)); // Append to API params
+        }
+        const currentRoleValues = paramsToFetch.getAll(getKey('role')); // Read role filter
+        if (currentRoleValues.length > 0) {
+          currentRoleValues.forEach((r) => paramsForApi.append('role', r)); // Append role to API params (non-prefixed)
         }
 
         // 4. Set sorting parameters from the prefixed URL keys in paramsToFetch
@@ -307,6 +315,14 @@ export function useDataTable<T>({
       stateChanged = true;
       resetPage = true;
     }
+    if (
+      JSON.stringify(roleFilter) !== // Check if role filter changed
+      JSON.stringify(prevDeps.current.roleFilter)
+    ) {
+      updates.role = roleFilter.length > 0 ? roleFilter : null; // Pass null if empty
+      stateChanged = true;
+      resetPage = true;
+    }
     // Check if sorting changed
     if (JSON.stringify(sorting) !== JSON.stringify(prevDeps.current.sorting)) {
       if (sorting.length > 0) {
@@ -369,6 +385,7 @@ export function useDataTable<T>({
         startDate: safeGetParam(getKey('startDate')), // Update previous startDate
         endDate: safeGetParam(getKey('endDate')), // Update previous endDate
         verifiedFilter, // Update previous verified filter
+        roleFilter, // Update previous role filter
       };
     }
   }, [
@@ -377,6 +394,7 @@ export function useDataTable<T>({
     genreFilter,
     verifiedFilter,
     sorting,
+    roleFilter,
     updateUrlParams,
     debouncedFetch,
     currentPage,
@@ -392,6 +410,7 @@ export function useDataTable<T>({
     const urlStatus = safeGetAllParams(getKey('status'));
     const urlGenres = safeGetAllParams(getKey('genres'));
     const urlVerified = safeGetAllParams(getKey('isVerified')); // Read verified from URL
+    const urlRoleParams = safeGetAllParams(getKey('role')); // Read role from URL
     const urlSortBy = safeGetParam(getKey('sortBy'));
     const urlSortOrder = safeGetParam(getKey('sortOrder'));
     const urlSorting = urlSortBy
@@ -399,6 +418,15 @@ export function useDataTable<T>({
       : [];
     const urlStartDate = safeGetParam(getKey('startDate')); // Read startDate from URL
     const urlEndDate = safeGetParam(getKey('endDate')); // Read endDate from URL
+
+    // ** Check for invalid role param first **
+    if (loggedInAdminLevel !== 1 && urlRoleParams.length > 0) {
+      // Invalid state: Non-level-1 admin has role param in URL.
+      // console.log(`Admin Level ${loggedInAdminLevel} detected with role param. Removing...`);
+      updateUrlParams({ role: null }, true); // Remove param and replace URL history state.
+      // Don't proceed with state sync or fetch for this invalid URL state.
+      return;
+    }
 
     // Check if URL state differs from *current tracked state (prevDeps)*
     const urlStateDiffers =
@@ -411,7 +439,8 @@ export function useDataTable<T>({
       JSON.stringify(urlSorting) !== JSON.stringify(prevDeps.current.sorting) ||
       urlStartDate !== prevDeps.current.startDate || // Compare startDate
       urlEndDate !== prevDeps.current.endDate || // Compare endDate
-      JSON.stringify(urlVerified) !== JSON.stringify(prevDeps.current.verifiedFilter); // Compare verified filter
+      JSON.stringify(urlVerified) !== JSON.stringify(prevDeps.current.verifiedFilter) || // Compare verified filter
+      JSON.stringify(safeGetAllParams(getKey('role'))) !== JSON.stringify(prevDeps.current.roleFilter); // Compare role filter
 
     // console.log(`Effect 2: Initial Load: ${initialLoad.current}, URL State Differs: ${urlStateDiffers}`);
 
@@ -425,6 +454,7 @@ export function useDataTable<T>({
       setGenreFilter(urlGenres);
       setSorting(urlSorting);
       setVerifiedFilter(urlVerified); // Sync verified filter state
+      setRoleFilter(safeGetAllParams(getKey('role'))); // Sync role filter state
       // Note: currentPage is derived directly from searchParams, so no separate state update needed
 
       // Fetch data immediately based on URL state
@@ -442,6 +472,7 @@ export function useDataTable<T>({
         startDate: urlStartDate, // Update previous startDate
         endDate: urlEndDate, // Update previous endDate
         verifiedFilter: urlVerified, // Update previous verified filter
+        roleFilter: safeGetAllParams(getKey('role')), // Update previous role filter
       };
 
       if (initialLoad.current) {
@@ -450,7 +481,7 @@ export function useDataTable<T>({
     }
     // searchParams is the sole dependency, representing the URL state
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, loggedInAdminLevel, updateUrlParams, fetchDataInternal, getKey, safeParamsToString]); // Add dependencies
 
   // Refresh data function (refetches based on current URL state)
   const refreshData = useCallback(async () => {
@@ -477,6 +508,8 @@ export function useDataTable<T>({
     setGenreFilter, // Expose setter
     verifiedFilter, // Expose state
     setVerifiedFilter, // Expose setter
+    roleFilter, // Expose role filter state
+    setRoleFilter, // Expose role filter setter
     selectedRows,
     setSelectedRows,
     sorting, // Expose state

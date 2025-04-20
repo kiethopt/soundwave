@@ -45,6 +45,10 @@ interface DataTableWrapperProps<TData> {
       value: string[];
       onChange: (value: string[]) => void;
     };
+    roleFilter?: {
+      value: string[];
+      onChange: (value: string[]) => void;
+    };
   };
 }
 
@@ -86,6 +90,7 @@ export function DataTableWrapper<TData>({
           statusFilter={toolbar.statusFilter}
           genreFilter={toolbar.genreFilter}
           verifiedFilter={toolbar.verifiedFilter}
+          roleFilter={toolbar.roleFilter}
         />
       )}
 

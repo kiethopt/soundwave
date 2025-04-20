@@ -72,20 +72,37 @@ async function main() {
     }
 
     // === 3. Seed Admin Account ===
-    const adminBar = multibar.create(1, 0, { task: 'Seeding admin account' });
+    const adminBar = multibar.create(2, 0, { task: 'Seeding admin accounts' });
     await prisma.user.upsert({
       where: { email: 'admin@soundwave.com' },
-      update: { isActive: true, role: Role.ADMIN },
+      update: { isActive: true, role: Role.ADMIN, adminLevel: 1 },
       create: {
         email: 'admin@soundwave.com',
         username: 'admin',
         password: hashedPassword,
-        name: 'System Administrator',
+        name: 'Administrator',
         role: Role.ADMIN,
+        adminLevel: 1,
         isActive: true,
       },
     });
     adminBar.update(1);
+
+    // === 3.1 Seed Admin Level 2 Account ===
+    await prisma.user.upsert({
+      where: { email: 'admin2@soundwave.com' },
+      update: { isActive: true, role: Role.ADMIN, adminLevel: 2 },
+      create: {
+        email: 'admin2@soundwave.com',
+        username: 'admin2',
+        password: hashedPassword,
+        name: 'Administrator Level 2',
+        role: Role.ADMIN,
+        adminLevel: 2,
+        isActive: true,
+      },
+    });
+    adminBar.increment();
 
     // === 4. Seed Artists (from artists.ts) ===
     const artistBar = multibar.create(artists.length, 0, { task: 'Seeding artists' });

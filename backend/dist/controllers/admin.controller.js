@@ -41,6 +41,7 @@ const handle_utils_1 = require("../utils/handle-utils");
 const db_1 = __importDefault(require("../config/db"));
 const adminService = __importStar(require("../services/admin.service"));
 const emailService = __importStar(require("../services/email.service"));
+const client_1 = require("@prisma/client");
 const getAllUsers = async (req, res) => {
     try {
         const { users, pagination } = await adminService.getUsers(req);
@@ -99,50 +100,43 @@ const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
         const avatarFile = req.file;
-        const { isActive, reason, ...userData } = req.body;
-        const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
-        if (isStatusUpdate) {
-            const isActiveBool = isActive === 'true' || isActive === true ? true : false;
-            const currentUser = await db_1.default.user.findUnique({
-                where: { id },
-                select: { isActive: true, email: true, name: true, username: true },
-            });
-            if (currentUser && currentUser.isActive && !isActiveBool) {
-                const updatedUser = await adminService.updateUserInfo(id, {
-                    isActive: false,
-                });
-                if (reason) {
-                    await db_1.default.notification.create({
-                        data: {
-                            type: 'ACCOUNT_DEACTIVATED',
-                            message: `Your account has been deactivated. Reason: ${reason}`,
-                            recipientType: 'USER',
-                            userId: id,
-                            isRead: false,
-                        },
-                    });
-                }
-                if (currentUser.email) {
-                    const userName = currentUser.name || currentUser.username || 'User';
+        const userData = { ...req.body };
+        if (userData.adminLevel !== undefined && userData.adminLevel !== null) {
+            const parsedLevel = parseInt(String(userData.adminLevel), 10);
+            userData.adminLevel = isNaN(parsedLevel) ? null : parsedLevel;
+        }
+        const originalIsActiveInput = userData.isActive;
+        if (userData.isActive !== undefined) {
+            userData.isActive = userData.isActive === 'true' || userData.isActive === true;
+        }
+        const updatedUser = await adminService.updateUserInfo(id, userData, avatarFile);
+        if (originalIsActiveInput !== undefined) {
+            const intendedState = userData.isActive;
+            if (updatedUser.isActive === false && intendedState === false) {
+                const reason = userData.reason || '';
+                const userName = updatedUser.name || updatedUser.username || 'User';
+                db_1.default.notification.create({
+                    data: {
+                        type: 'ACCOUNT_DEACTIVATED',
+                        message: `Your account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`,
+                        recipientType: 'USER',
+                        userId: id,
+                        isRead: false,
+                    },
+                }).catch(err => console.error('[Async Notify Error] Failed to create deactivation notification:', err));
+                if (updatedUser.email) {
                     try {
-                        const emailOptions = emailService.createAccountDeactivatedEmail(currentUser.email, userName, 'user', reason);
-                        await emailService.sendEmail(emailOptions);
+                        const emailOptions = emailService.createAccountDeactivatedEmail(updatedUser.email, userName, 'user', reason);
+                        emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send deactivation email:', err));
                     }
-                    catch (emailError) {
-                        console.error(`Failed to send user deactivation email to ${currentUser.email}:`, emailError);
+                    catch (syncError) {
+                        console.error('[Email Setup Error] Failed to create deactivation email options:', syncError);
                     }
                 }
-                res.json({
-                    message: 'User deactivated successfully',
-                    user: updatedUser,
-                });
-                return;
             }
-            else if (currentUser && !currentUser.isActive && isActiveBool) {
-                const updatedUser = await adminService.updateUserInfo(id, {
-                    isActive: true,
-                });
-                await db_1.default.notification.create({
+            else if (updatedUser.isActive === true && intendedState === true) {
+                const userName = updatedUser.name || updatedUser.username || 'User';
+                db_1.default.notification.create({
                     data: {
                         type: 'ACCOUNT_ACTIVATED',
                         message: 'Your account has been reactivated.',
@@ -150,22 +144,18 @@ const updateUser = async (req, res) => {
                         userId: id,
                         isRead: false,
                     },
-                });
-                if (currentUser.email) {
-                    const userName = currentUser.name || currentUser.username || 'User';
+                }).catch(err => console.error('[Async Notify Error] Failed to create activation notification:', err));
+                if (updatedUser.email) {
                     try {
-                        const emailOptions = emailService.createAccountActivatedEmail(currentUser.email, userName, 'user');
-                        await emailService.sendEmail(emailOptions);
+                        const emailOptions = emailService.createAccountActivatedEmail(updatedUser.email, userName, 'user');
+                        emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send activation email:', err));
                     }
-                    catch (emailError) {
-                        console.error(`Failed to send user activation email to ${currentUser.email}:`, emailError);
+                    catch (syncError) {
+                        console.error('[Email Setup Error] Failed to create activation email options:', syncError);
                     }
                 }
-                res.json({ message: 'User activated successfully', user: updatedUser });
-                return;
             }
         }
-        const updatedUser = await adminService.updateUserInfo(id, userData, avatarFile);
         res.json({
             message: 'User updated successfully',
             user: updatedUser,
@@ -173,6 +163,10 @@ const updateUser = async (req, res) => {
     }
     catch (error) {
         if (error instanceof Error) {
+            if (error.message.startsWith('Permission denied:')) {
+                res.status(403).json({ message: error.message });
+                return;
+            }
             if (error.message === 'User not found') {
                 res.status(404).json({ message: 'User not found' });
                 return;
@@ -183,6 +177,18 @@ const updateUser = async (req, res) => {
                 return;
             }
             else if (error.message === 'Current password is incorrect') {
+                res.status(400).json({ message: error.message });
+                return;
+            }
+            else if (error.message.includes('password change')) {
+                res.status(400).json({ message: error.message });
+                return;
+            }
+            else if (error.message === 'Password must be at least 6 characters long.') {
+                res.status(400).json({ message: error.message });
+                return;
+            }
+            else if (error.message === "No valid data provided for update.") {
                 res.status(400).json({ message: error.message });
                 return;
             }
@@ -305,10 +311,19 @@ exports.updateArtist = updateArtist;
 const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
-        await adminService.deleteUserById(id);
+        const requestingUser = req.user;
+        if (!requestingUser || requestingUser.role !== client_1.Role.ADMIN) {
+            res.status(403).json({ message: 'Forbidden: Admin access required.' });
+            return;
+        }
+        await adminService.deleteUserById(id, requestingUser);
         res.json({ message: 'User deleted successfully' });
     }
     catch (error) {
+        if (error instanceof Error && error.message === 'Permission denied: Admins cannot be deleted.') {
+            res.status(403).json({ message: error.message });
+            return;
+        }
         (0, handle_utils_1.handleError)(res, error, 'Delete user');
     }
 };

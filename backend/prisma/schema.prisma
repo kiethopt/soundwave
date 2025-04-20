@@ -16,7 +16,9 @@ model User {
   avatar               String?
   role                 Role            @default(USER)
   currentProfile       String          @default("USER")
+  adminLevel           Int?
   isActive             Boolean         @default(true)
+  followVisibility     Boolean         @default(true)
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
   lastLoginAt          DateTime?
@@ -36,6 +38,7 @@ model User {
   @@index([role])
   @@index([isActive])
   @@index([createdAt])
+  @@index([adminLevel])
   @@map("users")
 }
 

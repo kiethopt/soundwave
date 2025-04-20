@@ -46,10 +46,11 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const email_service_1 = require("./email.service");
+const bcrypt_1 = __importDefault(require("bcrypt"));
 const getUsers = async (req) => {
     const { search = '', status } = req.query;
     const where = {
-        role: 'USER',
+        role: client_1.Role.USER,
         ...(search
             ? {
                 OR: [
@@ -59,13 +60,11 @@ const getUsers = async (req) => {
                 ],
             }
             : {}),
-        ...(status !== undefined ? { isActive: status === 'true' } : {}),
+        ...(status !== undefined ? { isActive: (0, handle_utils_1.toBooleanValue)(status) } : {}),
     };
     const options = {
         where,
-        include: {
-            artistProfile: true,
-        },
+        select: prisma_selects_1.userSelect,
         orderBy: { createdAt: 'desc' },
     };
     const result = await (0, handle_utils_1.paginate)(db_1.default.user, req, options);
@@ -109,11 +108,9 @@ const getArtistRequests = async (req) => {
             });
         }
     }
-    const isVerified = (0, handle_utils_1.toBooleanValue)(status);
-    if (isVerified !== undefined) {
-        if (Array.isArray(where.AND)) {
-            where.AND.push({ isVerified: isVerified });
-        }
+    const isVerifiedFilter = (0, handle_utils_1.toBooleanValue)(status);
+    if (isVerifiedFilter !== undefined && Array.isArray(where.AND)) {
+        where.AND.push({ isVerified: isVerifiedFilter });
     }
     const dateFilter = {};
     const parsedStartDate = startDate ? new Date(startDate) : null;
@@ -128,9 +125,7 @@ const getArtistRequests = async (req) => {
             };
         }
         else {
-            dateFilter.verificationRequestedAt = {
-                gte: parsedStartDate,
-            };
+            dateFilter.verificationRequestedAt = { gte: parsedStartDate };
         }
         if (Array.isArray(where.AND)) {
             where.AND.push(dateFilter);
@@ -159,58 +154,68 @@ const getArtistRequestDetail = async (id) => {
 };
 exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUserInfo = async (id, data, avatarFile) => {
-    const currentUser = await db_1.default.user.findUnique({
+    const targetUser = await db_1.default.user.findUnique({
         where: { id },
-        select: { ...prisma_selects_1.userSelect, password: true },
+        select: { id: true, email: true, username: true, password: true, avatar: true, role: true, adminLevel: true }
     });
-    if (!currentUser) {
+    if (!targetUser) {
         throw new Error('User not found');
     }
-    const { name, email, username, isActive, role, password, currentPassword } = data;
-    let passwordHash;
-    if (password) {
-        const bcrypt = require('bcrypt');
-        if (currentPassword) {
-            const isPasswordValid = await bcrypt.compare(currentPassword, currentUser.password);
-            if (!isPasswordValid) {
-                throw new Error('Current password is incorrect');
-            }
-            passwordHash = await bcrypt.hash(password, 10);
+    const { name, email, username, isActive, password, role, adminLevel } = data;
+    const updateData = {};
+    if (role && Object.values(client_1.Role).includes(role)) {
+        updateData.role = role;
+    }
+    if (adminLevel !== undefined && adminLevel !== null && !isNaN(Number(adminLevel))) {
+        if (updateData.role === client_1.Role.ADMIN || (targetUser.role === client_1.Role.ADMIN && !updateData.role)) {
+            updateData.adminLevel = Number(adminLevel);
+        }
+        else if (role === client_1.Role.ADMIN) {
+            updateData.adminLevel = Number(adminLevel);
+        }
+        else {
+            updateData.adminLevel = null;
         }
     }
-    if (email && email !== currentUser.email) {
-        const existingEmail = await db_1.default.user.findFirst({
-            where: { email, NOT: { id } },
-        });
-        if (existingEmail) {
+    else if (updateData.role && updateData.role !== client_1.Role.ADMIN) {
+        updateData.adminLevel = null;
+    }
+    if (name !== undefined)
+        updateData.name = name;
+    if (email !== undefined && email !== targetUser.email) {
+        const existingEmail = await db_1.default.user.findFirst({ where: { email, NOT: { id } } });
+        if (existingEmail)
             throw new Error('Email already exists');
-        }
+        updateData.email = email;
     }
-    if (username && username !== currentUser.username) {
-        const existingUsername = await db_1.default.user.findFirst({
-            where: { username, NOT: { id } },
-        });
-        if (existingUsername) {
+    if (username !== undefined && username !== targetUser.username) {
+        const existingUsername = await db_1.default.user.findFirst({ where: { username, NOT: { id } } });
+        if (existingUsername)
             throw new Error('Username already exists');
-        }
+        updateData.username = username;
     }
-    let avatarUrl = currentUser.avatar;
+    if (isActive !== undefined) {
+        updateData.isActive = (0, handle_utils_1.toBooleanValue)(isActive);
+    }
+    if (password) {
+        if (password.length < 6) {
+            throw new Error('Password must be at least 6 characters long.');
+        }
+        updateData.password = await bcrypt_1.default.hash(password, 10);
+    }
     if (avatarFile) {
         const uploadResult = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'users/avatars');
-        avatarUrl = uploadResult.secure_url;
+        updateData.avatar = uploadResult.secure_url;
     }
-    const isActiveBool = isActive !== undefined ? (0, handle_utils_1.toBooleanValue)(isActive) : undefined;
+    else if (data.avatar === null && targetUser.avatar) {
+        updateData.avatar = null;
+    }
+    if (Object.keys(updateData).length === 0 && !avatarFile && !(data.avatar === null && targetUser.avatar)) {
+        throw new Error("No valid data provided for update.");
+    }
     const updatedUser = await db_1.default.user.update({
         where: { id },
-        data: {
-            ...(name !== undefined && { name }),
-            ...(email !== undefined && { email }),
-            ...(username !== undefined && { username }),
-            ...(avatarUrl !== currentUser.avatar && { avatar: avatarUrl }),
-            ...(isActiveBool !== undefined && { isActive: isActiveBool }),
-            ...(role !== undefined && { role }),
-            ...(passwordHash && { password: passwordHash }),
-        },
+        data: updateData,
         select: prisma_selects_1.userSelect,
     });
     return updatedUser;
@@ -243,22 +248,24 @@ const updateArtistInfo = async (id, data, avatarFile) => {
         avatarUrl = result.secure_url;
     }
     let socialMediaLinksUpdate = existingArtist.socialMediaLinks;
-    if (socialMediaLinks) {
+    if (socialMediaLinks !== undefined) {
         try {
-            const parsedLinks = typeof socialMediaLinks === 'string' ? JSON.parse(socialMediaLinks) : socialMediaLinks;
-            if (typeof parsedLinks === 'object' && parsedLinks !== null) {
-                socialMediaLinksUpdate = parsedLinks;
+            if (socialMediaLinks === '' || socialMediaLinks === null) {
+                socialMediaLinksUpdate = null;
             }
             else {
-                console.warn('Invalid socialMediaLinks format received:', socialMediaLinks);
+                const parsedLinks = typeof socialMediaLinks === 'string' ? JSON.parse(socialMediaLinks) : socialMediaLinks;
+                if (typeof parsedLinks === 'object' && parsedLinks !== null) {
+                    socialMediaLinksUpdate = parsedLinks;
+                }
+                else {
+                    console.warn('Invalid socialMediaLinks format received:', socialMediaLinks);
+                }
             }
         }
         catch (error) {
-            console.error('Error parsing socialMediaLinks JSON:', error);
+            console.error('Error processing socialMediaLinks JSON:', error);
         }
-    }
-    else if (socialMediaLinks === null || socialMediaLinks === '') {
-        socialMediaLinksUpdate = null;
     }
     const updatedArtist = await db_1.default.artistProfile.update({
         where: { id },
@@ -278,8 +285,23 @@ const updateArtistInfo = async (id, data, avatarFile) => {
     return updatedArtist;
 };
 exports.updateArtistInfo = updateArtistInfo;
-const deleteUserById = async (id) => {
-    return db_1.default.user.delete({ where: { id } });
+const deleteUserById = async (id, requestingUser) => {
+    const userToDelete = await db_1.default.user.findUnique({
+        where: { id },
+        select: { role: true, adminLevel: true },
+    });
+    if (!userToDelete) {
+        console.log(`User with ID ${id} not found for deletion.`);
+        return { message: `User ${id} not found.` };
+    }
+    if (userToDelete.role === client_1.Role.ADMIN && userToDelete.adminLevel === 1) {
+        throw new Error('Permission denied: Level 1 Admins cannot be deleted.');
+    }
+    if (userToDelete.role === client_1.Role.ADMIN && (!requestingUser || requestingUser.role !== client_1.Role.ADMIN || requestingUser.adminLevel !== 1)) {
+        throw new Error('Permission denied: Only Level 1 Admins can delete other Admins.');
+    }
+    await db_1.default.user.delete({ where: { id } });
+    return { message: `User ${id} deleted successfully.` };
 };
 exports.deleteUserById = deleteUserById;
 const deleteArtistById = async (id) => {
@@ -299,6 +321,11 @@ const getArtists = async (req) => {
                     {
                         user: {
                             email: { contains: String(search), mode: 'insensitive' },
+                        },
+                    },
+                    {
+                        user: {
+                            name: { contains: String(search), mode: 'insensitive' },
                         },
                     },
                 ],
@@ -367,7 +394,7 @@ const getGenres = async (req) => {
 exports.getGenres = getGenres;
 const createNewGenre = async (name) => {
     const existingGenre = await db_1.default.genre.findFirst({
-        where: { name },
+        where: { name: { equals: name, mode: 'insensitive' } },
     });
     if (existingGenre) {
         throw new Error('Genre name already exists');
@@ -384,9 +411,12 @@ const updateGenreInfo = async (id, name) => {
     if (!existingGenre) {
         throw new Error('Genre not found');
     }
-    if (name !== existingGenre.name) {
+    if (name.toLowerCase() !== existingGenre.name.toLowerCase()) {
         const existingGenreWithName = await db_1.default.genre.findFirst({
-            where: { name, NOT: { id } },
+            where: {
+                name: { equals: name, mode: 'insensitive' },
+                NOT: { id }
+            },
         });
         if (existingGenreWithName) {
             throw new Error('Genre name already exists');
@@ -409,22 +439,31 @@ const approveArtistRequest = async (requestId) => {
             verificationRequestedAt: { not: null },
             isVerified: false,
         },
+        include: {
+            user: { select: { id: true, email: true, name: true, username: true } }
+        }
     });
     if (!artistProfile) {
-        throw new Error('Artist request not found or already verified');
+        throw new Error('Artist request not found, already verified, or rejected.');
     }
-    return db_1.default.artistProfile.update({
-        where: { id: requestId },
-        data: {
-            role: client_1.Role.ARTIST,
-            isVerified: true,
-            verifiedAt: new Date(),
-            verificationRequestedAt: null,
-        },
-        include: {
-            user: { select: prisma_selects_1.userSelect },
-        },
+    const updatedProfile = await db_1.default.$transaction(async (tx) => {
+        const profile = await tx.artistProfile.update({
+            where: { id: requestId },
+            data: {
+                role: client_1.Role.ARTIST,
+                isVerified: true,
+                verifiedAt: new Date(),
+                verificationRequestedAt: null,
+            },
+            include: { user: { select: prisma_selects_1.userSelect } }
+        });
+        await tx.user.update({
+            where: { id: profile.userId },
+            data: { role: client_1.Role.ARTIST }
+        });
+        return profile;
     });
+    return updatedProfile;
 };
 exports.approveArtistRequest = approveArtistRequest;
 const rejectArtistRequest = async (requestId) => {
@@ -439,7 +478,7 @@ const rejectArtistRequest = async (requestId) => {
         },
     });
     if (!artistProfile) {
-        throw new Error('Artist request not found or already verified');
+        throw new Error('Artist request not found, already verified, or rejected.');
     }
     await db_1.default.artistProfile.delete({
         where: { id: requestId },
@@ -455,11 +494,10 @@ const deleteArtistRequest = async (requestId) => {
         where: {
             id: requestId,
             verificationRequestedAt: { not: null },
-            isVerified: false,
         },
     });
     if (!artistProfile) {
-        throw new Error('Artist request not found or already verified/rejected');
+        throw new Error('Artist request not found or not in a deletable state (e.g., approved).');
     }
     await db_1.default.artistProfile.delete({
         where: { id: requestId },
@@ -469,7 +507,7 @@ const deleteArtistRequest = async (requestId) => {
 exports.deleteArtistRequest = deleteArtistRequest;
 const getDashboardStats = async () => {
     const stats = await Promise.all([
-        db_1.default.user.count({ where: { role: client_1.Role.USER } }),
+        db_1.default.user.count({ where: { role: { not: client_1.Role.ADMIN } } }),
         db_1.default.artistProfile.count({
             where: {
                 role: client_1.Role.ARTIST,
@@ -530,32 +568,32 @@ const getSystemStatus = async () => {
     }
     const useRedis = process.env.USE_REDIS_CACHE === 'true';
     if (useRedis) {
-        if (typeof cache_middleware_1.client.ping !== 'function') {
-            console.warn('[System Status] Redis check inconsistent: Cache enabled but using mock client (restart required).');
-            statuses.push({
-                name: 'Cache (Redis)',
-                status: 'Issue',
-                message: 'Inconsistent config: Cache enabled, but mock client active (restart needed).',
-            });
-        }
-        else {
-            if (!cache_middleware_1.client.isOpen) {
-                statuses.push({ name: 'Cache (Redis)', status: 'Outage', message: 'Client not connected' });
-            }
-            else {
-                try {
+        if (cache_middleware_1.client && typeof cache_middleware_1.client.ping === 'function') {
+            try {
+                if (!cache_middleware_1.client.isOpen) {
+                    statuses.push({ name: 'Cache (Redis)', status: 'Outage', message: 'Client not connected' });
+                }
+                else {
                     await cache_middleware_1.client.ping();
                     statuses.push({ name: 'Cache (Redis)', status: 'Available' });
                 }
-                catch (error) {
-                    console.error('[System Status] Redis ping failed:', error);
-                    statuses.push({
-                        name: 'Cache (Redis)',
-                        status: 'Issue',
-                        message: error instanceof Error ? error.message : 'Ping failed',
-                    });
-                }
             }
+            catch (error) {
+                console.error('[System Status] Redis ping failed:', error);
+                statuses.push({
+                    name: 'Cache (Redis)',
+                    status: 'Issue',
+                    message: error instanceof Error ? error.message : 'Ping failed',
+                });
+            }
+        }
+        else {
+            console.warn('[System Status] Redis client seems uninitialized or mock.');
+            statuses.push({
+                name: 'Cache (Redis)',
+                status: 'Issue',
+                message: 'Redis client not properly initialized or is a mock.',
+            });
         }
     }
     else {
@@ -568,7 +606,7 @@ const getSystemStatus = async () => {
             statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Available' });
         }
         else {
-            statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Issue', message: 'Ping failed or unexpected status' });
+            statuses.push({ name: 'Cloudinary (Media Storage)', status: 'Issue', message: `Ping failed or unexpected status: ${pingResult?.status}` });
         }
     }
     catch (error) {
@@ -586,7 +624,7 @@ const getSystemStatus = async () => {
             const genAI = new GoogleGenerativeAI(geminiApiKey);
             const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
             const model = genAI.getGenerativeModel({ model: modelName });
-            await model.countTokens("");
+            await model.countTokens("test");
             statuses.push({ name: 'Gemini AI (Playlists)', status: 'Available', message: `API Key valid. Configured model: ${modelName}` });
         }
         catch (error) {
@@ -603,8 +641,13 @@ const getSystemStatus = async () => {
     }
     if (email_service_1.transporter) {
         try {
-            await email_service_1.transporter.verify();
-            statuses.push({ name: 'Email (Nodemailer)', status: 'Available' });
+            const verified = await email_service_1.transporter.verify();
+            if (verified) {
+                statuses.push({ name: 'Email (Nodemailer)', status: 'Available' });
+            }
+            else {
+                statuses.push({ name: 'Email (Nodemailer)', status: 'Issue', message: 'Verification returned false' });
+            }
         }
         catch (error) {
             console.error('[System Status] Nodemailer verification failed:', error);
@@ -619,7 +662,7 @@ const getSystemStatus = async () => {
         statuses.push({
             name: 'Email (Nodemailer)',
             status: 'Disabled',
-            message: 'SMTP configuration incomplete or verification failed',
+            message: 'SMTP configuration incomplete or transporter not initialized',
         });
     }
     return statuses;
@@ -627,29 +670,59 @@ const getSystemStatus = async () => {
 exports.getSystemStatus = getSystemStatus;
 const updateCacheStatus = async (enabled) => {
     try {
-        const envPath = path.resolve(__dirname, '../../.env');
-        const envContent = fs.readFileSync(envPath, 'utf8');
+        const envPath = process.env.NODE_ENV === 'production'
+            ? path.resolve(process.cwd(), '../.env')
+            : path.resolve(process.cwd(), '.env');
+        if (!fs.existsSync(envPath)) {
+            console.error(`.env file not found at ${envPath}`);
+            throw new Error('Environment file not found.');
+        }
+        const currentStatus = process.env.USE_REDIS_CACHE === 'true';
         if (enabled === undefined) {
-            const currentStatus = process.env.USE_REDIS_CACHE === 'true';
             return { enabled: currentStatus };
         }
-        const updatedContent = envContent.replace(/USE_REDIS_CACHE=.*/, `USE_REDIS_CACHE=${enabled}`);
-        fs.writeFileSync(envPath, updatedContent);
-        const previousStatus = process.env.USE_REDIS_CACHE === 'true';
-        process.env.USE_REDIS_CACHE = String(enabled);
-        console.log(`[Redis] Cache ${enabled ? 'enabled' : 'disabled'}`);
-        const { client } = require('../middleware/cache.middleware');
-        if (enabled && !previousStatus && !client.isOpen) {
-            await client.connect();
+        if (enabled === currentStatus) {
+            console.log(`[Redis] Cache status already ${enabled ? 'enabled' : 'disabled'}. No change needed.`);
+            return { enabled };
         }
-        else if (!enabled && previousStatus && client.isOpen) {
-            await client.disconnect();
+        let envContent = fs.readFileSync(envPath, 'utf8');
+        const regex = /USE_REDIS_CACHE=.*/;
+        const newLine = `USE_REDIS_CACHE=${enabled}`;
+        if (envContent.match(regex)) {
+            envContent = envContent.replace(regex, newLine);
+        }
+        else {
+            envContent += `
+${newLine}`;
+        }
+        fs.writeFileSync(envPath, envContent);
+        process.env.USE_REDIS_CACHE = String(enabled);
+        console.log(`[Redis] Cache ${enabled ? 'enabled' : 'disabled'}. Restart might be required for full effect.`);
+        const { client: dynamicRedisClient } = require('../middleware/cache.middleware');
+        if (enabled && dynamicRedisClient && !dynamicRedisClient.isOpen) {
+            try {
+                await dynamicRedisClient.connect();
+                console.log('[Redis] Connected successfully.');
+            }
+            catch (connectError) {
+                console.error('[Redis] Failed to connect after enabling:', connectError);
+            }
+        }
+        else if (!enabled && dynamicRedisClient && dynamicRedisClient.isOpen) {
+            try {
+                await dynamicRedisClient.disconnect();
+                console.log('[Redis] Disconnected successfully.');
+            }
+            catch (disconnectError) {
+                console.error('[Redis] Failed to disconnect after disabling:', disconnectError);
+            }
         }
         return { enabled };
     }
     catch (error) {
-        console.error('Error updating cache status', error);
-        throw new Error('Failed to update cache status');
+        console.error('Error updating cache status:', error);
+        const currentStatusAfterError = process.env.USE_REDIS_CACHE === 'true';
+        throw new Error(`Failed to update cache status. Current status: ${currentStatusAfterError}`);
     }
 };
 exports.updateCacheStatus = updateCacheStatus;
@@ -663,13 +736,15 @@ const updateAIModel = async (model) => {
             'gemini-1.5-flash-8b',
             'gemini-1.5-pro',
         ];
-        if (!model) {
+        const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+        const isEnabled = !!process.env.GEMINI_API_KEY;
+        if (model === undefined) {
             return {
                 success: true,
                 message: 'Current AI model settings retrieved',
                 data: {
-                    model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
-                    enabled: !!process.env.GEMINI_API_KEY,
+                    model: currentModel,
+                    enabled: isEnabled,
                     validModels,
                 },
             };
@@ -677,22 +752,21 @@ const updateAIModel = async (model) => {
         if (!validModels.includes(model)) {
             throw new Error(`Invalid model name. Valid models are: ${validModels.join(', ')}`);
         }
-        let envPath;
-        if (process.env.NODE_ENV === 'development') {
-            envPath = path.join(process.cwd(), '.env');
-        }
-        else {
-            envPath = path.join(process.cwd(), '..', '.env');
-        }
+        const envPath = process.env.NODE_ENV === 'production'
+            ? path.resolve(process.cwd(), '../.env')
+            : path.resolve(process.cwd(), '.env');
         if (!fs.existsSync(envPath)) {
             throw new Error(`.env file not found at ${envPath}`);
         }
         let envContent = fs.readFileSync(envPath, 'utf8');
-        if (envContent.includes('GEMINI_MODEL=')) {
-            envContent = envContent.replace(/GEMINI_MODEL=.*/, `GEMINI_MODEL=${model}`);
+        const regex = /GEMINI_MODEL=.*/;
+        const newLine = `GEMINI_MODEL=${model}`;
+        if (envContent.match(regex)) {
+            envContent = envContent.replace(regex, newLine);
         }
         else {
-            envContent += `\nGEMINI_MODEL=${model}`;
+            envContent += `
+${newLine}`;
         }
         fs.writeFileSync(envPath, envContent);
         process.env.GEMINI_MODEL = model;
@@ -702,39 +776,56 @@ const updateAIModel = async (model) => {
             message: `AI model settings updated to ${model}`,
             data: {
                 model,
-                enabled: true,
+                enabled: isEnabled,
                 validModels,
             },
         };
     }
     catch (error) {
         console.error('[Admin] Error updating AI model:', error);
-        throw error;
+        return {
+            success: false,
+            message: error instanceof Error ? error.message : 'Failed to update AI model',
+            error: true,
+        };
     }
 };
 exports.updateAIModel = updateAIModel;
 const updateMaintenanceMode = async (enabled) => {
     try {
-        const envPath = path.resolve(__dirname, '../../.env');
-        const envContent = fs.readFileSync(envPath, 'utf8');
+        const envPath = process.env.NODE_ENV === 'production'
+            ? path.resolve(process.cwd(), '../.env')
+            : path.resolve(process.cwd(), '.env');
+        if (!fs.existsSync(envPath)) {
+            throw new Error(`.env file not found at ${envPath}`);
+        }
+        const currentStatus = process.env.MAINTENANCE_MODE === 'true';
         if (enabled === undefined) {
-            const currentStatus = process.env.MAINTENANCE_MODE === 'true';
             return { enabled: currentStatus };
         }
-        if (envContent.includes('MAINTENANCE_MODE=')) {
-            const updatedContent = envContent.replace(/MAINTENANCE_MODE=.*/, `MAINTENANCE_MODE=${enabled}`);
-            fs.writeFileSync(envPath, updatedContent);
+        if (enabled === currentStatus) {
+            console.log(`[System] Maintenance mode already ${enabled ? 'enabled' : 'disabled'}.`);
+            return { enabled };
+        }
+        let envContent = fs.readFileSync(envPath, 'utf8');
+        const regex = /MAINTENANCE_MODE=.*/;
+        const newLine = `MAINTENANCE_MODE=${enabled}`;
+        if (envContent.match(regex)) {
+            envContent = envContent.replace(regex, newLine);
         }
         else {
-            fs.writeFileSync(envPath, `${envContent}\nMAINTENANCE_MODE=${enabled}`);
+            envContent += `
+${newLine}`;
         }
+        fs.writeFileSync(envPath, envContent);
         process.env.MAINTENANCE_MODE = String(enabled);
-        console.log(`[System] Maintenance mode ${enabled ? 'enabled' : 'disabled'}`);
+        console.log(`[System] Maintenance mode ${enabled ? 'enabled' : 'disabled'}.`);
         return { enabled };
     }
     catch (error) {
-        console.error('Error updating maintenance mode', error);
-        throw new Error('Failed to update maintenance mode');
+        console.error('Error updating maintenance mode:', error);
+        const currentStatusAfterError = process.env.MAINTENANCE_MODE === 'true';
+        throw new Error(`Failed to update maintenance mode. Current status: ${currentStatusAfterError}`);
     }
 };
 exports.updateMaintenanceMode = updateMaintenanceMode;

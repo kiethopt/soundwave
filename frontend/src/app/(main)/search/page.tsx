@@ -108,6 +108,19 @@ function SearchContent() {
   // Fetch search results
   useEffect(() => {
     const fetchResults = async () => {
+      const storedUserData = localStorage.getItem('userData');
+      if (storedUserData) {
+        try {
+          const user = JSON.parse(storedUserData);
+          if (user && (user.role === 'ADMIN' || user.currentProfile === 'ARTIST')) {
+            console.log('Search page load detected for Admin/Artist, skipping fetch.');
+            return;
+          }
+        } catch (e) {
+          console.error("Error parsing user data in search page:", e);
+        }
+      }
+
       if (!query) {
         setResults({ artists: [], albums: [], tracks: [], users: [] });
         return;
@@ -146,10 +159,8 @@ function SearchContent() {
     const handleAudioControl = (data: any) => {
       if (data.type === 'STOP_OTHER_SESSIONS') {
         console.log('Received STOP_OTHER_SESSIONS via Socket.IO');
-        // Dừng phát nhạc nếu đang phát (logic giữ nguyên)
-        if (audioRef.current && isPlaying) { // Chỉ dừng nếu đang phát
-          pauseTrack(); // Sử dụng pauseTrack từ context
-          // Không cần setCurrentlyPlaying(null) vì context sẽ xử lý
+        if (audioRef.current && isPlaying) {
+          pauseTrack();
         }
       }
     };
@@ -161,7 +172,7 @@ function SearchContent() {
       console.log('Cleaning up Search page socket listener');
       socket.off('audio-control', handleAudioControl);
     };
-  }, [isPlaying, pauseTrack]); // Thêm dependencies để đảm bảo hàm xử lý luôn đúng
+  }, [isPlaying, pauseTrack]); 
 
   useEffect(() => {
     if (currentTrack && queueType !== 'album' && queueType !== 'artist') {
@@ -207,7 +218,6 @@ function SearchContent() {
           playTrack(item);
         }
       } else if ('tracks' in item) {
-        // Xử lý phát Album
         if (item.tracks.length > 0) {
           const isCurrentAlbumPlaying =
             currentTrack &&

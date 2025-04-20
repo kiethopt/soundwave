@@ -21,6 +21,8 @@ import {
   Save,
   X,
   CalendarDays,
+  Crown,
+  Star,
 } from 'lucide-react';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { AvatarFallback } from '@radix-ui/react-avatar';
@@ -34,6 +36,7 @@ import {
 } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 export default function AdminProfile({
   params,
@@ -305,7 +308,7 @@ export default function AdminProfile({
             >
               {userData.name || 'Admin User'}
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge
                 variant={userData.isActive ? 'success' : 'destructive'}
                 className="px-2 py-0.5"
@@ -315,6 +318,14 @@ export default function AdminProfile({
               <Badge variant="outline" className="px-2 py-0.5 capitalize">
                 {userData.role}
               </Badge>
+              {userData.role === 'ADMIN' && typeof userData.adminLevel === 'number' && (
+                  <Badge variant="secondary" className="px-2 py-0.5 flex items-center gap-1">
+                      {userData.adminLevel === 1 && <Crown className="h-3 w-3 text-yellow-500" />}
+                      {userData.adminLevel === 2 && <Star className="h-3 w-3 text-blue-400 fill-current" />}
+                      {userData.adminLevel === 3 && <Star className="h-3 w-3 text-gray-400" />}
+                      <span>Level {userData.adminLevel}</span>
+                  </Badge>
+              )}
             </div>
             <p
               className={`text-sm ${
@@ -414,20 +425,47 @@ export default function AdminProfile({
               <Shield className="h-5 w-5" />
               Account Information
             </h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label className={theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'}>
-                  Role
-                </Label>
-                <div className="relative">
-                  <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={userData.role}
-                    disabled
-                    className={`pl-10 ${theme === 'light' ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-800/50 border-zinc-700'}`}
-                  />
+            <div className="grid gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label className={theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'}>
+                    Role
+                  </Label>
+                  <div className="relative">
+                    <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={userData.role}
+                      disabled
+                      className={`pl-10 ${theme === 'light' ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-800/50 border-zinc-700'}`}
+                    />
+                  </div>
                 </div>
+
+                {userData.role === 'ADMIN' && typeof userData.adminLevel === 'number' && (
+                  <div className="grid gap-2">
+                    <Label className={theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'}>
+                      Admin Level
+                    </Label>
+                    <div
+                      className={cn(
+                        'flex items-center h-9 w-fit rounded-md border px-3 text-sm',
+                        'opacity-70 cursor-not-allowed select-none',
+                        theme === 'light'
+                          ? 'bg-zinc-50 border-zinc-200 text-zinc-600'
+                          : 'bg-zinc-800/50 border-zinc-700 text-zinc-400'
+                      )}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {userData.adminLevel === 1 && <Crown className="h-4 w-4 text-yellow-500" />}
+                        {userData.adminLevel === 2 && <Star className="h-4 w-4 text-blue-400 fill-current" />}
+                        {userData.adminLevel === 3 && <Star className="h-4 w-4 text-gray-400" />}
+                        <span>Level {userData.adminLevel}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+
               <div className="grid gap-2">
                 <Label className={theme === 'light' ? 'text-zinc-700' : 'text-zinc-300'}>
                   Account Status
