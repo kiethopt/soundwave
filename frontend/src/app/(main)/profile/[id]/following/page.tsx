@@ -144,11 +144,11 @@ export default function UserProfilePage({
 
   return (
     <div className='px-4 md:px-6 py-6'>
-      <div className='flex flex-col gap-4'>
-        <h1 className='text-2xl font-bold mb-4'>Following</h1> 
+      <div className='flex flex-col gap-6'>
+        <h1 className='text-2xl font-bold'>Following</h1> 
         
         {/* Filter Bar - Copied and adapted from search page */}
-        <div className="w-full border-b border-white/10 mb-6">
+        <div className="w-full border-b border-white/10">
           <div className="flex gap-8 px-0">
             {filterButtons.map((button) => (
               <button
@@ -236,13 +236,13 @@ export default function UserProfilePage({
         
         {/* Optional: Message for empty results based on filter */}
         {(activeFilter === 'artists' && followingArtists.length === 0) && (
-          <p className="text-white/60 mt-4">You are not following any artists.</p>
+          <p className="text-white/60">You are not following any artists.</p>
         )}
         {(activeFilter === 'users' && followingUsers.length === 0) && (
-          <p className="text-white/60 mt-4">You are not following any users.</p>
+          <p className="text-white/60">You are not following any users.</p>
         )}
         {(activeFilter === 'all' && followingArtists.length === 0 && followingUsers.length === 0) && (
-          <p className="text-white/60 mt-4">You are not following anyone yet.</p>
+          <p className="text-white/60">You are not following anyone yet.</p>
         )}
 
       </div>
