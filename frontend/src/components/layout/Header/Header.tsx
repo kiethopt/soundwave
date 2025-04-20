@@ -243,7 +243,7 @@ export default function Header({
     e.preventDefault();
     if (searchQuery.trim()) {
      const token = localStorage.getItem('userToken');
-      if (token) {
+      if (token && userData && userData.role !== 'ADMIN' && userData.currentProfile !== 'ARTIST') {
         api.history.saveSearch(token, searchQuery.trim())
           .catch(err => console.error("Failed to save search history:", err));
       }
@@ -481,7 +481,7 @@ export default function Header({
           <Menu className="w-6 h-6" />
         </button>
 
-        {!isAdminOrArtist && (
+        {isAuthenticated && !isAdminOrArtist && (
           <div className="hidden md:flex items-center gap-4 lg:gap-6">
             <Link
               href="/"

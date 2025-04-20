@@ -3,7 +3,7 @@
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar/Sidebar';
 import Header from '@/components/layout/Header/Header';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Toaster } from 'react-hot-toast';
 import type React from 'react';
@@ -20,6 +20,7 @@ import { SocketProvider } from "@/contexts/SocketContext";
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -78,6 +79,32 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('storage', handleStorageChange);
 
   }, [pathname]);
+
+  useEffect(() => {
+    if (userData && pathname) {
+      const isUserPage = (
+        pathname === '/' ||
+        pathname.startsWith('/search') ||
+        pathname.startsWith('/discover') ||
+        pathname.startsWith('/playlist/') ||
+        pathname.startsWith('/album/') ||
+        pathname.startsWith('/genre/') ||
+        (pathname.startsWith('/profile/') && pathname !== '/profile/me')
+      );
+
+      const isAdmin = userData.role === 'ADMIN';
+      const isArtist = userData.currentProfile === 'ARTIST';
+
+      if (isUserPage && isAdmin) {
+        console.log('Redirecting admin from user page:', pathname);
+        router.push('/admin/dashboard');
+      }
+      else if (isUserPage && isArtist) {
+        console.log('Redirecting artist from user page:', pathname);
+        router.push('/artist/dashboard');
+      }
+    }
+  }, [userData, pathname, router]);
 
   if (!mounted) {
     return null;

@@ -9,13 +9,14 @@ import {
   DialogPortal,
   DialogTitle,
   DialogFooter,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import type { Track, Album, ArtistProfile, User, Genre, Label } from '@/types';
+import { Track, Album, ArtistProfile, User, Genre, Label } from '@/types';
 import Image from 'next/image';
 import { Facebook, Instagram, Verified, Spinner } from '@/components/ui/Icons';
 import { api } from '@/utils/api';
@@ -34,12 +35,10 @@ import { Label as InputLabel } from '@/components/ui/label';
 import { Tags } from 'lucide-react';
 import Link from 'next/link';
 import { X } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 
 interface EditTrackModalProps {
   track: Track | null;
   onClose: () => void;
-  // Sửa kiểu của onSubmit để nhận FormData
   onSubmit: (trackId: string, formData: FormData) => Promise<void>;
   availableArtists: Array<{ id: string; name: string }>;
   selectedFeaturedArtists: string[];
@@ -70,7 +69,6 @@ export function EditTrackModal({
 }: EditTrackModalProps) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Add state for genre validation error
   const [genreError, setGenreError] = useState<string | null>(null);
 
   // Cập nhật preview khi track thay đổi (chỉ khi component được mount hoặc track prop thay đổi)
@@ -78,7 +76,7 @@ export function EditTrackModal({
     if (track?.coverUrl) {
       setPreviewImage(track.coverUrl);
     } else {
-      setPreviewImage(null); // Reset nếu track mới không có ảnh
+      setPreviewImage(null);
     }
   }, [track?.coverUrl]);
 
@@ -89,7 +87,6 @@ export function EditTrackModal({
     if (file) {
       const imageUrl = URL.createObjectURL(file);
       setPreviewImage(imageUrl);
-      // Không cần return URL.revokeObjectURL vì component sẽ unmount khi đóng modal
     }
   };
 
@@ -1079,14 +1076,17 @@ export function EditUserModal({
   onSubmit,
   theme = 'light',
 }: EditUserModalProps) {
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(
+    user?.avatar ?? null
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [role, setRole] = useState<string>(user?.role ?? 'USER');
 
   useEffect(() => {
+    // Reset preview image when user changes
     if (user) {
-      setRole(user.role);
+      setPreviewImage(user.avatar ?? null);
     }
+    // No longer need to fetch loggedInAdminLevel or set role/level state here
   }, [user]);
 
   if (!user) return null;
@@ -1094,7 +1094,7 @@ export function EditUserModal({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    formData.append('role', role);
+    // Role and adminLevel are no longer appended here
     await onSubmit(user.id, formData);
   };
 
@@ -1224,32 +1224,6 @@ export function EditUserModal({
                 : 'bg-white border-gray-300'
                 }`}
             />
-          </div>
-
-          {/* Role */}
-          <div className="space-y-2">
-            <span
-              className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                }`}
-            >
-              Role
-            </span>
-            <Select value={role} onValueChange={setRole}>
-              <SelectTrigger
-                className={`w-full ${theme === 'dark'
-                  ? 'bg-[#3a3a3a] border-[#505050] text-white'
-                  : 'bg-white border-gray-300'
-                  }`}
-              >
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent
-                className={theme === 'dark' ? 'bg-[#3a3a3a] text-white' : ''}
-              >
-                <SelectItem value="USER">User</SelectItem>
-                <SelectItem value="ADMIN">Admin</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Buttons */}
@@ -3623,6 +3597,66 @@ export function SystemPlaylistModal({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface MakeAdminModalProps {
+  user: User | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (userId: string) => void;
+  theme?: 'light' | 'dark';
+}
+
+export function MakeAdminModal({
+  user,
+  isOpen,
+  onClose,
+  onConfirm,
+  theme = 'light',
+}: MakeAdminModalProps) {
+  if (!isOpen || !user) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`${theme === 'dark' ? 'bg-[#2a2a2a] border-[#404040] text-white' : 'bg-white'} p-6 rounded-lg shadow-lg max-w-md w-full`}
+      >
+        <DialogHeader>
+          <DialogTitle
+            className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
+          >
+            Confirm Admin Promotion
+          </DialogTitle>
+          <DialogDescription
+            className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}
+          >
+            Are you sure you want to promote this user to Admin (Level 2)?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="mt-4 space-y-2">
+          <p><strong>Name:</strong> {user.name || 'N/A'}</p>
+          <p><strong>Username:</strong> {user.username || 'N/A'}</p>
+          <p><strong>Email:</strong> {user.email}</p>
+          <p><strong>Current Role:</strong> {user.role}</p>
+          {user.adminLevel && (
+            <p><strong>Current Admin Level:</strong> {user.adminLevel}</p>
+          )}
+        </div>
+        <DialogFooter className="mt-6 flex justify-end gap-3">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => onConfirm(user.id)}
+          >
+            Confirm Promotion
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

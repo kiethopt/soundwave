@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { api } from '@/utils/api';
+import toast from 'react-hot-toast';
 
 interface AdminRouteProps {
   children: React.ReactNode;
@@ -10,6 +11,7 @@ interface AdminRouteProps {
 
 export default function AdminRoute({ children }: AdminRouteProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isVerified, setIsVerified] = useState(false);
 
   useEffect(() => {
@@ -29,7 +31,12 @@ export default function AdminRoute({ children }: AdminRouteProps) {
           return;
         }
 
-        // Thêm verify token với backend
+        if (pathname.startsWith('/admin/system') && user.adminLevel !== 1) {
+          toast.error('Permission Denied: Access restricted to Level 1 Admins.');
+          router.push('/admin/dashboard');
+          return;
+        }
+
         await api.auth.validateToken(token);
         setIsVerified(true);
       } catch (error) {
@@ -41,7 +48,7 @@ export default function AdminRoute({ children }: AdminRouteProps) {
     };
 
     verifyAdmin();
-  }, [router]);
+  }, [router, pathname]);
 
   if (!isVerified) {
     return null;

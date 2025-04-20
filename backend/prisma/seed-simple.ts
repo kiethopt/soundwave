@@ -75,13 +75,14 @@ async function main() {
     const adminBar = multibar.create(1, 0, { task: 'Seeding admin account' });
     await prisma.user.upsert({
       where: { email: 'admin@soundwave.com' },
-      update: { isActive: true, role: Role.ADMIN },
+      update: { isActive: true, role: Role.ADMIN, adminLevel: 1 },
       create: {
         email: 'admin@soundwave.com',
         username: 'admin',
         password: hashedPassword,
-        name: 'System Administrator',
+        name: 'Administrator',
         role: Role.ADMIN,
+        adminLevel: 1,
         isActive: true,
       },
     });

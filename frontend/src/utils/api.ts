@@ -271,33 +271,28 @@ export const api = {
 
     updateUser: async (
       userId: string,
-      data: FormData | { isActive?: boolean; reason?: string },
+      data: FormData | Record<string, any>,
       token: string
     ) => {
-      if (data instanceof FormData) {
-        return fetchWithAuth(
-          `/api/admin/users/${userId}`,
-          {
-            method: "PUT",
-            body: data,
-          },
-          token
-        );
-      } else {
-        const postData = {
-          ...data,
-          isActive: data.isActive?.toString(),
-        };
+      let body: BodyInit;
+      const headers: HeadersInit = {};
 
-        return fetchWithAuth(
-          `/api/admin/users/${userId}`,
-          {
-            method: "PUT",
-            body: JSON.stringify(postData),
-          },
-          token
-        );
+      if (data instanceof FormData) {
+        body = data;
+      } else {
+        body = JSON.stringify(data);
+        headers['Content-Type'] = 'application/json';
       }
+
+      return fetchWithAuth(
+        `/api/admin/users/${userId}`,
+        {
+          method: "PUT",
+          body: body,
+          headers: headers,
+        },
+        token
+      );
     },
 
     updateArtist: async (

@@ -21,6 +21,7 @@ import {
   EditUserModal,
   UserInfoModal,
   DeactivateModal,
+  MakeAdminModal,
 } from '@/components/ui/data-table/data-table-modals';
 
 export default function UserManagement() {
@@ -41,6 +42,7 @@ export default function UserManagement() {
     selectedRows,
     setSelectedRows,
     updateQueryParam,
+    refreshData,
   } = useDataTable<User>({
     fetchData: async (page, params) => {
       const token = localStorage.getItem('userToken');
@@ -69,14 +71,13 @@ export default function UserManagement() {
   // Modal states
   const [updatingUser, setUpdatingUser] = useState<User | null>(null);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
-
-  // Add new state variables
-  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
   const [userIdToDeactivate, setUserIdToDeactivate] = useState<string | null>(
     null
   );
+  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
   const [isBulkDeactivating, setIsBulkDeactivating] = useState(false);
   const [isBulkActivating, setIsBulkActivating] = useState(false);
+  const [userToMakeAdmin, setUserToMakeAdmin] = useState<User | null>(null);
 
   // Action handlers
   const handleUpdateUser = async (userId: string, data: FormData) => {
@@ -91,17 +92,17 @@ export default function UserManagement() {
       const response = await api.admin.updateUser(userId, data, token);
       const updatedUser = response.user;
 
-      setUsers(
-        users.map((user) =>
-          user.id === userId ? { ...user, ...updatedUser } : user
-        )
+      setUsers((prevUsers) =>
+        prevUsers.map((user) => (user.id === userId ? { ...user, ...updatedUser } : user))
       );
 
       toast.success('User updated successfully');
       setUpdatingUser(null);
     } catch (error) {
       console.error('Error updating user:', error);
-      toast.error('Failed to update user');
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update user'
+      );
     } finally {
       setActionLoading(null);
     }
@@ -123,30 +124,16 @@ export default function UserManagement() {
         return;
       }
 
-      if (!Array.isArray(userIds)) {
-        setActionLoading(userIds);
+      if (ids.length > 0) {
+        setActionLoading('bulk-delete'); // Indicate bulk action
       }
 
       await Promise.all(ids.map((id) => api.admin.deleteUser(id, token)));
 
-      if (!Array.isArray(userIds)) {
-        setUsers((prev) => prev.filter((user) => user.id !== userIds));
-      } else {
-        const params = new URLSearchParams();
-        params.set('page', currentPage.toString());
-        params.set('limit', limit.toString());
-
-        if (searchInput) params.append('q', searchInput);
-        if (statusFilter.length === 1) params.append('status', statusFilter[0]);
-
-        const response = await api.admin.getAllUsers(
-          token,
-          currentPage,
-          limit,
-          params.toString()
-        );
-        setUsers(response.users);
-      }
+      // Instead of conditional logic, always refetch after delete for simplicity and consistency
+      await refreshData();
+      setRowSelection({}); // Clear selection after successful delete
+      setSelectedRows([]);
 
       toast.success(
         ids.length === 1
@@ -158,137 +145,92 @@ export default function UserManagement() {
         error instanceof Error ? error.message : 'Failed to delete user(s)'
       );
     } finally {
-      if (!Array.isArray(userIds)) {
-        setActionLoading(null);
-      }
+      setActionLoading(null);
     }
   };
 
-  // Update handleStatusChange to include token initialization
   const handleStatusChange = async (userId: string, isActive: boolean) => {
     if (!isActive) {
+      // Open deactivate modal for confirmation and reason
       setUserIdToDeactivate(userId);
       setIsDeactivateModalOpen(true);
       return;
     }
 
+    // Proceed with activation directly
     try {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
       setActionLoading(userId);
-      // Gọi API để thay đổi trạng thái
       const response = await api.admin.updateUser(userId, { isActive }, token);
 
-      // Cập nhật state với đối tượng trả về từ API
       if (response && response.user) {
-        setUsers(
-          users.map((user) =>
+        setUsers((prev) =>
+          prev.map((user) =>
             user.id === userId ? { ...user, ...response.user } : user
           )
         );
+        toast.success(`User activated successfully`);
       } else {
-        // Fallback nếu response không như mong đợi
-        setUsers(
-          users.map((user) =>
-            user.id === userId ? { ...user, isActive } : user
-          )
-        );
+        console.warn('Activate response did not contain expected user data.');
+        toast.error('Failed to update user data locally after activation.');
       }
-
-      toast.success(
-        `User ${isActive ? 'activated' : 'deactivated'} successfully`
-      );
     } catch (err) {
-      console.error('Status change error:', err);
+      console.error('Activation error:', err);
       toast.error(
-        err instanceof Error
-          ? err.message
-          : `Failed to ${isActive ? 'activate' : 'deactivate'} user`
+        err instanceof Error ? err.message : `Failed to activate user`
       );
     } finally {
       setActionLoading(null);
     }
   };
 
-  // Modify handleDeactivateConfirm to handle bulk actions
   const handleDeactivateConfirm = async (reason: string) => {
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
 
+    const idsToProcess = isBulkDeactivating
+      ? selectedRows.filter((user) => user.isActive).map((user) => user.id)
+      : userIdToDeactivate
+      ? [userIdToDeactivate]
+      : [];
+
+    if (idsToProcess.length === 0) {
+      toast('No active users selected for deactivation.');
       setIsDeactivateModalOpen(false);
+      setIsBulkDeactivating(false);
+      setUserIdToDeactivate(null);
+      return;
+    }
 
-      if (isBulkDeactivating && selectedRows.length > 0) {
-        // Bulk deactivation
-        setActionLoading('bulk');
+    setActionLoading(isBulkDeactivating ? 'bulk-deactivate' : userIdToDeactivate);
 
-        // Filter out already inactive users
-        const usersToDeactivate = selectedRows.filter((user) => user.isActive);
+    try {
+      await Promise.all(
+        idsToProcess.map((id) =>
+          api.admin.updateUser(id, { isActive: false, reason }, token)
+        )
+      );
 
-        if (usersToDeactivate.length === 0) {
-          toast('All selected users are already inactive.');
-          setIsBulkDeactivating(false);
-          setActionLoading(null);
-          setSelectedRows([]);
-          setRowSelection({});
-          return;
-        }
+      // Update local state after successful deactivation
+      setUsers((prev) =>
+        prev.map((user) =>
+          idsToProcess.includes(user.id)
+            ? { ...user, isActive: false }
+            : user
+        )
+      );
 
-        await Promise.all(
-          usersToDeactivate.map((user) =>
-            api.admin.updateUser(user.id, { isActive: false, reason }, token)
-          )
-        );
-
-        // Update local state
-        const updatedUserIds = usersToDeactivate.map((user) => user.id);
-        setUsers((prev) =>
-          prev.map((user) =>
-            updatedUserIds.includes(user.id)
-              ? { ...user, isActive: false }
-              : user
-          )
-        );
-
-        toast.success(`Deactivated ${usersToDeactivate.length} users successfully`);
+      toast.success(
+        `Deactivated ${idsToProcess.length} user(s) successfully`
+      );
+      if (isBulkDeactivating) {
         setSelectedRows([]);
         setRowSelection({});
-      } else if (userIdToDeactivate) {
-        // Single user deactivation
-        const userToDeactivate = users.find(u => u.id === userIdToDeactivate);
-        if (!userToDeactivate || !userToDeactivate.isActive) {
-          toast('User is already inactive.');
-          setUserIdToDeactivate(null);
-          return;
-        }
-
-        setActionLoading(userIdToDeactivate);
-        const response = await api.admin.updateUser(
-          userIdToDeactivate,
-          { isActive: false, reason },
-          token
-        );
-
-        if (response && response.user) {
-          setUsers(
-            users.map((user) =>
-              user.id === userIdToDeactivate
-                ? { ...user, ...response.user }
-                : user
-            )
-          );
-        } else {
-          setUsers(
-            users.map((user) =>
-              user.id === userIdToDeactivate
-                ? { ...user, isActive: false }
-                : user
-            )
-          );
-        }
-
-        toast.success('User deactivated successfully');
       }
     } catch (error) {
       console.error('Deactivation error:', error);
@@ -296,34 +238,33 @@ export default function UserManagement() {
         error instanceof Error ? error.message : 'Failed to deactivate user(s)'
       );
     } finally {
+      setIsDeactivateModalOpen(false);
       setIsBulkDeactivating(false);
       setUserIdToDeactivate(null);
       setActionLoading(null);
     }
   };
 
-  // Add function to handle bulk activation
   const handleBulkActivate = async () => {
-    if (!selectedRows.length) return;
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
 
-    const confirmMessage = `Activate ${selectedRows.length} selected users?`;
-    if (!confirm(confirmMessage)) return;
+    const usersToActivate = selectedRows.filter((user) => !user.isActive);
+
+    if (usersToActivate.length === 0) {
+      toast('No inactive users selected for activation.');
+      return;
+    }
+
+    if (!confirm(`Activate ${usersToActivate.length} selected users?`)) return;
+
+    setActionLoading('bulk-activate');
+    setIsBulkActivating(true);
 
     try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-
-      // Only target inactive users
-      const usersToActivate = selectedRows.filter((user) => !user.isActive);
-
-      if (usersToActivate.length === 0) {
-        toast('All selected users are already active.');
-        return;
-      }
-
-      setActionLoading('bulk');
-      setIsBulkActivating(true);
-
       await Promise.all(
         usersToActivate.map((user) =>
           api.admin.updateUser(user.id, { isActive: true }, token)
@@ -354,20 +295,57 @@ export default function UserManagement() {
     }
   };
 
-  // Modify handleBulkDeactivate to open the modal
   const handleBulkDeactivate = () => {
-    if (!selectedRows.length) return;
     const usersToDeactivate = selectedRows.filter((user) => user.isActive);
 
     if (usersToDeactivate.length === 0) {
-        toast('All selected users are already inactive.');
-        return;
+      toast('No active users selected for deactivation.');
+      return;
     }
 
     if (!confirm(`Deactivate ${usersToDeactivate.length} selected users?`)) return;
 
     setIsBulkDeactivating(true);
     setIsDeactivateModalOpen(true);
+  };
+
+  const handleConfirmMakeAdmin = async (userId: string) => {
+    if (!userToMakeAdmin || userToMakeAdmin.id !== userId) return; 
+
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+
+    setActionLoading(userId);
+    try {
+      const response = await api.admin.updateUser(
+        userId,
+        { role: 'ADMIN', adminLevel: 2 },
+        token
+      );
+
+      if (response && response.user) {
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === userId ? { ...user, ...response.user } : user
+          )
+        );
+        toast.success('User promoted to Admin successfully');
+      } else {
+        console.warn('Make admin response did not contain expected user data.');
+        toast.error('Failed to update user data locally after promotion.');
+      }
+    } catch (err) {
+      console.error('Make Admin error:', err);
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to promote user to Admin'
+      );
+    } finally {
+      setActionLoading(null);
+      setUserToMakeAdmin(null); // Close modal on success or failure
+    }
   };
 
   // Table configuration
@@ -377,6 +355,7 @@ export default function UserManagement() {
     onEdit: setUpdatingUser,
     onView: setViewingUser,
     onStatusChange: handleStatusChange,
+    onMakeAdmin: setUserToMakeAdmin,
   });
 
   const table = useReactTable({
@@ -390,12 +369,10 @@ export default function UserManagement() {
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: (updatedSelection) => {
       setRowSelection(updatedSelection);
-      const selectedRowData = users.filter(
-        (user, index) =>
-          typeof updatedSelection === 'object' &&
-          updatedSelection[index.toString()]
-      );
-      setSelectedRows(selectedRowData);
+      if (typeof updatedSelection === 'object' && updatedSelection !== null) {
+        const selectedRowData = users.filter((_, index) => updatedSelection[index.toString()]);
+        setSelectedRows(selectedRowData);
+      }
     },
     state: {
       sorting,
@@ -413,22 +390,19 @@ export default function UserManagement() {
 
   return (
     <div
-      className={`container mx-auto space-y-4 p-4 pb-20 ${
-        theme === 'dark' ? 'text-white' : ''
-      }`}
+      className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''
+        }`}
     >
       <div className="mb-6">
         <h1
-          className={`text-2xl md:text-3xl font-bold tracking-tight ${
-            theme === 'dark' ? 'text-white' : 'text-gray-900'
-          }`}
+          className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}
         >
           User Management
         </h1>
         <p
-          className={`text-muted-foreground ${
-            theme === 'dark' ? 'text-white/60' : ''
-          }`}
+          className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : ''
+            }`}
         >
           Manage and monitor user accounts
         </p>
@@ -518,6 +492,15 @@ export default function UserManagement() {
         onConfirm={handleDeactivateConfirm}
         theme={theme}
         entityType="user"
+      />
+
+      {/* Render the MakeAdminModal - Props updated */}
+      <MakeAdminModal
+        isOpen={!!userToMakeAdmin} // Use truthiness of user object
+        user={userToMakeAdmin}
+        onClose={() => setUserToMakeAdmin(null)} // Directly set state to null
+        onConfirm={handleConfirmMakeAdmin}
+        theme={theme}
       />
     </div>
   );

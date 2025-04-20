@@ -63,8 +63,10 @@ export interface User {
   name?: string;
   avatar?: string;
   role: 'USER' | 'ADMIN'; // Chỉ có USER và ADMIN
+  adminLevel?: number;
   currentProfile: 'USER' | 'ARTIST';
   isActive: boolean;
+  followVisibility: boolean;
   createdAt: string;
   updatedAt: string;
   lastLoginAt?: string;

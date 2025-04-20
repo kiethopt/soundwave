@@ -7,6 +7,10 @@ import {
 import prisma from '../config/db';
 import * as adminService from '../services/admin.service';
 import * as emailService from '../services/email.service';
+import { User as PrismaUser, Role } from '@prisma/client';
+
+// Define User type including adminLevel for controller scope
+type UserWithAdminLevel = PrismaUser & { adminLevel?: number | null };
 
 // Lấy danh sách tất cả người dùng - ADMIN only
 export const getAllUsers = async (
@@ -87,116 +91,100 @@ export const updateUser = async (
   try {
     const { id } = req.params;
     const avatarFile = req.file;
-    const { isActive, reason, ...userData } = req.body;
+    const userData = { ...req.body };
 
-    // Check if we're updating isActive status (activating/deactivating)
-    const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
-
-    // Handle user activation/deactivation with reason
-    if (isStatusUpdate) {
-      // Properly convert isActive to boolean
-      const isActiveBool =
-        isActive === 'true' || isActive === true ? true : false;
-
-      const currentUser = await prisma.user.findUnique({
-        where: { id },
-        select: { isActive: true, email: true, name: true, username: true }, // Lấy thêm email, name, username
-      });
-
-      if (currentUser && currentUser.isActive && !isActiveBool) {
-        // User is being deactivated
-        const updatedUser = await adminService.updateUserInfo(id, {
-          isActive: false,
-        });
-
-        // Send notification if reason is provided
-        if (reason) {
-          await prisma.notification.create({
-            data: {
-              type: 'ACCOUNT_DEACTIVATED',
-              message: `Your account has been deactivated. Reason: ${reason}`,
-              recipientType: 'USER',
-              userId: id,
-              isRead: false,
-            },
-          });
-        }
-        // **Gửi email thông báo Deactivation**
-        if (currentUser.email) {
-          const userName = currentUser.name || currentUser.username || 'User';
-          try {
-            const emailOptions = emailService.createAccountDeactivatedEmail(
-              currentUser.email,
-              userName,
-              'user', // Loại tài khoản
-              reason
-            );
-            await emailService.sendEmail(emailOptions);
-          } catch (emailError) {
-            console.error(
-              `Failed to send user deactivation email to ${currentUser.email}:`,
-              emailError
-            );
-          }
-        }
-
-        res.json({
-          message: 'User deactivated successfully',
-          user: updatedUser,
-        });
-        return; // Kết thúc hàm sau khi xử lý xong
-      } else if (currentUser && !currentUser.isActive && isActiveBool) {
-        // User is being activated
-        const updatedUser = await adminService.updateUserInfo(id, {
-          isActive: true,
-        });
-
-        // Send notification for reactivation
-        await prisma.notification.create({
-          data: {
-            type: 'ACCOUNT_ACTIVATED',
-            message: 'Your account has been reactivated.',
-            recipientType: 'USER',
-            userId: id,
-            isRead: false,
-          },
-        });
-        // **Gửi email thông báo Activation**
-        if (currentUser.email) {
-          const userName = currentUser.name || currentUser.username || 'User';
-          try {
-            const emailOptions = emailService.createAccountActivatedEmail(
-              currentUser.email,
-              userName,
-              'user' // Loại tài khoản
-            );
-            await emailService.sendEmail(emailOptions);
-          } catch (emailError) {
-            console.error(
-              `Failed to send user activation email to ${currentUser.email}:`,
-              emailError
-            );
-          }
-        }
-
-        res.json({ message: 'User activated successfully', user: updatedUser });
-        return; // Kết thúc hàm sau khi xử lý xong
-      }
+    if (userData.adminLevel !== undefined && userData.adminLevel !== null) {
+      const parsedLevel = parseInt(String(userData.adminLevel), 10);
+      userData.adminLevel = isNaN(parsedLevel) ? null : parsedLevel;
     }
 
-    // Regular user update (not status change)
+    const originalIsActiveInput = userData.isActive;
+    if (userData.isActive !== undefined) {
+      userData.isActive = userData.isActive === 'true' || userData.isActive === true;
+    }
+
     const updatedUser = await adminService.updateUserInfo(
       id,
       userData,
       avatarFile
     );
 
+    // --- Asynchronous Notification & Email --- 
+    if (originalIsActiveInput !== undefined) {
+        const intendedState = userData.isActive;
+
+        if (updatedUser.isActive === false && intendedState === false) { 
+            const reason = userData.reason || '';
+            const userName = updatedUser.name || updatedUser.username || 'User';
+
+            // Create notification (fire-and-forget)
+            prisma.notification.create({ 
+                data: {
+                    type: 'ACCOUNT_DEACTIVATED',
+                    message: `Your account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`,
+                    recipientType: 'USER',
+                    userId: id,
+                    isRead: false,
+                },
+             }).catch(err => console.error('[Async Notify Error] Failed to create deactivation notification:', err));
+
+            // Send email (fire-and-forget)
+            if (updatedUser.email) {
+                try {
+                    const emailOptions = emailService.createAccountDeactivatedEmail(
+                        updatedUser.email,
+                        userName,
+                        'user',
+                        reason
+                    );
+                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send deactivation email:', err));
+                } catch (syncError) {
+                    console.error('[Email Setup Error] Failed to create deactivation email options:', syncError);
+                }
+            }
+        } else if (updatedUser.isActive === true && intendedState === true) { 
+            const userName = updatedUser.name || updatedUser.username || 'User';
+
+            // Create notification (fire-and-forget)
+            prisma.notification.create({ 
+                data: {
+                    type: 'ACCOUNT_ACTIVATED',
+                    message: 'Your account has been reactivated.',
+                    recipientType: 'USER',
+                    userId: id,
+                    isRead: false,
+                },
+             }).catch(err => console.error('[Async Notify Error] Failed to create activation notification:', err));
+
+            // Send email (fire-and-forget)
+            if (updatedUser.email) {
+                 try {
+                    const emailOptions = emailService.createAccountActivatedEmail(
+                        updatedUser.email,
+                        userName,
+                        'user'
+                    );
+                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send activation email:', err));
+                } catch (syncError) {
+                    console.error('[Email Setup Error] Failed to create activation email options:', syncError);
+                }
+            }
+        }
+    }
+
+    // Send the successful response immediately
     res.json({
       message: 'User updated successfully',
-      user: updatedUser,
+      user: updatedUser, // Return the updated user data
     });
+
   } catch (error) {
+    // Keep existing error handling for service errors
     if (error instanceof Error) {
+      if (error.message.startsWith('Permission denied:')) {
+        res.status(403).json({ message: error.message });
+        return;
+      }
       if (error.message === 'User not found') {
         res.status(404).json({ message: 'User not found' });
         return;
@@ -209,8 +197,18 @@ export const updateUser = async (
       } else if (error.message === 'Current password is incorrect') {
         res.status(400).json({ message: error.message });
         return;
+      } else if (error.message.includes('password change')) {
+        res.status(400).json({ message: error.message });
+        return;
+      } else if (error.message === 'Password must be at least 6 characters long.') {
+         res.status(400).json({ message: error.message });
+         return;
+      } else if (error.message === "No valid data provided for update.") {
+         res.status(400).json({ message: error.message });
+         return;
       }
     }
+    // General error handler
     handleError(res, error, 'Update user');
   }
 };
@@ -377,9 +375,21 @@ export const deleteUser = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    await adminService.deleteUserById(id);
+    const requestingUser = req.user as UserWithAdminLevel | undefined;
+
+    if (!requestingUser || requestingUser.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden: Admin access required.' });
+      return;
+    }
+
+    await adminService.deleteUserById(id, requestingUser);
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
+     // Handle specific error for admin deletion attempt
+    if (error instanceof Error && error.message === 'Permission denied: Admins cannot be deleted.') {
+        res.status(403).json({ message: error.message });
+        return;
+    }
     handleError(res, error, 'Delete user');
   }
 };
