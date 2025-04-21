@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import HorizontalTrackListItem from '@/components/user/track/HorizontalTrackListItem';
 import Image from 'next/image';
+import { EditProfileModal } from '@/components/user/profile/EditProfileModal';
 
 const DEFAULT_AVATAR = '/images/default-avatar.jpg';
 
@@ -46,6 +47,7 @@ export default function UserProfilePage({
     user?.avatar || DEFAULT_AVATAR
   );
   const [showAllTracks, setShowAllTracks] = useState(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
 
   const {
     currentTrack,
@@ -235,6 +237,10 @@ export default function UserProfilePage({
     );
   };
 
+  const handleEditProfile = () => {
+    setIsEditProfileModalOpen(true);
+  };
+
   if (user && user.avatar) {
     console.log('Avatar exists:', user.avatar);
   } else {
@@ -308,7 +314,7 @@ export default function UserProfilePage({
                   >
                     {followers.length} Followers
                   </span>
-                  <span className="text-xs font-semibold mx-1.5">•</span>
+                  <span className="text-xs font-semibold mx-1">•</span>
                   <span
                     className="text-sm font-semibold hover:underline cursor-pointer"
                     onClick={(e) => {
@@ -354,7 +360,7 @@ export default function UserProfilePage({
                       className="cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
-                        router.push(`/edit-profile`);
+                        handleEditProfile();
                       }}
                     >
                       <Edit className="w-4 h-4 mr-2" />
@@ -552,8 +558,21 @@ export default function UserProfilePage({
               </div>
             </div>
           )}
+
+          {isOwner && (
+            <EditProfileModal
+              open={isEditProfileModalOpen}
+              onOpenChange={setIsEditProfileModalOpen}
+              onSuccess={() => {
+                toast.success('Profile updated successfully!');
+              }}
+              simpleMode={true}
+            />
+          )}
         </div>
       )}
     </div>
+
+    
   );
 }

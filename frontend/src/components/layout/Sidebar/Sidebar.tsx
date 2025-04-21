@@ -97,6 +97,8 @@ export default function Sidebar({
   useEffect(() => {
     try {
        localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
+       
+      window.dispatchEvent(new CustomEvent("storage-changed"));
     } catch (error) {
       console.error(
         "Error writing sidebarCollapsed state to localStorage:",
@@ -104,6 +106,22 @@ export default function Sidebar({
       );
     }
   }, [isCollapsed]);
+
+  // Listen for changes in the sidebar collapsed setting
+  useEffect(() => {
+    const handleSidebarCollapsedChange = (event: CustomEvent) => {
+      const { collapsed } = event.detail;
+      setIsCollapsed(collapsed);
+    };
+
+    window.addEventListener('sidebar-collapsed-changed', 
+      handleSidebarCollapsedChange as EventListener);
+
+    return () => {
+      window.removeEventListener('sidebar-collapsed-changed', 
+      handleSidebarCollapsedChange as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     const userData = localStorage.getItem("userData");

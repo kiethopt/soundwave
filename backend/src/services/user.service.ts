@@ -711,16 +711,33 @@ export const editProfile = async (
     throw new Error('Unauthorized');
   }
 
-  const { email, username, name, avatar } = profileData;
+  const { email, username, name, avatar, password, currentPassword, newPassword, newEmail } = profileData;
 
   // Kiểm tra email đã tồn tại chưa
-  if (email) {
+  if (newEmail) {
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: newEmail },
     });
 
     if (existingUser && existingUser.id !== user.id) {
       throw new Error('Email already in use');
+    }
+
+    // Verify currentPassword if changing email
+    if (currentPassword) {
+      const userWithPassword = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { password: true }
+      });
+      
+      const bcrypt = require('bcrypt');
+      const isPasswordValid = await bcrypt.compare(currentPassword, userWithPassword?.password);
+      
+      if (!isPasswordValid) {
+        throw new Error('Incorrect password');
+      }
+    } else {
+      throw new Error('Current password is required to change email');
     }
   }
 
@@ -735,6 +752,23 @@ export const editProfile = async (
     }
   }
 
+  // Handle password change
+  if (newPassword && currentPassword) {
+    const userWithPassword = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { password: true }
+    });
+    
+    const bcrypt = require('bcrypt');
+    const isPasswordValid = await bcrypt.compare(currentPassword, userWithPassword?.password);
+    
+    if (!isPasswordValid) {
+      throw new Error('Incorrect password');
+    }
+  } else if (newPassword && !currentPassword) {
+    throw new Error('Current password is required to change password');
+  }
+
   // Upload avatar lên Cloudinary nếu có file
   let avatarUrl = null;
   if (avatarFile) {
@@ -745,10 +779,25 @@ export const editProfile = async (
   // Xây dựng dữ liệu cập nhật chỉ với các trường hợp lệ
   const updateData: Record<string, any> = {};
   if (email) updateData.email = email;
+  if (newEmail) updateData.email = newEmail;
   if (username) updateData.username = username;
   if (name) updateData.name = name;
   if (avatarFile) updateData.avatar = avatarUrl;
   else if (avatar) updateData.avatar = avatar;
+  
+  // Hash password if provided
+  if (newPassword) {
+    const bcrypt = require('bcrypt');
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+    updateData.password = hashedPassword;
+  } else if (password) {
+    // Handle legacy plain password (should be removed in production)
+    const bcrypt = require('bcrypt');
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    updateData.password = hashedPassword;
+  }
 
   // Nếu không có gì để cập nhật
   if (Object.keys(updateData).length === 0) {
