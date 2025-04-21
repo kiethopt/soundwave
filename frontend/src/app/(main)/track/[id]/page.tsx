@@ -4,14 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import { Track } from '@/types';
-import { ArrowLeft, Calendar, Music, Heart, Share2, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Calendar, Music} from 'lucide-react';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { useTrack } from '@/contexts/TrackContext';
 import { AlbumTracks } from '@/components/user/album/AlbumTracks';
-import io, { Socket } from 'socket.io-client'; // Import Socket
+import io, { Socket } from 'socket.io-client';
 
 export default function TrackDetailPage() {
   const params = useParams();
@@ -367,6 +367,7 @@ export default function TrackDetailPage() {
                 currentTrack={currentTrack}
                 isPlaying={isPlaying}
                 requiresAuth={!isAuthenticated}
+                playlists={[]}
               />
             </div>        
           </div>

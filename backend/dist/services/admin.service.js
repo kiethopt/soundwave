@@ -47,10 +47,14 @@ const path = __importStar(require("path"));
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const email_service_1 = require("./email.service");
 const bcrypt_1 = __importDefault(require("bcrypt"));
-const getUsers = async (req) => {
-    const { search = '', status } = req.query;
+const getUsers = async (req, requestingUser) => {
+    const { search = '', status, role } = req.query;
     const where = {
-        role: client_1.Role.USER,
+        ...(requestingUser.adminLevel !== 1
+            ? { role: client_1.Role.USER }
+            : role && typeof role === 'string' && Object.values(client_1.Role).includes(role.toUpperCase())
+                ? { role: role.toUpperCase() }
+                : {}),
         ...(search
             ? {
                 OR: [

@@ -44,7 +44,11 @@ const emailService = __importStar(require("../services/email.service"));
 const client_1 = require("@prisma/client");
 const getAllUsers = async (req, res) => {
     try {
-        const { users, pagination } = await adminService.getUsers(req);
+        if (!req.user) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const { users, pagination } = await adminService.getUsers(req, req.user);
         res.json({ users, pagination });
     }
     catch (error) {

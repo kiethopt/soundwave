@@ -112,6 +112,8 @@ const likeTrack = async (userId, trackId) => {
                 privacy: "PRIVATE",
                 type: "FAVORITE",
                 userId,
+                totalTracks: 0,
+                totalDuration: 0,
             },
         });
     }
@@ -127,9 +129,22 @@ const likeTrack = async (userId, trackId) => {
             trackOrder: tracksCount + 1,
         },
     });
+    await db_1.default.playlist.update({
+        where: {
+            id: favoritePlaylist.id,
+        },
+        data: {
+            totalTracks: {
+                increment: 1,
+            },
+            totalDuration: {
+                increment: track.duration || 0,
+            },
+        },
+    });
     const io = (0, socket_1.getIO)();
     io.emit('playlist-updated');
-    io.to(`user-${userId}`).emit('favorites-updated', { action: 'added', trackId });
+    io.to(`user-${userId}`).emit('favorites-updated', { action: 'add', trackId });
     return { message: 'Track liked successfully' };
 };
 exports.likeTrack = likeTrack;
@@ -169,6 +184,10 @@ const unlikeTrack = async (userId, trackId) => {
         });
         return { message: 'Track unliked successfully' };
     }
+    const track = await db_1.default.track.findUnique({
+        where: { id: trackId },
+        select: { duration: true }
+    });
     await db_1.default.userLikeTrack.delete({
         where: {
             userId_trackId: {
@@ -186,6 +205,19 @@ const unlikeTrack = async (userId, trackId) => {
             trackId,
         },
     });
+    await db_1.default.playlist.update({
+        where: {
+            id: favoritePlaylist.id,
+        },
+        data: {
+            totalTracks: {
+                decrement: 1,
+            },
+            totalDuration: {
+                decrement: track?.duration || 0,
+            },
+        },
+    });
     const io = (0, socket_1.getIO)();
     if (favoritePlaylist._count.tracks === 1) {
         await db_1.default.playlist.delete({
@@ -198,7 +230,7 @@ const unlikeTrack = async (userId, trackId) => {
         return { message: 'Track unliked and empty Favorites playlist removed' };
     }
     io.emit('playlist-updated');
-    io.to(`user-${userId}`).emit('favorites-updated', { action: 'removed', trackId });
+    io.to(`user-${userId}`).emit('favorites-updated', { action: 'remove', trackId });
     return { message: 'Track unliked successfully' };
 };
 exports.unlikeTrack = unlikeTrack;

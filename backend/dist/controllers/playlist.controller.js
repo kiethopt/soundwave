@@ -108,17 +108,6 @@ const getPlaylists = async (req, res, next) => {
                     type: "FAVORITE",
                 },
             });
-            if (!favoritePlaylist) {
-                favoritePlaylist = await db_1.default.playlist.create({
-                    data: {
-                        name: "Favorites",
-                        description: "List of your favorite songs",
-                        privacy: "PRIVATE",
-                        type: "FAVORITE",
-                        userId,
-                    },
-                });
-            }
             let vibeRewindPlaylist = await db_1.default.playlist.findFirst({
                 where: {
                     userId,
