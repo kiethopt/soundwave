@@ -23,6 +23,7 @@ import {
   getGenreTopTracks,
   getGenreTopArtists,
   getGenreNewestTracks,
+  setFollowVisibility,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -32,8 +33,8 @@ const router = express.Router();
 
 router.post('/follow/:id', authenticate, cacheMiddleware, followUser);
 router.delete('/unfollow/:id', authenticate, cacheMiddleware, unfollowUser);
-router.get('/followers', authenticate, cacheMiddleware, getFollowers);
-router.get('/following', authenticate, cacheMiddleware, getFollowing);
+router.get('/followers/:id', authenticate, cacheMiddleware, getFollowers);
+router.get('/following/:id', authenticate, cacheMiddleware, getFollowing);
 router.get('/search-all', authenticate, searchAll);
 router.get('/genres', authenticate, getAllGenres);
 router.get('/profile/:id', getUserProfile);
@@ -55,6 +56,12 @@ router.put(
   upload.single('avatar'),
   handleUploadError,
   editProfile
+);
+
+router.put(
+  '/set-follow-visibility',
+  authenticate,
+  setFollowVisibility
 );
 
 // Route kiểm tra yêu cầu trở thành Artist

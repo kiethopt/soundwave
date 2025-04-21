@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getGenreNewestTracks = exports.getGenreTopArtists = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
+exports.setFollowVisibility = exports.getGenreNewestTracks = exports.getGenreTopArtists = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
 const userService = __importStar(require("../services/user.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const requestToBecomeArtist = async (req, res) => {
@@ -145,28 +145,50 @@ const unfollowUser = async (req, res) => {
 };
 exports.unfollowUser = unfollowUser;
 const getFollowers = async (req, res) => {
+    const { id } = req.params;
     try {
-        const followers = await userService.getUserFollowers(req);
+        const followers = await userService.getUserFollowers(id);
         res.json(followers);
     }
     catch (error) {
-        if (error instanceof Error && error.message === 'Unauthorized') {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
+        if (error instanceof Error) {
+            if (error.message === 'User not found') {
+                res.status(404).json({ message: 'User not found' });
+                return;
+            }
+            else if (error.message === 'Unauthorized') {
+                res.status(401).json({ message: 'Unauthorized' });
+                return;
+            }
+            else if (error.message === 'User ID is required') {
+                res.status(400).json({ message: 'User ID is required' });
+                return;
+            }
         }
         (0, handle_utils_1.handleError)(res, error, 'Get followers');
     }
 };
 exports.getFollowers = getFollowers;
 const getFollowing = async (req, res) => {
+    const { id } = req.params;
     try {
-        const following = await userService.getUserFollowing(req);
+        const following = await userService.getUserFollowing(id);
         res.json(following);
     }
     catch (error) {
-        if (error instanceof Error && error.message === 'Unauthorized') {
-            res.status(401).json({ message: 'Unauthorized' });
-            return;
+        if (error instanceof Error) {
+            if (error.message === 'User not found') {
+                res.status(404).json({ message: 'User not found' });
+                return;
+            }
+            else if (error.message === 'Unauthorized') {
+                res.status(401).json({ message: 'Unauthorized' });
+                return;
+            }
+            else if (error.message === 'User ID is required') {
+                res.status(400).json({ message: 'User ID is required' });
+                return;
+            }
         }
         (0, handle_utils_1.handleError)(res, error, 'Get following');
     }
@@ -370,4 +392,19 @@ const getGenreNewestTracks = async (req, res) => {
     }
 };
 exports.getGenreNewestTracks = getGenreNewestTracks;
+const setFollowVisibility = async (req, res) => {
+    try {
+        const isPublic = req.body.isVisible;
+        const result = await userService.setFollowVisibility(req.user, isPublic);
+        res.json(result);
+    }
+    catch (error) {
+        if (error instanceof Error && error.message === 'Unauthorized') {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        (0, handle_utils_1.handleError)(res, error, 'Set follow visibility');
+    }
+};
+exports.setFollowVisibility = setFollowVisibility;
 //# sourceMappingURL=user.controller.js.map

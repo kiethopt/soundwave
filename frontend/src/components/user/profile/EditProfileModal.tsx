@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Lock, Mail, AtSign, UserIcon } from 'lucide-react';
 import { ChangeEmailModal } from '@/components/user/profile/ChangeEmailModal';
+import { ChangePasswordModal } from '@/components/user/profile/ChangePasswordModal';
 import toast from 'react-hot-toast';
 
 interface EditProfileModalProps {
@@ -326,6 +327,12 @@ export function EditProfileModal({
           const user = JSON.parse(localStorage.getItem('userData') || '{}');
           setUserData(prev => ({ ...prev, email: user.email || prev.email }));
         }}
+      />
+
+      {/* Password Change Modal */}
+      <ChangePasswordModal
+        open={isChangePasswordModalOpen}
+        onOpenChange={setIsChangePasswordModalOpen}
       />
     </>
   );

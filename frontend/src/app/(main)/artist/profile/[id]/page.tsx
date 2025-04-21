@@ -63,6 +63,8 @@ export default function ArtistProfilePage({
   const [loading, setLoading] = useState(true);
   const [follow, setFollow] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  // Add state for follower count
+  const [followerCount, setFollowerCount] = useState<number>(0);
   const { dominantColor } = useDominantColor(
     artist?.artistBanner || artist?.avatar || ""
   );
@@ -111,7 +113,7 @@ export default function ArtistProfilePage({
         relatedArtistsResponse,
       ] = await Promise.all([
         api.artists.getProfile(id, token),
-        api.user.getFollowing(token),
+        api.user.getUserFollowing(userData.id, token),
         api.artists.getAlbumByArtistId(id, token),
         api.artists.getTrackByArtistId(id, token),
         api.artists.getTrackByArtistId(id, token, "SINGLE"),
@@ -119,11 +121,18 @@ export default function ArtistProfilePage({
       ]);
 
       setArtist(artistData);
+      // Set follower count from artist data
+      setFollowerCount(artistData.monthlyListeners || 0);
 
       if (followingResponse) {
+        // Fix: Check if the current user is already following this artist
         const isFollowing = followingResponse.some(
-          (artistProfile: ArtistProfile) => artistProfile.id === id
+          (following: any) => 
+            (following.type === 'ARTIST' && following.id === id) || 
+            (following.followingArtistId === id)
         );
+
+        console.log('Is following:', isFollowing);
         const isOwner = userData.artistProfile?.id === id;
         setFollow(isFollowing);
         setIsOwner(isOwner);
@@ -287,8 +296,8 @@ export default function ArtistProfilePage({
           `[WebSocket] Attempting to connect for Artist Profile: ${id}`
         );
 
-        socket.on("connect", () => {
-          console.log(`[WebSocket] Connected for Artist Profile: ${id}`);
+        socket.on('connect', () => {
+            console.log(`[WebSocket] Connected for Artist Profile ${id}`);
         });
 
         socket.on("disconnect", (reason: string) => {
@@ -542,6 +551,49 @@ export default function ArtistProfilePage({
     };
   }, [id, setTracks, setStandaloneReleases, setAlbums]);
 
+  // Add event listener for follower-count-changed events
+  useEffect(() => {
+    // Listen for follower count changes from other components
+    const handleFollowerCountChange = (e: CustomEvent) => {
+      const { artistId, isFollowing } = (e as any).detail;
+      
+      if (artistId === id) {
+        // Already handled by our component, no need to update again
+        return;
+      }
+      
+      // Update follower counts for related artists when they're followed elsewhere
+      setRelatedArtists(prevArtists => {
+        return prevArtists.map(artist => {
+          if (artist.id === artistId) {
+            return {
+              ...artist,
+              monthlyListeners: isFollowing
+                ? (artist.monthlyListeners || 0) + 1
+                : Math.max(0, (artist.monthlyListeners || 0) - 1)
+            };
+          }
+          return artist;
+        });
+      });
+    };
+    
+    window.addEventListener("follower-count-changed", handleFollowerCountChange as EventListener);
+    
+    return () => {
+      window.removeEventListener("follower-count-changed", handleFollowerCountChange as EventListener);
+    };
+  }, [id]);
+  
+  useEffect(() => {
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    fetchData(); // Call the fetchData function
+  }, [token, router, fetchData]);
+
   const handleFollow = async () => {
     if (!token) {
       router.push("/login");
@@ -551,10 +603,24 @@ export default function ArtistProfilePage({
           await api.user.unfollowUserOrArtist(id, token);
           toast.success("Unfollowed artist!");
           setFollow(false);
+          // Decrement follower count
+          setFollowerCount(prevCount => Math.max(0, prevCount - 1));
+          
+          // Dispatch event for other components to know about the follow change
+          window.dispatchEvent(new CustomEvent("follower-count-changed", { 
+            detail: { artistId: id, isFollowing: false }
+          }));
         } else {
           await api.user.followUserOrArtist(id, token);
           toast.success("Followed artist!");
           setFollow(true);
+          // Increment follower count
+          setFollowerCount(prevCount => prevCount + 1);
+          
+          // Dispatch event for other components to know about the follow change
+          window.dispatchEvent(new CustomEvent("follower-count-changed", { 
+            detail: { artistId: id, isFollowing: true }
+          }));
         }
       } catch (error) {
         console.error(error);
@@ -975,8 +1041,10 @@ export default function ArtistProfilePage({
                   )}
                 </div>
                 <h1
-                  className="text-6xl font-bold uppercase py-4"
-                  style={{ lineHeight: "1.1", color: textColor }}
+                  className="text-6xl w-fit font-bold uppercase py-4 cursor-pointer"
+                  style={{ lineHeight: '1.1', color: textColor }}
+                  // onclick show edit modal
+                  onClick={() => setIsEditOpen(true)}
                 >
                   {artist.artistName}
                 </h1>
@@ -984,9 +1052,9 @@ export default function ArtistProfilePage({
                   className="text-base font-semibold py-6"
                   style={{ lineHeight: "1.1", color: textColor }}
                 >
-                  {new Intl.NumberFormat("en-US").format(
-                    artist.monthlyListeners
-                  )}{" "}
+                  {new Intl.NumberFormat('en-US').format(
+                    followerCount
+                  )}{' '}
                   monthly listeners
                 </span>
               </div>

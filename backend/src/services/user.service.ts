@@ -461,20 +461,33 @@ export const unfollowTarget = async (follower: any, followingId: string) => {
 };
 
 // Lấy danh sách người theo dõi
-export const getUserFollowers = async (req: Request) => {
-  const userId = req.user?.id;
+export const getUserFollowers = async (userId: string) => {
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new Error('User ID is required');
+  }
+
+  // Check if the user exists
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { 
+      id: true, 
+      followVisibility: true,
+      artistProfile: {
+        select: {
+          id: true
+        }
+      }
+    }
+  });
+
+  if (!user) {
+    throw new Error('User not found');
   }
 
   const options = {
     where: {
       OR: [
-        { followingUserId: userId, followingType: 'USER' },
-        {
-          followingArtistId: req.user?.artistProfile?.id,
-          followingType: 'ARTIST',
-        },
+        { followingUserId: userId, followingType: 'USER' as FollowingType },
       ],
     },
     select: {
@@ -484,24 +497,34 @@ export const getUserFollowers = async (req: Request) => {
       },
       createdAt: true,
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: 'desc' as const },
   };
 
-  const result = await paginate(prisma.userFollow, req, options);
+  const followers = await prisma.userFollow.findMany(options);
 
   return {
-    followers: result.data.map(
-      (follow: { follower: typeof userSelect }) => follow.follower
-    ),
-    pagination: result.pagination,
+    followers: followers.map((follow) => follow.follower),
+    canView: true
   };
 };
 
 // Lấy danh sách người đang theo dõi
-export const getUserFollowing = async (req: Request) => {
-  const userId = req.user?.id;
+export const getUserFollowing = async (userId: string) => {
   if (!userId) {
-    throw new Error('Unauthorized');
+    throw new Error('User ID is required');
+  }
+
+  // Check if the user exists
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { 
+      id: true, 
+      followVisibility: true
+    }
+  });
+
+  if (!user) {
+    throw new Error('User not found');
   }
 
   const options = {
@@ -543,35 +566,26 @@ export const getUserFollowing = async (req: Request) => {
       },
       createdAt: true,
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: 'desc' as const },
   };
 
-  const result = await paginate(prisma.userFollow, req, options);
+  const following = await prisma.userFollow.findMany(options);
 
   // Mapping followed users and artists
-  const following = result.data.map(
-    (follow: {
-      followingType: 'USER' | 'ARTIST';
-      followingUser: any;
-      followingArtist: any;
-    }) => {
-      if (follow.followingType === 'USER') {
-        return {
-          type: 'USER',
-          ...follow.followingUser,
-        };
-      } else {
-        return {
-          type: 'ARTIST',
-          ...follow.followingArtist,
-          user: follow.followingArtist?.user,
-        };
-      }
+  return following.map((follow) => {
+    if (follow.followingType === 'USER') {
+      return {
+        type: 'USER',
+        ...follow.followingUser,
+      };
+    } else {
+      return {
+        type: 'ARTIST',
+        ...follow.followingArtist,
+        user: follow.followingArtist?.user,
+      };
     }
-  );
-
-  // Trả về mảng trực tiếp thay vì object có pagination
-  return following;
+  });
 };
 
 // Gửi yêu cầu trở thành Artist
@@ -819,6 +833,7 @@ export const getUserProfile = async (id: string) => {
       id: true,
       name: true,
       email: true,
+      followVisibility: true,
       username: true,
       avatar: true,
       role: true,
@@ -1489,3 +1504,15 @@ export const getGenreTopArtists = async (genreId: string) => {
 
   return artists;
 }
+
+// Set user followVisibility 
+export const setFollowVisibility = async (user: any, isPublic: boolean) => {
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
+
+  return prisma.user.update({
+    where: { id: user.id },
+    data: { followVisibility: isPublic },
+  });
+};

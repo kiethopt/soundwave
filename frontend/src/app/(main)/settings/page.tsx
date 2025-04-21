@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from '@/contexts/ThemeContext';
 import { ExternalLink } from 'lucide-react';
 import { EditProfileModal } from '@/components/user/profile/EditProfileModal';
-import { set } from 'lodash';
 import toast from 'react-hot-toast';
+import { api } from '@/utils/api';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -16,19 +16,39 @@ export default function SettingsPage() {
   const [compactLayout, setCompactLayout] = useState<boolean>(false);
   const [showSocialLists, setShowSocialLists] = useState<boolean>(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
-
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const sidebarCollapsed = JSON.parse(localStorage.getItem('sidebarCollapsed') || 'false');
-      setCompactLayout(sidebarCollapsed || false);
-      
-      const userSettings = JSON.parse(localStorage.getItem('userSettings') || '{}');
-      setShowSocialLists(userSettings.showSocialLists || false);
-    } catch (error) {
-      console.error('Error loading settings:', error);
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      router.push('/login');
+      return;
     }
-  }, []);
+
+    // Fetch user data including follow visibility setting
+    const fetchUserData = async () => {
+      try {
+        setIsLoading(true);
+        const userData = await api.auth.getMe(token);
+        setShowSocialLists(userData.followVisibility || false);
+        
+        // Load other settings from localStorage
+        try {
+          const sidebarCollapsed = JSON.parse(localStorage.getItem('sidebarCollapsed') || 'false');
+          setCompactLayout(sidebarCollapsed || false);
+        } catch (error) {
+          console.error('Error loading sidebar settings:', error);
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        toast.error('Failed to load user settings');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [router]);
 
   // Listen for sidebar collapsed state changes
   useEffect(() => {
@@ -58,20 +78,30 @@ export default function SettingsPage() {
     window.dispatchEvent(event);
   };
 
-  useEffect(() => {
-    try {
-      const userSettings = {
-        showSocialLists
-      };
-      localStorage.setItem('userSettings', JSON.stringify(userSettings));
-    } catch (error) {
-      console.error('Error saving settings:', error);
-    }
-  }, [showSocialLists]);
-
   const handleEditLoginMethods = () => {
     setIsEditProfileModalOpen(true);
   };
+
+  const handleShowSocialListsChange = async (value: boolean) => {
+    setShowSocialLists(value);
+    
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      await api.user.setFollowVisibility(token, { isVisible: value });
+      toast.success(value 
+        ? 'Your follower and following lists are now public' 
+        : 'Your follower and following lists are now private');
+    } catch (error) {
+      console.error('Error updating follow visibility:', error);
+      toast.error('Failed to update visibility settings');
+      setShowSocialLists(!value);
+    }
+  }
 
   return (
     <div className="w-full px-4 py-8">
@@ -101,6 +131,7 @@ export default function SettingsPage() {
           <Switch 
             checked={compactLayout} 
             onCheckedChange={handleCompactLayoutChange}
+            disabled={isLoading}
           />
         </div>
       </div>
@@ -112,7 +143,8 @@ export default function SettingsPage() {
           <span className="text-sm">Show my follower and following lists on my public profile</span>
           <Switch 
             checked={showSocialLists} 
-            onCheckedChange={setShowSocialLists}
+            onCheckedChange={handleShowSocialListsChange}
+            disabled={isLoading}
           />
         </div>
       </div>

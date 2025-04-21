@@ -1,5 +1,4 @@
 import { ArtistRequestFilters, CreatePlaylistData } from "@/types";
-import { get } from "lodash";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -568,11 +567,11 @@ export const api = {
         token
       ),
 
-    getFollowers: async (token: string) =>
-      fetchWithAuth("/api/user/followers", { method: "GET" }, token),
+    getUserFollowers: async (id: string, token: string) =>
+      fetchWithAuth(`/api/user/followers/${id}`, { method: "GET" }, token),
 
-    getFollowing: async (token: string) =>
-      fetchWithAuth("/api/user/following", { method: "GET" }, token),
+    getUserFollowing: async (id: string, token: string) =>
+      fetchWithAuth(`/api/user/following/${id}`, { method: "GET" }, token),
 
     requestArtistRole: async (token: string, data: FormData) =>
       fetchWithAuth(
@@ -603,6 +602,17 @@ export const api = {
       return fetchWithAuth(
         "/api/user/check-artist-request",
         { method: "GET" },
+        token
+      );
+    },
+
+    setFollowVisibility: async (token: string, data: { isVisible: boolean }) => {
+      return fetchWithAuth(
+        "/api/user/set-follow-visibility",
+        {
+          method: "PUT",
+          body: JSON.stringify(data),
+        },
         token
       );
     },

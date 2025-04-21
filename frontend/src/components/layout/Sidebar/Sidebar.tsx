@@ -586,7 +586,7 @@ export default function Sidebar({
                     )}
                     
                     {/* Conditional rendering for 'Create playlist' prompt */}
-                    {!isCollapsed && !loading && playlists.length === 0 ? (
+                    {!isCollapsed && !loading && playlists.length === 0 || !isAuthenticated ? (
                       <div
                         className={`p-4 rounded-lg mt-4 ${
                           theme === "light" ? "bg-gray-100" : "bg-[#242424]"
