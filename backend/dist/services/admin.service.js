@@ -49,12 +49,24 @@ const email_service_1 = require("./email.service");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const getUsers = async (req, requestingUser) => {
     const { search = '', status, role } = req.query;
+    let roleFilter = {};
+    if (requestingUser.adminLevel !== 1) {
+        roleFilter = client_1.Role.USER;
+    }
+    if (requestingUser.adminLevel === 1 && role) {
+        const requestedRoles = Array.isArray(role)
+            ? role
+            : [role];
+        const validRoles = requestedRoles
+            .map((r) => r.toUpperCase())
+            .filter((r) => Object.values(client_1.Role).includes(r));
+        if (validRoles.length > 0) {
+            roleFilter = { in: validRoles };
+        }
+    }
     const where = {
-        ...(requestingUser.adminLevel !== 1
-            ? { role: client_1.Role.USER }
-            : role && typeof role === 'string' && Object.values(client_1.Role).includes(role.toUpperCase())
-                ? { role: role.toUpperCase() }
-                : {}),
+        ...(Object.keys(roleFilter).length > 0 ? { role: roleFilter } : {}),
+        ...(requestingUser.adminLevel === 1 ? { id: { not: requestingUser.id } } : {}),
         ...(search
             ? {
                 OR: [
@@ -469,10 +481,6 @@ const approveArtistRequest = async (requestId) => {
                 verificationRequestedAt: null,
             },
             include: { user: { select: prisma_selects_1.userSelect } }
-        });
-        await tx.user.update({
-            where: { id: profile.userId },
-            data: { role: client_1.Role.ARTIST }
         });
         return profile;
     });

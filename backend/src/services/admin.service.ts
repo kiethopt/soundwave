@@ -26,13 +26,33 @@ type User = PrismaUser & { adminLevel?: number | null };
 export const getUsers = async (req: Request, requestingUser: User) => {
   const { search = '', status, role } = req.query;
 
+  // Start with base role filtering based on requesting user's level
+  let roleFilter: Prisma.UserWhereInput['role'] = {};
+  if (requestingUser.adminLevel !== 1) {
+    roleFilter = Role.USER; // Level 2+ Admins only see USER role
+  }
+
+  // Apply specific role filter from query if provided and user is Level 1 Admin
+  if (requestingUser.adminLevel === 1 && role) {
+    const requestedRoles = Array.isArray(role)
+      ? (role as string[])
+      : [role as string];
+
+    const validRoles = requestedRoles
+      .map((r) => r.toUpperCase())
+      .filter((r) => Object.values(Role).includes(r as Role)) as Role[];
+
+    if (validRoles.length > 0) {
+      roleFilter = { in: validRoles };
+    }
+  }
+
   const where: Prisma.UserWhereInput = {
-    ...(requestingUser.adminLevel !== 1
-      ? { role: Role.USER } // Level 2+ Admins only see USER role
-      : role && typeof role === 'string' && Object.values(Role).includes(role.toUpperCase() as Role)
-      ? { role: role.toUpperCase() as Role } // Apply role filter if valid and provided by Lvl 1
-      : {} // Lvl 1 sees all roles if no specific role filter is applied
-    ),
+    // Apply the determined role filter
+    ...(Object.keys(roleFilter).length > 0 ? { role: roleFilter } : {}),
+    // Exclude the requesting user if they are Level 1 Admin
+    ...(requestingUser.adminLevel === 1 ? { id: { not: requestingUser.id } } : {}),
+    // Combine with search filter using AND implicitly
     ...(search
       ? {
           OR: [
@@ -42,6 +62,7 @@ export const getUsers = async (req: Request, requestingUser: User) => {
           ],
         }
       : {}),
+    // Combine with status filter using AND implicitly
     ...(status !== undefined ? { isActive: toBooleanValue(status) } : {}),
   };
 
@@ -551,18 +572,12 @@ export const approveArtistRequest = async (requestId: string) => {
      const profile = await tx.artistProfile.update({
          where: { id: requestId },
          data: {
-             role: Role.ARTIST, // Ensure role is set on profile
+             role: Role.ARTIST, 
              isVerified: true,
              verifiedAt: new Date(),
-             verificationRequestedAt: null, // Clear the request timestamp
+             verificationRequestedAt: null,
          },
-         include: { user: { select: userSelect }} // Select user data needed for response/email
-     });
-
-     // Update associated User's role (important!)
-     await tx.user.update({
-        where: { id: profile.userId },
-        data: { role: Role.ARTIST } // Update user role to ARTIST
+         include: { user: { select: userSelect }}
      });
 
      return profile;

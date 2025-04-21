@@ -371,7 +371,8 @@ export default function Sidebar({
               userRole === ("ADMIN" as "USER" | "ADMIN") ? "px-2" : "px-4"
             }`}
           >
-            {currentProfile === ("USER" as "USER" | "ARTIST") &&
+            {userRole === ("USER" as "USER" | "ADMIN") &&
+              currentProfile === ("USER" as "USER" | "ARTIST") &&
               ( 
                 <div className="flex flex-col">
                   <div className="h-[72px] -mx-4 border-b border-white/10">
@@ -708,6 +709,7 @@ export default function Sidebar({
                 </div>
               )}
 
+            {/* Artist Dashboard Section */}
             {hasArtistProfile &&
               isArtistVerified &&
               currentProfile === ("ARTIST" as "USER" | "ARTIST") && (
