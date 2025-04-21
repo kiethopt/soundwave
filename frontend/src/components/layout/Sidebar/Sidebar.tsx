@@ -346,7 +346,9 @@ export default function Sidebar({
             <div className="px-4 py-6">
               <div
                 className={
-                  isCollapsed ? "flex justify-center" : "flex justify-start"
+                  isCollapsed
+                    ? "flex justify-center"
+                    : "flex justify-start"
                 }
               >
                 <Image
@@ -564,43 +566,44 @@ export default function Sidebar({
                       </div>
                     )}
                     
-                      {!loading && playlists.length === 0 && (
-                        <div
-                          className={`p-4 rounded-lg mt-4 ${
-                            theme === "light" ? "bg-gray-100" : "bg-[#242424]"
+                    {/* Conditional rendering for 'Create playlist' prompt */}
+                    {!isCollapsed && !loading && playlists.length === 0 ? (
+                      <div
+                        className={`p-4 rounded-lg mt-4 ${
+                          theme === "light" ? "bg-gray-100" : "bg-[#242424]"
+                        }`}
+                      >
+                        <h3
+                          className={`font-bold text-base ${
+                            theme === "light" ? "text-gray-900" : "text-white"
                           }`}
                         >
-                          <h3
-                            className={`font-bold text-base ${
-                              theme === "light" ? "text-gray-900" : "text-white"
-                            }`}
-                          >
-                            Create your first playlist
-                          </h3>
-                          <p
-                            className={`text-sm mt-1 ${
-                              theme === "light"
-                                ? "text-gray-600"
-                                : "text-white/70"
-                            }`}
-                          >
-                            It's easy! We'll help you
-                          </p>
-                          <button
-                            onClick={handleCreateInstantPlaylist}
-                            disabled={isCreatingPlaylist}
-                            className={`mt-4 px-4 py-1.5 rounded-full font-semibold text-sm ${
-                              theme === "light"
-                                ? "bg-black text-white hover:bg-gray-800"
-                                : "bg-white text-black hover:bg-gray-200"
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
-                          >
-                            {isCreatingPlaylist
-                              ? "Creating..."
-                              : "Create playlist"}
-                          </button>
+                          Create your first playlist
+                        </h3>
+                        <p
+                          className={`text-sm mt-1 ${
+                            theme === "light"
+                              ? "text-gray-600"
+                              : "text-white/70"
+                          }`}
+                        >
+                          It's easy! We'll help you
+                        </p>
+                        <button
+                          onClick={handleCreateInstantPlaylist}
+                          disabled={isCreatingPlaylist}
+                          className={`mt-4 px-4 py-1.5 rounded-full font-semibold text-sm ${
+                            theme === "light"
+                              ? "bg-black text-white hover:bg-gray-800"
+                              : "bg-white text-black hover:bg-gray-200"
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          {isCreatingPlaylist
+                            ? "Creating..."
+                            : "Create playlist"}
+                        </button>
                       </div>
-                    )}
+                    ) : null}
 
                     <div
                       className={`${
@@ -822,7 +825,9 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
+                    <div className="w-full flex justify-center">
                       <HomeOutline className="w-6 h-6" />
+                    </div>
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
@@ -844,7 +849,9 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
-                    <Requests className="w-6 h-6 mx-auto" />
+                    <div className="w-full flex justify-center">
+                      <Requests className="w-6 h-6" />
+                    </div>
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
@@ -872,7 +879,9 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
+                    <div className="w-full flex justify-center">
                       <Users className="w-6 h-6" />
+                    </div>
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
@@ -892,7 +901,9 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
+                    <div className="w-full flex justify-center">
                       <Users className="w-6 h-6" />
+                    </div>
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
@@ -914,7 +925,9 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
-                    <Genres className="w-6 h-6 mx-auto" />
+                    <div className="w-full flex justify-center">
+                      <Genres className="w-6 h-6" />
+                    </div>
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
@@ -934,7 +947,9 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
-                    <Tags className="w-6 h-6 mx-auto" />
+                    <div className="w-full flex justify-center">
+                      <Tags className="w-6 h-6" />
+                    </div>
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
@@ -954,7 +969,9 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
-                    <LayoutGrid className="w-6 h-6 mx-auto" />
+                    <div className="w-full flex justify-center">
+                      <LayoutGrid className="w-6 h-6" />
+                    </div>
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
@@ -982,7 +999,9 @@ export default function Sidebar({
                   }`}
                 >
                   {isCollapsed ? (
-                    <Settings className="w-6 h-6 mx-auto" />
+                    <div className="w-full flex justify-center">
+                      <Settings className="w-6 h-6" />
+                    </div>
                   ) : (
                     <>
                       <div className="min-w-[32px] flex justify-center">
@@ -997,7 +1016,9 @@ export default function Sidebar({
           </nav>
 
           <div
-            className={`p-4 ${
+            className={`p-4 flex ${
+              isCollapsed ? "justify-center" : "justify-start"
+            } ${
               userRole === ("ADMIN" as "USER" | "ADMIN") ? "mt-auto" : ""
             }`}
           >
