@@ -227,138 +227,102 @@ export const updateArtist = async (
     const avatarFile = req.file;
     const { isActive, reason, isVerified, socialMediaLinks, ...artistData } = req.body;
 
-    // Check if we're updating isActive status (activating/deactivating)
-    const isStatusUpdate = 'isActive' in req.body || isActive !== undefined;
-
-    // Handle artist activation/deactivation with reason
-    if (isStatusUpdate) {
-      // Properly convert isActive to boolean
-      const isActiveBool =
-        isActive === 'true' || isActive === true ? true : false;
-
-      const currentArtist = await prisma.artistProfile.findUnique({
-        where: { id },
-        select: { isActive: true, userId: true, artistName: true }, // Lấy thêm artistName
-      });
-      // **Lấy thông tin user (chủ sở hữu artist profile) để gửi email**
-      let ownerUser: {
-        email: string | null;
-        name: string | null;
-        username: string | null;
-      } | null = null;
-      if (currentArtist?.userId) {
-        ownerUser = await prisma.user.findUnique({
-          where: { id: currentArtist.userId },
-          select: { email: true, name: true, username: true },
-        });
-      }
-      const ownerUserName = ownerUser?.name || ownerUser?.username || 'Artist';
-      if (currentArtist && currentArtist.isActive && !isActiveBool) {
-        // Artist is being deactivated
-        const updatedArtist = await adminService.updateArtistInfo(id, {
-          isActive: false,
-        });
-
-        // Send notification if reason is provided
-        if (reason && currentArtist.userId) {
-          await prisma.notification.create({
-            data: {
-              type: 'ACCOUNT_DEACTIVATED',
-              message: `Your artist account has been deactivated. Reason: ${reason}`,
-              recipientType: 'USER',
-              userId: currentArtist.userId,
-              isRead: false,
-            },
-          });
-        }
-        // **Gửi email thông báo Deactivation Artist**
-        if (ownerUser?.email) {
-          try {
-            const emailOptions = emailService.createAccountDeactivatedEmail(
-              ownerUser.email,
-              ownerUserName,
-              'artist', // Loại tài khoản
-              reason
-            );
-            await emailService.sendEmail(emailOptions);
-          } catch (emailError) {
-            console.error(
-              `Failed to send artist deactivation email to ${ownerUser.email}:`,
-              emailError
-            );
-          }
-        }
-        res.json({
-          message: 'Artist deactivated successfully',
-          artist: updatedArtist,
-        });
-        return;
-      } else if (currentArtist && !currentArtist.isActive && isActiveBool) {
-        // Artist is being activated
-        const updatedArtist = await adminService.updateArtistInfo(id, {
-          isActive: true,
-        });
-
-        // Send notification for reactivation
-        if (currentArtist.userId) {
-          await prisma.notification.create({
-            data: {
-              type: 'ACCOUNT_ACTIVATED',
-              message: 'Your artist account has been reactivated.',
-              recipientType: 'USER',
-              userId: currentArtist.userId,
-              isRead: false,
-            },
-          });
-        }
-        // **Gửi email thông báo Activation Artist**
-        if (ownerUser?.email) {
-          try {
-            const emailOptions = emailService.createAccountActivatedEmail(
-              ownerUser.email,
-              ownerUserName,
-              'artist' // Loại tài khoản
-            );
-            await emailService.sendEmail(emailOptions);
-          } catch (emailError) {
-            console.error(
-              `Failed to send artist activation email to ${ownerUser.email}:`,
-              emailError
-            );
-          }
-        }
-
-        res.json({
-          message: 'Artist activated successfully',
-          artist: updatedArtist,
-        });
-        return;
-      }
+    const originalIsActiveInput = isActive;
+    let intendedIsActiveState: boolean | undefined = undefined;
+    if (isActive !== undefined) {
+      intendedIsActiveState = isActive === 'true' || isActive === true;
     }
 
-    // Regular artist update (not status change)
-    // Construct the data object for the service, including new fields
+    // Prepare data for the service call
     const dataForService: any = {
       ...artistData,
     };
+    if (intendedIsActiveState !== undefined) {
+      dataForService.isActive = intendedIsActiveState;
+    }
     if (isVerified !== undefined) {
-      dataForService.isVerified = isVerified;
+      dataForService.isVerified = isVerified === 'true' || isVerified === true;
     }
     if (socialMediaLinks !== undefined) {
       dataForService.socialMediaLinks = socialMediaLinks;
     }
 
+    // Call the service to update the artist info
     const updatedArtist = await adminService.updateArtistInfo(
       id,
-      dataForService, // Pass the combined data
+      dataForService,
       avatarFile
     );
 
+    // --- Asynchronous Notification & Email --- 
+    if (originalIsActiveInput !== undefined) {
+      const finalIsActiveState = updatedArtist.isActive;
+      const ownerUser = updatedArtist.user; 
+      const ownerUserName = ownerUser?.name || ownerUser?.username || 'Artist';
+
+      if (finalIsActiveState === false && intendedIsActiveState === false) {
+        // Artist was deactivated
+        if (ownerUser?.id) {
+          const notificationMessage = `Your artist account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`;
+          prisma.notification.create({ 
+            data: {
+                type: 'ACCOUNT_DEACTIVATED',
+                message: notificationMessage,
+                recipientType: 'USER', // Notifications go to the User profile
+                userId: ownerUser.id,
+                isRead: false,
+            },
+          }).catch(err => console.error('[Async Notify Error] Failed to create artist deactivation notification:', err));
+        }
+        if (ownerUser?.email) {
+          try {
+            const emailOptions = emailService.createAccountDeactivatedEmail(
+                ownerUser.email,
+                ownerUserName,
+                'artist', 
+                reason
+            );
+            emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist deactivation email:', err));
+          } catch (syncError) {
+            console.error('[Email Setup Error] Failed to create artist deactivation email options:', syncError);
+          }
+        }
+      } else if (finalIsActiveState === true && intendedIsActiveState === true) {
+        // Artist was activated
+        if (ownerUser?.id) {
+            prisma.notification.create({ 
+                data: {
+                    type: 'ACCOUNT_ACTIVATED',
+                    message: 'Your artist account has been reactivated.',
+                    recipientType: 'USER', // Notifications go to the User profile
+                    userId: ownerUser.id,
+                    isRead: false,
+                },
+            }).catch(err => console.error('[Async Notify Error] Failed to create artist activation notification:', err));
+        }
+        if (ownerUser?.email) {
+          try {
+            const emailOptions = emailService.createAccountActivatedEmail(
+                ownerUser.email,
+                ownerUserName,
+                'artist'
+            );
+            emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist activation email:', err));
+          } catch (syncError) {
+            console.error('[Email Setup Error] Failed to create artist activation email options:', syncError);
+          }
+        }
+      }
+    }
+
+    // Send the successful response immediately
     res.json({
       message: 'Artist updated successfully',
-      artist: updatedArtist,
+      artist: updatedArtist, // Return the updated artist data
     });
+
   } catch (error) {
+    // Simplify error handling as some context variables were removed
     if (error instanceof Error) {
       if (error.message === 'Artist not found') {
         res.status(404).json({ message: 'Artist not found' });
@@ -366,9 +330,13 @@ export const updateArtist = async (
       } else if (error.message === 'Artist name already exists') {
         res.status(400).json({ message: 'Artist name already exists' });
         return;
+      } else {
+         // For other errors from the service or prisma, use the generic handler
+         handleError(res, error, 'Update artist');
       }
+    } else {
+        handleError(res, error, 'Update artist');
     }
-    handleError(res, error, 'Update artist');
   }
 };
 

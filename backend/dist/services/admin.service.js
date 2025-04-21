@@ -228,6 +228,15 @@ exports.updateUserInfo = updateUserInfo;
 const updateArtistInfo = async (id, data, avatarFile) => {
     const existingArtist = await db_1.default.artistProfile.findUnique({
         where: { id },
+        select: {
+            id: true,
+            artistName: true,
+            isActive: true,
+            isVerified: true,
+            socialMediaLinks: true,
+            userId: true,
+            user: { select: { email: true, name: true, username: true } }
+        }
     });
     if (!existingArtist) {
         throw new Error('Artist not found');

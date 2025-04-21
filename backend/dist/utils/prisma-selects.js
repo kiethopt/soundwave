@@ -306,6 +306,7 @@ exports.artistProfileSelect = {
             name: true,
             email: true,
             avatar: true,
+            username: true,
         },
     },
 };

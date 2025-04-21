@@ -308,6 +308,7 @@ export const artistProfileSelect = {
       name: true,
       email: true,
       avatar: true,
+      username: true,
     },
   },
 } satisfies Prisma.ArtistProfileSelect;

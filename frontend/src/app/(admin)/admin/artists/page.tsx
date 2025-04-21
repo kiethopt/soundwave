@@ -73,20 +73,31 @@ export default function ArtistManagement() {
   const [isBulkDeactivating, setIsBulkDeactivating] = useState(false);
 
   // Action handlers
-  const handleArtistStatus = async (artistId: string, isActive: boolean) => {
-    if (isActive) {
+  const handleChangeArtistStatus = async (artistId: string) => {
+    const artist = artists.find((a) => a.id === artistId);
+    if (!artist) {
+      toast.error('Artist not found.');
+      return;
+    }
+
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('No authentication token found');
+      return;
+    }
+
+    // If artist is currently active, open deactivate modal
+    if (artist.isActive) {
+      setArtistIdToDeactivate(artistId);
+      setIsDeactivateModalOpen(true);
+    } else {
+      // If artist is currently inactive, activate them
       try {
-        const token = localStorage.getItem('userToken');
-        if (!token) throw new Error('No authentication token found');
-
         setActionLoading(artistId);
-
         await api.admin.updateArtist(artistId, { isActive: true }, token);
 
         setArtists((prev) =>
-          prev.map((artist) =>
-            artist.id === artistId ? { ...artist, isActive: true } : artist
-          )
+          prev.map((a) => (a.id === artistId ? { ...a, isActive: true } : a))
         );
 
         toast.success('Artist activated successfully');
@@ -97,9 +108,6 @@ export default function ArtistManagement() {
       } finally {
         setActionLoading(null);
       }
-    } else {
-      setArtistIdToDeactivate(artistId);
-      setIsDeactivateModalOpen(true);
     }
   };
 
@@ -279,7 +287,7 @@ export default function ArtistManagement() {
   // Define columns
   const columns = getArtistColumns({
     theme,
-    onStatusChange: handleArtistStatus,
+    onStatusChange: handleChangeArtistStatus,
     onDelete: handleDeleteArtist,
     loading,
     actionLoading,

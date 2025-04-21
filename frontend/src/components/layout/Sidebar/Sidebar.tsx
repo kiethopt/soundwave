@@ -370,7 +370,7 @@ export default function Sidebar({
             }`}
           >
             {currentProfile === ("USER" as "USER" | "ARTIST") &&
-              userRole === ("USER" as "USER" | "ADMIN") && (
+              ( 
                 <div className="flex flex-col">
                   <div className="h-[72px] -mx-4 border-b border-white/10">
                     <div className="h-full flex items-center gap-4 px-7">

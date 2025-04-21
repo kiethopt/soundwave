@@ -157,7 +157,6 @@ export const getArtistRequestDetail = async (id: string) => {
   return request;
 };
 
-// --- REWRITTEN updateUserInfo Function ---
 export const updateUserInfo = async (
   id: string,
   data: any,
@@ -257,6 +256,16 @@ export const updateArtistInfo = async (
   // Kiểm tra artist có tồn tại không
   const existingArtist = await prisma.artistProfile.findUnique({
     where: { id },
+    // Select user details needed for potential async tasks later in controller
+    select: {
+      id: true,
+      artistName: true,
+      isActive: true,
+      isVerified: true,
+      socialMediaLinks: true,
+      userId: true,
+      user: { select: { email: true, name: true, username: true } }
+    }
   });
 
   if (!existingArtist) {
@@ -334,6 +343,8 @@ export const updateArtistInfo = async (
       // Update social media links only if it was present in the request data
       ...(socialMediaLinks !== undefined && { socialMediaLinks: socialMediaLinksUpdate }),
     },
+    // Use artistProfileSelect to ensure consistent return data,
+    // it already includes the necessary user fields.
     select: artistProfileSelect,
   });
 
