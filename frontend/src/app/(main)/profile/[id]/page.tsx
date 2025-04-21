@@ -585,7 +585,7 @@ export default function UserProfilePage({
               {/* Follow Button (Can't self follow) */}
               {!isOwner && (
                 <Button
-                  variant={theme === "dark" ? "secondary" : "outline"}
+                  variant={theme === "dark" ? "default" : "outline"}
                   size="sm"
                   onClick={handleFollow}
                   className="flex-shrink-0 justify-center min-w-[80px]"
