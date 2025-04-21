@@ -1,6 +1,6 @@
 import { Track } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
-import { MoreHorizontal, Heart, Share2 } from 'lucide-react';
+import { MoreHorizontal, Heart, Share2, ListMusic } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
@@ -8,10 +8,17 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
-import { Play, Pause } from '@/components/ui/Icons';
+import { Play, Pause, AddSimple } from '@/components/ui/Icons';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
+import { toast } from 'react-hot-toast';
+import { api } from '@/utils/api';
+import { useTrack } from '@/contexts/TrackContext';
 
 interface AlbumTracksProps {
   tracks: Track[];
@@ -19,6 +26,7 @@ interface AlbumTracksProps {
   currentTrack: Track | null;
   isPlaying: boolean;
   requiresAuth?: boolean;
+  playlists: { id: string; name: string; coverUrl?: string }[];
 }
 
 export function AlbumTracks({
@@ -27,10 +35,12 @@ export function AlbumTracks({
   currentTrack,
   isPlaying,
   requiresAuth = false,
+  playlists,
 }: AlbumTracksProps) {
   const { theme } = useTheme();
   const router = useRouter();
   const { dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
+  const { addToQueue } = useTrack();
 
   const handleTrackPlay = (track: Track) => {
     if (requiresAuth) {
@@ -39,6 +49,46 @@ export function AlbumTracks({
     }
 
     onTrackPlay(track);
+  };
+
+  const handleAddToFavorites = async (trackId: string) => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      await api.tracks.like(trackId, token);
+      toast.success('Added to Favorites');
+      
+      // Emit event to update playlists
+      window.dispatchEvent(new CustomEvent('favorites-changed'));
+    } catch (error: any) {
+      console.error('Error adding to favorites:', error);
+      toast.error(error.message || 'Cannot add to favorites');
+    }
+  };
+
+  const handleAddToQueue = (track: Track) => {
+    addToQueue(track);
+    toast.success('Added to queue');
+  };
+
+  const handleAddToPlaylist = async (playlistId: string, trackId: string) => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      await api.playlists.addTrack(playlistId, trackId, token);
+      toast.success('Added to playlist');
+    } catch (error: any) {
+      console.error('Error adding to playlist:', error);
+      toast.error(error.message || 'Cannot add to playlist');
+    }
   };
 
   return (
@@ -160,14 +210,67 @@ export function AlbumTracks({
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuItem
                     className="cursor-pointer"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddToQueue(track);
+                    }}
                   >
-                    <div className="flex items-center w-4 h-4 mr-2">+</div>
-                    Add to Playlist
+                    <ListMusic className="w-4 h-4 mr-2" />
+                    Add to Queue
                   </DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <AddSimple className="w-4 h-4 mr-2" />
+                      Add to Playlist
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent className="w-48">
+                        {playlists.length === 0 ? (
+                          <DropdownMenuItem disabled>
+                            No playlists available
+                          </DropdownMenuItem>
+                        ) : (
+                          playlists.map((playlist) => (
+                            <DropdownMenuItem
+                              key={playlist.id}
+                              onClick={() =>
+                                handleAddToPlaylist(playlist.id, track.id)
+                              }
+                            >
+                              <div className="flex items-center gap-2 w-full">
+                                <div className="w-6 h-6 relative flex-shrink-0">
+                                  {playlist.coverUrl ? (
+                                    <img
+                                      src={playlist.coverUrl}
+                                      alt={playlist.name}
+                                      className="w-full h-full object-cover rounded"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-white/10 rounded flex items-center justify-center">
+                                      <svg
+                                        className="w-4 h-4 text-white/70"
+                                        fill="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </div>
+                                <span className="truncate">{playlist.name}</span>
+                              </div>
+                            </DropdownMenuItem>
+                          ))
+                        )}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
                   <DropdownMenuItem
                     className="cursor-pointer"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddToFavorites(track.id);
+                    }}
                   >
                     <Heart className="w-4 h-4 mr-2" />
                     Add to Favorites

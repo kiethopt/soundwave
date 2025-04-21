@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, Music, AddSimple } from '@/components/ui/Icons';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Album, Track } from '@/types';
+import { Album, Track, Playlist } from '@/types';
 import { useTrack } from '@/contexts/TrackContext';
 import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
 import {
@@ -20,7 +20,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { AlbumTracks } from '@/components/user/album/AlbumTracks';
 import io, { Socket } from 'socket.io-client'; // Import Socket
-
 export default function AlbumDetailPage() {
   const params = useParams();
   const albumId = params?.id
@@ -35,6 +34,7 @@ export default function AlbumDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const { dominantColor } = useDominantColor(album?.coverUrl);
   const { theme } = useTheme();
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const {
     currentTrack,
     isPlaying,
@@ -75,6 +75,22 @@ export default function AlbumDetailPage() {
       fetchAlbumDetails();
     }
   }, [albumId, fetchAlbumDetails]);
+
+  useEffect(() => {
+    const fetchPlaylists = async () => {
+      try {
+        const token = localStorage.getItem('userToken');
+        if (!token) return;
+
+        const response = await api.playlists.getAll(token);
+        setPlaylists(response.data);
+      } catch (error) {
+        console.error('Error fetching playlists:', error);
+      }
+    };
+
+    fetchPlaylists();
+  }, []);
 
   // WebSocket listener for album updates
   useEffect(() => {
@@ -381,6 +397,7 @@ export default function AlbumDetailPage() {
                   currentTrack={currentTrack}
                   isPlaying={isPlaying}
                   requiresAuth={!isAuthenticated}
+                  playlists={playlists}
                 />
               </div>
             </div>

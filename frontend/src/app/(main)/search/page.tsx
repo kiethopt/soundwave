@@ -283,6 +283,25 @@ function SearchContent() {
     }
   };
 
+  const handleAddToFavorites = async (trackId: string) => {
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      await api.tracks.like(trackId, token);
+      toast.success('Added to Favorites');
+      
+      // Emit event to update playlists
+      window.dispatchEvent(new CustomEvent('favorites-changed'));
+    } catch (error: any) {
+      console.error('Error adding to favorites:', error);
+      toast.error(error.message || 'Cannot add to favorites');
+    }
+  };
+
   return (
     <div suppressHydrationWarning>
       {/* Filter Bar */}
@@ -593,7 +612,13 @@ function SearchContent() {
                                 </DropdownMenuSubContent>
                               </DropdownMenuPortal>
                             </DropdownMenuSub>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToFavorites(track.id);
+                              }}
+                            >
                               <Heart className="w-4 h-4 mr-2" />
                               Add to Favorites
                             </DropdownMenuItem>
@@ -760,7 +785,13 @@ function SearchContent() {
                                 </DropdownMenuSubContent>
                               </DropdownMenuPortal>
                             </DropdownMenuSub>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToFavorites(track.id);
+                              }}
+                            >
                               <Heart className="w-4 h-4 mr-2" />
                               Add to Favorites
                             </DropdownMenuItem>

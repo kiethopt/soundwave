@@ -99,19 +99,6 @@ export const getPlaylists: RequestHandler = async (
         },
       });
 
-      // Create Favorites playlist if it doesn't exist
-      if (!favoritePlaylist) {
-        favoritePlaylist = await prisma.playlist.create({
-          data: {
-            name: "Favorites",
-            description: "List of your favorite songs",
-            privacy: "PRIVATE",
-            type: "FAVORITE",
-            userId,
-          },
-        });
-      }
-
       // Check for Vibe Rewind playlist
       let vibeRewindPlaylist = await prisma.playlist.findFirst({
         where: {

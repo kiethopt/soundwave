@@ -516,7 +516,7 @@ export default function Sidebar({
                                   </p>
                                   <p className="text-neutral-400 text-xs">
                                     Playlist •{" "}
-                                    {favoritePlaylist.totalTracks || 0} bài hát
+                                    {favoritePlaylist.totalTracks || 0} tracks
                                   </p>
                                 </TooltipContent>
                               </Tooltip>
@@ -657,8 +657,7 @@ export default function Sidebar({
                                     {playlist.name}
                                   </p>
                                   <p className="text-neutral-400 text-xs">
-                                    Playlist • {playlist.totalTracks || 0} bài
-                                    hát
+                                    Playlist • {playlist.totalTracks || 0} tracks
                                   </p>
                                 </TooltipContent>
                               </Tooltip>

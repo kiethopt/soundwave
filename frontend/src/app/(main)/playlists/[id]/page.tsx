@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Pencil, Trash2, Lock, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useSocket } from "@/contexts/SocketContext";
 
 // Khai báo event bus đơn giản để gọi fetchPlaylists từ sidebar
 const playlistUpdateEvent = new CustomEvent("playlist-updated");
@@ -60,12 +61,14 @@ export default function PlaylistPage() {
     : null;
   const { isAuthenticated, dialogOpen, setDialogOpen, handleProtectedAction } =
     useAuth();
+  const { socket } = useSocket();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [favoritePlaylistTotalTracks, setFavoritePlaylistTotalTracks] = useState<number>(0);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,6 +120,9 @@ export default function PlaylistPage() {
 
         if (response.success) {
           setPlaylist(response.data);
+          if (response.data.type === "FAVORITE") {
+            setFavoritePlaylistTotalTracks(response.data.totalTracks);
+          }
         } else {
           setError(response.message || "Could not load playlist");
         }
@@ -132,6 +138,21 @@ export default function PlaylistPage() {
       fetchPlaylist();
     }
   }, [id]);
+
+  // Add socket listener for favorites updates
+  useEffect(() => {
+    if (!socket || !id) return;
+
+    socket.on("favorites-updated", (data: { action: "add" | "remove"; trackId: string }) => {
+      if (playlist?.type === "FAVORITE") {
+        setFavoritePlaylistTotalTracks((prev) => prev + (data.action === "add" ? 1 : -1));
+      }
+    });
+
+    return () => {
+      socket.off("favorites-updated");
+    };
+  }, [socket, id, playlist?.type]);
 
   const handleCoverClick = () => {
     if (!canEditPlaylist || isUploadingCover) return;
@@ -417,15 +438,14 @@ export default function PlaylistPage() {
 
           {/* Updated Metadata Line - Only show track count and duration */}
           <div className="flex items-center gap-1.5 text-sm text-white/70 flex-wrap mt-1">
-            {/* Remove user section as data is not available */}
             {playlist.totalTracks > 0 && (
               <>
-                <span>{playlist.totalTracks} bài hát,</span>
+                <span>{playlist.type === "FAVORITE" ? favoritePlaylistTotalTracks : playlist.totalTracks} tracks,</span>
                 <span className="ml-1 text-white/50">{formattedDuration}</span>
               </>
             )}
             {playlist.totalTracks === 0 && (
-              <span className="text-white/50">0 bài hát</span>
+              <span className="text-white/50">0 tracks</span>
             )}
           </div>
 
