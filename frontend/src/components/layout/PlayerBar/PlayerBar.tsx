@@ -23,6 +23,7 @@ import { api } from "@/utils/api";
 import { toast } from "react-hot-toast";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function PlayerBar() {
   const [showMobileExpanded, setShowMobileExpanded] = useState(false);
@@ -31,6 +32,7 @@ export default function PlayerBar() {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { handleProtectedAction } = useAuth();
 
   const {
     currentTrack,
@@ -55,15 +57,15 @@ export default function PlayerBar() {
   const prevVolumeRef = useRef(volume);
 
   useEffect(() => {
-    const token = localStorage.getItem('userToken');
+    const token = localStorage.getItem("userToken");
     setIsAuthenticated(!!token);
     const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'userToken') {
-            setIsAuthenticated(!!localStorage.getItem('userToken'));
-        }
+      if (event.key === "userToken") {
+        setIsAuthenticated(!!localStorage.getItem("userToken"));
+      }
     };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
   const formatTime = (seconds: number) => {
@@ -76,39 +78,46 @@ export default function PlayerBar() {
     setShowMobileExpanded(!showMobileExpanded);
   };
 
-  const handleLike = async (e: any) => {
+  const handleLike = async (e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
     }
 
-    if (!currentTrack) return;
+    handleProtectedAction(async () => {
+      if (!currentTrack) return;
 
-    const token = localStorage.getItem("userToken");
-    if (!token) {
-      setShowAuthDialog(true);
-      return;
-    }
+      const token = localStorage.getItem("userToken");
+      if (!token) return;
 
-    try {
-      if (isLiked) {
-        await api.tracks.unlike(currentTrack.id, token);
-        setIsLiked(false);
-        toast.success("Removed from your Liked Tracks");
-        
-        // Trigger manual event to update sidebar
-        window.dispatchEvent(new CustomEvent("favorites-changed"));
-      } else {
-        await api.tracks.like(currentTrack.id, token);
-        setIsLiked(true);
-        toast.success("Added to your Liked Tracks");
-        
-        // Trigger manual event to update sidebar
-        window.dispatchEvent(new CustomEvent("favorites-changed"));
+      const currentlyLiked = isLiked;
+      const trackId = currentTrack.id;
+
+      setIsLiked(!currentlyLiked);
+
+      try {
+        if (currentlyLiked) {
+          await api.tracks.unlike(trackId, token);
+          toast.success("Removed from your Liked Tracks");
+          window.dispatchEvent(
+            new CustomEvent("favorites-changed", {
+              detail: { action: "remove", trackId },
+            })
+          );
+        } else {
+          await api.tracks.like(trackId, token);
+          toast.success("Added to your Liked Tracks");
+          window.dispatchEvent(
+            new CustomEvent("favorites-changed", {
+              detail: { action: "add", trackId },
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Error toggling like status:", error);
+        toast.error("There was an error updating your liked tracks");
+        setIsLiked(currentlyLiked);
       }
-    } catch (error) {
-      console.error("Error toggling like status:", error);
-      toast.error("There was an error updating your liked tracks");
-    }
+    });
   };
 
   useEffect(() => {
@@ -131,17 +140,18 @@ export default function PlayerBar() {
 
   const getVolumeIcon = () => {
     if (volume === 0) return <VolumeOff className="w-5 h-5 text-white" />;
-    if (volume > 0 && volume <= 0.66) return <VolumeMedium className="w-5 h-5 text-white" />;
+    if (volume > 0 && volume <= 0.66)
+      return <VolumeMedium className="w-5 h-5 text-white" />;
     return <VolumeFull className="w-5 h-5 text-white" />;
   };
 
   const handleVolumeIconClick = () => {
     if (volume === 0) {
-      const prev = localStorage.getItem('prevUserVolume');
+      const prev = localStorage.getItem("prevUserVolume");
       setVolume(prev ? parseFloat(prev) : 0.5);
     } else {
       prevVolumeRef.current = volume;
-      localStorage.setItem('prevUserVolume', volume.toString());
+      localStorage.setItem("prevUserVolume", volume.toString());
       setVolume(0);
     }
   };
@@ -155,9 +165,7 @@ export default function PlayerBar() {
       {/* Desktop & Tablet Player Bar */}
       <div
         className={`fixed bottom-0 left-0 right-0 z-50 p-3 px-4 grid-cols-5 gap-4 items-center w-full hidden md:grid transition-colors duration-300 ${
-          !currentTrack
-            ? 'bg-[#111111] opacity-80'
-            : 'bg-[#1c1c1c]'
+          !currentTrack ? "bg-[#111111] opacity-80" : "bg-[#1c1c1c]"
         }`}
       >
         {/* Track Info */}
@@ -208,7 +216,7 @@ export default function PlayerBar() {
         {/* Track Controls - Dim controls if no track */}
         <div
           className={`flex flex-col items-center justify-center col-span-3 space-y-2 ${
-            !currentTrack ? 'opacity-50 pointer-events-none' : ''
+            !currentTrack ? "opacity-50 pointer-events-none" : ""
           }`}
         >
           {/* Track Controls */}
@@ -269,7 +277,7 @@ export default function PlayerBar() {
           {/* Progress Bar */}
           <div className="flex w-full items-center justify-between max-w-2xl space-x-4">
             <span className="text-white text-sm min-w-fit">
-              {currentTrack ? formatTime((progress / 100) * duration) : '0:00'}
+              {currentTrack ? formatTime((progress / 100) * duration) : "0:00"}
             </span>
             <div className="relative w-full flex items-center group">
               {/* Background bar */}
@@ -311,7 +319,7 @@ export default function PlayerBar() {
               />
             </div>
             <span className="text-white text-sm min-w-fit">
-              {currentTrack ? formatTime(duration) : '0:00'}
+              {currentTrack ? formatTime(duration) : "0:00"}
             </span>
           </div>
         </div>
@@ -319,7 +327,7 @@ export default function PlayerBar() {
         {/* Volume Control & Queue - Dim controls if no track */}
         <div
           className={`flex items-center justify-end space-x-4 col-span-1 ${
-            !currentTrack ? 'opacity-50 pointer-events-none' : ''
+            !currentTrack ? "opacity-50 pointer-events-none" : ""
           }`}
         >
           {/* Queue Button */}
@@ -393,8 +401,8 @@ export default function PlayerBar() {
         onClick={!currentTrack ? undefined : toggleMobileExpanded}
         className={`md:hidden fixed bottom-0 left-0 right-0 z-50 border-t px-4 py-6 flex items-center w-full transition-colors duration-300 ${
           !currentTrack
-            ? 'bg-[#111111] opacity-80 cursor-default'
-            : 'bg-[#1c1c1c] border-[#383838] cursor-pointer'
+            ? "bg-[#111111] opacity-80 cursor-default"
+            : "bg-[#1c1c1c] border-[#383838] cursor-pointer"
         }`}
       >
         {/* Track Image / Placeholder */}
@@ -424,14 +432,16 @@ export default function PlayerBar() {
               </p>
             </>
           ) : (
-            <h3 className="text-neutral-400 text-base font-medium">No track playing</h3>
+            <h3 className="text-neutral-400 text-base font-medium">
+              No track playing
+            </h3>
           )}
         </div>
 
         {/* Control Buttons - Dim controls if no track */}
         <div
           className={`flex items-center ${
-            !currentTrack ? 'opacity-50 pointer-events-none' : ''
+            !currentTrack ? "opacity-50 pointer-events-none" : ""
           }`}
         >
           {/* Play/Pause Button */}
@@ -459,10 +469,7 @@ export default function PlayerBar() {
         <div className="md:hidden fixed inset-0 z-[60] bg-[#1c1c1c] flex flex-col p-4">
           {/* Header with close button */}
           <div className="flex items-center justify-between p-4">
-            <button
-              onClick={toggleMobileExpanded}
-              className="text-white p-2"
-            >
+            <button onClick={toggleMobileExpanded} className="text-white p-2">
               <Down className="w-6 h-6" />
             </button>
             <h2 className="text-white text-lg font-medium">Now Playing</h2>

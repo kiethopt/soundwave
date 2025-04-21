@@ -625,13 +625,27 @@ const editProfile = async (user, profileData, avatarFile) => {
     if (!user) {
         throw new Error('Unauthorized');
     }
-    const { email, username, name, avatar } = profileData;
-    if (email) {
+    const { email, username, name, avatar, password, currentPassword, newPassword, newEmail } = profileData;
+    if (newEmail) {
         const existingUser = await db_1.default.user.findUnique({
-            where: { email },
+            where: { email: newEmail },
         });
         if (existingUser && existingUser.id !== user.id) {
             throw new Error('Email already in use');
+        }
+        if (currentPassword) {
+            const userWithPassword = await db_1.default.user.findUnique({
+                where: { id: user.id },
+                select: { password: true }
+            });
+            const bcrypt = require('bcrypt');
+            const isPasswordValid = await bcrypt.compare(currentPassword, userWithPassword?.password);
+            if (!isPasswordValid) {
+                throw new Error('Incorrect password');
+            }
+        }
+        else {
+            throw new Error('Current password is required to change email');
         }
     }
     if (username) {
@@ -642,6 +656,20 @@ const editProfile = async (user, profileData, avatarFile) => {
             throw new Error('Username already in use');
         }
     }
+    if (newPassword && currentPassword) {
+        const userWithPassword = await db_1.default.user.findUnique({
+            where: { id: user.id },
+            select: { password: true }
+        });
+        const bcrypt = require('bcrypt');
+        const isPasswordValid = await bcrypt.compare(currentPassword, userWithPassword?.password);
+        if (!isPasswordValid) {
+            throw new Error('Incorrect password');
+        }
+    }
+    else if (newPassword && !currentPassword) {
+        throw new Error('Current password is required to change password');
+    }
     let avatarUrl = null;
     if (avatarFile) {
         const uploadResult = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'user-avatars');
@@ -650,6 +678,8 @@ const editProfile = async (user, profileData, avatarFile) => {
     const updateData = {};
     if (email)
         updateData.email = email;
+    if (newEmail)
+        updateData.email = newEmail;
     if (username)
         updateData.username = username;
     if (name)
@@ -658,6 +688,18 @@ const editProfile = async (user, profileData, avatarFile) => {
         updateData.avatar = avatarUrl;
     else if (avatar)
         updateData.avatar = avatar;
+    if (newPassword) {
+        const bcrypt = require('bcrypt');
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+        updateData.password = hashedPassword;
+    }
+    else if (password) {
+        const bcrypt = require('bcrypt');
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        updateData.password = hashedPassword;
+    }
     if (Object.keys(updateData).length === 0) {
         throw new Error('No data provided for update');
     }

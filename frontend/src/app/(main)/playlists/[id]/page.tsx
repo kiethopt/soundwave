@@ -7,7 +7,7 @@ import { TrackList } from "@/components/user/track/TrackList";
 import { EditPlaylistDialog } from "@/components/user/playlist/EditPlaylistDialog";
 import { DeletePlaylistDialog } from "@/components/user/playlist/DeletePlaylistDialog";
 import { api } from "@/utils/api";
-import { Playlist, PlaylistPrivacy } from "@/types";
+import { Playlist, PlaylistPrivacy, Track } from "@/types";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
@@ -19,9 +19,24 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Trash2, Lock, Globe } from "lucide-react";
+import {
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Lock,
+  Globe,
+  Clock,
+  ListMusic,
+  Music2,
+  User,
+  Album,
+  CalendarDays,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useSocket } from "@/contexts/SocketContext";
+import { Card } from "@/components/ui/card";
+import { useTheme } from "@/contexts/ThemeContext";
+import { CheckCircle2 } from "lucide-react";
 
 // Khai báo event bus đơn giản để gọi fetchPlaylists từ sidebar
 const playlistUpdateEvent = new CustomEvent("playlist-updated");
@@ -29,26 +44,26 @@ const playlistUpdateEvent = new CustomEvent("playlist-updated");
 // Helper function to format duration (seconds) into "X phút Y giây"
 const formatDuration = (totalSeconds: number): string => {
   if (!totalSeconds || totalSeconds === 0) {
-    return "0 giây";
+    return "0 seconds";
   }
   totalSeconds = Math.round(totalSeconds);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  let formattedString = "";
+  const parts: string[] = [];
+
   if (hours > 0) {
-    formattedString += `${hours} giờ `;
+    parts.push(`${hours} ${hours === 1 ? "hour" : "hours"}`);
   }
   if (minutes > 0) {
-    formattedString += `${minutes} phút `;
+    parts.push(`${minutes} ${minutes === 1 ? "minute" : "minutes"}`);
   }
-  // Always show seconds if total duration is less than a minute, or if there are remaining seconds
-  if (totalSeconds < 60 || seconds > 0) {
-    formattedString += `${seconds} giây`;
+  if (totalSeconds < 60 || seconds > 0 || parts.length === 0) {
+    parts.push(`${seconds} ${seconds === 1 ? "second" : "seconds"}`);
   }
 
-  return formattedString.trim(); // Trim trailing space if only hours/minutes shown
+  return parts.join(" ");
 };
 
 export default function PlaylistPage() {
@@ -68,9 +83,15 @@ export default function PlaylistPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [favoritePlaylistTotalTracks, setFavoritePlaylistTotalTracks] = useState<number>(0);
+  const [favoritePlaylistTotalTracks, setFavoritePlaylistTotalTracks] =
+    useState<number>(0);
+  const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
+  const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const { theme } = useTheme();
 
   // Check if this is a special system playlist
   const isVibeRewindPlaylist =
@@ -143,16 +164,124 @@ export default function PlaylistPage() {
   useEffect(() => {
     if (!socket || !id) return;
 
-    socket.on("favorites-updated", (data: { action: "add" | "remove"; trackId: string }) => {
-      if (playlist?.type === "FAVORITE") {
-        setFavoritePlaylistTotalTracks((prev) => prev + (data.action === "add" ? 1 : -1));
+    socket.on(
+      "favorites-updated",
+      (data: { action: "add" | "remove"; trackId: string }) => {
+        if (playlist?.type === "FAVORITE") {
+          setFavoritePlaylistTotalTracks(
+            (prev) => prev + (data.action === "add" ? 1 : -1)
+          );
+        }
       }
-    });
+    );
 
     return () => {
       socket.off("favorites-updated");
     };
   }, [socket, id, playlist?.type]);
+
+  // Placeholder: Add a useEffect to fetch user playlists for the dropdown menu
+  useEffect(() => {
+    const fetchUserPlaylists = async () => {
+      const token = localStorage.getItem("userToken");
+      if (!token) return; // Need token to fetch user-specific playlists
+      try {
+        // Assuming an API endpoint exists to get minimal playlist info (id, name, coverUrl)
+        const response = await api.playlists.getUserPlaylists(token);
+        if (response.success && Array.isArray(response.data)) {
+          setUserPlaylists(response.data);
+        } else {
+          console.error("Failed to fetch user playlists:", response.message);
+        }
+      } catch (error) {
+        console.error("Error fetching user playlists:", error);
+      }
+    };
+    fetchUserPlaylists();
+  }, []);
+
+  // Updated useEffect to fetch favorite track IDs via user playlists
+  useEffect(() => {
+    const fetchFavoriteIds = async () => {
+      const token = localStorage.getItem("userToken");
+      if (!token) return;
+      try {
+        // 1. Fetch all user playlists
+        const playlistsResponse = await api.playlists.getUserPlaylists(token);
+
+        if (
+          playlistsResponse.success &&
+          Array.isArray(playlistsResponse.data)
+        ) {
+          // 2. Find the favorite playlist
+          const favoritePlaylistInfo = playlistsResponse.data.find(
+            (p: Playlist) => p.type === "FAVORITE"
+          );
+
+          if (favoritePlaylistInfo && favoritePlaylistInfo.id) {
+            // 3. Fetch details of the favorite playlist to get tracks
+            const favoriteDetailsResponse = await api.playlists.getById(
+              favoritePlaylistInfo.id,
+              token
+            );
+
+            if (
+              favoriteDetailsResponse.success &&
+              favoriteDetailsResponse.data?.tracks
+            ) {
+              // 4. Extract track IDs and update state
+              const trackIds = favoriteDetailsResponse.data.tracks.map(
+                (t: Track) => t.id
+              );
+              setFavoriteTrackIds(new Set(trackIds));
+            } else {
+              console.error(
+                "Failed to fetch favorite playlist details:",
+                favoriteDetailsResponse.message
+              );
+              setFavoriteTrackIds(new Set()); // Reset if fetch fails
+            }
+          } else {
+            // No favorite playlist found for the user
+            setFavoriteTrackIds(new Set());
+          }
+        } else {
+          console.error(
+            "Failed to fetch user playlists:",
+            playlistsResponse.message
+          );
+          setFavoriteTrackIds(new Set()); // Reset if fetch fails
+        }
+      } catch (error) {
+        console.error("Error fetching favorite track IDs:", error);
+        setFavoriteTrackIds(new Set()); // Reset on error
+      }
+    };
+
+    fetchFavoriteIds();
+
+    // Listener for favorite changes (remains the same)
+    const handleFavoritesChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        action: "add" | "remove";
+        trackId: string;
+      }>;
+      const { action, trackId } = customEvent.detail;
+      setFavoriteTrackIds((prevIds) => {
+        const newIds = new Set(prevIds);
+        if (action === "add") {
+          newIds.add(trackId);
+        } else {
+          newIds.delete(trackId);
+        }
+        return newIds;
+      });
+    };
+    window.addEventListener("favorites-changed", handleFavoritesChanged);
+    return () => {
+      window.removeEventListener("favorites-changed", handleFavoritesChanged);
+    };
+  }, []);
 
   const handleCoverClick = () => {
     if (!canEditPlaylist || isUploadingCover) return;
@@ -440,7 +569,12 @@ export default function PlaylistPage() {
           <div className="flex items-center gap-1.5 text-sm text-white/70 flex-wrap mt-1">
             {playlist.totalTracks > 0 && (
               <>
-                <span>{playlist.type === "FAVORITE" ? favoritePlaylistTotalTracks : playlist.totalTracks} tracks,</span>
+                <span>
+                  {playlist.type === "FAVORITE"
+                    ? favoritePlaylistTotalTracks
+                    : playlist.totalTracks}{" "}
+                  tracks,
+                </span>
                 <span className="ml-1 text-white/50">{formattedDuration}</span>
               </>
             )}
@@ -502,26 +636,87 @@ export default function PlaylistPage() {
         </div>
       </div>
 
-      <div className="p-6">
-        <div className="mb-4 border-b border-white/10">
-          <div className="grid grid-cols-[16px_4fr_3fr_2fr_minmax(120px,1fr)] gap-4 px-4 py-2 text-sm text-white/70">
-            <div className="text-center">#</div>
-            <div>Title</div>
-            <div>Album</div>
-            <div>Date added</div>
-            <div className="text-right">Duration</div>
-          </div>
-        </div>
+      <Card
+        className={`m-6 rounded-xl border backdrop-blur-sm ${
+          theme === "light"
+            ? "bg-white/80 border-gray-200"
+            : "bg-black/20 border-white/10"
+        }`}
+      >
+        {/* Conditionally render table header and list OR empty state */}
+        {playlist.tracks && playlist.tracks.length > 0 ? (
+          <>
+            {/* Table Header */}
+            <div
+              className={`mb-0 px-6 py-4 border-b ${
+                theme === "light"
+                  ? "border-gray-200 text-gray-500"
+                  : "border-white/10 text-white/60"
+              }`}
+            >
+              <div
+                className={`grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_50px] gap-4 items-center text-sm`}
+              >
+                <div className="flex justify-center">#</div>
+                <div>Title</div>
+                <div>Album</div>
+                <div className="flex items-center justify-start">
+                  Date Added
+                </div>
+                <div className="w-[40px] flex justify-center"></div>
+                <div className="flex items-center justify-center">
+                  <Clock className="w-4 h-4 mr-1" />
+                </div>
+                <div className="w-[50px] flex justify-center"></div>
+              </div>
+            </div>
 
-        <TrackList
-          tracks={playlist.tracks}
-          showAlbum
-          showDateAdded
-          allowRemove={playlist.canEdit && playlist.type === "NORMAL"}
-          onRemove={handleRemoveTrack}
-          requiresAuth={!isAuthenticated}
-        />
-      </div>
+            {/* Divider and TrackList */}
+            <div
+              className={`divide-y ${
+                theme === "light" ? "divide-gray-200" : "divide-white/10"
+              }`}
+            >
+              <TrackList
+                tracks={playlist.tracks}
+                allowRemove={playlist.canEdit && playlist.type === "NORMAL"}
+                onRemove={handleRemoveTrack}
+                requiresAuth={!isAuthenticated}
+                playlists={userPlaylists}
+                favoriteTrackIds={favoriteTrackIds}
+              />
+            </div>
+          </>
+        ) : (
+          // Empty State Content - Updated Icon
+          <div className="p-10 flex flex-col items-center justify-center text-center">
+            {/* Replaced Music2 icon with Unicode character and adjusted styling */}
+            <span
+              className={`text-6xl mb-4 ${
+                theme === "light" ? "text-gray-400" : "text-white/30"
+              }`}
+              aria-hidden="true" // Hide decorative character from screen readers
+            >
+              ♪
+            </span>
+            <h3
+              className={`text-xl font-semibold mb-1 ${
+                theme === "light" ? "text-gray-800" : "text-white"
+              }`}
+            >
+              Songs will appear here
+            </h3>
+            <p
+              className={`${
+                theme === "light" ? "text-gray-600" : "text-white/60"
+              }`}
+            >
+              Add some tracks to get started!
+            </p>
+            {/* Optional: Add a button to find songs? */}
+          </div>
+        )}
+      </Card>
 
       {playlist && (
         <EditPlaylistDialog
