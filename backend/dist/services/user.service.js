@@ -36,12 +36,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
 const prisma_selects_1 = require("../utils/prisma-selects");
-const handle_utils_1 = require("../utils/handle-utils");
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const emailService = __importStar(require("./email.service"));
 const socket_1 = require("../config/socket");
@@ -430,19 +429,29 @@ const unfollowTarget = async (follower, followingId) => {
     return { message: 'Unfollowed successfully' };
 };
 exports.unfollowTarget = unfollowTarget;
-const getUserFollowers = async (req) => {
-    const userId = req.user?.id;
+const getUserFollowers = async (userId) => {
     if (!userId) {
-        throw new Error('Unauthorized');
+        throw new Error('User ID is required');
+    }
+    const user = await db_1.default.user.findUnique({
+        where: { id: userId },
+        select: {
+            id: true,
+            followVisibility: true,
+            artistProfile: {
+                select: {
+                    id: true
+                }
+            }
+        }
+    });
+    if (!user) {
+        throw new Error('User not found');
     }
     const options = {
         where: {
             OR: [
                 { followingUserId: userId, followingType: 'USER' },
-                {
-                    followingArtistId: req.user?.artistProfile?.id,
-                    followingType: 'ARTIST',
-                },
             ],
         },
         select: {
@@ -454,17 +463,26 @@ const getUserFollowers = async (req) => {
         },
         orderBy: { createdAt: 'desc' },
     };
-    const result = await (0, handle_utils_1.paginate)(db_1.default.userFollow, req, options);
+    const followers = await db_1.default.userFollow.findMany(options);
     return {
-        followers: result.data.map((follow) => follow.follower),
-        pagination: result.pagination,
+        followers: followers.map((follow) => follow.follower),
+        canView: true
     };
 };
 exports.getUserFollowers = getUserFollowers;
-const getUserFollowing = async (req) => {
-    const userId = req.user?.id;
+const getUserFollowing = async (userId) => {
     if (!userId) {
-        throw new Error('Unauthorized');
+        throw new Error('User ID is required');
+    }
+    const user = await db_1.default.user.findUnique({
+        where: { id: userId },
+        select: {
+            id: true,
+            followVisibility: true
+        }
+    });
+    if (!user) {
+        throw new Error('User not found');
     }
     const options = {
         where: {
@@ -507,8 +525,8 @@ const getUserFollowing = async (req) => {
         },
         orderBy: { createdAt: 'desc' },
     };
-    const result = await (0, handle_utils_1.paginate)(db_1.default.userFollow, req, options);
-    const following = result.data.map((follow) => {
+    const following = await db_1.default.userFollow.findMany(options);
+    return following.map((follow) => {
         if (follow.followingType === 'USER') {
             return {
                 type: 'USER',
@@ -523,7 +541,6 @@ const getUserFollowing = async (req) => {
             };
         }
     });
-    return following;
 };
 exports.getUserFollowing = getUserFollowing;
 const requestArtistRole = async (user, data, avatarFile) => {
@@ -625,13 +642,27 @@ const editProfile = async (user, profileData, avatarFile) => {
     if (!user) {
         throw new Error('Unauthorized');
     }
-    const { email, username, name, avatar } = profileData;
-    if (email) {
+    const { email, username, name, avatar, password, currentPassword, newPassword, newEmail } = profileData;
+    if (newEmail) {
         const existingUser = await db_1.default.user.findUnique({
-            where: { email },
+            where: { email: newEmail },
         });
         if (existingUser && existingUser.id !== user.id) {
             throw new Error('Email already in use');
+        }
+        if (currentPassword) {
+            const userWithPassword = await db_1.default.user.findUnique({
+                where: { id: user.id },
+                select: { password: true }
+            });
+            const bcrypt = require('bcrypt');
+            const isPasswordValid = await bcrypt.compare(currentPassword, userWithPassword?.password);
+            if (!isPasswordValid) {
+                throw new Error('Incorrect password');
+            }
+        }
+        else {
+            throw new Error('Current password is required to change email');
         }
     }
     if (username) {
@@ -642,6 +673,20 @@ const editProfile = async (user, profileData, avatarFile) => {
             throw new Error('Username already in use');
         }
     }
+    if (newPassword && currentPassword) {
+        const userWithPassword = await db_1.default.user.findUnique({
+            where: { id: user.id },
+            select: { password: true }
+        });
+        const bcrypt = require('bcrypt');
+        const isPasswordValid = await bcrypt.compare(currentPassword, userWithPassword?.password);
+        if (!isPasswordValid) {
+            throw new Error('Incorrect password');
+        }
+    }
+    else if (newPassword && !currentPassword) {
+        throw new Error('Current password is required to change password');
+    }
     let avatarUrl = null;
     if (avatarFile) {
         const uploadResult = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'user-avatars');
@@ -650,6 +695,8 @@ const editProfile = async (user, profileData, avatarFile) => {
     const updateData = {};
     if (email)
         updateData.email = email;
+    if (newEmail)
+        updateData.email = newEmail;
     if (username)
         updateData.username = username;
     if (name)
@@ -658,6 +705,18 @@ const editProfile = async (user, profileData, avatarFile) => {
         updateData.avatar = avatarUrl;
     else if (avatar)
         updateData.avatar = avatar;
+    if (newPassword) {
+        const bcrypt = require('bcrypt');
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+        updateData.password = hashedPassword;
+    }
+    else if (password) {
+        const bcrypt = require('bcrypt');
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        updateData.password = hashedPassword;
+    }
     if (Object.keys(updateData).length === 0) {
         throw new Error('No data provided for update');
     }
@@ -675,6 +734,7 @@ const getUserProfile = async (id) => {
             id: true,
             name: true,
             email: true,
+            followVisibility: true,
             username: true,
             avatar: true,
             role: true,
@@ -1257,4 +1317,14 @@ const getGenreTopArtists = async (genreId) => {
     return artists;
 };
 exports.getGenreTopArtists = getGenreTopArtists;
+const setFollowVisibility = async (user, isPublic) => {
+    if (!user) {
+        throw new Error('Unauthorized');
+    }
+    return db_1.default.user.update({
+        where: { id: user.id },
+        data: { followVisibility: isPublic },
+    });
+};
+exports.setFollowVisibility = setFollowVisibility;
 //# sourceMappingURL=user.service.js.map
