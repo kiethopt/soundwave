@@ -2559,7 +2559,14 @@ export function EditArtistProfileModal({
         apiFormData.append('artistBanner', bannerFile);
       }
 
-      await api.artists.updateProfile(artistProfile.id, apiFormData, token);
+      // Update userData in localStorage with new artistProfile
+      const response = await api.artists.updateProfile(artistProfile.id, apiFormData, token);
+      const newArtistProfile = response.data;
+      const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+      userData.artistProfile = newArtistProfile;
+
+      localStorage.setItem('userData', JSON.stringify(userData));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'userData' }));
 
       toast.success('Updated Artist Profile');
       onOpenChange(false);
@@ -2715,7 +2722,7 @@ export function EditArtistProfileModal({
           <div className="flex justify-end space-x-3 pt-4">
             <Button
               type="button"
-              variant="outline" // Adjusted variant for consistency
+              variant={theme === 'dark' ? 'cancel' : 'destructive'}
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
             >

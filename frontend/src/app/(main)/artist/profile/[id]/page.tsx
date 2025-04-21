@@ -42,7 +42,6 @@ export default function ArtistProfilePage({
   const [loading, setLoading] = useState(true);
   const [follow, setFollow] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
-  // Add state for follower count
   const [followerCount, setFollowerCount] = useState<number>(0);
   const { dominantColor } = useDominantColor(
     artist?.artistBanner || artist?.avatar || ''
@@ -89,11 +88,9 @@ export default function ArtistProfilePage({
       ]);
 
       setArtist(artistData);
-      // Set follower count from artist data
       setFollowerCount(artistData.monthlyListeners || 0);
 
       if (followingResponse) {
-        // Fix: Check if the current user is already following this artist
         const isFollowing = followingResponse.some(
           (following: any) => 
             (following.type === 'ARTIST' && following.id === id) || 
@@ -171,7 +168,6 @@ export default function ArtistProfilePage({
     fetchData(); // Call the fetchData function
   }, [token, router, fetchData]);
 
-  // WebSocket listener for track list updates AND album list updates
   useEffect(() => {
     if (!id) return; // Don't connect if artist id is not available
 
@@ -356,12 +352,10 @@ export default function ArtistProfilePage({
 
   // Add event listener for follower-count-changed events
   useEffect(() => {
-    // Listen for follower count changes from other components
     const handleFollowerCountChange = (e: CustomEvent) => {
       const { artistId, isFollowing } = (e as any).detail;
       
       if (artistId === id) {
-        // Already handled by our component, no need to update again
         return;
       }
       
@@ -394,7 +388,7 @@ export default function ArtistProfilePage({
       return;
     }
 
-    fetchData(); // Call the fetchData function
+    fetchData();
   }, [token, router, fetchData]);
 
   const handleFollow = async () => {
@@ -680,6 +674,22 @@ export default function ArtistProfilePage({
     );
   };
 
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'userData') {
+        // Nếu userData có artistProfile, cập nhật lại artist
+        const updatedUser = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (updatedUser.artistProfile && artist && updatedUser.artistProfile.id === artist.id) {
+          setArtist((prev) => ({ ...prev!, ...updatedUser.artistProfile }));
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [artist]);
+
+  if (!artist) return null;
+
   return (
     <div
       className="min-h-screen w-full rounded-lg"
@@ -756,10 +766,9 @@ export default function ArtistProfilePage({
                   )}
                 </div>
                 <h1
-                  className="text-6xl w-fit font-bold uppercase py-4 cursor-pointer"
+                  className={`text-6xl w-fit font-bold uppercase py-4 ${isOwner ? 'cursor-pointer' : ''}`}
                   style={{ lineHeight: '1.1', color: textColor }}
-                  // onclick show edit modal
-                  onClick={() => setIsEditOpen(true)}
+                  onClick={isOwner ? () => setIsEditOpen(true) : undefined}
                 >
                   {artist.artistName}
                 </h1>
@@ -989,7 +998,7 @@ export default function ArtistProfilePage({
             theme={theme}
             onUpdateSuccess={() => {
               toast.success('Profile updated! Refreshing data...');
-              fetchData(); // Refetch data on successful update
+              fetchData();
             }}
           />
         </div>

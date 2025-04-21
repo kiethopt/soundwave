@@ -140,6 +140,17 @@ export default function UserProfilePage({
     }
   }, [id, router]);
 
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'userData') {
+        const updatedUser = JSON.parse(localStorage.getItem('userData') || '{}');
+        setUser((prev) => ({ ...prev, ...updatedUser }));
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const handleFollow = async () => {
     if (!token) {
       router.push('/login');
@@ -325,9 +336,9 @@ export default function UserProfilePage({
               <div className="flex flex-col items-start justify-center flex-1 ml-4 llg:ml-8 gap-4">
                 <span className="text-sm font-semibold ">Profile</span>
                 <h1
-                  className="text-4xl w-fit md:text-6xl font-bold capitalize cursor-pointer"
+                  className={`text-4xl w-fit md:text-6xl font-bold capitalize ${isOwner ? 'cursor-pointer' : ''}`}
                   style={{ lineHeight: '1.1' }}
-                  onClick={() => setIsEditProfileModalOpen(true)}
+                  onClick={isOwner ? () => setIsEditProfileModalOpen(true) : undefined}
                 >
                   {user?.name || user?.username || 'User'}
                 </h1>

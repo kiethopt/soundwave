@@ -363,6 +363,7 @@ export const userSelect = {
       artistName: true,
       isVerified: true,
       isActive: true,
+      avatar: true,
       verificationRequestedAt: true,
       role: true, // Role ARTIST
       socialMediaLinks: true,

@@ -179,13 +179,16 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
           (t) => t.id === track.id
         );
 
-        // If track is in queue, reorganize the queue
         if (trackIndex !== -1) {
-          const reorderedQueue = reorderQueueFromSelected(trackQueueRef.current, trackIndex);
-          setTrackQueue(reorderedQueue);
-          trackQueueRef.current = reorderedQueue;
-          setQueue(reorderedQueue);
-          setCurrentIndex(0);
+          // Nếu track đã có trong queue, chỉ set currentIndex, KHÔNG reorder queue
+          setCurrentIndex(trackIndex);
+        } else {
+          // Nếu track chưa có trong queue, thêm vào queue và play
+          const newQueue = [...trackQueueRef.current, track];
+          setTrackQueue(newQueue);
+          trackQueueRef.current = newQueue;
+          setQueue(newQueue);
+          setCurrentIndex(newQueue.length - 1);
         }
 
         if (!trackToPlay.audioUrl) {

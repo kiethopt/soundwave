@@ -702,7 +702,9 @@ export default function Header({
               >
                 <div className="relative w-full h-full rounded-full overflow-hidden">
                   <Image
-                    src={userData?.avatar || '/images/default-avatar.jpg'}
+                    src={userData?.currentProfile === 'ARTIST' && userData?.artistProfile?.avatar
+                      ? userData.artistProfile.avatar
+                      : userData?.avatar || '/images/default-avatar.jpg'}
                     alt="User avatar"
                     fill
                     sizes="32px"
