@@ -28,24 +28,67 @@ const fetchWithAuth = async (
     const errorText = await response.text();
     let errorMessage = "An unexpected error occurred";
     let errorCode = "";
+    let errorData: any = null; // Added to potentially hold more error details
 
     try {
       const errorResponse = JSON.parse(errorText);
       errorMessage = errorResponse.message || errorMessage;
       errorCode = errorResponse.code || "";
+      errorData = errorResponse.data || null; // Store extra data if available
 
       // Thêm xử lý error code cho tài khoản bị khóa
       if (errorCode === "ARTIST_DEACTIVATED") {
         errorMessage = "Your artist account has been deactivated";
       }
+
+      // === ADDED CHECK FOR DUPLICATE TRACK ===
+      if (
+        errorCode === "TRACK_ALREADY_IN_PLAYLIST" ||
+        errorMessage.includes("already exists")
+      ) {
+        console.warn(`Handled duplicate track error: ${errorMessage}`); // Optional warning
+        // Return a specific structure instead of throwing
+        return {
+          success: false,
+          code: "TRACK_ALREADY_IN_PLAYLIST", // Standardize the code
+          message: errorMessage,
+          data: errorData, // Pass along any extra data
+        };
+      }
+      // ========================================
     } catch (e) {
-      errorMessage = errorText;
+      // If parsing fails, the errorText itself might be the message
+      errorMessage = errorText || errorMessage;
     }
 
+    // For any other error that was not handled above, throw it
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  // If response IS ok, parse and return JSON
+  // Check if response has content before trying to parse JSON
+  const responseText = await response.text();
+  try {
+    return JSON.parse(responseText);
+  } catch (e) {
+    // Handle cases where the response is OK (2xx) but has no body or non-JSON body
+    if (
+      response.status >= 200 &&
+      response.status < 300 &&
+      responseText.trim() === ""
+    ) {
+      return { success: true }; // Or return null/undefined based on expectations
+    }
+    console.error(
+      "Failed to parse successful response JSON:",
+      e,
+      "Response Text:",
+      responseText
+    );
+    // Decide what to return or throw if JSON parsing fails on a successful response
+    // Returning a success indicator might be safer than throwing an unrelated error
+    return { success: true, data: responseText }; // Or just { success: true }
+  }
 };
 
 // Interfaces
@@ -280,7 +323,7 @@ export const api = {
         body = data;
       } else {
         body = JSON.stringify(data);
-        headers['Content-Type'] = 'application/json';
+        headers["Content-Type"] = "application/json";
       }
 
       return fetchWithAuth(
