@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import * as cliProgress from 'cli-progress';
 import colors from 'colors';
+import { faker } from '@faker-js/faker';
 
 // Import data from our modular structure
 import { artists } from './data/artists';
@@ -105,7 +106,7 @@ async function main() {
     adminBar.increment();
 
     // === 4. Seed Artists (from artists.ts) ===
-    const artistBar = multibar.create(artists.length, 0, { task: 'Seeding artists' });
+    const artistBar = multibar.create(artists.length, 0, { task: 'Seeding verified artists' });
     
     // Create a Map to store artistName -> artistId for easier lookup
     const artistProfilesMap = new Map<string, string>();
@@ -150,6 +151,58 @@ async function main() {
       });
       artistProfilesMap.set(artistProfile.artistName, artistProfile.id);
       artistBar.update(i + 1);
+    }
+
+    // === 4.1 Seed User Accounts Requesting Artist Role ===
+    const requestUserCount = 20;
+    const requestBar = multibar.create(requestUserCount, 0, { task: 'Seeding artist requests'});
+    for (let i = 0; i < requestUserCount; i++) {
+      const firstName = faker.person.firstName();
+      const lastName = faker.person.lastName();
+      const username = faker.internet.username({ firstName, lastName }).toLowerCase() + `_${faker.string.alphanumeric(3)}`;
+      const email = `${username}@soundwave-request.com`;
+      const artistName = faker.music.genre() + ' ' + faker.word.adjective() + ' ' + faker.person.firstName(); // Generate a unique artist name
+
+      // Create the user account
+      const requestingUser = await prisma.user.upsert({
+          where: { email },
+          update: {}, // No update needed if exists
+          create: {
+              email: email,
+              username: username,
+              password: hashedPassword,
+              name: `${firstName} ${lastName}`,
+              role: Role.USER,
+              isActive: true,
+              createdAt: now,
+              updatedAt: now,
+              avatar: `https://api.dicebear.com/7.x/pixel-art/svg?seed=${username}&backgroundColor=transparent`,
+          },
+      });
+
+      // Create the corresponding ArtistProfile representing the request
+      await prisma.artistProfile.upsert({
+          where: { userId: requestingUser.id },
+          update: {}, // No update needed if somehow exists
+          create: {
+              userId: requestingUser.id,
+              artistName: artistName,
+              bio: faker.lorem.paragraph(),
+              // Use DiceBear for the requested artist avatar as well
+              avatar: `https://api.dicebear.com/7.x/pixel-art/svg?seed=${artistName.replace(/\s+/g, '_')}&backgroundColor=transparent`,
+              socialMediaLinks: {
+                  facebook: `https://facebook.com/${username}`,
+                  instagram: `https://instagram.com/${username}`,
+              },
+              role: Role.ARTIST, // The profile *type* is ARTIST
+              isVerified: false, // Not verified yet
+              isActive: true, // Schema default, admin decides on approval
+              verificationRequestedAt: faker.date.recent({ days: 30 }), // Simulate request time within last 30 days
+              createdAt: now,
+              updatedAt: now,
+          },
+      });
+      requestBar.increment();
     }
 
     // === 5. Seed Albums and Tracks (from albums.ts) ===
