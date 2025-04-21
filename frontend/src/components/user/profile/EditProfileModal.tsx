@@ -113,6 +113,7 @@ export function EditProfileModal({
       const storedUserData = JSON.parse(localStorage.getItem('userData') || '{}');
       const updatedUserData = { ...storedUserData, ...response };
       localStorage.setItem('userData', JSON.stringify(updatedUserData));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'userData' }));
       
       onOpenChange(false);
       

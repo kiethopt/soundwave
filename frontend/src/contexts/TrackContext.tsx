@@ -179,13 +179,16 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
           (t) => t.id === track.id
         );
 
-        // If track is in queue, reorganize the queue
         if (trackIndex !== -1) {
-          const reorderedQueue = reorderQueueFromSelected(trackQueueRef.current, trackIndex);
-          setTrackQueue(reorderedQueue);
-          trackQueueRef.current = reorderedQueue;
-          setQueue(reorderedQueue);
-          setCurrentIndex(0);
+          // Nếu track đã có trong queue, chỉ set currentIndex, KHÔNG reorder queue
+          setCurrentIndex(trackIndex);
+        } else {
+          // Nếu track chưa có trong queue, thêm vào queue và play
+          const newQueue = [...trackQueueRef.current, track];
+          setTrackQueue(newQueue);
+          trackQueueRef.current = newQueue;
+          setQueue(newQueue);
+          setCurrentIndex(newQueue.length - 1);
         }
 
         if (!trackToPlay.audioUrl) {
@@ -561,25 +564,25 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   // Add new queue management functions
   const addToQueue = useCallback((track: Track) => {
     setQueue((prevQueue) => {
-      // Check if the track already exists in the queue
       const isTrackInQueue = prevQueue.some((item) => item.id === track.id);
 
-      // Only add the track if it's not already in the queue
+      // Nếu queue rỗng, thêm và play luôn
+      if (prevQueue.length === 0) {
+        setTrackQueue([track]);
+        trackQueueRef.current = [track];
+        playTrack(track);
+        return [track];
+      }
+
+      // Nếu chưa có trong queue, thêm vào cuối
       if (!isTrackInQueue) {
         const newQueue = [...prevQueue, track];
         return newQueue;
       }
 
-      // Return the unchanged queue if the track already exists
       return prevQueue;
     });
-
-    // Also update the trackQueue if it's empty
-    if (trackQueueRef.current.length === 0) {
-      setTrackQueue([track]);
-      trackQueueRef.current = [track];
-    }
-  }, []);
+  }, [playTrack]);
 
   const removeFromQueue = useCallback(
     (index: number) => {

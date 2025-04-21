@@ -26,6 +26,9 @@ export function QueuePanel({ isOpen, onClose }: QueuePanelProps) {
 
   if (!isOpen) return null;
   
+  const currentIndex = queue.findIndex(track => track.id === currentTrack?.id);
+  const rotatedQueue = currentIndex !== -1 ? [...queue.slice(currentIndex), ...queue.slice(0, currentIndex)] : queue;
+
   const handleDragEnd = (result: DropResult) => {
     // Dropped outside the list
     if (!result.destination) return;
@@ -46,7 +49,7 @@ export function QueuePanel({ isOpen, onClose }: QueuePanelProps) {
   };
 
   return (
-    <div className="fixed right-0 top-0 z-40 h-full w-80 md:w-96 bg-[#121212] border-l border-white/10 overflow-hidden">
+    <div className="fixed right-0 top-0 z-40 h-full w-80 md:w-96 bg-[#121212] border-l border-white/10 overflow-hidden pb-[90px]">
       <div className="flex flex-col h-full">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
@@ -81,7 +84,7 @@ export function QueuePanel({ isOpen, onClose }: QueuePanelProps) {
                     ref={provided.innerRef}
                     className="divide-y divide-white/10"
                   >
-                    {queue.map((track, index) => (
+                    {rotatedQueue.map((track, index) => (
                       <Draggable key={track.id} draggableId={track.id} index={index}>
                         {(provided, snapshot) => (
                           <div

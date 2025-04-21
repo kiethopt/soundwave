@@ -403,6 +403,14 @@ const addTrackToPlaylist = async (req, res, next) => {
             });
             return;
         }
+        if (playlist.type === "SYSTEM" &&
+            (playlist.name === "Vibe Rewind" || playlist.name === "Welcome Mix")) {
+            res.status(400).json({
+                success: false,
+                message: `Cannot manually add tracks to ${playlist.name} playlist.`,
+            });
+            return;
+        }
         if (playlist.type === "SYSTEM" && userRole !== "ADMIN") {
             res.status(403).json({
                 success: false,

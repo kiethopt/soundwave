@@ -449,6 +449,18 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
     }
 
     // Check if it's a SYSTEM playlist - only ADMIN can modify
+    if (
+      playlist.type === "SYSTEM" &&
+      (playlist.name === "Vibe Rewind" || playlist.name === "Welcome Mix")
+    ) {
+      res.status(400).json({
+        success: false,
+        message: `Cannot manually add tracks to ${playlist.name} playlist.`,
+      });
+      return;
+    }
+
+    // Existing check: Only ADMIN can modify other SYSTEM playlists
     if (playlist.type === "SYSTEM" && userRole !== "ADMIN") {
       res.status(403).json({
         success: false,

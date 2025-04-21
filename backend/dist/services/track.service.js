@@ -296,7 +296,7 @@ const getTracks = async (req) => {
             artist: {
                 select: { id: true, artistName: true, avatar: true },
             },
-            album: { select: { id: true, title: true } },
+            album: { select: { id: true, title: true, coverUrl: true } },
             genres: { include: { genre: true } },
             featuredArtists: {
                 include: { artistProfile: { select: { id: true, artistName: true } } },

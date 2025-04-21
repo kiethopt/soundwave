@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/utils/api';
-import { Track } from '@/types';
-import { ArrowLeft, Calendar, Music} from 'lucide-react';
-import { useDominantColor } from '@/hooks/useDominantColor';
-import { useTheme } from '@/contexts/ThemeContext';
-import { useAuth } from '@/hooks/useAuth';
-import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
-import { useTrack } from '@/contexts/TrackContext';
-import { AlbumTracks } from '@/components/user/album/AlbumTracks';
-import io, { Socket } from 'socket.io-client';
+import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { api } from "@/utils/api";
+import { Track, Playlist } from "@/types";
+import { ArrowLeft, Calendar, Music } from "lucide-react";
+import { useDominantColor } from "@/hooks/useDominantColor";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/hooks/useAuth";
+import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
+import { useTrack } from "@/contexts/TrackContext";
+import { AlbumTracks } from "@/components/user/album/AlbumTracks";
+import io, { Socket } from "socket.io-client";
 
 export default function TrackDetailPage() {
   const params = useParams();
@@ -25,9 +25,11 @@ export default function TrackDetailPage() {
   const [track, setTrack] = useState<Track | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const { dominantColor } = useDominantColor(track?.coverUrl);
   const { theme } = useTheme();
-  const { isAuthenticated, dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
+  const { isAuthenticated, dialogOpen, setDialogOpen, handleProtectedAction } =
+    useAuth();
   const {
     currentTrack,
     isPlaying,
@@ -45,16 +47,16 @@ export default function TrackDetailPage() {
     try {
       setLoading(true);
       setError(null);
-      
-      // Get token if available
-      const token = localStorage.getItem('userToken');
 
-      const trackData = await api.tracks.getById(trackId, token || '');
-      console.log('Track data:', trackData);
+      // Get token if available
+      const token = localStorage.getItem("userToken");
+
+      const trackData = await api.tracks.getById(trackId, token || "");
+      console.log("Track data:", trackData);
       setTrack(trackData);
     } catch (error) {
-      console.error('Error fetching track details:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load track');
+      console.error("Error fetching track details:", error);
+      setError(error instanceof Error ? error.message : "Failed to load track");
     } finally {
       setLoading(false);
     }
@@ -64,102 +66,153 @@ export default function TrackDetailPage() {
     fetchTrackDetails();
   }, [fetchTrackDetails]);
 
+  // Fetch playlists (similar to album detail page)
+  useEffect(() => {
+    const fetchPlaylists = async () => {
+      try {
+        const token = localStorage.getItem("userToken");
+        if (!token) return; // Only fetch if logged in
+
+        const response = await api.playlists.getUserPlaylists(token); // Use getUserPlaylists
+        if (response.success && Array.isArray(response.data)) {
+          setPlaylists(
+            response.data.map((p: any) => ({
+              // Ensure correct mapping if needed
+              id: p.id,
+              name: p.name,
+              coverUrl: p.coverUrl,
+              // Add other necessary fields if the type from API is different
+            }))
+          );
+        } else {
+          console.error("Failed to fetch user playlists:", response.message);
+          setPlaylists([]); // Reset on failure
+        }
+      } catch (error) {
+        console.error("Error fetching playlists:", error);
+        setPlaylists([]); // Reset on error
+      }
+    };
+
+    fetchPlaylists();
+  }, []);
+
   // WebSocket listener for real-time updates
   useEffect(() => {
     if (!trackId) return; // Don't connect if trackId is not available
 
     let socket: Socket | null = null;
-    const connectTimer = setTimeout(() => {
+    const connectTimer = setTimeout(
+      () => {
         socket = io(process.env.NEXT_PUBLIC_API_URL!);
 
-        socket.on('connect', () => {
-            console.log(`[WebSocket] Connected for Track Detail: ${trackId}`);
+        socket.on("connect", () => {
+          console.log(`[WebSocket] Connected for Track Detail: ${trackId}`);
         });
 
-        socket.on('disconnect', (reason: string) => {
-            console.log(`[WebSocket] Disconnected from Track Detail ${trackId}:`, reason);
+        socket.on("disconnect", (reason: string) => {
+          console.log(
+            `[WebSocket] Disconnected from Track Detail ${trackId}:`,
+            reason
+          );
         });
 
-        socket.on('connect_error', (error: Error) => {
-            console.error(`[WebSocket] Connection Error for Track Detail ${trackId}:`, error);
+        socket.on("connect_error", (error: Error) => {
+          console.error(
+            `[WebSocket] Connection Error for Track Detail ${trackId}:`,
+            error
+          );
         });
 
         // Listener for track updates
-        socket.on('track:updated', (data: { track: Track }) => {
-            if (data.track.id === trackId) {
-                console.log(`[WebSocket] Track ${trackId} updated:`, data.track);
-                setTrack((prevTrack) => (prevTrack ? { ...prevTrack, ...data.track } : data.track));
-                setError(null); // Clear previous errors if track is updated
-            }
+        socket.on("track:updated", (data: { track: Track }) => {
+          if (data.track.id === trackId) {
+            console.log(`[WebSocket] Track ${trackId} updated:`, data.track);
+            setTrack((prevTrack) =>
+              prevTrack ? { ...prevTrack, ...data.track } : data.track
+            );
+            setError(null); // Clear previous errors if track is updated
+          }
         });
 
         // Listener for track deletions
-        socket.on('track:deleted', (data: { trackId: string }) => {
-            if (data.trackId === trackId) {
-                console.log(`[WebSocket] Track ${trackId} deleted`);
-                setTrack(null);
-                setError('This track has been deleted.');
-            }
+        socket.on("track:deleted", (data: { trackId: string }) => {
+          if (data.trackId === trackId) {
+            console.log(`[WebSocket] Track ${trackId} deleted`);
+            setTrack(null);
+            setError("This track has been deleted.");
+          }
         });
 
         // Listener for visibility changes
-        socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
+        socket.on(
+          "track:visibilityChanged",
+          (data: { trackId: string; isActive: boolean }) => {
             if (data.trackId === trackId) {
-                console.log(`[WebSocket] Track ${trackId} visibility changed to ${data.isActive}`);
-                setTrack((prevTrack) => {
-                    if (!prevTrack) return null; // Should not happen if track exists, but safety check
+              console.log(
+                `[WebSocket] Track ${trackId} visibility changed to ${data.isActive}`
+              );
+              setTrack((prevTrack) => {
+                if (!prevTrack) return null; // Should not happen if track exists, but safety check
 
-                    let currentArtistId: string | null = null;
-                    try {
-                        const userDataString = localStorage.getItem('userData');
-                        if (userDataString) {
-                            const userData = JSON.parse(userDataString);
-                            currentArtistId = userData?.artistProfile?.id || null;
-                        }
-                    } catch (e) {
-                        console.error("Error parsing user data for visibility check:", e);
-                    }
+                let currentArtistId: string | null = null;
+                try {
+                  const userDataString = localStorage.getItem("userData");
+                  if (userDataString) {
+                    const userData = JSON.parse(userDataString);
+                    currentArtistId = userData?.artistProfile?.id || null;
+                  }
+                } catch (e) {
+                  console.error(
+                    "Error parsing user data for visibility check:",
+                    e
+                  );
+                }
 
-                    const isOwner = prevTrack.artistId === currentArtistId;
+                const isOwner = prevTrack.artistId === currentArtistId;
 
-                    if (!data.isActive && !isOwner) {
-                        // Track hidden and user is not the owner
-                        setError('This track is no longer available.');
-                        return null; // Hide the track details
-                    } else {
-                        // Track is now visible OR user is the owner (can see hidden tracks)
-                        setError(null); // Clear error if track becomes visible/accessible again
-                        return { ...prevTrack, isActive: data.isActive }; // Update isActive status
-                    }
-                });
+                if (!data.isActive && !isOwner) {
+                  // Track hidden and user is not the owner
+                  setError("This track is no longer available.");
+                  return null; // Hide the track details
+                } else {
+                  // Track is now visible OR user is the owner (can see hidden tracks)
+                  setError(null); // Clear error if track becomes visible/accessible again
+                  return { ...prevTrack, isActive: data.isActive }; // Update isActive status
+                }
+              });
             }
-        });
-    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
+          }
+        );
+      },
+      process.env.NODE_ENV === "development" ? 100 : 0
+    ); // Add delay
 
     // Cleanup function
     return () => {
-        clearTimeout(connectTimer);
-        if (socket) {
-            console.log(`[WebSocket] Disconnecting from Track Detail ${trackId}...`);
-            socket.off('connect');
-            socket.off('disconnect');
-            socket.off('connect_error');
-            socket.off('track:updated');
-            socket.off('track:deleted');
-            socket.off('track:visibilityChanged');
-            socket.disconnect();
-        }
+      clearTimeout(connectTimer);
+      if (socket) {
+        console.log(
+          `[WebSocket] Disconnecting from Track Detail ${trackId}...`
+        );
+        socket.off("connect");
+        socket.off("disconnect");
+        socket.off("connect_error");
+        socket.off("track:updated");
+        socket.off("track:deleted");
+        socket.off("track:visibilityChanged");
+        socket.disconnect();
+      }
     };
-
   }, [trackId]); // Re-run effect if trackId changes
 
   const handleTrackPlay = (track: Track) => {
     // Check if user is authenticated before playing
     handleProtectedAction(() => {
-      if (currentTrack?.id === track.id && isPlaying && queueType === 'track') {
+      if (currentTrack?.id === track.id && isPlaying && queueType === "track") {
         pauseTrack();
       } else {
-        setQueueType('track');
+        setQueueType("track");
         if (track) {
           trackQueue([track]);
         }
@@ -200,10 +253,10 @@ export default function TrackDetailPage() {
             ${dominantColor} 0%, 
             ${dominantColor}99 15%,
             ${dominantColor}40 30%,
-            ${theme === 'light' ? '#ffffff' : '#121212'} 100%)`
-          : theme === 'light'
-          ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
-          : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
+            ${theme === "light" ? "#ffffff" : "#121212"} 100%)`
+          : theme === "light"
+          ? "linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)"
+          : "linear-gradient(180deg, #2c2c2c 0%, #121212 100%)",
       }}
     >
       <div className="max-w-8xl mx-auto px-4 md:px-6 py-6 mb-16 md:mb-0">
@@ -212,9 +265,9 @@ export default function TrackDetailPage() {
           <button
             onClick={() => router.back()}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              theme === 'light'
-                ? 'bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow'
-                : 'bg-black/20 hover:bg-black/30 text-white/80 hover:text-white'
+              theme === "light"
+                ? "bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow"
+                : "bg-black/20 hover:bg-black/30 text-white/80 hover:text-white"
             }`}
           >
             <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
@@ -227,7 +280,7 @@ export default function TrackDetailPage() {
           {/* Track Cover */}
           <div className="w-[280px] md:w-[220px] flex-shrink-0">
             <img
-              src={track.coverUrl || '/images/default-track.jpg'}
+              src={track.coverUrl || "/images/default-track.jpg"}
               alt={track.title}
               className="w-full aspect-square object-cover rounded-xl shadow-2xl"
             />
@@ -238,7 +291,7 @@ export default function TrackDetailPage() {
             <div className="text-center md:text-left">
               <h1
                 className={`text-3xl md:text-4xl font-bold mb-2 ${
-                  theme === 'light' ? 'text-gray-900' : 'text-white'
+                  theme === "light" ? "text-gray-900" : "text-white"
                 }`}
               >
                 {track.title}
@@ -247,7 +300,7 @@ export default function TrackDetailPage() {
               <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
                 <span
                   className={`cursor-pointer hover:underline underline-offset-2 ${
-                    theme === 'light' ? 'text-gray-900' : 'text-white/90'
+                    theme === "light" ? "text-gray-900" : "text-white/90"
                   }`}
                   onClick={() =>
                     router.push(`/artist/profile/${track.artist.id}`)
@@ -255,14 +308,14 @@ export default function TrackDetailPage() {
                 >
                   {track.artist.artistName}
                 </span>
-                
+
                 {/* Track type badge */}
                 {track.type && (
                   <span
                     className={`px-2 py-0.5 text-xs rounded-full ${
-                      theme === 'light'
-                        ? 'bg-gray-200 text-gray-800'
-                        : 'bg-white/20 text-white/90'
+                      theme === "light"
+                        ? "bg-gray-200 text-gray-800"
+                        : "bg-white/20 text-white/90"
                     }`}
                   >
                     {track.type}
@@ -274,26 +327,28 @@ export default function TrackDetailPage() {
                 {track.album && (
                   <div
                     className={`flex items-center gap-2 cursor-pointer ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      theme === "light" ? "text-gray-600" : "text-white/60"
                     }`}
                     onClick={() => router.push(`/album/${track.album?.id}`)}
                   >
                     <Music className="w-5 h-5" />
-                    <span className="hover:underline underline-offset-2">{track.album.title}</span>
+                    <span className="hover:underline underline-offset-2">
+                      {track.album.title}
+                    </span>
                   </div>
                 )}
-                
+
                 <div
                   className={`flex items-center gap-2 ${
-                    theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                    theme === "light" ? "text-gray-600" : "text-white/60"
                   }`}
                 >
                   <Calendar className="w-5 h-5" />
                   <span>
-                    {new Date(track.releaseDate).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
+                    {new Date(track.releaseDate).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
                     })}
                   </span>
                 </div>
@@ -301,11 +356,12 @@ export default function TrackDetailPage() {
                 {track.duration && (
                   <div
                     className={`flex items-center gap-2 ${
-                      theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                      theme === "light" ? "text-gray-600" : "text-white/60"
                     }`}
                   >
                     <span>
-                      {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
+                      {Math.floor(track.duration / 60)}:
+                      {String(track.duration % 60).padStart(2, "0")}
                     </span>
                   </div>
                 )}
@@ -317,9 +373,9 @@ export default function TrackDetailPage() {
                     <span
                       key={genre.id}
                       className={`px-3 py-1 rounded-full text-sm ${
-                        theme === 'light'
-                          ? 'bg-gray-200 text-gray-800'
-                          : 'bg-white/10 text-white/80'
+                        theme === "light"
+                          ? "bg-gray-200 text-gray-800"
+                          : "bg-white/10 text-white/80"
                       }`}
                     >
                       {genre.name}
@@ -335,17 +391,17 @@ export default function TrackDetailPage() {
         <div className="w-full mt-8">
           <div
             className={`rounded-xl overflow-hidden border shadow-lg backdrop-blur-sm transition-all ${
-              theme === 'light'
-                ? 'bg-white/90 border-gray-200 shadow-gray-200/30'
-                : 'bg-black/30 border-white/10 shadow-black/20'
+              theme === "light"
+                ? "bg-white/90 border-gray-200 shadow-gray-200/30"
+                : "bg-black/30 border-white/10 shadow-black/20"
             }`}
           >
             {/* Header - Desktop only */}
             <div
               className={`hidden md:grid md:grid-cols-[48px_1.5fr_1fr_1fr_100px_50px] md:gap-4 px-6 py-4 border-b ${
-                theme === 'light' ? 'border-gray-200' : 'border-white/10'
+                theme === "light" ? "border-gray-200" : "border-white/10"
               } text-sm font-medium ${
-                theme === 'light' ? 'text-gray-500' : 'text-white/60'
+                theme === "light" ? "text-gray-500" : "text-white/60"
               }`}
             >
               <div className="text-center">#</div>
@@ -358,7 +414,7 @@ export default function TrackDetailPage() {
 
             <div
               className={`divide-y ${
-                theme === 'light' ? 'divide-gray-200/70' : 'divide-white/10'
+                theme === "light" ? "divide-gray-200/70" : "divide-white/10"
               }`}
             >
               <AlbumTracks
@@ -367,21 +423,24 @@ export default function TrackDetailPage() {
                 currentTrack={currentTrack}
                 isPlaying={isPlaying}
                 requiresAuth={!isAuthenticated}
-                playlists={[]}
+                playlists={playlists}
               />
-            </div>        
+            </div>
           </div>
 
           {track.label && (
             <div className="flex items-center gap-2 mt-2">
-              <span className={`text-xs font-medium ${theme === 'light' ? 'text-gray-500' : 'text-white/60'}`}>
+              <span
+                className={`text-xs font-medium ${
+                  theme === "light" ? "text-gray-500" : "text-white/60"
+                }`}
+              >
                 © {track.label.name}
               </span>
             </div>
           )}
-        </div>    
-          
-        
+        </div>
+
         {/* Auth Dialog */}
         <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
       </div>

@@ -221,6 +221,9 @@ exports.artistProfileSelect = {
                     duration: true,
                     playCount: true,
                     trackNumber: true,
+                    audioUrl: true,
+                    coverUrl: true,
+                    isActive: true,
                     label: {
                         select: {
                             id: true,
@@ -359,6 +362,7 @@ exports.userSelect = {
             artistName: true,
             isVerified: true,
             isActive: true,
+            avatar: true,
             verificationRequestedAt: true,
             role: true,
             socialMediaLinks: true,
