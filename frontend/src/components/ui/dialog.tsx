@@ -51,16 +51,16 @@ const DialogContent = React.forwardRef<
         {children}
         <DialogPrimitive.Close
           className={cn(
-            'absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 disabled:pointer-events-none',
+            'absolute right-4 top-3 rounded-full p-1.5 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none',
             theme === 'light'
-              ? 'ring-offset-white focus:ring-neutral-950 focus:ring-offset-2 data-[state=open]:bg-neutral-100 data-[state=open]:text-neutral-500'
-              : 'ring-offset-neutral-950 focus:ring-neutral-300 focus:ring-offset-2 data-[state=open]:bg-neutral-800 data-[state=open]:text-neutral-400'
+              ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 ring-offset-white focus:ring-neutral-950'
+              : 'bg-white/10 text-white/70 hover:bg-white/20 ring-offset-neutral-950 focus:ring-neutral-300'
           )}
         >
           <X
             className={cn(
-              'h-4 w-4',
-              theme === 'light' ? 'text-neutral-950' : 'text-white'
+              'h-5 w-5',
+              theme === 'light' ? 'text-gray-700' : 'text-white/80'
             )}
           />
           <span className="sr-only">Close</span>

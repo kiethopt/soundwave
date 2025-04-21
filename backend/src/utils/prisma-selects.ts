@@ -223,6 +223,9 @@ export const artistProfileSelect = {
           duration: true,
           playCount: true,
           trackNumber: true,
+          audioUrl: true,
+          coverUrl: true,
+          isActive: true,
           label: {
             select: {
               id: true,

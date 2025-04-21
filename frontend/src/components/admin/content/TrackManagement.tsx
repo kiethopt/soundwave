@@ -10,12 +10,11 @@ import {
   getCoreRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  Table,
 } from '@tanstack/react-table';
 import type { Track, FetchDataResponse } from '@/types';
 import toast from 'react-hot-toast';
 import { EditTrackModal, TrackDetailModal } from '@/components/ui/data-table/data-table-modals';
-import io, { Socket } from 'socket.io-client';
+import io from 'socket.io-client';
 
 
 interface TrackManagementProps {
@@ -197,18 +196,28 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
 
   const handleDeleteTrack = useCallback(
     async (trackId: string | string[]) => {
+      const idsToDelete = Array.isArray(trackId) ? trackId : [trackId];
+      const confirmMessage = idsToDelete.length > 1 
+        ? `Are you sure you want to delete these ${idsToDelete.length} tracks? This action cannot be undone.`
+        : 'Are you sure you want to delete this track? This action cannot be undone.';
+        
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+
       try {
         const token = localStorage.getItem('userToken') || '';
         const id = Array.isArray(trackId) ? trackId[0] : trackId;
 
         await api.tracks.delete(id, token);
         toast.success('Track deleted successfully');
+        refreshTracks();
       } catch (error) {
         console.error('Failed to delete track:', error);
         toast.error('Failed to delete track');
       }
     },
-    []
+    [refreshTracks]
   );
   const handleToggleVisibility = useCallback(
     async (trackId: string, currentIsActive: boolean) => {
@@ -282,9 +291,24 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
         socket.on('track:updated', (data: { track: Track }) => {
             console.log('[Admin] Track updated via WebSocket:', data);
             setData((currentTracks: Track[]) =>
-                currentTracks.map((track: Track) =>
-                    track.id === data.track.id ? { ...track, ...data.track } : track // Merge updates
-                )
+                currentTracks.map((currentTrack: Track) => {
+                    if (currentTrack.id === data.track.id) {
+                        return {
+                            ...currentTrack,
+                            ...data.track, 
+                            album: data.track.album 
+                                ? { ...currentTrack.album, ...data.track.album } 
+                                : currentTrack.album, 
+                            artist: data.track.artist
+                                ? { ...currentTrack.artist, ...data.track.artist }
+                                : currentTrack.artist,
+                            genres: data.track.genres || currentTrack.genres,
+                            featuredArtists: data.track.featuredArtists || currentTrack.featuredArtists,
+                        };
+                    } else {
+                        return currentTrack;
+                    }
+                })
             );
         });
 

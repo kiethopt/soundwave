@@ -167,18 +167,28 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
 
   const handleDeleteAlbum = useCallback(
     async (albumId: string | string[]) => {
+      const idsToDelete = Array.isArray(albumId) ? albumId : [albumId];
+      const confirmMessage = idsToDelete.length > 1 
+        ? `Are you sure you want to delete these ${idsToDelete.length} albums? This action cannot be undone.`
+        : 'Are you sure you want to delete this album? This action cannot be undone.';
+        
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+
       try {
         const token = localStorage.getItem('userToken') || '';
-        const id = Array.isArray(albumId) ? albumId[0] : albumId;
+        const deletePromises = idsToDelete.map(id => api.albums.delete(id, token)); 
+        await Promise.all(deletePromises);
 
-        await api.albums.delete(id, token);
-        toast.success('Album deleted successfully');
+        toast.success(`Successfully deleted ${idsToDelete.length} album${idsToDelete.length > 1 ? 's' : ''}`);
+        refreshAlbums();
       } catch (error) {
-        console.error('Failed to delete album:', error);
-        toast.error('Failed to delete album');
+        console.error('Failed to delete album(s):', error);
+        toast.error('Failed to delete album(s)');
       }
     },
-    []
+    [refreshAlbums]
   );
 
   const handleAlbumEditSubmit = useCallback(

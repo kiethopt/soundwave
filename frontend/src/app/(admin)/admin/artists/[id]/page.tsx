@@ -57,32 +57,51 @@ export default function ArtistDetail() {
       if (album) {
         setSelectedAlbum(album);
         setIsAlbumModalOpen(true);
+      } else {
+        // Clear the state if album not found for this artist
+        setIsAlbumModalOpen(false); 
       }
+    } else {
+      setIsAlbumModalOpen(false); // Close if no albumId
     }
 
-    // Handle track parameter
     const trackId = safeGetParam("track");
     if (trackId && artist) {
-      const track = artist.tracks?.find((t) => t.id.toString() === trackId);
-
-      // If not found in direct tracks, check albums
-      if (!track && artist.albums) {
+      let foundTrack: Track | undefined;
+      foundTrack = artist.tracks?.find((t) => t.id.toString() === trackId);
+      if (!foundTrack && artist.albums) {
         for (const album of artist.albums) {
-          const foundTrack = album.tracks?.find(
-            (t) => t.id.toString() === trackId
-          );
-          if (foundTrack) {
-            setSelectedTrack(foundTrack);
-            setIsTrackModalOpen(true);
-            break;
-          }
+          foundTrack = album.tracks?.find((t) => t.id.toString() === trackId);
+          if (foundTrack) break;
         }
-      } else if (track) {
-        setSelectedTrack(track);
-        setIsTrackModalOpen(true);
       }
+
+      if (foundTrack) {
+        setSelectedTrack(foundTrack);
+        setIsTrackModalOpen(true);
+      } else {
+        // Clear the state if track not found for this artist
+        setIsTrackModalOpen(false);
+      }
+    } else {
+      setIsTrackModalOpen(false); // Close if no trackId
     }
-  }, [searchParams, artist, safeGetParam]);
+  }, [searchParams, artist]); // Depend only on searchParams and artist
+
+  // Separate useEffect for closing the *other* modal when one opens
+  useEffect(() => {
+    if (isAlbumModalOpen) {
+      setIsTrackModalOpen(false);
+      setSelectedTrack(null);
+    }
+  }, [isAlbumModalOpen]);
+
+  useEffect(() => {
+    if (isTrackModalOpen) {
+      setIsAlbumModalOpen(false);
+      setSelectedAlbum(null);
+    }
+  }, [isTrackModalOpen]);
 
   useEffect(() => {
     const fetchArtist = async () => {

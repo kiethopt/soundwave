@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogTrigger,
+  DialogClose,
 } from '@/components/ui/dialog';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
@@ -1909,8 +1910,7 @@ export function AlbumDetailModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`${theme === 'dark' ? 'bg-[#1e1e1e] border-[#404040]' : 'bg-white'
-          } p-0 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-hidden`}
+        className={`${theme === 'dark' ? 'bg-[#1e1e1e] border-[#404040]' : 'bg-white'} p-0 rounded-lg shadow-lg w-full max-w-5xl max-h-[90vh] overflow-hidden`} // Changed max-w-4xl to max-w-5xl
       >
         <DialogTitle className="sr-only">{album.title}</DialogTitle>
         <div
@@ -2016,16 +2016,17 @@ export function AlbumDetailModal({
               >
                 {/* Header - Desktop only */}
                 <div
-                  className={`hidden md:block px-6 py-3 border-b ${theme === 'light' ? 'border-gray-200' : 'border-white/10'
+                  className={`hidden md:block px-6 py-3 border-b ${theme === 'light' ? 'border-gray-200' : 'border-white/10'}
                     }`}
                 >
                   <div
-                    className={`grid grid-cols-[48px_4fr_2fr_100px] gap-4 text-xs ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
-                      }`}
+                    className={`grid grid-cols-[48px_4fr_2fr_250px_100px] gap-4 text-xs ${theme === 'light' ? 'text-gray-600' : 'text-white/60'}
+                    }`}
                   >
                     <div className="text-center">#</div>
                     <div>Title</div>
                     <div>Artists</div>
+                    <div className="text-center">Player</div>
                     <div className="text-right">Duration</div>
                   </div>
                 </div>
@@ -2037,7 +2038,7 @@ export function AlbumDetailModal({
                   {sortedTracks.map((track) => (
                     <div
                       key={track.id}
-                      className={`md:grid md:grid-cols-[48px_4fr_2fr_100px] md:gap-4 px-4 md:px-6 py-2.5 md:py-3 ${theme === 'light'
+                      className={`md:grid md:grid-cols-[48px_4fr_2fr_250px_100px] md:gap-4 px-4 md:px-6 py-2.5 md:py-3 ${theme === 'light'
                         ? 'hover:bg-gray-100'
                         : 'hover:bg-white/5'
                         }`}
@@ -2050,52 +2051,68 @@ export function AlbumDetailModal({
                         {track.trackNumber}
                       </div>
 
-                      {/* Mobile Layout */}
-                      <div className="md:hidden flex items-center justify-between gap-2">
-                        <div className="flex flex-col flex-1 min-w-0">
+                      {/* Mobile Layout - Including Player */}
+                      <div className="md:hidden flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <span
+                              className={`font-medium text-sm line-clamp-1 ${theme === 'light' ? 'text-gray-900' : 'text-white'
+                                }`}
+                            >
+                              {track.title}
+                            </span>
+                            <div
+                              className={`text-xs line-clamp-1 ${theme === 'light'
+                                ? 'text-gray-600'
+                                : 'text-white/60'
+                                }`}
+                            >
+                              {track.artist?.artistName || 'Unknown Artist'}
+                              {track.featuredArtists?.length > 0 && (
+                                <span
+                                  className={
+                                    theme === 'light'
+                                      ? 'text-gray-400'
+                                      : 'text-white/40'
+                                  }
+                                >
+                                  {' '}
+                                  • feat.{' '}
+                                  {track.featuredArtists
+                                    .map(
+                                      ({ artistProfile }) =>
+                                        artistProfile?.artistName ||
+                                        'Unknown Artist'
+                                    )
+                                    .join(', ')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                           <span
-                            className={`font-medium text-sm line-clamp-1 ${theme === 'light' ? 'text-gray-900' : 'text-white'
-                              }`}
-                          >
-                            {track.title}
-                          </span>
-                          <div
-                            className={`text-xs line-clamp-1 ${theme === 'light'
+                            className={`text-sm whitespace-nowrap pl-3 ${theme === 'light'
                               ? 'text-gray-600'
                               : 'text-white/60'
                               }`}
                           >
-                            {track.artist?.artistName || 'Unknown Artist'}
-                            {track.featuredArtists?.length > 0 && (
-                              <span
-                                className={
-                                  theme === 'light'
-                                    ? 'text-gray-400'
-                                    : 'text-white/40'
-                                }
-                              >
-                                {' '}
-                                • feat.{' '}
-                                {track.featuredArtists
-                                  .map(
-                                    ({ artistProfile }) =>
-                                      artistProfile?.artistName ||
-                                      'Unknown Artist'
-                                  )
-                                  .join(', ')}
-                              </span>
-                            )}
-                          </div>
+                            {formatDuration(track.duration)}
+                          </span>
                         </div>
-                        <span
-                          className={`text-sm whitespace-nowrap pl-3 ${theme === 'light'
-                            ? 'text-gray-600'
-                            : 'text-white/60'
-                            }`}
-                        >
-                          {formatDuration(track.duration)}
-                        </span>
+                        {/* Mobile Audio Player */}
+                        {track.audioUrl && (
+                          <div className="w-full">
+                            <audio
+                              controls
+                              src={track.audioUrl}
+                              className="w-full h-8 rounded-md"
+                              style={{ filter: theme === 'dark' ? 'invert(1) sepia(0.1) saturate(0.8) hue-rotate(180deg)' : 'none' }}
+                            >
+                              Your browser does not support the audio element.
+                            </audio>
+                          </div>
+                        )}
                       </div>
+
                       {/* Desktop Layout */}
                       <div
                         className={`hidden md:flex items-center min-w-0 ${theme === 'light' ? 'text-gray-900' : 'text-white'
@@ -2119,9 +2136,9 @@ export function AlbumDetailModal({
                         </div>
                         {track.featuredArtists?.length > 0 && (
                           <div
-                            className={`text-xs line-clamp-1 ${theme === 'light'
-                              ? 'text-gray-600'
-                              : 'text-white/60'
+                            className={`text-xs line-clamp-1 mt-0.5 ${theme === 'light'
+                              ? 'text-gray-500'
+                              : 'text-white/50'
                               }`}
                           >
                             feat.{' '}
@@ -2135,8 +2152,22 @@ export function AlbumDetailModal({
                         )}
                       </div>
 
+                      {/* Desktop Audio Player */}
+                      <div className="hidden md:flex items-center">
+                        {track.audioUrl && (
+                          <audio
+                            controls
+                            src={track.audioUrl}
+                            className="w-full h-8 rounded-md"
+                            style={{ filter: theme === 'dark' ? 'invert(1) sepia(0.1) saturate(0.8) hue-rotate(180deg)' : 'none' }}
+                          >
+                            Your browser does not support the audio element.
+                          </audio>
+                        )}
+                      </div>
+
                       <div
-                        className={`hidden md:flex items-center justify-end ${theme === 'light' ? 'text-gray-600' : 'text-white'
+                        className={`hidden md:flex items-center justify-end ${theme === 'light' ? 'text-gray-600' : 'text-white/60'
                           }`}
                       >
                         {formatDuration(track.duration)}
@@ -2159,6 +2190,11 @@ export function AlbumDetailModal({
           )}
         </div>
       </DialogContent>
+      {/* Close Button */}
+      <DialogClose className={`absolute top-3 right-3 p-1 rounded-full transition-colors ${theme === 'light' ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>
+        <X className="w-5 h-5" />
+        <span className="sr-only">Close</span>
+      </DialogClose>
     </Dialog>
   );
 }
@@ -2194,13 +2230,13 @@ export function TrackDetailModal({
 
   const handleArtistClick = (artistId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    onClose();
+    onClose(); // Close the current modal first
     router.push(`/admin/artists/${artistId}`);
   };
 
   const handleAlbumClick = (albumId: string | number, e: React.MouseEvent) => {
     e.stopPropagation();
-    onClose();
+    onClose(); // Close the current modal first
     if (track.artist?.id) {
       router.push(`/admin/artists/${track.artist.id}?album=${albumId}`);
     } else {
@@ -2349,15 +2385,11 @@ export function TrackDetailModal({
                       From the album:
                     </span>
                     <div
-                      className="flex items-center gap-2 mt-1 cursor-pointer hover:opacity-80"
-                      onClick={(e) =>
-                        track.album?.id && handleAlbumClick(track.album.id, e)
-                      }
+                      className="flex items-center gap-2 mt-1"
                     >
                       <img
                         src={
-                          track.album.coverUrl ||
-                          'https://placehold.co/50x50?text=No+Cover'
+                          track.album.coverUrl
                         }
                         alt={track.album.title}
                         className="w-12 h-12 object-cover rounded"
@@ -2444,8 +2476,29 @@ export function TrackDetailModal({
               <span>© {track.label.name || 'Unknown Label'}</span>
             )}
           </div>
+
+          {/* Track Audio Player */}
+          {track.audioUrl && (
+            <div className="mt-4 w-full">
+              <audio
+                controls
+                src={track.audioUrl}
+                className={`w-full rounded-lg ${theme === 'dark' ? 'bg-[#282828] shadow-md shadow-black/30' : 'bg-gray-100 shadow-sm'
+                  }`}
+              >
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+          )}
+
+          {/* Add any other info or actions here */}
         </div>
       </DialogContent>
+      {/* Close Button */}
+      <DialogClose className={`absolute top-3 right-3 p-1 rounded-full transition-colors ${theme === 'light' ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>
+        <X className="w-5 h-5" />
+        <span className="sr-only">Close</span>
+      </DialogClose>
     </Dialog>
   );
 }

@@ -1,6 +1,4 @@
 import { ArtistRequestFilters, CreatePlaylistData } from "@/types";
-import { get } from "lodash";
-import { setFollowVisibility } from '../../../backend/src/services/user.service';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
