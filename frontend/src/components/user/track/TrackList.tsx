@@ -143,29 +143,27 @@ export function TrackList({
         // Placeholder for unlike logic
         try {
           await api.tracks.unlike(trackId, token); // Assume unlike exists
-          toast.success("Removed from Favorites (Placeholder)");
+          toast.success("Removed from Favorites");
           window.dispatchEvent(
             new CustomEvent("favorites-changed", {
               detail: { action: "remove", trackId },
             })
           );
         } catch (error: any) {
-          toast.error(
-            error.message || "Failed to remove favorite (Placeholder)"
-          );
+          toast.error(error.message || "Failed to remove favorite");
         }
       } else {
         // Placeholder for like logic
         try {
           await api.tracks.like(trackId, token);
-          toast.success("Added to Favorites (Placeholder)");
+          toast.success("Added to Favorites");
           window.dispatchEvent(
             new CustomEvent("favorites-changed", {
               detail: { action: "add", trackId },
             })
           );
         } catch (error: any) {
-          toast.error(error.message || "Failed to add favorite (Placeholder)");
+          toast.error(error.message || "Failed to add favorite");
         }
       }
     });

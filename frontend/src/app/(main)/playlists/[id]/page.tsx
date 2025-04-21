@@ -520,19 +520,55 @@ export default function PlaylistPage() {
         </div>
 
         <div className="flex flex-col gap-2">
-          {!isSpecialPlaylist && !playlist.isAIGenerated && (
-            <Badge
-              variant="secondary"
-              className={`text-xs font-medium rounded-full px-2 py-0.5 w-fit ${
-                playlist.privacy === "PRIVATE"
-                  ? "bg-neutral-700 text-neutral-300"
-                  : "bg-blue-500/20 text-blue-300"
-              }`}
-            >
-              {playlist.privacy === "PRIVATE" ? "Private" : "Public"}
-            </Badge>
-          )}
+          {/* Badges Section (Moved Above Title) */}
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            {" "}
+            {/* Added mb-1 for spacing */}
+            {/* Normal Privacy Badge */}
+            {!isSpecialPlaylist && !playlist.isAIGenerated && (
+              <Badge
+                variant="secondary"
+                className={`text-xs font-medium rounded-full px-2 py-0.5 w-fit ${
+                  playlist.privacy === "PRIVATE"
+                    ? "bg-neutral-700 text-neutral-300"
+                    : "bg-blue-500/20 text-blue-300"
+                }`}
+              >
+                {playlist.privacy === "PRIVATE" ? "Private" : "Public"}
+              </Badge>
+            )}
+            {/* System Playlist Badges */}
+            {isVibeRewindPlaylist && (
+              <Badge
+                variant="secondary"
+                className="text-xs font-medium rounded-full px-2 py-0.5 w-fit bg-neutral-700 text-neutral-300"
+              >
+                Private
+              </Badge>
+            )}
+            {isWelcomeMixPlaylist && (
+              <Badge
+                variant="secondary"
+                className="text-xs font-medium rounded-full px-2 py-0.5 w-fit bg-neutral-700 text-neutral-300"
+              >
+                Private
+              </Badge>
+            )}
+            {/* AI/Personalized Badges */}
+            {playlist.isAIGenerated && (
+              <>
+                <Badge
+                  variant="outline"
+                  className="bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 border-none text-white text-xs px-1.5 py-0.5 font-bold"
+                >
+                  AI
+                </Badge>
+                <Badge>Personalized</Badge>
+              </>
+            )}
+          </div>
 
+          {/* Title Section */}
           <div className="flex items-center gap-2 flex-wrap">
             <h1
               className={`text-[2rem] font-bold leading-tight ${
@@ -544,21 +580,11 @@ export default function PlaylistPage() {
                   : undefined
               }
               title={canEditPlaylist ? "Edit details" : undefined}
+              // Removed AI badge from here
             >
               {playlist.name}
-              {playlist.isAIGenerated && (
-                <Badge
-                  variant="outline"
-                  className="ml-2 bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 border-none text-white text-xs px-1.5 py-0.5 font-bold"
-                >
-                  AI
-                </Badge>
-              )}
             </h1>
-
-            {isVibeRewindPlaylist && <Badge>Auto-Updated</Badge>}
-            {isWelcomeMixPlaylist && <Badge>Welcome Mix</Badge>}
-            {playlist.isAIGenerated && <Badge>Personalized</Badge>}
+            {/* Badges were previously here, now moved above */}
           </div>
 
           {playlist.description && (
