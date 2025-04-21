@@ -123,13 +123,22 @@ export const getFollowers = async (
   req: Request,
   res: Response
 ): Promise<void> => {
+  const { id } = req.params;
   try {
-    const followers = await userService.getUserFollowers(req);
+    const followers = await userService.getUserFollowers(id);
     res.json(followers);
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
+    if (error instanceof Error) {
+      if (error.message === 'User not found') {
+        res.status(404).json({ message: 'User not found' });
+        return;
+      } else if (error.message === 'Unauthorized') {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+      } else if (error.message === 'User ID is required') {
+        res.status(400).json({ message: 'User ID is required' });
+        return;
+      }
     }
     handleError(res, error, 'Get followers');
   }
@@ -140,13 +149,22 @@ export const getFollowing = async (
   req: Request,
   res: Response
 ): Promise<void> => {
+  const { id } = req.params;
   try {
-    const following = await userService.getUserFollowing(req);
+    const following = await userService.getUserFollowing(id);
     res.json(following);
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      res.status(401).json({ message: 'Unauthorized' });
-      return;
+    if (error instanceof Error) {
+      if (error.message === 'User not found') {
+        res.status(404).json({ message: 'User not found' });
+        return;
+      } else if (error.message === 'Unauthorized') {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+      } else if (error.message === 'User ID is required') {
+        res.status(400).json({ message: 'User ID is required' });
+        return;
+      }
     }
     handleError(res, error, 'Get following');
   }
@@ -387,3 +405,19 @@ export const getGenreNewestTracks = async (
   }
 }
 
+export const setFollowVisibility = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const isPublic = req.body.isVisible;
+    const result = await userService.setFollowVisibility(req.user, isPublic);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    handleError(res, error, 'Set follow visibility');
+  }
+}

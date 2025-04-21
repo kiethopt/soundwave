@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import toast from 'react-hot-toast';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { Play, Pause, Edit, Up, Down, Right } from '@/components/ui/Icons';
-import { ArrowLeft, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Copy, MoreHorizontal } from 'lucide-react';
 import { useTrack } from '@/contexts/TrackContext';
 import {
   DropdownMenu,
@@ -36,6 +36,7 @@ export default function UserProfilePage({
   const [token, setToken] = useState<string | null>(null);
   const [following, setFollowing] = useState<User[]>([]);
   const [followers, setFollowers] = useState<User[]>([]);
+  const [followerCount, setFollowerCount] = useState<number>(0);
   const [followingArtists, setFollowingArtists] = useState<ArtistProfile[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [topArtists, setTopArtists] = useState<ArtistProfile[]>([]);
@@ -75,8 +76,8 @@ export default function UserProfilePage({
       try {
         const [userResponse, followingResponse, followersResponse] = await Promise.all([
           api.user.getUserById(id, storedToken),
-          api.user.getFollowing(storedToken),
-          api.user.getFollowers(storedToken)
+          api.user.getUserFollowing(id, storedToken),
+          api.user.getUserFollowers(id, storedToken)
         ]);
 
         if (userResponse) {
@@ -85,17 +86,18 @@ export default function UserProfilePage({
 
         if (followersResponse && followersResponse.followers) {
           setFollowers(followersResponse.followers);
+          setFollowerCount(followersResponse.followers.length);
         }
 
-        if (isOwner) {
-          setFollowing(followingResponse);
+        setFollowing(followingResponse);
           const followingArtists = followingResponse.filter(
             (followingUser: any) => followingUser.type === 'ARTIST'
           );
           setFollowingArtists(followingArtists);
-        } else {
-          const isFollowing = followingResponse.some(
-            (user: User) => user.id === id
+
+        if (!isOwner) {
+          const isFollowing = followersResponse.followers.some(
+            (follower: User) => follower.id === userData.id
           );
           setFollow(isFollowing);
         }
@@ -149,10 +151,34 @@ export default function UserProfilePage({
         await api.user.unfollowUserOrArtist(id, token);
         toast.success('Unfollowed user!');
         setFollow(false);
+        // Decrement follower count
+        setFollowerCount(prevCount => Math.max(0, prevCount - 1));
+        
+        // Also update followers list (remove current user)
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        setFollowers(prev => prev.filter(follower => follower.id !== userData.id));
+        
+        // Dispatch event for other components to know about the follow change
+        window.dispatchEvent(new CustomEvent("follower-count-changed", { 
+          detail: { userId: id, isFollowing: false }
+        }));
       } else {
         await api.user.followUserOrArtist(id, token);
         toast.success('Followed user!');
         setFollow(true);
+        // Increment follower count
+        setFollowerCount(prevCount => prevCount + 1);
+        
+        // Add current user to followers (would need full user data ideally)
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        if (userData.id && !followers.some(f => f.id === userData.id)) {
+          setFollowers(prev => [...prev, userData]);
+        }
+        
+        // Dispatch event for other components to know about the follow change
+        window.dispatchEvent(new CustomEvent("follower-count-changed", { 
+          detail: { userId: id, isFollowing: true }
+        }));
       }
     } catch (error) {
       console.error(error);
@@ -299,31 +325,36 @@ export default function UserProfilePage({
               <div className="flex flex-col items-start justify-center flex-1 ml-4 llg:ml-8 gap-4">
                 <span className="text-sm font-semibold ">Profile</span>
                 <h1
-                  className="text-4xl md:text-6xl font-bold capitalize"
+                  className="text-4xl w-fit md:text-6xl font-bold capitalize cursor-pointer"
                   style={{ lineHeight: '1.1' }}
+                  onClick={() => setIsEditProfileModalOpen(true)}
                 >
                   {user?.name || user?.username || 'User'}
                 </h1>
                 <div>
-                <span
-                    className="text-sm font-semibold hover:underline cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/profile/${id}/followers`);
-                    }}
-                  >
-                    {followers.length} Followers
-                  </span>
-                  <span className="text-xs font-semibold mx-1">•</span>
-                  <span
-                    className="text-sm font-semibold hover:underline cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/profile/${id}/following`);
-                    }}
-                  >
-                    {following.length} Following
-                  </span>
+                  {user.followVisibility === true ? (
+                    <>
+                      <span
+                        className="text-sm font-semibold hover:underline cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/profile/${id}/followers`);
+                        }}
+                      >
+                        {followers.length} Followers
+                      </span>
+                      <span className="text-xs font-semibold mx-1">•</span>
+                      <span
+                        className="text-sm font-semibold hover:underline cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/profile/${id}/following`);
+                        }}
+                      >
+                        {following.length} Following
+                      </span>
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -367,18 +398,17 @@ export default function UserProfilePage({
                       Edit Profile
                     </DropdownMenuItem>
                   )}
-                  {!isOwner && (
-                    <DropdownMenuItem
-                      className="cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Follow User
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuItem
                     className="cursor-pointer"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}/profile/${id}`
+                      );
+                      toast.success('Profile link copied to clipboard!');
+                    }}
                   >
+                    <Copy className="w-4 h-4 mr-1" />
                     Copy Profile Link
                   </DropdownMenuItem>
                 </DropdownMenuContent>

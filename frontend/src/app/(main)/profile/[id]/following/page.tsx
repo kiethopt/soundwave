@@ -48,7 +48,7 @@ export default function UserProfilePage({
     const fetchUserData = async () => {
       try {
         const [followingResponse] = await Promise.all([
-          api.user.getFollowing(storedToken),
+          api.user.getUserFollowing(id, storedToken),
         ]);
 
         if (followingResponse) {

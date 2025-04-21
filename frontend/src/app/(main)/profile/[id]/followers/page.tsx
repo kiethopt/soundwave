@@ -27,7 +27,7 @@ export default function UserFollowersPage({
 
     const fetchFollowerData = async () => {
       try {
-        const followersResponse = await api.user.getFollowers(storedToken);
+        const followersResponse = await api.user.getUserFollowers(id, storedToken);
 
         if (followersResponse && followersResponse.followers) {
           const followers = followersResponse.followers;
