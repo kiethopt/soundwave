@@ -8,6 +8,7 @@ import prisma from '../config/db';
 import * as adminService from '../services/admin.service';
 import * as emailService from '../services/email.service';
 import { User as PrismaUser, Role } from '@prisma/client';
+import { getIO, getUserSockets } from '../config/socket';
 
 // Define User type including adminLevel for controller scope
 type UserWithAdminLevel = PrismaUser & { adminLevel?: number | null };
@@ -515,36 +516,30 @@ export const approveArtistRequest = async (
 ): Promise<void> => {
   try {
     const { requestId } = req.body;
-    // Service trả về user trong updatedProfile.user
     const updatedProfile = await adminService.approveArtistRequest(requestId);
 
-    // Tạo thông báo in-app (như cũ)
+    // --- Gửi thông báo & email (logic cũ) ---
+    // Create notification
     await prisma.notification.create({
       data: {
         type: 'ARTIST_REQUEST_APPROVE',
         message: 'Your request to become an Artist has been approved!',
         recipientType: 'USER',
-        userId: updatedProfile.user.id, // Lấy ID từ user trong updatedProfile
+        userId: updatedProfile.user.id,
         isRead: false,
       },
     });
-
-    // Gửi email thông báo duyệt
+    // Send email
     if (updatedProfile.user.email) {
-      // Kiểm tra email tồn tại
       try {
-        // **Sửa lỗi ở đây: Truyền đủ 2 tham số**
         const emailOptions = emailService.createArtistRequestApprovedEmail(
-          updatedProfile.user.email, // Tham số 1: to
-          updatedProfile.user.name || updatedProfile.user.username || 'User' // Tham số 2: userName
+          updatedProfile.user.email,
+          updatedProfile.user.name || updatedProfile.user.username || 'User'
         );
-        await emailService.sendEmail(emailOptions); // Gửi email
-        console.log(
-          `Artist approval email sent to ${updatedProfile.user.email}`
-        );
+        await emailService.sendEmail(emailOptions);
+        console.log(`Artist approval email sent to ${updatedProfile.user.email}`);
       } catch (emailError) {
         console.error('Failed to send artist approval email:', emailError);
-        // Không nên throw lỗi ở đây để tránh ảnh hưởng response chính
       }
     } else {
       console.warn(
@@ -552,52 +547,62 @@ export const approveArtistRequest = async (
       );
     }
 
-    // Trả về response thành công
+    // --- Phát sự kiện Socket.IO --- 
+    try {
+        const io = getIO();
+        const userSockets = getUserSockets();
+        const targetUserId = updatedProfile.user.id;
+        const targetSocketId = userSockets.get(targetUserId);
+
+        if (targetSocketId) {
+            console.log(`🚀 Emitting artist_status_updated (approved) to user ${targetUserId} via socket ${targetSocketId}`);
+            io.to(targetSocketId).emit('artist_status_updated', {
+                status: 'approved',
+                message: 'Your request to become an Artist has been approved!',
+                artistProfile: updatedProfile
+            });
+        } else {
+            console.log(`Socket not found for user ${targetUserId}. Cannot emit update.`);
+        }
+    } catch (socketError) {
+        console.error('Failed to emit socket event for artist approval:', socketError);
+    }
+    // ---------------------------
+
     res.json({
       message: 'Artist role approved successfully',
-      // Trả về user data đã được select cẩn thận từ service hoặc query lại nếu cần
-      user: {
-        id: updatedProfile.user.id,
-        email: updatedProfile.user.email,
-        name: updatedProfile.user.name,
-        username: updatedProfile.user.username,
-        avatar: updatedProfile.user.avatar,
-        role: updatedProfile.user.role, // Role đã được cập nhật
-        // ... các trường khác trong userSelect nếu cần
-      },
+      user: updatedProfile.user, // Trả về thông tin user đã được cập nhật (nếu có)
     });
   } catch (error) {
-    // Xử lý lỗi như cũ
     if (
       error instanceof Error &&
-      error.message.includes('not found or already verified')
+      error.message.includes('not found, already verified, or rejected')
     ) {
       res
         .status(404)
-        .json({ message: 'Artist request not found or already verified' });
+        .json({ message: 'Artist request not found, already verified, or rejected' });
       return;
     }
     handleError(res, error, 'Approve artist request');
   }
 };
 
-// Từ chối yêu cầu
+// Từ chối yêu cầu trở thành Artist
 export const rejectArtistRequest = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
     const { requestId, reason } = req.body;
-    // Service đã trả về user với đủ thông tin (bao gồm email, username, name)
     const result = await adminService.rejectArtistRequest(requestId);
 
-    let notificationMessage =
-      'Your request to become an Artist has been rejected.';
+    // --- Gửi thông báo & email (logic cũ) ---
+    let notificationMessage = 'Your request to become an Artist has been rejected.';
     if (reason && reason.trim() !== '') {
       notificationMessage += ` Reason: ${reason.trim()}`;
     }
 
-    // Tạo thông báo in-app (như cũ)
+    // Create notification
     await prisma.notification.create({
       data: {
         type: 'ARTIST_REQUEST_REJECT',
@@ -608,23 +613,18 @@ export const rejectArtistRequest = async (
       },
     });
 
-    // Gửi email thông báo từ chối
+    // Send email
     if (result.user.email) {
-      // Kiểm tra email có tồn tại không
       try {
-        // **Sửa lại lời gọi hàm ở đây:**
         const emailOptions = emailService.createArtistRequestRejectedEmail(
-          result.user.email, // Tham số 1: to (email người nhận)
-          result.user.name || result.user.username || 'User', // Tham số 2: userName
-          reason // Tham số 3: reason (tùy chọn)
+          result.user.email,
+          result.user.name || result.user.username || 'User',
+          reason
         );
-
-        // Gọi sendEmail trực tiếp với emailOptions đã hoàn chỉnh
         await emailService.sendEmail(emailOptions);
         console.log(`Artist rejection email sent to ${result.user.email}`);
       } catch (emailError) {
         console.error('Failed to send artist rejection email:', emailError);
-        // Cân nhắc log lỗi chi tiết hơn nếu cần
       }
     } else {
       console.warn(
@@ -632,27 +632,43 @@ export const rejectArtistRequest = async (
       );
     }
 
+    // --- Phát sự kiện Socket.IO --- 
+    try {
+        const io = getIO();
+        const userSockets = getUserSockets();
+        const targetSocketId = userSockets.get(result.user.id);
+
+        if (targetSocketId) {
+            console.log(`🚀 Emitting artist_status_updated (rejected) to user ${result.user.id} via socket ${targetSocketId}`);
+            io.to(targetSocketId).emit('artist_status_updated', {
+                status: 'rejected',
+                message: notificationMessage, // Gửi cả lý do từ chối nếu có
+            });
+        } else {
+            console.log(`Socket not found for user ${result.user.id}. Cannot emit update.`);
+        }
+    } catch (socketError) {
+        console.error('Failed to emit socket event for artist rejection:', socketError);
+    }
+    // ---------------------------
+
     res.json({
       message: 'Artist role request rejected successfully',
-      user: result.user, // user đã có đủ thông tin từ service
-      hasPendingRequest: result.hasPendingRequest,
+      // user: result.user, // Có thể không cần trả về user ở đây vì profile đã bị xóa
+      hasPendingRequest: result.hasPendingRequest, // = false
     });
-    // Thêm return để đảm bảo hàm kết thúc sau khi gửi response
-    return;
+
   } catch (error) {
-    // Xử lý lỗi như cũ
     if (
       error instanceof Error &&
-      error.message.includes('not found or already verified')
+      error.message.includes('not found, already verified, or rejected')
     ) {
       res
         .status(404)
-        .json({ message: 'Artist request not found or already verified' });
-      return; // Thêm return
+        .json({ message: 'Artist request not found, already verified, or rejected' });
+      return;
     }
     handleError(res, error, 'Reject artist request');
-    // Thêm return sau khi xử lý lỗi
-    return;
   }
 };
 

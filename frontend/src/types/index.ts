@@ -79,6 +79,7 @@ export interface User {
   followers?: UserFollow[];
   notifications?: Notification[];
   likedTracks?: Track[];
+  hasPendingArtistRequest?: boolean;
 }
 
 export interface ArtistProfile {
@@ -399,12 +400,17 @@ export interface Stats {
   totalArtists: number;
   totalArtistRequests: number;
   totalGenres: number;
+  totalLabels: number;
+  totalAlbums: number;
+  totalTracks: number;
+  totalSystemPlaylists: number;
   topArtists: Array<{
     id: string;
     artistName: string;
     avatar?: string;
     monthlyListeners: number;
   }>;
+  monthlyUserData: Array<{ month: string; users: number }>;
 }
 
 export interface TrackEditForm {

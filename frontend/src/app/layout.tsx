@@ -187,10 +187,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <ThemeProvider>
-        <SessionProvider>
-          <TrackProvider>
-            <MaintenanceProvider>
-              <SocketProvider>
+        <SocketProvider>
+          <SessionProvider>
+            <TrackProvider>
+              <MaintenanceProvider>
                 <BackgroundProvider>
                   <body className="bg-[#111]" suppressHydrationWarning>
                     <MaintenanceBanner />
@@ -198,10 +198,10 @@ export default function RootLayout({
                     <Toaster position="top-center" />
                   </body>
                 </BackgroundProvider>
-              </SocketProvider>
-            </MaintenanceProvider>
-          </TrackProvider>
-        </SessionProvider>
+              </MaintenanceProvider>
+            </TrackProvider>
+          </SessionProvider>
+        </SocketProvider>
       </ThemeProvider>
     </html>
   );
