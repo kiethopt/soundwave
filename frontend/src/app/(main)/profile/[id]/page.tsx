@@ -551,7 +551,7 @@ export default function UserProfilePage({
                   {user?.name || user?.username || "User"}
                 </h1>
                 <div>
-                  {user.followVisibility === true ? (
+                  {user.followVisibility === true || isOwner ? (
                     <>
                       <span
                         className="text-sm font-semibold hover:underline cursor-pointer"
@@ -746,7 +746,7 @@ export default function UserProfilePage({
           )}
 
           {/* Following Artists Section */}
-          {followingArtists.length > 0 && (
+          {followingArtists.length > 0 && user.followVisibility === true && (
             <div className="px-4 md:px-6 py-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Following artists</h2>

@@ -556,7 +556,6 @@ const getDashboardStats = async () => {
             const monthDate = (0, date_fns_1.subMonths)(now, i);
             const endOfMonthDate = (0, date_fns_1.endOfMonth)(monthDate);
             const monthLabel = allMonths[monthDate.getMonth()];
-            const yearMonthLabel = (0, date_fns_1.format)(monthDate, 'MMM yyyy');
             const userCount = await db_1.default.user.count({
                 where: {
                     createdAt: { lte: endOfMonthDate },
