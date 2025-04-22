@@ -16,6 +16,7 @@ export default function DiscoveryPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const [firstGenreColor, setFirstGenreColor] = useState<string | null>(null);
+  const [hoveredGenreColor, setHoveredGenreColor] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('userToken') || '';
@@ -90,7 +91,7 @@ export default function DiscoveryPage() {
   // Set the first genre color when genres are loaded
   useEffect(() => {
     if (genres.length > 0) {
-      const firstGenreColorClass = getGenreColor(genres[0].name);
+      const firstGenreColorClass = getGenreColor(genres[1].name);
       const dominantColor = getDominantHexColor(firstGenreColorClass);
       setFirstGenreColor(dominantColor);
       
@@ -99,16 +100,30 @@ export default function DiscoveryPage() {
     }
   }, [genres, updateGenreData]);
 
+  // Handle genre hover
+  const handleGenreHover = (genreName: string) => {
+    const colorClass = getGenreColor(genreName);
+    const dominantColor = getDominantHexColor(colorClass);
+    setHoveredGenreColor(dominantColor);
+  };
+
+  // Handle genre hover end
+  const handleGenreHoverEnd = () => {
+    setHoveredGenreColor(null);
+  };
+
+  const currentBackgroundColor = hoveredGenreColor || firstGenreColor;
+
   return (
     <div 
-      className="container mx-auto p-4 md:p-6 mb-16 md:mb-0"
-      style={{
-        background: firstGenreColor
+    className="container mx-auto p-4 md:p-6 mb-16 md:mb-0 transition-colors duration-1000 ease"
+    style={{
+        background: currentBackgroundColor
           ? `linear-gradient(180deg, 
-              ${firstGenreColor} 0%, 
-              ${firstGenreColor}30 8%, 
-              ${firstGenreColor}15 15%, 
-              ${theme === 'light' ? '#ffffff' : '#121212'} 70%)`
+              ${currentBackgroundColor}50 0%, 
+              ${currentBackgroundColor}25 15%, 
+              ${currentBackgroundColor}10 30%, 
+              ${theme === 'light' ? '#ffffff' : '#121212'} 100%)`
           : theme === 'light'
           ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
           : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
@@ -154,6 +169,8 @@ export default function DiscoveryPage() {
                   const dominantColor = getDominantHexColor(colorClass);
                   updateGenreData(genre.name, dominantColor || '');
                 }}
+                onMouseEnter={() => handleGenreHover(genre.name)}
+                onMouseLeave={handleGenreHoverEnd}
               >
                 <div 
                   className={`relative h-32 md:h-40 rounded-lg overflow-hidden group cursor-pointer
