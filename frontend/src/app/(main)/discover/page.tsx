@@ -15,7 +15,7 @@ export default function DiscoveryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-
+  const [firstGenreColor, setFirstGenreColor] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('userToken') || '';
@@ -87,8 +87,33 @@ export default function DiscoveryPage() {
     return defaultColors[Math.abs(hash) % defaultColors.length];
   };
 
+  // Set the first genre color when genres are loaded
+  useEffect(() => {
+    if (genres.length > 0) {
+      const firstGenreColorClass = getGenreColor(genres[0].name);
+      const dominantColor = getDominantHexColor(firstGenreColorClass);
+      setFirstGenreColor(dominantColor);
+      
+      // Also update the genre data in context
+      updateGenreData(genres[0].name, dominantColor || '');
+    }
+  }, [genres, updateGenreData]);
+
   return (
-    <div className="container mx-auto p-4 md:p-6 mb-16 md:mb-0">
+    <div 
+      className="container mx-auto p-4 md:p-6 mb-16 md:mb-0"
+      style={{
+        background: firstGenreColor
+          ? `linear-gradient(180deg, 
+              ${firstGenreColor} 0%, 
+              ${firstGenreColor}30 8%, 
+              ${firstGenreColor}15 15%, 
+              ${theme === 'light' ? '#ffffff' : '#121212'} 70%)`
+          : theme === 'light'
+          ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
+          : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
+      }}
+    >
       <div className="mb-8">
         <h1 className={`text-3xl font-bold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>
           Discover

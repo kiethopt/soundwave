@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [showSocialLists, setShowSocialLists] = useState<boolean>(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const settingPageColor = '#AD8574';
 
   useEffect(() => {
     const token = localStorage.getItem('userToken');
@@ -104,7 +105,17 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="w-full px-4 py-8">
+    <div className="w-full px-4 py-8"
+    style={{
+      background: settingPageColor
+        ? `linear-gradient(180deg, 
+            ${settingPageColor} 0%, 
+            ${settingPageColor}50 15%, 
+            ${theme === 'light' ? '#ffffff' : '#121212'} 70%)`
+        : theme === 'light'
+        ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
+        : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
+    }}>
       <h1 className="text-4xl font-bold mb-8">Settings</h1>
       
       {/* Account Section */}

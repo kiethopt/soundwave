@@ -136,6 +136,25 @@ export default function PlayerBar() {
     };
 
     checkLikeStatus();
+      const handleFavoritesChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        action: "add" | "remove";
+        trackId: string;
+      }>;
+      
+      if (!customEvent.detail || !currentTrack) return;
+      const { action, trackId } = customEvent.detail;
+      
+      if (trackId === currentTrack.id) {
+        setIsLiked(action === "add");
+      }
+    };
+
+    window.addEventListener("favorites-changed", handleFavoritesChanged);
+
+    return () => {
+      window.removeEventListener("favorites-changed", handleFavoritesChanged);
+    };
   }, [currentTrack?.id]);
 
   const getVolumeIcon = () => {
