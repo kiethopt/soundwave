@@ -877,10 +877,15 @@ export function getUserColumns({
                 >
                   <Edit className="mr-2 h-4 w-4" /> Edit
                 </DropdownMenuItem>
-                {user.role === 'USER' && onMakeAdmin && (
+                {/* Make Admin Option - Conditional Rendering */}
+                {onMakeAdmin && loggedInAdminLevel === 1 && user.role !== 'ADMIN' && (
                   <DropdownMenuItem
                     onSelect={() => onMakeAdmin(user)}
-                    className={menuItemClass}
+                    className={`cursor-pointer ${
+                      theme === 'dark'
+                        ? 'hover:bg-white/10'
+                        : 'hover:bg-gray-100'
+                    }`}
                   >
                     <ShieldCheck className="mr-2 h-4 w-4" /> Make Admin
                   </DropdownMenuItem>

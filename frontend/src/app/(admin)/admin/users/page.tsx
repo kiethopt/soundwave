@@ -378,12 +378,17 @@ export default function UserManagement() {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: (updatedSelection) => {
-      setRowSelection(updatedSelection);
-      if (typeof updatedSelection === 'object' && updatedSelection !== null) {
-        const selectedRowData = users.filter((_, index) => updatedSelection[index.toString()]);
-        setSelectedRows(selectedRowData);
-      }
+    onRowSelectionChange: (updater) => {
+      // Cập nhật state của hàng được chọn
+      setRowSelection(updater); 
+
+      // Lấy dữ liệu của các hàng được chọn và cập nhật state của hook
+      const currentSelection = table.getState().rowSelection;
+      const selectedRowData = table
+        .getRowModel()
+        .rows.filter((row) => currentSelection[row.id])
+        .map((row) => row.original);
+      setSelectedRows(selectedRowData);
     },
     state: {
       sorting,

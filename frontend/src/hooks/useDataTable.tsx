@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { debounce } from 'lodash';
 import type { SortingState } from '@tanstack/react-table';
 
 interface FetchDataResponse<T> {
-  // Ensure this matches the type in types/index.ts
   data: T[];
   pagination: { totalPages: number };
 }
@@ -14,9 +12,9 @@ interface UseDataTableOptions<T> {
   fetchData: (
     page: number,
     params: URLSearchParams
-  ) => Promise<FetchDataResponse<T>>; // Use the defined interface
+  ) => Promise<FetchDataResponse<T>>;
   limit?: number;
-  paramKeyPrefix?: string; // Optional prefix for URL params (e.g., 'album_', 'track_')
+  paramKeyPrefix?: string;
   loggedInAdminLevel?: number | null;
 }
 
@@ -30,7 +28,6 @@ export function useDataTable<T>({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Helper functions to safely access searchParams
   const safeGetParam = (key: string): string => {
     return searchParams?.get(key) || '';
   };
@@ -182,12 +179,6 @@ export function useDataTable<T>({
     },
     [fetchData, limit, getKey]
   );
-
-  const debouncedFetch = useRef(
-    debounce((page: number, params: URLSearchParams) => {
-      fetchDataInternal(page, params);
-    }, 300)
-  ).current;
 
   const updateUrlParams = useCallback(
     (
@@ -371,8 +362,8 @@ export function useDataTable<T>({
       });
 
 
-      // Trigger debounced fetch using the complete, intended URL parameters
-      debouncedFetch(updates.page || newPage, paramsForFetch);
+      // Trigger fetch immediately using the complete, intended URL parameters
+      fetchDataInternal(updates.page || newPage, paramsForFetch);
 
 
       // Update previous dependencies ref *after* logic
@@ -396,7 +387,6 @@ export function useDataTable<T>({
     sorting,
     roleFilter,
     updateUrlParams,
-    debouncedFetch,
     currentPage,
     getKey,
   ]);
@@ -421,10 +411,7 @@ export function useDataTable<T>({
 
     // ** Check for invalid role param first **
     if (loggedInAdminLevel !== 1 && urlRoleParams.length > 0) {
-      // Invalid state: Non-level-1 admin has role param in URL.
-      // console.log(`Admin Level ${loggedInAdminLevel} detected with role param. Removing...`);
-      updateUrlParams({ role: null }, true); // Remove param and replace URL history state.
-      // Don't proceed with state sync or fetch for this invalid URL state.
+      updateUrlParams({ role: null }, true);
       return;
     }
 

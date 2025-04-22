@@ -111,7 +111,6 @@ export function DataTableToolbar({
   theme = 'light',
   searchPlaceholder = 'Search...',
 }: DataTableToolbarProps) {
-  // Replace the debounced search with a local state to track input value
   const [inputValue, setInputValue] = React.useState(searchValue);
 
   // Update the local state when the searchValue prop changes

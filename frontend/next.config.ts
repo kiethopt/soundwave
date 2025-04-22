@@ -41,6 +41,12 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'api.dicebear.com',
+        port: '',
+        pathname: '/7.x/pixel-art/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'avatars.githubusercontent.com',
         port: '',
       },
