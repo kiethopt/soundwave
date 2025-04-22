@@ -76,13 +76,14 @@ export default function Header({
       if (!token || !userData) return;
 
       const allNotificationsData = await api.notifications.getList(token);
+      const newUserData = await api.auth.getMe(token);
       const relevantNotifications = filterNotificationsByProfile(allNotificationsData);
 
       setNotifications(relevantNotifications);
       const currentUnreadCount = relevantNotifications.filter(n => !n.isRead).length;
       setNotificationCount(currentUnreadCount);
       localStorage.setItem('notificationCount', String(currentUnreadCount));
-
+      localStorage.setItem('userData', JSON.stringify(newUserData));
     } catch (error) {
       console.error('Error fetching/setting notifications:', error);
     }
@@ -606,7 +607,7 @@ export default function Header({
           <div className="w-8 h-8"></div>
         ) : isAuthenticated ? (
           <>
-            {userData?.artistProfile?.isVerified && (
+            {userData?.artistProfile && (
                <button
                  onClick={handleSwitchProfile}
                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200 ${theme === 'light'

@@ -33,9 +33,14 @@ export function QueuePanel({ isOpen, onClose }: QueuePanelProps) {
     // Dropped outside the list
     if (!result.destination) return;
     
-    reorderQueue(result.source.index, result.destination.index);
+    // Convert rotated indices to original queue indices
+    const sourceIndex = (result.source.index + currentIndex) % queue.length;
+    const destIndex = (result.destination.index + currentIndex) % queue.length;
+    
+    // Call reorderQueue with the corrected indices
+    reorderQueue(sourceIndex, destIndex);
   };
-
+  
   const handleTrackAction = (track: Track) => {
     if (currentTrack?.id === track.id) {
       if (isPlaying) {

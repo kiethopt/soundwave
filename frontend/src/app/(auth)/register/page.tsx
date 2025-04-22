@@ -250,21 +250,19 @@ function GoogleRegisterButton() {
         if (backendResponse.token && backendResponse.user) {
           // Lưu token và thông tin user
           localStorage.setItem("userToken", backendResponse.token);
-          localStorage.setItem(
-            "userData",
-            JSON.stringify(backendResponse.user)
-          );
+          const userData = await api.auth.getMe(backendResponse.token);
+          localStorage.setItem('userData', JSON.stringify(userData));
 
           // Điều hướng đến trang tương ứng
           if (backendResponse.user.role === "ADMIN") {
-            window.location.href = "/admin/dashboard";
+            router.push("/admin/dashboard");
           } else if (
             backendResponse.user.currentProfile === "ARTIST" &&
             backendResponse.user.artistProfile?.isVerified
           ) {
-            window.location.href = "/artist/dashboard";
+            router.push("/artist/dashboard");
           } else {
-            window.location.href = "/";
+            router.push("/");
           }
         }
       } catch (error) {
