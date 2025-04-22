@@ -202,7 +202,6 @@ export function EditPlaylistDialog({
         payload = JSON.stringify(updatePayload);
         headers["Content-Type"] = "application/json";
       } else {
-        toast("No changes to save.");
         setIsLoading(false);
         parentOnOpenChange(false);
         return;
@@ -248,182 +247,220 @@ export function EditPlaylistDialog({
       <DialogContent
         className={`sm:max-w-[500px] ${
           theme === "light"
-            ? "bg-white text-gray-900 border border-gray-200"
-            : "bg-[#121212] text-white border border-white/10"
+            ? "bg-white text-black"
+            : "bg-[#121212] border-neutral-800 text-white"
         }`}
-        onInteractOutside={(e) => {
-          if (showUnsavedWarning) {
-            e.preventDefault();
-          }
-        }}
       >
         <DialogHeader>
           <DialogTitle
-            className={theme === "light" ? "text-gray-900" : "text-white"}
+            className={`text-xl font-bold ${
+              theme === "light" ? "text-black" : "text-white"
+            }`}
           >
             Edit details
           </DialogTitle>
         </DialogHeader>
 
         {showUnsavedWarning && (
-          <Alert variant="default" className="mt-4 mb-0 p-3 rounded-md">
-            <Info className="h-4 w-4" />
-            <AlertTitle className="font-semibold text-sm">
+          <Alert
+            variant="destructive"
+            className="mb-4 bg-red-500/10 border-red-500/30 text-red-400"
+          >
+            <Info className="h-4 w-4 !text-red-400" />
+            <AlertTitle className="text-red-400 font-semibold">
               Unsaved Changes
             </AlertTitle>
-            <AlertDescription className="text-xs">
-              Save your changes before closing.
+            <AlertDescription className="text-red-400/80">
+              You have unsaved changes. Close again to discard them, or click
+              'Save' to keep them.
             </AlertDescription>
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-3 gap-6 pt-4">
-          <div className="col-span-1 flex flex-col items-center justify-start pt-1">
-            <div className="relative group w-32 h-32">
-              <div
-                className={`w-full h-full rounded-md bg-neutral-800 flex items-center justify-center overflow-hidden ${
-                  !canChangeImage ? "cursor-not-allowed" : ""
-                }`}
-              >
+        <form onSubmit={handleSubmit} className="grid gap-6 py-4">
+          <div className="flex items-start gap-4">
+            <div
+              className={`relative w-40 h-40 flex-shrink-0 ${
+                canChangeImage
+                  ? "cursor-pointer group"
+                  : "cursor-not-allowed opacity-70"
+              }`}
+              onClick={triggerFileInput}
+              title={canChangeImage ? "Change cover photo" : undefined}
+            >
+              <div className="relative w-full h-full">
                 {previewImage ? (
                   <Image
                     src={previewImage}
                     alt="Playlist cover preview"
-                    width={128}
-                    height={128}
-                    className="object-cover w-full h-full"
+                    width={160}
+                    height={160}
+                    className="object-cover w-full h-full rounded-md shadow-md"
                   />
                 ) : (
-                  <PlaylistIcon
-                    name={playlist.name}
-                    type={playlist.type}
-                    isAIGenerated={playlist.isAIGenerated}
-                    size={48}
-                    className="text-neutral-500"
-                  />
+                  <div
+                    className={`w-full h-full flex items-center justify-center rounded-md shadow-md ${
+                      theme === "light" ? "bg-gray-200" : "bg-white/10"
+                    }`}
+                  >
+                    <PlaylistIcon
+                      name={formData.name || playlist.name}
+                      type={playlist.type}
+                      isAIGenerated={playlist.isAIGenerated}
+                      size={64}
+                      className={theme === "light" ? "" : "text-white/70"}
+                    />
+                  </div>
+                )}
+                {canChangeImage && (
+                  <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-md">
+                    <Pencil className="w-8 h-8 text-white mb-1" />
+                    <span className="text-white text-sm font-semibold text-center px-2">
+                      Choose Photo
+                    </span>
+                  </div>
                 )}
               </div>
-
-              {canChangeImage && (
-                <div
-                  className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-md"
-                  onClick={triggerFileInput}
-                  title="Change cover image"
-                >
-                  <Pencil className="w-8 h-8 text-white mb-1" />
-                  <span className="text-white text-xs font-semibold">
-                    Chọn ảnh
-                  </span>
-                </div>
-              )}
-
               {canChangeImage && previewImage && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="icon"
-                      className="absolute top-1 right-1 h-8 w-8 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 hover:bg-black/70 focus-visible:opacity-100 disabled:pointer-events-none disabled:opacity-50"
-                      title="More options"
+                      className={`absolute top-1 right-1 rounded-full w-7 h-7 bg-black/60 hover:bg-black/80 ${
+                        theme === "light" ? "text-white" : "text-white"
+                      }`}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Options"
                     >
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="sr-only">More options</span>
+                      <MoreHorizontal className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
-                    className="w-48 bg-[#282828] border-none text-white p-1"
                     align="end"
+                    className={
+                      theme === "light" ? "" : "bg-[#282828] border-none"
+                    }
                   >
                     <DropdownMenuItem
                       onSelect={triggerFileInput}
-                      className="hover:bg-[#3E3E3E] cursor-pointer text-sm px-3 py-2 rounded-[3px]"
+                      className={
+                        theme === "light" ? "" : "text-white hover:bg-white/10"
+                      }
                     >
-                      <ImageIcon className="w-4 h-4 mr-2" />
-                      Change photo
+                      <ImageIcon className="w-4 h-4 mr-2" /> Change photo
                     </DropdownMenuItem>
-                    {previewImage && (
-                      <DropdownMenuItem
-                        onSelect={handleRemovePhoto}
-                        className="text-red-500 hover:bg-[#3E3E3E] hover:text-red-500 focus:text-red-500 cursor-pointer text-sm px-3 py-2 rounded-[3px]"
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Remove photo
-                      </DropdownMenuItem>
-                    )}
+                    <DropdownMenuItem
+                      onSelect={handleRemovePhoto}
+                      className={
+                        theme === "light"
+                          ? "text-red-600"
+                          : "text-red-500 hover:bg-white/10 focus:text-red-400"
+                      }
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" /> Remove photo
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
             </div>
-
             <input
-              ref={fileInputRef}
               type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
               accept="image/*"
               className="hidden"
-              onChange={handleFileChange}
               disabled={!canChangeImage}
             />
+
+            <div className="flex-grow grid gap-0">
+              <div>
+                <label
+                  htmlFor="name"
+                  className={`block text-sm font-medium mb-1.5 ${
+                    theme === "light" ? "text-gray-700" : "text-neutral-300"
+                  }`}
+                >
+                  Name
+                </label>
+                <Input
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  placeholder="Add a name"
+                  maxLength={50}
+                  required
+                  className={`text-base font-semibold ${
+                    theme === "light"
+                      ? "border-gray-300 focus:border-black"
+                      : "bg-white/[.07] border-white/20 focus:border-white text-white"
+                  }`}
+                  disabled={isSpecialPlaylist}
+                />
+                <div
+                  className={`text-xs mt-1.5 text-right ${
+                    theme === "light" ? "text-gray-500" : "text-neutral-400"
+                  }`}
+                >
+                  {formData.name.length}/50
+                </div>
+              </div>
+              <div>
+                <label
+                  htmlFor="description"
+                  className={`block text-sm font-medium mb-1.5 ${
+                    theme === "light" ? "text-gray-700" : "text-neutral-300"
+                  }`}
+                >
+                  Description
+                </label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  placeholder="Add an optional description"
+                  maxLength={120}
+                  rows={4}
+                  className={`text-sm resize-none ${
+                    theme === "light"
+                      ? "border-gray-300 focus:border-black"
+                      : "bg-white/[.07] border-white/20 focus:border-white text-white"
+                  }`}
+                  disabled={isSpecialPlaylist}
+                />
+                <div
+                  className={`text-xs mt-1.5 text-right ${
+                    theme === "light" ? "text-gray-500" : "text-neutral-400"
+                  }`}
+                >
+                  {formData.description.length}/120
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="col-span-2 space-y-4">
-            <div className="space-y-1">
-              <label htmlFor="name" className="text-sm font-medium">
-                Name
-              </label>
-              <Input
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                required
-                readOnly={isVibeRewind || isFavorite}
-                className={
-                  theme === "light"
-                    ? "border-gray-200 focus:border-gray-300"
-                    : "border-neutral-700 bg-neutral-800 focus:border-white/20 text-white"
-                }
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="description" className="text-sm font-medium">
-                Description
-              </label>
-              <Textarea
-                id="description"
-                name="description"
-                placeholder="Add an optional description"
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={3}
-                className={
-                  theme === "light"
-                    ? "border-gray-200 focus:border-gray-300"
-                    : "border-neutral-700 bg-neutral-800 focus:border-white/20 text-white"
-                }
-              />
-            </div>
-          </div>
-
-          <div className="col-span-3 mt-4">
-            <p className="text-xs text-gray-400 mb-4">
+          <div className="mt-4">
+            <p
+              className={`text-xs ${
+                theme === "light" ? "text-gray-500" : "text-neutral-500"
+              }`}
+            >
               By continuing, you agree to allow Soundwave to access the images
               you have chosen to upload. Please ensure you have permission to
               upload the images.
             </p>
           </div>
 
-          <div className="col-span-3 flex justify-end">
+          <div className="flex justify-end mt-2">
             <Button
               type="submit"
-              disabled={isLoading}
-              className={
-                theme === "light"
-                  ? "bg-black text-white hover:bg-black/80"
-                  : "bg-[#A57865] text-white hover:bg-[#A57865]/90"
-              }
+              disabled={isLoading || isSpecialPlaylist}
+              className={`font-bold px-8 py-3 rounded-md bg-[#A57865] text-white hover:bg-[#8a6353] disabled:opacity-50`}
             >
-              {isLoading ? "Saving..." : "Save Changes"}
+              {isLoading ? "Saving..." : "Save"}
             </Button>
           </div>
         </form>

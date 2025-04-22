@@ -679,11 +679,24 @@ export const updatePlaylist: RequestHandler = async (
       return;
     }
 
+    // Prevent changing privacy for FAVORITE playlists
+    if (
+      playlist.type === "FAVORITE" &&
+      privacy &&
+      privacy !== playlist.privacy
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Cannot change the privacy of the Favorites playlist",
+      });
+      return;
+    }
+
     // Chuẩn bị dữ liệu cập nhật
     const updateData: any = {
       name,
       description,
-      privacy,
+      ...(playlist.type !== "FAVORITE" && { privacy }),
     };
 
     // Xử lý upload file nếu có

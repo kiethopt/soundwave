@@ -117,3 +117,32 @@
     @apply bg-white/10 text-white hover:bg-white/20;
   }
 }
+
+/* --- Custom Scrollbar Styling for Playlist Container --- */
+
+/* Make the scrollbar itself thinner */
+.playlist-scroll-container::-webkit-scrollbar {
+  width: 2px; /* Adjusted to 2px */
+}
+
+/* Hide scrollbar thumb by default */
+.playlist-scroll-container::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 20px;
+  border: 1px solid transparent; /* Reduced border for thinner scrollbar */
+}
+
+/* Show scrollbar thumb when hovering the container */
+.playlist-scroll-container:hover::-webkit-scrollbar-thumb {
+  background-color: #525252;
+}
+
+/* Firefox fallback - set thumb color on hover and use thin width */
+.playlist-scroll-container {
+  scrollbar-width: thin; /* Make scrollbar thin in Firefox */
+  scrollbar-color: transparent transparent;
+}
+
+.playlist-scroll-container:hover {
+  scrollbar-color: #525252 transparent;
+}

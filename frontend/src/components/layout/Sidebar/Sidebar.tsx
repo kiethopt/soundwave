@@ -96,8 +96,8 @@ export default function Sidebar({
 
   useEffect(() => {
     try {
-       localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
-       
+      localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
+
       window.dispatchEvent(new CustomEvent("storage-changed"));
     } catch (error) {
       console.error(
@@ -114,12 +114,16 @@ export default function Sidebar({
       setIsCollapsed(collapsed);
     };
 
-    window.addEventListener('sidebar-collapsed-changed', 
-      handleSidebarCollapsedChange as EventListener);
+    window.addEventListener(
+      "sidebar-collapsed-changed",
+      handleSidebarCollapsedChange as EventListener
+    );
 
     return () => {
-      window.removeEventListener('sidebar-collapsed-changed', 
-      handleSidebarCollapsedChange as EventListener);
+      window.removeEventListener(
+        "sidebar-collapsed-changed",
+        handleSidebarCollapsedChange as EventListener
+      );
     };
   }, []);
 
@@ -234,7 +238,7 @@ export default function Sidebar({
     // Socket event listeners for real-time updates
     if (socket && userId) {
       console.log(`[Socket] Setting up listeners for user ${userId}`);
-      
+
       // Listen for global playlist updates
       socket.on("playlist-updated", () => {
         console.log("[Socket] Global playlist update received");
@@ -258,7 +262,7 @@ export default function Sidebar({
     return () => {
       window.removeEventListener("playlist-updated", handlePlaylistUpdate);
       window.removeEventListener("favorites-changed", handleFavoritesChanged);
-      
+
       // Clean up socket listeners
       if (socket) {
         console.log("[Socket] Cleaning up listeners");
@@ -323,8 +327,8 @@ export default function Sidebar({
       )}
 
       <TooltipProvider delayDuration={0}>
-      <div
-        className={`
+        <div
+          className={`
           fixed md:static inset-y-0 left-0 z-50
           transform transition-transform duration-300 ease-in-out
           md:transform-none md:transition-none
@@ -337,72 +341,69 @@ export default function Sidebar({
               : "bg-[#1a1a1a] border-r border-white/10"
           }
         `}
-      >
-        <div
-          className={`h-full flex flex-col ${
-            isPlayerBarVisible ? "pb-[90px]" : ""
-          }`}
         >
           <div
-            className={`md:hidden p-4 ${
-              isCollapsed ? "flex justify-center" : "flex justify-end"
+            className={`h-full flex flex-col ${
+              isPlayerBarVisible ? "pb-[90px]" : ""
             }`}
           >
-            <button
-              onClick={onClose}
-              className={`p-1 flex items-center justify-center w-8 h-8 rounded-full ${
-                theme === "light"
-                  ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  : "bg-white/10 text-white/60 hover:text-white"
+            <div
+              className={`md:hidden p-4 ${
+                isCollapsed ? "flex justify-center" : "flex justify-end"
               }`}
             >
-              <XIcon className="w-6 h-6" />
-            </button>
-          </div>
-
-          {userRole === ("ADMIN" as "USER" | "ADMIN") && (
-            <div className="px-4 py-6">
-              <div
-                className={
-                  isCollapsed
-                    ? "flex justify-center"
-                    : "flex justify-start"
-                }
+              <button
+                onClick={onClose}
+                className={`p-1 flex items-center justify-center w-8 h-8 rounded-full ${
+                  theme === "light"
+                    ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    : "bg-white/10 text-white/60 hover:text-white"
+                }`}
               >
-                <Image
-                  src={
-                    isCollapsed
-                      ? "/images/Soundwave_onlySword.webp"
-                      : "/images/Soundwave_full.webp"
-                  }
-                  alt="Soundwave Logo"
-                  width={isCollapsed ? 40 : 140}
-                  height={isCollapsed ? 40 : 40}
-                  className="object-contain"
-                />
-              </div>
+                <XIcon className="w-6 h-6" />
+              </button>
             </div>
-          )}
 
-          <nav
-            className={`flex-1 ${
-              userRole === ("ADMIN" as "USER" | "ADMIN") ? "px-2" : "px-4"
-            }`}
-          >
-            {userRole === ("USER" as "USER" | "ADMIN") &&
-              currentProfile === ("USER" as "USER" | "ARTIST") &&
-              ( 
-                <div className="flex flex-col">
-                  <div className="h-[72px] -mx-4 border-b border-white/10">
-                    <div className="h-full flex items-center gap-4 px-7">
-                      {isCollapsed ? (
+            {userRole === ("ADMIN" as "USER" | "ADMIN") && (
+              <div className="px-4 py-6">
+                <div
+                  className={
+                    isCollapsed ? "flex justify-center" : "flex justify-start"
+                  }
+                >
+                  <Image
+                    src={
+                      isCollapsed
+                        ? "/images/Soundwave_onlySword.webp"
+                        : "/images/Soundwave_full.webp"
+                    }
+                    alt="Soundwave Logo"
+                    width={isCollapsed ? 40 : 140}
+                    height={isCollapsed ? 40 : 40}
+                    className="object-contain"
+                  />
+                </div>
+              </div>
+            )}
+
+            <nav
+              className={`flex-1 min-h-0 ${
+                userRole === ("ADMIN" as "USER" | "ADMIN") ? "px-2" : "px-4"
+              }`}
+            >
+              {userRole === ("USER" as "USER" | "ADMIN") &&
+                currentProfile === ("USER" as "USER" | "ARTIST") && (
+                  <div className="flex flex-col h-full">
+                    <div className="h-[72px] -mx-4 border-b border-white/10">
+                      <div className="h-full flex items-center gap-4 px-7">
+                        {isCollapsed ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="w-full flex justify-center py-1 group">
                                 <div className="relative p-1.5 rounded-lg bg-neutral-800 flex items-center justify-center w-10 h-10 shadow-md cursor-pointer">
                                   <LibraryOutline className="w-7 h-7 text-white/70 group-hover:hidden" />
                                   <LibraryFilled className="w-7 h-7 text-white hidden group-hover:block" />
-                        </div>
+                                </div>
                               </div>
                             </TooltipTrigger>
                             <TooltipContent
@@ -412,23 +413,23 @@ export default function Sidebar({
                               <p>Your Library</p>
                             </TooltipContent>
                           </Tooltip>
-                      ) : (
-                        <>
-                          <div
+                        ) : (
+                          <>
+                            <div
                               className={`flex items-center gap-3 group cursor-pointer ${
-                              theme === "light"
-                                ? "text-gray-600 hover:text-gray-900"
-                                : "text-white/70 hover:text-white"
-                            }`}
-                          >
-                            <div className="relative">
-                              <LibraryOutline className="w-7 h-7 group-hover:hidden" />
-                              <LibraryFilled className="w-7 h-7 hidden group-hover:block" />
+                                theme === "light"
+                                  ? "text-gray-600 hover:text-gray-900"
+                                  : "text-white/70 hover:text-white"
+                              }`}
+                            >
+                              <div className="relative">
+                                <LibraryOutline className="w-7 h-7 group-hover:hidden" />
+                                <LibraryFilled className="w-7 h-7 hidden group-hover:block" />
+                              </div>
+                              <span className="text-base font-medium">
+                                Your Library
+                              </span>
                             </div>
-                            <span className="text-base font-medium">
-                              Your Library
-                            </span>
-                          </div>
                             <button
                               onClick={handleCreateInstantPlaylist}
                               disabled={isCreatingPlaylist}
@@ -438,35 +439,38 @@ export default function Sidebar({
                                   : "bg-neutral-800 hover:bg-white/10"
                               } disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
-                          <AddSimple
+                              <AddSimple
                                 className={`w-6 h-6 ${
-                              theme === "light"
+                                  theme === "light"
                                     ? "text-gray-600 group-hover:text-gray-900"
                                     : "text-white/70 group-hover:text-white"
                                 }`}
                               />
                             </button>
-                        </>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div
-                      className={`mt-2 overflow-y-auto scrollbar-thin scrollbar-thumb-neutral-700 scrollbar-track-transparent pr-1 ${
-                      isCollapsed
-                          ? "space-y-2 flex flex-col items-center pt-2"
-                        : "space-y-1"
-                    }`}
-                  >
+                    <div
+                      className={`playlist-scroll-container flex-1 mt-2 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent pb-6 ${
+                        isCollapsed
+                          ? "space-y-2 flex flex-col items-center pt-2 px-6 pr-8"
+                          : "space-y-1 pr-1"
+                      }`}
+                    >
                       {isCollapsed && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
                               onClick={handleCreateInstantPlaylist}
                               disabled={isCreatingPlaylist}
-                              className={`flex items-center justify-center w-10 h-10 p-1.5 rounded-lg bg-neutral-800 text-white/70 hover:text-white hover:bg-[#333333] transition-colors duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
-                              <AddSimple className="w-6 h-6" />
+                              <div
+                                className={`flex items-center justify-center w-10 h-10 p-1.5 rounded-lg bg-neutral-800 text-white/70 hover:text-white hover:bg-[#333333] transition-colors duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
+                              >
+                                <AddSimple className="w-6 h-6" />
+                              </div>
                             </button>
                           </TooltipTrigger>
                           <TooltipContent
@@ -479,54 +483,48 @@ export default function Sidebar({
                       )}
 
                       {favoritePlaylist && favoritePlaylist.totalTracks > 0 && (
-                      <div
-                        className={`${
-                          isCollapsed
-                            ? "w-full flex items-center justify-center"
-                            : ""
-                        }`}
-                      >
-                        <Link
-                          href={`/playlists/${favoritePlaylist.id}`}
-                          className={`flex ${
-                            isCollapsed
-                              ? "items-center justify-center py-1"
+                        <div>
+                          <Link
+                            href={`/playlists/${favoritePlaylist.id}`}
+                            className={`flex ${
+                              isCollapsed
+                                ? "items-center justify-center py-1"
                                 : `items-center px-3 py-2.5 rounded-md ${
                                     isActive(
-                                  `/playlists/${favoritePlaylist.id}`
+                                      `/playlists/${favoritePlaylist.id}`
                                     )
-                                    ? theme === "light"
-                                      ? "bg-gray-200 text-gray-900"
-                                      : "bg-[#A57865]/30 text-white"
-                                    : theme === "light"
-                                    ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                                }`
-                          }`}
-                        >
-                          {isCollapsed ? (
+                                      ? theme === "light"
+                                        ? "bg-gray-200 text-gray-900"
+                                        : "bg-[#A57865]/30 text-white"
+                                      : theme === "light"
+                                      ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                                  }`
+                            }`}
+                          >
+                            {isCollapsed ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                            <div
-                              className={`p-1.5 rounded-lg ${
+                                  <div
+                                    className={`p-1.5 rounded-lg ${
                                       isActive(
                                         `/playlists/${favoritePlaylist.id}`
                                       )
-                                  ? "bg-[#A57865]/30"
-                                  : "bg-neutral-800"
+                                        ? "bg-[#A57865]/30"
+                                        : "bg-neutral-800"
                                     } flex items-center justify-center w-10 h-10 shadow-md transition-all duration-200 hover:scale-105 hover:bg-[#333333]`}
-                            >
-                              <PlaylistIcon
-                                coverUrl={favoritePlaylist.coverUrl}
-                                name={favoritePlaylist.name}
-                                type={favoritePlaylist.type}
+                                  >
+                                    <PlaylistIcon
+                                      coverUrl={favoritePlaylist.coverUrl}
+                                      name={favoritePlaylist.name}
+                                      type={favoritePlaylist.type}
                                       isAIGenerated={
                                         favoritePlaylist.isAIGenerated
                                       }
-                                size={28}
-                                className="rounded object-cover"
-                              />
-                                </div>
+                                      size={28}
+                                      className="rounded object-cover"
+                                    />
+                                  </div>
                                 </TooltipTrigger>
                                 <TooltipContent
                                   side="right"
@@ -541,135 +539,136 @@ export default function Sidebar({
                                   </p>
                                 </TooltipContent>
                               </Tooltip>
-                          ) : (
-                            <div className="flex items-center w-full gap-2">
-                              <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
-                                {favoritePlaylist.coverUrl ? (
-                                  <Image
-                                    src={favoritePlaylist.coverUrl}
-                                    alt={favoritePlaylist.name}
-                                    width={40}
-                                    height={40}
-                                    className="object-cover w-full h-full"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center bg-neutral-800 relative">
-                                    <PlaylistIcon
-                                      name={favoritePlaylist.name}
-                                      type={favoritePlaylist.type}
-                                      isAIGenerated={
-                                        favoritePlaylist.isAIGenerated
-                                      }
-                                      size={24}
+                            ) : (
+                              <div className="flex items-center w-full gap-2">
+                                <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
+                                  {favoritePlaylist.coverUrl ? (
+                                    <Image
+                                      src={favoritePlaylist.coverUrl}
+                                      alt={favoritePlaylist.name}
+                                      width={40}
+                                      height={40}
+                                      className="object-cover w-full h-full"
                                     />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-neutral-800 relative">
+                                      <PlaylistIcon
+                                        name={favoritePlaylist.name}
+                                        type={favoritePlaylist.type}
+                                        isAIGenerated={
+                                          favoritePlaylist.isAIGenerated
+                                        }
+                                        size={24}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <div className="flex items-center gap-1">
+                                    <BsFillPinAngleFill className="w-3 h-3 text-[#A57865] flex-shrink-0" />
+                                    <span className="truncate font-medium text-sm leading-tight">
+                                      {favoritePlaylist.name}
+                                    </span>
                                   </div>
-                                )}
-                              </div>
-                              <div className="flex flex-col min-w-0 flex-1">
-                                <div className="flex items-center gap-1">
-                                  <BsFillPinAngleFill className="w-3 h-3 text-[#A57865] flex-shrink-0" />
-                                  <span className="truncate font-medium text-sm leading-tight">
-                                    {favoritePlaylist.name}
-                                  </span>
-                                </div>
-                                <div className="flex items-center text-xs text-white/50 mt-0.5">
-                                  <span className="truncate">
-                                    Private •{" "}
-                                    {favoritePlaylist.totalTracks || 0} tracks
-                                  </span>
+                                  <div className="flex items-center text-xs text-white/50 mt-0.5">
+                                    <span className="truncate">
+                                      Private •{" "}
+                                      {favoritePlaylist.totalTracks || 0} tracks
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                        </Link>
-                      </div>
-                    )}
-                    
-                    {/* Conditional rendering for 'Create playlist' prompt */}
-                    {!isCollapsed && !loading && playlists.length === 0 || !isAuthenticated ? (
+                            )}
+                          </Link>
+                        </div>
+                      )}
+
+                      {/* Conditional rendering for 'Create playlist' prompt */}
+                      {(!isCollapsed && !loading && playlists.length === 0) ||
+                      !isAuthenticated ? (
+                        <div
+                          className={`p-4 rounded-lg mt-4 ${
+                            theme === "light" ? "bg-gray-100" : "bg-[#242424]"
+                          }`}
+                        >
+                          <h3
+                            className={`font-bold text-base ${
+                              theme === "light" ? "text-gray-900" : "text-white"
+                            }`}
+                          >
+                            Create your first playlist
+                          </h3>
+                          <p
+                            className={`text-sm mt-1 ${
+                              theme === "light"
+                                ? "text-gray-600"
+                                : "text-white/70"
+                            }`}
+                          >
+                            It's easy! We'll help you
+                          </p>
+                          <button
+                            onClick={handleCreateInstantPlaylist}
+                            disabled={isCreatingPlaylist}
+                            className={`mt-4 px-4 py-1.5 rounded-full font-semibold text-sm ${
+                              theme === "light"
+                                ? "bg-black text-white hover:bg-gray-800"
+                                : "bg-white text-black hover:bg-gray-200"
+                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          >
+                            {isCreatingPlaylist
+                              ? "Creating..."
+                              : "Create playlist"}
+                          </button>
+                        </div>
+                      ) : null}
+
                       <div
-                        className={`p-4 rounded-lg mt-4 ${
-                          theme === "light" ? "bg-gray-100" : "bg-[#242424]"
+                        className={`${
+                          isCollapsed
+                            ? "w-full flex flex-col items-center space-y-2"
+                            : ""
                         }`}
                       >
-                        <h3
-                          className={`font-bold text-base ${
-                            theme === "light" ? "text-gray-900" : "text-white"
-                          }`}
-                        >
-                          Create your first playlist
-                        </h3>
-                        <p
-                          className={`text-sm mt-1 ${
-                            theme === "light"
-                              ? "text-gray-600"
-                              : "text-white/70"
-                          }`}
-                        >
-                          It's easy! We'll help you
-                        </p>
-                        <button
-                          onClick={handleCreateInstantPlaylist}
-                          disabled={isCreatingPlaylist}
-                          className={`mt-4 px-4 py-1.5 rounded-full font-semibold text-sm ${
-                            theme === "light"
-                              ? "bg-black text-white hover:bg-gray-800"
-                              : "bg-white text-black hover:bg-gray-200"
-                          } disabled:opacity-50 disabled:cursor-not-allowed`}
-                        >
-                          {isCreatingPlaylist
-                            ? "Creating..."
-                            : "Create playlist"}
-                        </button>
-                      </div>
-                    ) : null}
-
-                    <div
-                      className={`${
-                        isCollapsed
-                          ? "w-full flex flex-col items-center space-y-2"
-                          : ""
-                      }`}
-                    >
-                      {playlists.map((playlist, index) => (
-                        <Link
-                          key={playlist.id}
-                          href={`/playlists/${playlist.id}`}
-                          className={`flex ${
-                            isCollapsed
-                              ? "items-center justify-center py-1"
+                        {playlists.map((playlist, index) => (
+                          <Link
+                            key={playlist.id}
+                            href={`/playlists/${playlist.id}`}
+                            className={`flex ${
+                              isCollapsed
+                                ? "items-center justify-center py-1"
                                 : `items-center px-3 py-2.5 ${
                                     index > 0 ? "mt-1" : ""
-                                } rounded-md ${
-                                  isActive(`/playlists/${playlist.id}`)
-                                    ? theme === "light"
-                                      ? "bg-gray-200 text-gray-900"
-                                      : "bg-[#A57865]/30 text-white"
-                                    : theme === "light"
-                                    ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                                }`
-                          }`}
-                        >
-                          {isCollapsed ? (
+                                  } rounded-md ${
+                                    isActive(`/playlists/${playlist.id}`)
+                                      ? theme === "light"
+                                        ? "bg-gray-200 text-gray-900"
+                                        : "bg-[#A57865]/30 text-white"
+                                      : theme === "light"
+                                      ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                                  }`
+                            }`}
+                          >
+                            {isCollapsed ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                            <div
-                              className={`p-1.5 rounded-lg ${
-                                isActive(`/playlists/${playlist.id}`)
-                                  ? "bg-[#A57865]/30"
-                                  : "bg-neutral-800"
+                                  <div
+                                    className={`p-1.5 rounded-lg ${
+                                      isActive(`/playlists/${playlist.id}`)
+                                        ? "bg-[#A57865]/30"
+                                        : "bg-neutral-800"
                                     } flex items-center justify-center w-10 h-10 shadow-md transition-all duration-200 hover:scale-105 hover:bg-[#333333]`}
-                            >
-                              <PlaylistIcon
-                                coverUrl={playlist.coverUrl}
-                                name={playlist.name}
-                                type={playlist.type}
-                                isAIGenerated={playlist.isAIGenerated}
-                                size={28}
-                                className="rounded object-cover"
-                              />
-                                </div>
+                                  >
+                                    <PlaylistIcon
+                                      coverUrl={playlist.coverUrl}
+                                      name={playlist.name}
+                                      type={playlist.type}
+                                      isAIGenerated={playlist.isAIGenerated}
+                                      size={28}
+                                      className="rounded object-cover"
+                                    />
+                                  </div>
                                 </TooltipTrigger>
                                 <TooltipContent
                                   side="right"
@@ -679,388 +678,387 @@ export default function Sidebar({
                                     {playlist.name}
                                   </p>
                                   <p className="text-neutral-400 text-xs">
-                                    Playlist • {playlist.totalTracks || 0} tracks
+                                    Playlist • {playlist.totalTracks || 0}{" "}
+                                    tracks
                                   </p>
                                 </TooltipContent>
                               </Tooltip>
-                          ) : (
-                            <div className="flex items-center w-full gap-2">
-                              <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
-                                {playlist.coverUrl ? (
-                                  <Image
-                                    src={playlist.coverUrl}
-                                    alt={playlist.name}
-                                    width={40}
-                                    height={40}
-                                    className="object-cover w-full h-full"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center bg-neutral-800">
-                                    <PlaylistIcon
-                                      name={playlist.name}
-                                      type={playlist.type}
-                                      isAIGenerated={playlist.isAIGenerated}
-                                      size={24}
+                            ) : (
+                              <div className="flex items-center w-full gap-2">
+                                <div className="w-10 h-10 min-w-[40px] rounded overflow-hidden mr-1">
+                                  {playlist.coverUrl ? (
+                                    <Image
+                                      src={playlist.coverUrl}
+                                      alt={playlist.name}
+                                      width={40}
+                                      height={40}
+                                      className="object-cover w-full h-full"
                                     />
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex flex-col min-w-0 flex-1">
-                                <span className="truncate font-medium text-sm leading-tight">
-                                  {playlist.name}
-                                </span>
-                                <div className="flex items-center text-xs text-white/50 mt-0.5">
-                                  <span className="truncate">
-                                    {playlist.privacy === "PRIVATE"
-                                      ? "Private"
-                                      : "Public"}{" "}
-                                    • {playlist.totalTracks || 0} tracks
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-neutral-800">
+                                      <PlaylistIcon
+                                        name={playlist.name}
+                                        type={playlist.type}
+                                        isAIGenerated={playlist.isAIGenerated}
+                                        size={24}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <span className="truncate font-medium text-sm leading-tight">
+                                    {playlist.name}
                                   </span>
+                                  <div className="flex items-center text-xs text-white/50 mt-0.5">
+                                    <span className="truncate">
+                                      {playlist.privacy === "PRIVATE"
+                                        ? "Private"
+                                        : "Public"}{" "}
+                                      • {playlist.totalTracks || 0} tracks
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
-                        </Link>
-                      ))}
+                            )}
+                          </Link>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-            {/* Artist Dashboard Section */}
-            {hasArtistProfile &&
-              isArtistVerified &&
-              currentProfile === ("ARTIST" as "USER" | "ARTIST") && (
-                <div className="mt-4 space-y-2">
-                  {!isCollapsed && (
-                    <div
-                      className={`px-3 text-sm font-medium ${
-                        theme === "light" ? "text-gray-600" : "text-white/70"
+              {/* Artist Dashboard Section */}
+              {hasArtistProfile &&
+                isArtistVerified &&
+                currentProfile === ("ARTIST" as "USER" | "ARTIST") && (
+                  <div className="mt-4 space-y-2">
+                    {!isCollapsed && (
+                      <div
+                        className={`px-3 text-sm font-medium ${
+                          theme === "light" ? "text-gray-600" : "text-white/70"
+                        }`}
+                      >
+                        Artist Dashboard
+                      </div>
+                    )}
+                    <Link
+                      href="/artist/dashboard"
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                        pathname && pathname.startsWith("/artist/dashboard")
+                          ? theme === "light"
+                            ? "bg-gray-200 text-gray-900"
+                            : "bg-[#A57865]/30 text-white"
+                          : theme === "light"
+                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
                       }`}
                     >
-                      Artist Dashboard
-                    </div>
-                  )}
-                  <Link
-                    href="/artist/dashboard"
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                      pathname && pathname.startsWith("/artist/dashboard")
-                        ? theme === "light"
-                          ? "bg-gray-200 text-gray-900"
-                          : "bg-[#A57865]/30 text-white"
-                        : theme === "light"
-                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    {isCollapsed ? (
+                      {isCollapsed ? (
                         <HomeOutline className="w-6 h-6" />
-                    ) : (
-                      <>
-                        <HomeOutline className="w-6 h-6" />
-                        <span>Dashboard</span>
-                      </>
-                    )}
-                  </Link>
-                  <Link
-                    href="/artist/albums"
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                      pathname && pathname.startsWith("/artist/albums")
-                        ? theme === "light"
-                          ? "bg-gray-200 text-gray-900"
-                          : "bg-white/10 text-white"
-                        : theme === "light"
-                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    {isCollapsed ? (
+                      ) : (
+                        <>
+                          <HomeOutline className="w-6 h-6" />
+                          <span>Dashboard</span>
+                        </>
+                      )}
+                    </Link>
+                    <Link
+                      href="/artist/albums"
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                        pathname && pathname.startsWith("/artist/albums")
+                          ? theme === "light"
+                            ? "bg-gray-200 text-gray-900"
+                            : "bg-white/10 text-white"
+                          : theme === "light"
+                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {isCollapsed ? (
                         <Album className="w-6 h-6" />
-                    ) : (
-                      <>
-                        <Album className="w-6 h-6" />
-                        <span>Albums</span>
-                      </>
-                    )}
-                  </Link>
-                  <Link
-                    href="/artist/tracks"
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                      pathname && pathname.startsWith("/artist/tracks")
-                        ? theme === "light"
-                          ? "bg-gray-200 text-gray-900"
-                          : "bg-white/10 text-white"
-                        : theme === "light"
-                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    {isCollapsed ? (
+                      ) : (
+                        <>
+                          <Album className="w-6 h-6" />
+                          <span>Albums</span>
+                        </>
+                      )}
+                    </Link>
+                    <Link
+                      href="/artist/tracks"
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                        pathname && pathname.startsWith("/artist/tracks")
+                          ? theme === "light"
+                            ? "bg-gray-200 text-gray-900"
+                            : "bg-white/10 text-white"
+                          : theme === "light"
+                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {isCollapsed ? (
                         <Music className="w-6 h-6" />
-                    ) : (
-                      <>
-                        <Music className="w-6 h-6" />
-                        <span>Tracks</span>
-                      </>
-                    )}
-                  </Link>
-                  <Link
-                    href="/artist/stats"
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md ${
-                      pathname && pathname.startsWith("/artist/stats")
-                        ? theme === "light"
-                          ? "bg-gray-200 text-gray-900"
-                          : "bg-white/10 text-white"
-                        : theme === "light"
-                        ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    {isCollapsed ? (
+                      ) : (
+                        <>
+                          <Music className="w-6 h-6" />
+                          <span>Tracks</span>
+                        </>
+                      )}
+                    </Link>
+                    <Link
+                      href="/artist/stats"
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                        pathname && pathname.startsWith("/artist/stats")
+                          ? theme === "light"
+                            ? "bg-gray-200 text-gray-900"
+                            : "bg-white/10 text-white"
+                          : theme === "light"
+                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {isCollapsed ? (
                         <ChartIcon className="w-6 h-6" />
-                    ) : (
-                      <>
-                        <ChartIcon className="w-6 h-6" />
-                        <span>Stats</span>
-                      </>
-                    )}
-                  </Link>
-                </div>
-              )}
-
-            {userRole === ("ADMIN" as "USER" | "ADMIN") && (
-              <div className="mt-2 flex flex-col gap-1">
-                {!isCollapsed && (
-                  <div className="px-3 py-2 text-xs font-medium uppercase text-gray-500">
-                    Menu
+                      ) : (
+                        <>
+                          <ChartIcon className="w-6 h-6" />
+                          <span>Stats</span>
+                        </>
+                      )}
+                    </Link>
                   </div>
                 )}
 
-                <Link
-                  href="/admin/dashboard"
-                  className={`flex items-center px-3 py-2.5 ${
-                    isActive("/admin/dashboard")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {isCollapsed ? (
-                    <div className="w-full flex justify-center">
-                      <HomeOutline className="w-6 h-6" />
+              {userRole === ("ADMIN" as "USER" | "ADMIN") && (
+                <div className="mt-2 flex flex-col gap-1">
+                  {!isCollapsed && (
+                    <div className="px-3 py-2 text-xs font-medium uppercase text-gray-500">
+                      Menu
                     </div>
-                  ) : (
-                    <>
-                      <div className="min-w-[32px] flex justify-center">
-                        <HomeOutline className="w-5 h-5" />
-                      </div>
-                      <span className="ml-3 font-medium text-sm">
-                        Dashboard
-                      </span>
-                    </>
                   )}
-                </Link>
 
-                <Link
-                  href="/admin/artist-requests"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/artist-requests")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {isCollapsed ? (
-                    <div className="w-full flex justify-center">
-                      <Requests className="w-6 h-6" />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="min-w-[32px] flex justify-center">
-                        <Requests className="w-5 h-5" />
+                  <Link
+                    href="/admin/dashboard"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      isActive("/admin/dashboard")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <HomeOutline className="w-6 h-6" />
                       </div>
-                      <span className="ml-3 font-medium text-sm">
-                        Artist Requests
-                      </span>
-                    </>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <HomeOutline className="w-5 h-5" />
+                        </div>
+                        <span className="ml-3 font-medium text-sm">
+                          Dashboard
+                        </span>
+                      </>
+                    )}
+                  </Link>
+
+                  <Link
+                    href="/admin/artist-requests"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      pathname && pathname.startsWith("/admin/artist-requests")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <Requests className="w-6 h-6" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <Requests className="w-5 h-5" />
+                        </div>
+                        <span className="ml-3 font-medium text-sm">
+                          Artist Requests
+                        </span>
+                      </>
+                    )}
+                  </Link>
+
+                  {!isCollapsed && (
+                    <div className="mt-4 px-3 py-2 text-xs font-medium uppercase text-gray-500">
+                      Management
+                    </div>
                   )}
-                </Link>
 
-                {!isCollapsed && (
-                  <div className="mt-4 px-3 py-2 text-xs font-medium uppercase text-gray-500">
-                    Management
-                  </div>
-                )}
-
-                <Link
-                  href="/admin/users"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/users")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {isCollapsed ? (
-                    <div className="w-full flex justify-center">
-                      <Users className="w-6 h-6" />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="min-w-[32px] flex justify-center">
-                        <Users className="w-5 h-5" />
+                  <Link
+                    href="/admin/users"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      pathname && pathname.startsWith("/admin/users")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <Users className="w-6 h-6" />
                       </div>
-                      <span className="ml-3 font-medium text-sm">Users</span>
-                    </>
-                  )}
-                </Link>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <Users className="w-5 h-5" />
+                        </div>
+                        <span className="ml-3 font-medium text-sm">Users</span>
+                      </>
+                    )}
+                  </Link>
 
-                <Link
-                  href="/admin/artists"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/artists")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {isCollapsed ? (
-                    <div className="w-full flex justify-center">
-                      <Users className="w-6 h-6" />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="min-w-[32px] flex justify-center">
-                        <Users className="w-5 h-5" />
+                  <Link
+                    href="/admin/artists"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      pathname && pathname.startsWith("/admin/artists")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <Users className="w-6 h-6" />
                       </div>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <Users className="w-5 h-5" />
+                        </div>
                         <span className="ml-3 font-medium text-sm">
                           Artists
                         </span>
-                    </>
-                  )}
-                </Link>
+                      </>
+                    )}
+                  </Link>
 
-                <Link
-                  href="/admin/genres"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/genres")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {isCollapsed ? (
-                    <div className="w-full flex justify-center">
-                      <Genres className="w-6 h-6" />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="min-w-[32px] flex justify-center">
-                        <Genres className="w-5 h-5" />
+                  <Link
+                    href="/admin/genres"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      pathname && pathname.startsWith("/admin/genres")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <Genres className="w-6 h-6" />
                       </div>
-                      <span className="ml-3 font-medium text-sm">Genres</span>
-                    </>
-                  )}
-                </Link>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <Genres className="w-5 h-5" />
+                        </div>
+                        <span className="ml-3 font-medium text-sm">Genres</span>
+                      </>
+                    )}
+                  </Link>
 
-                <Link
-                  href="/admin/labels"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/labels")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {isCollapsed ? (
-                    <div className="w-full flex justify-center">
-                      <Tags className="w-6 h-6" />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="min-w-[32px] flex justify-center">
-                        <Tags className="w-5 h-5" />
+                  <Link
+                    href="/admin/labels"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      pathname && pathname.startsWith("/admin/labels")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <Tags className="w-6 h-6" />
                       </div>
-                      <span className="ml-3 font-medium text-sm">Labels</span>
-                    </>
-                  )}
-                </Link>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <Tags className="w-5 h-5" />
+                        </div>
+                        <span className="ml-3 font-medium text-sm">Labels</span>
+                      </>
+                    )}
+                  </Link>
 
-                <Link
-                  href="/admin/content"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/content")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {isCollapsed ? (
-                    <div className="w-full flex justify-center">
-                      <LayoutGrid className="w-6 h-6" />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="min-w-[32px] flex justify-center">
-                        <LayoutGrid className="w-5 h-5" />
+                  <Link
+                    href="/admin/content"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      pathname && pathname.startsWith("/admin/content")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <LayoutGrid className="w-6 h-6" />
                       </div>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <LayoutGrid className="w-5 h-5" />
+                        </div>
                         <span className="ml-3 font-medium text-sm">
                           Content
                         </span>
-                    </>
-                  )}
-                </Link>
+                      </>
+                    )}
+                  </Link>
 
-                {!isCollapsed && (
-                  <div className="mt-4 px-3 py-2 text-xs font-medium uppercase text-gray-500">
-                    Configuration
-                  </div>
-                )}
-
-                <Link
-                  href="/admin/system"
-                  className={`flex items-center px-3 py-2.5 ${
-                    pathname && pathname.startsWith("/admin/system")
-                      ? "bg-gray-200 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {isCollapsed ? (
-                    <div className="w-full flex justify-center">
-                      <Settings className="w-6 h-6" />
+                  {!isCollapsed && (
+                    <div className="mt-4 px-3 py-2 text-xs font-medium uppercase text-gray-500">
+                      Configuration
                     </div>
-                  ) : (
-                    <>
-                      <div className="min-w-[32px] flex justify-center">
-                        <Settings className="w-5 h-5" />
-                      </div>
-                      <span className="ml-3 font-medium text-sm">System</span>
-                    </>
                   )}
-                </Link>
-              </div>
-            )}
-          </nav>
 
-          <div
-            className={`p-4 flex ${
-              isCollapsed ? "justify-center" : "justify-start"
-            } ${
-              userRole === ("ADMIN" as "USER" | "ADMIN") ? "mt-auto" : ""
-            }`}
-          >
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className={`w-10 h-10 flex items-center justify-center rounded-full ${
-                userRole === ("ADMIN" as "USER" | "ADMIN")
-                  ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                  : theme === "light"
-                  ? "bg-gray-200 hover:bg-gray-300 text-gray-600"
-                  : "bg-neutral-800 hover:bg-[#333333] text-white shadow-md transition-all duration-200"
-              }`}
-            >
-              {isCollapsed ? (
-                <Right className="w-5 h-5" />
-              ) : (
-                <Left className="w-5 h-5" />
+                  <Link
+                    href="/admin/system"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      pathname && pathname.startsWith("/admin/system")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <Settings className="w-6 h-6" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <Settings className="w-5 h-5" />
+                        </div>
+                        <span className="ml-3 font-medium text-sm">System</span>
+                      </>
+                    )}
+                  </Link>
+                </div>
               )}
-            </button>
+            </nav>
+
+            <div
+              className={`flex-shrink-0 p-4 flex ${
+                isCollapsed ? "justify-center" : "justify-start"
+              } ${userRole === ("ADMIN" as "USER" | "ADMIN") ? "mt-auto" : ""}`}
+            >
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className={`w-10 h-10 flex items-center justify-center rounded-full ${
+                  userRole === ("ADMIN" as "USER" | "ADMIN")
+                    ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                    : theme === "light"
+                    ? "bg-gray-200 hover:bg-gray-300 text-gray-600"
+                    : "bg-neutral-800 hover:bg-[#333333] text-white shadow-md transition-all duration-200"
+                }`}
+              >
+                {isCollapsed ? (
+                  <Right className="w-5 h-5" />
+                ) : (
+                  <Left className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
       </TooltipProvider>
 
       <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />

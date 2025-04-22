@@ -36,9 +36,32 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.setFollowVisibility = exports.getGenreNewestTracks = exports.getGenreTopArtists = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
 const userService = __importStar(require("../services/user.service"));
 const handle_utils_1 = require("../utils/handle-utils");
+const socket_1 = require("../config/socket");
 const requestToBecomeArtist = async (req, res) => {
     try {
-        await userService.requestArtistRole(req.user, req.body, req.file);
+        const currentUser = req.user;
+        if (!currentUser) {
+            res.status(401).json({ message: 'Unauthorized' });
+            return;
+        }
+        const createdProfile = await userService.requestArtistRole(currentUser, req.body, req.file);
+        try {
+            const io = (0, socket_1.getIO)();
+            const userSockets = (0, socket_1.getUserSockets)();
+            const targetSocketId = userSockets.get(currentUser.id);
+            if (targetSocketId) {
+                console.log(`🚀 Emitting artist_request_submitted to user ${currentUser.id} via socket ${targetSocketId}`);
+                io.to(targetSocketId).emit('artist_request_submitted', {
+                    hasPendingRequest: true,
+                });
+            }
+            else {
+                console.log(`Socket not found for user ${currentUser.id}. Cannot emit request submission update.`);
+            }
+        }
+        catch (socketError) {
+            console.error('Failed to emit socket event for artist request submission:', socketError);
+        }
         res.json({ message: 'Artist role request submitted successfully' });
     }
     catch (error) {

@@ -37,6 +37,7 @@ import { useSocket } from "@/contexts/SocketContext";
 import { Card } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
 import { CheckCircle2 } from "lucide-react";
+import { useDominantColor } from "@/hooks/useDominantColor";
 
 // Khai báo event bus đơn giản để gọi fetchPlaylists từ sidebar
 const playlistUpdateEvent = new CustomEvent("playlist-updated");
@@ -92,6 +93,7 @@ export default function PlaylistPage() {
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const { theme } = useTheme();
+  const { dominantColor } = useDominantColor(playlist?.coverUrl);
 
   // Check if this is a special system playlist
   const isVibeRewindPlaylist =
@@ -446,13 +448,23 @@ export default function PlaylistPage() {
   const formattedDuration = formatDuration(playlist.totalDuration || 0);
 
   return (
-    <div className="flex flex-col">
+    <div
+      className="flex flex-col min-h-screen rounded-lg"
+      style={{
+        // Quay lại logic gốc: Luôn dùng dominantColor nếu có, fallback về theme color
+        background: dominantColor
+          ? `linear-gradient(180deg, ${dominantColor} 0%, ${dominantColor}99 15%, ${dominantColor}40 30%, ${
+              theme === "light" ? "#ffffff" : "#121212"
+            } 100%)`
+          : theme === "light"
+          ? "linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)"
+          : "linear-gradient(180deg, #2c2c2c 0%, #121212 100%)",
+      }}
+    >
       {/* Header */}
-      <div
-        className={`flex items-end gap-6 p-6 bg-gradient-to-b from-[#A57865]/30`}
-      >
+      <div className={`flex items-end gap-6 p-6`}>
         <div
-          className={`w-[232px] h-[232px] flex-shrink-0 relative group ${
+          className={`w-[232px] h-[232px] flex-shrink-0 relative group shadow ${
             canEditPlaylist ? "cursor-pointer" : ""
           }`}
           onClick={handleCoverClick}
@@ -465,7 +477,7 @@ export default function PlaylistPage() {
                 alt={playlist.name}
                 width={232}
                 height={232}
-                className="w-full h-full object-cover shadow-lg rounded-md"
+                className="w-full h-full object-cover rounded-md"
               />
               {canEditPlaylist && (
                 <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-md">
@@ -554,6 +566,15 @@ export default function PlaylistPage() {
                 Private
               </Badge>
             )}
+            {/* Favorite Playlist Badge */}
+            {playlist.type === "FAVORITE" && (
+              <Badge
+                variant="secondary"
+                className="text-xs font-medium rounded-full px-2 py-0.5 w-fit bg-neutral-700 text-neutral-300"
+              >
+                Private
+              </Badge>
+            )}
             {/* AI/Personalized Badges */}
             {playlist.isAIGenerated && (
               <>
@@ -571,7 +592,7 @@ export default function PlaylistPage() {
           {/* Title Section */}
           <div className="flex items-center gap-2 flex-wrap">
             <h1
-              className={`text-[2rem] font-bold leading-tight ${
+              className={`text-[2rem] font-bold leading-tight truncate ${
                 canEditPlaylist ? "cursor-pointer" : ""
               }`}
               onClick={
@@ -588,7 +609,9 @@ export default function PlaylistPage() {
           </div>
 
           {playlist.description && (
-            <p className="text-sm text-white/70">{playlist.description}</p>
+            <p className="text-sm text-white/70 truncate">
+              {playlist.description}
+            </p>
           )}
 
           {/* Updated Metadata Line - Only show track count and duration */}
@@ -681,7 +704,7 @@ export default function PlaylistPage() {
               }`}
             >
               <div
-                className={`grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_50px] gap-4 items-center text-sm`}
+                className={`grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_50px] gap-4 items-center text-sm font-medium`}
               >
                 <div className="flex justify-center">#</div>
                 <div>Title</div>
