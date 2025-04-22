@@ -586,10 +586,19 @@ const updatePlaylist = async (req, res) => {
             });
             return;
         }
+        if (playlist.type === "FAVORITE" &&
+            privacy &&
+            privacy !== playlist.privacy) {
+            res.status(400).json({
+                success: false,
+                message: "Cannot change the privacy of the Favorites playlist",
+            });
+            return;
+        }
         const updateData = {
             name,
             description,
-            privacy,
+            ...(playlist.type !== "FAVORITE" && { privacy }),
         };
         if (req.file) {
             try {
