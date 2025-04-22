@@ -235,12 +235,11 @@ function GoogleLoginButton({ onError }: GoogleLoginButtonProps) {
 
           // Điều hướng đến trang tương ứng
           if (backendResponse.user.role === 'ADMIN') {
-            router.push('/admin/dashboard');
+            window.location.href = '/admin/dashboard';
           } else if (backendResponse.user.currentProfile === 'ARTIST') {
-            router.push('/artist/dashboard');
+            window.location.href = '/artist/dashboard';
           } else {
-            router.push('/');
-            console.log('User data:', backendResponse.user);
+            window.location.href = '/';
           }
         }
       } catch (error: any) {

@@ -255,14 +255,14 @@ function GoogleRegisterButton() {
 
           // Điều hướng đến trang tương ứng
           if (backendResponse.user.role === "ADMIN") {
-            router.push("/admin/dashboard");
+            window.location.href = "/admin/dashboard";
           } else if (
             backendResponse.user.currentProfile === "ARTIST" &&
             backendResponse.user.artistProfile?.isVerified
           ) {
-            router.push("/artist/dashboard");
+            window.location.href = "/artist/dashboard";
           } else {
-            router.push("/");
+            window.location.href = "/";
           }
         }
       } catch (error) {
