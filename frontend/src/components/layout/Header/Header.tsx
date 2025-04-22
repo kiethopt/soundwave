@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useContext } from 'react';
 import {
   Notifications,
   DiscoverFilled,
@@ -25,6 +25,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { LogOut, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
+import { useSession } from '@/contexts/SessionContext';
 
 export default function Header({
   onMenuClick,
@@ -33,8 +34,7 @@ export default function Header({
   onMenuClick?: () => void;
 }) {
   const pathname = usePathname();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState<User | null>(null);
+  const { user, isAuthenticated, loading, updateUserSession } = useSession();
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -58,13 +58,12 @@ export default function Header({
   const router = useRouter();
   const { dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
 
-  const isAdminOrArtist =
-    userData?.role === 'ADMIN' || userData?.currentProfile === 'ARTIST';
+  const isAdminOrArtist = user?.role === 'ADMIN' || user?.currentProfile === 'ARTIST';
 
   const filterNotificationsByProfile = (allNotifications: any[]) => {
-    if (!userData) return [];
+    if (!user) return [];
     return allNotifications.filter(
-      (n) => n.recipientType === userData.currentProfile
+      (n) => n.recipientType === user.currentProfile
     );
   };
 
@@ -73,7 +72,7 @@ export default function Header({
   const fetchAndSetNotifications = async () => {
     try {
       const token = localStorage.getItem('userToken');
-      if (!token || !userData) return;
+      if (!token || !user) return;
 
       const allNotificationsData = await api.notifications.getList(token);
       const relevantNotifications = filterNotificationsByProfile(allNotificationsData);
@@ -89,20 +88,20 @@ export default function Header({
   };
 
   useEffect(() => {
-    if (isAuthenticated && userData) {
+    if (isAuthenticated && user) {
       fetchAndSetNotifications();
     }
-  }, [isAuthenticated, userData]);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
-    if (!userData?.id || !isAuthenticated) return;
+    if (!user?.id || !isAuthenticated) return;
 
     const socket = getSocket();
 
     const handleNewNotification = (data: any) => {
       console.log('Received new notification event via Socket.IO:', data);
-      if (data.recipientType !== userData.currentProfile) {
-        console.log(`Ignoring notification for ${data.recipientType} profile while viewing ${userData.currentProfile}`);
+      if (!user || data.recipientType !== user.currentProfile) {
+        console.log(`Ignoring notification for ${data.recipientType} profile while viewing ${user?.currentProfile}`);
         return;
       }
       setNotifications((prev) => {
@@ -118,29 +117,7 @@ export default function Header({
       }
     };
 
-    const handleArtistRequestStatus = (data: any) => {
-      console.log('Received artist request status event via Socket.IO:', data);
-      const fetchAndUpdateUserData = async () => {
-        const token = localStorage.getItem('userToken');
-        if (!token) return
-        try {
-          const newUserData = await api.auth.getMe(token);
-          if (newUserData) {
-            localStorage.setItem('userData', JSON.stringify(newUserData));
-            setUserData(newUserData);
-            fetchAndSetNotifications();
-          } else {
-            console.warn('Received null user data after status update');
-          }
-        } catch (error) {
-          console.error('Failed to fetch updated user data after status update:', error);
-        }
-      };
-      fetchAndUpdateUserData();
-    };
-
     socket.on('notification', handleNewNotification);
-    socket.on('artist-request-status', handleArtistRequestStatus);
 
     const savedCount = Number(localStorage.getItem('notificationCount') || '0');
     setNotificationCount(savedCount);
@@ -148,9 +125,8 @@ export default function Header({
     return () => {
       console.log('Cleaning up Header socket listeners');
       socket.off('notification', handleNewNotification);
-      socket.off('artist-request-status', handleArtistRequestStatus);
     };
-  }, [userData, isAuthenticated]);
+  }, [user, isAuthenticated]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -169,81 +145,11 @@ export default function Header({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('userToken');
-      const storedUserData = localStorage.getItem('userData');
-
-      if (token && storedUserData) {
-        try {
-          const parsedUserData = JSON.parse(storedUserData);
-          if (parsedUserData && parsedUserData.id) {
-            setIsAuthenticated(true);
-            setUserData(parsedUserData);
-          } else {
-            localStorage.removeItem('userToken');
-            localStorage.removeItem('sessionId');
-            localStorage.removeItem('userData');
-            setIsAuthenticated(false);
-            setUserData(null);
-          }
-        } catch (e) {
-          console.error('Error parsing stored user data:', e);
-          localStorage.removeItem('userToken');
-          localStorage.removeItem('sessionId');
-          localStorage.removeItem('userData');
-          setIsAuthenticated(false);
-          setUserData(null);
-        }
-      } else if (token) {
-        try {
-            const fetchedUserData = await api.auth.getMe(token);
-            if (fetchedUserData) {
-                setIsAuthenticated(true);
-                setUserData(fetchedUserData);
-                localStorage.setItem('userData', JSON.stringify(fetchedUserData));
-            } else {
-                console.warn("Couldn't fetch user data with existing token.");
-                localStorage.removeItem('userToken');
-                localStorage.removeItem('sessionId');
-                localStorage.removeItem('userData');
-                localStorage.removeItem('prevUserVolume');
-                localStorage.removeItem('userVolume');
-                setIsAuthenticated(false);
-                setUserData(null);
-            }
-        } catch (e) {
-            console.error("Failed to fetch user data with token:", e);
-            localStorage.removeItem('userToken');
-            localStorage.removeItem('sessionId');
-            localStorage.removeItem('userData');
-            setIsAuthenticated(false);
-            setUserData(null);
-        }
-      } else {
-        setIsAuthenticated(false);
-        setUserData(null);
-      }
-    };
-
-    checkAuth();
-
-    const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'userData' || event.key === 'userToken') {
-            checkAuth();
-            fetchAndSetNotifications();
-        }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-
-  }, []);
-
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (searchQuery.trim()) {
      const token = localStorage.getItem('userToken');
-      if (token && userData && userData.role !== 'ADMIN' && userData.currentProfile !== 'ARTIST') {
+      if (token && user && user.role !== 'ADMIN' && user.currentProfile !== 'ARTIST') {
         api.history.saveSearch(token, searchQuery.trim())
           .catch(err => console.error("Failed to save search history:", err));
       }
@@ -271,13 +177,7 @@ export default function Header({
       console.error('Logout error:', error);
     } finally {
       disconnectSocket();
-      localStorage.removeItem('userToken');
-      localStorage.removeItem('sessionId');
-      localStorage.removeItem('userData');
-      localStorage.removeItem('notificationCount');
-      localStorage.removeItem('hasPendingRequest');
-      setIsAuthenticated(false);
-      setUserData(null);
+      updateUserSession(null, null);
       setNotifications([]);
       setNotificationCount(0);
       setSearchSuggestions([]);
@@ -289,7 +189,7 @@ export default function Header({
   const handleBellClick = async () => {
     try {
       const canProceed = handleProtectedAction();
-      if (!canProceed || !userData) return;
+      if (!canProceed || !user) return;
 
       const opening = !showNotifications;
       setShowNotifications((prev) => !prev);
@@ -329,19 +229,18 @@ export default function Header({
 
       const response = await api.auth.switchProfile(token);
 
+      updateUserSession(response.user, token);
+
       if (response.user.currentProfile === 'ARTIST' && !response.user.artistProfile?.isActive) {
         toast.error('Your artist account has been deactivated');
-        return;
       }
 
-      localStorage.setItem('userData', JSON.stringify(response.user));
-      setUserData(response.user);
       toast.success(`Switched to ${response.user.currentProfile} profile`);
       setShowDropdown(false);
 
-      if (response.user.currentProfile === 'ARTIST') {
+      if (response.user.currentProfile === 'ARTIST' && response.user.artistProfile?.isActive) {
         window.location.href = '/artist/dashboard';
-      } else {
+      } else if (response.user.currentProfile === 'USER') {
         window.location.href = '/';
       }
     } catch (error) {
@@ -416,7 +315,6 @@ export default function Header({
     e.stopPropagation();
     const token = localStorage.getItem('userToken');
     if (!token) {
-      // Silently return or log if needed, user shouldn't see toast here.
       console.warn("Attempted to clear history without authentication.");
       return;
     }
@@ -424,11 +322,8 @@ export default function Header({
     try {
       await api.history.deleteSearchHistory(token);
       setSearchSuggestions([]);
-      // toast.success(response.message || "Search history cleared."); // Removed toast
     } catch (error) {
       console.error("Error clearing search history:", error);
-      // Optionally show an error toast if clearing fails, but not on success.
-      // toast.error("Failed to clear search history."); 
     }
   };
 
@@ -582,7 +477,6 @@ export default function Header({
                   ) : (
                     <div className={`px-4 py-3 text-sm text-center ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>No recent searches found.</div>
                   )}
-                  {/* Clear Button */}
                   {!isLoadingSuggestions && searchSuggestions.length > 0 && (
                      <div className={`sticky bottom-0 px-3 py-2 ${theme === 'light' ? 'bg-white/95 backdrop-blur-sm' : 'bg-[#282828]/95 backdrop-blur-sm'} border-t ${theme === 'light' ? 'border-gray-200' : 'border-white/10'}`}>
                        <button
@@ -606,7 +500,7 @@ export default function Header({
           <div className="w-8 h-8"></div>
         ) : isAuthenticated ? (
           <>
-            {userData?.artistProfile?.isVerified && (
+            {user?.artistProfile?.isVerified && (
                <button
                  onClick={handleSwitchProfile}
                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-200 ${theme === 'light'
@@ -614,7 +508,7 @@ export default function Header({
                      : 'bg-white/10 text-white hover:bg-white/20'
                  }`}
                >
-                 {userData.currentProfile === 'USER' ? (
+                 {user.currentProfile === 'USER' ? (
                    <>
                      <ArrowRight className="w-4 h-4" />
                      <span>Artist Dashboard</span>
@@ -652,7 +546,7 @@ export default function Header({
                 >
                    {notifications.length === 0 ? (
                      <p className={`px-4 py-3 text-sm text-center ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
-                       No relevant notifications for {userData?.currentProfile} profile
+                       No relevant notifications for {user?.currentProfile} profile
                      </p>
                    ) : (
                      notifications.map((item) => (
@@ -702,9 +596,9 @@ export default function Header({
               >
                 <div className="relative w-full h-full rounded-full overflow-hidden">
                   <Image
-                    src={userData?.currentProfile === 'ARTIST' && userData?.artistProfile?.avatar
-                      ? userData.artistProfile.avatar
-                      : userData?.avatar || '/images/default-avatar.jpg'}
+                    src={user?.currentProfile === 'ARTIST' && user?.artistProfile?.avatar
+                      ? user.artistProfile.avatar
+                      : user?.avatar || '/images/default-avatar.jpg'}
                     alt="User avatar"
                     fill
                     sizes="32px"
@@ -727,14 +621,14 @@ export default function Header({
                         <div className="w-12 h-12 rounded-full overflow-hidden">
                           <Image
                             src={
-                              userData?.currentProfile === 'ARTIST' && userData?.artistProfile?.avatar
-                                ? userData.artistProfile.avatar
-                                : userData?.avatar || '/images/default-avatar.jpg'
+                              user?.currentProfile === 'ARTIST' && user?.artistProfile?.avatar
+                                ? user.artistProfile.avatar
+                                : user?.avatar || '/images/default-avatar.jpg'
                             }
                             alt={
-                              userData?.currentProfile === 'ARTIST'
-                                ? userData?.artistProfile?.artistName || 'Artist'
-                                : userData?.name || 'User'
+                              user?.currentProfile === 'ARTIST'
+                                ? user?.artistProfile?.artistName || 'Artist'
+                                : user?.name || 'User'
                             }
                             width={48}
                             height={48}
@@ -751,17 +645,17 @@ export default function Header({
                         <h2
                           className={`text-base font-semibold truncate ${theme === 'light' ? 'text-zinc-900' : 'text-zinc-100'}`}
                         >
-                          {userData?.currentProfile === 'ARTIST'
-                            ? userData?.artistProfile?.artistName || userData?.name
-                            : userData?.name || userData?.username || 'User'
+                          {user?.currentProfile === 'ARTIST'
+                            ? user?.artistProfile?.artistName || user?.name
+                            : user?.name || user?.username || 'User'
                           }
                         </h2>
                         <p
                           className={`text-sm ${theme === 'light' ? 'text-zinc-600' : 'text-zinc-400'}`}
                         >
-                          {userData?.role === 'ADMIN'
+                          {user?.role === 'ADMIN'
                             ? 'Administrator'
-                            : userData?.currentProfile === 'ARTIST'
+                            : user?.currentProfile === 'ARTIST'
                               ? 'Artist'
                               : 'User'}
                         </p>
@@ -774,11 +668,11 @@ export default function Header({
                   <div className="p-2" role="none">
                     <Link
                       href={
-                        userData?.role === 'ADMIN'
-                          ? `/admin/profile/${userData.id}`
-                          : userData?.currentProfile === 'USER'
-                            ? `/profile/${userData?.id}`
-                            : `/artist/profile/${userData?.artistProfile?.id}`
+                        user?.role === 'ADMIN'
+                          ? `/admin/profile/${user.id}`
+                          : user?.currentProfile === 'USER'
+                            ? `/profile/${user?.id}`
+                            : `/artist/profile/${user?.artistProfile?.id}`
                       }
                       className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}
                       onClick={() => setShowDropdown(false)}
@@ -798,7 +692,7 @@ export default function Header({
                       <span className="text-sm font-medium">Settings</span>
                     </Link>
 
-                    {userData?.role === 'USER' && !userData?.artistProfile && (
+                    {user?.role === 'USER' && !user?.artistProfile && !user?.hasPendingArtistRequest && (
                       <Link
                         href="/request-artist"
                         className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}

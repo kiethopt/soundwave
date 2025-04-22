@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as userService from '../services/user.service';
 import { handleError } from '../utils/handle-utils';
+import { getIO, getUserSockets } from '../config/socket'; // Import socket functions
 
 // Yêu cầu trở thành Artist (Request Artist Role)
 export const requestToBecomeArtist = async (
@@ -8,7 +9,38 @@ export const requestToBecomeArtist = async (
   res: Response
 ): Promise<void> => {
   try {
-    await userService.requestArtistRole(req.user, req.body, req.file);
+    // req.user được lấy từ middleware authenticate
+    const currentUser = req.user;
+    if (!currentUser) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+    }
+
+    // Gọi service để tạo yêu cầu, service sẽ trả về profile nếu thành công
+    const createdProfile = await userService.requestArtistRole(currentUser, req.body, req.file);
+
+    // --- Phát sự kiện Socket.IO cho user --- 
+    try {
+        const io = getIO();
+        const userSockets = getUserSockets();
+        const targetSocketId = userSockets.get(currentUser.id);
+
+        if (targetSocketId) {
+            console.log(`🚀 Emitting artist_request_submitted to user ${currentUser.id} via socket ${targetSocketId}`);
+            // Gửi trạng thái có yêu cầu đang chờ
+            io.to(targetSocketId).emit('artist_request_submitted', {
+                hasPendingRequest: true,
+                // Có thể gửi kèm profile vừa tạo nếu cần
+                // artistProfile: createdProfile 
+            });
+        } else {
+            console.log(`Socket not found for user ${currentUser.id}. Cannot emit request submission update.`);
+        }
+    } catch (socketError) {
+        console.error('Failed to emit socket event for artist request submission:', socketError);
+    }
+    // ------------------------------------
+
     res.json({ message: 'Artist role request submitted successfully' });
   } catch (error) {
     if (error instanceof Error) {

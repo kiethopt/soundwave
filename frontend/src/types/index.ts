@@ -79,6 +79,7 @@ export interface User {
   followers?: UserFollow[];
   notifications?: Notification[];
   likedTracks?: Track[];
+  hasPendingArtistRequest?: boolean;
 }
 
 export interface ArtistProfile {
