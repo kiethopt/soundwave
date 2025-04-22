@@ -46,7 +46,9 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const email_service_1 = require("./email.service");
+const client_2 = require("@prisma/client");
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const date_fns_1 = require("date-fns");
 const getUsers = async (req, requestingUser) => {
     const { search = '', status, role } = req.query;
     let roleFilter = {};
@@ -527,48 +529,63 @@ const deleteArtistRequest = async (requestId) => {
 };
 exports.deleteArtistRequest = deleteArtistRequest;
 const getDashboardStats = async () => {
-    const stats = await Promise.all([
+    const coreStatsPromise = Promise.all([
         db_1.default.user.count({ where: { role: { not: client_1.Role.ADMIN } } }),
-        db_1.default.artistProfile.count({
-            where: {
-                role: client_1.Role.ARTIST,
-                isVerified: true,
-            },
-        }),
-        db_1.default.artistProfile.count({
-            where: {
-                verificationRequestedAt: { not: null },
-                isVerified: false,
-            },
-        }),
+        db_1.default.artistProfile.count({ where: { role: client_1.Role.ARTIST, isVerified: true } }),
+        db_1.default.artistProfile.count({ where: { verificationRequestedAt: { not: null }, isVerified: false } }),
         db_1.default.artistProfile.findMany({
-            where: {
-                role: client_1.Role.ARTIST,
-                isVerified: true,
-            },
+            where: { role: client_1.Role.ARTIST, isVerified: true },
             orderBy: [{ monthlyListeners: 'desc' }],
             take: 4,
-            select: {
-                id: true,
-                artistName: true,
-                avatar: true,
-                monthlyListeners: true,
-            },
+            select: { id: true, artistName: true, avatar: true, monthlyListeners: true },
         }),
         db_1.default.genre.count(),
+        db_1.default.label.count(),
+        db_1.default.album.count({ where: { isActive: true } }),
+        db_1.default.track.count({ where: { isActive: true } }),
+        db_1.default.playlist.count({ where: { type: client_2.PlaylistType.SYSTEM, userId: null } }),
     ]);
-    const [totalUsers, totalArtists, totalArtistRequests, topArtists, totalGenres,] = stats;
+    const monthlyUserDataPromise = (async () => {
+        const monthlyData = [];
+        const allMonths = [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+        ];
+        const now = new Date();
+        for (let i = 11; i >= 0; i--) {
+            const monthDate = (0, date_fns_1.subMonths)(now, i);
+            const endOfMonthDate = (0, date_fns_1.endOfMonth)(monthDate);
+            const monthLabel = allMonths[monthDate.getMonth()];
+            const userCount = await db_1.default.user.count({
+                where: {
+                    createdAt: { lte: endOfMonthDate },
+                },
+            });
+            monthlyData.push({ month: monthLabel, users: userCount });
+        }
+        return monthlyData;
+    })();
+    const [coreStats, monthlyUserData] = await Promise.all([
+        coreStatsPromise,
+        monthlyUserDataPromise,
+    ]);
+    const [totalUsers, totalArtists, totalArtistRequests, topArtists, totalGenres, totalLabels, totalAlbums, totalTracks, totalSystemPlaylists,] = coreStats;
     return {
         totalUsers,
         totalArtists,
         totalArtistRequests,
         totalGenres,
+        totalLabels,
+        totalAlbums,
+        totalTracks,
+        totalSystemPlaylists,
         topArtists: topArtists.map((artist) => ({
             id: artist.id,
             artistName: artist.artistName,
             avatar: artist.avatar,
             monthlyListeners: artist.monthlyListeners,
         })),
+        monthlyUserData,
         updatedAt: new Date().toISOString(),
     };
 };

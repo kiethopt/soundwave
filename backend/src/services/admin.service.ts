@@ -15,24 +15,22 @@ import * as path from 'path';
 import { SystemComponentStatus } from '../types/system.types';
 import { client as redisClient } from '../middleware/cache.middleware';
 import { transporter as nodemailerTransporter } from './email.service';
-import { Prisma, User as PrismaUser } from '@prisma/client';
+import { Prisma, User as PrismaUser, PlaylistType } from '@prisma/client';
 import { ArtistProfile } from '@prisma/client';
-import bcrypt from 'bcrypt'; // Import bcrypt
+import bcrypt from 'bcrypt';
+import { format, subMonths, endOfMonth } from 'date-fns';
 
-// Explicitly type User to include adminLevel for this file's scope
 type User = PrismaUser & { adminLevel?: number | null };
 
-// Updated getUsers function to accept requestingUser
 export const getUsers = async (req: Request, requestingUser: User) => {
   const { search = '', status, role } = req.query;
 
-  // Start with base role filtering based on requesting user's level
   let roleFilter: Prisma.UserWhereInput['role'] = {};
   if (requestingUser.adminLevel !== 1) {
-    roleFilter = Role.USER; // Level 2+ Admins only see USER role
+    roleFilter = Role.USER; // Level 2+ Admins chỉ xem được USER
   }
 
-  // Apply specific role filter from query if provided and user is Level 1 Admin
+  // Level 1 Admin có thể xem tất cả các role
   if (requestingUser.adminLevel === 1 && role) {
     const requestedRoles = Array.isArray(role)
       ? (role as string[])
@@ -48,11 +46,10 @@ export const getUsers = async (req: Request, requestingUser: User) => {
   }
 
   const where: Prisma.UserWhereInput = {
-    // Apply the determined role filter
     ...(Object.keys(roleFilter).length > 0 ? { role: roleFilter } : {}),
-    // Exclude the requesting user if they are Level 1 Admin
+    // Level 1 Admin không xem được chính mình
     ...(requestingUser.adminLevel === 1 ? { id: { not: requestingUser.id } } : {}),
-    // Combine with search filter using AND implicitly
+    // Tìm kiếm theo email, username, name
     ...(search
       ? {
           OR: [
@@ -62,7 +59,7 @@ export const getUsers = async (req: Request, requestingUser: User) => {
           ],
         }
       : {}),
-    // Combine with status filter using AND implicitly
+    // Kết hợp với filter status
     ...(status !== undefined ? { isActive: toBooleanValue(status) } : {}),
   };
 
@@ -72,7 +69,7 @@ export const getUsers = async (req: Request, requestingUser: User) => {
     orderBy: { createdAt: 'desc' },
   };
 
-  // Pass the modified where clause to paginate
+  // Phân trang và sắp xếp theo ngày tạo
   const result = await paginate<User>(prisma.user, req, options);
 
   return {
@@ -644,57 +641,85 @@ export const deleteArtistRequest = async (requestId: string) => {
 
 // Lấy thống kê dashboard
 export const getDashboardStats = async () => {
-  // Sử dụng Promise.all để thực hiện đồng thời các truy vấn
-  const stats = await Promise.all([
-    prisma.user.count({ where: { role: { not: Role.ADMIN } } }), // Count non-admin users
-    prisma.artistProfile.count({
-      where: {
-        role: Role.ARTIST,
-        isVerified: true,
-      },
-    }), // Tổng số nghệ sĩ đã xác minh
-    prisma.artistProfile.count({
-      where: {
-        verificationRequestedAt: { not: null },
-        isVerified: false,
-      },
-    }), // Tổng số yêu cầu nghệ sĩ đang chờ
-    prisma.artistProfile.findMany({
-      where: {
-        role: Role.ARTIST,
-        isVerified: true,
-      },
+  const coreStatsPromise = Promise.all([
+    prisma.user.count({ where: { role: { not: Role.ADMIN } } }), // Total non-admin users
+    prisma.artistProfile.count({ where: { role: Role.ARTIST, isVerified: true } }), // Total verified artists
+    prisma.artistProfile.count({ where: { verificationRequestedAt: { not: null }, isVerified: false } }), // Total pending artist requests
+    prisma.artistProfile.findMany({ // Top artists
+      where: { role: Role.ARTIST, isVerified: true },
       orderBy: [{ monthlyListeners: 'desc' }],
       take: 4,
-      select: {
-        id: true,
-        artistName: true,
-        avatar: true,
-        monthlyListeners: true,
-      },
-    }), // Nghệ sĩ nổi bật nhất
-    prisma.genre.count(), // Tổng số thể loại nhạc
+      select: { id: true, artistName: true, avatar: true, monthlyListeners: true },
+    }),
+    prisma.genre.count(), // Total genres
+    prisma.label.count(), // Total labels
+    prisma.album.count({ where: { isActive: true } }), // Total active albums
+    prisma.track.count({ where: { isActive: true } }), // Total active tracks
+    prisma.playlist.count({ where: { type: PlaylistType.SYSTEM, userId: null } }), // Total base system playlists
   ]);
 
+  // --- Tính toán dữ liệu tháng ---
+  const monthlyUserDataPromise = (async () => {
+    const monthlyData: Array<{ month: string; users: number }> = [];
+    const allMonths = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    const now = new Date();
+
+    // Tính toán cho 12 tháng gần đây nhất
+    for (let i = 11; i >= 0; i--) {
+      const monthDate = subMonths(now, i);
+      const endOfMonthDate = endOfMonth(monthDate);
+      const monthLabel = allMonths[monthDate.getMonth()];
+
+      const userCount = await prisma.user.count({
+        where: {
+          createdAt: { lte: endOfMonthDate },
+        },
+      });
+
+      monthlyData.push({ month: monthLabel, users: userCount });
+    }
+    return monthlyData;
+  })();
+
+  // --- Chờ tất cả các promise --- 
+  const [coreStats, monthlyUserData] = await Promise.all([
+    coreStatsPromise,
+    monthlyUserDataPromise,
+  ]);
+
+  // --- Tách dữ liệu cơ bản --- 
   const [
     totalUsers,
     totalArtists,
     totalArtistRequests,
     topArtists,
     totalGenres,
-  ] = stats;
+    totalLabels,
+    totalAlbums,
+    totalTracks,
+    totalSystemPlaylists,
+  ] = coreStats;
 
+  // --- Trả về dữ liệu kết hợp --- 
   return {
     totalUsers,
     totalArtists,
     totalArtistRequests,
     totalGenres,
+    totalLabels,
+    totalAlbums,
+    totalTracks,
+    totalSystemPlaylists,
     topArtists: topArtists.map((artist) => ({
       id: artist.id,
       artistName: artist.artistName,
       avatar: artist.avatar,
       monthlyListeners: artist.monthlyListeners,
     })),
+    monthlyUserData, // Dữ liệu tháng thực tế
     updatedAt: new Date().toISOString(),
   };
 };
