@@ -169,4 +169,9 @@ export const labelData = [
     description: 'Hãng thu âm và sản xuất âm nhạc QP hype...',
     logoUrl: null,
   },
+  {
+    name: 'Đen',
+    description: 'Label tự do của Đen.',
+    logoUrl: null,
+  },
 ]; 
