@@ -26,6 +26,36 @@ export const singles: SingleTrackData[] = [
     featuredArtistNames: [],
     playCount: 100
   },
+  {
+    artistName: 'Vũ.',
+    title: 'Lạ Lùng',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745439076/lalung_jspxir.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745439072/L%E1%BA%A1_L%C3%B9ng_amsc9e.mp3',
+    genreNames: ['V-Pop', 'Indie'],
+    labelName: 'Warner Music Vietnam',
+    featuredArtistNames: [],
+    playCount: 90
+  },
+  {
+    artistName: 'Vũ.',
+    title: 'Đông Kiếm Em',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745439348/dongkiemem_nstwin.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745439344/%C4%90%C3%B4ng_Ki%E1%BA%BFm_Em_vs63al.mp3',
+    genreNames: ['V-Pop', 'Ballad'],
+    labelName: 'Warner Music Vietnam',
+    featuredArtistNames: [],
+    playCount: 80
+  },
+  {
+    artistName: 'Vũ.',
+    title: 'Hẹn Hò',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745439262/henho_uejz5a.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745439258/H%E1%BB%87n_H%C3%B2_ihqk4b.mp3',
+    genreNames: ['V-Pop', 'Ballad'],
+    labelName: 'Warner Music Vietnam',
+    featuredArtistNames: [],
+    playCount: 70
+  },
   
   // Wren Evans' Singles
   {
@@ -47,6 +77,26 @@ export const singles: SingleTrackData[] = [
     labelName: 'SPACESPEAKERS LABEL',
     featuredArtistNames: [],
     playCount: 75
+  },
+  {
+    artistName: 'Wren Evans',
+    title: 'Thích Em Hơi Nhiều',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745433944/thichemhoinhieu_n1befr.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745433941/Th%C3%ADch_Em_H%C6%A1i_Nhi%E1%BB%81u_-_The_Goodboi_Flip_jhiypj.mp3',
+    genreNames: ['V-Pop'],
+    labelName: 'SPACESPEAKERS LABEL',
+    featuredArtistNames: [],
+    playCount: 70
+  },
+  {
+    artistName: 'Wren Evans',
+    title: 'Cứu Lấy Âm Nhạc',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745434174/cuulayamnhac_lic7qy.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745434167/C%E1%BB%A9u_L%E1%BA%A5y_%C3%82m_Nh%E1%BA%A1c_f0y2xf.mp3',
+    genreNames: ['V-Pop', 'Hip-Hop'],
+    labelName: 'SPACESPEAKERS LABEL',
+    featuredArtistNames: ['itsnk'],
+    playCount: 70
   },
   
   // Phan Đinh Tùng's Single
@@ -70,9 +120,153 @@ export const singles: SingleTrackData[] = [
     genreNames: ['V-Pop', 'Hip-Hop', 'Rap'],
     labelName: 'M Music Records',
     featuredArtistNames: [],
-    playCount: 0,
+    playCount: 63,
     releaseDate: new Date('2025-04-01')
-  }
+  },
+
+  {
+    artistName: 'HIEUTHUHAI',
+    title: 'TRÌNH',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745432929/TRINH_ap6p2g.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745432905/TR%C3%8CNH_iobw5p.mp3',
+    genreNames: ['V-Pop', 'Hip-Hop', 'Rap'],
+    labelName: 'M Music Records',
+    featuredArtistNames: [],
+    playCount: 45,
+  },
+
+  // SOOBIN's Single
+  {
+    artistName: 'SOOBIN',
+    title: 'Vẫn Nhớ',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745431465/vannho_yh3ama.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745431285/V%E1%BA%ABn_Nh%E1%BB%9B_e8qiqi.mp3',
+    genreNames: ['V-Pop', 'Ballad'],
+    labelName: 'Universal Music Vietnam',
+    featuredArtistNames: [],
+    playCount: 37,
+  },
+
+  {
+    artistName: 'SOOBIN',
+    title: 'Vài Lần Đón Đưa',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745431592/vailandondua_dgnhah.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745431587/Vai_Lan_Don_Dua_jiecy2.mp3',
+    genreNames: ['V-Pop', 'Ballad'],
+    labelName: 'Universal Music Vietnam',
+    featuredArtistNames: [],
+    playCount: 15,
+  },
+
+  {
+    artistName: 'SOOBIN',
+    title: 'Say Goodbye',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745431779/saygoodbye_im75o4.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745431784/Say_Goodbye_rhpmv9.mp3',
+    genreNames: ['V-Pop', 'Ballad', 'Acoustic'],
+    labelName: 'Universal Music Vietnam',
+    featuredArtistNames: [],
+    playCount: 25,
+  },
+
+  {
+    artistName: 'SOOBIN',
+    title: 'Ngày Mai Em Đi',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745432092/ngaymaiemdi_s00edy.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745432073/Ng%C3%A0y_Mai_Em_%C4%90i_z2ll3z.mp3',
+    genreNames: ['V-Pop', 'Acoustic'],
+    labelName: 'Universal Music Vietnam',
+    featuredArtistNames: ['Lê Hiếu'],
+    playCount: 16,
+  },
+
+  // Son Tung M-TP's Single
+  {
+    artistName: 'Sơn Tùng M-TP',
+    title: 'Chạy Ngay Đi',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745435171/chayngaydi_q2tbv1.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745435167/Ch%E1%BA%A1y_Ngay_%C4%90i_av6kxz.mp3',
+    genreNames: ['V-Pop', 'Hip-Hop'],
+    labelName: 'M-TP Entertainment',
+    featuredArtistNames: [],
+    playCount: 100,
+  },
+
+  {
+    artistName: 'Sơn Tùng M-TP',
+    title: 'Making My Way',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745435260/makingmyway_j07fyn.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745435297/MAKING_MY_WAY_s7hrju.mp3',
+    genreNames: ['V-Pop', 'Pop'],
+    labelName: 'M-TP Entertainment',
+    featuredArtistNames: [],
+    playCount: 80,
+  },
+
+  {
+    artistName: 'Sơn Tùng M-TP',
+    title: 'Hãy Trao Cho Anh',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745435426/haytraochoanh_fcmixd.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745435429/H%C3%A3y_Trao_Cho_Anh_q8cm6x.mp3',
+    genreNames: ['V-Pop', 'Pop'],
+    labelName: 'M-TP Entertainment',
+    featuredArtistNames: [],
+    playCount: 90,
+  },
+
+  // tlinh's Single
+  {
+    artistName: 'tlinh',
+    title: 'Vài Câu Nói Có Khiến Người Thay Đổi',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745438765/vaicaunoicokhiennguoithaydoi_mlo7k0.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745438771/vaicaunoicokhiennguoithaydoi_aqkrcc.mp3',
+    genreNames: ['V-Pop'],
+    labelName: 'M Music Records',
+    featuredArtistNames: ['GREY D'],
+    playCount: 50,
+  },
+  {
+    artistName: 'tlinh',
+    title: 'Vứt Zác',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745438553/vutzac_d0drbh.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745438570/V%E1%BB%A9t_Z%C3%A1c_rzwagg.mp3',
+    genreNames: ['V-Pop', 'Rap', 'Hip-Hop'],
+    labelName: 'M Music Records',
+    featuredArtistNames: ['Low G'],
+    playCount: 40,
+  },
+
+  // Obito's Single
+  {
+    artistName: 'Obito',
+    title: 'Simple Love',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745439839/simplelove_hm8scr.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745439837/Simple_Love_eznpfm.mp3',
+    genreNames: ['V-Pop', 'Hip-Hop'],
+    labelName: 'Universal Music Vietnam',
+    featuredArtistNames: ['Seachains'],
+    playCount: 40,
+  },
+  {
+    artistName: 'Obito',
+    title: 'Phong Long',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745440114/phonglong_dclnox.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745440211/Phong_Long_zt4pc3.mp3',
+    genreNames: ['V-Pop', 'Rap'],
+    labelName: 'Universal Music Vietnam',
+    featuredArtistNames: ['Low G, WOKE UP'],
+    playCount: 30,
+  },
+  {
+    artistName: 'Obito',
+    title: 'When You Look at Me',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745440519/whenyoulookatme_az7yye.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745440528/When_You_Look_at_Me_feat._Seachains_hw4whz.mp3',
+    genreNames: ['V-Pop', 'Rap'],
+    labelName: 'Universal Music Vietnam',
+    featuredArtistNames: ['Seachains'],
+    playCount: 20,
+  },
 ];
 
 // Function to get single by title and artist (useful for references)

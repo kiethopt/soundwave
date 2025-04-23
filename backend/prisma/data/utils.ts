@@ -169,4 +169,10 @@ export const labelData = [
     description: 'Hãng thu âm và sản xuất âm nhạc QP hype...',
     logoUrl: null,
   },
+  {
+    name: 'M-TP Entertainment',
+    description: 'Công ty giải trí do rapper Sơn Tùng M-TP sáng lập...',
+    logoUrl: 
+      'https://res.cloudinary.com/dbwhalglx/image/upload/v1745435638/mtp_uzn4ba.jpg',
+  },
 ]; 

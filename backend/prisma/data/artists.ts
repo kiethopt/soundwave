@@ -400,6 +400,38 @@ export const artists: ArtistData[] = [
       },
     },
   },
+  {
+    user: {
+      email: 'seachains@soundwave.com',
+      username: 'seachains_artist',
+      name: 'Seachains',
+    },
+    profile: {
+      artistName: 'Seachains',
+      bio: 'Seachains là một nghệ sĩ trẻ nổi bật trong làng nhạc Việt Nam, với nhiều sản phẩm âm nhạc chất lượng.',
+      avatar: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745439987/seachains_kmptms.jpg',
+      socialMediaLinks: {
+        facebook: 'seachains',
+        instagram: 'seachains'
+      },
+    },
+  },
+  {
+    user: {
+      email: 'wokeup@soundwave.com',
+      username: 'wokeup_artist',
+      name: 'WOKEUP',
+    },
+    profile: {
+      artistName: 'WOKEUP',
+      bio: 'WOKEUP là một nghệ sĩ trẻ nổi bật trong làng nhạc Việt Nam, với nhiều sản phẩm âm nhạc chất lượng.',
+      avatar: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745440097/wokeup_wnwnoy.jpg',
+      socialMediaLinks: {
+        facebook: 'wokeupmusic',
+        instagram: 'wokeupmusic'
+      },
+    },
+  },
 ];
 
 // Function to get artist by name (useful for references)
