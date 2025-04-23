@@ -569,6 +569,50 @@ export const albums: AlbumData[] = [
       }
     ]
   },
+
+  // MONO - ĐẸP EP
+  {
+    artistName: 'MONO',
+    title: 'ĐẸP',
+    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436646/seed/artists/MONO/%C4%90%E1%BA%B8P/s9htcpunfrmtv4rks2op.jpg',
+    type: AlbumType.EP,
+    labelName: 'M Music Records',
+    genreNames: ['V-Pop', 'Pop'], // Assign appropriate genres
+    releaseDate: new Date('2023-11-30'),
+    tracks: [
+      {
+        title: 'Intro',
+        audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745436660/seed/artists/MONO/%C4%90%E1%BA%B8P/etloawr3szztpwe3i8uu.mp3',
+        trackNumber: 1,
+        featuredArtists: []
+      },
+      {
+        title: 'Cười Lên',
+        audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745436654/seed/artists/MONO/%C4%90%E1%BA%B8P/zlampxskxnna5w0hzpbd.mp3',
+        trackNumber: 2,
+        featuredArtists: []
+      },
+      {
+        title: 'Em Xinh',
+        audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745436655/seed/artists/MONO/%C4%90%E1%BA%B8P/fj49m1dofctxporz6eom.mp3',
+        trackNumber: 3,
+        featuredArtists: ['Onionn']
+      },
+      {
+        title: 'Young',
+        audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745436660/seed/artists/MONO/%C4%90%E1%BA%B8P/etloawr3szztpwe3i8uu.mp3',
+        trackNumber: 4,
+        featuredArtists: []
+      },
+      {
+        title: 'Open Your Eyes',
+        audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745436653/seed/artists/MONO/%C4%90%E1%BA%B8P/c1deru5yg2u8tex2nzka.mp3',
+        trackNumber: 5,
+        featuredArtists: ['Onionn']
+      }
+    ],
+    featuredArtistNames: [] // No featured artists for the whole EP
+  },
 ];
 
 // Function to get album by title (useful for references)

@@ -170,6 +170,11 @@ export const labelData = [
     logoUrl: null,
   },
   {
+    name: 'Đen',
+    description: 'Label tự do của Đen.',
+    logoUrl: null,
+  },
+  {
     name: 'M-TP Entertainment',
     description: 'Công ty giải trí do rapper Sơn Tùng M-TP sáng lập...',
     logoUrl: 

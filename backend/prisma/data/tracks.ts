@@ -124,6 +124,84 @@ export const singles: SingleTrackData[] = [
     releaseDate: new Date('2025-04-01')
   },
 
+  // MONO - Ôm Em Thật Lâu
+  {
+    artistName: 'MONO',
+    title: 'Ôm Em Thật Lâu',
+    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436291/seed/artists/MONO/yt1xzctpsfy3hqr7sdmb.jpg',
+    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745436293/seed/artists/MONO/ckois6mvulxsu4anpabz.mp3',
+    genreNames: ['V-Pop', 'Pop'],
+    labelName: 'M Music Records',
+    featuredArtistNames: [],
+    playCount: 0,
+    releaseDate: new Date('2025-04-03')
+  },
+
+  // MONO - Chăm Hoa
+  {
+    artistName: 'MONO',
+    title: 'Chăm Hoa',
+    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436544/seed/artists/MONO/vvlotcogfhiooiq3gctm.jpg',
+    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745436548/seed/artists/MONO/bqbgkmbuvxmwqywz93ki.mp3',
+    genreNames: ['V-Pop', 'Pop'],
+    labelName: 'M Music Records',
+    featuredArtistNames: [],
+    playCount: 0,
+    releaseDate: new Date('2024-10-22')
+  },
+
+  // Đen - Dưới Hiên Nhà
+  {
+    artistName: 'Đen',
+    title: 'Dưới Hiên Nhà',
+    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437250/seed/artists/%C4%90en/iizch3ygybzl83q1zmfy.jpg',
+    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745437256/seed/artists/%C4%90en/uvojxryuxqsnyxe7apaw.mp3',
+    genreNames: ['Hip-Hop', 'Rap'],
+    labelName: 'Đen',
+    featuredArtistNames: ['Emcee L (Da LAB)', 'JGKiD (Da LAB)'],
+    playCount: 0,
+    releaseDate: new Date('2016-08-06')
+  },
+
+  // Đen - Đi Theo Bóng Mặt Trời
+  {
+    artistName: 'Đen',
+    title: 'Đi Theo Bóng Mặt Trời',
+    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437393/seed/artists/%C4%90en/begfbwkugfedpwumd5et.jpg',
+    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745437395/seed/artists/%C4%90en/ujvytchqdd0zry8zbxdb.mp3',
+    genreNames: ['Hip-Hop', 'Rap'],
+    labelName: 'Đen',
+    featuredArtistNames: ['Giang Nguyễn'],
+    playCount: 0,
+    releaseDate: new Date('2017-05-13')
+  },
+
+  // Đen - Ta Cứ Đi Cùng Nhau
+  {
+    artistName: 'Đen',
+    title: 'Ta Cứ Đi Cùng Nhau',
+    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437677/seed/artists/%C4%90en/dgk5twb5ki5vi0qq5ocl.jpg',
+    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745437684/seed/artists/%C4%90en/qaeai8knaylimfg9ytwe.mp3',
+    genreNames: ['Hip-Hop', 'Rap', 'Pop'],
+    labelName: 'Đen',
+    featuredArtistNames: ['Linh Cáo'],
+    playCount: 0,
+    releaseDate: new Date('2017-09-11')
+  },
+
+  // Đen - Ngày Khác Lạ
+  {
+    artistName: 'Đen',
+    title: 'Ngày Khác Lạ',
+    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437804/seed/artists/%C4%90en/vdxgft0se7oxe6iilxqf.jpg',
+    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745437809/seed/artists/%C4%90en/rl0h6dr5lbhnx8twsvnk.mp3',
+    genreNames: ['Hip-Hop', 'Rap'],
+    labelName: 'Đen',
+    featuredArtistNames: ['Giang Phạm', 'Triple D'],
+    playCount: 0,
+    releaseDate: new Date('2018-02-23')
+  },
+
   {
     artistName: 'HIEUTHUHAI',
     title: 'TRÌNH',
