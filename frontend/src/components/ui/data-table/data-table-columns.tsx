@@ -147,14 +147,14 @@ export function getTrackColumns({
       header: 'Title',
       cell: ({ row }) => {
         const track = row.original;
-        return (
-          <div
-            className="flex items-center gap-3 cursor-pointer"
-            onClick={() => onViewDetails?.(track)}
-          >
+        const userRole = getUserRole(); // Get the user role
+
+        const content = (
+          <div className="flex items-center gap-3">
             <div
-              className={`w-8 h-8 rounded overflow-hidden ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
-                }`}
+              className={`w-8 h-8 rounded overflow-hidden flex-shrink-0 ${
+                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+              }`}
             >
               {track.coverUrl ? (
                 <Image
@@ -166,21 +166,38 @@ export function getTrackColumns({
                 />
               ) : (
                 <Music
-                  className={`w-8 h-8 p-1.5 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                    }`}
+                  className={`w-8 h-8 p-1.5 ${
+                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                  }`}
                 />
               )}
             </div>
             <div>
-              <div
-                className={`font-medium ${theme === 'dark' ? 'text-white' : ''
-                  }`}
+              <span // Use span instead of Link text initially
+                className={`font-medium ${
+                  userRole === 'ADMIN' ? 'hover:underline cursor-pointer' : '' // Add underline on hover for ADMIN
+                } ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
               >
                 {track.title}
-              </div>
+              </span>
             </div>
           </div>
         );
+
+        if (userRole === 'ADMIN') {
+          return (
+            <div onClick={() => onViewDetails?.(track)} className="cursor-pointer">
+              {content}
+            </div>
+          );
+        } else {
+          // Default to Artist behavior (or any non-admin role)
+          return (
+            <Link href={`/artist/tracks/${track.id}`}>
+              {content}
+            </Link>
+          );
+        }
       },
     },
     {
@@ -491,17 +508,17 @@ export function getAlbumColumns({
     },
     {
       accessorKey: 'title',
-      header: 'Album',
+      header: 'Title',
       cell: ({ row }) => {
         const album = row.original;
-        return (
-          <div
-            className="flex items-center gap-3 cursor-pointer"
-            onClick={() => onViewDetails?.(album)}
-          >
+        const userRole = getUserRole(); // Assuming getUserRole is available
+
+        const content = (
+          <div className="flex items-center gap-3">
             <div
-              className={`w-8 h-8 rounded overflow-hidden ${theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
-                }`}
+              className={`w-8 h-8 rounded overflow-hidden flex-shrink-0 ${
+                theme === 'dark' ? 'bg-white/10' : 'bg-gray-100'
+              }`}
             >
               {album.coverUrl ? (
                 <Image
@@ -513,21 +530,37 @@ export function getAlbumColumns({
                 />
               ) : (
                 <Music
-                  className={`w-8 h-8 p-1.5 ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'
-                    }`}
+                  className={`w-8 h-8 p-1.5 ${
+                    theme === 'dark' ? 'text-white/40' : 'text-gray-400'
+                  }`}
                 />
               )}
             </div>
-            <div>
-              <div
-                className={`font-medium ${theme === 'dark' ? 'text-white' : ''
-                  }`}
-              >
-                {album.title}
-              </div>
-            </div>
+            <span
+              className={`font-medium ${userRole === 'ADMIN' ? 'hover:underline' : ''} ${
+                theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}
+            >
+              {album.title}
+            </span>
           </div>
         );
+
+        if (userRole === 'ADMIN' && onViewDetails) {
+          // Admin clicks trigger onViewDetails (e.g., modal)
+          return (
+            <div onClick={() => onViewDetails?.(album)} className="cursor-pointer">
+              {content}
+            </div>
+          );
+        } else {
+          // Artist (and others) link to the detail page
+          return (
+            <Link href={`/artist/albums/${album.id}`} className="cursor-pointer">
+             {content}
+            </Link>
+          );
+        }
       },
     },
     {
@@ -1686,3 +1719,4 @@ export function getSystemPlaylistColumns({
     },
   ];
 }
+

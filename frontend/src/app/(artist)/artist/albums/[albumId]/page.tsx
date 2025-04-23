@@ -4,7 +4,7 @@ import type { Album, ArtistProfile, Track, TrackEditForm } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/utils/api';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import TrackUploadForm from '@/components/admin/TrackUploadForm';
 import toast from 'react-hot-toast';
 import {
@@ -28,9 +28,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/contexts/ThemeContext';
 import io, { Socket } from 'socket.io-client'; // Import Socket
+import { Button } from '@/components/ui/button';
 
 export default function AlbumDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const extractedAlbumId = params?.albumId
     ? Array.isArray(params.albumId)
       ? params.albumId[0]
@@ -559,17 +561,14 @@ export default function AlbumDetailPage() {
       <div className="max-w-8xl mx-auto px-4 md:px-6 py-6 mb-16 md:mb-0">
         {/* Header with Back button and Edit button */}
         <div className="flex items-center justify-between mb-6">
-          <Link
-            href="/artist/albums"
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              theme === 'light'
-                ? 'bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow'
-                : 'bg-black/20 hover:bg-black/30 text-white/80 hover:text-white'
-            }`}
+          <Button
+            variant="default"
+            onClick={() => router.back()}
+            className="mb-4 -ml-4 text-white focus-visible:ring-white/50 hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: dominantColor || (theme === 'dark' ? '#374151' : '#6b7280') }}
           >
-            <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
-            <span>Back</span>
-          </Link>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          </Button>
           <button
             onClick={() => setShowEditDialog(true)}
             className={`p-2 rounded-full transition-colors ${
