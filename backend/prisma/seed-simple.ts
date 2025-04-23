@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import * as cliProgress from 'cli-progress';
 import colors from 'colors';
 import { faker } from '@faker-js/faker';
+import * as mm from 'music-metadata'; // Namespace import
+import fetch from 'node-fetch'; // Import node-fetch for manual stream fetching
 
 // Import data from our modular structure
 import { artists } from './data/artists';
@@ -15,18 +17,51 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 
-// Helper function to convert MM:SS or M:SS string to seconds
-function durationToSeconds(durationStr: string): number {
-  const parts = durationStr.split(':').map(Number);
-  if (parts.length === 2) {
-    const minutes = parts[0];
-    const seconds = parts[1];
-    if (!isNaN(minutes) && !isNaN(seconds)) {
-      return minutes * 60 + seconds;
-    }
+// Helper function to get audio duration from URL using music-metadata via parseBuffer
+async function getAudioDurationFromUrl(audioUrl: string): Promise<number> {
+  if (!audioUrl) {
+    console.warn(colors.yellow(`⚠️ Audio URL is missing. Returning 0.`));
+    return 0;
   }
-  console.warn(`⚠️ Invalid duration format: ${durationStr}. Returning 0.`);
-  return 0; // Default or throw error if strict parsing is needed
+  try {
+    // Fetch the entire audio file into a buffer
+    const response = await fetch(audioUrl, { timeout: 30000 }); // Increase timeout for full download (30s)
+
+    if (!response.ok) {
+        console.warn(colors.yellow(`⚠️ HTTP error fetching ${audioUrl}: ${response.status} ${response.statusText}. Returning 0.`));
+        return 0;
+    }
+
+    const buffer = await response.buffer(); // Get response as Buffer
+
+    // Get content type from headers if available
+    const contentType = response.headers.get('content-type') || undefined;
+
+    // Use parseBuffer with the fetched buffer
+    const metadata = await mm.parseBuffer(buffer, { mimeType: contentType }, { duration: true });
+
+    if (metadata.format.duration) {
+      return Math.round(metadata.format.duration); // Round to nearest integer
+    }
+    console.warn(colors.yellow(`⚠️ Could not read duration from metadata for: ${audioUrl}. Returning 0.`));
+    return 0;
+  } catch (error: any) {
+    // Log more specific errors
+    let errorMessage = error.message || String(error);
+    if (error.type === 'request-timeout' || error.code === 'ETIMEDOUT' || errorMessage.includes('timeout')) {
+        errorMessage = 'Timeout during fetch or parsing';
+    } else if (error.code === 'ENOTFOUND' || error.code === 'EAI_AGAIN') {
+        errorMessage = 'Network error or host not found';
+    } else if (errorMessage.includes('Parse error')) {
+        errorMessage = 'Could not parse audio metadata';
+    } else if (errorMessage.includes('HTTP error')) {
+        // Already handled above, but catch potential re-throws
+    } else {
+        errorMessage = `Unexpected error: ${errorMessage}`;
+    }
+    console.warn(colors.yellow(`⚠️ Error processing duration for ${audioUrl}: ${errorMessage}. Returning 0.`));
+    return 0;
+  }
 }
 
 async function main() {
@@ -226,10 +261,14 @@ async function main() {
       const albumLabelId = await getLabelId(prisma, albumData.labelName);
       const albumGenreIds = await getGenreIds(prisma, albumData.genreNames);
       const totalTracks = albumData.tracks.length;
-      const albumDuration = albumData.tracks.reduce(
-        (sum, track) => sum + track.duration,
-        0
+
+      // Fetch durations for all tracks in the album first
+      const trackDurations = await Promise.all(
+          albumData.tracks.map(trackData => getAudioDurationFromUrl(trackData.audioUrl))
       );
+
+      // Calculate total album duration based on fetched durations
+      const albumDuration = trackDurations.reduce((sum, duration) => sum + duration, 0);
 
       // Create the album
       const album = await prisma.album.upsert({
@@ -271,14 +310,17 @@ async function main() {
         .filter((id): id is string => !!id);
 
       // Create tracks for the album
-      for (const trackData of albumData.tracks) {
+      for (let trackIndex = 0; trackIndex < albumData.tracks.length; trackIndex++) {
+        const trackData = albumData.tracks[trackIndex];
+        const fetchedDuration = trackDurations[trackIndex]; // Get the pre-fetched duration
+
         const track = await prisma.track.upsert({
           where: { title_artistId: { title: trackData.title, artistId } },
           update: {
             audioUrl: trackData.audioUrl,
             trackNumber: trackData.trackNumber,
             coverUrl: trackData.coverUrl || album.coverUrl, // Use track cover if available, otherwise album cover
-            duration: trackData.duration,
+            duration: fetchedDuration, // Use fetched duration
             isActive: true,
             type: album.type,
             labelId: null, // Explicitly null for tracks within albums
@@ -289,7 +331,7 @@ async function main() {
           },
           create: {
             title: trackData.title,
-            duration: trackData.duration,
+            duration: fetchedDuration, // Use fetched duration
             releaseDate: albumData.releaseDate || now,
             trackNumber: trackData.trackNumber,
             coverUrl: trackData.coverUrl || album.coverUrl,
@@ -362,11 +404,14 @@ async function main() {
           return !!id;
         });
 
+      // Fetch single duration
+      const singleDuration = await getAudioDurationFromUrl(singleData.audioUrl);
+
       // Create the single track
       const track = await prisma.track.upsert({
         where: { title_artistId: { title: singleData.title, artistId } }, // Unique constraint
         update: {
-          duration: singleData.duration,
+          duration: singleDuration, // Use fetched duration
           coverUrl: singleData.coverUrl,
           audioUrl: singleData.audioUrl,
           isActive: true,
@@ -381,7 +426,7 @@ async function main() {
         },
         create: {
           title: singleData.title,
-          duration: singleData.duration,
+          duration: singleDuration, // Use fetched duration
           releaseDate: singleData.releaseDate || now,
           trackNumber: null, // Singles don't typically have track numbers
           coverUrl: singleData.coverUrl,
