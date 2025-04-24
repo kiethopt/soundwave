@@ -70,6 +70,7 @@ interface GetUserColumnsOptions {
   onEdit?: (user: User) => void;
   onView?: (user: User) => void;
   onMakeAdmin?: (user: User) => void;
+  onTriggerDelete?: (user: User) => void;
   loggedInAdminLevel?: number | null;
 }
 
@@ -83,6 +84,7 @@ interface GetArtistColumnsOptions {
   theme?: 'light' | 'dark';
   onStatusChange?: (id: string, isActive: boolean) => Promise<void>;
   onDelete?: (id: string | string[]) => Promise<void>;
+  onTriggerDelete?: (artist: ArtistProfile) => void;
   loading?: boolean;
   actionLoading?: string | null;
 }
@@ -767,6 +769,7 @@ export function getUserColumns({
   onView,
   onStatusChange,
   onMakeAdmin,
+  onTriggerDelete,
   loggedInAdminLevel,
 }: GetUserColumnsOptions): ColumnDef<User>[] {
   const columns: ColumnDef<User>[] = [
@@ -937,7 +940,14 @@ export function getUserColumns({
                 )}
                 <DropdownMenuSeparator className={theme === 'dark' ? 'bg-white/10' : ''} />
                 <DropdownMenuItem
-                  onSelect={() => onDelete?.(user.id)}
+                  onClick={() => {
+                    console.log("Delete clicked for user:", user.id);
+                    if (onTriggerDelete) {
+                      onTriggerDelete(user);
+                    } else if (onDelete) {
+                      onDelete(user.id);
+                    }
+                  }}
                   className={`text-red-600 focus:text-red-600 ${menuItemClass}`}
                 >
                   <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -1093,8 +1103,9 @@ export function getArtistColumns({
   onDelete,
   loading,
   actionLoading,
+  onTriggerDelete,
 }: GetArtistColumnsOptions): ColumnDef<ArtistProfile>[] {
-  return [
+  const columns: ColumnDef<ArtistProfile>[] = [
     {
       id: 'select',
       header: ({ table }) => (
@@ -1277,7 +1288,13 @@ export function getArtistColumns({
 
                 {onDelete && (
                   <DropdownMenuItem
-                    onClick={() => onDelete(artist.id)}
+                    onClick={() => {
+                      if (onTriggerDelete) {
+                        onTriggerDelete(artist);
+                      } else {
+                        onDelete(artist.id);
+                      }
+                    }}
                     className={
                       theme === 'dark'
                         ? 'hover:bg-white/10 text-red-500'
@@ -1295,6 +1312,8 @@ export function getArtistColumns({
       },
     },
   ];
+
+  return columns;
 }
 
 export function getArtistRequestColumns({

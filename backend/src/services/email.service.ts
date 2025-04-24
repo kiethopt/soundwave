@@ -354,11 +354,34 @@ export const createAccountDeactivatedEmail = (
 };
 
 /**
+ * Create email content for account deletion notification
+ */
+export const createAccountDeletedEmail = (
+  to: string,
+  userName: string,
+  reason?: string
+): EmailOptions => {
+  const subject = 'Your SoundWave account has been deleted';
+  const reasonText = reason ? `<p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;"><strong>Reason:</strong> ${reason}</p>` : '';
+  const mainContentHtml = `
+    <h2 style="color: ${TEXT_DARK}; margin-top: 0; margin-bottom: 20px; font-size: 24px; text-align: center;">Account Deleted</h2>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Hello ${userName},</p>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">This email confirms that your SoundWave account has been permanently deleted by an administrator.</p>
+    ${reasonText}
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">All associated data, including playlists and listening history, has been removed.</p>
+    <p style="margin: 0; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">If you believe this was done in error, please contact our support team.</p>
+  `;
+  // No action button needed for deletion confirmation
+  const html = createRichHtmlTemplate(subject, mainContentHtml, to);
+  return { to, subject, html };
+};
+
+/**
  * Create email content for password reset request notification
  */
 export const createPasswordResetEmail = (
   to: string,
-  userName: string, // Add userName for greeting
+  userName: string,
   resetLink: string
 ): EmailOptions => {
   const subject = 'Your SoundWave Password Reset Request';
@@ -408,7 +431,5 @@ export const createWelcomeEmail = (
   );
   return { to, subject, html };
 };
-
-
 
 export { transporter };

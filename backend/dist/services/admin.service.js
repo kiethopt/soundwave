@@ -49,6 +49,7 @@ const email_service_1 = require("./email.service");
 const client_2 = require("@prisma/client");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const date_fns_1 = require("date-fns");
+const emailService = __importStar(require("./email.service"));
 const getUsers = async (req, requestingUser) => {
     const { search = '', status, role } = req.query;
     let roleFilter = {};
@@ -312,27 +313,73 @@ const updateArtistInfo = async (id, data, avatarFile) => {
     return updatedArtist;
 };
 exports.updateArtistInfo = updateArtistInfo;
-const deleteUserById = async (id, requestingUser) => {
+const deleteUserById = async (id, requestingUser, reason) => {
     const userToDelete = await db_1.default.user.findUnique({
         where: { id },
-        select: { role: true, adminLevel: true },
+        select: { role: true, adminLevel: true, email: true, name: true, username: true },
     });
     if (!userToDelete) {
-        console.log(`User with ID ${id} not found for deletion.`);
-        return { message: `User ${id} not found.` };
+        throw new Error('User not found');
     }
-    if (userToDelete.role === client_1.Role.ADMIN && userToDelete.adminLevel === 1) {
-        throw new Error('Permission denied: Level 1 Admins cannot be deleted.');
+    if (!requestingUser || typeof requestingUser.adminLevel !== 'number') {
+        throw new Error('Permission denied: Invalid requesting user data.');
     }
-    if (userToDelete.role === client_1.Role.ADMIN && (!requestingUser || requestingUser.role !== client_1.Role.ADMIN || requestingUser.adminLevel !== 1)) {
-        throw new Error('Permission denied: Only Level 1 Admins can delete other Admins.');
+    if (userToDelete.role === client_1.Role.ADMIN) {
+        if (requestingUser.id === id) {
+            throw new Error('Permission denied: Admins cannot delete themselves.');
+        }
+        const targetAdminLevel = userToDelete.adminLevel ?? Infinity;
+        const requesterAdminLevel = requestingUser.adminLevel ?? Infinity;
+        if (requesterAdminLevel >= targetAdminLevel) {
+            throw new Error('Permission denied: Cannot delete an admin with the same or higher level.');
+        }
+    }
+    if (userToDelete.email) {
+        try {
+            const userName = userToDelete.name || userToDelete.username || 'User';
+            const emailOptions = emailService.createAccountDeletedEmail(userToDelete.email, userName, reason);
+            emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send account deletion email:', err));
+        }
+        catch (syncError) {
+            console.error('[Email Setup Error] Failed to create deletion email options:', syncError);
+        }
     }
     await db_1.default.user.delete({ where: { id } });
-    return { message: `User ${id} deleted successfully.` };
+    return { message: `User ${id} deleted successfully. Reason: ${reason || 'No reason provided'}` };
 };
 exports.deleteUserById = deleteUserById;
-const deleteArtistById = async (id) => {
-    return db_1.default.artistProfile.delete({ where: { id } });
+const deleteArtistById = async (id, reason) => {
+    const artistToDelete = await db_1.default.artistProfile.findUnique({
+        where: { id },
+        select: {
+            id: true,
+            artistName: true,
+            user: {
+                select: {
+                    id: true,
+                    email: true,
+                    name: true,
+                    username: true
+                }
+            }
+        }
+    });
+    if (!artistToDelete) {
+        throw new Error('Artist not found');
+    }
+    const associatedUser = artistToDelete.user;
+    if (associatedUser && associatedUser.email) {
+        try {
+            const nameToSend = artistToDelete.artistName || associatedUser.name || associatedUser.username || 'Artist';
+            const emailOptions = emailService.createAccountDeletedEmail(associatedUser.email, nameToSend, reason);
+            emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist account deletion email:', err));
+        }
+        catch (syncError) {
+            console.error('[Email Setup Error] Failed to create artist deletion email options:', syncError);
+        }
+    }
+    await db_1.default.artistProfile.delete({ where: { id: artistToDelete.id } });
+    return { message: `Artist ${id} deleted permanently. Reason: ${reason || 'No reason provided'}` };
 };
 exports.deleteArtistById = deleteArtistById;
 const getArtists = async (req) => {

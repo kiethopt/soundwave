@@ -371,11 +371,35 @@ export const api = {
       }
     },
 
-    deleteUser: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/users/${id}`, { method: "DELETE" }, token),
+    deleteUser: async (
+      id: string,
+      token: string,
+      reason?: string
+    ): Promise<{ message: string }> => {
+      const options: RequestInit = {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      };
+      if (reason) {
+        options.body = JSON.stringify({ reason });
+      }
+      return fetchWithAuth(`/api/admin/users/${id}`, options, token);
+    },
 
-    deleteArtist: async (id: string, token: string) =>
-      fetchWithAuth(`/api/admin/artists/${id}`, { method: "DELETE" }, token),
+    deleteArtist: async (
+      id: string,
+      token: string,
+      reason?: string
+    ): Promise<{ message: string }> => {
+      const options: RequestInit = {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      };
+      if (reason) {
+        options.body = JSON.stringify({ reason });
+      }
+      return fetchWithAuth(`/api/admin/artists/${id}`, options, token);
+    },
 
     getAllGenres: async (
       token: string,

@@ -304,11 +304,12 @@ const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
         const requestingUser = req.user;
+        const { reason } = req.body;
         if (!requestingUser || requestingUser.role !== client_1.Role.ADMIN) {
             res.status(403).json({ message: 'Forbidden: Admin access required.' });
             return;
         }
-        await adminService.deleteUserById(id, requestingUser);
+        await adminService.deleteUserById(id, requestingUser, reason);
         res.json({ message: 'User deleted successfully' });
     }
     catch (error) {
@@ -323,7 +324,8 @@ exports.deleteUser = deleteUser;
 const deleteArtist = async (req, res) => {
     try {
         const { id } = req.params;
-        await adminService.deleteArtistById(id);
+        const { reason } = req.body;
+        await adminService.deleteArtistById(id, reason);
         res.json({ message: 'Artist deleted permanently' });
     }
     catch (error) {

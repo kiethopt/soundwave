@@ -319,11 +319,10 @@ export const updateArtist = async (
     // Send the successful response immediately
     res.json({
       message: 'Artist updated successfully',
-      artist: updatedArtist, // Return the updated artist data
+      artist: updatedArtist,
     });
 
   } catch (error) {
-    // Simplify error handling as some context variables were removed
     if (error instanceof Error) {
       if (error.message === 'Artist not found') {
         res.status(404).json({ message: 'Artist not found' });
@@ -332,7 +331,6 @@ export const updateArtist = async (
         res.status(400).json({ message: 'Artist name already exists' });
         return;
       } else {
-         // For other errors from the service or prisma, use the generic handler
          handleError(res, error, 'Update artist');
       }
     } else {
@@ -349,16 +347,16 @@ export const deleteUser = async (
   try {
     const { id } = req.params;
     const requestingUser = req.user as UserWithAdminLevel | undefined;
+    const { reason } = req.body;
 
     if (!requestingUser || requestingUser.role !== Role.ADMIN) {
       res.status(403).json({ message: 'Forbidden: Admin access required.' });
       return;
     }
 
-    await adminService.deleteUserById(id, requestingUser);
+    await adminService.deleteUserById(id, requestingUser, reason);
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
-     // Handle specific error for admin deletion attempt
     if (error instanceof Error && error.message === 'Permission denied: Admins cannot be deleted.') {
         res.status(403).json({ message: error.message });
         return;
@@ -374,7 +372,8 @@ export const deleteArtist = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    await adminService.deleteArtistById(id);
+    const { reason } = req.body;
+    await adminService.deleteArtistById(id, reason);
     res.json({ message: 'Artist deleted permanently' });
   } catch (error) {
     handleError(res, error, 'Delete artist');

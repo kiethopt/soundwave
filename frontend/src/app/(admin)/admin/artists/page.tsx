@@ -8,7 +8,7 @@ import { useDataTable } from '@/hooks/useDataTable';
 import { getArtistColumns } from '@/components/ui/data-table/data-table-columns';
 import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
 import { ArtistProfile } from '@/types';
-import { DeactivateModal } from '@/components/ui/data-table/data-table-modals';
+import { DeactivateModal, ConfirmDeleteModal } from '@/components/ui/data-table/data-table-modals';
 import {
   ColumnFiltersState,
   getCoreRowModel,
@@ -41,6 +41,7 @@ export default function ArtistManagement() {
     updateQueryParam,
     verifiedFilter,
     setVerifiedFilter,
+    refreshData,
   } = useDataTable<ArtistProfile>({
     fetchData: async (page, params) => {
       const token = localStorage.getItem('userToken');
@@ -71,6 +72,8 @@ export default function ArtistManagement() {
     string | null
   >(null);
   const [isBulkDeactivating, setIsBulkDeactivating] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [artistToDelete, setArtistToDelete] = useState<ArtistProfile | null>(null);
 
   // Action handlers
   const handleChangeArtistStatus = async (artistId: string) => {
@@ -215,29 +218,6 @@ export default function ArtistManagement() {
     setIsDeactivateModalOpen(true);
   };
 
-  const handleDeleteArtist = async (artistIds: string | string[]) => {
-    const ids = Array.isArray(artistIds) ? artistIds : [artistIds];
-    const confirmMessage =
-      ids.length === 1
-        ? 'Are you sure you want to delete this artist?'
-        : `Delete ${ids.length} selected artists?`;
-    if (!confirm(confirmMessage)) return;
-
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-      if (!Array.isArray(artistIds)) setActionLoading(artistIds);
-      await Promise.all(ids.map((id) => api.admin.deleteArtist(id, token)));
-      setArtists((prev) => prev.filter((artist) => !ids.includes(artist.id)));
-      setSelectedRows([]);
-      toast.success('Artist deleted successfully');
-    } catch (error) {
-      toast.error('Failed to delete artist(s)');
-    } finally {
-      if (!Array.isArray(artistIds)) setActionLoading(null);
-    }
-  };
-
   // Handle bulk activation of artists
   const handleBulkActivate = async () => {
     if (!selectedRows.length) return;
@@ -284,11 +264,65 @@ export default function ArtistManagement() {
     }
   };
 
+  // Function to handle triggering the delete modal for a single artist
+  const handleTriggerArtistDeleteModal = (artist: ArtistProfile) => {
+    setArtistToDelete(artist);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Function for bulk artist deletion (no reason for now)
+  const handleBulkDeleteArtist = async (artistIds: string[]) => {
+    const confirmMessage = `Delete ${artistIds.length} selected artists? This action is permanent.`;
+    if (!confirm(confirmMessage)) return;
+
+    setActionLoading('bulk-delete');
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+      await Promise.all(artistIds.map((id) => api.admin.deleteArtist(id, token)));
+      await updateQueryParam({ page: 1 }); // Use updateQueryParam from useDataTable
+      setRowSelection({});
+      setSelectedRows([]);
+      toast.success(`Deleted ${artistIds.length} artists successfully`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete artists');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Function to confirm deletion from the modal
+  const handleConfirmArtistDelete = async (artistId: string, reason: string) => {
+    setActionLoading(artistId);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      await api.admin.deleteArtist(artistId, token, reason);
+
+      toast.success('Artist deleted successfully');
+      setIsDeleteModalOpen(false);
+      setArtistToDelete(null);
+      await refreshData(); // Correct: Use refreshData from useDataTable
+      setRowSelection({});
+      setSelectedRows([]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete artist');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   // Define columns
   const columns = getArtistColumns({
     theme,
     onStatusChange: handleChangeArtistStatus,
-    onDelete: handleDeleteArtist,
+    onDelete: async (ids) => {
+      if (Array.isArray(ids)) {
+        await handleBulkDeleteArtist(ids);
+      }
+    },
+    onTriggerDelete: handleTriggerArtistDeleteModal,
     loading,
     actionLoading,
   });
@@ -361,7 +395,7 @@ export default function ArtistManagement() {
           searchValue: searchInput,
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
-          onDelete: () => handleDeleteArtist(selectedRows.map((row) => row.id)),
+          onDelete: () => handleBulkDeleteArtist(selectedRows.map((row) => row.id)),
           onActivate: handleBulkActivate,
           onDeactivate: handleBulkDeactivate,
           showExport: true,
@@ -400,6 +434,18 @@ export default function ArtistManagement() {
           setIsBulkDeactivating(false);
         }}
         onConfirm={handleDeactivateConfirm}
+        theme={theme}
+        entityType="artist"
+      />
+
+      <ConfirmDeleteModal
+        user={artistToDelete ? { id: artistToDelete.id, name: artistToDelete.artistName, email: artistToDelete.user.email } : null}
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setArtistToDelete(null);
+        }}
+        onConfirm={handleConfirmArtistDelete}
         theme={theme}
         entityType="artist"
       />

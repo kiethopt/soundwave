@@ -1945,45 +1945,6 @@ export function RejectModal({
   );
 }
 
-interface DeactivateModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: (reason: string) => void;
-  theme?: "light" | "dark";
-  entityType?: "user" | "artist";
-}
-
-export function DeactivateModal({
-  isOpen,
-  onClose,
-  onConfirm,
-  theme = "light",
-  entityType = "user",
-}: DeactivateModalProps) {
-  const title = `Deactivate ${entityType === "user" ? "User" : "Artist"}`;
-  const description = `Please provide a reason for deactivating this ${entityType}. This will be sent to the ${entityType}.`;
-
-  const predefinedReasons = [
-    "Violation of terms of service",
-    "Inappropriate content or behavior",
-    "Account inactivity",
-    "User requested deactivation",
-  ];
-
-  return (
-    <ActionReasonModal
-      isOpen={isOpen}
-      onClose={onClose}
-      onConfirm={onConfirm}
-      title={title}
-      description={description}
-      actionText="Deactivate"
-      theme={theme}
-      predefinedReasons={predefinedReasons}
-    />
-  );
-}
-
 interface AlbumDetailModalProps {
   album: Album | null;
   isOpen: boolean;
@@ -3992,6 +3953,166 @@ export function MakeAdminModal({
             onClick={() => onConfirm(user.id)}
           >
             Confirm Promotion
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface DeactivateModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+  theme?: "light" | "dark";
+  entityType?: "user" | "artist";
+}
+
+export function DeactivateModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  theme = "light",
+  entityType = "user",
+}: DeactivateModalProps) {
+  const title = `Deactivate ${entityType === "user" ? "User" : "Artist"}`;
+  const description = `Please provide a reason for deactivating this ${entityType}. This will be sent to the ${entityType}.`;
+
+  const predefinedReasons = [
+    "Violation of terms of service",
+    "Inappropriate content or behavior",
+    "Account inactivity",
+    "User requested deactivation",
+  ];
+
+  return (
+    <ActionReasonModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onConfirm={onConfirm}
+      title={title}
+      description={description}
+      actionText="Deactivate"
+      theme={theme}
+      predefinedReasons={predefinedReasons}
+    />
+  );
+}
+
+interface ConfirmDeleteModalProps {
+  user: { id: string; name?: string | null; email: string } | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (userId: string, reason: string) => void;
+  theme?: 'light' | 'dark';
+  entityType?: string;
+}
+
+export function ConfirmDeleteModal({
+  user,
+  isOpen,
+  onClose,
+  onConfirm,
+  theme = 'light',
+  entityType = 'item',
+}: ConfirmDeleteModalProps) {
+  const [reason, setReason] = useState('');
+
+  // Define predefined reasons directly inside the component
+  const predefinedReasons = [
+    'Account requested deletion',
+    'Violated terms of service',
+    'Spam account',
+    'Other (specify below)',
+  ];
+
+  useEffect(() => {
+    if (isOpen) {
+      setReason(''); // Reset reason when modal opens
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !user) return null;
+
+  const entityName = user.name || user.email;
+
+  const handleConfirm = () => {
+    if (!reason.trim()) {
+      // Optionally add validation/toast here if reason is mandatory
+      alert('Please provide a reason for deletion.');
+      return;
+    }
+    onConfirm(user.id, reason);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={theme === 'dark' ? 'dark bg-[#1e1e1e] border-gray-700' : ''}
+      >
+        <DialogHeader>
+          <DialogTitle
+            className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : ''}`}>
+            Confirm Deletion
+          </DialogTitle>
+          <DialogDescription className={theme === 'dark' ? 'text-gray-400' : ''}>
+            Are you sure you want to permanently delete the {entityType}{" "}
+            <strong>{entityName}</strong>? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-4 space-y-2">
+          <label
+            htmlFor="deleteReason"
+            className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+              }`}
+          >
+            Reason for Deletion (Required)
+          </label>
+          <Textarea
+            id="deleteReason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={`Please provide a reason for deleting this ${entityType}...`}
+            className={`min-h-[80px] w-full rounded-md border p-2 text-sm ${theme === 'dark'
+                ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500'
+                : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+              }`}
+          />
+        </div>
+
+        {/* Add predefined reason buttons */} 
+        {predefinedReasons.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Or select a predefined reason:</p>
+            <div className="flex flex-wrap gap-2">
+              {predefinedReasons.map((preReason) => (
+                <Button
+                  key={preReason}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setReason(preReason)}
+                  className={`${theme === 'dark' ? 'text-white border-gray-600 hover:bg-gray-700' : ''} ${reason === preReason ? (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200') : ''}`}
+                >
+                  {preReason}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="mt-6 sm:justify-end gap-2">
+          <Button variant="outline" onClick={onClose} className={theme === 'dark' ? 'text-white border-gray-600 hover:bg-gray-700' : ''}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleConfirm}
+            disabled={!reason.trim()} // Disable if no reason
+            className={theme === 'dark' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+          >
+            Delete {entityType.charAt(0).toUpperCase() + entityType.slice(1)}
           </Button>
         </DialogFooter>
       </DialogContent>

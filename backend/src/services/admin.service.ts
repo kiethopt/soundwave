@@ -18,7 +18,8 @@ import { transporter as nodemailerTransporter } from './email.service';
 import { Prisma, User as PrismaUser, PlaylistType } from '@prisma/client';
 import { ArtistProfile } from '@prisma/client';
 import bcrypt from 'bcrypt';
-import { format, subMonths, endOfMonth } from 'date-fns';
+import { subMonths, endOfMonth } from 'date-fns';
+import * as emailService from './email.service';
 
 type User = PrismaUser & { adminLevel?: number | null };
 
@@ -370,35 +371,109 @@ export const updateArtistInfo = async (
 };
 
 // Xóa user theo ID
-export const deleteUserById = async (id: string, requestingUser: User) => {
+export const deleteUserById = async (
+  id: string,
+  requestingUser: User,
+  reason?: string
+) => {
+  // Check permission
   const userToDelete = await prisma.user.findUnique({
     where: { id },
-    select: { role: true, adminLevel: true }, // Also select adminLevel
+    select: { role: true, adminLevel: true, email: true, name: true, username: true },
   });
 
   if (!userToDelete) {
-     // User already deleted or never existed, return success or specific indicator
-     console.log(`User with ID ${id} not found for deletion.`);
-     return { message: `User ${id} not found.` }; // Indicate user not found
+    throw new Error('User not found');
   }
 
-  // Add check for Level 1 Admin deletion
-  if (userToDelete.role === Role.ADMIN && userToDelete.adminLevel === 1) {
-    throw new Error('Permission denied: Level 1 Admins cannot be deleted.');
+  // Basic check: ensure requestUser exists and has a role/level
+  if (!requestingUser || typeof requestingUser.adminLevel !== 'number') {
+    throw new Error('Permission denied: Invalid requesting user data.');
   }
 
-  // Allow Level 1 Admin to delete other Admins (Level 2)
-  if (userToDelete.role === Role.ADMIN && (!requestingUser || requestingUser.role !== Role.ADMIN || requestingUser.adminLevel !== 1)) {
-     throw new Error('Permission denied: Only Level 1 Admins can delete other Admins.');
+  // Admins cannot delete other admins with the same or higher level
+  if (userToDelete.role === Role.ADMIN) {
+    if (requestingUser.id === id) {
+      throw new Error('Permission denied: Admins cannot delete themselves.');
+    }
+    const targetAdminLevel = userToDelete.adminLevel ?? Infinity; // Treat null level as highest
+    const requesterAdminLevel = requestingUser.adminLevel ?? Infinity;
+    if (requesterAdminLevel >= targetAdminLevel) {
+      throw new Error(
+        'Permission denied: Cannot delete an admin with the same or higher level.'
+      );
+    }
   }
 
-  // If we reach here, deletion is permitted (either a USER or an ADMIN being deleted by Level 1)
+  // --- Send Deletion Email (Asynchronous) --- 
+  if (userToDelete.email) {
+      try {
+          const userName = userToDelete.name || userToDelete.username || 'User';
+          const emailOptions = emailService.createAccountDeletedEmail(
+              userToDelete.email,
+              userName,
+              reason
+          );
+          emailService.sendEmail(emailOptions).catch(err => 
+              console.error('[Async Email Error] Failed to send account deletion email:', err)
+          );
+      } catch (syncError) {
+          console.error('[Email Setup Error] Failed to create deletion email options:', syncError);
+      }
+  }
+
+  // Delete user
   await prisma.user.delete({ where: { id } });
-  return { message: `User ${id} deleted successfully.`}; // Indicate success
+
+  return { message: `User ${id} deleted successfully. Reason: ${reason || 'No reason provided'}` };
 };
 
-export const deleteArtistById = async (id: string) => {
-  return prisma.artistProfile.delete({ where: { id } });
+// Delete Artist by ID, now accepts reason and sends notification
+export const deleteArtistById = async (id: string, reason?: string) => {
+  const artistToDelete = await prisma.artistProfile.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      artistName: true,
+      user: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          username: true
+        }
+      }
+    }
+  });
+
+  if (!artistToDelete) {
+    throw new Error('Artist not found');
+  }
+
+  // 2. Send Deletion Email (Asynchronous) to the associated user
+  const associatedUser = artistToDelete.user;
+  if (associatedUser && associatedUser.email) {
+      try {
+          // Use artistName if available, otherwise fallback to username or generic
+          const nameToSend = artistToDelete.artistName || associatedUser.name || associatedUser.username || 'Artist';
+          const emailOptions = emailService.createAccountDeletedEmail(
+              associatedUser.email,
+              nameToSend,
+              reason
+          );
+          // Send email asynchronously
+          emailService.sendEmail(emailOptions).catch(err =>
+              console.error('[Async Email Error] Failed to send artist account deletion email:', err)
+          );
+      } catch (syncError) {
+          console.error('[Email Setup Error] Failed to create artist deletion email options:', syncError);
+      }
+  }
+
+  // 3. Delete the artist profile (onDelete: Cascade in User model will NOT delete the User)
+  await prisma.artistProfile.delete({ where: { id: artistToDelete.id } });
+
+  return { message: `Artist ${id} deleted permanently. Reason: ${reason || 'No reason provided'}` };
 };
 
 // Lấy danh sách nghệ sĩ

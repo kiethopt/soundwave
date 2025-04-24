@@ -22,6 +22,7 @@ import {
   UserInfoModal,
   DeactivateModal,
   MakeAdminModal,
+  ConfirmDeleteModal,
 } from '@/components/ui/data-table/data-table-modals';
 import { useSession } from '@/contexts/SessionContext';
 import React from 'react';
@@ -84,6 +85,8 @@ export default function UserManagement() {
   const [isBulkDeactivating, setIsBulkDeactivating] = useState(false);
   const [isBulkActivating, setIsBulkActivating] = useState(false);
   const [userToMakeAdmin, setUserToMakeAdmin] = useState<User | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // Action handlers
   const handleUpdateUser = async (userId: string, data: FormData) => {
@@ -114,42 +117,49 @@ export default function UserManagement() {
     }
   };
 
-  const handleDeleteUsers = async (userIds: string | string[]) => {
-    const ids = Array.isArray(userIds) ? userIds : [userIds];
-    const confirmMessage =
-      ids.length === 1
-        ? 'Are you sure you want to delete this user?'
-        : `Delete ${ids.length} selected users?`;
+  const handleTriggerDeleteModal = (user: User) => {
+    setUserToDelete(user);
+    setIsDeleteModalOpen(true);
+  };
 
+  const handleBulkDelete = async (userIds: string[]) => {
+    const confirmMessage = `Delete ${userIds.length} selected users? This action is permanent.`;
     if (!confirm(confirmMessage)) return;
 
+    setActionLoading('bulk-delete');
     try {
       const token = localStorage.getItem('userToken');
-      if (!token) {
-        toast.error('No authentication token found');
-        return;
-      }
+      if (!token) throw new Error('No authentication token found');
 
-      if (ids.length > 0) {
-        setActionLoading('bulk-delete'); // Indicate bulk action
-      }
+      await Promise.all(userIds.map((id) => api.admin.deleteUser(id, token)));
 
-      await Promise.all(ids.map((id) => api.admin.deleteUser(id, token)));
-
-      // Instead of conditional logic, always refetch after delete for simplicity and consistency
       await refreshData();
-      setRowSelection({}); // Clear selection after successful delete
+      setRowSelection({});
       setSelectedRows([]);
-
-      toast.success(
-        ids.length === 1
-          ? 'User deleted successfully'
-          : `Deleted ${ids.length} users successfully`
-      );
+      toast.success(`Deleted ${userIds.length} users successfully`);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to delete user(s)'
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to delete users');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleConfirmDelete = async (userId: string, reason: string) => {
+    setActionLoading(userId);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      await api.admin.deleteUser(userId, token, reason);
+
+      toast.success('User deleted successfully');
+      setIsDeleteModalOpen(false);
+      setUserToDelete(null);
+      await refreshData();
+      setRowSelection({});
+      setSelectedRows([]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete user');
     } finally {
       setActionLoading(null);
     }
@@ -161,6 +171,10 @@ export default function UserManagement() {
       setUserIdToDeactivate(userId);
       setIsDeactivateModalOpen(true);
       return;
+    }
+
+    if (!window.confirm(`Are you sure you want to activate the user "${users.find(u => u.id === userId)?.name || users.find(u => u.id === userId)?.email}"?`)) {
+      return; // Stop if admin cancels
     }
 
     // Proceed with activation directly
@@ -359,14 +373,19 @@ export default function UserManagement() {
     () =>
       getUserColumns({
         theme,
-        onDelete: handleDeleteUsers,
+        onDelete: async (ids) => {
+          if (Array.isArray(ids)) {
+            await handleBulkDelete(ids);
+          }
+        },
         onEdit: setUpdatingUser,
         onView: setViewingUser,
         onStatusChange: handleStatusChange,
         onMakeAdmin: setUserToMakeAdmin,
+        onTriggerDelete: handleTriggerDeleteModal,
         loggedInAdminLevel: loggedInUser?.adminLevel,
       }),
-    [theme, loggedInUser?.adminLevel]
+    [theme, loggedInUser?.adminLevel, users]
   );
 
   const table = useReactTable({
@@ -438,7 +457,7 @@ export default function UserManagement() {
           searchValue: searchInput,
           onSearchChange: setSearchInput,
           selectedRowsCount: selectedRows.length,
-          onDelete: () => handleDeleteUsers(selectedRows.map((row) => row.id)),
+          onDelete: () => handleBulkDelete(selectedRows.map((row) => row.id)),
           onActivate: handleBulkActivate,
           onDeactivate: handleBulkDeactivate,
           showExport: true,
@@ -516,11 +535,22 @@ export default function UserManagement() {
         entityType="user"
       />
 
-      {/* Render the MakeAdminModal - Props updated */}
+      <ConfirmDeleteModal
+        user={userToDelete}
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setUserToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        theme={theme}
+        entityType="user"
+      />
+
       <MakeAdminModal
-        isOpen={!!userToMakeAdmin} // Use truthiness of user object
+        isOpen={!!userToMakeAdmin}
         user={userToMakeAdmin}
-        onClose={() => setUserToMakeAdmin(null)} // Directly set state to null
+        onClose={() => setUserToMakeAdmin(null)}
         onConfirm={handleConfirmMakeAdmin}
         theme={theme}
       />

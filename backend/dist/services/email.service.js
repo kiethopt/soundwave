@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.transporter = exports.createWelcomeEmail = exports.createPasswordResetEmail = exports.createAccountDeactivatedEmail = exports.createAccountActivatedEmail = exports.createNewReleaseEmail = exports.createArtistRequestRejectedEmail = exports.createArtistRequestApprovedEmail = exports.createNewFollowerEmail = exports.sendEmail = void 0;
+exports.transporter = exports.createWelcomeEmail = exports.createPasswordResetEmail = exports.createAccountDeletedEmail = exports.createAccountDeactivatedEmail = exports.createAccountActivatedEmail = exports.createNewReleaseEmail = exports.createArtistRequestRejectedEmail = exports.createArtistRequestApprovedEmail = exports.createNewFollowerEmail = exports.sendEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
@@ -226,6 +226,21 @@ const createAccountDeactivatedEmail = (to, userName, accountType, reason) => {
     return { to, subject, html };
 };
 exports.createAccountDeactivatedEmail = createAccountDeactivatedEmail;
+const createAccountDeletedEmail = (to, userName, reason) => {
+    const subject = 'Your SoundWave account has been deleted';
+    const reasonText = reason ? `<p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;"><strong>Reason:</strong> ${reason}</p>` : '';
+    const mainContentHtml = `
+    <h2 style="color: ${TEXT_DARK}; margin-top: 0; margin-bottom: 20px; font-size: 24px; text-align: center;">Account Deleted</h2>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Hello ${userName},</p>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">This email confirms that your SoundWave account has been permanently deleted by an administrator.</p>
+    ${reasonText}
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">All associated data, including playlists and listening history, has been removed.</p>
+    <p style="margin: 0; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">If you believe this was done in error, please contact our support team.</p>
+  `;
+    const html = createRichHtmlTemplate(subject, mainContentHtml, to);
+    return { to, subject, html };
+};
+exports.createAccountDeletedEmail = createAccountDeletedEmail;
 const createPasswordResetEmail = (to, userName, resetLink) => {
     const subject = 'Your SoundWave Password Reset Request';
     const mainContentHtml = `
