@@ -86,6 +86,16 @@ exports.albumSelect = {
                     },
                 },
             },
+            genres: {
+                select: {
+                    genre: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                },
+            },
         },
     },
     genres: {
@@ -248,6 +258,16 @@ exports.artistProfileSelect = {
                             },
                         },
                     },
+                    genres: {
+                        select: {
+                            genre: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                },
+                            },
+                        },
+                    },
                 },
             },
             artist: {
@@ -297,6 +317,16 @@ exports.artistProfileSelect = {
                             id: true,
                             artistName: true,
                             isVerified: true,
+                        },
+                    },
+                },
+            },
+            genres: {
+                select: {
+                    genre: {
+                        select: {
+                            id: true,
+                            name: true,
                         },
                     },
                 },
@@ -406,6 +436,16 @@ exports.userSelect = {
                                     },
                                 },
                             },
+                            genres: {
+                                select: {
+                                    genre: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
                 },
@@ -436,6 +476,16 @@ exports.userSelect = {
                                             name: true,
                                         },
                                     },
+                                },
+                            },
+                        },
+                    },
+                    genres: {
+                        select: {
+                            genre: {
+                                select: {
+                                    id: true,
+                                    name: true,
                                 },
                             },
                         },
@@ -580,6 +630,16 @@ exports.searchAlbumSelect = {
                         select: {
                             id: true,
                             artistName: true,
+                        },
+                    },
+                },
+            },
+            genres: {
+                select: {
+                    genre: {
+                        select: {
+                            id: true,
+                            name: true,
                         },
                     },
                 },

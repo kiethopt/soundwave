@@ -71,9 +71,18 @@ const initApp = async () => {
 };
 
 // Start the server
-server.listen(PORT, async () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`🔌 Socket.IO listening on port ${PORT}`);
+// Ensure PORT is treated as a number before passing to listen
+const numericPort = typeof PORT === 'string' ? parseInt(PORT, 10) : PORT;
+
+server.listen(numericPort, '127.0.0.1', async () => {
+  console.log(`🚀 Server is running on http://127.0.0.1:${numericPort}`);
+  console.log(`🔌 Socket.IO listening on http://127.0.0.1:${numericPort}`);
   // Initialize app and system playlists after server starts
   await initApp();
+});
+
+// Catch unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });

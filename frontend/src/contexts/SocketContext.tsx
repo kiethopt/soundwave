@@ -25,7 +25,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Set up event listeners
     socketInstance.on('connect', () => {
-      console.log('Socket connected');
+      //console.log('Socket connected');
       setIsConnected(true);
       
       // Join user room if authenticated
@@ -43,7 +43,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     socketInstance.on('disconnect', () => {
-      console.log('Socket disconnected');
+      //console.log('Socket disconnected');
       setIsConnected(false);
     });
 

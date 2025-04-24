@@ -15,26 +15,20 @@ const initializeSocket = (server) => {
     io.on('connection', (socket) => {
         socket.on('register_user', (userId) => {
             if (userId) {
-                console.log(`✅ Registering user ${userId} with socket ${socket.id}`);
                 userSockets.set(userId, socket.id);
                 socket.removeAllListeners('disconnect');
                 socket.on('disconnect', () => {
-                    console.log(`🔌 Socket disconnected: ${socket.id} for user ${userId}`);
                     if (userSockets.get(userId) === socket.id) {
                         userSockets.delete(userId);
-                        console.log(`🧹 Cleaned up socket mapping for user ${userId}`);
                     }
                     else {
-                        console.log(` Socket ${socket.id} disconnected, but user ${userId} has a newer socket.`);
                     }
                 });
             }
             else {
-                console.warn(`⚠️ Attempted to register socket ${socket.id} without a userId.`);
             }
         });
         socket.on('disconnect', () => {
-            console.log(`🔌 Socket disconnected: ${socket.id} (user not registered or already handled)`);
         });
     });
     return io;

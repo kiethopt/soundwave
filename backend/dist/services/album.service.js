@@ -287,8 +287,11 @@ const addTracksToAlbum = async (req) => {
     const titles = Array.isArray(req.body.title) ? req.body.title : [req.body.title];
     const releaseDates = Array.isArray(req.body.releaseDate) ? req.body.releaseDate : [req.body.releaseDate];
     const featuredArtists = Array.isArray(req.body.featuredArtists)
-        ? req.body.featuredArtists.map((artists) => artists.split(','))
-        : req.body.featuredArtists ? [req.body.featuredArtists.split(',')] : [];
+        ? req.body.featuredArtists.map((artists) => artists?.split(',').map((id) => id.trim()).filter(Boolean) ?? [])
+        : req.body.featuredArtists ? [req.body.featuredArtists.split(',').map((id) => id.trim()).filter(Boolean)] : [];
+    const genres = Array.isArray(req.body.genres)
+        ? req.body.genres.map((genreIds) => genreIds?.split(',').map((id) => id.trim()).filter(Boolean) ?? [])
+        : req.body.genres ? [req.body.genres.split(',').map((id) => id.trim()).filter(Boolean)] : [];
     const mm = await Promise.resolve().then(() => __importStar(require('music-metadata')));
     const createdTracks = await Promise.all(files.map(async (file, index) => {
         const metadata = await mm.parseBuffer(file.buffer);
@@ -315,7 +318,14 @@ const addTracksToAlbum = async (req) => {
                 ...(featuredArtists[index]?.length && {
                     featuredArtists: {
                         create: featuredArtists[index].map((artistProfileId) => ({
-                            artistProfile: { connect: { id: artistProfileId.trim() } },
+                            artistProfile: { connect: { id: artistProfileId } },
+                        })),
+                    },
+                }),
+                ...(genres[index]?.length && {
+                    genres: {
+                        create: genres[index].map((genreId) => ({
+                            genre: { connect: { id: genreId } },
                         })),
                     },
                 }),

@@ -1036,7 +1036,7 @@ export const api = {
     getById: async (albumId: string, token?: string) => {
       try {
         const response = await fetchWithAuth(
-          `/api/albums/${albumId}`,
+          `/api/albums/${albumId}?include=tracks.genres`,
           { method: "GET" },
           token
         );

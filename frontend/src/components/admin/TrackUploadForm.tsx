@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { TrackUploadFormProps } from '@/types';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { useTheme } from '@/contexts/ThemeContext';
+import { Genre } from '@/types';
 
 const TrackUploadForm = ({
   album,
@@ -14,8 +16,12 @@ const TrackUploadForm = ({
   onTrackDetailChange,
   artists = [],
   existingTrackCount,
+  availableGenres = [],
 }: TrackUploadFormProps & { existingTrackCount: number }) => {
   const { theme } = useTheme();
+  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
+
+  console.log('Received availableGenres prop:', availableGenres);
   const artistOptions = artists
     .filter((artist) => artist.isVerified && artist.role === 'ARTIST')
     .map((artist) => ({
@@ -23,8 +29,35 @@ const TrackUploadForm = ({
       name: artist.artistName,
     }));
 
+  const genreOptions = availableGenres.map((genre) => ({
+    id: genre.id,
+    name: genre.name,
+  }));
+
+  const validateForm = () => {
+    const errors: { [key: string]: string } = {};
+    let isValid = true;
+
+    newTracks.forEach((file) => {
+      if (!trackDetails[file.name]?.genres || trackDetails[file.name].genres.length === 0) {
+        errors[file.name] = 'This field is required';
+        isValid = false;
+      }
+    });
+
+    setValidationErrors(errors);
+    return isValid;
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateForm()) {
+      onSubmit(e);
+    }
+  };
+
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <form onSubmit={handleFormSubmit} className="space-y-6">
       <div>
         <label
           className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
@@ -154,6 +187,36 @@ const TrackUploadForm = ({
                   placeholder="Select featured artists"
                   multiple
                 />
+              </div>
+
+              {/* Genres select */}
+              <div>
+                <label
+                  className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
+                >
+                  Genres *
+                </label>
+                {/* Wrap SearchableSelect for error styling */}
+                <div
+                  className={validationErrors[file.name] ? 'rounded-md border border-red-500' : ''}
+                >
+                  <SearchableSelect
+                    options={genreOptions}
+                    value={trackDetails[file.name]?.genres || []}
+                    onChange={(value) =>
+                      onTrackDetailChange(file.name, 'genres', value)
+                    }
+                    placeholder="Select genres"
+                    multiple
+                  />
+                </div>
+                {/* Display validation error */}
+                {validationErrors[file.name] && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {validationErrors[file.name]}
+                  </p>
+                )}
               </div>
             </div>
           ))}

@@ -15,16 +15,16 @@ export const getSocket = (): Socket => {
     });
 
     socket.on('connect', () => {
-      console.log('🔌 Connected to Socket.IO server');
+      //console.log('🔌 Connected to Socket.IO server');
     });
 
     socket.on('disconnect', (reason) => {
-      console.log(`🔌 Disconnected from Socket.IO server: ${reason}`);
+      //console.log(`🔌 Disconnected from Socket.IO server: ${reason}`);
       socket = null; // Reset socket instance on disconnect
     });
 
     socket.on('connect_error', (err) => {
-      console.error('Socket.IO connection error:', err);
+    //  console.error('Socket.IO connection error:', err);
       socket = null; // Reset socket instance on connection error
     });
   }

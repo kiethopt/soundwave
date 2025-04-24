@@ -361,16 +361,22 @@ const createTrack = async (req) => {
         const now = new Date();
         isActive = trackReleaseDate <= now;
     }
-    const featuredArtistsArray = Array.isArray(featuredArtists)
-        ? featuredArtists
-        : featuredArtists
-            ? featuredArtists.split(',').map((id) => id.trim())
-            : [];
-    const genreIdsArray = Array.isArray(genreIds)
-        ? genreIds
-        : genreIds
-            ? genreIds.split(',').map((id) => id.trim())
-            : [];
+    const artistsArray = !featuredArtists
+        ? []
+        : Array.isArray(featuredArtists)
+            ? featuredArtists.map((id) => id.trim()).filter(Boolean)
+            : typeof featuredArtists === 'string'
+                ? featuredArtists.split(',').map((id) => id.trim()).filter(Boolean)
+                : [];
+    let genresArray = [];
+    if (genreIds) {
+        if (Array.isArray(genreIds)) {
+            genresArray = genreIds.map((id) => id.trim()).filter(Boolean);
+        }
+        else if (typeof genreIds === 'string') {
+            genresArray = genreIds.split(',').map((id) => id.trim()).filter(Boolean);
+        }
+    }
     let finalLabelId = null;
     if (labelId) {
         const labelExists = await db_1.default.label.findUnique({
@@ -393,16 +399,16 @@ const createTrack = async (req) => {
             type: albumId ? undefined : 'SINGLE',
             isActive,
             labelId: finalLabelId,
-            featuredArtists: featuredArtistsArray.length > 0
+            featuredArtists: artistsArray.length > 0
                 ? {
-                    create: featuredArtistsArray.map((featArtistId) => ({
+                    create: artistsArray.map((featArtistId) => ({
                         artistId: featArtistId,
                     })),
                 }
                 : undefined,
-            genres: genreIdsArray.length > 0
+            genres: genresArray.length > 0
                 ? {
-                    create: genreIdsArray.map((genreId) => ({
+                    create: genresArray.map((genreId) => ({
                         genre: {
                             connect: { id: genreId },
                         },
@@ -519,8 +525,10 @@ const updateTrack = async (req, id) => {
             const artistsArray = !featuredArtists
                 ? []
                 : Array.isArray(featuredArtists)
-                    ? featuredArtists
-                    : [featuredArtists];
+                    ? featuredArtists.map((id) => id.trim()).filter(Boolean)
+                    : typeof featuredArtists === 'string'
+                        ? featuredArtists.split(',').map((id) => id.trim()).filter(Boolean)
+                        : [];
             if (artistsArray.length > 0) {
                 await tx.trackArtist.createMany({
                     data: artistsArray.map((artistId) => ({
@@ -538,21 +546,10 @@ const updateTrack = async (req, id) => {
             let genresArray = [];
             if (genreIds) {
                 if (Array.isArray(genreIds)) {
-                    genresArray = genreIds;
+                    genresArray = genreIds.map((id) => id.trim()).filter(Boolean);
                 }
                 else if (typeof genreIds === 'string') {
-                    try {
-                        const parsed = JSON.parse(genreIds);
-                        if (Array.isArray(parsed)) {
-                            genresArray = parsed.map(String);
-                        }
-                        else {
-                            genresArray = [String(genreIds)];
-                        }
-                    }
-                    catch {
-                        genresArray = [genreIds];
-                    }
+                    genresArray = genreIds.split(',').map((id) => id.trim()).filter(Boolean);
                 }
             }
             if (genresArray.length === 0) {

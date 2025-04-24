@@ -279,8 +279,11 @@ export const addTracksToAlbum = async (req: Request) => {
   const titles = Array.isArray(req.body.title) ? req.body.title : [req.body.title];
   const releaseDates = Array.isArray(req.body.releaseDate) ? req.body.releaseDate : [req.body.releaseDate];
   const featuredArtists = Array.isArray(req.body.featuredArtists)
-    ? req.body.featuredArtists.map((artists: string) => artists.split(','))
-    : req.body.featuredArtists ? [req.body.featuredArtists.split(',')] : [];
+    ? req.body.featuredArtists.map((artists: string) => artists?.split(',').map((id: string) => id.trim()).filter(Boolean) ?? [])
+    : req.body.featuredArtists ? [req.body.featuredArtists.split(',').map((id: string) => id.trim()).filter(Boolean)] : [];
+  const genres = Array.isArray(req.body.genres)
+    ? req.body.genres.map((genreIds: string) => genreIds?.split(',').map((id: string) => id.trim()).filter(Boolean) ?? [])
+    : req.body.genres ? [req.body.genres.split(',').map((id: string) => id.trim()).filter(Boolean)] : [];
 
   const mm = await import('music-metadata');
   const createdTracks = await Promise.all(
@@ -310,7 +313,14 @@ export const addTracksToAlbum = async (req: Request) => {
           ...(featuredArtists[index]?.length && {
             featuredArtists: {
               create: featuredArtists[index].map((artistProfileId: string) => ({
-                artistProfile: { connect: { id: artistProfileId.trim() } },
+                artistProfile: { connect: { id: artistProfileId } },
+              })),
+            },
+          }),
+          ...(genres[index]?.length && {
+            genres: {
+              create: genres[index].map((genreId: string) => ({
+                genre: { connect: { id: genreId } },
               })),
             },
           }),
