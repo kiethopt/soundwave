@@ -86,6 +86,16 @@ export const albumSelect = {
           },
         },
       },
+      genres: {
+        select: {
+          genre: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
     },
   },
   genres: {
@@ -250,6 +260,16 @@ export const artistProfileSelect = {
               },
             },
           },
+          genres: {
+            select: {
+              genre: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
         },
       },
       artist: {
@@ -299,6 +319,16 @@ export const artistProfileSelect = {
               id: true,
               artistName: true,
               isVerified: true,
+            },
+          },
+        },
+      },
+      genres: {
+        select: {
+          genre: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },
@@ -410,6 +440,16 @@ export const userSelect = {
                   },
                 },
               },
+              genres: {
+                select: {
+                  genre: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -440,6 +480,16 @@ export const userSelect = {
                       name: true,
                     },
                   },
+                },
+              },
+            },
+          },
+          genres: {
+            select: {
+              genre: {
+                select: {
+                  id: true,
+                  name: true,
                 },
               },
             },
@@ -588,6 +638,16 @@ export const searchAlbumSelect = {
             select: {
               id: true,
               artistName: true,
+            },
+          },
+        },
+      },
+      genres: {
+        select: {
+          genre: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },

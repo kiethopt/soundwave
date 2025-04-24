@@ -6,7 +6,7 @@ export interface FormData {
 }
 
 export interface TrackUploadFormProps {
-  album: Album;
+  album: Album | null;
   newTracks: File[];
   trackDetails: {
     [key: string]: {
@@ -14,14 +14,16 @@ export interface TrackUploadFormProps {
       artist: string;
       featuredArtists: string[];
       trackNumber: number;
-      releaseDate?: string;
+      releaseDate: string;
+      genres: string[];
     };
   };
   isUploading: boolean;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (e: React.FormEvent) => Promise<void>;
   onTrackDetailChange: (fileName: string, field: string, value: any) => void;
-  artists: ArtistProfile[];
+  artists?: ArtistProfile[];
+  availableGenres?: Genre[];
 }
 
 export interface ArtistRequestFilters {
@@ -418,6 +420,7 @@ export interface TrackEditForm {
   releaseDate: string;
   trackNumber: number;
   featuredArtists: string[];
+  genres: string[];
 }
 
 export interface CreatePlaylistData {

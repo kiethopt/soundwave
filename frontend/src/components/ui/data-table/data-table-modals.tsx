@@ -456,6 +456,7 @@ export function EditAlbumModal({
 }: EditAlbumModalProps) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [genreError, setGenreError] = useState<string | null>(null); // <<< Added state for genre error
 
   useEffect(() => {
     if (album?.coverUrl) {
@@ -467,6 +468,8 @@ export function EditAlbumModal({
     if (album?.label?.id) {
       setSelectedLabelId(album.label.id);
     }
+    // Clear genre error when album changes or modal opens
+    setGenreError(null); // <<< Clear error on mount/album change
   }, [album, setSelectedLabelId]);
 
   if (!album) return null;
@@ -485,13 +488,22 @@ export function EditAlbumModal({
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // <<< Added genre validation check
+    if (selectedGenres.length === 0) {
+      setGenreError("This field is required");
+      return; // Stop submission if validation fails
+    } else {
+      setGenreError(null); // Clear error if validation passes
+    }
+
     const formData = new FormData(e.currentTarget);
 
     // Xóa các trường hiện có để tránh trùng lặp
     formData.delete("genres");
     formData.delete("labelId"); // Xóa labelId cũ nếu có
 
-    // Thêm genres từ state
+    // Thêm genres từ state (validation ensures it's not empty)
     selectedGenres.forEach((genreId) => {
       formData.append("genres", genreId);
     });
@@ -671,16 +683,25 @@ export function EditAlbumModal({
                 theme === "dark" ? "text-gray-200" : "text-gray-700"
               }`}
             >
-              Genres
+              Genres * {/* <<< Added asterisk */}
             </span>
-            <SearchableSelect
-              options={availableGenres}
-              value={selectedGenres}
-              onChange={setSelectedGenres}
-              placeholder="Select genres..."
-              multiple={true}
-              required={false}
-            />
+            {/* <<< Wrap SearchableSelect for error styling */}
+            <div
+              className={cn(genreError && "rounded-md border border-red-500")}
+            >
+              <SearchableSelect
+                options={availableGenres}
+                value={selectedGenres}
+                onChange={setSelectedGenres}
+                placeholder="Select genres..."
+                multiple={true}
+                // required={false} <<< Removed required prop
+              />
+            </div>
+             {/* <<< Display error message */}
+             {genreError && (
+              <p className="text-sm text-red-500 mt-1">{genreError}</p>
+            )}
           </div>
 
           {/* Thêm trường chọn Label */}

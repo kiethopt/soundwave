@@ -407,17 +407,22 @@ export const createTrack = async (req: Request) => {
     isActive = trackReleaseDate <= now;
   }
 
-  const featuredArtistsArray = Array.isArray(featuredArtists)
-    ? featuredArtists
-    : featuredArtists
-      ? featuredArtists.split(',').map((id: string) => id.trim())
-      : [];
+  const artistsArray = !featuredArtists
+    ? []
+    : Array.isArray(featuredArtists)
+      ? featuredArtists.map((id: string) => id.trim()).filter(Boolean)
+      : typeof featuredArtists === 'string'
+        ? featuredArtists.split(',').map((id: string) => id.trim()).filter(Boolean)
+        : [];
 
-  const genreIdsArray = Array.isArray(genreIds)
-    ? genreIds
-    : genreIds
-      ? genreIds.split(',').map((id: string) => id.trim())
-      : [];
+  let genresArray: string[] = [];
+  if (genreIds) {
+    if (Array.isArray(genreIds)) {
+      genresArray = genreIds.map((id: string) => id.trim()).filter(Boolean);
+    } else if (typeof genreIds === 'string') {
+      genresArray = genreIds.split(',').map((id: string) => id.trim()).filter(Boolean);
+    }
+  }
 
   let finalLabelId: string | null = null;
   if (labelId) {
@@ -442,17 +447,17 @@ export const createTrack = async (req: Request) => {
       isActive,
       labelId: finalLabelId,
       featuredArtists:
-        featuredArtistsArray.length > 0
+        artistsArray.length > 0
           ? {
-            create: featuredArtistsArray.map((featArtistId: string) => ({
+            create: artistsArray.map((featArtistId: string) => ({
               artistId: featArtistId,
             })),
           }
           : undefined,
       genres:
-        genreIdsArray.length > 0
+        genresArray.length > 0
           ? {
-            create: genreIdsArray.map((genreId: string) => ({
+            create: genresArray.map((genreId: string) => ({
               genre: {
                 connect: { id: genreId },
               },
@@ -601,8 +606,10 @@ export const updateTrack = async (req: Request, id: string) => {
       const artistsArray = !featuredArtists
         ? []
         : Array.isArray(featuredArtists)
-          ? featuredArtists
-          : [featuredArtists];
+          ? featuredArtists.map((id: string) => id.trim()).filter(Boolean)
+          : typeof featuredArtists === 'string'
+            ? featuredArtists.split(',').map((id: string) => id.trim()).filter(Boolean)
+            : [];
 
       if (artistsArray.length > 0) {
         await tx.trackArtist.createMany({
@@ -623,20 +630,9 @@ export const updateTrack = async (req: Request, id: string) => {
       let genresArray: string[] = [];
       if (genreIds) {
         if (Array.isArray(genreIds)) {
-          genresArray = genreIds;
+          genresArray = genreIds.map((id: string) => id.trim()).filter(Boolean);
         } else if (typeof genreIds === 'string') {
-          try {
-            // Attempt to parse if it's a JSON string array
-            const parsed = JSON.parse(genreIds);
-            if (Array.isArray(parsed)) {
-              genresArray = parsed.map(String); // Ensure elements are strings
-            } else {
-                genresArray = [String(genreIds)]; // Treat as single ID if not array
-            }
-          } catch {
-            // Treat as single ID if JSON parsing fails
-            genresArray = [genreIds];
-          }
+          genresArray = genreIds.split(',').map((id: string) => id.trim()).filter(Boolean);
         }
       }
 

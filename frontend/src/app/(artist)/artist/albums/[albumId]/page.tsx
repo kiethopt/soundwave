@@ -1,6 +1,6 @@
 'use client';
 
-import type { Album, ArtistProfile, Track, TrackEditForm } from '@/types';
+import type { Album, ArtistProfile, Track, TrackEditForm, Genre } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/utils/api';
@@ -29,6 +29,7 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import io, { Socket } from 'socket.io-client'; // Import Socket
 import { Button } from '@/components/ui/button';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 export default function AlbumDetailPage() {
   const params = useParams();
@@ -59,6 +60,7 @@ export default function AlbumDetailPage() {
       featuredArtists: string[];
       trackNumber: number;
       releaseDate: string;
+      genres: string[];
     };
   }>({});
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -69,7 +71,10 @@ export default function AlbumDetailPage() {
     releaseDate: '',
     trackNumber: 0,
     featuredArtists: [],
+    genres: [],
   });
+  const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
+  const [trackGenreError, setTrackGenreError] = useState<string | null>(null);
   const { dominantColor } = useDominantColor(album?.coverUrl);
   const { theme } = useTheme();
 
@@ -140,24 +145,32 @@ export default function AlbumDetailPage() {
   }, [extractedAlbumId]);
 
   useEffect(() => {
-    const fetchArtists = async () => {
+    const fetchArtistsAndGenres = async () => {
       try {
         const token = localStorage.getItem('userToken');
         if (!token) return;
 
-        const response = await api.artists.getAllArtistsProfile(token, 1, 100);
-        const verifiedArtists = response.artists.filter(
+        // Fetch Artists
+        const artistResponse = await api.artists.getAllArtistsProfile(token, 1, 100);
+        const verifiedArtists = artistResponse.artists.filter(
           (artist: ArtistProfile) =>
             artist.isVerified && artist.role === 'ARTIST'
         );
         setArtists(verifiedArtists);
+
+        // Fetch Genres
+        const genreResponse = await api.genres.getAll(token); // Assuming api.genres.getAll() exists and takes token
+        console.log('API Genre Response:', genreResponse);
+        setAvailableGenres(genreResponse?.genres || []); // Extract the genres array
+
       } catch (err) {
-        console.error('Error fetching artists:', err);
+        console.error('Error fetching artists or genres:', err);
+        // Optionally set separate error states for artists/genres
       }
     };
 
-    fetchArtists();
-  }, []);
+    fetchArtistsAndGenres();
+  }, []); // Fetch on mount
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,6 +198,7 @@ export default function AlbumDetailPage() {
   };
 
   const handleEditTrack = async (track: Track) => {
+    console.log("Editing Track Object:", JSON.stringify(track, null, 2));
     setEditingTrack(track);
     setTrackEditForm({
       title: track.title,
@@ -193,6 +207,7 @@ export default function AlbumDetailPage() {
       featuredArtists: track.featuredArtists.map(
         ({ artistProfile }) => artistProfile.id
       ),
+      genres: track.genres?.map(({ genre }) => genre.id) ?? [],
     });
     setShowEditTrackDialog(true);
     setActiveTrackMenu(null);
@@ -201,6 +216,14 @@ export default function AlbumDetailPage() {
   const handleEditTrackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTrack || !album) return;
+
+    // Genre validation
+    if (!trackEditForm.genres || trackEditForm.genres.length === 0) {
+      setTrackGenreError("This field is required");
+      return; // Stop submission
+    } else {
+      setTrackGenreError(null); // Clear error if validation passes
+    }
 
     try {
       const token = localStorage.getItem('userToken');
@@ -215,9 +238,15 @@ export default function AlbumDetailPage() {
           'featuredArtists',
           trackEditForm.featuredArtists.join(',')
         );
+        formData.append('updateFeaturedArtists', 'true');
       }
 
-      // Optimistic update với kiểu dữ liệu hợp lệ
+      if (trackEditForm.genres && trackEditForm.genres.length > 0) {
+        formData.append('genreIds', trackEditForm.genres.join(','));
+        formData.append('updateGenres', 'true');
+      }
+
+      // Optimistic update with kiểu dữ liệu hợp lệ
       const updatedTracks = album.tracks.map((t) => {
         if (t.id === editingTrack.id) {
           return {
@@ -233,6 +262,12 @@ export default function AlbumDetailPage() {
                 avatar: artists.find((a) => a.id === artistId)?.avatar || null,
                 isVerified:
                   artists.find((a) => a.id === artistId)?.isVerified || false,
+              },
+            })),
+            genres: trackEditForm.genres.map((genreId) => ({
+              genre: {
+                id: genreId,
+                name: availableGenres.find((g) => g.id === genreId)?.name || '',
               },
             })),
           };
@@ -346,7 +381,13 @@ export default function AlbumDetailPage() {
         if (details.featuredArtists && details.featuredArtists.length > 0) {
           formData.append(`featuredArtists`, details.featuredArtists.join(','));
         }
+        if (details.genres && details.genres.length > 0) {
+          formData.append(`genres`, details.genres.join(','));
+        }
       });
+
+      // Log the genres being sent for each track
+      console.log('FormData - genres being sent:', formData.getAll('genres'));
 
       const response = await api.albums.uploadTracks(
         extractedAlbumId,
@@ -397,6 +438,7 @@ export default function AlbumDetailPage() {
             trackNumber: existingTrackCount + index + 1,
             releaseDate:
               album?.releaseDate || new Date().toISOString().split('T')[0],
+            genres: [],
           };
         }
       });
@@ -998,6 +1040,7 @@ export default function AlbumDetailPage() {
                 }));
               }}
               artists={artists}
+              availableGenres={availableGenres}
               existingTrackCount={album.tracks?.length || 0}
             />
           </div>
@@ -1307,6 +1350,38 @@ export default function AlbumDetailPage() {
                   </select>
                 </div>
 
+                {/* Genres Select */}
+                <div>
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
+                    }`}
+                  >
+                    Genres *
+                  </label>
+                  {/* Wrap SearchableSelect for error styling */}
+                  <div
+                    className={trackGenreError ? "rounded-md border border-red-500" : ""}
+                  >
+                    <SearchableSelect
+                      options={availableGenres.map((g) => ({ id: g.id, name: g.name }))}
+                      value={trackEditForm.genres}
+                      onChange={(value: string[]) =>
+                        setTrackEditForm({
+                          ...trackEditForm,
+                          genres: value,
+                        })
+                      }
+                      placeholder="Select genres..."
+                      multiple={true}
+                    />
+                  </div>
+                  {/* Display error message */}
+                  {trackGenreError && (
+                    <p className="text-sm text-red-500 mt-1">{trackGenreError}</p>
+                  )}
+                </div>
+
                 <div className="flex justify-end gap-4 mt-6">
                   <button
                     type="button"
@@ -1316,7 +1391,7 @@ export default function AlbumDetailPage() {
                         ? 'text-gray-600 hover:text-gray-900'
                         : 'text-white/60 hover:text-white'
                     }`}
-                  >
+                  > 
                     Cancel
                   </button>
                   <button
