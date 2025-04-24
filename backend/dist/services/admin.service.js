@@ -172,64 +172,65 @@ const getArtistRequestDetail = async (id) => {
     return request;
 };
 exports.getArtistRequestDetail = getArtistRequestDetail;
-const updateUserInfo = async (id, data, avatarFile) => {
-    const targetUser = await db_1.default.user.findUnique({
-        where: { id },
-        select: { id: true, email: true, username: true, password: true, avatar: true, role: true, adminLevel: true }
-    });
-    if (!targetUser) {
+const updateUserInfo = async (id, data, requestingUser, avatarFile) => {
+    const { currentPassword, newPassword, confirmPassword, reason, ...updateData } = data;
+    const existingUser = await db_1.default.user.findUnique({ where: { id } });
+    if (!existingUser) {
         throw new Error('User not found');
     }
-    const { name, email, username, isActive, password, role, adminLevel } = data;
-    const updateData = {};
-    if (role && Object.values(client_1.Role).includes(role)) {
-        updateData.role = role;
+    if (requestingUser.adminLevel !== 1 && existingUser.role === client_1.Role.ADMIN) {
+        throw new Error(`Permission denied: You cannot modify an Admin user.`);
     }
-    if (adminLevel !== undefined && adminLevel !== null && !isNaN(Number(adminLevel))) {
-        if (updateData.role === client_1.Role.ADMIN || (targetUser.role === client_1.Role.ADMIN && !updateData.role)) {
-            updateData.adminLevel = Number(adminLevel);
-        }
-        else if (role === client_1.Role.ADMIN) {
-            updateData.adminLevel = Number(adminLevel);
-        }
-        else {
+    if ((updateData.role !== undefined || updateData.adminLevel !== undefined) && requestingUser.adminLevel !== 1) {
+        throw new Error(`Permission denied: Only Level 1 Admins can change user roles or admin levels.`);
+    }
+    if (requestingUser.id === id && (updateData.role !== undefined || updateData.adminLevel !== undefined)) {
+        throw new Error(`Permission denied: Cannot change your own role or admin level.`);
+    }
+    if (requestingUser.id === id && requestingUser.adminLevel === 1 && updateData.adminLevel !== undefined) {
+        throw new Error("Permission denied: Level 1 Admins cannot change their own level.");
+    }
+    if (updateData.adminLevel === 1) {
+        throw new Error("Permission denied: Cannot promote user to Level 1 Admin.");
+    }
+    if (updateData.adminLevel !== undefined && updateData.adminLevel !== null) {
+        const parsedLevel = parseInt(String(updateData.adminLevel), 10);
+        if (isNaN(parsedLevel) || parsedLevel < 2) {
             updateData.adminLevel = null;
         }
+        else {
+            updateData.adminLevel = parsedLevel;
+        }
     }
-    else if (updateData.role && updateData.role !== client_1.Role.ADMIN) {
-        updateData.adminLevel = null;
-    }
-    if (name !== undefined)
-        updateData.name = name;
-    if (email !== undefined && email !== targetUser.email) {
-        const existingEmail = await db_1.default.user.findFirst({ where: { email, NOT: { id } } });
+    if (updateData.name !== undefined)
+        updateData.name = updateData.name;
+    if (updateData.email !== undefined && updateData.email !== existingUser.email) {
+        const existingEmail = await db_1.default.user.findFirst({ where: { email: updateData.email, NOT: { id } } });
         if (existingEmail)
             throw new Error('Email already exists');
-        updateData.email = email;
     }
-    if (username !== undefined && username !== targetUser.username) {
-        const existingUsername = await db_1.default.user.findFirst({ where: { username, NOT: { id } } });
+    if (updateData.username !== undefined && updateData.username !== existingUser.username) {
+        const existingUsername = await db_1.default.user.findFirst({ where: { username: updateData.username, NOT: { id } } });
         if (existingUsername)
             throw new Error('Username already exists');
-        updateData.username = username;
     }
-    if (isActive !== undefined) {
-        updateData.isActive = (0, handle_utils_1.toBooleanValue)(isActive);
+    if (updateData.isActive !== undefined) {
+        updateData.isActive = (0, handle_utils_1.toBooleanValue)(updateData.isActive);
     }
-    if (password) {
-        if (password.length < 6) {
+    if (newPassword) {
+        if (newPassword.length < 6) {
             throw new Error('Password must be at least 6 characters long.');
         }
-        updateData.password = await bcrypt_1.default.hash(password, 10);
+        updateData.password = await bcrypt_1.default.hash(newPassword, 10);
     }
     if (avatarFile) {
         const uploadResult = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'users/avatars');
         updateData.avatar = uploadResult.secure_url;
     }
-    else if (data.avatar === null && targetUser.avatar) {
+    else if (data.avatar === null && existingUser.avatar) {
         updateData.avatar = null;
     }
-    if (Object.keys(updateData).length === 0 && !avatarFile && !(data.avatar === null && targetUser.avatar)) {
+    if (Object.keys(updateData).length === 0 && !avatarFile && !(data.avatar === null && existingUser.avatar)) {
         throw new Error("No valid data provided for update.");
     }
     const updatedUser = await db_1.default.user.update({

@@ -15,14 +15,12 @@ interface UseDataTableOptions<T> {
   ) => Promise<FetchDataResponse<T>>;
   limit?: number;
   paramKeyPrefix?: string;
-  loggedInAdminLevel?: number | null;
 }
 
 export function useDataTable<T>({
   fetchData,
   limit = 10,
   paramKeyPrefix = '',
-  loggedInAdminLevel,
 }: UseDataTableOptions<T>) {
   const router = useRouter();
   const pathname = usePathname();
@@ -410,10 +408,11 @@ export function useDataTable<T>({
     const urlEndDate = safeGetParam(getKey('endDate')); // Read endDate from URL
 
     // ** Check for invalid role param first **
-    if (loggedInAdminLevel !== 1 && urlRoleParams.length > 0) {
-      updateUrlParams({ role: null }, true);
-      return;
-    }
+    // REMOVED: Logic related to loggedInAdminLevel
+    // if (loggedInAdminLevel !== 1 && urlRoleParams.length > 0) {
+    //   updateUrlParams({ role: null }, true);
+    //   return;
+    // }
 
     // Check if URL state differs from *current tracked state (prevDeps)*
     const urlStateDiffers =
@@ -468,7 +467,7 @@ export function useDataTable<T>({
     }
     // searchParams is the sole dependency, representing the URL state
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, loggedInAdminLevel, updateUrlParams, fetchDataInternal, getKey, safeParamsToString]); // Add dependencies
+  }, [searchParams, /* loggedInAdminLevel, REMOVED */ updateUrlParams, fetchDataInternal, getKey, safeParamsToString]); // Add dependencies
 
   // Refresh data function (refetches based on current URL state)
   const refreshData = useCallback(async () => {

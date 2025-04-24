@@ -97,20 +97,21 @@ export const updateUser = async (
     const { id } = req.params;
     const avatarFile = req.file;
     const userData = { ...req.body };
+    const requestingUser = req.user as UserWithAdminLevel;
 
-    if (userData.adminLevel !== undefined && userData.adminLevel !== null) {
-      const parsedLevel = parseInt(String(userData.adminLevel), 10);
-      userData.adminLevel = isNaN(parsedLevel) ? null : parsedLevel;
+    // CRITICAL: Ensure requestingUser is defined before calling the service
+    if (!requestingUser) {
+      res.status(401).json({ message: "Unauthorized: Requesting user data missing." });
+      return;
     }
 
-    const originalIsActiveInput = userData.isActive;
-    if (userData.isActive !== undefined) {
-      userData.isActive = userData.isActive === 'true' || userData.isActive === true;
-    }
+
+    const originalIsActiveInput = userData.isActive; // Keep for notification logic
 
     const updatedUser = await adminService.updateUserInfo(
       id,
       userData,
+      requestingUser, // Pass the requesting user to the service
       avatarFile
     );
 
@@ -184,12 +185,14 @@ export const updateUser = async (
     });
 
   } catch (error) {
-    // Keep existing error handling for service errors
+    // --- Specific Error Handling FIRST ---
     if (error instanceof Error) {
+      // Handle Permission Errors from the service
       if (error.message.startsWith('Permission denied:')) {
         res.status(403).json({ message: error.message });
         return;
       }
+      // Handle other known errors
       if (error.message === 'User not found') {
         res.status(404).json({ message: 'User not found' });
         return;

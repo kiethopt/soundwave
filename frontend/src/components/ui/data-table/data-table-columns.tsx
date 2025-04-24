@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   XCircle,
   View,
+  UserCog,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -71,7 +72,6 @@ interface GetUserColumnsOptions {
   onView?: (user: User) => void;
   onMakeAdmin?: (user: User) => void;
   onTriggerDelete?: (user: User) => void;
-  loggedInAdminLevel?: number | null;
 }
 
 interface GetGenreColumnsOptions {
@@ -770,7 +770,6 @@ export function getUserColumns({
   onStatusChange,
   onMakeAdmin,
   onTriggerDelete,
-  loggedInAdminLevel,
 }: GetUserColumnsOptions): ColumnDef<User>[] {
   const columns: ColumnDef<User>[] = [
     {
@@ -854,6 +853,41 @@ export function getUserColumns({
       ),
     },
     {
+      accessorKey: 'adminLevel',
+      header: 'Admin Level',
+      cell: ({ row }: { row: Row<User> }) => {
+        const user = row.original;
+        const level = user.adminLevel;
+        const role = user.role;
+
+        if (role !== 'ADMIN' || level === null || level === undefined) {
+          return <span className={theme === 'dark' ? "text-gray-400" : "text-gray-500"}>N/A</span>;
+        }
+
+        let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' = 'secondary';
+        let badgeText = `Level ${level}`;
+
+        switch (level) {
+          case 1:
+            badgeVariant = 'destructive'; // Use a distinct style for level 1
+            break;
+          case 2:
+            badgeVariant = 'outline'; // Default/outline for level 2
+            break;
+          // Add more cases if needed for other levels
+          default:
+            badgeVariant = 'outline';
+            badgeText = `Level ${level}`; // Show level number for others
+        }
+
+        return (
+          <Badge variant={badgeVariant} className={`text-xs ${theme === 'dark' ? 'border-white/30' : ''}`}>
+            {badgeText}
+          </Badge>
+        );
+      },
+    },
+    {
       accessorKey: 'isActive',
       header: 'Status',
       cell: ({ row }) => (
@@ -913,19 +947,6 @@ export function getUserColumns({
                 >
                   <Edit className="mr-2 h-4 w-4" /> Edit
                 </DropdownMenuItem>
-                {/* Make Admin Option - Conditional Rendering */}
-                {onMakeAdmin && loggedInAdminLevel === 1 && user.role !== 'ADMIN' && (
-                  <DropdownMenuItem
-                    onSelect={() => onMakeAdmin(user)}
-                    className={`cursor-pointer ${
-                      theme === 'dark'
-                        ? 'hover:bg-white/10'
-                        : 'hover:bg-gray-100'
-                    }`}
-                  >
-                    <ShieldCheck className="mr-2 h-4 w-4" /> Make Admin
-                  </DropdownMenuItem>
-                )}
                 {onStatusChange && (
                    <DropdownMenuItem
                      onSelect={() => onStatusChange(user.id, !user.isActive)}
@@ -938,6 +959,16 @@ export function getUserColumns({
                      )}
                    </DropdownMenuItem>
                 )}
+                {/* Make Admin Option - Always visible if onMakeAdmin exists */}
+                {onMakeAdmin && (
+                  <DropdownMenuItem
+                    onSelect={() => onMakeAdmin(user)} 
+                    className={`${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'} cursor-pointer`}
+                    disabled={user.role === 'ADMIN'} // Disable if already an admin
+                  >
+                    <UserCog className="mr-2 h-4 w-4" /> Make Admin
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator className={theme === 'dark' ? 'bg-white/10' : ''} />
                 <DropdownMenuItem
                   onClick={() => {
@@ -948,9 +979,10 @@ export function getUserColumns({
                       onDelete(user.id);
                     }
                   }}
-                  className={`text-red-600 focus:text-red-600 ${menuItemClass}`}
+                  className={`${theme === 'dark' ? 'text-red-400 focus:text-red-400 focus:bg-red-500/10' : 'text-red-600 focus:text-red-600 focus:bg-red-100'} font-medium`}
                 >
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -959,45 +991,6 @@ export function getUserColumns({
       },
     },
   ];
-
-  // Insert Admin Level column after User info if applicable
-  if (loggedInAdminLevel === 1) {
-    columns.splice(3, 0, { // Splice inserts at index 3 (after name, username, email)
-      accessorKey: 'adminLevel',
-      header: 'Admin Level',
-      cell: ({ row }: { row: Row<User> }) => {
-        const user = row.original;
-        const level = user.adminLevel;
-        const role = user.role;
-
-        if (role !== 'ADMIN' || level === null || level === undefined) {
-          return <span className={theme === 'dark' ? "text-gray-400" : "text-gray-500"}>N/A</span>;
-        }
-
-        let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' = 'secondary';
-        let badgeText = `Level ${level}`;
-
-        switch (level) {
-          case 1:
-            badgeVariant = 'destructive';
-            break;
-          case 2:
-            badgeVariant = 'outline';
-            break;
-          // Add more cases if needed
-          default:
-            badgeVariant = 'outline';
-            badgeText = `Level ${level}`;
-        }
-
-        return (
-          <Badge variant={badgeVariant} className="text-xs">
-            {badgeText}
-          </Badge>
-        );
-      },
-    } as ColumnDef<User>);
-  }
 
   return columns;
 }

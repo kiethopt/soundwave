@@ -106,15 +106,13 @@ const updateUser = async (req, res) => {
         const { id } = req.params;
         const avatarFile = req.file;
         const userData = { ...req.body };
-        if (userData.adminLevel !== undefined && userData.adminLevel !== null) {
-            const parsedLevel = parseInt(String(userData.adminLevel), 10);
-            userData.adminLevel = isNaN(parsedLevel) ? null : parsedLevel;
+        const requestingUser = req.user;
+        if (!requestingUser) {
+            res.status(401).json({ message: "Unauthorized: Requesting user data missing." });
+            return;
         }
         const originalIsActiveInput = userData.isActive;
-        if (userData.isActive !== undefined) {
-            userData.isActive = userData.isActive === 'true' || userData.isActive === true;
-        }
-        const updatedUser = await adminService.updateUserInfo(id, userData, avatarFile);
+        const updatedUser = await adminService.updateUserInfo(id, userData, requestingUser, avatarFile);
         if (originalIsActiveInput !== undefined) {
             const intendedState = userData.isActive;
             if (updatedUser.isActive === false && intendedState === false) {

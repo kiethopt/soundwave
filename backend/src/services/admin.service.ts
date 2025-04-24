@@ -179,81 +179,94 @@ export const getArtistRequestDetail = async (id: string) => {
 export const updateUserInfo = async (
   id: string,
   data: any,
+  requestingUser: User,
   avatarFile?: Express.Multer.File
 ) => {
-  const targetUser = await prisma.user.findUnique({
-    where: { id },
-    select: { id: true, email: true, username: true, password: true, avatar: true, role: true, adminLevel: true }
-  });
+  const { currentPassword, newPassword, confirmPassword, reason, ...updateData } = data;
 
-  if (!targetUser) {
+  // Fetch existing user
+  const existingUser = await prisma.user.findUnique({ where: { id } });
+  if (!existingUser) {
     throw new Error('User not found');
   }
 
-  const { name, email, username, isActive, password, role, adminLevel } = data;
-  const updateData: Prisma.UserUpdateInput = {};
-
-  // Handle potential role/level promotion/change if provided
-  if (role && Object.values(Role).includes(role)) {
-    updateData.role = role as Role;
+  // --- Permission Checks ---
+  // 1. Non-level 1 admins cannot modify other admins
+  if (requestingUser.adminLevel !== 1 && existingUser.role === Role.ADMIN) {
+      throw new Error(`Permission denied: You cannot modify an Admin user.`);
   }
-  if (adminLevel !== undefined && adminLevel !== null && !isNaN(Number(adminLevel))) {
-    // Allow setting level only if role is ADMIN (or becoming ADMIN)
-    if (updateData.role === Role.ADMIN || (targetUser.role === Role.ADMIN && !updateData.role)) {
-       updateData.adminLevel = Number(adminLevel);
-    } else if (role === Role.ADMIN) { // Explicitly promoting
-        updateData.adminLevel = Number(adminLevel);
+
+  // 2. Only Level 1 Admins can change 'role' or 'adminLevel'
+  if ((updateData.role !== undefined || updateData.adminLevel !== undefined) && requestingUser.adminLevel !== 1) {
+      throw new Error(`Permission denied: Only Level 1 Admins can change user roles or admin levels.`);
+  }
+
+  // 3. Prevent self-role/level change for security (Level 1 admins can be changed by other L1s if needed)
+  if (requestingUser.id === id && (updateData.role !== undefined || updateData.adminLevel !== undefined)) {
+    throw new Error(`Permission denied: Cannot change your own role or admin level.`);
+  }
+
+  // 4. Level 1 admins cannot change their own level (can be demoted by another L1 if needed)
+  if (requestingUser.id === id && requestingUser.adminLevel === 1 && updateData.adminLevel !== undefined) {
+      throw new Error("Permission denied: Level 1 Admins cannot change their own level.");
+  }
+  
+  // 5. Cannot promote to Level 1 admin (only through direct DB or initial setup)
+  if (updateData.adminLevel === 1) {
+      throw new Error("Permission denied: Cannot promote user to Level 1 Admin.");
+  }
+
+
+  // Validate adminLevel if provided
+  if (updateData.adminLevel !== undefined && updateData.adminLevel !== null) {
+    const parsedLevel = parseInt(String(updateData.adminLevel), 10);
+    if (isNaN(parsedLevel) || parsedLevel < 2) { // Must be 2 or higher, or null
+      updateData.adminLevel = null; // Default to null if invalid
     } else {
-        // If setting level but not ADMIN, remove adminLevel (or set to null)
-        updateData.adminLevel = null;
+      updateData.adminLevel = parsedLevel;
     }
-  } else if (updateData.role && updateData.role !== Role.ADMIN) {
-    // If role is changed to non-admin, ensure level is nullified
-    updateData.adminLevel = null;
   }
 
   // Name
-  if (name !== undefined) updateData.name = name;
+  if (updateData.name !== undefined) updateData.name = updateData.name;
 
   // Email (check uniqueness if changed)
-  if (email !== undefined && email !== targetUser.email) {
-    const existingEmail = await prisma.user.findFirst({ where: { email, NOT: { id } } });
+  if (updateData.email !== undefined && updateData.email !== existingUser.email) {
+    const existingEmail = await prisma.user.findFirst({ where: { email: updateData.email, NOT: { id } } });
     if (existingEmail) throw new Error('Email already exists');
-    updateData.email = email;
   }
 
   // Username (check uniqueness if changed)
-  if (username !== undefined && username !== targetUser.username) {
-    const existingUsername = await prisma.user.findFirst({ where: { username, NOT: { id } } });
+  if (updateData.username !== undefined && updateData.username !== existingUser.username) {
+    const existingUsername = await prisma.user.findFirst({ where: { username: updateData.username, NOT: { id } } });
     if (existingUsername) throw new Error('Username already exists');
-    updateData.username = username;
   }
 
   // isActive status
-  if (isActive !== undefined) {
+  if (updateData.isActive !== undefined) {
     // Deactivation of Level 1 Admin should be prevented in middleware
-    updateData.isActive = toBooleanValue(isActive);
+    updateData.isActive = toBooleanValue(updateData.isActive);
   }
 
   // Password (Admin sets directly - length validation)
-  if (password) {
-    if (password.length < 6) {
+  if (newPassword) {
+    if (newPassword.length < 6) {
       throw new Error('Password must be at least 6 characters long.');
     }
-    updateData.password = await bcrypt.hash(password, 10);
+    updateData.password = await bcrypt.hash(newPassword, 10);
   }
 
   // Avatar
   if (avatarFile) {
     const uploadResult = await uploadFile(avatarFile.buffer, 'users/avatars');
     updateData.avatar = uploadResult.secure_url;
-  } else if (data.avatar === null && targetUser.avatar) {
+  } else if (data.avatar === null && existingUser.avatar) {
     // Handle explicit avatar removal if `avatar: null` is passed
     updateData.avatar = null;
   }
 
   // Perform Update if there are changes
-  if (Object.keys(updateData).length === 0 && !avatarFile && !(data.avatar === null && targetUser.avatar)) {
+  if (Object.keys(updateData).length === 0 && !avatarFile && !(data.avatar === null && existingUser.avatar)) {
       throw new Error("No valid data provided for update.");
   }
 
