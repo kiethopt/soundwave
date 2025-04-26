@@ -17,14 +17,21 @@ import labelRoutes from './routes/label.routes';
 // Import the extended Prisma client to ensure extensions are loaded
 import prisma from './config/db';
 import { registerPlaylistCronJobs } from './prisma/extensions/playlist.extension';
+import { initializeSocket } from './config/socket'; // Import the socket initializer
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 
+// Initialize Socket.IO AFTER creating the http server
+initializeSocket(server);
+
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000', 
+  credentials: true 
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -69,12 +76,11 @@ const initApp = async () => {
 };
 
 // Start the server
-// Ensure PORT is treated as a number before passing to listen
 const numericPort = typeof PORT === 'string' ? parseInt(PORT, 10) : PORT;
 
-server.listen(numericPort, '127.0.0.1', async () => {
-  console.log(`🚀 Server is running on http://127.0.0.1:${numericPort}`);
-  console.log(`🔌 Socket.IO listening on http://127.0.0.1:${numericPort}`);
+server.listen(numericPort, '0.0.0.0', async () => {
+  console.log(`🚀 Server is running on http://localhost:${numericPort}`);
+  console.log(`🔌 Socket.IO listening on http://localhost:${numericPort}`);
   await initApp();
 });
 
