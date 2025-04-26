@@ -707,15 +707,11 @@ export const deleteArtistRequest = async (requestId: string) => {
   const artistProfile = await prisma.artistProfile.findFirst({
     where: {
       id: requestId,
-      verificationRequestedAt: { not: null }, // Must be a pending request
-      // No isVerified check here, allow deletion even if rejected (profile deleted)
+      verificationRequestedAt: { not: null },
     },
   });
 
   if (!artistProfile) {
-    // If not found, it might have been approved, rejected, or never existed.
-    // Consider if throwing an error or returning success is better.
-    // Let's throw an error for clarity that the target wasn't a deletable request.
     throw new Error('Artist request not found or not in a deletable state (e.g., approved).');
   }
 

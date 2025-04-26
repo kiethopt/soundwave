@@ -57,7 +57,7 @@ export function useDataTable<T>({
     safeGetAllParams(getKey('genres'))
   );
   const [verifiedFilter, setVerifiedFilter] = useState<string[]>(
-    safeGetAllParams(getKey('isVerified')) // New state for verification filter
+    safeGetAllParams(getKey('isVerified'))
   );
   const [roleFilter, setRoleFilter] = useState<string[]>(safeGetAllParams(getKey('role')));
   const [sorting, setSorting] = useState<SortingState>(() => {
@@ -69,10 +69,10 @@ export function useDataTable<T>({
     return [];
   });
 
-  // Get currentPage from URL, default to 1
+  // Lấy currentPage từ URL, mặc định là 1
   const currentPage = Math.max(1, Number(safeGetParam(getKey('page'))) || 1);
 
-  // Ref to track initial load & previous state for change detection
+  // Tham chiếu để theo dõi tải ban đầu và trạng thái trước đó để phát hiện thay đổi
   const initialLoad = useRef(true);
   const prevDeps = useRef({
     currentPage,
@@ -82,11 +82,9 @@ export function useDataTable<T>({
     sorting,
     startDate: safeGetParam(getKey('startDate')), 
     endDate: safeGetParam(getKey('endDate')), 
-    verifiedFilter: safeGetAllParams(getKey('isVerified')), // Track previous verified filter
-    roleFilter: safeGetAllParams(getKey('role')), // Track previous role filter
+    verifiedFilter: safeGetAllParams(getKey('isVerified')),
+    roleFilter: safeGetAllParams(getKey('role')),
   });
-
-  // --- Fetching Logic --- //
 
   const fetchDataInternal = useCallback(
     async (
@@ -94,41 +92,45 @@ export function useDataTable<T>({
       paramsToFetch: URLSearchParams,
       showLoading: boolean = true
     ) => {
-      if (showLoading) {
+      if (showLoading) {1
         setLoading(true);
       }
       try {
         const paramsForApi = new URLSearchParams();
 
-        // 1. Set standard pagination from pageToFetch and limit
+        // 1. Đặt phân trang chuẩn từ pageToFetch và giới hạn
         paramsForApi.set('page', String(Math.max(1, pageToFetch)));
         paramsForApi.set('limit', String(limit));
 
-        // 2. Set search parameter from the prefixed URL key in paramsToFetch
+        // 2. Đặt tham số tìm kiếm từ khóa URL có tiền tố trong paramsToFetch
         const currentSearchValue = paramsToFetch.get(getKey('q'));
         if (currentSearchValue) {
           paramsForApi.set('search', currentSearchValue); // Use 'search' for API
         }
 
-        // 3. Set filter parameters from the prefixed URL keys in paramsToFetch
+        // 3. Đặt tham số bộ lọc từ các khóa URL có tiền tố trong paramsToFetch
+        // Lọc theo status
         const currentStatusValues = paramsToFetch.getAll(getKey('status'));
         if (currentStatusValues.length > 0) {
           currentStatusValues.forEach((s) => paramsForApi.append('status', s));
         }
+        // Lọc theo genres
         const currentGenreValues = paramsToFetch.getAll(getKey('genres'));
         if (currentGenreValues.length > 0) {
           currentGenreValues.forEach((g) => paramsForApi.append('genres', g));
         }
-        const currentVerifiedValues = paramsToFetch.getAll(getKey('isVerified')); // Read verified filter
+        // Lọc theo verified
+        const currentVerifiedValues = paramsToFetch.getAll(getKey('isVerified'));
         if (currentVerifiedValues.length > 0) {
-          currentVerifiedValues.forEach((v) => paramsForApi.append('isVerified', v)); // Append to API params
+          currentVerifiedValues.forEach((v) => paramsForApi.append('isVerified', v));
         }
-        const currentRoleValues = paramsToFetch.getAll(getKey('role')); // Read role filter
+        // Lọc theo role
+        const currentRoleValues = paramsToFetch.getAll(getKey('role'));
         if (currentRoleValues.length > 0) {
-          currentRoleValues.forEach((r) => paramsForApi.append('role', r)); // Append role to API params (non-prefixed)
+          currentRoleValues.forEach((r) => paramsForApi.append('role', r));
         }
 
-        // 4. Set sorting parameters from the prefixed URL keys in paramsToFetch
+        // 4. Đặt tham số sắp xếp từ các khóa URL có tiền tố trong paramsToFetch
         const currentSortBy = paramsToFetch.get(getKey('sortBy'));
         const currentSortOrder = paramsToFetch.get(getKey('sortOrder'));
         if (currentSortBy) {
@@ -138,7 +140,7 @@ export function useDataTable<T>({
           }
         }
 
-        // 5. Set date range parameters from the prefixed URL keys in paramsToFetch
+        // 5. Đặt tham số phạm vi ngày từ các khóa URL có tiền tố trong paramsToFetch
         const currentStartDate = paramsToFetch.get(getKey('startDate'));
         const currentEndDate = paramsToFetch.get(getKey('endDate'));
         if (currentStartDate) {
@@ -178,6 +180,7 @@ export function useDataTable<T>({
     [fetchData, limit, getKey]
   );
 
+  // Cập nhật URL params
   const updateUrlParams = useCallback(
     (
       updates: Record<string, string | number | string[] | null>,
@@ -243,7 +246,6 @@ export function useDataTable<T>({
       if (changed) {
         const queryStr = newParams.toString() ? `?${newParams.toString()}` : '';
         const targetUrl = pathname + queryStr;
-        // console.log(`Updating URL (${replace ? 'replace' : 'push'}): ${targetUrl}`);
         if (replace) {
           router.replace(targetUrl, { scroll: false });
         } else {
@@ -251,40 +253,31 @@ export function useDataTable<T>({
         }
       }
     },
-    // updateUrlParams depends on searchParams to read other tabs' params
-    [router, searchParams, pathname, getKey, safeParamsToString] // Removed paramKeyPrefix dependency
+    // updateUrlParams phụ thuộc vào searchParams để đọc các params của các tab khác
+    [router, searchParams, pathname, getKey, safeParamsToString]
   );
 
-  // --- Effects for State and URL Synchronization --- //
-
-  // Effect 1: Handle direct user input changes (search, filters, sorting)
-  // Updates URL (push) and triggers debounced fetch.
+  // Effect 1: Lắng nghe State thay đổi -> Cập nhật URL (Tìm kiếm, Lọc, Sắp xếp)
   useEffect(() => {
-    // Skip initial load synchronization - Effect 2 handles initial load
     if (initialLoad.current) {
       return;
     }
-    // console.log("Effect 1 Triggered (User Input Change)");
 
     const updates: Record<string, any> = {};
     let stateChanged = false;
     let resetPage = false;
-    const newPage = Math.max(1, Number(safeGetParam(getKey('page'))) || 1); // Start with current URL page
 
-    // Check if search changed
+    // Kiểm tra từng state xem có thay đổi so với giá trị trước đó không (prevDeps.current)
     if (searchInput !== prevDeps.current.searchInput) {
-      // CRITICAL FIX: Always ensure empty string is converted to null
-      // This will cause the parameter to be removed from the URL
       updates.q = searchInput === '' ? null : searchInput;
       stateChanged = true;
       resetPage = true;
     }
-    // Check if filters changed
     if (
       JSON.stringify(statusFilter) !==
       JSON.stringify(prevDeps.current.statusFilter)
     ) {
-      updates.status = statusFilter.length > 0 ? statusFilter : null; // Pass null if empty
+      updates.status = statusFilter.length > 0 ? statusFilter : null;
       stateChanged = true;
       resetPage = true;
     }
@@ -292,89 +285,57 @@ export function useDataTable<T>({
       JSON.stringify(genreFilter) !==
       JSON.stringify(prevDeps.current.genreFilter)
     ) {
-      updates.genres = genreFilter.length > 0 ? genreFilter : null; // Pass null if empty
+      updates.genres = genreFilter.length > 0 ? genreFilter : null;
       stateChanged = true;
       resetPage = true;
     }
     if (
-      JSON.stringify(verifiedFilter) !== // Check if verified filter changed
+      JSON.stringify(verifiedFilter) !==
       JSON.stringify(prevDeps.current.verifiedFilter)
     ) {
-      updates.isVerified = verifiedFilter.length > 0 ? verifiedFilter : null; // Pass null if empty
+      updates.isVerified = verifiedFilter.length > 0 ? verifiedFilter : null;
       stateChanged = true;
       resetPage = true;
     }
     if (
-      JSON.stringify(roleFilter) !== // Check if role filter changed
+      JSON.stringify(roleFilter) !==
       JSON.stringify(prevDeps.current.roleFilter)
     ) {
-      updates.role = roleFilter.length > 0 ? roleFilter : null; // Pass null if empty
+      updates.role = roleFilter.length > 0 ? roleFilter : null;
       stateChanged = true;
       resetPage = true;
     }
-    // Check if sorting changed
     if (JSON.stringify(sorting) !== JSON.stringify(prevDeps.current.sorting)) {
       if (sorting.length > 0) {
         updates.sortBy = sorting[0].id;
         updates.sortOrder = sorting[0].desc ? 'desc' : 'asc';
       } else {
-        updates.sortBy = null; // Explicitly remove sorting params
+        updates.sortBy = null; 
         updates.sortOrder = null;
       }
       stateChanged = true;
       resetPage = true;
     }
 
+    // Nếu có thay đổi filter/search/sort -> reset page về 1
     if (resetPage) {
-      updates.page = 1; // Reset page if search, filter or sort changed
-    } else {
-      // If only page changed (e.g. pagination click), ensure page update is included
-      if (currentPage !== prevDeps.current.currentPage) {
-        updates.page = currentPage;
-        // No need to set stateChanged = true here, URL change (Effect 2) handles page-only changes
-      }
+      updates.page = 1;
     }
 
-    // If state relevant to this hook instance changed (search, filter, sort)
+    // Nếu state của hook này thay đổi (do người dùng tương tác)
     if (stateChanged) {
-      // Update URL (use push for user-driven changes)
+      // 1. Chỉ cập nhật URL
       updateUrlParams(updates, false);
 
-      // Construct the full set of parameters for the *next URL state*
-      const paramsForFetch = new URLSearchParams(safeParamsToString()); // Start with existing URL params
-
-      // Apply the changes from 'updates' to build the final parameter set
-      Object.entries(updates).forEach(([key, value]) => {
-          const prefixedKey = getKey(key);
-          paramsForFetch.delete(prefixedKey); // Remove existing before potentially adding new
-
-          if (key === 'page' && (value === 1 || value === '1')) {
-              // Already deleted, do nothing more
-          } else if (Array.isArray(value)) {
-              if (value.length > 0) {
-                  value.forEach((v) => paramsForFetch.append(prefixedKey, v.toString()));
-              }
-          } else if (value !== null && value !== '' && value !== undefined) {
-              paramsForFetch.set(prefixedKey, value.toString());
-          }
-      });
-
-
-      // Trigger fetch immediately using the complete, intended URL parameters
-      fetchDataInternal(updates.page || newPage, paramsForFetch);
-
-
-      // Update previous dependencies ref *after* logic
+      // 2.cCp nhật prevDeps để theo dõi state cho lần so sánh sau
       prevDeps.current = {
-        currentPage: updates.page || prevDeps.current.currentPage, // Update page if it was reset
+        ...prevDeps.current,
         searchInput,
         statusFilter,
         genreFilter,
         sorting,
-        startDate: safeGetParam(getKey('startDate')), // Update previous startDate
-        endDate: safeGetParam(getKey('endDate')), // Update previous endDate
-        verifiedFilter, // Update previous verified filter
-        roleFilter, // Update previous role filter
+        verifiedFilter,
+        roleFilter,
       };
     }
   }, [
@@ -389,16 +350,13 @@ export function useDataTable<T>({
     getKey,
   ]);
 
-  // Effect 2: Handle URL changes (e.g., browser back/forward, direct URL edit, page changes)
-  // Updates *state* based on URL and triggers *immediate* fetch if necessary.
+  // Effect 2: Handle URL changes (trình duyệt back/forward, sửa URL trực tiếp, thay đổi trang)
   useEffect(() => {
-    // console.log("Effect 2 Triggered (URL Change Check)");
     const urlPage = Math.max(1, Number(safeGetParam(getKey('page'))) || 1);
     const urlSearch = safeGetParam(getKey('q'));
     const urlStatus = safeGetAllParams(getKey('status'));
     const urlGenres = safeGetAllParams(getKey('genres'));
-    const urlVerified = safeGetAllParams(getKey('isVerified')); // Read verified from URL
-    const urlRoleParams = safeGetAllParams(getKey('role')); // Read role from URL
+    const urlVerified = safeGetAllParams(getKey('isVerified'));
     const urlSortBy = safeGetParam(getKey('sortBy'));
     const urlSortOrder = safeGetParam(getKey('sortOrder'));
     const urlSorting = urlSortBy
@@ -406,13 +364,6 @@ export function useDataTable<T>({
       : [];
     const urlStartDate = safeGetParam(getKey('startDate')); // Read startDate from URL
     const urlEndDate = safeGetParam(getKey('endDate')); // Read endDate from URL
-
-    // ** Check for invalid role param first **
-    // REMOVED: Logic related to loggedInAdminLevel
-    // if (loggedInAdminLevel !== 1 && urlRoleParams.length > 0) {
-    //   updateUrlParams({ role: null }, true);
-    //   return;
-    // }
 
     // Check if URL state differs from *current tracked state (prevDeps)*
     const urlStateDiffers =
@@ -423,25 +374,21 @@ export function useDataTable<T>({
       JSON.stringify(urlGenres) !==
         JSON.stringify(prevDeps.current.genreFilter) ||
       JSON.stringify(urlSorting) !== JSON.stringify(prevDeps.current.sorting) ||
-      urlStartDate !== prevDeps.current.startDate || // Compare startDate
-      urlEndDate !== prevDeps.current.endDate || // Compare endDate
+      urlStartDate !== prevDeps.current.startDate || 
+      urlEndDate !== prevDeps.current.endDate ||
       JSON.stringify(urlVerified) !== JSON.stringify(prevDeps.current.verifiedFilter) || // Compare verified filter
       JSON.stringify(safeGetAllParams(getKey('role'))) !== JSON.stringify(prevDeps.current.roleFilter); // Compare role filter
 
-    // console.log(`Effect 2: Initial Load: ${initialLoad.current}, URL State Differs: ${urlStateDiffers}`);
 
     // If initial load OR URL state has changed from tracked state
     if (initialLoad.current || urlStateDiffers) {
-      // console.log(`Effect 2: Syncing state and fetching...`);
-
       // Sync state with URL values for this instance
       setSearchInput(urlSearch);
       setStatusFilter(urlStatus);
       setGenreFilter(urlGenres);
       setSorting(urlSorting);
-      setVerifiedFilter(urlVerified); // Sync verified filter state
-      setRoleFilter(safeGetAllParams(getKey('role'))); // Sync role filter state
-      // Note: currentPage is derived directly from searchParams, so no separate state update needed
+      setVerifiedFilter(urlVerified);
+      setRoleFilter(safeGetAllParams(getKey('role')));
 
       // Fetch data immediately based on URL state
       // Pass the current searchParams (representing the URL) to fetchDataInternal
@@ -455,52 +402,48 @@ export function useDataTable<T>({
         statusFilter: urlStatus,
         genreFilter: urlGenres,
         sorting: urlSorting,
-        startDate: urlStartDate, // Update previous startDate
-        endDate: urlEndDate, // Update previous endDate
-        verifiedFilter: urlVerified, // Update previous verified filter
-        roleFilter: safeGetAllParams(getKey('role')), // Update previous role filter
+        startDate: urlStartDate,
+        endDate: urlEndDate,
+        verifiedFilter: urlVerified,
+        roleFilter: safeGetAllParams(getKey('role')),
       };
 
       if (initialLoad.current) {
         initialLoad.current = false;
       }
     }
-    // searchParams is the sole dependency, representing the URL state
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, /* loggedInAdminLevel, REMOVED */ updateUrlParams, fetchDataInternal, getKey, safeParamsToString]); // Add dependencies
+  }, [searchParams, updateUrlParams, fetchDataInternal, getKey, safeParamsToString]);
 
   // Refresh data function (refetches based on current URL state)
   const refreshData = useCallback(async () => {
-    // console.log("Refreshing data based on current URL");
     const params = new URLSearchParams(safeParamsToString());
     const pageToRefresh = Math.max(1, Number(params.get(getKey('page'))) || 1);
-    // Pass the current URL params; fetchDataInternal knows how to map them for the API
     await fetchDataInternal(pageToRefresh, params);
   }, [searchParams, fetchDataInternal, getKey, safeParamsToString]);
 
   return {
     data,
-    setData, // Allow external data manipulation if needed
+    setData,
     loading,
     totalPages,
-    currentPage, // This is now always derived directly from URL state
+    currentPage,
     actionLoading,
     setActionLoading,
-    searchInput, // Expose state
-    setSearchInput, // Expose setter
-    statusFilter, // Expose state
-    setStatusFilter, // Expose setter
-    genreFilter, // Expose state
-    setGenreFilter, // Expose setter
-    verifiedFilter, // Expose state
-    setVerifiedFilter, // Expose setter
-    roleFilter, // Expose role filter state
-    setRoleFilter, // Expose role filter setter
+    searchInput,
+    setSearchInput,
+    statusFilter,
+    setStatusFilter,
+    genreFilter,
+    setGenreFilter,
+    verifiedFilter,
+    setVerifiedFilter,
+    roleFilter,
+    setRoleFilter,
     selectedRows,
     setSelectedRows,
-    sorting, // Expose state
-    setSorting, // Expose setter
-    updateQueryParam: updateUrlParams, // Expose URL update function
-    refreshData, // Expose refresh function
+    sorting,
+    setSorting,
+    updateQueryParam: updateUrlParams, 
+    refreshData,
   };
 }

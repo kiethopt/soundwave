@@ -8,10 +8,8 @@ const fetchWithAuth = async (
   options: RequestInit = {},
   token?: string
 ) => {
-  const sessionId = localStorage.getItem("sessionId");
   const headers: Record<string, string> = {
     ...(token && { Authorization: `Bearer ${token}` }),
-    ...(sessionId && { "Session-ID": sessionId }),
     ...(options.headers as Record<string, string>),
   };
 
