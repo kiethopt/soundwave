@@ -21,10 +21,15 @@ const playlist_routes_1 = __importDefault(require("./routes/playlist.routes"));
 const label_routes_1 = __importDefault(require("./routes/label.routes"));
 const db_1 = __importDefault(require("./config/db"));
 const playlist_extension_1 = require("./prisma/extensions/playlist.extension");
+const socket_1 = require("./config/socket");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
-app.use((0, cors_1.default)());
+(0, socket_1.initializeSocket)(server);
+app.use((0, cors_1.default)({
+    origin: 'http://localhost:3000',
+    credentials: true
+}));
 app.use(express_1.default.json({ limit: '50mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/api/auth', auth_routes_1.default);
@@ -60,9 +65,9 @@ const initApp = async () => {
     }
 };
 const numericPort = typeof PORT === 'string' ? parseInt(PORT, 10) : PORT;
-server.listen(numericPort, '127.0.0.1', async () => {
-    console.log(`🚀 Server is running on http://127.0.0.1:${numericPort}`);
-    console.log(`🔌 Socket.IO listening on http://127.0.0.1:${numericPort}`);
+server.listen(numericPort, '0.0.0.0', async () => {
+    console.log(`🚀 Server is running on http://localhost:${numericPort}`);
+    console.log(`🔌 Socket.IO listening on http://localhost:${numericPort}`);
     await initApp();
 });
 process.on('unhandledRejection', (reason, promise) => {

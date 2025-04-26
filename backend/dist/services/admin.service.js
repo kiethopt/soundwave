@@ -51,7 +51,7 @@ const bcrypt_1 = __importDefault(require("bcrypt"));
 const date_fns_1 = require("date-fns");
 const emailService = __importStar(require("./email.service"));
 const getUsers = async (req, requestingUser) => {
-    const { search = '', status, role } = req.query;
+    const { search = '', status, role, sortBy, sortOrder } = req.query;
     let roleFilter = {};
     if (requestingUser.adminLevel !== 1) {
         roleFilter = client_1.Role.USER;
@@ -81,10 +81,16 @@ const getUsers = async (req, requestingUser) => {
             : {}),
         ...(status !== undefined ? { isActive: (0, handle_utils_1.toBooleanValue)(status) } : {}),
     };
+    let orderBy = { createdAt: 'desc' };
+    const validSortFields = ['name', 'email', 'username', 'role', 'isActive', 'createdAt', 'lastLoginAt'];
+    if (sortBy && validSortFields.includes(String(sortBy))) {
+        const order = sortOrder === 'asc' ? 'asc' : 'desc';
+        orderBy = { [String(sortBy)]: order };
+    }
     const options = {
         where,
         select: prisma_selects_1.userSelect,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
     };
     const result = await (0, handle_utils_1.paginate)(db_1.default.user, req, options);
     return {

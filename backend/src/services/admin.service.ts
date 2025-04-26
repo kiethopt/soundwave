@@ -24,7 +24,7 @@ import * as emailService from './email.service';
 type User = PrismaUser & { adminLevel?: number | null };
 
 export const getUsers = async (req: Request, requestingUser: User) => {
-  const { search = '', status, role } = req.query;
+  const { search = '', status, role, sortBy, sortOrder } = req.query;
 
   let roleFilter: Prisma.UserWhereInput['role'] = {};
   if (requestingUser.adminLevel !== 1) {
@@ -64,10 +64,18 @@ export const getUsers = async (req: Request, requestingUser: User) => {
     ...(status !== undefined ? { isActive: toBooleanValue(status) } : {}),
   };
 
+  // Sorting Logic
+  let orderBy: Prisma.UserOrderByWithRelationInput = { createdAt: 'desc' }; // Default sort
+  const validSortFields = ['name', 'email', 'username', 'role', 'isActive', 'createdAt', 'lastLoginAt'];
+  if (sortBy && validSortFields.includes(String(sortBy))) {
+    const order = sortOrder === 'asc' ? 'asc' : 'desc'; // Default to desc if sortOrder is not asc
+    orderBy = { [String(sortBy)]: order };
+  }
+
   const options = {
     where,
     select: userSelect,
-    orderBy: { createdAt: 'desc' },
+    orderBy, // Use the determined orderBy clause
   };
 
   // Phân trang và sắp xếp theo ngày tạo

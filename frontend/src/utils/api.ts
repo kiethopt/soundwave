@@ -13,6 +13,7 @@ const fetchWithAuth = async (
     ...(options.headers as Record<string, string>),
   };
 
+  // Set Content-Type for non-FormData requests
   if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
@@ -22,70 +23,72 @@ const fetchWithAuth = async (
     headers,
   });
 
+  // --- Simplified Error Handling --- 
   if (!response.ok) {
-    const errorText = await response.text();
-    let errorMessage = "An unexpected error occurred";
+    let errorMessage = `HTTP error! status: ${response.status}`;
     let errorCode = "";
-    let errorData: any = null; // Added to potentially hold more error details
-
+    let errorData: any = null;
     try {
-      const errorResponse = JSON.parse(errorText);
-      errorMessage = errorResponse.message || errorMessage;
-      errorCode = errorResponse.code || "";
-      errorData = errorResponse.data || null; // Store extra data if available
+      const errorBody = await response.json();
+      errorMessage = errorBody.message || errorMessage;
+      errorCode = errorBody.code || "";
+      errorData = errorBody.data || null;
 
-      // Thêm xử lý error code cho tài khoản bị khóa
-      if (errorCode === "ARTIST_DEACTIVATED") {
-        errorMessage = "Your artist account has been deactivated";
+      // Specific handling for TRACK_ALREADY_IN_PLAYLIST - return instead of throw
+       if (errorCode === "TRACK_ALREADY_IN_PLAYLIST") {
+         console.warn(`Handled duplicate track error: ${errorMessage}`);
+         return {
+           success: false,
+           code: "TRACK_ALREADY_IN_PLAYLIST",
+           message: errorMessage,
+           data: errorData,
+         };
+       }
+      
+      // Specific handling for ACCOUNT_DEACTIVATED or ARTIST_DEACTIVATED
+      if (errorCode === "ACCOUNT_DEACTIVATED" || errorCode === "ARTIST_DEACTIVATED"){
+          // Optionally re-throw a specific error type or modify message
+          // For now, just ensure the message is passed
       }
-
-      // === ADDED CHECK FOR DUPLICATE TRACK ===
-      if (
-        errorCode === "TRACK_ALREADY_IN_PLAYLIST" ||
-        errorMessage.includes("already exists")
-      ) {
-        console.warn(`Handled duplicate track error: ${errorMessage}`); // Optional warning
-        // Return a specific structure instead of throwing
-        return {
-          success: false,
-          code: "TRACK_ALREADY_IN_PLAYLIST", // Standardize the code
-          message: errorMessage,
-          data: errorData, // Pass along any extra data
-        };
+      
+    } catch (jsonError) {
+      // If JSON parsing fails, try to get the raw text
+      try {
+        const errorText = await response.text();
+        errorMessage = errorText || errorMessage; // Use text if available
+      } catch (textError) {
+        // Keep the original HTTP status error if text fails
+        console.error("Failed to read error response text:", textError);
       }
-      // ========================================
-    } catch (e) {
-      // If parsing fails, the errorText itself might be the message
-      errorMessage = errorText || errorMessage;
     }
 
-    // For any other error that was not handled above, throw it
-    throw new Error(errorMessage);
+    // Throw a standard Error object with the message from the backend
+    const errorToThrow = new Error(errorMessage);
+    // Optional: Attach code/data if needed elsewhere, but rely on message for display
+    (errorToThrow as any).code = errorCode;
+    (errorToThrow as any).data = errorData;
+    throw errorToThrow; 
   }
+  // --- End Simplified Error Handling ---
 
-  // If response IS ok, parse and return JSON
-  // Check if response has content before trying to parse JSON
+  // Handle successful responses (2xx)
   const responseText = await response.text();
   try {
+    // If responseText is empty, return a success indicator
+    if (!responseText) {
+      return { success: true };
+    }
+    // Otherwise, parse the JSON
     return JSON.parse(responseText);
   } catch (e) {
-    // Handle cases where the response is OK (2xx) but has no body or non-JSON body
-    if (
-      response.status >= 200 &&
-      response.status < 300 &&
-      responseText.trim() === ""
-    ) {
-      return { success: true }; // Or return null/undefined based on expectations
-    }
+    // If parsing fails on a successful response, log and return raw text
     console.error(
       "Failed to parse successful response JSON:",
       e,
       "Response Text:",
       responseText
     );
-    // Decide what to return or throw if JSON parsing fails on a successful response
-    // Returning a success indicator might be safer than throwing an unrelated error
-    return { success: true, data: responseText }; // Or just { success: true }
+    return { success: true, data: responseText };
   }
 };
 
@@ -914,7 +917,6 @@ export const api = {
         );
       } catch (error) {
         console.error(`Error playing track ${trackId}:`, error);
-        // Don't return an error response since this is a background operation
         return { success: false };
       }
     },
@@ -1301,10 +1303,9 @@ export const api = {
       formData: FormData,
       token: string
     ) => {
-      // Ensure this uses the main PATCH endpoint and backend handles FormData
       try {
         return await fetchWithAuth(
-          `/api/playlists/${playlistId}`, // Use the main PATCH route
+          `/api/playlists/${playlistId}`,
           {
             method: "PATCH",
             body: formData,

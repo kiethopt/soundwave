@@ -890,12 +890,36 @@ export default function Sidebar({
                     </div>
                   )}
 
+                  {/* Old User Management */}
+                  {/* <Link
+                    href="/admin/users"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      pathname && pathname.startsWith('/admin/users')
+                        ? 'bg-gray-200 text-gray-900'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <Users className="w-6 h-6" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <Users className="w-5 h-5" />
+                        </div>
+                        <span className="ml-3 font-medium text-sm">Users</span>
+                      </>
+                    )}
+                  </Link> */}
+
+
                   <Link
                     href="/admin/users"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/users")
-                        ? "bg-gray-200 text-gray-900"
-                        : "text-gray-700 hover:bg-gray-100"
+                      pathname && pathname.startsWith('/admin/simple-users')
+                        ? 'bg-gray-200 text-gray-900'
+                        : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
                     {isCollapsed ? (
