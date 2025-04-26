@@ -384,14 +384,10 @@ export const deleteArtist = async (
 };
 
 // Lấy danh sách tất cả nghệ sĩ - ADMIN only
-export const getAllArtists = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const getAllArtists = async (req: Request, res: Response) => {
   try {
-    const { artists, pagination } = await adminService.getArtists(req);
-
-    res.json({ artists, pagination });
+    const result = await adminService.getArtists(req);
+    res.status(200).json(result);
   } catch (error) {
     handleError(res, error, 'Get all artists');
   }

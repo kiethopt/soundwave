@@ -390,7 +390,7 @@ const deleteArtistById = async (id, reason) => {
 };
 exports.deleteArtistById = deleteArtistById;
 const getArtists = async (req) => {
-    const { search = '', status, isVerified } = req.query;
+    const { search = '', status, isVerified, sortBy, sortOrder } = req.query;
     const where = {
         role: client_1.Role.ARTIST,
         verificationRequestedAt: null,
@@ -414,10 +414,19 @@ const getArtists = async (req) => {
             : {}),
         ...(status !== undefined ? { isActive: status === 'true' } : {}),
     };
+    let orderBy;
+    const validSortFields = ['artistName', 'isVerified', 'isActive', 'monthlyListeners', 'createdAt'];
+    if (sortBy && validSortFields.includes(String(sortBy))) {
+        const order = sortOrder === 'asc' ? 'asc' : 'desc';
+        orderBy = [{ [String(sortBy)]: order }, { id: 'asc' }];
+    }
+    else {
+        orderBy = [{ createdAt: 'desc' }, { id: 'asc' }];
+    }
     const options = {
         where,
         select: prisma_selects_1.artistProfileSelect,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
     };
     const result = await (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, options);
     return {

@@ -2135,17 +2135,6 @@ export function AlbumDetailModal({
           )}
         </div>
       </DialogContent>
-      {/* Close Button */}
-      <DialogClose
-        className={`absolute top-3 right-3 p-1 rounded-full transition-colors ${
-          theme === "light"
-            ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            : "bg-white/10 text-white/70 hover:bg-white/20"
-        }`}
-      >
-        <X className="w-5 h-5" />
-        <span className="sr-only">Close</span>
-      </DialogClose>
     </Dialog>
   );
 }
@@ -2458,17 +2447,6 @@ export function TrackDetailModal({
           {/* Add any other info or actions here */}
         </div>
       </DialogContent>
-      {/* Close Button */}
-      <DialogClose
-        className={`absolute top-3 right-3 p-1 rounded-full transition-colors ${
-          theme === "light"
-            ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            : "bg-white/10 text-white/70 hover:bg-white/20"
-        }`}
-      >
-        <X className="w-5 h-5" />
-        <span className="sr-only">Close</span>
-      </DialogClose>
     </Dialog>
   );
 }

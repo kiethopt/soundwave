@@ -497,14 +497,15 @@ export const deleteArtistById = async (id: string, reason?: string) => {
   return { message: `Artist ${id} deleted permanently. Reason: ${reason || 'No reason provided'}` };
 };
 
-// Lấy danh sách nghệ sĩ
+// Lấy danh sách tất cả nghệ sĩ đã xác minh
 export const getArtists = async (req: Request) => {
-  const { search = '', status, isVerified } = req.query;
+  const { search = '', status, isVerified, sortBy, sortOrder } = req.query;
 
   const where: Prisma.ArtistProfileWhereInput = {
     role: Role.ARTIST,
-    verificationRequestedAt: null, // Luôn loại bỏ các ArtistProfile đang pending
+    verificationRequestedAt: null, // Đã được xác minh (không phải đang chờ yêu cầu)
     ...(isVerified !== undefined && { isVerified: isVerified === 'true' }),
+    // Tìm kiếm
     ...(search
       ? {
           OR: [
@@ -514,7 +515,7 @@ export const getArtists = async (req: Request) => {
                 email: { contains: String(search), mode: 'insensitive' },
               },
             },
-            { // Also search user name for artists
+            {
               user: {
                 name: { contains: String(search), mode: 'insensitive' },
               },
@@ -522,16 +523,28 @@ export const getArtists = async (req: Request) => {
           ],
         }
       : {}),
+    // Trạng thái active/inactive
     ...(status !== undefined ? { isActive: status === 'true' } : {}),
   };
+
+  // Sorting Logic
+  let orderBy: Prisma.ArtistProfileOrderByWithRelationInput | Prisma.ArtistProfileOrderByWithRelationInput[];
+  const validSortFields = ['artistName', 'isVerified', 'isActive', 'monthlyListeners', 'createdAt'];
+
+  if (sortBy && validSortFields.includes(String(sortBy))) {
+    const order = sortOrder === 'asc' ? 'asc' : 'desc'; 
+    orderBy = [{ [String(sortBy)]: order }, { id: 'asc' }];
+  } else {
+    orderBy = [{ createdAt: 'desc' }, { id: 'asc' }];
+  }
 
   const options = {
     where,
     select: artistProfileSelect,
-    orderBy: { createdAt: 'desc' },
+    orderBy,
   };
 
-  const result = await paginate(prisma.artistProfile, req, options);
+  const result = await paginate<ArtistProfile>(prisma.artistProfile, req, options);
 
   return {
     artists: result.data,

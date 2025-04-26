@@ -16,13 +16,6 @@ import {
 import Image from 'next/image';
 import { XIcon, Edit, Trash2, ShieldAlert, UserCog } from 'lucide-react';
 import toast from 'react-hot-toast';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 // Edit User Modal
 interface EditUserModalProps {

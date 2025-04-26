@@ -333,8 +333,8 @@ const deleteArtist = async (req, res) => {
 exports.deleteArtist = deleteArtist;
 const getAllArtists = async (req, res) => {
     try {
-        const { artists, pagination } = await adminService.getArtists(req);
-        res.json({ artists, pagination });
+        const result = await adminService.getArtists(req);
+        res.status(200).json(result);
     }
     catch (error) {
         (0, handle_utils_1.handleError)(res, error, 'Get all artists');

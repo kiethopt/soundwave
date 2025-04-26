@@ -26,7 +26,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
 import { PlaylistIcon } from "@/components/user/playlist/PlaylistIcon";
 import { BsFillPinAngleFill } from "react-icons/bs";
-import { BsStars } from "react-icons/bs";
 import { Playlist } from "@/types";
 import { useSocket } from "@/contexts/SocketContext";
 import { toast } from "react-hot-toast";
@@ -584,8 +583,7 @@ export default function Sidebar({
                       )}
 
                       {/* Conditional rendering for 'Create playlist' prompt */}
-                      {(!isCollapsed && !loading && playlists.length === 0) ||
-                      !isAuthenticated ? (
+                      {!isCollapsed && (!isAuthenticated || (isAuthenticated && !loading && playlists.length === 0)) && (
                         <div
                           className={`p-4 rounded-lg mt-4 ${
                             theme === "light" ? "bg-gray-100" : "bg-[#242424]"
@@ -621,7 +619,7 @@ export default function Sidebar({
                               : "Create playlist"}
                           </button>
                         </div>
-                      ) : null}
+                      )}
 
                       <div
                         className={`${
@@ -917,7 +915,7 @@ export default function Sidebar({
                   <Link
                     href="/admin/users"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith('/admin/simple-users')
+                      pathname && pathname.startsWith('/admin/users')
                         ? 'bg-gray-200 text-gray-900'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
