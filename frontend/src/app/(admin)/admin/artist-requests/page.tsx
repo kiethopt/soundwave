@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { RejectModal, ApproveModal } from '@/components/ui/admin-modals';
+import { RejectModal, ApproveModal, ConfirmDeleteModal } from '@/components/ui/admin-modals';
 
 export default function ArtistRequestManagement() {
   const { theme } = useTheme();
@@ -38,6 +38,10 @@ export default function ArtistRequestManagement() {
   
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [requestToApprove, setRequestToApprove] = useState<ArtistRequest | null>(null);
+  
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isBulkDelete, setIsBulkDelete] = useState(false);
+  const [requestToDelete, setRequestToDelete] = useState<ArtistRequest | null>(null);
   
   const [searchInput, setSearchInput] = useState('');
   const [activeSearchTerm, setActiveSearchTerm] = useState('');
@@ -194,21 +198,57 @@ export default function ArtistRequestManagement() {
     setIsRejectModalOpen(true);
   };
 
-  // Open reject modal for bulk rejection
-  const handleBulkRejectClick = () => {
+  // Open delete modal for bulk deletion
+  const handleBulkDeleteClick = () => {
     if (selectedRequestIds.size === 0) {
-      toast.error('No requests selected for rejection.');
+      toast.error('No requests selected for deletion.');
       return;
     }
     // Ensure current page has selected items before proceeding
     const itemsOnCurrentPage = requests.filter(r => selectedRequestIds.has(r.id)).length;
     if (itemsOnCurrentPage === 0 && selectedRequestIds.size > 0) {
-        toast.error('Selection includes items from other pages. Please reject per page or clear selection.');
+        toast.error('Selection includes items from other pages. Please delete per page or clear selection.');
         return;
     }
 
-    setIsBulkReject(true);
-    setIsRejectModalOpen(true);
+    setIsBulkDelete(true);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Handle delete confirmation
+  const handleDeleteConfirm = async (ids: string[]) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      setIsDeleteModalOpen(false);
+      return;
+    }
+
+    try {
+      setActionLoading('bulk');
+      
+      if (isBulkDelete) {
+        const promises = Array.from(selectedRequestIds).map(id => 
+          api.admin.deleteArtistRequest(id, token)
+        );
+        await Promise.all(promises);
+        toast.success(`${selectedRequestIds.size} requests deleted successfully!`);
+        setSelectedRequestIds(new Set());
+      } else if (requestToDelete) {
+        await api.admin.deleteArtistRequest(requestToDelete.id, token);
+        toast.success(`${requestToDelete.artistName || 'Request'} deleted successfully!`);
+      }
+      
+      refreshTable();
+    } catch (err: any) {
+      console.error('Error deleting request(s):', err);
+      toast.error(err.message || 'Failed to delete request(s).');
+    } finally {
+      setActionLoading(null);
+      setIsDeleteModalOpen(false);
+      setRequestToDelete(null);
+      setIsBulkDelete(false);
+    }
   };
 
   // Handle reject confirmation
@@ -423,14 +463,14 @@ export default function ArtistRequestManagement() {
         <div className="min-w-[200px]">
           {selectedRequestIds.size > 0 && (
             <Button
-              onClick={handleBulkRejectClick}
+              onClick={handleBulkDeleteClick}
               variant="destructive"
               size="default"
               disabled={loading || actionLoading === 'bulk'}
               className={`${theme === 'dark' ? 'bg-red-700 hover:bg-red-800' : ''}`}
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              Reject Selected ({selectedRequestIds.size})
+              Delete Selected ({selectedRequestIds.size})
             </Button>
           )}
         </div>
@@ -481,6 +521,25 @@ export default function ArtistRequestManagement() {
         onConfirm={handleApproveConfirm}
         theme={theme}
         artistName={requestToApprove?.artistName}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setRequestToDelete(null);
+          setIsBulkDelete(false);
+        }}
+        onConfirm={handleDeleteConfirm}
+        theme={theme}
+        entityType="artist request"
+        item={requestToDelete ? { 
+          id: requestToDelete.id, 
+          name: requestToDelete.artistName, 
+          email: requestToDelete.user?.email || ''
+        } : null}
+        count={isBulkDelete ? selectedRequestIds.size : undefined}
       />
     </div>
   );
