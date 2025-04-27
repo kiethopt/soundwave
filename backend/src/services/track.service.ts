@@ -266,7 +266,7 @@ export const getTracks = async (req: Request) => {
       { album: { title: { contains: search, mode: 'insensitive' } } },
       {
         genres: {
-          some: {
+          every: {
             genre: {
               name: { contains: search, mode: 'insensitive' },
             },
@@ -983,7 +983,7 @@ export const getTracksByGenre = async (req: Request, genreId: string) => {
 
   const whereClause: any = {
     genres: {
-      some: {
+      every: {
         genreId: genreId,
       },
     },
@@ -1058,7 +1058,7 @@ export const getTracksByTypeAndGenre = async (req: Request, type: string, genreI
   const whereClause: any = {
     type: type as AlbumType,
     genres: {
-      some: {
+      every: {
         genreId: genreId,
       },
     },

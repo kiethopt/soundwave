@@ -1414,7 +1414,7 @@ export const getGenreTopTracks = async (genreId: string) => {
     where: {
       isActive: true,
       genres: {
-        some: {
+        every: {
           genreId,
         },
       },
@@ -1445,7 +1445,7 @@ export const getGenreNewestTracks = async (genreId: string) => {
     where: {
       isActive: true,
       genres: {
-        some: {
+        every: {
           genreId,
         },
       },

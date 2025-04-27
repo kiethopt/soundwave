@@ -84,7 +84,7 @@ export const getAlbums = async (req: Request) => {
     whereClause.OR = [
       { title: { contains: search, mode: 'insensitive' } },
       { artist: { artistName: { contains: search, mode: 'insensitive' } } },
-      { genres: { some: { genre: { name: { contains: search, mode: 'insensitive' } } } } },
+      { genres: { every: { genre: { name: { contains: search, mode: 'insensitive' } } } } },
     ];
   }
 
