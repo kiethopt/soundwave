@@ -268,7 +268,7 @@ const updateArtistInfo = async (id, data, avatarFile) => {
     if (!existingArtist) {
         throw new Error('Artist not found');
     }
-    const { artistName, bio, isActive, isVerified, socialMediaLinks } = data;
+    const { artistName, bio, isActive, isVerified } = data;
     let validatedArtistName = undefined;
     if (artistName && artistName !== existingArtist.artistName) {
         const nameExists = await db_1.default.artistProfile.findFirst({
@@ -287,26 +287,6 @@ const updateArtistInfo = async (id, data, avatarFile) => {
         const result = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artists/avatars', 'image');
         avatarUrl = result.secure_url;
     }
-    let socialMediaLinksUpdate = existingArtist.socialMediaLinks;
-    if (socialMediaLinks !== undefined) {
-        try {
-            if (socialMediaLinks === '' || socialMediaLinks === null) {
-                socialMediaLinksUpdate = null;
-            }
-            else {
-                const parsedLinks = typeof socialMediaLinks === 'string' ? JSON.parse(socialMediaLinks) : socialMediaLinks;
-                if (typeof parsedLinks === 'object' && parsedLinks !== null) {
-                    socialMediaLinksUpdate = parsedLinks;
-                }
-                else {
-                    console.warn('Invalid socialMediaLinks format received:', socialMediaLinks);
-                }
-            }
-        }
-        catch (error) {
-            console.error('Error processing socialMediaLinks JSON:', error);
-        }
-    }
     const updatedArtist = await db_1.default.artistProfile.update({
         where: { id },
         data: {
@@ -318,7 +298,6 @@ const updateArtistInfo = async (id, data, avatarFile) => {
                 verifiedAt: (0, handle_utils_1.toBooleanValue)(isVerified) ? new Date() : null,
             }),
             ...(avatarUrl && { avatar: avatarUrl }),
-            ...(socialMediaLinks !== undefined && { socialMediaLinks: socialMediaLinksUpdate }),
         },
         select: prisma_selects_1.artistProfileSelect,
     });

@@ -120,32 +120,6 @@ export default function ArtistRequestDetail({
     );
   }
 
-  const formatSocialMediaLink = (
-    platform: 'facebook' | 'instagram',
-    value: string
-  ) => {
-    if (!value) return '#';
-
-    try {
-      if (value.startsWith('http')) {
-        const url = new URL(value);
-        return url.toString();
-      }
-
-      const cleanValue = value.replace(/^@/, '').replace(/\s+/g, '');
-      switch (platform) {
-        case 'facebook':
-          return `https://facebook.com/${cleanValue}`;
-        case 'instagram':
-          return `https://instagram.com/${cleanValue}`;
-        default:
-          return '#';
-      }
-    } catch {
-      return '#';
-    }
-  };
-
   return (
     <div
       className="container mx-auto mb-16 md:mb-0 p-4"
@@ -342,10 +316,7 @@ export default function ArtistRequestDetail({
                 <div className="space-y-3">
                   {request.socialMediaLinks.facebook && (
                     <a
-                      href={formatSocialMediaLink(
-                        'facebook',
-                        request.socialMediaLinks.facebook
-                      )}
+                      href={request.socialMediaLinks.facebook}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`flex items-center gap-4 p-4 ${
@@ -366,10 +337,7 @@ export default function ArtistRequestDetail({
 
                   {request.socialMediaLinks.instagram && (
                     <a
-                      href={formatSocialMediaLink(
-                        'instagram',
-                        request.socialMediaLinks.instagram
-                      )}
+                      href={request.socialMediaLinks.instagram}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`flex items-center gap-4 p-4 ${

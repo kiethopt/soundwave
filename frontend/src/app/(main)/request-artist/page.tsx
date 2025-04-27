@@ -192,15 +192,10 @@ export default function RequestArtistPage() {
       submitFormData.append('bio', formData.bio);
       submitFormData.append('genres', formData.genres.join(','));
 
+      // Send the full URLs
       const socialMediaLinks = {
-        facebook: formData.facebookLink.replace(
-          'https://www.facebook.com/',
-          ''
-        ),
-        instagram: formData.instagramLink.replace(
-          'https://www.instagram.com/',
-          ''
-        ),
+        facebook: formData.facebookLink, 
+        instagram: formData.instagramLink,
       };
       submitFormData.append(
         'socialMediaLinks',
