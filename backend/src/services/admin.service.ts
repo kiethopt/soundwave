@@ -312,7 +312,7 @@ export const updateArtistInfo = async (
     throw new Error('Artist not found');
   }
 
-  const { artistName, bio, isActive, isVerified, socialMediaLinks } = data;
+  const { artistName, bio, isActive, isVerified } = data;
 
   // Kiểm tra tên nghệ sĩ nếu có thay đổi
   let validatedArtistName = undefined;
@@ -342,31 +342,6 @@ export const updateArtistInfo = async (
     avatarUrl = result.secure_url;
   }
 
-  // Prepare social media links update (ensure it's a valid JSON or null)
-  let socialMediaLinksUpdate = existingArtist.socialMediaLinks;
-  if (socialMediaLinks !== undefined) { // Allow updating even if empty string/null is passed
-    try {
-        // If it's an empty string or explicitly null, set to null
-        if (socialMediaLinks === '' || socialMediaLinks === null) {
-             socialMediaLinksUpdate = null;
-        } else {
-             // Assuming socialMediaLinks is passed as a JSON string from FormData
-             const parsedLinks = typeof socialMediaLinks === 'string' ? JSON.parse(socialMediaLinks) : socialMediaLinks;
-             // Simple validation: ensure it's an object
-             if (typeof parsedLinks === 'object' && parsedLinks !== null) {
-                 socialMediaLinksUpdate = parsedLinks;
-             } else {
-                 console.warn('Invalid socialMediaLinks format received:', socialMediaLinks);
-                 // Keep existing links if parsing fails or format is wrong
-             }
-        }
-    } catch (error) {
-      console.error('Error processing socialMediaLinks JSON:', error);
-      // Keep existing links if parsing fails
-    }
-  }
-
-
   // Cập nhật artist trực tiếp với các trường đã gửi
   const updatedArtist = await prisma.artistProfile.update({
     where: { id },
@@ -380,8 +355,6 @@ export const updateArtistInfo = async (
         verifiedAt: toBooleanValue(isVerified) ? new Date() : null,
       }),
       ...(avatarUrl && { avatar: avatarUrl }),
-      // Update social media links only if it was present in the request data
-      ...(socialMediaLinks !== undefined && { socialMediaLinks: socialMediaLinksUpdate }),
     },
     // Use artistProfileSelect to ensure consistent return data,
     // it already includes the necessary user fields.

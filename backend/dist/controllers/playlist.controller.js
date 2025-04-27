@@ -40,6 +40,7 @@ exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBase
 const playlistService = __importStar(require("../services/playlist.service"));
 const albumService = __importStar(require("../services/album.service"));
 const userService = __importStar(require("../services/user.service"));
+const historyService = __importStar(require("../services/history.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
@@ -986,7 +987,7 @@ const getHomePageData = async (req, res, next) => {
         };
         if (isAuthenticated && userId) {
             try {
-                const [systemPlaylists, userSystemPlaylists, userPlaylists, userTopTracks, userTopArtists,] = await Promise.all([
+                const [systemPlaylists, userSystemPlaylists, userPlaylists, userTopTracks, userTopArtists, userPlayHistory,] = await Promise.all([
                     db_1.default.playlist.findMany({
                         where: {
                             type: "SYSTEM",
@@ -1038,6 +1039,7 @@ const getHomePageData = async (req, res, next) => {
                     }),
                     userService.getUserTopTracks(req.user),
                     userService.getUserTopArtists(req.user),
+                    historyService.getPlayHistoryService(req)
                 ]);
                 responseData.systemPlaylists = systemPlaylists.map((playlist) => ({
                     ...playlist,
@@ -1056,6 +1058,7 @@ const getHomePageData = async (req, res, next) => {
                 }));
                 responseData.userTopTracks = userTopTracks;
                 responseData.userTopArtists = userTopArtists;
+                responseData.userPlayHistory = userPlayHistory.data;
             }
             catch (error) {
                 console.error("Error fetching user playlist data:", error);

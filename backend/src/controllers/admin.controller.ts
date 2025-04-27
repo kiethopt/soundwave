@@ -229,7 +229,7 @@ export const updateArtist = async (
   try {
     const { id } = req.params;
     const avatarFile = req.file;
-    const { isActive, reason, isVerified, socialMediaLinks, ...artistData } = req.body;
+    const { isActive, reason, isVerified, ...artistData } = req.body;
 
     const originalIsActiveInput = isActive;
     let intendedIsActiveState: boolean | undefined = undefined;
@@ -246,9 +246,6 @@ export const updateArtist = async (
     }
     if (isVerified !== undefined) {
       dataForService.isVerified = isVerified === 'true' || isVerified === true;
-    }
-    if (socialMediaLinks !== undefined) {
-      dataForService.socialMediaLinks = socialMediaLinks;
     }
 
     // Call the service to update the artist info

@@ -17,6 +17,7 @@ import {
 import { MoreHorizontal, Trash2, Search, Eye, Edit, CheckCircle, XCircle, Play, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Track } from '@/types';
+import { TrackDetailModal } from '@/components/ui/admin-modals';
 
 interface TrackManagementProps {
   theme: 'light' | 'dark';
@@ -37,6 +38,8 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   const [activeSearchTerm, setActiveSearchTerm] = useState('');
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'createdAt', direction: 'desc' });
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const limit = 10;
 
   const fetchTracks = useCallback(async (page: number, search: string, sort: SortConfig) => {
@@ -222,6 +225,20 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   const isAllSelected = tracks.length > 0 && selectedTrackIds.size === tracks.length;
   const isIndeterminate = selectedTrackIds.size > 0 && selectedTrackIds.size < tracks.length;
 
+  const handleViewTrackDetails = (track: Track) => {
+    setSelectedTrack(track);
+    setIsDetailModalOpen(true);
+  };
+
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedTrack(null);
+  };
+
+  const handleRowClick = (track: Track) => {
+    handleViewTrackDetails(track);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
@@ -329,8 +346,9 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                     <tr
                       key={track.id}
                       className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedTrackIds.has(track.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === track.id ? 'opacity-50 pointer-events-none' : ''}`}
+                      onClick={() => handleRowClick(track)}
                     >
-                      <td className="w-4 p-4">
+                      <td className="w-4 p-4" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           id={`select-row-${track.id}`}
                           checked={selectedTrackIds.has(track.id)}
@@ -355,12 +373,15 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="icon"
                             className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
-                            onClick={() => handleDeleteTrack(track.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTrack(track.id);
+                            }}
                             aria-label={`Delete track ${track.title}`}
                             disabled={loading || actionLoading !== null}
                           >
@@ -375,7 +396,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleViewTrackDetails(track)}>
                                 <Eye className="mr-2 h-4 w-4" /> View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem>
@@ -386,7 +407,10 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator className={theme === 'dark' ? 'bg-gray-600' : ''} />
                               <DropdownMenuItem
-                                onClick={() => handleToggleVisibility(track.id, track.isActive)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleVisibility(track.id, track.isActive);
+                                }}
                                 disabled={actionLoading === track.id}
                               >
                                 {track.isActive ? (
@@ -454,6 +478,14 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
           </div>
         </>
       )}
+
+      {/* Track Detail Modal */}
+      <TrackDetailModal
+        track={selectedTrack}
+        isOpen={isDetailModalOpen}
+        onClose={closeDetailModal}
+        theme={theme}
+      />
     </div>
   );
 };

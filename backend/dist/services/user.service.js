@@ -826,6 +826,7 @@ const getRecommendedArtists = async (user) => {
                 },
             },
         },
+        take: 15
     });
     if (process.env.USE_REDIS_CACHE === 'true') {
         await (0, cache_middleware_1.setCache)(cacheKey, recommendedArtists, 1800);

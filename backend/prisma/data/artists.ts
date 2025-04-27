@@ -32,8 +32,8 @@ export const artists: ArtistData[] = [
       bio: 'Obito là một nghệ sĩ hip hop Việt Nam nổi tiếng với phong cách âm nhạc lo-fi và lyric sâu sắc.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743859970/Obito_rmccxb.jpg',
       socialMediaLinks: {
-        facebook: 'obitoz',
-        instagram: 'obitoz',
+        facebook: 'https://www.facebook.com/youngtobiedasick',
+        instagram: 'https://www.instagram.com/youngtobieedasick',
       },
     },
   },
@@ -50,8 +50,8 @@ export const artists: ArtistData[] = [
       bio: 'RPT MCK (tên thật: Nghiêm Vũ Hoàng Long) là một rapper người Việt Nam, thành viên của Rapital và Gerdnang. Anh nổi tiếng khi tham gia King Of Rap và đạt được vị trí á quân.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743860346/rpt_mck_fjkaou.jpg',
       socialMediaLinks: {
-        facebook: 'MCK.rpt',
-        instagram: 'mck.rpt',
+        facebook: 'https://www.facebook.com/hoanglongmck',
+        instagram: 'https://www.instagram.com/rpt.mckeyyyyy',
       },
     },
   },
@@ -68,8 +68,8 @@ export const artists: ArtistData[] = [
       bio: 'Lăng LD là một rapper Việt Nam, thành viên nhóm Rap nhạc GrimReaper Team.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743860556/lang_ld_v0pbr0.jpg',
       socialMediaLinks: {
-        facebook: 'langld.grt',
-        instagram: 'langld.grt',
+        facebook: 'https://www.facebook.com/langld.westside',
+        instagram: 'https://www.instagram.com/langld.vn',
       },
     },
   },
@@ -86,8 +86,8 @@ export const artists: ArtistData[] = [
       bio: 'VSTRA là nghệ danh của rapper Việt Nam Nguyễn Hải Đăng, được biết đến với phong cách rap melodic.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743860648/vstra_ff8nu2.webp',
       socialMediaLinks: {
-        facebook: 'vstra.official',
-        instagram: 'vstravistaa',
+        facebook: 'https://www.facebook.com/embequocdann',
+        instagram: 'https://www.instagram.com/vstra____official',
       },
     },
   },
@@ -104,8 +104,8 @@ export const artists: ArtistData[] = [
       bio: 'AMEE (tên thật: Trần Huyền My) là ca sĩ người Việt Nam. Cô được biết đến nhiều hơn sau khi phát hành ca khúc "Anh Nhà Ở Đâu Thế" đạt hơn 100 triệu lượt xem trên YouTube.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743860145/amee_bqf6zt.jpg',
       socialMediaLinks: {
-        facebook: 'ameeofficial.vn',
-        instagram: 'ameevn',
+        facebook: 'https://www.facebook.com/ameest319',
+        instagram: 'https://www.instagram.com/ameemee_m',
       },
     },
   },
@@ -122,8 +122,8 @@ export const artists: ArtistData[] = [
       bio: 'Shiki (tên thật: Huỳnh Nhật Hào) là một trong những gương mặt mới xứng đáng được tỏa sáng hơn.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743439433/testAlbum/Shiki/L%E1%BA%B7ng/hkbmzyo4vngqrrdmb0az.webp',
       socialMediaLinks: {
-        facebook: 'shiki.official',
-        instagram: 'shiki.official',
+        facebook: 'https://www.facebook.com/shikirising',
+        instagram: 'https://www.instagram.com/shikidaspirit',
       },
     },
   },
@@ -140,8 +140,8 @@ export const artists: ArtistData[] = [
       bio: 'Hoàng Thái Vũ, thường được biết đến với nghệ danh Vũ., là một ca sĩ, nhạc sĩ sáng tác ca khúc người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743497776/testAlbum/V%C5%A9/ed4krbq1pbqzepsv6l7e.jpg',
       socialMediaLinks: {
-        facebook: 'vumusic',
-        instagram: 'vumusic.official',
+        facebook: 'https://www.facebook.com/hoangthaivuofficial',
+        instagram: 'https://www.instagram.com/toilavu',
       },
     },
   },
@@ -158,8 +158,8 @@ export const artists: ArtistData[] = [
       bio: 'tlinh tên thật là Nguyễn Thảo Linh, là một nữ rapper, ca sĩ và nhạc sĩ người Việt Nam. Cô được biết đến sau khi tham gia chương trình Rap Việt mùa 1.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743439252/testAlbum/tlinh%2C%20Low%20G/FLVR/yhujw5bifxyhncqddgiw.png',
       socialMediaLinks: {
-        instagram: 'thaylinhhomnay',
-        facebook: 'tlinh.official',
+        instagram: 'https://www.instagram.com/tlinhww',
+        facebook: 'https://www.facebook.com/lf.tlinh',
       },
     },
   },
@@ -176,8 +176,8 @@ export const artists: ArtistData[] = [
       bio: 'Low G là 1 rapper nổi tiếng Việt Nam. Anh có giọng rap đặc trưng cũng như khả năng rap mượt vượt trội so với nhiều rapper trẻ thế hệ mới.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743439236/testAlbum/tlinh%2C%20Low%20G/FLVR/fwt1lfhfrzqq6dchl8nw.jpg',
       socialMediaLinks: {
-        facebook: 'lowgthapsang',
-        instagram: 'lowgthapsang',
+        facebook: 'https://www.facebook.com/low.to.the.g',
+        instagram: 'https://www.instagram.com/lf.low.g',
       },
     },
   },
@@ -209,8 +209,8 @@ export const artists: ArtistData[] = [
       bio: 'Wren Evans tên thật là Lê Phan, là một ca sĩ, nhạc sĩ, nhà sản xuất âm nhạc người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743497966/testAlbum/Wren%20Evans/eyaniumxu7fui8ygdvsl.jpg',
       socialMediaLinks: {
-        instagram: 'wrenevansmusic',
-        facebook: 'wrenevansmusic',
+        instagram: 'https://www.instagram.com/wrenevans____',
+        facebook: 'https://www.facebook.com/wren.evans11',
       },
     },
   },
@@ -227,7 +227,7 @@ export const artists: ArtistData[] = [
       bio: 'Phan Đinh Tùng là một ca sĩ, nhạc sĩ nổi tiếng người Việt Nam, cựu thành viên nhóm nhạc MTV.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743442756/testAlbum/Phan%20%C4%90inh%20T%C3%B9ng/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/tomj0zyas6grk3zft230.jpg',
       socialMediaLinks: {
-        facebook: 'phandinhtung.singer',
+        facebook: 'https://www.facebook.com/phandinhtungsinger',
       },
     },
   },
@@ -259,8 +259,8 @@ export const artists: ArtistData[] = [
       bio: 'Nguyễn Hoàng Tôn là một nam ca sĩ, nhạc sĩ và nhà sản xuất âm nhạc người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743867515/Hoang_Ton_i6mzhx.jpg',
       socialMediaLinks: {
-        facebook: 'hoangton.official',
-        instagram: 'hoangton.official'
+        facebook: 'https://www.facebook.com/hoangton.official',
+        instagram: 'https://www.instagram.com/hoangton.official'
       },
     },
   },
@@ -277,8 +277,8 @@ export const artists: ArtistData[] = [
       bio: 'HIEUTHUHAI tên thật Trần Minh Hiếu, là một rapper và ca sĩ người Việt Nam. Anh được biết đến rộng rãi qua chương trình King of Rap và Rap Việt mùa 2.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743867958/HIEUTHUHAI_bh8xzk.webp',
       socialMediaLinks: {
-        facebook: 'hieuthuhai',
-        instagram: 'hieuthuhai'
+        facebook: 'https://www.facebook.com/HIEUTHUHAIOFFICIAL',
+        instagram: 'https://www.instagram.com/hieuthuhai'
       },
     },
   },
@@ -295,8 +295,8 @@ export const artists: ArtistData[] = [
       bio: 'B Ray tên thật là Trần Thiện Thanh Bảo, là một nam rapper người Mỹ gốc Việt.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743868367/Bray_rmfple.jpg',
       socialMediaLinks: {
-        facebook: 'yunbray110',
-        instagram: 'yunbray110'
+        facebook: 'https://www.facebook.com/yunbray110',
+        instagram: 'https://www.instagram.com/yunbray110'
       },
     },
   },
@@ -313,8 +313,8 @@ export const artists: ArtistData[] = [
       bio: 'Tage tên thật là Vũ Tuấn Huy, là một rapper, ca sĩ, nhạc sĩ người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743868350/Tage_pcmon9.webp',
       socialMediaLinks: {
-        facebook: 'ta.gekun',
-        instagram: 'ta.gekun'
+        facebook: 'https://www.facebook.com/ta.gekun',
+        instagram: 'https://www.instagram.com/ta.gekun'
       },
     },
   },
@@ -331,8 +331,8 @@ export const artists: ArtistData[] = [
       bio: 'marzuz tên thật là Trần My Anh, là một ca sĩ, nhạc sĩ, nhà sản xuất âm nhạc người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743868415/marzuz_cf4kcy.jpg',
       socialMediaLinks: {
-        facebook: 'marzuzisntreal',
-        instagram: 'marzuzisntreal'
+        facebook: 'https://www.facebook.com/marzuzisntreal',
+        instagram: 'https://www.instagram.com/marzuzisntreal'
       },
     },
   },
@@ -347,8 +347,8 @@ export const artists: ArtistData[] = [
       bio: 'Shayda là một nghệ sĩ với phong cách âm nhạc đặc trưng.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743870424/Shayda_n0vdby.webp',
       socialMediaLinks: {
-        facebook: 'shaydaofficial',
-        instagram: 'shaydaofficial'
+        facebook: 'https://www.facebook.com/shaydaofficial',
+        instagram: 'https://www.instagram.com/shaydaofficial'
       },
     },
   },
@@ -363,8 +363,8 @@ export const artists: ArtistData[] = [
       bio: 'SOOBIN là một ca sĩ, nhạc sĩ nổi tiếng người Việt Nam. Anh là thành viên nhóm SpaceSpeakers và đã phát hành nhiều ca khúc hit.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743874021/Soobin_eo3d2y.jpg',
       socialMediaLinks: {
-        facebook: 'soobinhoangson',
-        instagram: 'soobinhoangson'
+        facebook: 'https://www.facebook.com/soobinhoangson',
+        instagram: 'https://www.instagram.com/soobinhoangson'
       },
     },
   },
@@ -379,8 +379,8 @@ export const artists: ArtistData[] = [
       bio: 'Andree Right Hand là một nhà sản xuất âm nhạc và rapper người Việt Nam. Anh nổi tiếng với vai trò là thành viên của SpaceSpeakers và nhiều sản phẩm âm nhạc chất lượng.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743874323/andree_bpcik4.jpg',
       socialMediaLinks: {
-        facebook: 'andreerighthand',
-        instagram: 'andreerighthand'
+        facebook: 'https://www.facebook.com/andreerighthand',
+        instagram: 'https://www.instagram.com/andreerighthand'
       },
     },
   },
@@ -395,8 +395,8 @@ export const artists: ArtistData[] = [
       bio: 'Kris V là một nghệ sĩ trẻ trong làng nhạc Việt, với phong cách âm nhạc đặc trưng của mình.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743874348/kris_v_nucwck.jpg',
       socialMediaLinks: {
-        facebook: 'krisv.official',
-        instagram: 'krisv.official'
+        facebook: 'https://www.facebook.com/krisv.official',
+        instagram: 'https://www.instagram.com/krisv.official'
       },
     },
   },
@@ -412,8 +412,8 @@ export const artists: ArtistData[] = [
       bio: 'Duy Mạnh là một ca sĩ/nhạc sĩ nổi tiếng người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435097/seed/artists/cmh4t9es4o3cex4rd5pi.jpg',
       socialMediaLinks: {
-        facebook: 'duymanh.official',
-        instagram: 'duymanh.official',
+        facebook: 'https://www.facebook.com/duymanh.official',
+        instagram: 'https://www.instagram.com/duymanh.official',
       },
     },
   },
@@ -430,8 +430,8 @@ export const artists: ArtistData[] = [
       bio: 'Thịnh Suy là một ca sĩ, nhạc sĩ indie nổi tiếng tại Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435098/seed/artists/ntsuedaz9q0es7lpehut.jpg',
       socialMediaLinks: {
-        facebook: 'thinhsuy.official',
-        instagram: 'thinhsuy.official',
+        facebook: 'https://www.facebook.com/thinhsuy.official',
+        instagram: 'https://www.instagram.com/thinhsuy.official',
       },
     },
   },
@@ -448,8 +448,8 @@ export const artists: ArtistData[] = [
       bio: 'Văn Mai Hương là một nữ ca sĩ người Việt Nam, được biết đến sau khi giành vị trí Á quân tại cuộc thi Vietnam Idol 2010.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435227/seed/artists/ndhktqvi8fncnrukyj63.jpg',
       socialMediaLinks: {
-        facebook: 'vanmaihuong.official',
-        instagram: 'vanmaihuong.official',
+        facebook: 'https://www.facebook.com/vanmaihuong.official',
+        instagram: 'https://www.instagram.com/vanmaihuong.official',
       },
     },
   },
@@ -466,8 +466,8 @@ export const artists: ArtistData[] = [
       bio: 'Sơn Tùng M-TP (tên thật: Nguyễn Thanh Tùng) là một ca sĩ, nhạc sĩ và diễn viên nổi tiếng hàng đầu Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435226/seed/artists/rbgyzislbocq2xrqjfj6.jpg',
       socialMediaLinks: {
-        facebook: 'MTP.Fan',
-        instagram: 'sontungmtp',
+        facebook: 'https://www.facebook.com/MTP.Fan',
+        instagram: 'https://www.instagram.com/sontungmtp',
       },
     },
   },
@@ -484,8 +484,8 @@ export const artists: ArtistData[] = [
       bio: 'SlimV là một ca sĩ, nhạc sĩ người Việt Nam, được biết đến sau khi tham gia chương trình Giọng hát Việt 2015.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435226/seed/artists/hedfsp76waayhtmlheea.jpg',
       socialMediaLinks: {
-        facebook: 'slimv.official',
-        instagram: 'slimv.official',
+        facebook: 'https://www.facebook.com/slimv.official',
+        instagram: 'https://www.instagram.com/slimv.official',
       },
     },
   },
@@ -502,10 +502,10 @@ export const artists: ArtistData[] = [
       bio: 'Binz là một ca sĩ, nhạc sĩ người Việt Nam, được biết đến sau khi tham gia chương trình Giọng hát Việt 2015.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435226/seed/artists/hedfsp76waayhtmlheea.jpg',
       socialMediaLinks: {
-        facebook: 'binz.official',
-        instagram: 'binz.official',
+        facebook: 'https://www.facebook.com/binz.official',
+        instagram: 'https://www.instagram.com/binz.official',
       },
-    },  
+    },
   },
 
   // Dương Domic
@@ -520,8 +520,8 @@ export const artists: ArtistData[] = [
       bio: 'Dương Domic là một ca sĩ, nhạc sĩ người Việt Nam, được biết đến sau khi tham gia chương trình Giọng hát Việt 2015.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435226/seed/artists/hedfsp76waayhtmlheea.jpg',
       socialMediaLinks: {
-        facebook: 'duongdomic.official',
-        instagram: 'duongdomic.official',
+        facebook: 'https://www.facebook.com/duongdomic.official',
+        instagram: 'https://www.instagram.com/duongdomic.official',
       },
     },
   },
@@ -538,8 +538,8 @@ export const artists: ArtistData[] = [
       bio: 'Grey D (tên thật: Đoàn Thế Lân) là một ca sĩ, nhạc sĩ trẻ người Việt Nam, cựu thành viên nhóm Monstar.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435226/seed/artists/hedfsp76waayhtmlheea.jpg',
       socialMediaLinks: {
-        facebook: 'official.greyd',
-        instagram: 'greyd.official',
+        facebook: 'https://www.facebook.com/official.greyd',
+        instagram: 'https://www.instagram.com/greyd.official',
       },
     },
   },
@@ -556,8 +556,8 @@ export const artists: ArtistData[] = [
       bio: 'Tiên Tiên (tên thật: Huỳnh Nữ Thủy Tiên) là một nữ ca sĩ, nhạc sĩ người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435350/seed/artists/hifdaqxdymoiu8yqgit3.jpg',
       socialMediaLinks: {
-        facebook: 'tien.tien.official',
-        instagram: 'tien.tien.official',
+        facebook: 'https://www.facebook.com/tien.tien.official',
+        instagram: 'https://www.instagram.com/tien.tien.official',
       },
     },
   },
@@ -574,8 +574,8 @@ export const artists: ArtistData[] = [
       bio: 'Phương Mỹ Chi là một nữ ca sĩ trẻ người Việt Nam chuyên hát thể loại nhạc dân ca Nam bộ, được biết đến sau khi tham gia chương trình Giọng hát Việt nhí mùa đầu tiên.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435350/seed/artists/tyvn4dzaq02ihyfi4qxx.jpg',
       socialMediaLinks: {
-        facebook: 'phuongmychi.official',
-        instagram: 'phuongmychi_official',
+        facebook: 'https://www.facebook.com/phuongmychi.official',
+        instagram: 'https://www.instagram.com/phuongmychi_official',
       },
     },
   },
@@ -592,8 +592,8 @@ export const artists: ArtistData[] = [
       bio: 'WEAN là một rapper/nghệ sĩ trẻ nổi tiếng trong cộng đồng underground Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435350/seed/artists/kpayx0u1zckduv1hjm4p.jpg',
       socialMediaLinks: {
-        facebook: 'weantodale',
-        instagram: 'weantodale',
+        facebook: 'https://www.facebook.com/weantodale',
+        instagram: 'https://www.instagram.com/weantodale',
       },
     },
   },
@@ -610,8 +610,8 @@ export const artists: ArtistData[] = [
       bio: 'Rhymastic (tên thật: Vũ Đức Thiện) là một rapper, nhạc sĩ, nhà sản xuất âm nhạc người Việt Nam, thành viên của SpaceSpeakers.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435646/seed/artists/xaklw3dk0u6q3haumzab.jpg',
       socialMediaLinks: {
-        facebook: 'RhymasticOfficial',
-        instagram: 'rhymastic.official',
+        facebook: 'https://www.facebook.com/RhymasticOfficial',
+        instagram: 'https://www.instagram.com/rhymastic.official',
       },
     },
   },
@@ -628,8 +628,8 @@ export const artists: ArtistData[] = [
       bio: 'Phương Ly là một nữ ca sĩ người Việt Nam, em gái của ca sĩ Phương Linh.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435646/seed/artists/jjklaskdmipjsuugowwu.jpg',
       socialMediaLinks: {
-        facebook: 'phuongly.official',
-        instagram: 'may__lily',
+        facebook: 'https://www.facebook.com/phuongly.official',
+        instagram: 'https://www.instagram.com/may__lily',
       },
     },
   },
@@ -646,8 +646,8 @@ export const artists: ArtistData[] = [
       bio: 'JustaTee (tên thật: Nguyễn Thanh Tuấn) là một nam ca sĩ, nhạc sĩ, nhà sản xuất âm nhạc người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435646/seed/artists/ykrdfrtrkl5fub0smtph.jpg',
       socialMediaLinks: {
-        facebook: 'JustaTeeMusic',
-        instagram: 'justatee',
+        facebook: 'https://www.facebook.com/JustaTeeMusic',
+        instagram: 'https://www.instagram.com/justatee',
       },
     },
   },
@@ -664,8 +664,8 @@ export const artists: ArtistData[] = [
       bio: 'Phan Mạnh Quỳnh là một ca sĩ, nhạc sĩ người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435646/seed/artists/ugm8jo9timzrdwdhvy8p.jpg',
       socialMediaLinks: {
-        facebook: 'phanmanhquynh.official',
-        instagram: 'phanmanhquynh_official',
+        facebook: 'https://www.facebook.com/phanmanhquynh.official',
+        instagram: 'https://www.instagram.com/phanmanhquynh_official',
       },
     },
   },
@@ -682,8 +682,8 @@ export const artists: ArtistData[] = [
       bio: 'Mr. Siro (tên thật: Vương Quốc Tuân) là một ca sĩ, nhạc sĩ người Việt Nam, nổi tiếng với các bản ballad buồn.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435645/seed/artists/rifivsaygmhujwcjytby.jpg',
       socialMediaLinks: {
-        facebook: 'mrsiro.official',
-        instagram: 'mrsiro.official',
+        facebook: 'https://www.facebook.com/mrsiro.official',
+        instagram: 'https://www.instagram.com/mrsiro.official',
       },
     },
   },
@@ -700,8 +700,8 @@ export const artists: ArtistData[] = [
       bio: 'Phùng Khánh Linh là một nữ ca sĩ, nhạc sĩ người Việt Nam, được biết đến sau khi tham gia Giọng hát Việt 2015.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435645/seed/artists/nblqt7xqps1qe4j4x3ed.jpg',
       socialMediaLinks: {
-        facebook: 'phungkhanhlinh.official',
-        instagram: 'phungkhanhlinh.official',
+        facebook: 'https://www.facebook.com/phungkhanhlinh.official',
+        instagram: 'https://www.instagram.com/phungkhanhlinh.official',
       },
     },
   },
@@ -718,8 +718,8 @@ export const artists: ArtistData[] = [
       bio: 'Hà Anh Tuấn là một nam ca sĩ người Việt Nam, được biết đến sau khi tham gia cuộc thi Sao Mai điểm hẹn 2006.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435645/seed/artists/jxj0vpoj5khtovnvoie8.jpg',
       socialMediaLinks: {
-        facebook: 'haanhtuan.official',
-        instagram: 'haanhtuan.official',
+        facebook: 'https://www.facebook.com/haanhtuan.official',
+        instagram: 'https://www.instagram.com/haanhtuan.official',
       },
     },
   },
@@ -736,8 +736,8 @@ export const artists: ArtistData[] = [
       bio: 'Only C (tên thật: Nguyễn Phúc Thạch) là một nam ca sĩ, nhạc sĩ, nhà sản xuất âm nhạc người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436100/seed/artists/dnewgaqju5px6eyippya.jpg',
       socialMediaLinks: {
-        facebook: 'onlyc.official',
-        instagram: 'onlyc.official',
+        facebook: 'https://www.facebook.com/onlyc.official',
+        instagram: 'https://www.instagram.com/onlyc.official',
       },
     },
   },
@@ -754,8 +754,8 @@ export const artists: ArtistData[] = [
       bio: 'Karik (tên thật: Phạm Hoàng Khoa) là một rapper, nhạc sĩ người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436100/seed/artists/eq6c8fvi4r609zfmza9z.jpg',
       socialMediaLinks: {
-        facebook: 'karik.official',
-        instagram: 'karik.koniz',
+        facebook: 'https://www.facebook.com/karik.official',
+        instagram: 'https://www.instagram.com/karik.koniz',
       },
     },
   },
@@ -772,8 +772,8 @@ export const artists: ArtistData[] = [
       bio: 'Hoàng Dũng là một nam ca sĩ, nhạc sĩ người Việt Nam, được biết đến sau khi tham gia chương trình Giọng hát Việt 2015.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436100/seed/artists/j0lg1ewlfdgi2p4aesg4.jpg',
       socialMediaLinks: {
-        facebook: 'hoangdunglive',
-        instagram: 'hoangdunglive',
+        facebook: 'https://www.facebook.com/hoangdunglive',
+        instagram: 'https://www.instagram.com/hoangdunglive',
       },
     },
   },
@@ -790,8 +790,8 @@ export const artists: ArtistData[] = [
       bio: 'BigDaddy (tên thật: Trần Tất Vũ) là một rapper, ca sĩ người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436100/seed/artists/p2froifvqaanlnnln9pn.jpg',
       socialMediaLinks: {
-        facebook: 'bigdaddy.official',
-        instagram: 'bigdaddyofficial',
+        facebook: 'https://www.facebook.com/bigdaddy.official',
+        instagram: 'https://www.instagram.com/bigdaddyofficial',
       },
     },
   },
@@ -808,8 +808,8 @@ export const artists: ArtistData[] = [
       bio: 'Đen (tên thật: Nguyễn Đức Cường) là một nam rapper, nhạc sĩ người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436100/seed/artists/o7ba5g0bwho2hyiyqada.jpg',
       socialMediaLinks: {
-        facebook: 'den.vau.official',
-        instagram: 'den.vau',
+        facebook: 'https://www.facebook.com/den.vau.official',
+        instagram: 'https://www.instagram.com/den.vau',
       },
     },
   },
@@ -826,8 +826,8 @@ export const artists: ArtistData[] = [
       bio: 'Noo Phước Thịnh là một nam ca sĩ nổi tiếng người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436100/seed/artists/bglhujn8yinpi6zkqzyu.jpg',
       socialMediaLinks: {
-        facebook: 'NooPhuocThinh',
-        instagram: 'noophuocthinh',
+        facebook: 'https://www.facebook.com/NooPhuocThinh',
+        instagram: 'https://www.instagram.com/noophuocthinh',
       },
     },
   },
@@ -844,8 +844,8 @@ export const artists: ArtistData[] = [
       bio: 'MONO (tên thật: Nguyễn Việt Hoàng) là một nam ca sĩ trẻ người Việt Nam, em trai của Sơn Tùng M-TP.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436100/seed/artists/dtszf3obqaveuyffavla.jpg',
       socialMediaLinks: {
-        facebook: 'mono.official',
-        instagram: 'mono.official',
+        facebook: 'https://www.facebook.com/mono.official',
+        instagram: 'https://www.instagram.com/mono.official',
       },
     },
   },
@@ -862,8 +862,8 @@ export const artists: ArtistData[] = [
       bio: 'Onionn là một nhà sản xuất âm nhạc tài năng người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436817/seed/artists/sf0nzczbuougxsssmpd6.jpg',
       socialMediaLinks: {
-        facebook: 'onionn.official',
-        instagram: 'onionn.official',
+        facebook: 'https://www.facebook.com/onionn.official',
+        instagram: 'https://www.instagram.com/onionn.official',
       },
     },
   },
@@ -880,8 +880,8 @@ export const artists: ArtistData[] = [
       bio: 'Emcee L (tên thật: Nguyễn Hoàng Long) là thành viên của nhóm nhạc Da LAB.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437170/seed/artists/p73vypvzevnclbznwgb7.jpg',
       socialMediaLinks: {
-        facebook: 'emceel.dalab',
-        instagram: 'emceel.dalab',
+        facebook: 'https://www.facebook.com/emceel.dalab',
+        instagram: 'https://www.instagram.com/emceel.dalab',
       },
     },
   },
@@ -898,8 +898,8 @@ export const artists: ArtistData[] = [
       bio: 'JGKiD (tên thật: Võ Việt Phương) là thành viên của nhóm nhạc Da LAB.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437170/seed/artists/h2detkblxgzvbduzd6px.jpg',
       socialMediaLinks: {
-        facebook: 'jgkid.dalab',
-        instagram: 'jgkid.dalab',
+        facebook: 'https://www.facebook.com/jgkid.dalab',
+        instagram: 'https://www.instagram.com/jgkid.dalab',
       },
     },
   },
@@ -916,8 +916,8 @@ export const artists: ArtistData[] = [
       bio: 'Da LAB là một nhóm nhạc rap/pop nổi tiếng của Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437218/seed/artists/lt9szwlbowicbszcmr3l.jpg',
       socialMediaLinks: {
-        facebook: 'dalab.official',
-        instagram: 'dalab.official',
+        facebook: 'https://www.facebook.com/dalab.official',
+        instagram: 'https://www.instagram.com/dalab.official',
       },
     },
   },
@@ -934,8 +934,8 @@ export const artists: ArtistData[] = [
       bio: 'Giang Nguyễn là một nghệ sĩ.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437450/seed/artists/tn47evfkrjnizguscjzx.jpg',
       socialMediaLinks: {
-        facebook: 'giangnguyen.music',
-        instagram: 'giangnguyen.music',
+        facebook: 'https://www.facebook.com/giangnguyen.music',
+        instagram: 'https://www.instagram.com/giangnguyen.music',
       },
     },
   },
@@ -952,8 +952,8 @@ export const artists: ArtistData[] = [
       bio: 'Lê Hiếu là một nam ca sĩ/nhạc sĩ.',
       avatar: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745432001/lehieu_ixrrtx.jpg',
       socialMediaLinks: {
-        facebook: 'lehieu.official',
-        instagram: 'lehieu.official',
+        facebook: 'https://www.facebook.com/lehieu.official',
+        instagram: 'https://www.instagram.com/lehieu.official',
       },
     },
   },
@@ -970,8 +970,8 @@ export const artists: ArtistData[] = [
       bio: 'Linh Cáo là một nữ ca sĩ/nhạc sĩ.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437588/seed/artists/okk0pthyl5mgjpcvt7yi.jpg',
       socialMediaLinks: {
-        facebook: 'linhcao.official',
-        instagram: 'linhcao.official',
+        facebook: 'https://www.facebook.com/linhcao.official',
+        instagram: 'https://www.instagram.com/linhcao.official',
       },
     },
   },
@@ -988,8 +988,8 @@ export const artists: ArtistData[] = [
       bio: 'Giang Phạm là một nghệ sĩ.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437791/seed/artists/fiujck5nz4efdge47edn.jpg',
       socialMediaLinks: {
-        facebook: 'giangpham.music',
-        instagram: 'giangpham.music',
+        facebook: 'https://www.facebook.com/giangpham.music',
+        instagram: 'https://www.instagram.com/giangpham.music',
       },
     },
   },
@@ -1006,8 +1006,8 @@ export const artists: ArtistData[] = [
       bio: 'Triple D là một nhà sản xuất âm nhạc người Việt Nam.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437588/seed/artists/rswogy8xwesfionetgtd.jpg',
       socialMediaLinks: {
-        facebook: 'tripled.official',
-        instagram: 'tripled.official',
+        facebook: 'https://www.facebook.com/tripled.official',
+        instagram: 'https://www.instagram.com/tripled.official',
       },
     },
   },
@@ -1022,8 +1022,8 @@ export const artists: ArtistData[] = [
       bio: 'Seachains là một nghệ sĩ trẻ nổi bật trong làng nhạc Việt Nam, với nhiều sản phẩm âm nhạc chất lượng.',
       avatar: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745439987/seachains_kmptms.jpg',
       socialMediaLinks: {
-        facebook: 'seachains',
-        instagram: 'seachains'
+        facebook: 'https://www.facebook.com/seachains',
+        instagram: 'https://www.instagram.com/seachains'
       },
     },
   },
@@ -1038,8 +1038,8 @@ export const artists: ArtistData[] = [
       bio: 'WOKEUP là một nghệ sĩ trẻ nổi bật trong làng nhạc Việt Nam, với nhiều sản phẩm âm nhạc chất lượng.',
       avatar: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745440097/wokeup_wnwnoy.jpg',
       socialMediaLinks: {
-        facebook: 'wokeupmusic',
-        instagram: 'wokeupmusic'
+        facebook: 'https://www.facebook.com/wokeupmusic',
+        instagram: 'https://www.instagram.com/wokeupmusic'
       },
     },
   },

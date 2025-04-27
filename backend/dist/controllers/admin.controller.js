@@ -204,7 +204,7 @@ const updateArtist = async (req, res) => {
     try {
         const { id } = req.params;
         const avatarFile = req.file;
-        const { isActive, reason, isVerified, socialMediaLinks, ...artistData } = req.body;
+        const { isActive, reason, isVerified, ...artistData } = req.body;
         const originalIsActiveInput = isActive;
         let intendedIsActiveState = undefined;
         if (isActive !== undefined) {
@@ -218,9 +218,6 @@ const updateArtist = async (req, res) => {
         }
         if (isVerified !== undefined) {
             dataForService.isVerified = isVerified === 'true' || isVerified === true;
-        }
-        if (socialMediaLinks !== undefined) {
-            dataForService.socialMediaLinks = socialMediaLinks;
         }
         const updatedArtist = await adminService.updateArtistInfo(id, dataForService, avatarFile);
         if (originalIsActiveInput !== undefined) {

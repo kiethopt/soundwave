@@ -17,6 +17,7 @@ import {
 import { MoreHorizontal, Trash2, Search, Eye, Edit, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Album } from '@/types';
+import { AlbumDetailModal } from '@/components/ui/admin-modals';
 
 interface AlbumManagementProps {
   theme: 'light' | 'dark';
@@ -37,6 +38,8 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
   const [activeSearchTerm, setActiveSearchTerm] = useState('');
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<string>>(new Set());
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'createdAt', direction: 'desc' });
+  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const limit = 10;
 
   const fetchAlbums = useCallback(async (page: number, search: string, sort: SortConfig) => {
@@ -225,6 +228,20 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
   const isAllSelected = albums.length > 0 && selectedAlbumIds.size === albums.length;
   const isIndeterminate = selectedAlbumIds.size > 0 && selectedAlbumIds.size < albums.length;
 
+  const handleViewAlbumDetails = (album: Album) => {
+    setSelectedAlbum(album);
+    setIsDetailModalOpen(true);
+  };
+
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedAlbum(null);
+  };
+
+  const handleRowClick = (album: Album) => {
+    handleViewAlbumDetails(album);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
@@ -340,8 +357,9 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                     <tr
                       key={album.id}
                       className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedAlbumIds.has(album.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === album.id ? 'opacity-50 pointer-events-none' : ''}`}
+                      onClick={() => handleRowClick(album)}
                     >
-                      <td className="w-4 p-4">
+                      <td className="w-4 p-4" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           id={`select-row-${album.id}`}
                           checked={selectedAlbumIds.has(album.id)}
@@ -366,12 +384,15 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                       </td>
                       <td className="py-4 px-6">{formatDate(album.releaseDate)}</td>
                       <td className="py-4 px-6">
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="icon"
                             className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
-                            onClick={() => handleDeleteAlbum(album.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteAlbum(album.id);
+                            }}
                             aria-label={`Delete album ${album.title}`}
                             disabled={loading || actionLoading !== null}
                           >
@@ -386,7 +407,7 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleViewAlbumDetails(album)}>
                                 <Eye className="mr-2 h-4 w-4" /> View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem>
@@ -394,7 +415,10 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                               </DropdownMenuItem>
                               <DropdownMenuSeparator className={theme === 'dark' ? 'bg-gray-600' : ''} />
                               <DropdownMenuItem
-                                onClick={() => handleToggleVisibility(album.id, album.isActive)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleVisibility(album.id, album.isActive);
+                                }}
                                 disabled={actionLoading === album.id}
                               >
                                 {album.isActive ? (
@@ -462,6 +486,14 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
           </div>
         </>
       )}
+
+      {/* Album Detail Modal */}
+      <AlbumDetailModal
+        album={selectedAlbum}
+        isOpen={isDetailModalOpen}
+        onClose={closeDetailModal}
+        theme={theme}
+      />
     </div>
   );
 };

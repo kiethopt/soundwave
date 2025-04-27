@@ -2444,7 +2444,6 @@ export function TrackDetailModal({
             </div>
           )}
 
-          {/* Add any other info or actions here */}
         </div>
       </DialogContent>
     </Dialog>
