@@ -932,6 +932,7 @@ export const getRecommendedArtists = async (user: any) => {
         },
       },
     },
+    take: 15
   });
 
   if (process.env.USE_REDIS_CACHE === 'true') {

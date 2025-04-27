@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { api } from '@/utils/api';
-import { Album, Track, Playlist } from '@/types';
+import { Album, Track, Playlist, History } from '@/types';
 import { useTrack } from '@/contexts/TrackContext';
-import { ChevronRight, MoreHorizontal } from 'lucide-react';
-import { Play, Pause } from '@/components/ui/Icons';
+import { ChevronRight, Heart, MoreHorizontal, Share2, ListMusic } from 'lucide-react';
+import { Play, Pause, AddSimple } from '@/components/ui/Icons';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { useDominantColor } from '@/hooks/useDominantColor';
@@ -26,6 +26,8 @@ export default function Home() {
   const [aiGeneratedPlaylists, setAIGeneratedPlaylists] = useState<Playlist[]>(
     []
   );
+  const [topTracks, setTopTracks] = useState<Track[]>([]);
+  const [userPlayHistory, setUserPlayHistory] = useState<History[]>([]);
   const [loading, setLoading] = useState(true);
   const {
     playTrack,
@@ -41,6 +43,9 @@ export default function Home() {
   const { dialogOpen, setDialogOpen, handleProtectedAction, isAuthenticated } =
     useAuth();
   const { setBackgroundStyle } = useBackground();
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(new Set());
+  const filteredPlaylistNames = new Set(['Soundwave Hits: Trending Right Now', 'Discover Weekly', 'Release Radar']);
 
   const token = localStorage.getItem('userToken') || '';
 
@@ -66,11 +71,17 @@ export default function Home() {
             hotAlbums,
             userPlaylists,
             personalizedSystemPlaylists,
+            topTracks,
+            userPlayHistory,
           } = response.data;
 
           // Set albums data
           setNewestAlbums(newestAlbums || []);
           setHotAlbums(hotAlbums || []);
+          setUserPlayHistory(userPlayHistory || []);
+          setTopTracks(topTracks || []);
+
+          console.log(userPlayHistory)
 
           // Process system playlists
           if (systemPlaylists && systemPlaylists.length > 0) {
@@ -270,6 +281,10 @@ export default function Home() {
     return playingAlbumId === albumId && isPlaying;
   };
 
+  const isTrackPlaying = (trackId: string) => {
+    return currentTrack?.id === trackId && isPlaying;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -319,7 +334,7 @@ export default function Home() {
       {/* Featured Cards Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         {/* Card 1: Trending Playlist */}
-        {trendingPlaylist && (
+        {/* {trendingPlaylist && (
           <div
             className="cursor-pointer"
             onClick={() => router.push(`/playlists/${trendingPlaylist.id}`)}
@@ -345,7 +360,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Card 2: New Album */}
         {newestAlbums.length > 0 && (
@@ -408,7 +423,40 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Card 4: Top Track */}
+        {topTracks.length > 0 && (
+          <div
+            className="cursor-pointer"
+            onClick={() => router.push(`/track/${topTracks[0].id}`)}
+          >
+            <div className="mb-3">
+              <div className="uppercase text-xs font-medium text-primary mb-1.5">
+                MOST LISTENED TRACK
+              </div>
+              <h3 className="text-lg font-bold line-clamp-1 mb-1">
+                {topTracks[0].title}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {topTracks[0].artist.artistName}
+              </p>
+            </div>
+            <div className="editorial-card group">
+              <div className="relative aspect-[16/9] overflow-hidden rounded-lg">
+                <Image
+                  src={topTracks[0].coverUrl || '/images/default-album.jpg'}
+                  alt={topTracks[0].title}
+                  fill
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200"></div>
+              </div>
+            </div>
+          </div>    
+        )}
       </div>
+
+      
 
       {/* AI Generated Playlists Section - Only for authenticated users */}
       {isAuthenticated && personalizedPlaylists.length > 0 && (
@@ -745,6 +793,69 @@ export default function Home() {
           ))}
         </div>
       </Section>
+
+      {/* Update the dropdown menu in the Recently Played section */}
+      {isAuthenticated && userPlayHistory.length > 0 && (
+        <Section title="Recently Played">
+          <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
+            {userPlayHistory
+              .filter((history): history is History & { track: Track } => !!history.track)
+              .map((history, index) => (
+                <div
+                  key={`${history.track.id}-${index}`}
+                  className="cursor-pointer flex-shrink-0 w-40"
+                  onClick={() => router.push(`/track/${history.track.id}`)}
+                  onMouseEnter={() => setHoveredTrack(history.track.id)}
+                  onMouseLeave={() => setHoveredTrack(null)}
+                >
+                  <div className="flex flex-col space-y-2">
+                    <div className="relative aspect-square overflow-hidden rounded-lg">
+                      <Image
+                        src={history.track.coverUrl || '/images/default-track.jpg'}
+                        alt={history.track.title}
+                        fill
+                        className="object-cover"
+                      />
+                      <div
+                        className={`absolute inset-0 transition-all duration-150 ${
+                          hoveredTrack === history.track.id || isTrackPlaying(history.track.id)
+                            ? 'bg-black/30'
+                            : 'bg-black/0'
+                        }`}
+                      ></div>
+
+                      {(hoveredTrack === history.track.id || isTrackPlaying(history.track.id)) && (
+                        <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+                          <button
+                            className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePlayTrack(history.track, e);
+                            }}
+                          >
+                            {isTrackPlaying(history.track.id) ? (
+                              <Pause className="w-4 h-4" />
+                            ) : (
+                              <Play className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium line-clamp-1">
+                        {history.track.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        {history.track.artist.artistName}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </Section>
+      )}
 
       {/* Authentication Dialog */}
       <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />

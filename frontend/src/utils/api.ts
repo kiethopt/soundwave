@@ -1445,6 +1445,8 @@ export const api = {
             systemPlaylists: [],
             newestAlbums: [],
             hotAlbums: [],
+            topTracks: [],
+            userPlayHistory: [],
             userPlaylists: [],
           },
           message: "Failed to fetch homepage data",

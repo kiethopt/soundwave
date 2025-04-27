@@ -2,6 +2,7 @@ import { RequestHandler } from "express";
 import * as playlistService from "../services/playlist.service";
 import * as albumService from "../services/album.service";
 import * as userService from "../services/user.service";
+import * as historyService from "../services/history.service"
 import { handleError } from "../utils/handle-utils"; // Import error handler
 import { PrismaClient, Prisma } from "@prisma/client";
 import prisma from "../config/db"; // Import configured prisma instance
@@ -1236,6 +1237,7 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
           userPlaylists,
           userTopTracks,
           userTopArtists,
+          userPlayHistory,
         ] = await Promise.all([
           prisma.playlist.findMany({
             where: {
@@ -1288,6 +1290,7 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
           }),
           userService.getUserTopTracks(req.user),
           userService.getUserTopArtists(req.user),
+          historyService.getPlayHistoryService(req)
         ]);
 
         // Transform the data to match the expected format
@@ -1314,6 +1317,7 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
 
         responseData.userTopTracks = userTopTracks;
         responseData.userTopArtists = userTopArtists;
+        responseData.userPlayHistory = userPlayHistory.data;
       } catch (error: any) {
         console.error("Error fetching user playlist data:", error);
       }
