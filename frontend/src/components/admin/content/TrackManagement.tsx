@@ -3,21 +3,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
-import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Trash2, Search, Eye, Edit, CheckCircle, XCircle, Play, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Trash2, Search, Edit, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Track } from '@/types';
-import { TrackDetailModal } from '@/components/ui/admin-modals';
+import { TrackDetailModal, EditTrackModal } from '@/components/ui/admin-modals';
 
 interface TrackManagementProps {
   theme: 'light' | 'dark';
@@ -40,6 +31,8 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'createdAt', direction: 'desc' });
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [trackToEdit, setTrackToEdit] = useState<Track | null>(null);
   const limit = 10;
 
   const fetchTracks = useCallback(async (page: number, search: string, sort: SortConfig) => {
@@ -164,7 +157,8 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
     deleteMultipleTracks();
   };
 
-  const handleToggleVisibility = async (trackId: string, currentIsActive: boolean) => {
+  const handleToggleVisibility = async (trackId: string, currentIsActive: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
     setActionLoading(trackId);
     try {
       const token = localStorage.getItem('userToken');
@@ -237,6 +231,38 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
 
   const handleRowClick = (track: Track) => {
     handleViewTrackDetails(track);
+  };
+
+  const handleEditTrackClick = (track: Track, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTrackToEdit(track);
+    setIsEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setTrackToEdit(null);
+  };
+
+  const handleEditTrackSubmit = async (trackId: string, formData: FormData) => {
+    setActionLoading(trackId);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      formData.append('updateFeaturedArtists', 'true');
+      formData.append('updateGenres', 'true');
+
+      await api.tracks.update(trackId, formData, token);
+      toast.success('Track updated successfully');
+      closeEditModal();
+      fetchTracks(currentPage, activeSearchTerm, sortConfig);
+    } catch (err: any) {
+      console.error('Error updating track:', err);
+      toast.error(err.message || 'Failed to update track');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   return (
@@ -377,7 +403,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
+                            className={`hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-red-500 hover:text-red-400 hover:bg-red-500/20' : 'text-red-600 hover:text-red-700 hover:bg-red-100'}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteTrack(track.id);
@@ -387,44 +413,26 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0" data-radix-dropdown-menu-trigger disabled={loading || actionLoading !== null}>
-                                <span className="sr-only">Open menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => handleViewTrackDetails(track)}>
-                                <Eye className="mr-2 h-4 w-4" /> View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Play className="mr-2 h-4 w-4" /> Play Track
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Edit className="mr-2 h-4 w-4" /> Edit Track
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator className={theme === 'dark' ? 'bg-gray-600' : ''} />
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleVisibility(track.id, track.isActive);
-                                }}
-                                disabled={actionLoading === track.id}
-                              >
-                                {track.isActive ? (
-                                  <>
-                                    <XCircle className="mr-2 h-4 w-4" /> Hide Track
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle className="mr-2 h-4 w-4" /> Show Track
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-500/20' : 'text-blue-600 hover:text-blue-700 hover:bg-blue-100'}`}
+                            onClick={(e) => handleEditTrackClick(track, e)}
+                            aria-label={`Edit track ${track.title}`}
+                            disabled={loading || actionLoading !== null}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 p-0 ${theme === 'dark' ? (track.isActive ? 'text-green-400 hover:text-green-300 hover:bg-green-500/20' : 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/20') : (track.isActive ? 'text-green-600 hover:text-green-700 hover:bg-green-100' : 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-100')}`}
+                            onClick={(e) => handleToggleVisibility(track.id, track.isActive, e)}
+                            aria-label={track.isActive ? `Hide track ${track.title}` : `Show track ${track.title}`}
+                            disabled={loading || actionLoading !== null || actionLoading === track.id}
+                          >
+                            {actionLoading === track.id ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div> : (track.isActive ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />)}
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -484,6 +492,15 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
         track={selectedTrack}
         isOpen={isDetailModalOpen}
         onClose={closeDetailModal}
+        theme={theme}
+      />
+
+      {/* Edit Track Modal */}
+      <EditTrackModal
+        track={trackToEdit}
+        isOpen={isEditModalOpen}
+        onClose={closeEditModal}
+        onSubmit={handleEditTrackSubmit}
         theme={theme}
       />
     </div>

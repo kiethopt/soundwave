@@ -3,21 +3,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
-import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Trash2, Search, Eye, Edit, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Trash2, Search, Edit, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Album } from '@/types';
-import { AlbumDetailModal } from '@/components/ui/admin-modals';
+import { AlbumDetailModal, EditAlbumModal } from '@/components/ui/admin-modals';
 
 interface AlbumManagementProps {
   theme: 'light' | 'dark';
@@ -40,6 +31,8 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'createdAt', direction: 'desc' });
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [albumToEdit, setAlbumToEdit] = useState<Album | null>(null);
   const limit = 10;
 
   const fetchAlbums = useCallback(async (page: number, search: string, sort: SortConfig) => {
@@ -164,7 +157,8 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     deleteMultipleAlbums();
   };
 
-  const handleToggleVisibility = async (albumId: string, currentIsActive: boolean) => {
+  const handleToggleVisibility = async (albumId: string, currentIsActive: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
     setActionLoading(albumId);
     try {
       const token = localStorage.getItem('userToken');
@@ -240,6 +234,40 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
 
   const handleRowClick = (album: Album) => {
     handleViewAlbumDetails(album);
+  };
+
+  const handleEditAlbumClick = (album: Album, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAlbumToEdit(album);
+    setIsEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setAlbumToEdit(null);
+  };
+
+  const handleEditAlbumSubmit = async (albumId: string, formData: FormData) => {
+    setActionLoading(albumId);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      const labelId = formData.get('labelId');
+      if (labelId === '') {
+        formData.set('labelId', '');
+      }
+
+      await api.albums.update(albumId, formData, token);
+      toast.success('Album updated successfully');
+      closeEditModal();
+      fetchAlbums(currentPage, activeSearchTerm, sortConfig);
+    } catch (err: any) {
+      console.error('Error updating album:', err);
+      toast.error(err.message || 'Failed to update album');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   return (
@@ -388,7 +416,7 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
+                            className={`hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-red-500 hover:text-red-400 hover:bg-red-500/20' : 'text-red-600 hover:text-red-700 hover:bg-red-100'}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteAlbum(album.id);
@@ -398,41 +426,26 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0" data-radix-dropdown-menu-trigger disabled={loading || actionLoading !== null}>
-                                <span className="sr-only">Open menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => handleViewAlbumDetails(album)}>
-                                <Eye className="mr-2 h-4 w-4" /> View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Edit className="mr-2 h-4 w-4" /> Edit Album
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator className={theme === 'dark' ? 'bg-gray-600' : ''} />
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleVisibility(album.id, album.isActive);
-                                }}
-                                disabled={actionLoading === album.id}
-                              >
-                                {album.isActive ? (
-                                  <>
-                                    <XCircle className="mr-2 h-4 w-4" /> Hide Album
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle className="mr-2 h-4 w-4" /> Show Album
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-500/20' : 'text-blue-600 hover:text-blue-700 hover:bg-blue-100'}`}
+                            onClick={(e) => handleEditAlbumClick(album, e)}
+                            aria-label={`Edit album ${album.title}`}
+                            disabled={loading || actionLoading !== null}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 p-0 ${theme === 'dark' ? (album.isActive ? 'text-green-400 hover:text-green-300 hover:bg-green-500/20' : 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/20') : (album.isActive ? 'text-green-600 hover:text-green-700 hover:bg-green-100' : 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-100')}`}
+                            onClick={(e) => handleToggleVisibility(album.id, album.isActive, e)}
+                            aria-label={album.isActive ? `Hide album ${album.title}` : `Show album ${album.title}`}
+                            disabled={loading || actionLoading !== null || actionLoading === album.id}
+                          >
+                            {actionLoading === album.id ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div> : (album.isActive ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />)}
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -492,6 +505,15 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
         album={selectedAlbum}
         isOpen={isDetailModalOpen}
         onClose={closeDetailModal}
+        theme={theme}
+      />
+
+      {/* Edit Album Modal */}
+      <EditAlbumModal
+        album={albumToEdit}
+        isOpen={isEditModalOpen}
+        onClose={closeEditModal}
+        onSubmit={handleEditAlbumSubmit}
         theme={theme}
       />
     </div>
