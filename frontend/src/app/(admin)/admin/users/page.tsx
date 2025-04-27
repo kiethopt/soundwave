@@ -33,7 +33,7 @@ interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
-export default function SimpleUserManagement() {
+export default function UserManagement() {
   const { theme } = useTheme();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);

@@ -984,10 +984,33 @@ export default function Sidebar({
                     )}
                   </Link>
 
-                  <Link
+                  {/* Old Genres Management */}
+                  {/* <Link
                     href="/admin/genres"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
                       pathname && pathname.startsWith("/admin/genres")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <Genres className="w-6 h-6" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <Genres className="w-5 h-5" />
+                        </div>
+                        <span className="ml-3 font-medium text-sm">Genres</span>
+                      </>
+                    )}
+                  </Link> */}
+
+                  <Link
+                    href="/admin/simple-genres"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      pathname && pathname.startsWith("/admin/simple-genres")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}

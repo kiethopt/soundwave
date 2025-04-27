@@ -11,12 +11,10 @@ async function checkAndUpdateAlbumStatus(client: any) {
       where: {
         isActive: false,
         releaseDate: {
-          lte: now, // Activate if releaseDate is now or in the past
+          lte: now,
         },
-        // Only activate if the album wasn't updated AFTER its release date
-        // This implies it wasn't manually hidden after being released.
         updatedAt: {
-          lte: client.album.fields.releaseDate, // Compare updatedAt with releaseDate field
+          lte: client.album.fields.releaseDate,
         },
       },
       select: {
