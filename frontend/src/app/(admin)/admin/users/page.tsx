@@ -542,7 +542,7 @@ export default function SimpleUserManagement() {
                                    <Search className="mr-2 h-4 w-4" /> View Details
                                 </DropdownMenuItem>
                                <DropdownMenuItem onClick={(e) => {e.stopPropagation(); handleAction('edit', user)} } disabled={loading || actionLoading === user.id}>
-                                   <Edit className="mr-2 h-4 w-4" /> Edit Info
+                                   <Edit className="mr-2 h-4 w-4" /> Edit User
                                 </DropdownMenuItem>
                                {user.role !== 'ADMIN' && (
                                  <DropdownMenuItem onClick={(e) => {e.stopPropagation(); handleAction('makeAdmin', user)} } disabled={loading || actionLoading === user.id}>
