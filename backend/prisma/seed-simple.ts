@@ -395,14 +395,15 @@ async function main() {
       
       // Find featured artist IDs for this single
       const featuredArtistIds = singleData.featuredArtistNames
-        .map((name) => artistProfilesMap.get(name))
-        .filter((id): id is string => {
-          if (!id)
+        .map((name) => ({ name, id: artistProfilesMap.get(name) }))
+        .filter((item): item is { name: string, id: string } => {
+          if (!item.id)
             console.warn(
-              colors.yellow(`⚠️ Could not find featured artist ID for "${name}" on single "${singleData.title}".`)
+              colors.yellow(`⚠️ Could not find featured artist ID for "${item.name}" on single "${singleData.title}".`)
             );
-          return !!id;
-        });
+          return !!item.id;
+        })
+        .map(item => item.id);
 
       // Fetch single duration
       const singleDuration = await getAudioDurationFromUrl(singleData.audioUrl);

@@ -218,6 +218,7 @@ export const createAlbum = async (req: Request) => {
     userId: follower.followerId,
     artistId: targetArtistProfileId,
     senderId: targetArtistProfileId,
+    albumId: album.id,
   }));
 
   if (notificationsData.length > 0) {
@@ -231,6 +232,7 @@ export const createAlbum = async (req: Request) => {
     io.to(room).emit('notification', {
       type: NotificationType.NEW_ALBUM,
       message: `${artistName} just released a new album: ${album.title}`,
+      albumId: album.id,
     });
 
     if (user.email) {
