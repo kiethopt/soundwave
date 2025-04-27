@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Trash2, Search, Edit, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Album } from '@/types';
-import { AlbumDetailModal, EditAlbumModal } from '@/components/ui/admin-modals';
+import { AlbumDetailModal, EditAlbumModal, ConfirmDeleteModal } from '@/components/ui/admin-modals';
 
 interface AlbumManagementProps {
   theme: 'light' | 'dark';
@@ -33,6 +33,9 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [albumToEdit, setAlbumToEdit] = useState<Album | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [albumToDelete, setAlbumToDelete] = useState<Album | null>(null);
+  const [albumsToDeleteCount, setAlbumsToDeleteCount] = useState<number | null>(null);
   const limit = 10;
 
   const fetchAlbums = useCallback(async (page: number, search: string, sort: SortConfig) => {
@@ -93,32 +96,10 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     setSortConfig({ key, direction });
   };
 
-  const handleDeleteAlbum = async (albumId: string) => {
-    if (!window.confirm('Are you sure you want to delete this album? This action cannot be undone.')) {
-      return;
-    }
-
-    setActionLoading(albumId);
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-      
-      await api.albums.delete(albumId, token);
-      toast.success('Album deleted successfully');
-      fetchAlbums(currentPage, activeSearchTerm, sortConfig);
-      setSelectedAlbumIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(albumId);
-        return newSet;
-      });
-    } catch (err: any) {
-      console.error('Error deleting album:', err);
-      toast.error(err.message || 'Failed to delete album');
-    } finally {
-      setActionLoading(null);
-    }
+  const handleDeleteAlbumClick = (album: Album) => {
+    setAlbumToDelete(album);
+    setAlbumsToDeleteCount(null);
+    setIsDeleteModalOpen(true);
   };
 
   const handleBulkDeleteClick = () => {
@@ -126,35 +107,39 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
       toast('No albums selected.', { icon: '⚠️' });
       return;
     }
+    setAlbumToDelete(null);
+    setAlbumsToDeleteCount(selectedAlbumIds.size);
+    setIsDeleteModalOpen(true);
+  };
 
-    if (!window.confirm(`Are you sure you want to delete ${selectedAlbumIds.size} selected album(s)? This action cannot be undone.`)) {
-        return;
-      }
+  const handleConfirmDelete = async (idsToDelete: string[]) => {
+    const isBulk = albumsToDeleteCount !== null && albumsToDeleteCount > 0;
+    const actionId = isBulk ? 'bulk-delete' : idsToDelete[0];
+    setActionLoading(actionId);
 
-    const deleteMultipleAlbums = async () => {
-      setActionLoading('bulk-delete');
-      try {
-        const token = localStorage.getItem('userToken');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
-        
-        await Promise.all(
-          Array.from(selectedAlbumIds).map(id => api.albums.delete(id, token))
-        );
-        
-        toast.success(`Successfully deleted ${selectedAlbumIds.size} album(s)`);
-        fetchAlbums(currentPage, activeSearchTerm, sortConfig);
-        setSelectedAlbumIds(new Set());
-      } catch (err: any) {
-        console.error('Error deleting albums:', err);
-        toast.error(err.message || 'Failed to delete albums');
-      } finally {
-        setActionLoading(null);
-      }
-    };
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
 
-    deleteMultipleAlbums();
+      const deletePromises = idsToDelete.map(id => api.albums.delete(id, token));
+      await Promise.all(deletePromises);
+
+      toast.success(`Successfully deleted ${idsToDelete.length} album(s)`);
+      fetchAlbums(currentPage, activeSearchTerm, sortConfig); // Refresh list
+      setSelectedAlbumIds(prev => {
+        const newSet = new Set(prev);
+        idsToDelete.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+      setIsDeleteModalOpen(false); // Close modal on success
+      setAlbumToDelete(null);
+      setAlbumsToDeleteCount(null);
+    } catch (err: any) {
+      console.error('Error deleting album(s):', err);
+      toast.error(err.message || 'Failed to delete album(s)');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleToggleVisibility = async (albumId: string, currentIsActive: boolean, e: React.MouseEvent) => {
@@ -419,7 +404,7 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                             className={`hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-red-500 hover:text-red-400 hover:bg-red-500/20' : 'text-red-600 hover:text-red-700 hover:bg-red-100'}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteAlbum(album.id);
+                              handleDeleteAlbumClick(album);
                             }}
                             aria-label={`Delete album ${album.title}`}
                             disabled={loading || actionLoading !== null}
@@ -515,6 +500,23 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
         onClose={closeEditModal}
         onSubmit={handleEditAlbumSubmit}
         theme={theme}
+      />
+
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => {
+          if (albumToDelete) {
+            handleConfirmDelete([albumToDelete.id]);
+          } else if (albumsToDeleteCount) {
+            handleConfirmDelete(Array.from(selectedAlbumIds));
+          }
+        }}
+        item={albumToDelete ? { id: albumToDelete.id, name: albumToDelete.title, email: '' } : null}
+        count={albumsToDeleteCount || undefined}
+        theme={theme}
+        entityType="album"
       />
     </div>
   );

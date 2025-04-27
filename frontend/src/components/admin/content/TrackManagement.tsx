@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Trash2, Search, Edit, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Track } from '@/types';
-import { TrackDetailModal, EditTrackModal } from '@/components/ui/admin-modals';
+import { TrackDetailModal, EditTrackModal, ConfirmDeleteModal } from '@/components/ui/admin-modals';
 
 interface TrackManagementProps {
   theme: 'light' | 'dark';
@@ -33,6 +33,9 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [trackToEdit, setTrackToEdit] = useState<Track | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [trackToDelete, setTrackToDelete] = useState<Track | null>(null);
+  const [tracksToDeleteCount, setTracksToDeleteCount] = useState<number | null>(null);
   const limit = 10;
 
   const fetchTracks = useCallback(async (page: number, search: string, sort: SortConfig) => {
@@ -93,32 +96,10 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
     setSortConfig({ key, direction });
   };
 
-  const handleDeleteTrack = async (trackId: string) => {
-    if (!window.confirm('Are you sure you want to delete this track? This action cannot be undone.')) {
-      return;
-    }
-
-    setActionLoading(trackId);
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-      
-      await api.tracks.delete(trackId, token);
-      toast.success('Track deleted successfully');
-      fetchTracks(currentPage, activeSearchTerm, sortConfig);
-      setSelectedTrackIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(trackId);
-        return newSet;
-      });
-    } catch (err: any) {
-      console.error('Error deleting track:', err);
-      toast.error(err.message || 'Failed to delete track');
-    } finally {
-      setActionLoading(null);
-    }
+  const handleDeleteTrackClick = (track: Track) => {
+    setTrackToDelete(track);
+    setTracksToDeleteCount(null); // Indicate single delete
+    setIsDeleteModalOpen(true);
   };
 
   const handleBulkDeleteClick = () => {
@@ -126,35 +107,39 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
       toast('No tracks selected.', { icon: '⚠️' });
       return;
     }
+    setTrackToDelete(null); // Indicate bulk delete
+    setTracksToDeleteCount(selectedTrackIds.size);
+    setIsDeleteModalOpen(true);
+  };
 
-    if (!window.confirm(`Are you sure you want to delete ${selectedTrackIds.size} selected track(s)? This action cannot be undone.`)) {
-        return;
-      }
+  const handleConfirmDelete = async (idsToDelete: string[]) => {
+    const isBulk = tracksToDeleteCount !== null && tracksToDeleteCount > 0;
+    const actionId = isBulk ? 'bulk-delete' : idsToDelete[0];
+    setActionLoading(actionId);
 
-    const deleteMultipleTracks = async () => {
-      setActionLoading('bulk-delete');
-      try {
-        const token = localStorage.getItem('userToken');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
-        
-        await Promise.all(
-          Array.from(selectedTrackIds).map(id => api.tracks.delete(id, token))
-        );
-        
-        toast.success(`Successfully deleted ${selectedTrackIds.size} track(s)`);
-        fetchTracks(currentPage, activeSearchTerm, sortConfig);
-        setSelectedTrackIds(new Set());
-      } catch (err: any) {
-        console.error('Error deleting tracks:', err);
-        toast.error(err.message || 'Failed to delete tracks');
-      } finally {
-        setActionLoading(null);
-      }
-    };
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
 
-    deleteMultipleTracks();
+      const deletePromises = idsToDelete.map(id => api.tracks.delete(id, token));
+      await Promise.all(deletePromises);
+
+      toast.success(`Successfully deleted ${idsToDelete.length} track(s)`);
+      fetchTracks(currentPage, activeSearchTerm, sortConfig); // Refresh list
+      setSelectedTrackIds(prev => {
+        const newSet = new Set(prev);
+        idsToDelete.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+      setIsDeleteModalOpen(false);
+      setTrackToDelete(null);
+      setTracksToDeleteCount(null);
+    } catch (err: any) {
+      console.error('Error deleting track(s):', err);
+      toast.error(err.message || 'Failed to delete track(s)');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleToggleVisibility = async (trackId: string, currentIsActive: boolean, e: React.MouseEvent) => {
@@ -197,7 +182,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
       const newSet = new Set(prev);
       if (checked === true) {
         newSet.add(trackId);
-                    } else {
+      } else {
         newSet.delete(trackId);
       }
       return newSet;
@@ -406,7 +391,7 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                             className={`hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-red-500 hover:text-red-400 hover:bg-red-500/20' : 'text-red-600 hover:text-red-700 hover:bg-red-100'}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteTrack(track.id);
+                              handleDeleteTrackClick(track);
                             }}
                             aria-label={`Delete track ${track.title}`}
                             disabled={loading || actionLoading !== null}
@@ -502,6 +487,23 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
         onClose={closeEditModal}
         onSubmit={handleEditTrackSubmit}
         theme={theme}
+      />
+
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => {
+          if (trackToDelete) {
+            handleConfirmDelete([trackToDelete.id]);
+          } else if (tracksToDeleteCount) {
+            handleConfirmDelete(Array.from(selectedTrackIds));
+          }
+        }}
+        item={trackToDelete ? { id: trackToDelete.id, name: trackToDelete.title, email: '' } : null} // Adapt Track type
+        count={tracksToDeleteCount || undefined}
+        theme={theme}
+        entityType="track"
       />
     </div>
   );
