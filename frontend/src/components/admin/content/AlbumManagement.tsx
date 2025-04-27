@@ -1,392 +1,467 @@
 'use client';
 
-import React, { useMemo, useCallback, useState, useEffect } from 'react';
-import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
-import { useDataTable } from '@/hooks/useDataTable';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/utils/api';
-import { getAlbumColumns } from '@/components/ui/data-table/data-table-columns';
-import {
-  useReactTable,
-  getCoreRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-} from '@tanstack/react-table';
-import type { Album, FetchDataResponse } from '@/types';
 import toast from 'react-hot-toast';
-import { EditAlbumModal, AlbumDetailModal } from '@/components/ui/data-table/data-table-modals';
-import io, { Socket } from 'socket.io-client';
-
+import { useTheme } from '@/contexts/ThemeContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Trash2, Search, Eye, Edit, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import type { Album } from '@/types';
 
 interface AlbumManagementProps {
   theme: 'light' | 'dark';
 }
 
+interface SortConfig {
+  key: keyof Album | null;
+  direction: 'asc' | 'desc';
+}
+
 export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
-  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [albumForDetail, setAlbumForDetail] = useState<Album | null>(null);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
-  const [availableGenres, setAvailableGenres] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [availableLabels, setAvailableLabels] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [searchInput, setSearchInput] = useState('');
+  const [activeSearchTerm, setActiveSearchTerm] = useState('');
+  const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<string>>(new Set());
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'createdAt', direction: 'desc' });
+  const limit = 10;
 
-  const fetchAlbums = useCallback(
-    async (
-      page: number,
-      params: URLSearchParams
-    ): Promise<FetchDataResponse<Album>> => {
-      try {
-        const token = localStorage.getItem('userToken') || '';
-        const response = await api.albums.getAlbums(
-          token,
-          page,
-          10,
-          params.toString()
-        );
-
-        if (response && response.albums && response.pagination) {
-          return {
-            data: response.albums,
-            pagination: {
-              totalPages: response.pagination.totalPages,
-            },
-          };
-        } else {
-          console.error(
-            'Unexpected API response structure for albums:',
-            response
-          );
-          toast.error('Failed to parse album data from API.');
-          return { data: [], pagination: { totalPages: 1 } };
-        }
-      } catch (error) {
-        console.error('Error fetching albums:', error);
-        toast.error('Failed to fetch albums.');
-        return { data: [], pagination: { totalPages: 1 } };
-      }
-    },
-    []
-  );
-
-  const {
-    data: albums,
-    totalPages: albumTotalPages,
-    currentPage: albumCurrentPage,
-    searchInput: albumSearch,
-    setSearchInput: setAlbumSearch,
-    sorting: albumSorting,
-    setSorting: setAlbumSorting,
-    loading: albumsLoading,
-    updateQueryParam: updateAlbumQueryParam,
-    refreshData: refreshAlbums,
-    setData: setAlbums,
-  } = useDataTable<Album>({ fetchData: fetchAlbums, paramKeyPrefix: 'album_' });
-
-  const fetchAvailableData = useCallback(async () => {
+  const fetchAlbums = useCallback(async (page: number, search: string, sort: SortConfig) => {
+    setLoading(true);
     try {
-      const token = localStorage.getItem('userToken') || '';
-
-      // Fetch genres nếu chưa có
-      if (availableGenres.length === 0) {
-        const genresResponse = await api.genres.getAll(token);
-        if (genresResponse && genresResponse.genres) {
-          setAvailableGenres(
-            genresResponse.genres.map((genre: any) => ({
-              id: genre.id,
-              name: genre.name,
-            }))
-          );
-        }
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      if (search) {
+        params.append('search', search);
+      }
+      if (sort.key) {
+        params.append('sortBy', sort.key);
+        params.append('sortOrder', sort.direction);
       }
 
-      // Fetch labels nếu chưa có
-      if (availableLabels.length === 0) {
-        const labelsResponse = await api.labels.getAll(token, 1, 100, '');
-        if (labelsResponse && labelsResponse.labels) {
-          setAvailableLabels(
-            labelsResponse.labels.map((label: any) => ({
-              id: label.id,
-              name: label.name,
-            }))
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch available data:', error);
-      toast.error('Failed to load some required data');
+      const response = await api.albums.getAlbums(token, page, limit, params.toString());
+      setAlbums(response.albums || []);
+      setTotalPages(response.pagination?.totalPages || 1);
+    } catch (err: any) {
+      console.error('Error fetching albums:', err);
+      toast.error(err.message || 'Could not load albums');
+      setAlbums([]);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
     }
-  }, [availableGenres.length, availableLabels.length]);
-
-  // Tải availableLabels ngay khi component mount
-  useEffect(() => {
-    fetchAvailableData();
-  }, [fetchAvailableData]);
-
-  const handleEditAlbum = useCallback(
-    (album: Album) => {
-      setSelectedAlbum(album);
-      setIsEditModalOpen(true);
-
-      // Set genres
-      if (album.genres) {
-        const genreIds = album.genres.map((g) => g.genre.id);
-        setSelectedGenres(genreIds);
-      } else {
-        setSelectedGenres([]);
-      }
-
-      // Set label từ database (album.labelId)
-      if (album.labelId) {
-        const matchedLabel = availableLabels.find(
-          (label) => label.id === album.labelId
-        );
-        if (matchedLabel) {
-          setSelectedLabelId(matchedLabel.id);
-          console.log('Matched Label for Album:', matchedLabel);
-        } else {
-          setSelectedLabelId(null);
-          console.warn('Label ID not found in availableLabels:', album.labelId);
-        }
-      } else {
-        setSelectedLabelId(null);
-        console.log('No labelId found for album:', album.id);
-      }
-    },
-    [availableLabels]
-  );
-
-  const handleViewAlbumDetails = useCallback((album: Album) => {
-    setAlbumForDetail(album);
-    setIsDetailModalOpen(true);
   }, []);
 
-  const handleDeleteAlbum = useCallback(
-    async (albumId: string | string[]) => {
-      const idsToDelete = Array.isArray(albumId) ? albumId : [albumId];
-      const confirmMessage = idsToDelete.length > 1 
-        ? `Are you sure you want to delete these ${idsToDelete.length} albums? This action cannot be undone.`
-        : 'Are you sure you want to delete this album? This action cannot be undone.';
-        
-      if (!window.confirm(confirmMessage)) {
+  useEffect(() => {
+    fetchAlbums(currentPage, activeSearchTerm, sortConfig);
+  }, [fetchAlbums, currentPage, activeSearchTerm, sortConfig]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeSearchTerm, sortConfig]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchInput(e.target.value);
+  }
+
+  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setActiveSearchTerm(searchInput);
+  };
+
+  const handleSort = (key: keyof Album | null) => {
+    if (!key) return;
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleDeleteAlbum = async (albumId: string) => {
+    if (!window.confirm('Are you sure you want to delete this album? This action cannot be undone.')) {
+      return;
+    }
+
+    setActionLoading(albumId);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      await api.albums.delete(albumId, token);
+      toast.success('Album deleted successfully');
+      fetchAlbums(currentPage, activeSearchTerm, sortConfig);
+      setSelectedAlbumIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(albumId);
+        return newSet;
+      });
+    } catch (err: any) {
+      console.error('Error deleting album:', err);
+      toast.error(err.message || 'Failed to delete album');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleBulkDeleteClick = () => {
+    if (selectedAlbumIds.size === 0) {
+      toast('No albums selected.', { icon: '⚠️' });
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete ${selectedAlbumIds.size} selected album(s)? This action cannot be undone.`)) {
         return;
       }
 
+    const deleteMultipleAlbums = async () => {
+      setActionLoading('bulk-delete');
       try {
-        const token = localStorage.getItem('userToken') || '';
-        const deletePromises = idsToDelete.map(id => api.albums.delete(id, token)); 
-        await Promise.all(deletePromises);
-
-        toast.success(`Successfully deleted ${idsToDelete.length} album${idsToDelete.length > 1 ? 's' : ''}`);
-        refreshAlbums();
-      } catch (error) {
-        console.error('Failed to delete album(s):', error);
-        toast.error('Failed to delete album(s)');
-      }
-    },
-    [refreshAlbums]
-  );
-
-  const handleAlbumEditSubmit = useCallback(
-    async (albumId: string, formData: FormData) => {
-      try {
-        const token = localStorage.getItem('userToken') || '';
-        await api.albums.update(albumId, formData, token);
-        toast.success('Album updated successfully');
-        setSelectedAlbum(null);
-      } catch (error) {
-        console.error('Failed to update album:', error);
-        toast.error('Failed to update album');
-      }
-    },
-    []
-  );
-  const handleToggleVisibility = useCallback(
-    async (albumId: string, currentIsActive: boolean) => {
-      const action = currentIsActive ? 'hiding' : 'activating';
-      const optimisticAction = currentIsActive ? 'Hide' : 'Show';
-      const toastId = toast.loading(`${optimisticAction} album...`);
-      try {
-        const token = localStorage.getItem('userToken') || '';
-        // Assuming an endpoint exists like api.albums.toggleVisibility
-        await api.albums.toggleVisibility(albumId, token);
-        toast.success(`Album ${action === 'hiding' ? 'hidden' : 'activated'} successfully`, { id: toastId });
-        setAlbums((currentAlbums: Album[]) =>
-            currentAlbums.map((album: Album) =>
-                album.id === albumId ? { ...album, isActive: !currentIsActive } : album
-            )
-        );
-      } catch (error) {
-        console.error(`Failed ${action} album:`, error);
-        toast.error(`Failed to ${action} album`, { id: toastId });
-      }
-    },
-    [setAlbums]
-  );
-
-  const albumColumns = useMemo(
-    () =>
-      getAlbumColumns({
-        theme,
-        onEdit: handleEditAlbum,
-        onDelete: handleDeleteAlbum,
-        onVisibilityChange: handleToggleVisibility,
-        onViewDetails: handleViewAlbumDetails,
-      }),
-    [theme, handleEditAlbum, handleDeleteAlbum, handleViewAlbumDetails, handleToggleVisibility]
-  );
-
-  const albumTable = useReactTable({
-    data: albums || [],
-    columns: albumColumns,
-    pageCount: albumTotalPages,
-    state: {
-      pagination: {
-        pageIndex: albumCurrentPage - 1,
-        pageSize: 10,
-      },
-      sorting: albumSorting,
-    },
-    onPaginationChange: (updater) => {
-      if (typeof updater === 'function') {
-        const newPage =
-          updater({ pageIndex: albumCurrentPage - 1, pageSize: 10 }).pageIndex +
-          1;
-        updateAlbumQueryParam({ page: newPage });
-      }
-    },
-    onSortingChange: setAlbumSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    manualPagination: true,
-    manualSorting: true,
-  });
-
-  // WebSocket listener for Album updates
-  useEffect(() => {
-    let socket: Socket | null = null;
-    const connectTimer = setTimeout(() => {
-        socket = io(process.env.NEXT_PUBLIC_API_URL!);
-
-        console.log("[WebSocket] Connecting for Admin AlbumManagement...");
-
-        socket.on('connect', () => {
-            console.log("[WebSocket] Connected for Admin AlbumManagement");
-        });
-        socket.on('disconnect', (reason: string) => {
-            console.log("[WebSocket] Disconnected from Admin AlbumManagement:", reason);
-        });
-        socket.on('connect_error', (error: Error) => {
-            console.error("[WebSocket] Connection Error for Admin AlbumManagement:", error);
-        });
-
-        // Listen for album creation
-        socket.on('album:created', (data: { album: Album }) => {
-            console.log('[WebSocket] Album created:', data.album);
-            // Add to the beginning of the list for immediate visibility
-            // Note: This might not respect current sorting/filtering/pagination
-            // For a more robust solution, might need to refresh or re-evaluate filters/sort.
-            setAlbums((currentAlbums: Album[]) => [data.album, ...currentAlbums]);
-            // Or trigger a refresh if complex filtering/sorting is applied:
-            // refreshAlbums(); 
-        });
-
-        // Listen for album updates
-        socket.on('album:updated', (data: { album: Album }) => {
-          console.log('[WebSocket] Album updated:', data.album);
-          setAlbums((currentAlbums: Album[]) =>
-            currentAlbums.map((album: Album) =>
-              album.id === data.album.id ? { ...album, ...data.album } : album
-            )
-          );
-        });
-
-        // Listen for album deletions
-        socket.on('album:deleted', (data: { albumId: string }) => {
-          console.log('[WebSocket] Album deleted:', data.albumId);
-          setAlbums((currentAlbums: Album[]) =>
-            currentAlbums.filter((album: Album) => album.id !== data.albumId)
-          );
-        });
-
-         // Listen for album visibility changes
-        socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
-            console.log('[WebSocket] Album visibility changed:', data);
-            setAlbums((currentAlbums: Album[]) =>
-                currentAlbums.map((album: Album) =>
-                    album.id === data.albumId ? { ...album, isActive: data.isActive } : album
-                )
-            );
-        });
-    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
-
-    // Cleanup on component unmount
-    return () => {
-        clearTimeout(connectTimer);
-        if (socket) {
-            console.log("[WebSocket] Disconnecting from Admin AlbumManagement...");
-            socket.off('connect');
-            socket.off('disconnect');
-            socket.off('connect_error');
-            socket.off('album:created');
-            socket.off('album:updated');
-            socket.off('album:deleted');
-            socket.off('album:visibilityChanged');
-            socket.disconnect();
+        const token = localStorage.getItem('userToken');
+        if (!token) {
+          throw new Error('No authentication token found');
         }
+        
+        await Promise.all(
+          Array.from(selectedAlbumIds).map(id => api.albums.delete(id, token))
+        );
+        
+        toast.success(`Successfully deleted ${selectedAlbumIds.size} album(s)`);
+        fetchAlbums(currentPage, activeSearchTerm, sortConfig);
+        setSelectedAlbumIds(new Set());
+      } catch (err: any) {
+        console.error('Error deleting albums:', err);
+        toast.error(err.message || 'Failed to delete albums');
+      } finally {
+        setActionLoading(null);
+      }
     };
-  }, [setAlbums]); // Add setAlbums as dependency
+
+    deleteMultipleAlbums();
+  };
+
+  const handleToggleVisibility = async (albumId: string, currentIsActive: boolean) => {
+    setActionLoading(albumId);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      await api.albums.toggleVisibility(albumId, token);
+      
+      setAlbums(albums.map(album => 
+        album.id === albumId 
+          ? { ...album, isActive: !currentIsActive } 
+          : album
+      ));
+      
+      toast.success(`Album ${currentIsActive ? 'hidden' : 'activated'} successfully`);
+    } catch (err: any) {
+      console.error('Error toggling album visibility:', err);
+      toast.error(err.message || 'Failed to update album visibility');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      const allIds = new Set(albums.map(a => a.id));
+      setSelectedAlbumIds(allIds);
+    } else {
+      setSelectedAlbumIds(new Set());
+    }
+  };
+
+  const handleSelectRow = (albumId: string, checked: boolean | 'indeterminate') => {
+    setSelectedAlbumIds(prev => {
+      const newSet = new Set(prev);
+      if (checked === true) {
+        newSet.add(albumId);
+      } else {
+        newSet.delete(albumId);
+      }
+      return newSet;
+    });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-GB');
+    } catch {
+      return 'Invalid Date';
+    }
+  };
+
+  const isAllSelected = albums.length > 0 && selectedAlbumIds.size === albums.length;
+  const isIndeterminate = selectedAlbumIds.size > 0 && selectedAlbumIds.size < albums.length;
 
   return (
-    <>
-      <DataTableWrapper
-        table={albumTable}
-        columns={albumColumns}
-        data={albums}
-        pageCount={albumTotalPages}
-        pageIndex={albumCurrentPage - 1}
-        loading={albumsLoading}
-        onPageChange={(page) => updateAlbumQueryParam({ page: page + 1 })}
-        theme={theme}
-        toolbar={{
-          searchValue: albumSearch,
-          onSearchChange: setAlbumSearch,
-          searchPlaceholder: 'Search albums...',
-        }}
-      />
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+        <form onSubmit={handleSearchSubmit} className="relative flex-grow">
+          <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+          <Input
+            type="text"
+            placeholder="Search albums and press Enter..."
+            value={searchInput}
+            onChange={handleSearchChange}
+            className={`pl-10 pr-4 py-2 w-full rounded-md border h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}
+          />
+          <button type="submit" className="hidden">Search</button>
+        </form>
+      </div>
 
-      {isEditModalOpen && selectedAlbum && (
-        <EditAlbumModal
-          album={selectedAlbum}
-          onClose={() => {
-            setIsEditModalOpen(false);
-            setSelectedAlbum(null);
-          }}
-          onSubmit={handleAlbumEditSubmit}
-          availableGenres={availableGenres}
-          selectedGenres={selectedGenres}
-          setSelectedGenres={setSelectedGenres}
-          availableLabels={availableLabels}
-          selectedLabelId={selectedLabelId}
-          setSelectedLabelId={setSelectedLabelId}
-          theme={theme}
-        />
+      {loading ? (
+        <div className="text-center py-4">Loading albums...</div>
+      ) : (
+        <>
+          <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
+            <table className={`w-full text-sm text-left ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              <thead className={`text-xs uppercase ${theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-gray-50 text-gray-700'}`}>
+                <tr>
+                  <th scope="col" className="p-4 rounded-tl-md">
+                    <Checkbox
+                      id="select-all-checkbox"
+                      checked={isAllSelected ? true : isIndeterminate ? 'indeterminate' : false}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all albums"
+                      className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
+                      disabled={loading || actionLoading !== null}
+                    />
+                  </th>
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('title')}
+                  >
+                    <div className="flex items-center">
+                      Title
+                      {sortConfig.key === 'title' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                  >
+                    <div className="flex items-center">
+                      Artist
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('type')}
+                  >
+                    <div className="flex items-center">
+                      Type
+                      {sortConfig.key === 'type' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('isActive')}
+                  >
+                    <div className="flex items-center">
+                      Status
+                      {sortConfig.key === 'isActive' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('releaseDate')}
+                  >
+                    <div className="flex items-center">
+                      Release Date
+                      {sortConfig.key === 'releaseDate' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  <th scope="col" className="py-3 px-6 rounded-tr-md text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {albums.length > 0 ? (
+                  albums.map((album) => (
+                    <tr
+                      key={album.id}
+                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedAlbumIds.has(album.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === album.id ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      <td className="w-4 p-4">
+                        <Checkbox
+                          id={`select-row-${album.id}`}
+                          checked={selectedAlbumIds.has(album.id)}
+                          onCheckedChange={(checked) => handleSelectRow(album.id, checked)}
+                          aria-label={`Select row for album ${album.title}`}
+                          className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
+                          disabled={loading || actionLoading !== null}
+                        />
+                      </td>
+                      <td className={`py-4 px-6 font-medium whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {album.title}
+                      </td>
+                      <td className="py-4 px-6">{album.artist?.artistName || 'Unknown'}</td>
+                      <td className="py-4 px-6">{album.type}</td>
+                      <td className="py-4 px-6">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${album.isActive
+                          ? (theme === 'dark' ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800')
+                          : (theme === 'dark' ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800')
+                        }`}>
+                          {album.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">{formatDate(album.releaseDate)}</td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
+                            onClick={() => handleDeleteAlbum(album.id)}
+                            aria-label={`Delete album ${album.title}`}
+                            disabled={loading || actionLoading !== null}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0" data-radix-dropdown-menu-trigger disabled={loading || actionLoading !== null}>
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem>
+                                <Eye className="mr-2 h-4 w-4" /> View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4" /> Edit Album
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className={theme === 'dark' ? 'bg-gray-600' : ''} />
+                              <DropdownMenuItem
+                                onClick={() => handleToggleVisibility(album.id, album.isActive)}
+                                disabled={actionLoading === album.id}
+                              >
+                                {album.isActive ? (
+                                  <>
+                                    <XCircle className="mr-2 h-4 w-4" /> Hide Album
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="mr-2 h-4 w-4" /> Show Album
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="py-4 px-6 text-center">No albums found {activeSearchTerm ? 'matching your search' : ''}.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-between items-center mt-4">
+            <div className="min-w-[200px]">
+              {selectedAlbumIds.size > 0 && (
+                <Button
+                  onClick={handleBulkDeleteClick}
+                  variant="destructive"
+                  size="default"
+                  disabled={loading || actionLoading !== null}
+                  className={`${theme === 'dark' ? 'bg-red-700 hover:bg-red-800' : ''}`}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Selected ({selectedAlbumIds.size})
+                </Button>
+              )}
+            </div>
+            <div className="flex justify-end">
+              {totalPages > 1 && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1 || loading || actionLoading !== null}
+                    variant="outline"
+                    size="sm">
+                    Previous
+                  </Button>
+                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages || loading || actionLoading !== null}
+                    variant="outline"
+                    size="sm">
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
-
-      <AlbumDetailModal
-        album={albumForDetail}
-        isOpen={isDetailModalOpen}
-        onClose={() => {
-          setIsDetailModalOpen(false);
-          setAlbumForDetail(null);
-        }}
-        theme={theme}
-      />
-    </>
+    </div>
   );
 };

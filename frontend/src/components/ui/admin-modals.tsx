@@ -18,6 +18,21 @@ import { cn } from '@/lib/utils';
 import { UserIcon } from 'lucide-react';
 import { Edit, Tags } from './Icons';
 import Image from 'next/image';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Music } from 'lucide-react';
 
 // Edit User Modal
 interface EditUserModalProps {
@@ -1597,7 +1612,6 @@ export function EditLabelModal({
     if (isOpen && label) {
       setPreviewLogo(label.logoUrl);
       setLogoFile(null);
-      // Reset form fields to reflect the current label's data
       if (formRef.current) {
          const nameInput = formRef.current.elements.namedItem('name') as HTMLInputElement;
          const descriptionInput = formRef.current.elements.namedItem('description') as HTMLTextAreaElement;
@@ -1606,7 +1620,6 @@ export function EditLabelModal({
       }
       setIsSubmitting(false);
     } else if (!isOpen) {
-        // Clear preview when modal closes if not saving
         setPreviewLogo(null);
         setLogoFile(null);
     }
@@ -1633,20 +1646,20 @@ export function EditLabelModal({
       return;
     }
 
-    // Only add the file if a new one was selected
+    // Chỉ thêm file nếu có file mới được chọn
     if (logoFile) {
       formData.set("logoFile", logoFile);
     } else {
-      // If no new file is selected, ensure logoFile field is not sent
+      // Nếu ko có file mới được chọn, đảm bảo trường logoFile ko được gửi
       formData.delete("logoFile");
     }
 
     setIsSubmitting(true);
     try {
       await onSubmit(label.id, formData);
-      onClose(); // Close modal on success
+      onClose();
     } catch (error) {
-      // Error handled by the parent component
+      // Xử lý trong parent component
     } finally {
       setIsSubmitting(false);
     }
@@ -1728,7 +1741,7 @@ export function EditLabelModal({
              <input
                type="file"
                id="editLogoFile"
-               name="logoFile" // Important for FormData association, although we handle file state separately
+               name="logoFile"
                accept="image/*"
                onChange={handleFileChange}
                className="hidden"
@@ -1815,4 +1828,492 @@ export function EditLabelModal({
       </DialogContent>
     </Dialog>
   );
-} 
+}
+
+interface SystemPlaylistModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: FormData) => Promise<void>;
+  initialData?: {
+    id?: string;
+    name?: string;
+    description?: string;
+    coverUrl?: string;
+    privacy?: "PUBLIC" | "PRIVATE";
+    basedOnMood?: string;
+    basedOnGenre?: string;
+    basedOnArtist?: string;
+    basedOnSongLength?: string;
+    basedOnReleaseTime?: string;
+    trackCount?: number;
+  };
+  theme?: "light" | "dark";
+  mode: "create" | "edit";
+}
+
+export function SystemPlaylistModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialData = {},
+  theme = "light",
+  mode = "create",
+}: SystemPlaylistModalProps) {
+  const [name, setName] = useState(initialData.name || "");
+  const [description, setDescription] = useState(initialData.description || "");
+  const [privacy, setPrivacy] = useState<"PUBLIC" | "PRIVATE">(
+    initialData.privacy || "PUBLIC"
+  );
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(
+    initialData.coverUrl || null
+  );
+
+  // AI generation parameters - Initialize from initialData
+  const [isAIGenerated, setIsAIGenerated] = useState(true);
+  const [basedOnMood, setBasedOnMood] = useState(initialData.basedOnMood || "");
+  const [basedOnGenre, setBasedOnGenre] = useState(
+    initialData.basedOnGenre || ""
+  );
+  const [basedOnArtist, setBasedOnArtist] = useState(
+    initialData.basedOnArtist || ""
+  );
+  const [basedOnSongLength, setBasedOnSongLength] = useState(
+    initialData.basedOnSongLength || ""
+  );
+  const [basedOnReleaseTime, setBasedOnReleaseTime] = useState(
+    initialData.basedOnReleaseTime || ""
+  );
+  const [trackCount, setTrackCount] = useState(initialData.trackCount || 10);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCoverFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCoverClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const formData = new FormData();
+
+    // Basic playlist data
+    formData.append("name", name);
+    if (description) formData.append("description", description);
+    formData.append("privacy", privacy);
+
+    // If we're editing an existing playlist, include the ID
+    if (mode === "edit" && initialData.id) {
+      formData.append("id", initialData.id);
+    }
+
+    // Include the cover file if one was selected
+    if (coverFile) {
+      formData.append("cover", coverFile);
+    }
+
+    // AI generation parameters
+    formData.append("isAIGenerated", String(isAIGenerated));
+    if (isAIGenerated) {
+      if (basedOnMood) formData.append("basedOnMood", basedOnMood);
+      if (basedOnGenre) formData.append("basedOnGenre", basedOnGenre);
+      if (basedOnArtist) formData.append("basedOnArtist", basedOnArtist);
+      if (basedOnSongLength)
+        formData.append("basedOnSongLength", basedOnSongLength);
+      if (basedOnReleaseTime)
+        formData.append("basedOnReleaseTime", basedOnReleaseTime);
+      formData.append("trackCount", String(trackCount));
+    }
+    try {
+      await onSubmit(formData);
+      onClose();
+    } catch (error) {
+      console.error("Error submitting playlist:", error);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`sm:max-w-5xl w-[95vw] h-[85vh] flex flex-col ${
+          // Thay max-h-[90vh] bằng h-[85vh]
+          theme === "dark"
+            ? "bg-[#1e1e1e] text-white border-white/10"
+            : "bg-white"
+        }`}
+      >
+        <DialogHeader className="flex-shrink-0">
+          {" "}
+          {/* Header không co lại */}
+          <DialogTitle
+            className={theme === "dark" ? "text-white" : "text-gray-900"}
+          >
+            {mode === "create"
+              ? "Create System Playlist"
+              : "Edit System Playlist"}
+          </DialogTitle>
+          <DialogDescription
+            className={theme === "dark" ? "text-white/70" : "text-gray-500"}
+          >
+            {mode === "create"
+              ? "Create a new system playlist as a template for user playlists"
+              : "Edit the system playlist details"}
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Khu vực nội dung chính có thể scroll nội bộ */}
+        <div className="flex-grow overflow-y-hidden pt-4">
+          {/* Cho phép khu vực này giãn nở, ẩn scrollbar chính */}
+          <form
+            onSubmit={handleSubmit}
+            id="system-playlist-form"
+            className="h-full flex flex-col"
+          >
+            {/* Form chiếm hết chiều cao khu vực giữa */}
+            <Tabs
+              defaultValue="basic"
+              className="w-full flex flex-col flex-grow"
+            >
+              {/* Tabs chiếm không gian còn lại */}
+              <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
+                {/* TabsList không co lại */}
+                <TabsTrigger value="basic">Basic Information</TabsTrigger>
+                <TabsTrigger value="ai">AI Options</TabsTrigger>
+              </TabsList>
+              {/* Wrapper cuộn nội bộ cho TabsContent */}
+              <div className="flex-grow overflow-y-auto pr-3 mt-6">
+                {/* Phần này sẽ cuộn, không cần chiều cao cố định */}
+                {/* Nội dung tab Basic Information */}
+                <TabsContent value="basic" className="mt-0">
+                  <div className="space-y-6">
+                    {/* Container cho nội dung */}
+                    {/* Giữ lại grid nội bộ cho cover và các trường input cơ bản */}
+                    <div className="grid grid-cols-4 gap-4">
+                      {/* Cover Image */}
+                      <div className="col-span-1">
+                        <UILabel
+                          className={`mb-1 block text-sm font-medium ${
+                            theme === "dark" ? "text-white/80" : ""
+                          }`}
+                        >
+                          Cover
+                        </UILabel>
+                        <div
+                          onClick={handleCoverClick}
+                          className={`w-full aspect-square rounded-md ${
+                            theme === "dark"
+                              ? "bg-white/5 hover:bg-white/10"
+                              : "bg-gray-100 hover:bg-gray-200"
+                          } flex items-center justify-center cursor-pointer overflow-hidden transition-colors`}
+                        >
+                          {coverPreview ? (
+                            <Image
+                              src={coverPreview}
+                              alt="Playlist cover"
+                              width={100}
+                              height={100}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Music className="h-10 w-10 text-gray-400" />
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileChange}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <p
+                          className={`text-xs mt-1 text-center ${
+                            theme === "dark" ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        >
+                          Click to upload
+                        </p>
+                      </div>
+                      {/* Fields: Name, Description, Privacy */}
+                      <div className="col-span-3">
+                        {" "}
+                        {/* Giảm gap thành space-y-3 */}
+                        <div>
+                          <UILabel
+                            htmlFor="name"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Playlist Name*
+                          </UILabel>
+                          <Input
+                            id="name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="e.g., Top Hits of 2023"
+                            required
+                            maxLength={50} // Thêm giới hạn ký tự
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                          {/* Bộ đếm ký tự cho Title */}
+                          <p
+                            className={`text-xs text-right mt-1 ${
+                              theme === "dark"
+                                ? "text-white/50"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {name.length} / 50
+                          </p>
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="description"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Description
+                          </UILabel>
+                          <Textarea
+                            id="description"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Describe the playlist..."
+                            maxLength={300} // Thêm giới hạn ký tự
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                            rows={4}
+                          />
+                          {/* Bộ đếm ký tự cho Description */}
+                          <p
+                            className={`text-xs text-right mt-1 ${
+                              theme === "dark"
+                                ? "text-white/50"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {description.length} / 300
+                          </p>
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="privacy"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Privacy
+                          </UILabel>
+                          <Select
+                            value={privacy}
+                            onValueChange={(
+                              value: "PUBLIC" | "PRIVATE"
+                            ) => setPrivacy(value)}
+                          >
+                            <SelectTrigger
+                              className={
+                                theme === "dark"
+                                  ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                  : ""
+                              }
+                            >
+                              <SelectValue placeholder="Select privacy" />
+                            </SelectTrigger>
+                            <SelectContent
+                              className={
+                                theme === "dark"
+                                  ? "bg-[#2a2a2a] border-gray-600 text-white"
+                                  : ""
+                              }
+                            >
+                              <SelectItem value="PUBLIC">Public</SelectItem>
+                              <SelectItem value="PRIVATE">Private</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+                {/* Nội dung tab AI Options */}
+                <TabsContent value="ai" className="mt-0">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="ai-generated"
+                        checked={isAIGenerated}
+                        onCheckedChange={setIsAIGenerated}
+                      />
+                      <UILabel
+                        htmlFor="ai-generated"
+                        className={theme === "dark" ? "text-white" : ""}
+                      >
+                        AI Generated Playlist
+                      </UILabel>
+                    </div>
+                    {isAIGenerated && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <UILabel
+                            htmlFor="basedOnMood"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Based on Mood
+                          </UILabel>
+                          <Input
+                            id="basedOnMood"
+                            value={basedOnMood}
+                            onChange={(e) => setBasedOnMood(e.target.value)}
+                            placeholder="e.g., Energetic, Chill, Romantic"
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="basedOnGenre"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Based on Genre
+                          </UILabel>
+                          <Input
+                            id="basedOnGenre"
+                            value={basedOnGenre}
+                            onChange={(e) => setBasedOnGenre(e.target.value)}
+                            placeholder="e.g., Pop, Rock, Jazz"
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="basedOnArtist"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Based on Artist
+                          </UILabel>
+                          <Input
+                            id="basedOnArtist"
+                            value={basedOnArtist}
+                            onChange={(e) => setBasedOnArtist(e.target.value)}
+                            placeholder="e.g., Taylor Swift, The Weeknd"
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="basedOnSongLength"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Based on Song Length (seconds)
+                          </UILabel>
+                          <Input
+                            id="basedOnSongLength"
+                            type="number"
+                            value={basedOnSongLength}
+                            onChange={(e) => setBasedOnSongLength(e.target.value)}
+                            placeholder="e.g., 180 (for 3 minutes)"
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="basedOnReleaseTime"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Based on Release Time
+                          </UILabel>
+                          <Input
+                            id="basedOnReleaseTime"
+                            value={basedOnReleaseTime}
+                            onChange={(e) => setBasedOnReleaseTime(e.target.value)}
+                            placeholder="e.g., last_month, last_year, 2020s"
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="trackCount"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Number of Tracks
+                          </UILabel>
+                          <Input
+                            id="trackCount"
+                            type="number"
+                            value={trackCount}
+                            onChange={(e) =>
+                              setTrackCount(parseInt(e.target.value, 10))
+                            }
+                            min={5}
+                            max={50}
+                            required={isAIGenerated}
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </div>
+            </Tabs>
+          </form>
+        </div>
+
+        {/* Footer cố định */}
+        <DialogFooter className="flex-shrink-0 pt-4 border-t border-gray-200 dark:border-white/10">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className={
+              theme === "dark"
+                ? "border-white/20 text-white hover:bg-white/10"
+                : ""
+            }
+          >
+            Cancel
+          </Button>
+          <Button type="submit" form="system-playlist-form">
+            {mode === "create" ? "Create Playlist" : "Save Changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
