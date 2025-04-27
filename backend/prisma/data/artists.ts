@@ -472,6 +472,42 @@ export const artists: ArtistData[] = [
     },
   },
 
+  // SlimV
+  {
+    user: {
+      email: 'slimv@soundwave.com',
+      username: 'slimv_artist',
+      name: 'SlimV',
+    },
+    profile: {
+      artistName: 'SlimV',
+      bio: 'SlimV là một ca sĩ, nhạc sĩ người Việt Nam, được biết đến sau khi tham gia chương trình Giọng hát Việt 2015.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435226/seed/artists/hedfsp76waayhtmlheea.jpg',
+      socialMediaLinks: {
+        facebook: 'slimv.official',
+        instagram: 'slimv.official',
+      },
+    },
+  },
+
+  // Binz
+  {
+    user: {
+      email: 'binz@soundwave.com',
+      username: 'binz_artist',
+      name: 'Binz',
+    },
+    profile: {
+      artistName: 'Binz',
+      bio: 'Binz là một ca sĩ, nhạc sĩ người Việt Nam, được biết đến sau khi tham gia chương trình Giọng hát Việt 2015.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435226/seed/artists/hedfsp76waayhtmlheea.jpg',
+      socialMediaLinks: {
+        facebook: 'binz.official',
+        instagram: 'binz.official',
+      },
+    },  
+  },
+
   // Grey D
   {
     user: {
