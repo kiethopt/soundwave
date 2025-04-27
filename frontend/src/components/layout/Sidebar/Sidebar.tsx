@@ -1074,6 +1074,31 @@ export default function Sidebar({
                     )}
                   </Link>
 
+                  {/* Old Content Management */}
+                  {/* <Link
+                    href="/admin/content"
+                    className={`flex items-center px-3 py-2.5 rounded-md ${
+                      pathname && pathname.startsWith("/admin/content")
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isCollapsed ? (
+                      <div className="w-full flex justify-center">
+                        <LayoutGrid className="w-6 h-6" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="min-w-[32px] flex justify-center">
+                          <LayoutGrid className="w-5 h-5" />
+                        </div>
+                        <span className="ml-3 font-medium text-sm">
+                          Content
+                        </span>
+                      </>
+                    )}
+                  </Link> */}
+
                   <Link
                     href="/admin/content"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
