@@ -1,73 +1,66 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTheme } from '@/contexts/ThemeContext';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlbumManagement } from '@/components/admin/content/AlbumManagement';
 import { TrackManagement } from '@/components/admin/content/TrackManagement';
 import { SystemPlaylistManagement } from '@/components/admin/content/SystemPlaylistManagement';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Album, Disc3, ListMusic } from 'lucide-react';
 
 export default function ContentManagement() {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState('albums');
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <h1
-        className={`text-2xl font-semibold ${
-          theme === 'dark' ? 'text-white' : 'text-gray-900'
-        }`}
-      >
-        Content Management
-      </h1>
+    <div className={`container mx-auto space-y-6 p-4 pb-20 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+      <div className="mb-6">
+        <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          Content Management
+        </h1>
+        <p className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : 'text-gray-600'}`}>
+          Manage albums, tracks, and system playlists
+        </p>
+      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList
-          className={`grid w-full grid-cols-3 ${
-            theme === 'dark' ? 'bg-[#282828]' : 'bg-gray-100'
-          }`}
-        >
-          <TabsTrigger
+      <Tabs 
+        value={activeTab} 
+        onValueChange={setActiveTab} 
+        className="w-full"
+      >
+        <TabsList className={`grid w-full grid-cols-3 mb-6 ${theme === 'dark' ? 'bg-gray-800' : ''}`}>
+          <TabsTrigger 
             value="albums"
-            className={`${
-              theme === 'dark'
-                ? 'data-[state=active]:bg-[#3e3e3e] data-[state=active]:text-white'
-                : 'data-[state=active]:bg-white data-[state=active]:text-gray-900'
-            }`}
+            className={`flex items-center gap-2 ${theme === 'dark' ? 'data-[state=active]:bg-gray-700 data-[state=active]:text-white' : ''}`}
           >
-            Albums
+            <Album className="h-4 w-4" />
+            <span className="hidden sm:inline">Albums</span>
           </TabsTrigger>
-          <TabsTrigger
+          <TabsTrigger 
             value="tracks"
-            className={`${
-              theme === 'dark'
-                ? 'data-[state=active]:bg-[#3e3e3e] data-[state=active]:text-white'
-                : 'data-[state=active]:bg-white data-[state=active]:text-gray-900'
-            }`}
+            className={`flex items-center gap-2 ${theme === 'dark' ? 'data-[state=active]:bg-gray-700 data-[state=active]:text-white' : ''}`}
           >
-            Tracks
+            <Disc3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Tracks</span>
           </TabsTrigger>
-          <TabsTrigger
+          <TabsTrigger 
             value="playlists"
-            className={`${
-              theme === 'dark'
-                ? 'data-[state=active]:bg-[#3e3e3e] data-[state=active]:text-white'
-                : 'data-[state=active]:bg-white data-[state=active]:text-gray-900'
-            }`}
+            className={`flex items-center gap-2 ${theme === 'dark' ? 'data-[state=active]:bg-gray-700 data-[state=active]:text-white' : ''}`}
           >
-            System Playlists
+            <ListMusic className="h-4 w-4" />
+            <span className="hidden sm:inline">System Playlists</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="albums" className="mt-4">
+        <TabsContent value="albums" className="space-y-4">
           <AlbumManagement theme={theme} />
         </TabsContent>
 
-        <TabsContent value="tracks" className="mt-4">
+        <TabsContent value="tracks" className="space-y-4">
           <TrackManagement theme={theme} />
         </TabsContent>
 
-        <TabsContent value="playlists" className="mt-4">
+        <TabsContent value="playlists" className="space-y-4">
           <SystemPlaylistManagement theme={theme} />
         </TabsContent>
       </Tabs>

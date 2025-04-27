@@ -114,6 +114,7 @@ model Album {
   tracks      Track[]
   labelId     String?
   label       Label?        @relation(fields: [labelId], references: [id], onDelete: SetNull)
+  notifications Notification[]
 
   @@unique([title, artistId])
   @@index([title])
@@ -149,6 +150,7 @@ model Track {
   likedBy         UserLikeTrack[]
   labelId         String?
   label           Label?          @relation(fields: [labelId], references: [id], onDelete: SetNull)
+  notifications   Notification[]
 
   @@unique([title, artistId])
   @@index([title])
@@ -231,15 +233,21 @@ model Notification {
   userId        String?
   artistId      String?
   senderId      String?
+  trackId       String?
+  albumId       String?
   count         Int?             @default(1)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   artist        ArtistProfile?   @relation("ArtistNotifications", fields: [artistId], references: [id], onDelete: Cascade)
   user          User?            @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  track         Track?           @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  album         Album?           @relation(fields: [albumId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([artistId])
   @@index([senderId])
+  @@index([trackId])
+  @@index([albumId])
   @@index([createdAt])
   @@map("notifications")
 }

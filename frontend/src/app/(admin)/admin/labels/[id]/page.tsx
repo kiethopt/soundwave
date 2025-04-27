@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo, use } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import type { Label } from '@/types';
 import Image from 'next/image';
@@ -13,13 +13,8 @@ import { LabelInfoCard } from '@/components/admin/labels/LabelInfoCard';
 import { LabelTabs } from '@/components/admin/labels/LabelTabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
-export default function LabelDetail() {
-  const params = useParams();
-  const labelId = params?.id
-    ? Array.isArray(params.id)
-      ? params.id[0]
-      : params.id
-    : null;
+export default function LabelDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id: labelId } = use(params);
   const router = useRouter();
   const { theme } = useTheme();
   const [label, setLabel] = useState<Label | null>(null);

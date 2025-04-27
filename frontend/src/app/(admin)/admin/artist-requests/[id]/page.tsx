@@ -4,12 +4,11 @@ import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import { ArrowLeft, Check, X } from 'lucide-react';
-import Link from 'next/link';
 import { ArtistRequest } from '@/types';
 import toast from 'react-hot-toast';
 import { Facebook, Instagram } from '@/components/ui/Icons';
 import { useTheme } from '@/contexts/ThemeContext';
-import { RejectModal } from '@/components/ui/data-table/data-table-modals';
+import { RejectModal, ApproveModal } from '@/components/ui/admin-modals';
 
 export default function ArtistRequestDetail({
   params,
@@ -17,12 +16,13 @@ export default function ArtistRequestDetail({
   params: Promise<{ id: string }>;
 }) {
   const { theme } = useTheme();
-  const { id } = use(params);
+  const { id: requestId } = use(params);
   const router = useRouter();
   const [request, setRequest] = useState<ArtistRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
 
   useEffect(() => {
     const fetchRequestDetails = async () => {
@@ -31,7 +31,7 @@ export default function ArtistRequestDetail({
         if (!token) {
           throw new Error('No authentication token found');
         }
-        const response = await api.admin.getArtistRequestDetail(id, token);
+        const response = await api.admin.getArtistRequestDetail(requestId, token);
         setRequest(response);
       } catch (err) {
         console.error('Error fetching request details:', err);
@@ -44,13 +44,16 @@ export default function ArtistRequestDetail({
     };
 
     fetchRequestDetails();
-  }, [id]);
+  }, [requestId]);
 
-  const handleApprove = async () => {
-    if (!confirm('Are you sure you want to approve this artist request?'))
-      return;
+  const handleApproveClick = () => {
+    setShowApproveModal(true);
+  };
 
+  const handleApproveConfirm = async () => {
     try {
+      setShowApproveModal(false);
+      
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
@@ -65,12 +68,12 @@ export default function ArtistRequestDetail({
   };
 
   const handleRejectClick = () => {
-    setIsRejectModalOpen(true);
+    setShowRejectModal(true);
   };
 
   const handleRejectConfirm = async (reason: string) => {
     try {
-      setIsRejectModalOpen(false);
+      setShowRejectModal(false);
 
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
@@ -171,7 +174,7 @@ export default function ArtistRequestDetail({
             {/* Action Buttons */}
             <div className="flex justify-center sm:justify-end gap-2">
               <button
-                onClick={handleApprove}
+                onClick={handleApproveClick}
                 className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-green-500/20 text-green-400 rounded-lg text-xs sm:text-sm min-w-[120px] sm:min-w-[140px]"
               >
                 <Check className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -398,12 +401,19 @@ export default function ArtistRequestDetail({
         </div>
       </div>
 
-      {/* Rejection Reason Modal */}
       <RejectModal
-        isOpen={isRejectModalOpen}
-        onClose={() => setIsRejectModalOpen(false)}
-        onConfirm={handleRejectConfirm}
-        theme={theme === 'dark' ? 'dark' : 'light'}
+        isOpen={showRejectModal}
+        onClose={() => setShowRejectModal(false)}
+        onConfirm={(reason) => handleRejectConfirm(reason)}
+        theme={theme}
+      />
+
+      <ApproveModal
+        isOpen={showApproveModal}
+        onClose={() => setShowApproveModal(false)}
+        onConfirm={handleApproveConfirm}
+        theme={theme}
+        artistName={request?.artistName}
       />
     </div>
   );

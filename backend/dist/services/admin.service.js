@@ -117,6 +117,7 @@ const getArtistRequests = async (req) => {
         user: {
             isActive: true,
         },
+        isVerified: false,
         AND: [],
     };
     if (typeof search === 'string' && search.trim()) {
@@ -133,37 +134,41 @@ const getArtistRequests = async (req) => {
             });
         }
     }
-    const isVerifiedFilter = (0, handle_utils_1.toBooleanValue)(status);
-    if (isVerifiedFilter !== undefined && Array.isArray(where.AND)) {
-        where.AND.push({ isVerified: isVerifiedFilter });
-    }
     const dateFilter = {};
-    const parsedStartDate = startDate ? new Date(startDate) : null;
-    const parsedEndDate = endDate ? new Date(endDate) : null;
-    if (parsedStartDate && !isNaN(parsedStartDate.getTime())) {
-        if (parsedEndDate && !isNaN(parsedEndDate.getTime())) {
-            const endOfDay = new Date(parsedEndDate);
-            endOfDay.setHours(23, 59, 59, 999);
-            dateFilter.verificationRequestedAt = {
-                gte: parsedStartDate,
-                lte: endOfDay,
-            };
+    if (typeof startDate === 'string' && startDate) {
+        try {
+            const startOfDay = new Date(startDate);
+            startOfDay.setUTCHours(0, 0, 0, 0);
+            dateFilter.gte = startOfDay;
         }
-        else {
-            dateFilter.verificationRequestedAt = { gte: parsedStartDate };
-        }
-        if (Array.isArray(where.AND)) {
-            where.AND.push(dateFilter);
+        catch (e) {
+            console.error("Invalid start date format:", startDate);
         }
     }
-    const paginationResult = await (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, {
+    if (typeof endDate === 'string' && endDate) {
+        try {
+            const endOfDay = new Date(endDate);
+            endOfDay.setUTCHours(23, 59, 59, 999);
+            dateFilter.lte = endOfDay;
+        }
+        catch (e) {
+            console.error("Invalid end date format:", endDate);
+        }
+    }
+    if (dateFilter.gte || dateFilter.lte) {
+        if (Array.isArray(where.AND)) {
+            where.AND.push({ verificationRequestedAt: dateFilter });
+        }
+    }
+    const options = {
         where,
         select: prisma_selects_1.artistRequestSelect,
         orderBy: { verificationRequestedAt: 'desc' },
-    });
+    };
+    const result = await (0, handle_utils_1.paginate)(db_1.default.artistProfile, req, options);
     return {
-        requests: paginationResult.data,
-        pagination: paginationResult.pagination,
+        requests: result.data,
+        pagination: result.pagination,
     };
 };
 exports.getArtistRequests = getArtistRequests;

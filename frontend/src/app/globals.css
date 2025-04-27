@@ -146,3 +146,141 @@
 .playlist-scroll-container:hover {
   scrollbar-color: #525252 transparent;
 }
+
+/* --- React Datepicker Dark Theme --- */
+.react-datepicker--dark {
+  @apply bg-[#2a2a2a] border-[#4a4a4a] text-[#e0e0e0];
+}
+.react-datepicker--dark .react-datepicker__header {
+  @apply bg-[#3a3a3a] border-b-[#4a4a4a];
+}
+.react-datepicker--dark .react-datepicker__current-month,
+.react-datepicker--dark .react-datepicker-time__header,
+.react-datepicker--dark .react-datepicker-year-header {
+  @apply text-[#e0e0e0];
+}
+.react-datepicker--dark .react-datepicker__day-name,
+.react-datepicker--dark .react-datepicker__day,
+.react-datepicker--dark .react-datepicker__time-name {
+  @apply text-[#c0c0c0];
+}
+.react-datepicker--dark .react-datepicker__day:hover,
+.react-datepicker--dark .react-datepicker__month-text:hover,
+.react-datepicker--dark .react-datepicker__quarter-text:hover,
+.react-datepicker--dark .react-datepicker__year-text:hover {
+  @apply bg-[#4a4a4a];
+}
+.react-datepicker--dark .react-datepicker__day--selected,
+.react-datepicker--dark .react-datepicker__day--in-selecting-range,
+.react-datepicker--dark .react-datepicker__day--in-range,
+.react-datepicker--dark .react-datepicker__month-text--selected,
+.react-datepicker--dark .react-datepicker__month-text--in-selecting-range,
+.react-datepicker--dark .react-datepicker__month-text--in-range,
+.react-datepicker--dark .react-datepicker__quarter-text--selected,
+.react-datepicker--dark .react-datepicker__quarter-text--in-selecting-range,
+.react-datepicker--dark .react-datepicker__quarter-text--in-range,
+.react-datepicker--dark .react-datepicker__year-text--selected,
+.react-datepicker--dark .react-datepicker__year-text--in-selecting-range,
+.react-datepicker--dark .react-datepicker__year-text--in-range {
+  @apply bg-yellow-500 text-gray-900; /* Using Tailwind yellow */
+}
+.react-datepicker--dark .react-datepicker__day--selected:hover,
+.react-datepicker--dark .react-datepicker__day--in-selecting-range:hover,
+.react-datepicker--dark .react-datepicker__day--in-range:hover,
+.react-datepicker--dark .react-datepicker__month-text--selected:hover,
+.react-datepicker--dark .react-datepicker__month-text--in-selecting-range:hover,
+.react-datepicker--dark .react-datepicker__month-text--in-range:hover,
+.react-datepicker--dark .react-datepicker__quarter-text--selected:hover,
+.react-datepicker--dark .react-datepicker__quarter-text--in-selecting-range:hover,
+.react-datepicker--dark .react-datepicker__quarter-text--in-range:hover,
+.react-datepicker--dark .react-datepicker__year-text--selected:hover,
+.react-datepicker--dark .react-datepicker__year-text--in-selecting-range:hover,
+.react-datepicker--dark .react-datepicker__year-text--in-range:hover {
+  @apply bg-yellow-400 text-gray-900; /* Lighter yellow on hover for selected */
+}
+.react-datepicker--dark .react-datepicker__day--keyboard-selected,
+.react-datepicker--dark .react-datepicker__month-text--keyboard-selected,
+.react-datepicker--dark .react-datepicker__quarter-text--keyboard-selected,
+.react-datepicker--dark .react-datepicker__year-text--keyboard-selected {
+  @apply bg-yellow-300 text-gray-900; /* Lighter yellow for focus */
+}
+.react-datepicker--dark .react-datepicker__day--disabled {
+  @apply text-[#666666];
+}
+.react-datepicker--dark .react-datepicker__navigation--previous {
+  border-right-color: #4a4a4a;
+}
+.react-datepicker--dark .react-datepicker__navigation--next {
+  border-left-color: #4a4a4a;
+}
+.react-datepicker--dark .react-datepicker__close-icon::after {
+  @apply bg-yellow-500 text-gray-900;
+}
+
+.react-datepicker__close-icon {
+  @apply absolute right-0 top-0 flex items-center justify-center h-full w-8;
+}
+
+.react-datepicker__close-icon::after {
+  @apply flex items-center justify-center h-4 w-4 text-xs rounded-full;
+  line-height: 1;
+  padding: 0;
+}
+
+.react-datepicker-wrapper {
+  @apply w-full;
+}
+
+.react-datepicker__input-container input {
+  @apply pl-4 pr-8 py-2 w-full rounded-md h-10;
+}
+
+/* Light Theme Datepicker Selection Styles */
+.react-datepicker--light .react-datepicker__day--selected,
+.react-datepicker--light .react-datepicker__day--in-selecting-range,
+.react-datepicker--light .react-datepicker__day--in-range,
+.react-datepicker--light .react-datepicker__month-text--selected,
+.react-datepicker--light .react-datepicker__month-text--in-selecting-range,
+.react-datepicker--light .react-datepicker__month-text--in-range,
+.react-datepicker--light .react-datepicker__quarter-text--selected,
+.react-datepicker--light .react-datepicker__quarter-text--in-selecting-range,
+.react-datepicker--light .react-datepicker__quarter-text--in-range,
+.react-datepicker--light .react-datepicker__year-text--selected,
+.react-datepicker--light .react-datepicker__year-text--in-selecting-range,
+.react-datepicker--light .react-datepicker__year-text--in-range {
+  @apply bg-blue-500 text-white rounded; /* Default blue selection for light theme */
+}
+.react-datepicker--light .react-datepicker__day--selected:hover,
+.react-datepicker--light .react-datepicker__day--in-selecting-range:hover,
+.react-datepicker--light .react-datepicker__day--in-range:hover,
+.react-datepicker--light .react-datepicker__month-text--selected:hover,
+.react-datepicker--light .react-datepicker__month-text--in-selecting-range:hover,
+.react-datepicker--light .react-datepicker__month-text--in-range:hover,
+.react-datepicker--light .react-datepicker__quarter-text--selected:hover,
+.react-datepicker--light .react-datepicker__quarter-text--in-selecting-range:hover,
+.react-datepicker--light .react-datepicker__quarter-text--in-range:hover,
+.react-datepicker--light .react-datepicker__year-text--selected:hover,
+.react-datepicker--light .react-datepicker__year-text--in-selecting-range:hover,
+.react-datepicker--light .react-datepicker__year-text--in-range:hover {
+  @apply bg-blue-600 text-white; /* Slightly darker blue on hover for light theme */
+}
+
+/* Override general hover for selected/in-range days */
+.react-datepicker__day--selected:hover,
+.react-datepicker__day--in-selecting-range:hover,
+.react-datepicker__day--in-range:hover {
+  /* Don't apply the default gray background on hover */
+}
+.react-datepicker--light .react-datepicker__day:hover {
+   /* Keep default light hover or adjust if needed */
+   /* Example: @apply bg-gray-100; */
+}
+.react-datepicker--dark .react-datepicker__day:hover:not(.react-datepicker__day--selected):not(.react-datepicker__day--in-range) {
+   /* Ensure non-selected days still get dark hover */
+   @apply bg-[#4a4a4a];
+}
+
+/* Improved DatePicker close button styling */
+.react-datepicker__close-icon {
+  @apply absolute right-0 top-0 flex items-center justify-center h-full w-8;
+}

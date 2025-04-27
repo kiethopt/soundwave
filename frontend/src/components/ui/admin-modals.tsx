@@ -1,5 +1,5 @@
-import React, { useState, useEffect,  useRef } from 'react';
-import { User } from '@/types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Genre, User, Label } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label as UILabel } from '@/components/ui/label';
@@ -10,14 +10,29 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
   DialogDescription,
 } from '@/components/ui/dialog';
-import Image from 'next/image';
-import { XIcon, Edit, Trash2, ShieldAlert, UserCog, Eye, EyeOff } from 'lucide-react';
+import { XIcon, Trash2, ShieldAlert, UserCog, Eye, EyeOff, XCircle, CheckCircle, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { UserIcon } from 'lucide-react';
+import { Edit, Tags } from './Icons';
+import Image from 'next/image';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Music } from 'lucide-react';
 
 // Edit User Modal
 interface EditUserModalProps {
@@ -748,6 +763,1556 @@ export function MakeAdminModal({
              Confirm Make Admin
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Reject Modal
+interface RejectModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+  theme?: "light" | "dark";
+}
+
+export function RejectModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  theme = "light",
+}: RejectModalProps) {
+  const [reason, setReason] = useState("");
+  const [customReason, setCustomReason] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setReason("");
+      setCustomReason(false);
+    }
+  }, [isOpen]);
+
+  const predefinedReasons = [
+    "Incomplete information provided",
+    "Invalid artist credentials",
+    "Inappropriate content or behavior",
+    "Duplicate request",
+    "Not meeting platform requirements",
+    "Other (specify below)",
+  ];
+
+  const handlePredefinedClick = (preReason: string) => {
+    if (preReason === "Other (specify below)") {
+      setReason("");
+      setCustomReason(true);
+    } else {
+      setReason(preReason);
+      setCustomReason(false);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (!reason.trim()) {
+      toast.error("Please provide a reason.");
+      return;
+    }
+    onConfirm(reason);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`
+          sm:max-w-[450px] p-0 overflow-hidden
+          ${theme === 'dark'
+            ? 'bg-gray-800 text-white border-gray-700'
+            : 'bg-white'}
+        `}
+      >
+        {/* ---------- Header ---------- */}
+        <div className="px-6 pt-6">
+          {/* Header with X icon and Close button aligned */}
+          <div className="flex items-center justify-between w-full">
+            {/* X icon */}
+            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-red-100">
+              <XCircle className="w-7 h-7 text-red-600" strokeWidth={1.5} />
+            </div>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={`
+                w-8 h-8 rounded-md flex items-center justify-center transition-colors
+                ${theme === 'dark'
+                  ? 'hover:bg-white/10'
+                  : 'hover:bg-black/5'}
+              `}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* ---------- Title & Description ---------- */}
+          <DialogTitle
+            className={`
+              mt-4 text-lg font-bold text-left
+              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}
+            `}
+          >
+            Reject Artist Request
+          </DialogTitle>
+          <p
+            className={`
+              mt-1 text-sm text-left
+              ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}
+            `}
+          >
+            Please provide a reason for rejecting this artist request. This reason may be communicated to the user.
+          </p>
+        </div>
+
+        {/* ---------- Selection & Input ---------- */}
+        <div className="px-6 py-4">
+          {predefinedReasons.length > 0 && (
+            <div className="space-y-2">
+              <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                Select a reason:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {predefinedReasons.map((preReason) => (
+                  <Button
+                    key={preReason}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePredefinedClick(preReason)}
+                    className={`${theme === 'dark' ? 'text-white border-gray-600 hover:bg-gray-700' : ''} ${reason === preReason && !customReason ? (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200') : ''}`}
+                  >
+                    {preReason}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(customReason || predefinedReasons.length === 0) && (
+            <div className="space-y-1 mt-4">
+              <UILabel
+                htmlFor="rejectReason"
+                className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}
+              >
+                Reason (Required)
+              </UILabel>
+              <Textarea
+                id="rejectReason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Enter reason for rejection..."
+                className={`min-h-[80px] w-full rounded-md border p-2 text-sm ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ---------- Actions ---------- */}
+        <div className={`
+          px-6 py-4 flex gap-3 border-t
+          ${theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'}
+        `}>
+          <Button
+            variant="outline"
+            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-300'}`}
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-red-700 hover:bg-red-600' : ''}`}
+            onClick={handleConfirm}
+            disabled={!reason.trim()}
+          >
+            <XCircle className="w-4 h-4 mr-2" />
+            Reject Artist Request
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Approve Modal
+interface ApproveModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  theme?: "light" | "dark";
+  artistName?: string;
+}
+
+export function ApproveModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  theme = "light",
+  artistName,
+}: ApproveModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`
+          sm:max-w-[450px] p-0 overflow-hidden
+          ${theme === 'dark'
+            ? 'bg-gray-800 text-white border-gray-700'
+            : 'bg-white'}
+        `}
+      >
+        {/* ---------- Header ---------- */}
+        <div className="px-6 pt-6">
+          {/* Header with Check icon and Close button aligned */}
+          <div className="flex items-center justify-between w-full">
+            {/* Check icon */}
+            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-green-100">
+              <CheckCircle className="w-7 h-7 text-green-600" strokeWidth={1.5} />
+            </div>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={`
+                w-8 h-8 rounded-md flex items-center justify-center transition-colors
+                ${theme === 'dark'
+                  ? 'hover:bg-white/10'
+                  : 'hover:bg-black/5'}
+              `}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* ---------- Title & Description ---------- */}
+          <DialogTitle
+            className={`
+              mt-4 text-lg font-bold text-left
+              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}
+            `}
+          >
+            Approve Artist Request
+          </DialogTitle>
+          <p
+            className={`
+              mt-1 text-sm text-left
+              ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}
+            `}
+          >
+            {artistName 
+              ? `Are you sure you want to approve "${artistName}"? This action will grant artist status to the user.`
+              : `Are you sure you want to approve this artist request? This action will grant artist status to the user.`}
+          </p>
+        </div>
+
+        {/* ---------- Actions ---------- */}
+        <div className={`
+          mt-6 px-6 py-4 flex gap-3 border-t
+          ${theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'}
+        `}>
+          <Button
+            variant="outline"
+            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-300'}`}
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="default"
+            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+            onClick={onConfirm}
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Approve Artist
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Add Genre Modal
+interface AddGenreModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (name: string) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function AddGenreModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: AddGenreModalProps) {
+  const [name, setName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName("");
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    
+    setIsSubmitting(true);
+    try {
+      await onSubmit(name.trim());
+    } catch (error) {
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={cn(
+        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
+      )}>
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full",
+                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
+              )}>
+                <Tags className={cn(
+                  "w-7 h-7",
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                )} strokeWidth={1.5} />
+              </div>
+              <div>
+                <DialogTitle className={cn(
+                  "text-lg font-bold",
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                )}>
+                  Add New Genre
+                </DialogTitle>
+                <p className={cn(
+                  "text-sm mt-1",
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                )}>
+                  Create a new music genre category
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+              )}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} id="add-genre-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <UILabel htmlFor="genre-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Genre Name
+              </UILabel>
+              <Input
+                id="genre-name"
+                name="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter genre name"
+                className={cn(
+                  "w-full",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                maxLength={50}
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className={cn(
+          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+          theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'
+        )}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                : 'bg-white hover:bg-gray-50 border-gray-300'
+            )}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="add-genre-form"
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-blue-600 hover:bg-blue-700' 
+                : 'bg-neutral-900 hover:bg-neutral-900/90'
+            )}
+            disabled={isSubmitting}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Genre
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Edit Genre Modal
+interface EditGenreModalProps {
+  genre: Genre | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (genreId: string, name: string) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function EditGenreModal({
+  genre,
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: EditGenreModalProps) {
+  const [name, setName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && genre) {
+      setName(genre.name);
+      setIsSubmitting(false);
+    }
+  }, [isOpen, genre]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!genre || !name.trim()) return;
+    
+    setIsSubmitting(true);
+    try {
+      await onSubmit(genre.id, name.trim());
+    } catch (error) {
+      // Handle ở parent component
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen || !genre) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={cn(
+        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
+      )}>
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full",
+                theme === 'dark' ? 'bg-amber-900/30' : 'bg-amber-100'
+              )}>
+                <Edit className={cn(
+                  "w-7 h-7",
+                  theme === 'dark' ? 'text-amber-300' : 'text-amber-600'
+                )} strokeWidth={1.5} />
+              </div>
+              <div>
+                <DialogTitle className={cn(
+                  "text-lg font-bold",
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                )}>
+                  Edit Genre
+                </DialogTitle>
+                <p className={cn(
+                  "text-sm mt-1",
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                )}>
+                  Update genre information
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+              )}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} id="edit-genre-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <UILabel htmlFor="edit-genre-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Genre Name
+              </UILabel>
+              <Input
+                id="edit-genre-name"
+                name="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter genre name"
+                className={cn(
+                  "w-full",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                maxLength={50}
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className={cn(
+          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+          theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'
+        )}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                : 'bg-white hover:bg-gray-50 border-gray-300'
+            )}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="edit-genre-form"
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-blue-600 hover:bg-blue-700' 
+                : 'bg-neutral-900 hover:bg-neutral-900/90'
+            )}
+            disabled={isSubmitting}
+          >
+            Save Changes
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Add Label Modal
+interface AddLabelModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (formData: FormData) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function AddLabelModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: AddLabelModalProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [previewLogo, setPreviewLogo] = useState<string>("");
+
+  useEffect(() => {
+    if (!isOpen) {
+      setLogoFile(null);
+      setPreviewLogo("");
+      formRef.current?.reset();
+    }
+  }, [isOpen]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setLogoFile(e.target.files[0]);
+      setPreviewLogo(URL.createObjectURL(e.target.files[0]));
+    }
+  };
+
+  const handleLogoClick = () => {
+    document.getElementById("newLogoFile")?.click();
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    if (!formData.get("name")?.toString().trim()) {
+      toast.error("Label name is required.");
+      return;
+    }
+
+    if (logoFile) {
+      formData.set("logoFile", logoFile);
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+      onClose(); // Close modal on success
+    } catch (error) {
+      // Error handled by the parent component
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={cn(
+        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
+      )}>
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full",
+                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
+              )}>
+                <Tags className={cn(
+                  "w-7 h-7",
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                )} strokeWidth={1.5} />
+              </div>
+              <div>
+                <DialogTitle className={cn(
+                  "text-lg font-bold",
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                )}>
+                  Add New Label
+                </DialogTitle>
+                <p className={cn(
+                  "text-sm mt-1",
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                )}>
+                  Create a new record label
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+              )}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form ref={formRef} onSubmit={handleSubmit} id="add-label-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow space-y-4">
+           <div className="flex flex-col items-center space-y-3">
+             <UILabel
+               htmlFor="newLogoFile"
+               className={`w-28 h-28 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center ${theme === 'dark' ? 'border-gray-600 bg-gray-700 hover:bg-gray-600' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'}`}
+             >
+               {previewLogo ? (
+                 <Image
+                   src={previewLogo}
+                   alt="Label Logo Preview"
+                   width={112}
+                   height={112}
+                   className="w-full h-full object-cover"
+                 />
+               ) : (
+                 <div className="flex flex-col items-center justify-center text-center">
+                   <Tags className={`w-8 h-8 mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+                   <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Upload Logo</span>
+                 </div>
+               )}
+             </UILabel>
+             <input
+               type="file"
+               id="newLogoFile"
+               accept="image/*"
+               onChange={handleFileChange}
+               className="hidden"
+             />
+           </div>
+
+           <div className="space-y-2">
+             <UILabel htmlFor="add-label-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+               Label Name
+             </UILabel>
+             <Input
+               id="add-label-name"
+               name="name"
+               placeholder="Enter label name"
+               className={cn(
+                 "w-full",
+                 theme === 'dark' 
+                   ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+               )}
+               maxLength={100}
+               required
+               disabled={isSubmitting}
+             />
+           </div>
+
+            <div className="space-y-2">
+              <UILabel htmlFor="add-label-description" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Description
+              </UILabel>
+              <Textarea
+                id="add-label-description"
+                name="description"
+                placeholder="Enter label description (optional)"
+                className={cn(
+                  "w-full min-h-[80px]",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                maxLength={500}
+                disabled={isSubmitting}
+              />
+            </div>
+        </form>
+
+        {/* Footer */}
+        <div className={cn(
+          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+          theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'
+        )}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                : 'bg-white hover:bg-gray-50 border-gray-300'
+            )}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="add-label-form"
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-blue-600 hover:bg-blue-700' 
+                : 'bg-neutral-900 hover:bg-neutral-900/90'
+            )}
+            disabled={isSubmitting}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Label
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Edit Label Modal
+interface EditLabelModalProps {
+  label: Label | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (labelId: string, formData: FormData) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function EditLabelModal({
+  label,
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: EditLabelModalProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [previewLogo, setPreviewLogo] = useState<string | null | undefined>(
+    label?.logoUrl
+  );
+
+  useEffect(() => {
+    if (isOpen && label) {
+      setPreviewLogo(label.logoUrl);
+      setLogoFile(null);
+      if (formRef.current) {
+         const nameInput = formRef.current.elements.namedItem('name') as HTMLInputElement;
+         const descriptionInput = formRef.current.elements.namedItem('description') as HTMLTextAreaElement;
+         if (nameInput) nameInput.value = label.name;
+         if (descriptionInput) descriptionInput.value = label.description || '';
+      }
+      setIsSubmitting(false);
+    } else if (!isOpen) {
+        setPreviewLogo(null);
+        setLogoFile(null);
+    }
+  }, [isOpen, label]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setLogoFile(e.target.files[0]);
+      setPreviewLogo(URL.createObjectURL(e.target.files[0]));
+    }
+  };
+
+  const handleLogoClick = () => {
+    document.getElementById("editLogoFile")?.click();
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!label) return;
+
+    const formData = new FormData(e.currentTarget);
+    if (!formData.get("name")?.toString().trim()) {
+      toast.error("Label name is required.");
+      return;
+    }
+
+    // Chỉ thêm file nếu có file mới được chọn
+    if (logoFile) {
+      formData.set("logoFile", logoFile);
+    } else {
+      // Nếu ko có file mới được chọn, đảm bảo trường logoFile ko được gửi
+      formData.delete("logoFile");
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit(label.id, formData);
+      onClose();
+    } catch (error) {
+      // Xử lý trong parent component
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen || !label) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={cn(
+        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
+      )}>
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full",
+                theme === 'dark' ? 'bg-amber-900/30' : 'bg-amber-100'
+              )}>
+                <Edit className={cn(
+                  "w-7 h-7",
+                  theme === 'dark' ? 'text-amber-300' : 'text-amber-600'
+                )} strokeWidth={1.5} />
+              </div>
+              <div>
+                <DialogTitle className={cn(
+                  "text-lg font-bold",
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                )}>
+                  Edit Label
+                </DialogTitle>
+                <p className={cn(
+                  "text-sm mt-1",
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                )}>
+                  Update label information
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+              )}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form ref={formRef} onSubmit={handleSubmit} id="edit-label-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow space-y-4">
+           <div className="flex flex-col items-center space-y-3">
+             <UILabel
+               htmlFor="editLogoFile"
+               className={`w-28 h-28 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center ${theme === 'dark' ? 'border-gray-600 bg-gray-700 hover:bg-gray-600' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'}`}
+             >
+               {previewLogo ? (
+                 <Image
+                   src={previewLogo}
+                   alt="Label Logo Preview"
+                   width={112}
+                   height={112}
+                   className="w-full h-full object-cover"
+                 />
+               ) : (
+                 <div className="flex flex-col items-center justify-center text-center">
+                   <Tags className={`w-8 h-8 mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+                   <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Upload Logo</span>
+                 </div>
+               )}
+             </UILabel>
+             <input
+               type="file"
+               id="editLogoFile"
+               name="logoFile"
+               accept="image/*"
+               onChange={handleFileChange}
+               className="hidden"
+             />
+           </div>
+
+           <div className="space-y-2">
+             <UILabel htmlFor="edit-label-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+               Label Name
+             </UILabel>
+             <Input
+               id="edit-label-name"
+               name="name"
+               defaultValue={label.name}
+               placeholder="Enter label name"
+               className={cn(
+                 "w-full",
+                 theme === 'dark' 
+                   ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+               )}
+               maxLength={100}
+               required
+               disabled={isSubmitting}
+             />
+           </div>
+
+            <div className="space-y-2">
+              <UILabel htmlFor="edit-label-description" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Description
+              </UILabel>
+              <Textarea
+                id="edit-label-description"
+                name="description"
+                defaultValue={label.description || ''}
+                placeholder="Enter label description (optional)"
+                className={cn(
+                  "w-full min-h-[80px]",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                maxLength={500}
+                disabled={isSubmitting}
+              />
+            </div>
+        </form>
+
+        {/* Footer */}
+        <div className={cn(
+          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+          theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'
+        )}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                : 'bg-white hover:bg-gray-50 border-gray-300'
+            )}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="edit-label-form"
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-blue-600 hover:bg-blue-700' 
+                : 'bg-neutral-900 hover:bg-neutral-900/90'
+            )}
+            disabled={isSubmitting}
+          >
+            Save Changes
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface SystemPlaylistModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: FormData) => Promise<void>;
+  initialData?: {
+    id?: string;
+    name?: string;
+    description?: string;
+    coverUrl?: string;
+    privacy?: "PUBLIC" | "PRIVATE";
+    basedOnMood?: string;
+    basedOnGenre?: string;
+    basedOnArtist?: string;
+    basedOnSongLength?: string;
+    basedOnReleaseTime?: string;
+    trackCount?: number;
+  };
+  theme?: "light" | "dark";
+  mode: "create" | "edit";
+}
+
+export function SystemPlaylistModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialData = {},
+  theme = "light",
+  mode = "create",
+}: SystemPlaylistModalProps) {
+  const [name, setName] = useState(initialData.name || "");
+  const [description, setDescription] = useState(initialData.description || "");
+  const [privacy, setPrivacy] = useState<"PUBLIC" | "PRIVATE">(
+    initialData.privacy || "PUBLIC"
+  );
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(
+    initialData.coverUrl || null
+  );
+
+  // AI generation parameters - Initialize from initialData
+  const [isAIGenerated, setIsAIGenerated] = useState(true);
+  const [basedOnMood, setBasedOnMood] = useState(initialData.basedOnMood || "");
+  const [basedOnGenre, setBasedOnGenre] = useState(
+    initialData.basedOnGenre || ""
+  );
+  const [basedOnArtist, setBasedOnArtist] = useState(
+    initialData.basedOnArtist || ""
+  );
+  const [basedOnSongLength, setBasedOnSongLength] = useState(
+    initialData.basedOnSongLength || ""
+  );
+  const [basedOnReleaseTime, setBasedOnReleaseTime] = useState(
+    initialData.basedOnReleaseTime || ""
+  );
+  const [trackCount, setTrackCount] = useState(initialData.trackCount || 10);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCoverFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCoverClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const formData = new FormData();
+
+    // Basic playlist data
+    formData.append("name", name);
+    if (description) formData.append("description", description);
+    formData.append("privacy", privacy);
+
+    // If we're editing an existing playlist, include the ID
+    if (mode === "edit" && initialData.id) {
+      formData.append("id", initialData.id);
+    }
+
+    // Include the cover file if one was selected
+    if (coverFile) {
+      formData.append("cover", coverFile);
+    }
+
+    // AI generation parameters
+    formData.append("isAIGenerated", String(isAIGenerated));
+    if (isAIGenerated) {
+      if (basedOnMood) formData.append("basedOnMood", basedOnMood);
+      if (basedOnGenre) formData.append("basedOnGenre", basedOnGenre);
+      if (basedOnArtist) formData.append("basedOnArtist", basedOnArtist);
+      if (basedOnSongLength)
+        formData.append("basedOnSongLength", basedOnSongLength);
+      if (basedOnReleaseTime)
+        formData.append("basedOnReleaseTime", basedOnReleaseTime);
+      formData.append("trackCount", String(trackCount));
+    }
+    try {
+      await onSubmit(formData);
+      onClose();
+    } catch (error) {
+      console.error("Error submitting playlist:", error);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`sm:max-w-5xl w-[95vw] h-[85vh] flex flex-col ${
+          // Thay max-h-[90vh] bằng h-[85vh]
+          theme === "dark"
+            ? "bg-[#1e1e1e] text-white border-white/10"
+            : "bg-white"
+        }`}
+      >
+        <DialogHeader className="flex-shrink-0">
+          {" "}
+          {/* Header không co lại */}
+          <DialogTitle
+            className={theme === "dark" ? "text-white" : "text-gray-900"}
+          >
+            {mode === "create"
+              ? "Create System Playlist"
+              : "Edit System Playlist"}
+          </DialogTitle>
+          <DialogDescription
+            className={theme === "dark" ? "text-white/70" : "text-gray-500"}
+          >
+            {mode === "create"
+              ? "Create a new system playlist as a template for user playlists"
+              : "Edit the system playlist details"}
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Khu vực nội dung chính có thể scroll nội bộ */}
+        <div className="flex-grow overflow-y-hidden pt-4">
+          {/* Cho phép khu vực này giãn nở, ẩn scrollbar chính */}
+          <form
+            onSubmit={handleSubmit}
+            id="system-playlist-form"
+            className="h-full flex flex-col"
+          >
+            {/* Form chiếm hết chiều cao khu vực giữa */}
+            <Tabs
+              defaultValue="basic"
+              className="w-full flex flex-col flex-grow"
+            >
+              {/* Tabs chiếm không gian còn lại */}
+              <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
+                {/* TabsList không co lại */}
+                <TabsTrigger value="basic">Basic Information</TabsTrigger>
+                <TabsTrigger value="ai">AI Options</TabsTrigger>
+              </TabsList>
+              {/* Wrapper cuộn nội bộ cho TabsContent */}
+              <div className="flex-grow overflow-y-auto pr-3 mt-6">
+                {/* Phần này sẽ cuộn, không cần chiều cao cố định */}
+                {/* Nội dung tab Basic Information */}
+                <TabsContent value="basic" className="mt-0">
+                  <div className="space-y-6">
+                    {/* Container cho nội dung */}
+                    {/* Giữ lại grid nội bộ cho cover và các trường input cơ bản */}
+                    <div className="grid grid-cols-4 gap-4">
+                      {/* Cover Image */}
+                      <div className="col-span-1">
+                        <UILabel
+                          className={`mb-1 block text-sm font-medium ${
+                            theme === "dark" ? "text-white/80" : ""
+                          }`}
+                        >
+                          Cover
+                        </UILabel>
+                        <div
+                          onClick={handleCoverClick}
+                          className={`w-full aspect-square rounded-md ${
+                            theme === "dark"
+                              ? "bg-white/5 hover:bg-white/10"
+                              : "bg-gray-100 hover:bg-gray-200"
+                          } flex items-center justify-center cursor-pointer overflow-hidden transition-colors`}
+                        >
+                          {coverPreview ? (
+                            <Image
+                              src={coverPreview}
+                              alt="Playlist cover"
+                              width={100}
+                              height={100}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Music className="h-10 w-10 text-gray-400" />
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileChange}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <p
+                          className={`text-xs mt-1 text-center ${
+                            theme === "dark" ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        >
+                          Click to upload
+                        </p>
+                      </div>
+                      {/* Fields: Name, Description, Privacy */}
+                      <div className="col-span-3">
+                        {" "}
+                        {/* Giảm gap thành space-y-3 */}
+                        <div>
+                          <UILabel
+                            htmlFor="name"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Playlist Name*
+                          </UILabel>
+                          <Input
+                            id="name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="e.g., Top Hits of 2023"
+                            required
+                            maxLength={50} // Thêm giới hạn ký tự
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                          {/* Bộ đếm ký tự cho Title */}
+                          <p
+                            className={`text-xs text-right mt-1 ${
+                              theme === "dark"
+                                ? "text-white/50"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {name.length} / 50
+                          </p>
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="description"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Description
+                          </UILabel>
+                          <Textarea
+                            id="description"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Describe the playlist..."
+                            maxLength={300} // Thêm giới hạn ký tự
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                            rows={4}
+                          />
+                          {/* Bộ đếm ký tự cho Description */}
+                          <p
+                            className={`text-xs text-right mt-1 ${
+                              theme === "dark"
+                                ? "text-white/50"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {description.length} / 300
+                          </p>
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="privacy"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Privacy
+                          </UILabel>
+                          <Select
+                            value={privacy}
+                            onValueChange={(
+                              value: "PUBLIC" | "PRIVATE"
+                            ) => setPrivacy(value)}
+                          >
+                            <SelectTrigger
+                              className={
+                                theme === "dark"
+                                  ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                  : ""
+                              }
+                            >
+                              <SelectValue placeholder="Select privacy" />
+                            </SelectTrigger>
+                            <SelectContent
+                              className={
+                                theme === "dark"
+                                  ? "bg-[#2a2a2a] border-gray-600 text-white"
+                                  : ""
+                              }
+                            >
+                              <SelectItem value="PUBLIC">Public</SelectItem>
+                              <SelectItem value="PRIVATE">Private</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+                {/* Nội dung tab AI Options */}
+                <TabsContent value="ai" className="mt-0">
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="ai-generated"
+                        checked={isAIGenerated}
+                        onCheckedChange={setIsAIGenerated}
+                      />
+                      <UILabel
+                        htmlFor="ai-generated"
+                        className={theme === "dark" ? "text-white" : ""}
+                      >
+                        AI Generated Playlist
+                      </UILabel>
+                    </div>
+                    {isAIGenerated && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <UILabel
+                            htmlFor="basedOnMood"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Based on Mood
+                          </UILabel>
+                          <Input
+                            id="basedOnMood"
+                            value={basedOnMood}
+                            onChange={(e) => setBasedOnMood(e.target.value)}
+                            placeholder="e.g., Energetic, Chill, Romantic"
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="basedOnGenre"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Based on Genre
+                          </UILabel>
+                          <Input
+                            id="basedOnGenre"
+                            value={basedOnGenre}
+                            onChange={(e) => setBasedOnGenre(e.target.value)}
+                            placeholder="e.g., Pop, Rock, Jazz"
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="basedOnArtist"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Based on Artist
+                          </UILabel>
+                          <Input
+                            id="basedOnArtist"
+                            value={basedOnArtist}
+                            onChange={(e) => setBasedOnArtist(e.target.value)}
+                            placeholder="e.g., Taylor Swift, The Weeknd"
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="basedOnSongLength"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Based on Song Length (seconds)
+                          </UILabel>
+                          <Input
+                            id="basedOnSongLength"
+                            type="number"
+                            value={basedOnSongLength}
+                            onChange={(e) => setBasedOnSongLength(e.target.value)}
+                            placeholder="e.g., 180 (for 3 minutes)"
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="basedOnReleaseTime"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Based on Release Time
+                          </UILabel>
+                          <Input
+                            id="basedOnReleaseTime"
+                            value={basedOnReleaseTime}
+                            onChange={(e) => setBasedOnReleaseTime(e.target.value)}
+                            placeholder="e.g., last_month, last_year, 2020s"
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div>
+                          <UILabel
+                            htmlFor="trackCount"
+                            className={theme === "dark" ? "text-white" : ""}
+                          >
+                            Number of Tracks
+                          </UILabel>
+                          <Input
+                            id="trackCount"
+                            type="number"
+                            value={trackCount}
+                            onChange={(e) =>
+                              setTrackCount(parseInt(e.target.value, 10))
+                            }
+                            min={5}
+                            max={50}
+                            required={isAIGenerated}
+                            className={
+                              theme === "dark"
+                                ? "bg-white/[0.07] text-white border-white/[0.1]"
+                                : ""
+                            }
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </div>
+            </Tabs>
+          </form>
+        </div>
+
+        {/* Footer cố định */}
+        <DialogFooter className="flex-shrink-0 pt-4 border-t border-gray-200 dark:border-white/10">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className={
+              theme === "dark"
+                ? "border-white/20 text-white hover:bg-white/10"
+                : ""
+            }
+          >
+            Cancel
+          </Button>
+          <Button type="submit" form="system-playlist-form">
+            {mode === "create" ? "Create Playlist" : "Save Changes"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

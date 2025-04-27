@@ -1,25 +1,28 @@
 'use client';
 
 import * as React from 'react';
-import { format, isValid } from 'date-fns';
+import DatePicker from 'react-datepicker';
+import { format, parse, isValid } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
-import type { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { useTheme } from '@/contexts/ThemeContext';
+
+import 'react-datepicker/dist/react-datepicker.css';
 
 interface DateRangePickerProps {
   onChange: (dates: { startDate: string; endDate: string }) => void;
-  startDate: string;
-  endDate: string;
+  startDate: string; // 'yyyy-MM-dd' or empty string
+  endDate: string;   // 'yyyy-MM-dd' or empty string
   className?: string;
 }
+
+// Helper function để chuyển đổi chuỗi 'yyyy-MM-dd' thành Date hoặc null
+const parseDateString = (dateString: string): Date | null => {
+  if (!dateString) return null;
+  const parsed = parse(dateString, 'yyyy-MM-dd', new Date());
+  return isValid(parsed) ? parsed : null;
+};
 
 export function DateRangePicker({
   startDate,
@@ -28,137 +31,75 @@ export function DateRangePicker({
   className,
 }: DateRangePickerProps) {
   const { theme } = useTheme();
-  const [date, setDate] = React.useState<DateRange | undefined>(() => {
-    const initialFrom = startDate && isValid(new Date(startDate)) ? new Date(startDate) : undefined;
-    const initialTo = endDate && isValid(new Date(endDate)) ? new Date(endDate) : undefined;
-    if (initialFrom || initialTo) {
-      return { from: initialFrom, to: initialTo };
-    }
-    return undefined;
-  });
+
+  const [startDateObj, setStartDateObj] = React.useState<Date | null>(parseDateString(startDate));
+  const [endDateObj, setEndDateObj] = React.useState<Date | null>(parseDateString(endDate));
 
   React.useEffect(() => {
-    const propFrom = startDate && isValid(new Date(startDate)) ? new Date(startDate) : undefined;
-    const propTo = endDate && isValid(new Date(endDate)) ? new Date(endDate) : undefined;
-    
-    if (
-      (propFrom?.getTime() !== date?.from?.getTime()) ||
-      (propTo?.getTime() !== date?.to?.getTime())
-    ) {
-        if (propFrom || propTo) {
-            setDate({ from: propFrom, to: propTo });
-        } else {
-            setDate(undefined);
-        }
-    }
-  }, [startDate, endDate]);
+    setStartDateObj(parseDateString(startDate));
+  }, [startDate]);
 
-  const handleSelect = (range: DateRange | undefined) => {
-    setDate(range);
+  React.useEffect(() => {
+    setEndDateObj(parseDateString(endDate));
+  }, [endDate]);
 
-    let newStartDate = '';
-    let newEndDate = '';
+  const handleDateChange = (dates: [Date | null, Date | null]) => {
+    const [start, end] = dates;
+    setStartDateObj(start);
+    setEndDateObj(end);
 
-    if (range?.from && isValid(range.from)) {
-      newStartDate = format(range.from, 'yyyy-MM-dd');
-      if (range.to && isValid(range.to)) {
-        newEndDate = format(range.to, 'yyyy-MM-dd');
-      } else {
-        newEndDate = '';
-      }
-    } else {
-      newStartDate = '';
-      newEndDate = '';
-    }
-    
-    onChange({ startDate: newStartDate, endDate: newEndDate });
+    onChange({
+      startDate: start ? format(start, 'yyyy-MM-dd') : '',
+      endDate: end ? format(end, 'yyyy-MM-dd') : '',
+    });
   };
+
+  const CustomInput = React.forwardRef<HTMLButtonElement, { value?: string; onClick?: () => void }>(({ value, onClick }, ref) => (
+    <Button
+      variant={theme === 'light' ? 'outline' : 'secondary'}
+      className={cn(
+        'w-full h-10 justify-start text-left font-normal',
+        !startDateObj && !endDateObj && 'text-muted-foreground',
+        theme === 'light'
+          ? 'border border-neutral-200 text-neutral-950 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-gray-300'
+          : 'bg-white/[0.07] border border-white/[0.1] text-neutral-50 hover:bg-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20'
+      )}
+      onClick={onClick}
+      ref={ref}
+    >
+      <CalendarIcon className="mr-2 h-4 w-4" />
+      {startDateObj ? (
+        endDateObj ? (
+          <>
+            {format(startDateObj, 'dd/MM/yy')} - {format(endDateObj, 'dd/MM/yy')}
+          </>
+        ) : (
+          format(startDateObj, 'dd/MM/yy')
+        )
+      ) : (
+        <span>Select date range...</span>
+      )}
+    </Button>
+  ));
+  CustomInput.displayName = 'CustomInput';
 
   return (
     <div className={cn('grid gap-2', className)}>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant={theme === 'light' ? 'outline' : 'secondary'}
-            className={cn(
-              'w-[250px] sm:w-[300px] justify-start text-left font-normal',
-              !date && 'text-muted-foreground',
-              theme === 'light'
-                ? 'border border-neutral-200 text-neutral-950 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-gray-300'
-                : 'bg-white/[0.07] border border-white/[0.1] text-neutral-50 hover:bg-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/20'
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {date?.from ? (
-              date.to ? (
-                <>
-                  {format(date.from, 'dd/MM/yy')} -{' '}
-                  {format(date.to, 'dd/MM/yy')}
-                </>
-              ) : (
-                format(date.from, 'dd/MM/yy')
-              )
-            ) : (
-              <span>Pick dates</span>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          className={cn(
-            'w-auto p-0',
-            theme === 'light'
-              ? 'bg-white border-neutral-200 text-neutral-950'
-              : '  border-white/[0.1] text-neutral-50'
-          )}
-          align="start"
-        >
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={handleSelect}
-            numberOfMonths={2}
-            modifiers={{
-              selected: date ?? [],
-            }}
-            modifiersStyles={{
-              selected: {
-                backgroundColor: theme === 'light' ? '#ffaa3b' : '#eab308',
-                color: theme === 'light' ? '#ffffff' : '#111827',
-                fontWeight: 'bold',
-              },
-              range_start: {
-                backgroundColor: theme === 'light' ? '#ffaa3b' : '#eab308',
-                color: theme === 'light' ? '#ffffff' : '#111827',
-                borderTopLeftRadius: '50%',
-                borderBottomLeftRadius: '50%',
-                borderTopRightRadius: '0', 
-                borderBottomRightRadius: '0', 
-              },
-              range_end: {
-                backgroundColor: theme === 'light' ? '#ffaa3b' : '#eab308',
-                color: theme === 'light' ? '#ffffff' : '#111827',
-                borderTopLeftRadius: '0', 
-                borderBottomLeftRadius: '0', 
-                borderTopRightRadius: '50%',
-                borderBottomRightRadius: '50%',
-              },
-              range_middle: { 
-                backgroundColor: theme === 'light' ? '#ffedd5' : 'rgba(234, 179, 8, 0.2)', 
-                color: theme === 'light' ? '#9a3412' : '#fef3c7', 
-                borderRadius: '0',
-              }
-            }}
-            className={cn(
-              'max-h-[350px] overflow-y-auto',
-              theme === 'light'
-                ? 'bg-white text-neutral-950'
-                : 'bg-[#282828] text-neutral-50'
-            )}
-          />
-        </PopoverContent>
-      </Popover>
+      <DatePicker
+        selectsRange={true}
+        startDate={startDateObj}
+        endDate={endDateObj}
+        onChange={handleDateChange}
+        dateFormat="dd/MM/yyyy"
+        isClearable={true}
+        placeholderText="Select date range..."
+        customInput={<CustomInput />}
+        className="w-full"
+        calendarClassName={cn(
+            theme === 'dark' ? 'react-datepicker--dark' : 'react-datepicker--light'
+        )}
+        popperPlacement="bottom-start"
+      />
     </div>
   );
 }

@@ -438,6 +438,7 @@ const createTrack = async (req) => {
             userId: follower.followerId,
             artistId: finalArtistId,
             senderId: finalArtistId,
+            trackId: track.id,
         }));
         await db_1.default.notification.createMany({ data: notificationsData });
         const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${track.id}`;
@@ -447,6 +448,7 @@ const createTrack = async (req) => {
             io.to(room).emit('notification', {
                 type: client_1.NotificationType.NEW_TRACK,
                 message: `${artistName} just released a new track: ${track.title}`,
+                trackId: track.id,
             });
             if (user.email) {
                 const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'track', track.title, releaseLink, track.coverUrl);

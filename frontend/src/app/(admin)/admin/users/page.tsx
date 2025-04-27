@@ -33,7 +33,7 @@ interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
-export default function SimpleUserManagement() {
+export default function UserManagement() {
   const { theme } = useTheme();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,23 +124,6 @@ export default function SimpleUserManagement() {
     }
     setSortConfig({ key, direction });
   };
-
-  const renderSortableHeader = (label: string, sortKey: keyof User | null) => (
-    <th scope="col" className={`py-3 px-6 cursor-pointer transition-colors rounded-t-md ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`} onClick={() => handleSort(sortKey)}>
-      <div className="flex items-center">
-        {label}
-        {sortKey && (
-            sortConfig.key === sortKey ? (
-              sortConfig.direction === 'asc' ?
-                <ArrowUp className="ml-2 h-3 w-3" /> :
-                <ArrowDown className="ml-2 h-3 w-3" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-            )
-        )}
-      </div>
-    </th>
-  );
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -476,12 +459,98 @@ export default function SimpleUserManagement() {
                        className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
                        disabled={loading || actionLoading !== null}
                      />
-                   </th>
-                   {renderSortableHeader('Name', 'name')}
-                   {renderSortableHeader('Email', 'email')}
-                   {renderSortableHeader('Role', 'role')}
-                   {renderSortableHeader('Status', 'isActive')}
-                   {renderSortableHeader('Created At', 'createdAt')}
+                  </th>
+                  
+                  {/* Name column */}
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center">
+                      Name
+                      {sortConfig.key === 'name' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  
+                  {/* Email column */}
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('email')}
+                  >
+                    <div className="flex items-center">
+                      Email
+                      {sortConfig.key === 'email' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  
+                  {/* Role column */}
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('role')}
+                  >
+                    <div className="flex items-center">
+                      Role
+                      {sortConfig.key === 'role' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  
+                  {/* Status column */}
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('isActive')}
+                  >
+                    <div className="flex items-center">
+                      Status
+                      {sortConfig.key === 'isActive' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  
+                  {/* Created At column */}
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <div className="flex items-center">
+                      Created At
+                      {sortConfig.key === 'createdAt' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  
                   <th scope="col" className="py-3 px-6 rounded-tr-md text-center">Actions</th>
                 </tr>
               </thead>
@@ -491,7 +560,7 @@ export default function SimpleUserManagement() {
                     <tr
                       key={user.id}
                       onClick={(e) => handleRowClick(user, e)}
-                      className={`border-b cursor-pointer transition-opacity ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedUserIds.has(user.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === user.id ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedUserIds.has(user.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === user.id ? 'opacity-50 pointer-events-none' : ''}`}
                       >
                       <td className="w-4 p-4">
                          <Checkbox

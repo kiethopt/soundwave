@@ -490,6 +490,7 @@ export const createTrack = async (req: Request) => {
       userId: follower.followerId,
       artistId: finalArtistId,
       senderId: finalArtistId,
+      trackId: track.id,
     }));
 
     await prisma.notification.createMany({ data: notificationsData });
@@ -502,6 +503,7 @@ export const createTrack = async (req: Request) => {
       io.to(room).emit('notification', {
         type: NotificationType.NEW_TRACK,
         message: `${artistName} just released a new track: ${track.title}`,
+        trackId: track.id,
       });
 
       if (user.email) {
