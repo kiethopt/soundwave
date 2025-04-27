@@ -17,7 +17,7 @@ interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
-export default function SimpleGenreManagement() {
+export default function GenreManagement() {
   const { theme } = useTheme();
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,23 +96,6 @@ export default function SimpleGenreManagement() {
     }
     setSortConfig({ key, direction });
   };
-
-  const renderSortableHeader = (label: string, sortKey: keyof Genre | null) => (
-    <th scope="col" className={`py-3 px-6 cursor-pointer transition-colors rounded-t-md ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`} onClick={() => handleSort(sortKey)}>
-      <div className="flex items-center">
-        {label}
-        {sortKey && (
-            sortConfig.key === sortKey ? (
-              sortConfig.direction === 'asc' ?
-                <ArrowUp className="ml-2 h-3 w-3" /> :
-                <ArrowDown className="ml-2 h-3 w-3" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-            )
-        )}
-      </div>
-    </th>
-  );
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -368,9 +351,61 @@ export default function SimpleGenreManagement() {
                        disabled={loading || actionLoading !== null}
                      />
                    </th>
-                   {renderSortableHeader('Genre Name', 'name')}
-                   {renderSortableHeader('Created At', 'createdAt')}
-                   {renderSortableHeader('Updated At', 'updatedAt')}
+                   
+                   {/* Genre Name column - sortable */}
+                   <th 
+                     scope="col" 
+                     className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                     onClick={() => handleSort('name')}
+                   >
+                     <div className="flex items-center">
+                       Genre Name
+                       {sortConfig.key === 'name' ? (
+                         sortConfig.direction === 'asc' ?
+                           <ArrowUp className="ml-2 h-3 w-3" /> :
+                           <ArrowDown className="ml-2 h-3 w-3" />
+                       ) : (
+                         <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                       )}
+                     </div>
+                   </th>
+                   
+                   {/* Created At column */}
+                   <th 
+                     scope="col" 
+                     className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                     onClick={() => handleSort('createdAt')}
+                   >
+                     <div className="flex items-center">
+                       Created At
+                       {sortConfig.key === 'createdAt' ? (
+                         sortConfig.direction === 'asc' ?
+                           <ArrowUp className="ml-2 h-3 w-3" /> :
+                           <ArrowDown className="ml-2 h-3 w-3" />
+                       ) : (
+                         <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                       )}
+                     </div>
+                   </th>
+                   
+                   {/* Updated At column - sortable */}
+                   <th 
+                     scope="col" 
+                     className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                     onClick={() => handleSort('updatedAt')}
+                   >
+                     <div className="flex items-center">
+                       Updated At
+                       {sortConfig.key === 'updatedAt' ? (
+                         sortConfig.direction === 'asc' ?
+                           <ArrowUp className="ml-2 h-3 w-3" /> :
+                           <ArrowDown className="ml-2 h-3 w-3" />
+                       ) : (
+                         <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                       )}
+                     </div>
+                   </th>
+                   
                   <th scope="col" className="py-3 px-6 rounded-tr-md text-center">Actions</th>
                 </tr>
               </thead>
@@ -380,7 +415,7 @@ export default function SimpleGenreManagement() {
                     <tr
                       key={genre.id}
                       onClick={(e) => handleRowClick(genre, e)}
-                      className={`border-b cursor-pointer transition-opacity ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedGenreIds.has(genre.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === genre.id ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedGenreIds.has(genre.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === genre.id ? 'opacity-50 pointer-events-none' : ''}`}
                       >
                       <td className="w-4 p-4">
                          <Checkbox

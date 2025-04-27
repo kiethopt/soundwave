@@ -17,7 +17,7 @@ interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
-export default function SimpleLabelManagement() {
+export default function LabelManagement() {
   const { theme } = useTheme();
   const router = useRouter();
   const [labels, setLabels] = useState<Label[]>([]);
@@ -97,23 +97,6 @@ export default function SimpleLabelManagement() {
     }
     setSortConfig({ key, direction });
   };
-
-  const renderSortableHeader = (label: string, sortKey: keyof Label | null) => (
-    <th scope="col" className={`py-3 px-6 cursor-pointer transition-colors rounded-t-md ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`} onClick={() => handleSort(sortKey)}>
-      <div className="flex items-center">
-        {label}
-        {sortKey && (
-            sortConfig.key === sortKey ? (
-              sortConfig.direction === 'asc' ?
-                <ArrowUp className="ml-2 h-3 w-3" /> :
-                <ArrowDown className="ml-2 h-3 w-3" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-            )
-        )}
-      </div>
-    </th>
-  );
 
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
@@ -365,9 +348,54 @@ export default function SimpleLabelManagement() {
                        disabled={loading || actionLoading !== null}
                      />
                    </th>
-                   {renderSortableHeader('Label Name', 'name')}
-                   {renderSortableHeader('Tracks', 'tracks')}
-                   {renderSortableHeader('Albums', 'albums')}
+                   <th 
+                     scope="col" 
+                     className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                     onClick={() => handleSort('name')}
+                   >
+                     <div className="flex items-center">
+                       Label Name
+                       {sortConfig.key === 'name' ? (
+                         sortConfig.direction === 'asc' ?
+                           <ArrowUp className="ml-2 h-3 w-3" /> :
+                           <ArrowDown className="ml-2 h-3 w-3" />
+                       ) : (
+                         <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                       )}
+                     </div>
+                   </th>
+                   <th 
+                     scope="col" 
+                     className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                     onClick={() => handleSort('tracks')}
+                   >
+                     <div className="flex items-center">
+                       Tracks
+                       {sortConfig.key === 'tracks' ? (
+                         sortConfig.direction === 'asc' ?
+                           <ArrowUp className="ml-2 h-3 w-3" /> :
+                           <ArrowDown className="ml-2 h-3 w-3" />
+                       ) : (
+                         <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                       )}
+                     </div>
+                   </th>
+                   <th 
+                     scope="col" 
+                     className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                     onClick={() => handleSort('albums')}
+                   >
+                     <div className="flex items-center">
+                       Albums
+                       {sortConfig.key === 'albums' ? (
+                         sortConfig.direction === 'asc' ?
+                           <ArrowUp className="ml-2 h-3 w-3" /> :
+                           <ArrowDown className="ml-2 h-3 w-3" />
+                       ) : (
+                         <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                       )}
+                     </div>
+                   </th>
                    <th scope="col" className="py-3 px-6 rounded-tr-md text-center">Actions</th>
                 </tr>
               </thead>
@@ -377,7 +405,7 @@ export default function SimpleLabelManagement() {
                     <tr
                       key={label.id}
                       onClick={(e) => handleRowClick(label, e)}
-                      className={`border-b cursor-pointer transition-opacity ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedLabelIds.has(label.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === label.id ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedLabelIds.has(label.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === label.id ? 'opacity-50 pointer-events-none' : ''}`}
                       >
                       <td className="w-4 p-4">
                          <Checkbox

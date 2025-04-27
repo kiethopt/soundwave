@@ -333,7 +333,7 @@ export default function ArtistRequestManagement() {
                 <tr
                   key={request.id}
                   onClick={(e) => handleRowClick(request, e)}
-                  className={`border-b cursor-pointer transition-opacity ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedRequestIds.has(request.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === request.id ? 'opacity-50 pointer-events-none' : ''}`}
+                  className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedRequestIds.has(request.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === request.id ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   <td className="w-4 p-4">
                     <Checkbox

@@ -121,23 +121,6 @@ export default function ArtistManagement() {
     setSortConfig({ key, direction });
   };
 
-  const renderSortableHeader = (label: string, sortKey: keyof ArtistProfile | null) => (
-    <th scope="col" className={`py-3 px-6 cursor-pointer transition-colors rounded-t-md ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`} onClick={() => handleSort(sortKey)}>
-      <div className="flex items-center">
-        {label}
-        {sortKey && (
-            sortConfig.key === sortKey ? (
-              sortConfig.direction === 'asc' ?
-                <ArrowUp className="ml-2 h-3 w-3" /> :
-                <ArrowDown className="ml-2 h-3 w-3" />
-            ) : (
-              <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-            )
-        )}
-      </div>
-    </th>
-  );
-
   const handleSelectAll = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
       const allIds = new Set(artists.map(a => a.id));
@@ -406,13 +389,101 @@ export default function ArtistManagement() {
                        className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
                        disabled={loading || actionLoading !== null}
                      />
-                   </th>
-                   {renderSortableHeader('Artist Name', 'artistName')}
-                   <th scope="col" className="py-3 px-6">User Email</th>
-                   {renderSortableHeader('Verified', 'isVerified')}
-                   {renderSortableHeader('Status', 'isActive')}
-                   {renderSortableHeader('Monthly Listeners', 'monthlyListeners')}
-                   {renderSortableHeader('Created At', 'createdAt')}
+                  </th>
+                  
+                  {/* Artist Name column */}
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('artistName')}
+                  >
+                    <div className="flex items-center">
+                      Artist Name
+                      {sortConfig.key === 'artistName' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  
+                  {/* User Email column - not sortable */}
+                  <th scope="col" className="py-3 px-6">User Email</th>
+                  
+                  {/* Verified column */}
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('isVerified')}
+                  >
+                    <div className="flex items-center">
+                      Verified
+                      {sortConfig.key === 'isVerified' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  
+                  {/* Status column */}
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('isActive')}
+                  >
+                    <div className="flex items-center">
+                      Status
+                      {sortConfig.key === 'isActive' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  
+                  {/* Monthly Listeners column */}
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('monthlyListeners')}
+                  >
+                    <div className="flex items-center">
+                      Monthly Listeners
+                      {sortConfig.key === 'monthlyListeners' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  
+                  {/* Created At column */}
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    <div className="flex items-center">
+                      Created At
+                      {sortConfig.key === 'createdAt' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  
                   <th scope="col" className="py-3 px-6 rounded-tr-md text-center">Actions</th>
                 </tr>
               </thead>
@@ -422,8 +493,8 @@ export default function ArtistManagement() {
                     <tr
                       key={artist.id}
                       onClick={(e) => handleRowClick(artist, e)}
-                      className={`border-b cursor-pointer transition-opacity ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedArtistIds.has(artist.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === artist.id ? 'opacity-50 pointer-events-none' : ''}`}
-                      >
+                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedArtistIds.has(artist.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === artist.id ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
                       <td className="w-4 p-4">
                          <Checkbox
                            id={`select-row-${artist.id}`}
