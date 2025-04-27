@@ -27,8 +27,8 @@ export interface TrackUploadFormProps {
 }
 
 export interface ArtistRequestFilters {
-  startDate?: Date;
-  endDate?: Date;
+  startDate?: string;
+  endDate?: string;
   status?: string;
   search?: string;
 }

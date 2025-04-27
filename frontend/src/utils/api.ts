@@ -231,10 +231,10 @@ export const api = {
 
       if (filters) {
         if (filters.startDate) {
-          params.append("startDate", filters.startDate.toISOString());
+          params.append("startDate", filters.startDate);
         }
         if (filters.endDate) {
-          params.append("endDate", filters.endDate.toISOString());
+          params.append("endDate", filters.endDate);
         }
         if (filters.status) {
           params.append("status", filters.status);

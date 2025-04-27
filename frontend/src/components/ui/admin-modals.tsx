@@ -1,4 +1,4 @@
-import React, { useState, useEffect,  useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,11 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose,
   DialogDescription,
 } from '@/components/ui/dialog';
-import Image from 'next/image';
-import { XIcon, Edit, Trash2, ShieldAlert, UserCog, Eye, EyeOff } from 'lucide-react';
+import { XIcon, Trash2, ShieldAlert, UserCog, Eye, EyeOff, XCircle, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { UserIcon } from 'lucide-react';
@@ -746,6 +744,285 @@ export function MakeAdminModal({
             onClick={handleConfirm}
           >
              Confirm Make Admin
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Reject Modal
+interface RejectModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+  theme?: "light" | "dark";
+}
+
+export function RejectModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  theme = "light",
+}: RejectModalProps) {
+  const [reason, setReason] = useState("");
+  const [customReason, setCustomReason] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setReason("");
+      setCustomReason(false);
+    }
+  }, [isOpen]);
+
+  const predefinedReasons = [
+    "Incomplete information provided",
+    "Invalid artist credentials",
+    "Inappropriate content or behavior",
+    "Duplicate request",
+    "Not meeting platform requirements",
+    "Other (specify below)",
+  ];
+
+  const handlePredefinedClick = (preReason: string) => {
+    if (preReason === "Other (specify below)") {
+      setReason("");
+      setCustomReason(true);
+    } else {
+      setReason(preReason);
+      setCustomReason(false);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (!reason.trim()) {
+      toast.error("Please provide a reason.");
+      return;
+    }
+    onConfirm(reason);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`
+          sm:max-w-[450px] p-0 overflow-hidden
+          ${theme === 'dark'
+            ? 'bg-gray-800 text-white border-gray-700'
+            : 'bg-white'}
+        `}
+      >
+        {/* ---------- Header ---------- */}
+        <div className="px-6 pt-6">
+          {/* Header with X icon and Close button aligned */}
+          <div className="flex items-center justify-between w-full">
+            {/* X icon */}
+            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-red-100">
+              <XCircle className="w-7 h-7 text-red-600" strokeWidth={1.5} />
+            </div>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={`
+                w-8 h-8 rounded-md flex items-center justify-center transition-colors
+                ${theme === 'dark'
+                  ? 'hover:bg-white/10'
+                  : 'hover:bg-black/5'}
+              `}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* ---------- Title & Description ---------- */}
+          <DialogTitle
+            className={`
+              mt-4 text-lg font-bold text-left
+              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}
+            `}
+          >
+            Reject Artist Request
+          </DialogTitle>
+          <p
+            className={`
+              mt-1 text-sm text-left
+              ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}
+            `}
+          >
+            Please provide a reason for rejecting this artist request. This reason may be communicated to the user.
+          </p>
+        </div>
+
+        {/* ---------- Selection & Input ---------- */}
+        <div className="px-6 py-4">
+          {predefinedReasons.length > 0 && (
+            <div className="space-y-2">
+              <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                Select a reason:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {predefinedReasons.map((preReason) => (
+                  <Button
+                    key={preReason}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePredefinedClick(preReason)}
+                    className={`${theme === 'dark' ? 'text-white border-gray-600 hover:bg-gray-700' : ''} ${reason === preReason && !customReason ? (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200') : ''}`}
+                  >
+                    {preReason}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(customReason || predefinedReasons.length === 0) && (
+            <div className="space-y-1 mt-4">
+              <UILabel
+                htmlFor="rejectReason"
+                className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}
+              >
+                Reason (Required)
+              </UILabel>
+              <Textarea
+                id="rejectReason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Enter reason for rejection..."
+                className={`min-h-[80px] w-full rounded-md border p-2 text-sm ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ---------- Actions ---------- */}
+        <div className={`
+          px-6 py-4 flex gap-3 border-t
+          ${theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'}
+        `}>
+          <Button
+            variant="outline"
+            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-300'}`}
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-red-700 hover:bg-red-600' : ''}`}
+            onClick={handleConfirm}
+            disabled={!reason.trim()}
+          >
+            <XCircle className="w-4 h-4 mr-2" />
+            Reject Artist Request
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Approve Modal
+interface ApproveModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  theme?: "light" | "dark";
+  artistName?: string;
+}
+
+export function ApproveModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  theme = "light",
+  artistName,
+}: ApproveModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`
+          sm:max-w-[450px] p-0 overflow-hidden
+          ${theme === 'dark'
+            ? 'bg-gray-800 text-white border-gray-700'
+            : 'bg-white'}
+        `}
+      >
+        {/* ---------- Header ---------- */}
+        <div className="px-6 pt-6">
+          {/* Header with Check icon and Close button aligned */}
+          <div className="flex items-center justify-between w-full">
+            {/* Check icon */}
+            <div className="w-12 h-12 flex items-center justify-center rounded-full bg-green-100">
+              <CheckCircle className="w-7 h-7 text-green-600" strokeWidth={1.5} />
+            </div>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={`
+                w-8 h-8 rounded-md flex items-center justify-center transition-colors
+                ${theme === 'dark'
+                  ? 'hover:bg-white/10'
+                  : 'hover:bg-black/5'}
+              `}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* ---------- Title & Description ---------- */}
+          <DialogTitle
+            className={`
+              mt-4 text-lg font-bold text-left
+              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}
+            `}
+          >
+            Approve Artist Request
+          </DialogTitle>
+          <p
+            className={`
+              mt-1 text-sm text-left
+              ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}
+            `}
+          >
+            {artistName 
+              ? `Are you sure you want to approve "${artistName}"? This action will grant artist status to the user.`
+              : `Are you sure you want to approve this artist request? This action will grant artist status to the user.`}
+          </p>
+        </div>
+
+        {/* ---------- Actions ---------- */}
+        <div className={`
+          mt-6 px-6 py-4 flex gap-3 border-t
+          ${theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'}
+        `}>
+          <Button
+            variant="outline"
+            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-300'}`}
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="default"
+            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+            onClick={onConfirm}
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Approve Artist
           </Button>
         </div>
       </DialogContent>

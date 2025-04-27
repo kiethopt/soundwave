@@ -75,7 +75,7 @@ export const getUsers = async (req: Request, requestingUser: User) => {
   const options = {
     where,
     select: userSelect,
-    orderBy, // Use the determined orderBy clause
+    orderBy,
   };
 
   // Phân trang và sắp xếp theo ngày tạo
@@ -110,13 +110,13 @@ export const getArtistRequests = async (req: Request) => {
     user: {
       isActive: true,
     },
-    AND: [],
+    isVerified: false,
+    AND: [], // Sử dụng AND để dễ dàng thêm điều kiện lọc
   };
 
-  // Search filter (applies to artistName and user's name/email)
+  // Filter theo search term (tên nghệ sĩ, tên user, email user)
   if (typeof search === 'string' && search.trim()) {
     const trimmedSearch = search.trim();
-    // Explicitly check if where.AND is an array before push
     if (Array.isArray(where.AND)) {
       where.AND.push({
         OR: [
@@ -130,43 +130,43 @@ export const getArtistRequests = async (req: Request) => {
     }
   }
 
-  // Status filter for isVerified (assuming status param means isVerified for requests)
-  const isVerifiedFilter = toBooleanValue(status);
-  if (isVerifiedFilter !== undefined && Array.isArray(where.AND)) {
-    where.AND.push({ isVerified: isVerifiedFilter });
+  // Lọc theo date range (vereificationRequestedAt)
+  const dateFilter: { gte?: Date; lte?: Date } = {};
+  if (typeof startDate === 'string' && startDate) {
+    try {
+      // Parse startDate để lấy thời gian đầu của ngày đó
+      const startOfDay = new Date(startDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      dateFilter.gte = startOfDay;
+    } catch (e) { console.error("Invalid start date format:", startDate); }
+  }
+  if (typeof endDate === 'string' && endDate) {
+    try {
+        // Parse endDate để thời gian cuối cùng của ngày đó
+        const endOfDay = new Date(endDate);
+        endOfDay.setUTCHours(23, 59, 59, 999); // Sử dụng UTC để tránh múi giờ
+        dateFilter.lte = endOfDay;
+    } catch (e) { console.error("Invalid end date format:", endDate); }
   }
 
-  // Date range filter for verificationRequestedAt
-  const dateFilter: Prisma.ArtistProfileWhereInput = {};
-  const parsedStartDate = startDate ? new Date(startDate as string) : null;
-  const parsedEndDate = endDate ? new Date(endDate as string) : null;
-
-  if (parsedStartDate && !isNaN(parsedStartDate.getTime())) {
-    if (parsedEndDate && !isNaN(parsedEndDate.getTime())) {
-      // Ensure endDate includes the whole day
-      const endOfDay = new Date(parsedEndDate);
-      endOfDay.setHours(23, 59, 59, 999);
-      dateFilter.verificationRequestedAt = {
-        gte: parsedStartDate,
-        lte: endOfDay,
-      };
-    } else {
-      dateFilter.verificationRequestedAt = { gte: parsedStartDate };
-    }
-    if (Array.isArray(where.AND)) {
-      where.AND.push(dateFilter);
-    }
+  // Chỉ thêm vào `where` nếu có ít nhất một điều kiện date hợp lệ
+  if (dateFilter.gte || dateFilter.lte) {
+     if (Array.isArray(where.AND)) {
+       where.AND.push({ verificationRequestedAt: dateFilter });
+     }
   }
 
-  const paginationResult = await paginate<ArtistProfile>(prisma.artistProfile, req, {
-    where,
-    select: artistRequestSelect,
-    orderBy: { verificationRequestedAt: 'desc' }, // Default sort by request date
-  });
+  const options = {
+      where,
+      select: artistRequestSelect,
+      orderBy: { verificationRequestedAt: 'desc' }, // Sắp xếp theo ngày giảm dần
+  };
+
+  const result = await paginate<ArtistProfile>(prisma.artistProfile, req, options);
 
   return {
-    requests: paginationResult.data,
-    pagination: paginationResult.pagination,
+    requests: result.data,
+    pagination: result.pagination,
   };
 };
 

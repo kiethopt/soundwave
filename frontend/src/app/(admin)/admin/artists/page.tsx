@@ -33,7 +33,7 @@ interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
-export default function SimpleArtistManagement() {
+export default function ArtistManagement() {
   const { theme } = useTheme();
   const router = useRouter();
   const [artists, setArtists] = useState<ArtistProfile[]>([]);
