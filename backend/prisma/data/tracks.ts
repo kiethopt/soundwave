@@ -46,16 +46,6 @@ export const singles: SingleTrackData[] = [
     featuredArtistNames: [],
     playCount: 80
   },
-  {
-    artistName: 'Vũ.',
-    title: 'Hẹn Hò',
-    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745439262/henho_uejz5a.jpg',
-    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745439258/H%E1%BB%87n_H%C3%B2_ihqk4b.mp3',
-    genreNames: ['V-Pop', 'Ballad'],
-    labelName: 'Warner Music Vietnam',
-    featuredArtistNames: [],
-    playCount: 70
-  },
   
   // Wren Evans' Singles
   {
@@ -332,7 +322,7 @@ export const singles: SingleTrackData[] = [
     audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745440211/Phong_Long_zt4pc3.mp3',
     genreNames: ['V-Pop', 'Rap'],
     labelName: 'Universal Music Vietnam',
-    featuredArtistNames: ['Low G, WOKE UP'],
+    featuredArtistNames: ['Low G', 'WOKEUP'],
     playCount: 30,
   },
   {

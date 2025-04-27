@@ -534,7 +534,7 @@ export const artists: ArtistData[] = [
       name: 'Grey D',
     },
     profile: {
-      artistName: 'Grey D',
+      artistName: 'GREY D',
       bio: 'Grey D (tên thật: Đoàn Thế Lân) là một ca sĩ, nhạc sĩ trẻ người Việt Nam, cựu thành viên nhóm Monstar.',
       avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435226/seed/artists/hedfsp76waayhtmlheea.jpg',
       socialMediaLinks: {
@@ -936,6 +936,24 @@ export const artists: ArtistData[] = [
       socialMediaLinks: {
         facebook: 'giangnguyen.music',
         instagram: 'giangnguyen.music',
+      },
+    },
+  },
+
+  // Lê Hiếu 
+  {
+    user: {
+      email: 'lehieu@soundwave.com',
+      username: 'lehieu_artist',
+      name: 'Lê Hiếu',
+    },
+    profile: {
+      artistName: 'Lê Hiếu',
+      bio: 'Lê Hiếu là một nam ca sĩ/nhạc sĩ.',
+      avatar: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745432001/lehieu_ixrrtx.jpg',
+      socialMediaLinks: {
+        facebook: 'lehieu.official',
+        instagram: 'lehieu.official',
       },
     },
   },
