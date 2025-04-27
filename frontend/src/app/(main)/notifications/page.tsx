@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api } from '@/utils/api';
-import type { User } from '@/types';
+import type { User, Track, Album } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
 import Link from 'next/link';
 
@@ -25,6 +25,8 @@ export type NotificationType = {
   createdAt: string;
   senderId?: string;
   recipientType: string;
+  trackId?: string;
+  albumId?: string;
 };
 
 export default function NotificationsPage() {
@@ -196,30 +198,75 @@ export default function NotificationsPage() {
       return;
     }
 
-    const path = notification.type === 'NEW_FOLLOW' && notification.senderId
-      ? `/profile/${notification.senderId}`
-      : `/notification/${notification.id}`;
+    let path: string | null = null;
+    let shouldNavigate = true;
 
-    let markedAsReadSuccess = true; // Flag to track success
-    if (!notification.isRead) {
-      try {
-        await api.notifications.markAsRead(notification.id, token);
-        setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notification.id ? { ...n, isRead: true } : n
-          )
-        );
-      } catch (error) {
-        markedAsReadSuccess = false; // Mark as failed
-        console.error('Error marking notification as read:', error);
-        toast.error('Failed to mark notification as read');
-        return;
-      }
-    }
+    try {
+        if (notification.type === 'NEW_FOLLOW' && notification.senderId) {
+          path = `/profile/${notification.senderId}`;
+        } else if (notification.type === 'NEW_TRACK' && notification.trackId) {
+          const track: Track = await api.tracks.getById(notification.trackId, token);
+          if (!track.isActive) {
+            toast.error('This track is currently unavailable.');
+            shouldNavigate = false;
+          } else {
+            path = `/track/${notification.trackId}`;
+          }
+        } else if (notification.type === 'NEW_ALBUM' && notification.albumId) {
+          const album: Album = await api.albums.getById(notification.albumId, token);
+           if (!album.isActive) {
+             toast.error('This album is currently unavailable.');
+             shouldNavigate = false;
+           } else {
+             path = `/album/${notification.albumId}`;
+           }
+        } else {
+           path = `/notification/${notification.id}`;
+        }
 
-    // Only navigate if marking as read was successful (or not needed)
-    if (markedAsReadSuccess) {
-       router.push(path);
+        if (shouldNavigate && path) {
+          let markedAsReadSuccess = true;
+          if (!notification.isRead) {
+            try {
+              await api.notifications.markAsRead(notification.id, token);
+              setNotifications((prev) =>
+                prev.map((n) =>
+                  n.id === notification.id ? { ...n, isRead: true } : n
+                )
+              );
+            } catch (error) {
+              markedAsReadSuccess = false;
+              // console.error('Error marking notification as read:', error);
+              toast.error('Failed to mark notification as read');
+               return;
+            }
+          }
+
+          if (markedAsReadSuccess) {
+             router.push(path);
+          }
+        }
+    } catch (error) {
+        // console.error('Error handling notification click:', error);
+
+        if (error instanceof Error) {
+            const errorMessage = error.message.toLowerCase();
+            // Check for variations of "not found" errors
+            if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+                 toast.error('The requested content could not be found.');
+            } 
+            // Check specifically for the internal server error from track/album fetch
+            else if (errorMessage.includes('internal server error')) {
+                 toast.error('Could not retrieve details due to a server issue.');
+            } 
+            // Handle other potential errors
+            else {
+                toast.error('An error occurred while processing the notification.');
+            }
+        } else {
+            // Fallback for non-Error objects
+            toast.error('An unexpected error occurred.');
+        }
     }
   };
 

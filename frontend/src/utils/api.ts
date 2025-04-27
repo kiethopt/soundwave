@@ -857,8 +857,9 @@ export const api = {
           token
         );
       } catch (error) {
-        console.error(`Error fetching track ${trackId}:`, error);
-        return { success: false, message: "Failed to fetch track" };
+        // console.error(`Error fetching track ${trackId}:`, error);
+        // Still return or throw error so the calling component knows about it
+        return { success: false, message: "Failed to fetch track" }; // Assuming return based on code, adjust if it should throw
       }
     },
 
@@ -1066,8 +1067,9 @@ export const api = {
         );
         return response;
       } catch (error) {
-        console.error(`Error fetching album ${albumId}:`, error);
-        return { success: false, message: "Failed to fetch album details" };
+        // console.error(`Error fetching album ${albumId}:`, error);
+         // Still return or throw error so the calling component knows about it
+        return { success: false, message: "Failed to fetch album details" }; // Assuming return based on code, adjust if it should throw
       }
     },
 
