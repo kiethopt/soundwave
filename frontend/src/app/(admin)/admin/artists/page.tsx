@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MoreHorizontal, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, CheckCircle, XCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { MoreHorizontal, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle, XCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { ConfirmDeleteModal, DeactivateModal } from '@/components/ui/admin-modals';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';

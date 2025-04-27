@@ -116,13 +116,13 @@ export interface ArtistProfile {
 export interface UserFollow {
   id: string;
   followerId: string;
-  followingUserId?: string; // ID của User được follow (nếu followingType là USER)
-  followingArtistId?: string; // ID của ArtistProfile được follow (nếu followingType là ARTIST)
+  followingUserId?: string;
+  followingArtistId?: string;
   followingType: "USER" | "ARTIST";
   createdAt: string;
   follower: User;
-  followingUser?: User; // User được follow (nếu followingType là USER)
-  followingArtist?: ArtistProfile; // ArtistProfile được follow (nếu followingType là ARTIST)
+  followingUser?: User; 
+  followingArtist?: ArtistProfile;
 }
 
 export interface Artist {
