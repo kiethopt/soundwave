@@ -18,14 +18,18 @@ const getAllLabels = async (req) => {
         ];
     }
     const orderByClause = {};
-    if (sortBy &&
-        typeof sortBy === 'string' &&
-        (sortOrder === 'asc' || sortOrder === 'desc')) {
-        if (sortBy === 'name' || sortBy === 'createdAt' || sortBy === 'updatedAt') {
-            orderByClause[sortBy] = sortOrder;
+    const validSortKeys = ['name', 'tracks', 'albums'];
+    const key = sortBy;
+    const order = sortOrder === 'desc' ? 'desc' : 'asc';
+    if (sortBy && typeof sortBy === 'string' && validSortKeys.includes(key)) {
+        if (key === 'name') {
+            orderByClause.name = order;
         }
-        else {
-            orderByClause.name = 'asc';
+        else if (key === 'tracks') {
+            orderByClause.tracks = { _count: order };
+        }
+        else if (key === 'albums') {
+            orderByClause.albums = { _count: order };
         }
     }
     else {

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Genre, User } from '@/types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Genre, User, Label } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label, Label as UILabel } from '@/components/ui/label';
+import { Label as UILabel } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { UserIcon } from 'lucide-react';
 import { Edit, Tags } from './Icons';
+import Image from 'next/image';
 
 // Edit User Modal
 interface EditUserModalProps {
@@ -1123,9 +1124,9 @@ export function AddGenreModal({
         <form onSubmit={handleSubmit} id="add-genre-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="genre-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel htmlFor="genre-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
                 Genre Name
-              </Label>
+              </UILabel>
               <Input
                 id="genre-name"
                 name="name"
@@ -1282,9 +1283,9 @@ export function EditGenreModal({
         <form onSubmit={handleSubmit} id="edit-genre-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-genre-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel htmlFor="edit-genre-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
                 Genre Name
-              </Label>
+              </UILabel>
               <Input
                 id="edit-genre-name"
                 name="name"
@@ -1329,6 +1330,477 @@ export function EditGenreModal({
           <Button
             type="submit"
             form="edit-genre-form"
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-blue-600 hover:bg-blue-700' 
+                : 'bg-neutral-900 hover:bg-neutral-900/90'
+            )}
+            disabled={isSubmitting}
+          >
+            Save Changes
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Add Label Modal
+interface AddLabelModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (formData: FormData) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function AddLabelModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: AddLabelModalProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [previewLogo, setPreviewLogo] = useState<string>("");
+
+  useEffect(() => {
+    if (!isOpen) {
+      setLogoFile(null);
+      setPreviewLogo("");
+      formRef.current?.reset();
+    }
+  }, [isOpen]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setLogoFile(e.target.files[0]);
+      setPreviewLogo(URL.createObjectURL(e.target.files[0]));
+    }
+  };
+
+  const handleLogoClick = () => {
+    document.getElementById("newLogoFile")?.click();
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    if (!formData.get("name")?.toString().trim()) {
+      toast.error("Label name is required.");
+      return;
+    }
+
+    if (logoFile) {
+      formData.set("logoFile", logoFile);
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+      onClose(); // Close modal on success
+    } catch (error) {
+      // Error handled by the parent component
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={cn(
+        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
+      )}>
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full",
+                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
+              )}>
+                <Tags className={cn(
+                  "w-7 h-7",
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                )} strokeWidth={1.5} />
+              </div>
+              <div>
+                <DialogTitle className={cn(
+                  "text-lg font-bold",
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                )}>
+                  Add New Label
+                </DialogTitle>
+                <p className={cn(
+                  "text-sm mt-1",
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                )}>
+                  Create a new record label
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+              )}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form ref={formRef} onSubmit={handleSubmit} id="add-label-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow space-y-4">
+           <div className="flex flex-col items-center space-y-3">
+             <UILabel
+               htmlFor="newLogoFile"
+               className={`w-28 h-28 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center ${theme === 'dark' ? 'border-gray-600 bg-gray-700 hover:bg-gray-600' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'}`}
+             >
+               {previewLogo ? (
+                 <Image
+                   src={previewLogo}
+                   alt="Label Logo Preview"
+                   width={112}
+                   height={112}
+                   className="w-full h-full object-cover"
+                 />
+               ) : (
+                 <div className="flex flex-col items-center justify-center text-center">
+                   <Tags className={`w-8 h-8 mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+                   <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Upload Logo</span>
+                 </div>
+               )}
+             </UILabel>
+             <input
+               type="file"
+               id="newLogoFile"
+               accept="image/*"
+               onChange={handleFileChange}
+               className="hidden"
+             />
+           </div>
+
+           <div className="space-y-2">
+             <UILabel htmlFor="add-label-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+               Label Name
+             </UILabel>
+             <Input
+               id="add-label-name"
+               name="name"
+               placeholder="Enter label name"
+               className={cn(
+                 "w-full",
+                 theme === 'dark' 
+                   ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+               )}
+               maxLength={100}
+               required
+               disabled={isSubmitting}
+             />
+           </div>
+
+            <div className="space-y-2">
+              <UILabel htmlFor="add-label-description" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Description
+              </UILabel>
+              <Textarea
+                id="add-label-description"
+                name="description"
+                placeholder="Enter label description (optional)"
+                className={cn(
+                  "w-full min-h-[80px]",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                maxLength={500}
+                disabled={isSubmitting}
+              />
+            </div>
+        </form>
+
+        {/* Footer */}
+        <div className={cn(
+          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+          theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'
+        )}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                : 'bg-white hover:bg-gray-50 border-gray-300'
+            )}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="add-label-form"
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-blue-600 hover:bg-blue-700' 
+                : 'bg-neutral-900 hover:bg-neutral-900/90'
+            )}
+            disabled={isSubmitting}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Label
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Edit Label Modal
+interface EditLabelModalProps {
+  label: Label | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (labelId: string, formData: FormData) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function EditLabelModal({
+  label,
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: EditLabelModalProps) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [previewLogo, setPreviewLogo] = useState<string | null | undefined>(
+    label?.logoUrl
+  );
+
+  useEffect(() => {
+    if (isOpen && label) {
+      setPreviewLogo(label.logoUrl);
+      setLogoFile(null);
+      // Reset form fields to reflect the current label's data
+      if (formRef.current) {
+         const nameInput = formRef.current.elements.namedItem('name') as HTMLInputElement;
+         const descriptionInput = formRef.current.elements.namedItem('description') as HTMLTextAreaElement;
+         if (nameInput) nameInput.value = label.name;
+         if (descriptionInput) descriptionInput.value = label.description || '';
+      }
+      setIsSubmitting(false);
+    } else if (!isOpen) {
+        // Clear preview when modal closes if not saving
+        setPreviewLogo(null);
+        setLogoFile(null);
+    }
+  }, [isOpen, label]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setLogoFile(e.target.files[0]);
+      setPreviewLogo(URL.createObjectURL(e.target.files[0]));
+    }
+  };
+
+  const handleLogoClick = () => {
+    document.getElementById("editLogoFile")?.click();
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!label) return;
+
+    const formData = new FormData(e.currentTarget);
+    if (!formData.get("name")?.toString().trim()) {
+      toast.error("Label name is required.");
+      return;
+    }
+
+    // Only add the file if a new one was selected
+    if (logoFile) {
+      formData.set("logoFile", logoFile);
+    } else {
+      // If no new file is selected, ensure logoFile field is not sent
+      formData.delete("logoFile");
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit(label.id, formData);
+      onClose(); // Close modal on success
+    } catch (error) {
+      // Error handled by the parent component
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen || !label) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={cn(
+        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
+      )}>
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full",
+                theme === 'dark' ? 'bg-amber-900/30' : 'bg-amber-100'
+              )}>
+                <Edit className={cn(
+                  "w-7 h-7",
+                  theme === 'dark' ? 'text-amber-300' : 'text-amber-600'
+                )} strokeWidth={1.5} />
+              </div>
+              <div>
+                <DialogTitle className={cn(
+                  "text-lg font-bold",
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                )}>
+                  Edit Label
+                </DialogTitle>
+                <p className={cn(
+                  "text-sm mt-1",
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                )}>
+                  Update label information
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+              )}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form ref={formRef} onSubmit={handleSubmit} id="edit-label-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow space-y-4">
+           <div className="flex flex-col items-center space-y-3">
+             <UILabel
+               htmlFor="editLogoFile"
+               className={`w-28 h-28 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center ${theme === 'dark' ? 'border-gray-600 bg-gray-700 hover:bg-gray-600' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'}`}
+             >
+               {previewLogo ? (
+                 <Image
+                   src={previewLogo}
+                   alt="Label Logo Preview"
+                   width={112}
+                   height={112}
+                   className="w-full h-full object-cover"
+                 />
+               ) : (
+                 <div className="flex flex-col items-center justify-center text-center">
+                   <Tags className={`w-8 h-8 mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+                   <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Upload Logo</span>
+                 </div>
+               )}
+             </UILabel>
+             <input
+               type="file"
+               id="editLogoFile"
+               name="logoFile" // Important for FormData association, although we handle file state separately
+               accept="image/*"
+               onChange={handleFileChange}
+               className="hidden"
+             />
+           </div>
+
+           <div className="space-y-2">
+             <UILabel htmlFor="edit-label-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+               Label Name
+             </UILabel>
+             <Input
+               id="edit-label-name"
+               name="name"
+               defaultValue={label.name}
+               placeholder="Enter label name"
+               className={cn(
+                 "w-full",
+                 theme === 'dark' 
+                   ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+               )}
+               maxLength={100}
+               required
+               disabled={isSubmitting}
+             />
+           </div>
+
+            <div className="space-y-2">
+              <UILabel htmlFor="edit-label-description" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Description
+              </UILabel>
+              <Textarea
+                id="edit-label-description"
+                name="description"
+                defaultValue={label.description || ''}
+                placeholder="Enter label description (optional)"
+                className={cn(
+                  "w-full min-h-[80px]",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                maxLength={500}
+                disabled={isSubmitting}
+              />
+            </div>
+        </form>
+
+        {/* Footer */}
+        <div className={cn(
+          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+          theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'
+        )}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                : 'bg-white hover:bg-gray-50 border-gray-300'
+            )}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="edit-label-form"
             className={cn(
               "flex-1 text-center justify-center",
               theme === 'dark' 

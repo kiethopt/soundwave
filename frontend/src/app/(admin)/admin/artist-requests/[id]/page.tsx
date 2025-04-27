@@ -16,7 +16,7 @@ export default function ArtistRequestDetail({
   params: Promise<{ id: string }>;
 }) {
   const { theme } = useTheme();
-  const { id } = use(params);
+  const { id: requestId } = use(params);
   const router = useRouter();
   const [request, setRequest] = useState<ArtistRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +31,7 @@ export default function ArtistRequestDetail({
         if (!token) {
           throw new Error('No authentication token found');
         }
-        const response = await api.admin.getArtistRequestDetail(id, token);
+        const response = await api.admin.getArtistRequestDetail(requestId, token);
         setRequest(response);
       } catch (err) {
         console.error('Error fetching request details:', err);
@@ -44,7 +44,7 @@ export default function ArtistRequestDetail({
     };
 
     fetchRequestDetails();
-  }, [id]);
+  }, [requestId]);
 
   const handleApproveClick = () => {
     setShowApproveModal(true);

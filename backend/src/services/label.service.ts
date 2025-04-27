@@ -3,12 +3,13 @@ import { labelSelect } from '../utils/prisma-selects';
 import { Request } from 'express';
 import { uploadFile } from './upload.service';
 import { runValidations, validateField, paginate } from '../utils/handle-utils';
+import { Prisma } from '@prisma/client';
 
 export const getAllLabels = async (req: Request) => {
   const { search, sortBy, sortOrder } = req.query;
 
   // Xây dựng điều kiện tìm kiếm
-  const whereClause: any = {};
+  const whereClause: Prisma.LabelWhereInput = {};
 
   if (search && typeof search === 'string') {
     whereClause.OR = [
@@ -18,16 +19,20 @@ export const getAllLabels = async (req: Request) => {
   }
 
   // Xử lý sắp xếp
-  const orderByClause: any = {};
-  if (
-    sortBy &&
-    typeof sortBy === 'string' &&
-    (sortOrder === 'asc' || sortOrder === 'desc')
-  ) {
-    if (sortBy === 'name' || sortBy === 'createdAt' || sortBy === 'updatedAt') {
-      orderByClause[sortBy] = sortOrder;
-    } else {
-      orderByClause.name = 'asc';
+  const orderByClause: Prisma.LabelOrderByWithRelationInput = {};
+  const validSortKeys = ['name', 'tracks', 'albums'] as const;
+  type SortKey = typeof validSortKeys[number];
+
+  const key = sortBy as SortKey;
+  const order = sortOrder === 'desc' ? 'desc' : 'asc'; // Default to asc
+
+  if (sortBy && typeof sortBy === 'string' && validSortKeys.includes(key)) {
+    if (key === 'name') {
+      orderByClause.name = order;
+    } else if (key === 'tracks') {
+      orderByClause.tracks = { _count: order };
+    } else if (key === 'albums') {
+      orderByClause.albums = { _count: order };
     }
   } else {
     orderByClause.name = 'asc';
