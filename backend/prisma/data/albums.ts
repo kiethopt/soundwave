@@ -859,6 +859,43 @@ export const albums: AlbumData[] = [
     ],
   },
 
+  // Dương Domic - Dữ Liệu Quý EP
+  {
+    artistName: 'Dương Domic',
+    title: 'Dữ Liệu Quý',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745731266/dulieuquy_kd0c8v.jpg',
+    type: AlbumType.EP,
+    labelName: 'DAO Entertainment',
+    genreNames: ['V-Pop', 'Pop', 'R&B', 'Indie'],
+    releaseDate: new Date('2023-12-01'),
+    tracks: [
+      {
+        title: 'Chập Chờn',
+        audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731353/Ch%E1%BA%ADp_Ch%E1%BB%9Dn_akpg6s.mp3',
+        trackNumber: 1,
+        featuredArtists: []
+      },
+      {
+        title: 'Tràn Bộ Nhớ',
+        audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731355/Tr%C3%A0n_B%E1%BB%99_Nh%E1%BB%9B_ry2ikr.mp3',
+        trackNumber: 2,
+        featuredArtists: []
+      },
+      {
+        title: 'Pin Dự Phòng',
+        audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731355/Pin_D%E1%BB%B1_Ph%C3%B2ng_w6wafm.mp3',
+        trackNumber: 3,
+        featuredArtists: []
+      },
+      {
+        title: 'Mất Kết Nối',
+        audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731355/M%E1%BA%A5t_K%E1%BA%BFt_N%E1%BB%91i_qcxd1j.mp3',
+        trackNumber: 4,
+        featuredArtists: []
+      },
+    ],
+  },
+
 
 ];
 

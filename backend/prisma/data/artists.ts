@@ -508,6 +508,24 @@ export const artists: ArtistData[] = [
     },  
   },
 
+  // Dương Domic
+  {
+    user: {
+      email: 'duongdomic@soundwave.com',
+      username: 'duongdomic_artist',
+      name: 'Dương Domic',
+    },
+    profile: {
+      artistName: 'Dương Domic',
+      bio: 'Dương Domic là một ca sĩ, nhạc sĩ người Việt Nam, được biết đến sau khi tham gia chương trình Giọng hát Việt 2015.',
+      avatar: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745435226/seed/artists/hedfsp76waayhtmlheea.jpg',
+      socialMediaLinks: {
+        facebook: 'duongdomic.official',
+        instagram: 'duongdomic.official',
+      },
+    },
+  },
+
   // Grey D
   {
     user: {

@@ -345,6 +345,30 @@ export const singles: SingleTrackData[] = [
     featuredArtistNames: ['Seachains'],
     playCount: 20,
   },
+
+  // Dương Domic's Single
+  {
+    artistName: 'Dương Domic',
+    title: 'Là Em, Chính Em',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745731659/laemlachinhem_wzepft.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731671/L%C3%A0_Em_Ch%C3%ADnh_Em_ki38w0.mp3',
+    genreNames: ['V-Pop', 'Ballad'],
+    labelName: 'DAO Entertainment',
+    featuredArtistNames: [],
+    playCount: 25,
+  },
+  {
+    artistName: 'Dương Domic',
+    title: 'Yêu Em 2 Ngày',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745731856/yeuem2ngay_mwvqxx.jpg',
+    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731859/Y%C3%AAu_Em_2_Ng%C3%A0y_tgdmi8.mp3',
+    genreNames: ['V-Pop', 'Ballad', 'R&B'],
+    labelName: 'DAO Entertainment',
+    featuredArtistNames: [],
+    playCount: 25,
+  },
+  
+  
 ];
 
 // Function to get single by title and artist (useful for references)
