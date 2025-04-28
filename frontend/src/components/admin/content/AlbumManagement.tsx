@@ -3,20 +3,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
-import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Trash2, Search, Eye, Edit, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Trash2, Search, Edit, CheckCircle, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Album } from '@/types';
+import { AlbumDetailModal, EditAlbumModal, ConfirmDeleteModal } from '@/components/ui/admin-modals';
 
 interface AlbumManagementProps {
   theme: 'light' | 'dark';
@@ -37,6 +29,13 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
   const [activeSearchTerm, setActiveSearchTerm] = useState('');
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<string>>(new Set());
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'createdAt', direction: 'desc' });
+  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [albumToEdit, setAlbumToEdit] = useState<Album | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [albumToDelete, setAlbumToDelete] = useState<Album | null>(null);
+  const [albumsToDeleteCount, setAlbumsToDeleteCount] = useState<number | null>(null);
   const limit = 10;
 
   const fetchAlbums = useCallback(async (page: number, search: string, sort: SortConfig) => {
@@ -97,32 +96,10 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
     setSortConfig({ key, direction });
   };
 
-  const handleDeleteAlbum = async (albumId: string) => {
-    if (!window.confirm('Are you sure you want to delete this album? This action cannot be undone.')) {
-      return;
-    }
-
-    setActionLoading(albumId);
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-      
-      await api.albums.delete(albumId, token);
-      toast.success('Album deleted successfully');
-      fetchAlbums(currentPage, activeSearchTerm, sortConfig);
-      setSelectedAlbumIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(albumId);
-        return newSet;
-      });
-    } catch (err: any) {
-      console.error('Error deleting album:', err);
-      toast.error(err.message || 'Failed to delete album');
-    } finally {
-      setActionLoading(null);
-    }
+  const handleDeleteAlbumClick = (album: Album) => {
+    setAlbumToDelete(album);
+    setAlbumsToDeleteCount(null);
+    setIsDeleteModalOpen(true);
   };
 
   const handleBulkDeleteClick = () => {
@@ -130,38 +107,43 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
       toast('No albums selected.', { icon: '⚠️' });
       return;
     }
-
-    if (!window.confirm(`Are you sure you want to delete ${selectedAlbumIds.size} selected album(s)? This action cannot be undone.`)) {
-        return;
-      }
-
-    const deleteMultipleAlbums = async () => {
-      setActionLoading('bulk-delete');
-      try {
-        const token = localStorage.getItem('userToken');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
-        
-        await Promise.all(
-          Array.from(selectedAlbumIds).map(id => api.albums.delete(id, token))
-        );
-        
-        toast.success(`Successfully deleted ${selectedAlbumIds.size} album(s)`);
-        fetchAlbums(currentPage, activeSearchTerm, sortConfig);
-        setSelectedAlbumIds(new Set());
-      } catch (err: any) {
-        console.error('Error deleting albums:', err);
-        toast.error(err.message || 'Failed to delete albums');
-      } finally {
-        setActionLoading(null);
-      }
-    };
-
-    deleteMultipleAlbums();
+    setAlbumToDelete(null);
+    setAlbumsToDeleteCount(selectedAlbumIds.size);
+    setIsDeleteModalOpen(true);
   };
 
-  const handleToggleVisibility = async (albumId: string, currentIsActive: boolean) => {
+  const handleConfirmDelete = async (idsToDelete: string[]) => {
+    const isBulk = albumsToDeleteCount !== null && albumsToDeleteCount > 0;
+    const actionId = isBulk ? 'bulk-delete' : idsToDelete[0];
+    setActionLoading(actionId);
+
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      const deletePromises = idsToDelete.map(id => api.albums.delete(id, token));
+      await Promise.all(deletePromises);
+
+      toast.success(`Successfully deleted ${idsToDelete.length} album(s)`);
+      fetchAlbums(currentPage, activeSearchTerm, sortConfig); // Refresh list
+      setSelectedAlbumIds(prev => {
+        const newSet = new Set(prev);
+        idsToDelete.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+      setIsDeleteModalOpen(false); // Close modal on success
+      setAlbumToDelete(null);
+      setAlbumsToDeleteCount(null);
+    } catch (err: any) {
+      console.error('Error deleting album(s):', err);
+      toast.error(err.message || 'Failed to delete album(s)');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleToggleVisibility = async (albumId: string, currentIsActive: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
     setActionLoading(albumId);
     try {
       const token = localStorage.getItem('userToken');
@@ -224,6 +206,54 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
 
   const isAllSelected = albums.length > 0 && selectedAlbumIds.size === albums.length;
   const isIndeterminate = selectedAlbumIds.size > 0 && selectedAlbumIds.size < albums.length;
+
+  const handleViewAlbumDetails = (album: Album) => {
+    setSelectedAlbum(album);
+    setIsDetailModalOpen(true);
+  };
+
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedAlbum(null);
+  };
+
+  const handleRowClick = (album: Album) => {
+    handleViewAlbumDetails(album);
+  };
+
+  const handleEditAlbumClick = (album: Album, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAlbumToEdit(album);
+    setIsEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setAlbumToEdit(null);
+  };
+
+  const handleEditAlbumSubmit = async (albumId: string, formData: FormData) => {
+    setActionLoading(albumId);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) throw new Error('No authentication token found');
+
+      const labelId = formData.get('labelId');
+      if (labelId === '') {
+        formData.set('labelId', '');
+      }
+
+      await api.albums.update(albumId, formData, token);
+      toast.success('Album updated successfully');
+      closeEditModal();
+      fetchAlbums(currentPage, activeSearchTerm, sortConfig);
+    } catch (err: any) {
+      console.error('Error updating album:', err);
+      toast.error(err.message || 'Failed to update album');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -340,8 +370,9 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                     <tr
                       key={album.id}
                       className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedAlbumIds.has(album.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === album.id ? 'opacity-50 pointer-events-none' : ''}`}
+                      onClick={() => handleRowClick(album)}
                     >
-                      <td className="w-4 p-4">
+                      <td className="w-4 p-4" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           id={`select-row-${album.id}`}
                           checked={selectedAlbumIds.has(album.id)}
@@ -366,49 +397,40 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                       </td>
                       <td className="py-4 px-6">{formatDate(album.releaseDate)}</td>
                       <td className="py-4 px-6">
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
-                            onClick={() => handleDeleteAlbum(album.id)}
+                            className={`hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-red-500 hover:text-red-400 hover:bg-red-500/20' : 'text-red-600 hover:text-red-700 hover:bg-red-100'}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteAlbumClick(album);
+                            }}
                             aria-label={`Delete album ${album.title}`}
                             disabled={loading || actionLoading !== null}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0" data-radix-dropdown-menu-trigger disabled={loading || actionLoading !== null}>
-                                <span className="sr-only">Open menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem>
-                                <Eye className="mr-2 h-4 w-4" /> View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Edit className="mr-2 h-4 w-4" /> Edit Album
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator className={theme === 'dark' ? 'bg-gray-600' : ''} />
-                              <DropdownMenuItem
-                                onClick={() => handleToggleVisibility(album.id, album.isActive)}
-                                disabled={actionLoading === album.id}
-                              >
-                                {album.isActive ? (
-                                  <>
-                                    <XCircle className="mr-2 h-4 w-4" /> Hide Album
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle className="mr-2 h-4 w-4" /> Show Album
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-500/20' : 'text-blue-600 hover:text-blue-700 hover:bg-blue-100'}`}
+                            onClick={(e) => handleEditAlbumClick(album, e)}
+                            aria-label={`Edit album ${album.title}`}
+                            disabled={loading || actionLoading !== null}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 p-0 ${theme === 'dark' ? (album.isActive ? 'text-green-400 hover:text-green-300 hover:bg-green-500/20' : 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/20') : (album.isActive ? 'text-green-600 hover:text-green-700 hover:bg-green-100' : 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-100')}`}
+                            onClick={(e) => handleToggleVisibility(album.id, album.isActive, e)}
+                            aria-label={album.isActive ? `Hide album ${album.title}` : `Show album ${album.title}`}
+                            disabled={loading || actionLoading !== null || actionLoading === album.id}
+                          >
+                            {actionLoading === album.id ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div> : (album.isActive ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />)}
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -462,6 +484,40 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
           </div>
         </>
       )}
+
+      {/* Album Detail Modal */}
+      <AlbumDetailModal
+        album={selectedAlbum}
+        isOpen={isDetailModalOpen}
+        onClose={closeDetailModal}
+        theme={theme}
+      />
+
+      {/* Edit Album Modal */}
+      <EditAlbumModal
+        album={albumToEdit}
+        isOpen={isEditModalOpen}
+        onClose={closeEditModal}
+        onSubmit={handleEditAlbumSubmit}
+        theme={theme}
+      />
+
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => {
+          if (albumToDelete) {
+            handleConfirmDelete([albumToDelete.id]);
+          } else if (albumsToDeleteCount) {
+            handleConfirmDelete(Array.from(selectedAlbumIds));
+          }
+        }}
+        item={albumToDelete ? { id: albumToDelete.id, name: albumToDelete.title, email: '' } : null}
+        count={albumsToDeleteCount || undefined}
+        theme={theme}
+        entityType="album"
+      />
     </div>
   );
 };

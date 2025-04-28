@@ -2,9 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from "../config/db";
 import { trackSelect } from "../utils/prisma-selects";
 import { Playlist } from "@prisma/client";
-import { PlaylistType } from "@prisma/client";
-import { Prisma } from "@prisma/client";
-
+import { PlaylistType, Prisma, PrismaClient } from "@prisma/client";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
@@ -49,106 +47,29 @@ export interface PlaylistGenerationOptions {
  * @returns Object chứa điều kiện truy vấn Prisma
  */
 async function createEnhancedGenreFilter(genreInput: string): Promise<any> {
-  try {
-    // Phân tích thể loại để tìm thể loại chính và thể loại liên quan
-    const { mainGenreId, relatedGenres, subGenres, parentGenres } =
-      await analyzeGenre(genreInput);
+  // Analyze the genre input to find main, related, sub, and parent genres
+  const { mainGenre, mainGenreId, relatedGenres, subGenres, parentGenres } = await analyzeGenre(genreInput);
 
-    // Các IDs thể loại phân theo nhóm
-    const allMainGenreIds = mainGenreId ? [mainGenreId] : [];
-    const allSubGenreIds = subGenres.map((g) => g.id);
-    const allRelatedGenreIds = relatedGenres.map((g) => g.id);
-    const allParentGenreIds = parentGenres.map((g) => g.id);
-
-    console.log(`[AI] Genre distribution for "${genreInput}":`);
-    if (allMainGenreIds.length > 0)
-      console.log(`[AI] - Main: ${allMainGenreIds.length} genres`);
-    if (allSubGenreIds.length > 0)
-      console.log(`[AI] - Sub: ${allSubGenreIds.length} genres`);
-    if (allRelatedGenreIds.length > 0)
-      console.log(`[AI] - Related: ${allRelatedGenreIds.length} genres`);
-    if (allParentGenreIds.length > 0)
-      console.log(`[AI] - Parent: ${allParentGenreIds.length} genres`);
-
-    // Tạo danh sách IDs thể loại theo độ ưu tiên
-    const prioritizedGenreIds = [
-      ...allMainGenreIds, // Higher weight by appearing first
-      ...allSubGenreIds,
-      ...allParentGenreIds,
-      ...allRelatedGenreIds,
-    ];
-    
-    // Nếu không tìm thấy thể loại nào, thử tìm kiếm miễn là tên thể loại có chứa chuỗi đầu vào
-    if (prioritizedGenreIds.length === 0) {
-      console.log(`[AI] No exact genre matches found, searching by name`);
-      const fallbackGenres = await prisma.genre.findMany({
-        where: {
-          name: {
-            contains: genreInput,
-            mode: "insensitive",
-          }
-        },
-        select: { id: true },
-      });
-      
-      if (fallbackGenres.length > 0) {
-        return {
-          genres: {
-            some: {
-              genreId: {
-                in: fallbackGenres.map((g) => g.id),
-              },
-            },
-          },
-        };
+  // Create a filter that includes tracks from the genre and its related genres
+  const filter: Prisma.TrackWhereInput = mainGenreId ? {
+    genres: {
+      some: {
+        genreId: mainGenreId
       }
-      
-      // Vẫn không tìm thấy, trả về lọc cơ bản
-      return {
-        genres: {
-          some: {
-            genre: {
-              name: {
-                contains: genreInput,
-                mode: "insensitive",
-              },
-            },
-          },
-        },
-      };
     }
-    
-    // Tạo bộ lọc phức tạp dựa trên độ ưu tiên thể loại
-    return {
-      genres: {
-        some: {
-          genreId: {
-            in: prioritizedGenreIds,
-          },
-        },
-      },
-    };
-  } catch (error) {
-    console.error("[AI] Error creating enhanced genre filter:", error);
-    
-    // Trả về lọc cơ bản nếu có lỗi
-    return {
-      genres: {
-        some: {
-          genre: {
-            name: {
-              contains: genreInput,
-              mode: "insensitive",
-            },
-          },
-        },
-      },
-    };
-  }
+  } : {};
+
+  console.log("[AI] Created genre filter:", {
+    mainGenre,
+    mainGenreId,
+    filter
+  });
+
+  return filter;
 }
 
 /**
- * Generates a personalized playlist for a user using the Gemini AI model
+ * Tạo danh sách phát được cá nhân hóa cho người dùng bằng mô hình AI Gemini
  * @param userId - The user ID to generate the playlist for
  * @param options - Options for playlist generation
  * @returns A Promise resolving to an array of track IDs
@@ -538,9 +459,9 @@ export const generateAIPlaylist = async (
     }
     // Case 9: Only basedOnGenre
     else if (!hasMoodParam && hasGenreParam && !hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
-      artistRatio = 0.2;
-      genreRatio = 0.6;
-      popularRatio = 0.2;
+      artistRatio = 0;
+      genreRatio = 1;
+      popularRatio = 0;
     }
     // Case 10: basedOnGenre and basedOnArtist
     else if (!hasMoodParam && hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
@@ -746,42 +667,29 @@ export const generateAIPlaylist = async (
           id: { notIn: trackIds },
           ...(options.basedOnGenre ? enhancedGenreFilter : targetGenreIds.length > 0 ? {
             genres: {
-              some: {
+              every: {
                 genreId: { in: targetGenreIds },
               },
             },
           } : {}),
-          ...whereClause, // This now includes both genre and song length filters
+          ...whereClause,
           ...moodFilter,
           ...(hasArtistParam && hasGenreParam
             ? {
                 artist: {
                   artistName: {
-                    contains: options.basedOnArtist,
+                    equals: options.basedOnArtist,
                     mode: "insensitive",
                   },
                 },
               }
-            : 
-            hasGenreParam && !hasArtistParam && trackIds.length > 0
-            ? {
-                artistId: {
-                  notIn: Array.from(
-                    new Set(
-                      trackIds
-                            .map(id => {
-                              const track = artistTracks.find(t => t.id === id);
-                          return track?.artistId;
-                        })
-                        .filter(Boolean) as string[]
-                    )
-                  ),
-                },
-              }
             : {}),
         },
-        orderBy: [{ playCount: Prisma.SortOrder.desc }, { createdAt: Prisma.SortOrder.desc }],
-        take: genreTrackCount * 3, // Increased multiplier for better selection
+        orderBy: [
+          { playCount: Prisma.SortOrder.desc },
+          { createdAt: Prisma.SortOrder.desc },
+        ],
+        take: genreTrackCount * 3,
       };
 
       const genreTracks = await prisma.track.findMany(genreTracksQuery);
@@ -1111,7 +1019,7 @@ export const generateAIPlaylist = async (
 };
 
 /**
- * Creates or updates an AI-generated playlist for a user
+ * Tạo hoặc cập nhật danh sách phát do AI tạo ra cho người dùng
  * @param userId - The user ID to create the playlist for
  * @param options - Options for playlist generation
  * @returns The created or updated playlist
@@ -1264,7 +1172,7 @@ export const createAIGeneratedPlaylist = async (
 };
 
 /**
- * Generates a default playlist with popular tracks for new users
+ * Tạo danh sách phát mặc định với các bản nhạc phổ biến cho người dùng mới
  * @param userId - The user ID to generate the playlist for
  * @returns A Promise resolving to an array of track IDs
  */
@@ -1342,27 +1250,43 @@ export const generateDefaultPlaylistForNewUser = async (
 };
 
 
-async function getMoodFilter(mood: string): Promise<any> {
+async function getMoodFilter(mood: string): Promise<Prisma.TrackWhereInput> {
   const moodKeywords: Record<string, string[]> = {
-    happy: ['happy', 'joy', 'cheerful', 'upbeat', 'energetic', 'positive', 'sunny', 'bright'],
-    sad: ['sad', 'melancholy', 'depressing', 'down', 'emotional', 'heartbreak', 'tears'],
-    calm: ['calm', 'peaceful', 'relaxing', 'serene', 'tranquil', 'gentle', 'soothing'],
-    energetic: ['energetic', 'powerful', 'strong', 'intense', 'dynamic', 'power', 'force'],
-    romantic: ['romantic', 'love', 'passion', 'intimate', 'sweet', 'tender', 'affection'],
-    nostalgic: ['nostalgic', 'memories', 'retro', 'vintage', 'classic', 'old', 'remember'],
-    mysterious: ['mysterious', 'mystery', 'dark', 'enigmatic', 'secret', 'hidden', 'unknown'],
-    dreamy: ['dreamy', 'ethereal', 'atmospheric', 'ambient', 'floating', 'space', 'cloud'],
-    angry: ['angry', 'rage', 'furious', 'aggressive', 'intense', 'hate', 'frustrated'],
-    hopeful: ['hopeful', 'optimistic', 'inspiring', 'uplifting', 'motivation', 'dream', 'future']
+    happy: ['happy', 'joy', 'cheerful', 'upbeat', 'energetic', 'positive', 'sunny', 'bright', 'uplifting', 'fun', 'party', 'dance', 'celebrate', 'smile', 'laugh'],
+    sad: ['sad', 'melancholy', 'depressing', 'down', 'emotional', 'heartbreak', 'tears', 'cry', 'pain', 'lonely', 'missing', 'hurt', 'broken', 'sorrow', 'grief'],
+    calm: ['calm', 'peaceful', 'relaxing', 'serene', 'tranquil', 'gentle', 'soothing', 'quiet', 'meditation', 'zen', 'peace', 'soft', 'smooth', 'easy', 'light'],
+    energetic: ['energetic', 'powerful', 'strong', 'intense', 'dynamic', 'power', 'force', 'drive', 'pump', 'boost', 'high', 'rush', 'adrenaline', 'fast', 'loud'],
+    romantic: ['romantic', 'love', 'passion', 'intimate', 'sweet', 'tender', 'affection', 'heart', 'soul', 'forever', 'together', 'kiss', 'embrace', 'devotion', 'adore'],
+    nostalgic: ['nostalgic', 'memories', 'retro', 'vintage', 'classic', 'old', 'remember', 'past', 'yesterday', 'childhood', 'memory', 'throwback', 'throw back', 'old school'],
+    mysterious: ['mysterious', 'mystery', 'dark', 'enigmatic', 'secret', 'hidden', 'unknown', 'strange', 'weird', 'curious', 'enigma', 'puzzle', 'riddle', 'shadow', 'veil'],
+    dreamy: ['dreamy', 'ethereal', 'atmospheric', 'ambient', 'floating', 'space', 'cloud', 'dream', 'fantasy', 'magical', 'heavenly', 'celestial', 'cosmic', 'astral', 'ether'],
+    angry: ['angry', 'rage', 'furious', 'aggressive', 'intense', 'hate', 'frustrated', 'mad', 'angst', 'fury', 'wrath', 'outrage', 'violent', 'hostile', 'hostility'],
+    hopeful: ['hopeful', 'optimistic', 'inspiring', 'uplifting', 'motivation', 'dream', 'future', 'hope', 'faith', 'believe', 'trust', 'confidence', 'courage', 'strength', 'light']
+  };
+
+  const moodGenres: Record<string, string[]> = {
+    happy: ['pop', 'dance', 'disco', 'funk'],
+    sad: ['blues', 'soul', 'ballad', 'indie'],
+    calm: ['ambient', 'classical', 'jazz', 'acoustic'],
+    energetic: ['rock', 'metal', 'electronic', 'hip-hop'],
+    romantic: ['r&b', 'soul', 'jazz', 'pop'],
+    nostalgic: ['oldies', 'classic rock', 'folk', 'retro'],
+    mysterious: ['electronic', 'ambient', 'experimental', 'instrumental'],
+    dreamy: ['ambient', 'electronic', 'indie', 'alternative'],
+    angry: ['metal', 'rock', 'punk', 'hardcore'],
+    hopeful: ['gospel', 'pop', 'indie', 'alternative']
   };
 
   const normalizedMood = mood.toLowerCase().trim();
   
-  // Find matching mood category
+  // Find matching mood category and keywords
   let matchingKeywords: string[] = [];
+  let matchingCategory = '';
   for (const [category, keywords] of Object.entries(moodKeywords)) {
     if (keywords.some(keyword => normalizedMood.includes(keyword))) {
       matchingKeywords = keywords;
+      matchingCategory = category;
+      console.log(`[AI] Found mood category: ${category} with ${keywords.length} keywords`);
       break;
     }
   }
@@ -1370,51 +1294,62 @@ async function getMoodFilter(mood: string): Promise<any> {
   // If no specific mood match found, use the input mood as a keyword
   if (matchingKeywords.length === 0) {
     matchingKeywords = [normalizedMood];
+    console.log(`[AI] No specific mood category found, using input mood: ${normalizedMood}`);
   }
 
-  // Create the filter based on mood keywords
-  return {
-    OR: [
-      // Search in track title
-      {
-        title: {
-          contains: matchingKeywords[0],
-          mode: 'insensitive'
-        }
-      },
-      // Search in track description
-      {
-        description: {
-          contains: matchingKeywords[0],
-          mode: 'insensitive'
-        }
-      },
-      // Search in genre names
-      {
-        genres: {
-          some: {
-            genre: {
-              name: {
-                contains: matchingKeywords[0],
-                mode: 'insensitive'
-              }
+  // Take up to 5 most relevant keywords to create a focused filter
+  const selectedKeywords = matchingKeywords.slice(0, 5);
+  console.log(`[AI] Using keywords for mood filter: ${selectedKeywords.join(', ')}`);
+
+  // Create OR conditions for each keyword
+  const orConditions: Prisma.TrackWhereInput[] = selectedKeywords.flatMap(keyword => [
+    // Search in track title with higher weight
+    {
+      title: {
+        contains: keyword,
+        mode: Prisma.QueryMode.insensitive
+      }
+    },
+    // Search in genre names
+    {
+      genres: {
+        some: {
+          genre: {
+            name: {
+              contains: keyword,
+              mode: Prisma.QueryMode.insensitive
             }
           }
         }
-      },
-      // Search in artist name
-      {
-        artist: {
-          artistName: {
-            contains: matchingKeywords[0],
-            mode: 'insensitive'
+      }
+    }
+  ]);
+
+  // Add genre-based conditions if we have a matching category
+  if (matchingCategory && moodGenres[matchingCategory]) {
+    const genreConditions: Prisma.TrackWhereInput[] = moodGenres[matchingCategory].map(genre => ({
+      genres: {
+        some: {
+          genre: {
+            name: {
+              contains: genre,
+              mode: Prisma.QueryMode.insensitive
+            }
           }
         }
       }
+    }));
+    orConditions.push(...genreConditions);
+  }
+
+  // Return the filter with all OR conditions and ensure active tracks only
+  return {
+    AND: [
+      { isActive: true },
+      { OR: orConditions }
     ]
   };
 }
-
 
 /**
  * Phân tích và tìm thể loại nhạc dựa trên đầu vào của người dùng
@@ -1434,24 +1369,23 @@ async function analyzeGenre(genreInput: string): Promise<{
   const normalizedInput = genreInput.trim().toLowerCase();
   console.log(`[AI] Normalized input: "${normalizedInput}"`);
   
-  // Genre dictionary and subgenres remain the same
-  // ... existing genre dictionaries ...
-  
   let mainGenre: string | null = null;
   let mainGenreId: string | null = null;
   const foundSubGenres: { id: string; name: string }[] = [];
   const foundRelatedGenres: { id: string; name: string }[] = [];
   const foundParentGenres: { id: string; name: string }[] = [];
   
-  // Step 1: Try exact match first
-  const exactGenre = await prisma.genre.findFirst({
-    where: {
-      name: {
-        equals: normalizedInput,
-        mode: "insensitive",
-      },
-    },
+  // Lấy tất cả thể loại từ cơ sở dữ liệu để kiểm tra
+  const allGenres = await prisma.genre.findMany({
+    select: { id: true, name: true },
   });
+  
+  console.log(`[AI] Found ${allGenres.length} genres in database`);
+  
+  // Step 1: Try exact match first
+  const exactGenre = allGenres.find(
+    (genre) => genre.name.toLowerCase() === normalizedInput
+  );
   
   if (exactGenre) {
     console.log(`[AI] Found exact genre match: ${exactGenre.name}`);
@@ -1466,14 +1400,9 @@ async function analyzeGenre(genreInput: string): Promise<{
       ) {
         console.log(`[AI] Found genre from synonyms: ${genre}`);
         
-        const dbGenre = await prisma.genre.findFirst({
-          where: {
-            name: {
-              equals: genre,
-              mode: "insensitive",
-            },
-          },
-        });
+        const dbGenre = allGenres.find(
+          (g) => g.name.toLowerCase() === genre.toLowerCase()
+        );
         
         if (dbGenre) {
           mainGenre = dbGenre.name;
@@ -1485,39 +1414,90 @@ async function analyzeGenre(genreInput: string): Promise<{
     
     // Step 3: Try fuzzy matching if still no match
     if (!mainGenre) {
-      const fuzzyResults = await prisma.genre.findMany({
-        where: {
-          name: {
-            contains: normalizedInput,
-            mode: "insensitive",
-          },
-        },
-        take: 5,
-      });
+      // Tìm kiếm với từ khóa chính xác trong tên thể loại
+      const keywordGenres = allGenres.filter(
+        (genre) => genre.name.toLowerCase().includes(normalizedInput)
+      );
       
-      if (fuzzyResults.length > 0) {
-        // Find the closest match using Levenshtein distance
-        let closestMatch = fuzzyResults[0];
-        let minDistance = levenshteinDistance(
-          normalizedInput,
-          closestMatch.name.toLowerCase()
-        );
+      if (keywordGenres.length > 0) {
+        // Tìm kết quả khớp nhất bằng cách tính điểm
+        let bestMatch = keywordGenres[0];
+        let bestScore = 0;
         
-        for (const result of fuzzyResults) {
-          const distance = levenshteinDistance(normalizedInput, result.name.toLowerCase());
-          if (distance < minDistance) {
-            minDistance = distance;
-            closestMatch = result;
+        for (const genre of keywordGenres) {
+          const genreName = genre.name.toLowerCase();
+          
+          // Tính điểm dựa trên độ khớp
+          let score = 0;
+          
+          // Điểm cao nhất cho khớp chính xác
+          if (genreName === normalizedInput) {
+            score += 100;
+          }
+          // Điểm cao cho khớp từ đầu
+          else if (genreName.startsWith(normalizedInput)) {
+            score += 80;
+          }
+          // Điểm trung bình cho khớp từ cuối
+          else if (genreName.endsWith(normalizedInput)) {
+            score += 60;
+          }
+          // Điểm thấp cho khớp ở giữa
+          else if (genreName.includes(normalizedInput)) {
+            score += 40;
+          }
+          
+          // Thêm điểm dựa trên độ dài tương đối
+          const lengthRatio = normalizedInput.length / genreName.length;
+          if (lengthRatio > 0.8) {
+            score += 20; // Gần như khớp hoàn toàn
+          } else if (lengthRatio > 0.5) {
+            score += 10; // Khớp một phần đáng kể
+          }
+          
+          // Cập nhật kết quả tốt nhất
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = genre;
           }
         }
         
-        // Only use fuzzy match if it's reasonably close (distance < 3)
-        if (minDistance < 3) {
-          console.log(
-            `[AI] Found fuzzy match: ${closestMatch.name} (distance: ${minDistance})`
+        // Chỉ sử dụng kết quả nếu điểm đủ cao
+        if (bestScore >= 40) {
+          console.log(`[AI] Found best keyword match: ${bestMatch.name} (score: ${bestScore})`);
+          mainGenre = bestMatch.name;
+          mainGenreId = bestMatch.id;
+        } else {
+          // Thử tìm kiếm mờ với Levenshtein distance
+          const fuzzyResults = allGenres.filter(
+            (genre) => genre.name.toLowerCase().includes(normalizedInput.substring(0, 3))
           );
-          mainGenre = closestMatch.name;
-          mainGenreId = closestMatch.id;
+          
+          if (fuzzyResults.length > 0) {
+            // Find the closest match using Levenshtein distance
+            let closestMatch = fuzzyResults[0];
+            let minDistance = levenshteinDistance(
+              normalizedInput,
+              closestMatch.name.toLowerCase()
+            );
+            
+            for (const result of fuzzyResults) {
+              const distance = levenshteinDistance(normalizedInput, result.name.toLowerCase());
+              if (distance < minDistance) {
+                minDistance = distance;
+                closestMatch = result;
+              }
+            }
+            
+            // Chỉ sử dụng kết quả mờ nếu khoảng cách đủ nhỏ (giảm ngưỡng từ 3 xuống 2)
+            if (minDistance < 2) {
+              console.log(
+                `[AI] Found fuzzy match: ${closestMatch.name} (distance: ${minDistance})`
+              );
+              mainGenre = closestMatch.name;
+              mainGenreId = closestMatch.id;
+            }
+          }
         }
       }
     }
@@ -1528,14 +1508,9 @@ async function analyzeGenre(genreInput: string): Promise<{
     // Find sub-genres
     const subGenres = genreHierarchy[mainGenre.toLowerCase()] || [];
     for (const subGenre of subGenres) {
-      const dbSubGenre = await prisma.genre.findFirst({
-        where: {
-          name: {
-            equals: subGenre,
-            mode: "insensitive",
-          },
-        },
-      });
+      const dbSubGenre = allGenres.find(
+        (g) => g.name.toLowerCase() === subGenre.toLowerCase()
+      );
       
       if (dbSubGenre) {
         foundSubGenres.push({
@@ -1548,14 +1523,9 @@ async function analyzeGenre(genreInput: string): Promise<{
     // Find related genres
     const related = relatedGenres[mainGenre.toLowerCase()] || [];
     for (const relatedGenre of related) {
-      const dbRelatedGenre = await prisma.genre.findFirst({
-        where: {
-          name: {
-            equals: relatedGenre,
-            mode: "insensitive",
-          },
-        },
-      });
+      const dbRelatedGenre = allGenres.find(
+        (g) => g.name.toLowerCase() === relatedGenre.toLowerCase()
+      );
       
       if (dbRelatedGenre) {
         foundRelatedGenres.push({
@@ -1572,14 +1542,9 @@ async function analyzeGenre(genreInput: string): Promise<{
           (child) => child.toLowerCase() === mainGenre.toLowerCase()
         )
       ) {
-        const dbParentGenre = await prisma.genre.findFirst({
-          where: {
-            name: {
-              equals: parent,
-              mode: "insensitive",
-            },
-          },
-        });
+        const dbParentGenre = allGenres.find(
+          (g) => g.name.toLowerCase() === parent.toLowerCase()
+        );
         
         if (dbParentGenre) {
           foundParentGenres.push({
@@ -1637,6 +1602,7 @@ const genreHierarchy: Record<string, string[]> = {
     "j-pop",
     "power pop",
     "teen pop",
+    "V-Pop",
   ],
   "hip hop": [
     "trap",
@@ -1875,19 +1841,6 @@ const relatedGenres: Record<string, string[]> = {
   indie: ["alternative", "rock", "indie pop", "indie rock", "indie folk"],
   edm: ["electronic", "house", "techno", "trance", "dubstep"],
 };
-
-// Genre mappings for common variations
-const genreVariations: Record<string, string[]> = {
-  rock: ["rock music", "rock and roll", "rocks"],
-  pop: ["popular", "pop music"],
-  "hip hop": ["hiphop", "rap", "hip-hop"],
-  electronic: ["electronica", "electronic music", "edm"],
-  classical: ["classic", "orchestra", "orchestral"],
-  ambient: ["ambient music", "atmospheric", "chill"],
-  jazz: ["jazzy", "jazz music"],
-};
-
-
 
 // Helper function to calculate Levenshtein distance (edit distance) between two strings
 function levenshteinDistance(a: string, b: string): number {

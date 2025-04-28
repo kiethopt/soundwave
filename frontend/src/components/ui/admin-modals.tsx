@@ -12,7 +12,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { XIcon, Trash2, ShieldAlert, UserCog, Eye, EyeOff, XCircle, CheckCircle, Plus } from 'lucide-react';
+import { XIcon, Trash2, ShieldAlert, UserCog, Eye, EyeOff, XCircle, CheckCircle, Plus, AlbumIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { UserIcon } from 'lucide-react';
@@ -33,6 +33,11 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Music } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useDominantColor } from '@/hooks/useDominantColor';
+import { Album, Track } from '@/types';
+import { Calendar } from 'lucide-react';
+import { ArtistProfile } from '@/types';
 
 // Edit User Modal
 interface EditUserModalProps {
@@ -336,6 +341,200 @@ export function EditUserModal({
             )}
           >
             Save Changes
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Edit Artist Modal
+interface EditArtistModalProps {
+  artist: ArtistProfile | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (artistId: string, formData: FormData) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function EditArtistModal({
+  artist,
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: EditArtistModalProps) {
+  const [formData, setFormData] = useState<Partial<ArtistProfile>>({});
+  const [isUploading, setIsUploading] = useState(false);
+  
+  useEffect(() => {
+    if (artist) {
+      setFormData({
+        artistName: artist.artistName || '',
+        bio: artist.bio || '',
+      });
+    } else {
+      setFormData({});
+    }
+  }, [artist, isOpen]);
+
+  if (!isOpen || !artist) {
+    return null;
+  }
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!artist) return;
+
+    const form = new FormData();
+    
+    // Handle basic fields only
+    if (formData.artistName) form.append('artistName', formData.artistName);
+    if (formData.bio) form.append('bio', formData.bio);
+
+    try {
+      setIsUploading(true);
+      await onSubmit(artist.id, form);
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update artist');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={cn(
+        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
+      )}>
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full",
+                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
+              )}>
+                <Music className={cn(
+                  "w-7 h-7",
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                )} strokeWidth={1.5} />
+              </div>
+              <div>
+                <DialogTitle className={cn(
+                  "text-lg font-bold",
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                )}>
+                  Edit Artist
+                </DialogTitle>
+                <DialogDescription className={cn(
+                  "text-sm mt-1",
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                )}>
+                  Update artist information
+                </DialogDescription>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+              )}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} id="edit-artist-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-4">
+            {/* Artist Name */}
+            <div className="space-y-2">
+              <UILabel htmlFor="artistName" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Artist Name
+              </UILabel>
+              <Input
+                id="artistName"
+                name="artistName"
+                value={formData.artistName || ''}
+                onChange={handleInputChange}
+                className={cn(
+                  "w-full",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                placeholder="Enter artist name"
+              />
+            </div>
+
+            {/* Bio */}
+            <div className="space-y-2">
+              <UILabel htmlFor="bio" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Biography
+              </UILabel>
+              <Textarea
+                id="bio"
+                name="bio"
+                value={formData.bio || ''}
+                onChange={handleInputChange}
+                className={cn(
+                  "w-full min-h-[100px]",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                placeholder="Enter artist biography"
+              />
+            </div>
+
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className={cn(
+          "flex items-center justify-end gap-3 px-6 py-4 border-t",
+          theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+        )}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                : 'bg-white hover:bg-gray-50 border-gray-300'
+            )}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="edit-artist-form"
+            disabled={isUploading}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-blue-600 hover:bg-blue-700' 
+                : 'bg-neutral-900 hover:bg-neutral-900/90'
+            )}
+          >
+            {isUploading ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>
       </DialogContent>
@@ -1830,6 +2029,7 @@ export function EditLabelModal({
   );
 }
 
+// System Playlist Modal
 interface SystemPlaylistModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -2313,6 +2513,1145 @@ export function SystemPlaylistModal({
             {mode === "create" ? "Create Playlist" : "Save Changes"}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Album Detail Modal
+interface AlbumDetailModalProps {
+  album: Album | null;
+  isOpen: boolean;
+  onClose: () => void;
+  theme?: "light" | "dark";
+}
+
+export function AlbumDetailModal({
+  album,
+  isOpen,
+  onClose,
+  theme = "light",
+}: AlbumDetailModalProps) {
+  const { dominantColor } = useDominantColor(album?.coverUrl);
+
+  if (!album) return null;
+
+  const formatDuration = (seconds: number) => {
+    if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+      return "0:00";
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
+
+  // Sắp xếp bài hát theo trackNumber (nếu có) và sau đó theo title
+  const sortedTracks = [...(album.tracks || [])].sort((a, b) => {
+    const trackNumberA = a.trackNumber ?? Infinity;
+    const trackNumberB = b.trackNumber ?? Infinity;
+
+    if (trackNumberA !== trackNumberB) {
+      return trackNumberA - trackNumberB;
+    } else {
+      return a.title.localeCompare(b.title);
+    }
+  });
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`${theme === "dark" ? "bg-[#1e1e1e] border-[#404040]" : "bg-white"}
+         p-0 rounded-lg shadow-lg w-full max-w-5xl max-h-[90vh] overflow-hidden`}
+      >
+        <DialogTitle className="sr-only">{album.title}</DialogTitle>
+        <div
+          className="relative overflow-y-auto max-h-[90vh]"
+          style={{
+            background: dominantColor
+              ? `linear-gradient(180deg, 
+                  ${dominantColor} 0%, 
+                  ${dominantColor}99 15%,
+                  ${dominantColor}40 30%,
+                  ${theme === "light" ? "#ffffff" : "#1e1e1e"} 100%)`
+              : theme === "light"
+                ? "linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)"
+                : "linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)",
+          }}
+        >
+          {/* Close button */}
+          <div className="absolute top-4 right-4 z-10">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="Close"
+              className={`
+                w-8 h-8 rounded-full flex items-center justify-center 
+                ${theme === 'dark'
+                  ? 'bg-black/20 hover:bg-black/40 text-white/90'
+                  : 'bg-white/20 hover:bg-white/40 text-black/90'}
+              `}
+            >
+              <XIcon className="w-5 h-5" />
+            </Button>
+          </div>
+          <div className="p-6 pb-2">
+            {/* Album header */}
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+              {/* Album Cover */}
+              {album.coverUrl && (
+                <div className="w-[200px] flex-shrink-0">
+                  <img
+                    src={album.coverUrl}
+                    alt={album.title}
+                    className={`w-full aspect-square object-cover rounded-xl shadow-2xl ${
+                      theme === "light"
+                        ? "shadow-gray-200/50"
+                        : "shadow-black/50"
+                      }`}
+                  />
+                </div>
+              )}
+
+              {/* Album Info */}
+              <div className="flex flex-col gap-3 text-center md:text-left">
+                <h2
+                  className={`text-2xl md:text-3xl font-bold ${
+                    theme === "light" ? "text-gray-900" : "text-white"
+                    }`}
+                >
+                  {album.title}
+                </h2>
+
+                <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                  <span
+                    className={theme === "light" ? "text-gray-900" : "text-white/90"}
+                  >
+                    {album.artist?.artistName || "Unknown Artist"}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm">
+                  <div
+                    className={`flex items-center gap-1.5 ${
+                      theme === "light" ? "text-gray-600" : "text-white/60"
+                      }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>
+                      {new Date(album.releaseDate).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <div
+                    className={`flex items-center gap-1.5 ${
+                      theme === "light" ? "text-gray-600" : "text-white/60"
+                      }`}
+                  >
+                    <Music className="w-4 h-4" />
+                    <span>{album.totalTracks || 0} tracks</span>
+                  </div>
+                </div>
+
+                {album.genres?.length > 0 && (
+                  <div className="flex gap-1.5 flex-wrap justify-center md:justify-start mt-2">
+                    {album.genres.map(({ genre }) => (
+                      <span
+                        key={genre?.id || "unknown"}
+                        className={`px-2.5 py-0.5 rounded-full text-xs ${
+                          theme === "light"
+                            ? "bg-gray-100 text-gray-800"
+                            : "bg-white/10 text-white/80"
+                          }`}
+                      >
+                        {genre?.name || "Unknown Genre"}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Track List */}
+          {sortedTracks.length > 0 && (
+            <div className="px-6 pb-6 pt-2">
+              <div
+                className={`w-full rounded-xl overflow-hidden border backdrop-blur-sm ${
+                  theme === "light"
+                    ? "bg-gray-50/90 border-gray-200"
+                    : "bg-black/20 border-white/10"
+                  }`}
+              >
+                {/* Header - Desktop only */}
+                <div
+                  className={`hidden md:block px-6 py-3 border-b ${
+                    theme === "light" ? "border-gray-200" : "border-white/10"
+                    }
+                    }`}
+                >
+                  <div
+                    className={`grid grid-cols-[48px_4fr_2fr_250px_100px] gap-4 text-xs ${
+                      theme === "light" ? "text-gray-600" : "text-white/60"
+                      }
+                    }`}
+                  >
+                    <div className="text-center">#</div>
+                    <div>Title</div>
+                    <div>Artists</div>
+                    <div className="text-center">Player</div>
+                    <div className="text-right">Duration</div>
+                  </div>
+                </div>
+
+                <div
+                  className={`divide-y ${
+                    theme === "light" ? "divide-gray-200" : "divide-white/10"
+                    }`}
+                >
+                  {sortedTracks.map((track) => (
+                    <div
+                      key={track.id}
+                      className={`md:grid md:grid-cols-[48px_4fr_2fr_250px_100px] md:gap-4 px-4 md:px-6 py-2.5 md:py-3 ${
+                        theme === "light"
+                          ? "hover:bg-gray-100"
+                          : "hover:bg-white/5"
+                        }`}
+                    >
+                      {/* Track number */}
+                      <div
+                        className={`hidden md:flex items-center justify-center ${
+                          theme === "light" ? "text-gray-600" : "text-white/60"
+                          }`}
+                      >
+                        {track.trackNumber}
+                      </div>
+
+                      {/* Mobile Layout - Including Player */}
+                      <div className="md:hidden flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <span
+                              className={`font-medium text-sm line-clamp-1 ${
+                                theme === "light"
+                                  ? "text-gray-900"
+                                  : "text-white"
+                                }`}
+                            >
+                              {track.title}
+                            </span>
+                            <div
+                              className={`text-xs line-clamp-1 ${
+                                theme === "light"
+                                  ? "text-gray-600"
+                                  : "text-white/60"
+                                }`}
+                            >
+                              {track.artist?.artistName || "Unknown Artist"}
+                              {track.featuredArtists?.length > 0 && (
+                                <span
+                                  className={theme === "light"
+                                    ? "text-gray-400"
+                                    : "text-white/40"}
+                                >
+                                  {" "}
+                                  • feat.{" "}
+                                  {track.featuredArtists
+                                    .map(
+                                      ({ artistProfile }) =>
+                                        artistProfile?.artistName ||
+                                        "Unknown Artist"
+                                    )
+                                    .join(", ")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span
+                            className={`text-sm whitespace-nowrap pl-3 ${
+                              theme === "light"
+                                ? "text-gray-600"
+                                : "text-white/60"
+                              }`}
+                          >
+                            {formatDuration(track.duration)}
+                          </span>
+                        </div>
+                        {/* Mobile Audio Player */}
+                        {track.audioUrl && (
+                          <div className="w-full">
+                            <audio
+                              controls
+                              src={track.audioUrl}
+                              className="w-full h-8 rounded-md"
+                              style={{
+                                filter:
+                                  theme === "dark"
+                                    ? "invert(1) sepia(0.1) saturate(0.8) hue-rotate(180deg)"
+                                    : "none",
+                              }}
+                            >
+                              Your browser does not support the audio element.
+                            </audio>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Desktop Layout */}
+                      <div
+                        className={`hidden md:flex items-center min-w-0 ${
+                          theme === "light" ? "text-gray-900" : "text-white"
+                          }`}
+                      >
+                        <span className="font-medium line-clamp-1">
+                          {track.title}
+                        </span>
+                      </div>
+
+                      <div className="hidden md:flex flex-col justify-center min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`line-clamp-1 ${
+                              theme === "light"
+                                ? "text-gray-900"
+                                : "text-white/90"
+                              }`}
+                          >
+                            {track.artist?.artistName || "Unknown Artist"}
+                          </span>
+                        </div>
+                        {track.featuredArtists?.length > 0 && (
+                          <div
+                            className={`text-xs line-clamp-1 mt-0.5 ${
+                              theme === "light"
+                                ? "text-gray-500"
+                                : "text-white/50"
+                              }`}
+                          >
+                            feat.{" "}
+                            {track.featuredArtists
+                              .map(
+                                ({ artistProfile }) =>
+                                  artistProfile?.artistName || "Unknown Artist"
+                              )
+                              .join(", ")}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Desktop Audio Player */}
+                      <div className="hidden md:flex items-center">
+                        {track.audioUrl && (
+                          <audio
+                            controls
+                            src={track.audioUrl}
+                            className="w-full h-8 rounded-md"
+                            style={{
+                              filter:
+                                theme === "dark"
+                                  ? "invert(1) sepia(0.1) saturate(0.8) hue-rotate(180deg)"
+                                  : "none",
+                            }}
+                          >
+                            Your browser does not support the audio element.
+                          </audio>
+                        )}
+                      </div>
+
+                      <div
+                        className={`hidden md:flex items-center justify-end ${
+                          theme === "light" ? "text-gray-600" : "text-white/60"
+                          }`}
+                      >
+                        {formatDuration(track.duration)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Copyright Label Footer */}
+                {album.label && (
+                  <div
+                    className={`px-6 py-3 text-xs ${
+                      theme === "light" ? "text-gray-500" : "text-white/40"
+                      }`}
+                  >
+                    © {album.label.name || "Unknown Label"}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Track Detail Modal
+interface TrackDetailModalProps {
+  track: Track | null;
+  isOpen: boolean;
+  onClose: () => void;
+  theme?: "light" | "dark";
+  currentArtistId?: string;
+}
+
+export function TrackDetailModal({
+  track,
+  isOpen,
+  onClose,
+  theme = "light",
+  currentArtistId,
+}: TrackDetailModalProps) {
+  const router = useRouter();
+  const { dominantColor } = useDominantColor(track?.coverUrl);
+
+  if (!track) return null;
+
+  const formatDuration = (seconds: number) => {
+    if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+      return "0:00";
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
+
+  const handleArtistClick = (artistId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClose(); 
+    router.push(`/admin/artists/${artistId}`);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`${theme === "dark" ? "bg-[#1e1e1e] border-[#404040]" : "bg-white"}
+         p-0 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden`}
+      >
+        <DialogTitle className="sr-only">{track.title}</DialogTitle>
+        <div
+          className="relative overflow-y-auto max-h-[90vh]"
+          style={{
+            background: dominantColor
+              ? `linear-gradient(180deg, 
+                  ${dominantColor} 0%, 
+                  ${dominantColor}99 15%,
+                  ${dominantColor}40 30%,
+                  ${theme === "light" ? "#ffffff" : "#1e1e1e"} 100%)`
+              : theme === "light"
+                ? "linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)"
+                : "linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)",
+          }}
+        >
+          {/* Close button */}
+          <div className="absolute top-4 right-4 z-10">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="Close"
+              className={`
+                w-8 h-8 rounded-full flex items-center justify-center 
+                ${theme === 'dark'
+                  ? 'bg-black/20 hover:bg-black/40 text-white/90'
+                  : 'bg-white/20 hover:bg-white/40 text-black/90'}
+              `}
+            >
+              <XIcon className="w-5 h-5" />
+            </Button>
+          </div>
+          <div className="p-6">
+            {/* Track header */}
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+              {/* Track Cover */}
+              <div className="w-[200px] flex-shrink-0">
+                <img
+                  src={track.coverUrl ||
+                    track.album?.coverUrl ||
+                    "https://placehold.co/200x200?text=No+Cover"}
+                  alt={track.title}
+                  className={`w-full aspect-square object-cover rounded-xl shadow-2xl ${
+                    theme === "light" ? "shadow-gray-200/50" : "shadow-black/50"
+                    }`}
+                />
+              </div>
+
+              {/* Track Info */}
+              <div className="flex flex-col gap-3 text-center md:text-left">
+                <h2
+                  className={`text-2xl md:text-3xl font-bold ${
+                    theme === "light" ? "text-gray-900" : "text-white"
+                    }`}
+                >
+                  {track.title}
+                </h2>
+
+                {/* Main Artist - Only make clickable if not the current artist */}
+                <div className="flex items-center justify-center md:justify-start gap-2">
+                  <span
+                    className={`font-medium ${
+                      track.artist?.id !== currentArtistId ? "cursor-pointer hover:underline" : ""
+                    } ${theme === "light" ? "text-gray-900" : "text-white"}`}
+                    onClick={(e: React.MouseEvent) => 
+                      track.artist?.id && 
+                      track.artist.id !== currentArtistId && 
+                      handleArtistClick(track.artist.id, e)
+                    }
+                  >
+                    {track.artist?.artistName || "Unknown Artist"}
+                  </span>
+                </div>
+
+                {/* Featured Artists Section with improved styling */}
+                {track.featuredArtists?.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mt-1">
+                    <div
+                      className={`inline-flex items-center ${
+                        theme === "light"
+                          ? "bg-gray-100 text-gray-700"
+                          : "bg-gray-800/40 text-gray-300"
+                        } px-2.5 py-1 rounded-full text-sm`}
+                    >
+                      <span
+                        className={theme === "light" ? "text-gray-500" : "text-gray-400"}
+                      >
+                        feat.
+                      </span>
+                      <div className="flex flex-wrap items-center ml-1">
+                        {track.featuredArtists.map(
+                          ({ artistProfile }, index) => (
+                            <div
+                              key={artistProfile?.id || index}
+                              className="flex items-center"
+                            >
+                              {index > 0 && (
+                                <span className="mx-1 opacity-60">•</span>
+                              )}
+                              <button
+                                className="hover:underline font-medium inline-flex items-center"
+                                onClick={(e) =>
+                                  artistProfile?.id &&
+                                  handleArtistClick(artistProfile.id, e)
+                                }
+                              >
+                                {artistProfile?.artistName || "Unknown Artist"}
+                              </button>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm">
+                  <div
+                    className={`flex items-center gap-1.5 ${
+                      theme === "light" ? "text-gray-600" : "text-white/60"
+                      }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>
+                      {new Date(track.releaseDate).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <div
+                    className={`flex items-center gap-1.5 ${
+                      theme === "light" ? "text-gray-600" : "text-white/60"
+                      }`}
+                  >
+                    <Music className="w-4 h-4" />
+                    <span>{formatDuration(track.duration)}</span>
+                  </div>
+                </div>
+
+                {track.album && (
+                  <div className="mt-4">
+                    <span
+                      className={`text-sm font-medium ${
+                        theme === "light" ? "text-gray-500" : "text-gray-400"
+                        }`}
+                    >
+                      From the album:
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <img
+                        src={track.album.coverUrl || "https://placehold.co/150x150?text=No+Cover"}
+                        alt={track.album.title}
+                        className="w-12 h-12 object-cover rounded"
+                      />
+                      <div>
+                        <div
+                          className={`text-sm font-medium ${theme === "light" ? "text-gray-900" : "text-white"}`}
+                        >
+                          {track.album.title}
+                        </div>
+                        <div
+                          className={`text-xs ${theme === "light"
+                              ? "text-gray-600"
+                              : "text-gray-400"}`}
+                        >
+                          {track.album.type}
+                          {"releaseDate" in track.album &&
+                            ` • ${new Date(
+                              track.album.releaseDate as string
+                            ).getFullYear()}`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {track.genres?.length > 0 && (
+                  <div className="flex gap-1.5 flex-wrap justify-center md:justify-start mt-2">
+                    {track.genres.map(({ genre }) => (
+                      <span
+                        key={genre?.id || "unknown"}
+                        className={`px-2.5 py-0.5 rounded-full text-xs ${
+                          theme === "light"
+                            ? "bg-gray-100 text-gray-800"
+                            : "bg-white/10 text-white/80"
+                          }`}
+                      >
+                        {genre?.name || "Unknown Genre"}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-2">
+                  <div
+                    className={`flex items-center gap-2 ${theme === "light" ? "text-gray-600" : "text-white/60"}`}
+                  >
+                    <span>Track #:</span>
+                    <span
+                      className={theme === "light" ? "text-gray-900" : "text-white"}
+                    >
+                      {track.trackNumber}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`flex items-center gap-2 mt-1 ${theme === "light" ? "text-gray-600" : "text-white/60"}`}
+                  >
+                    <span>Play count:</span>
+                    <span
+                      className={theme === "light" ? "text-gray-900" : "text-white"}
+                    >
+                      {track.playCount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Track Label */}
+          <div
+            className={`px-6 pb-4 pt-2 text-xs ${theme === "dark" ? "text-white/40" : "text-gray-500"}`}
+          >
+            {track.label && (
+              <span>© {track.label.name || "Unknown Label"}</span>
+            )}
+          </div>
+
+          {/* Track Audio Player */}
+          {track.audioUrl && (
+            <div className="mt-4 w-full px-6 pb-6">
+              <audio
+                controls
+                src={track.audioUrl}
+                className={`w-full rounded-lg ${theme === "dark"
+                    ? "bg-[#282828] shadow-md shadow-black/30"
+                    : "bg-gray-100 shadow-sm"}`}
+                style={{
+                  filter:
+                    theme === "dark"
+                      ? "invert(1) sepia(0.1) saturate(0.8) hue-rotate(180deg)"
+                      : "none",
+                }}
+              >
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Edit Track Modal
+interface EditTrackModalProps {
+  track: Track | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (trackId: string, formData: FormData) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function EditTrackModal({
+  track,
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: EditTrackModalProps) {
+  const [formData, setFormData] = useState<Partial<Track>>({});
+  const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    if (track) {
+      setFormData({
+        title: track.title || '',
+        duration: track.duration || 0,
+        releaseDate: track.releaseDate ? new Date(track.releaseDate).toISOString().split('T')[0] : '',
+        trackNumber: track.trackNumber || 1,
+      });
+    } else {
+      setFormData({});
+    }
+  }, [track, isOpen]);
+
+  if (!isOpen || !track) {
+    return null;
+  }
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!track) return;
+
+    const form = new FormData();
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        form.append(key, value.toString()); 
+      }
+    });
+
+    try {
+      setIsUploading(true);
+      await onSubmit(track.id, form);
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update track');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={cn(
+        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
+      )}>
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full",
+                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
+              )}>
+                <Music className={cn(
+                  "w-7 h-7",
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                )} strokeWidth={1.5} />
+              </div>
+              <div>
+                <DialogTitle className={cn(
+                  "text-lg font-bold",
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                )}>
+                  Edit Track
+                </DialogTitle>
+                <DialogDescription className={cn(
+                  "text-sm mt-1",
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                )}>
+                  Update track information
+                </DialogDescription>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+              )}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} id="edit-track-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+            {/* Title */}
+            <div className="col-span-2 space-y-2">
+              <UILabel htmlFor="title" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Title
+              </UILabel>
+              <Input
+                id="title"
+                name="title"
+                value={formData.title || ''}
+                onChange={handleInputChange}
+                className={cn(
+                  "w-full",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                placeholder="Enter track title"
+                required
+              />
+            </div>
+
+            {/* Track Number */}
+            <div className="space-y-2">
+              <UILabel htmlFor="trackNumber" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Track Number
+              </UILabel>
+              <Input
+                id="trackNumber"
+                name="trackNumber"
+                type="number"
+                min="1"
+                value={formData.trackNumber || ''}
+                onChange={handleInputChange}
+                className={cn(
+                  "w-full",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                placeholder="Enter track number"
+              />
+            </div>
+
+            {/* Duration */}
+            <div className="space-y-2">
+              <UILabel htmlFor="duration" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Duration (seconds)
+              </UILabel>
+              <Input
+                id="duration"
+                name="duration"
+                type="number"
+                min="0"
+                step="1"
+                value={formData.duration || ''}
+                onChange={handleInputChange}
+                className={cn(
+                  "w-full",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                placeholder="Enter duration in seconds"
+              />
+            </div>
+
+            {/* Release Date */}
+            <div className="col-span-2 space-y-2">
+              <UILabel htmlFor="releaseDate" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Release Date
+              </UILabel>
+              <Input
+                id="releaseDate"
+                name="releaseDate"
+                type="date"
+                value={formData.releaseDate || ''}
+                onChange={handleInputChange}
+                className={cn(
+                  "w-full flex items-center", // Add flex items-center
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+              />
+            </div>
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className={cn(
+          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+          theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'
+        )}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                : 'bg-white hover:bg-gray-50 border-gray-300'
+            )}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="edit-track-form"
+            disabled={isUploading}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-blue-600 hover:bg-blue-700' 
+                : 'bg-neutral-900 hover:bg-neutral-900/90'
+            )}
+          >
+            {isUploading ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Edit Album Modal
+interface EditAlbumModalProps {
+  album: Album | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (albumId: string, formData: FormData) => Promise<void>;
+  theme?: "light" | "dark";
+}
+
+export function EditAlbumModal({
+  album,
+  isOpen,
+  onClose,
+  onSubmit,
+  theme = "light",
+}: EditAlbumModalProps) {
+  const [formData, setFormData] = useState<Partial<Album>>({});
+  const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    if (album) {
+      setFormData({
+        title: album.title || '',
+        releaseDate: album.releaseDate ? new Date(album.releaseDate).toISOString().split('T')[0] : '',
+        type: album.type || 'ALBUM',
+      });
+    } else {
+      setFormData({});
+    }
+  }, [album, isOpen]);
+
+  if (!isOpen || !album) {
+    return null;
+  }
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!album) return;
+
+    const form = new FormData();
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        form.append(key, value.toString()); 
+      }
+    });
+
+    try {
+      setIsUploading(true);
+      await onSubmit(album.id, form);
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update album');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={cn(
+        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
+      )}>
+        {/* Header */}
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full",
+                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
+              )}>
+                <AlbumIcon className={cn(
+                  "w-7 h-7",
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
+                )} strokeWidth={1.5} />
+              </div>
+              <div>
+                <DialogTitle className={cn(
+                  "text-lg font-bold",
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                )}>
+                  Edit Album
+                </DialogTitle>
+                <DialogDescription className={cn(
+                  "text-sm mt-1",
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
+                )}>
+                  Update album information
+                </DialogDescription>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className={cn(
+                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+              )}
+            >
+              <XIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} id="edit-album-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+            {/* Title */}
+            <div className="col-span-2 space-y-2">
+              <UILabel htmlFor="title" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Title
+              </UILabel>
+              <Input
+                id="title"
+                name="title"
+                value={formData.title || ''}
+                onChange={handleInputChange}
+                className={cn(
+                  "w-full",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+                placeholder="Enter album title"
+                required
+              />
+            </div>
+
+            {/* Album Type */}
+            <div className="col-span-2 space-y-2">
+              <UILabel htmlFor="type" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Album Type
+              </UILabel>
+              <select
+                id="type"
+                name="type"
+                value={formData.type || 'ALBUM'}
+                onChange={handleInputChange}
+                className={cn(
+                  "w-full h-9 rounded-md px-3 py-2 text-sm border",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                )}
+              >
+                <option value="ALBUM">Album</option>
+                <option value="EP">EP</option>
+                <option value="SINGLE">Single</option>
+              </select>
+            </div>
+
+            {/* Release Date */}
+            <div className="col-span-2 space-y-2">
+              <UILabel htmlFor="releaseDate" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+                Release Date
+              </UILabel>
+              <Input
+                id="releaseDate"
+                name="releaseDate"
+                type="date"
+                value={formData.releaseDate || ''}
+                onChange={handleInputChange}
+                className={cn(
+                  "w-full",
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                )}
+              />
+            </div>
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className={cn(
+          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+          theme === 'dark'
+            ? 'border-gray-700 bg-gray-800'
+            : 'border-gray-100 bg-gray-50'
+        )}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
+                : 'bg-white hover:bg-gray-50 border-gray-300'
+            )}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="edit-album-form"
+            disabled={isUploading}
+            className={cn(
+              "flex-1 text-center justify-center",
+              theme === 'dark' 
+                ? 'bg-blue-600 hover:bg-blue-700' 
+                : 'bg-neutral-900 hover:bg-neutral-900/90'
+            )}
+          >
+            {isUploading ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -1,110 +1,41 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, use, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/utils/api";
 import type { ArtistProfile, Album, Track } from "@/types";
 import Image from "next/image";
-import { Star, Search, MoreVertical } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
-import { ArrowLeft, Trash2 } from "@/components/ui/Icons";
 import {
-  EditArtistModal,
-  AlbumDetailModal,
-  TrackDetailModal,
-} from "@/components/ui/data-table/data-table-modals";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import toast from "react-hot-toast";
+  ArrowLeft,
+  Edit,
+  Trash2,
+  Facebook,
+  Instagram,
+} from "@/components/ui/Icons";
+import { Button } from "@/components/ui/button";
+import { EditTrackModal, ConfirmDeleteModal, EditAlbumModal, EditArtistModal } from "@/components/ui/admin-modals";
+import toast from 'react-hot-toast';
 
-export default function ArtistDetail() {
-  const params = useParams();
-  const artistId = params?.id
-    ? Array.isArray(params.id)
-      ? params.id[0]
-      : params.id
-    : null;
+export default function ArtistDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id: artistId } = use(params);
   const router = useRouter();
   const { theme } = useTheme();
   const [artist, setArtist] = useState<ArtistProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterText, setFilterText] = useState("");
-  const [showAll, setShowAll] = useState({ albums: false, tracks: false });
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
-  const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
-  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
-  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
+  const [isEditArtistModalOpen, setIsEditArtistModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'albums' | 'tracks'>('albums');
 
-  const searchParams = useSearchParams();
+  // State for modals
+  const [isEditTrackModalOpen, setIsEditTrackModalOpen] = useState(false);
+  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
+  const [isEditAlbumModalOpen, setIsEditAlbumModalOpen] = useState(false);
+  const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string; type: 'album' | 'track' } | null>(null);
 
-  // Helper function to safely access searchParams
-  const safeGetParam = (key: string): string | null => {
-    return searchParams?.get(key) || null;
-  };
-
-  useEffect(() => {
-    const albumId = safeGetParam("album");
-    if (albumId && artist && artist.albums) {
-      const album = artist.albums.find((a) => {
-        return a.id.toString() === albumId;
-      });
-      if (album) {
-        setSelectedAlbum(album);
-        setIsAlbumModalOpen(true);
-      } else {
-        // Clear the state if album not found for this artist
-        setIsAlbumModalOpen(false); 
-      }
-    } else {
-      setIsAlbumModalOpen(false); // Close if no albumId
-    }
-
-    const trackId = safeGetParam("track");
-    if (trackId && artist) {
-      let foundTrack: Track | undefined;
-      foundTrack = artist.tracks?.find((t) => t.id.toString() === trackId);
-      if (!foundTrack && artist.albums) {
-        for (const album of artist.albums) {
-          foundTrack = album.tracks?.find((t) => t.id.toString() === trackId);
-          if (foundTrack) break;
-        }
-      }
-
-      if (foundTrack) {
-        setSelectedTrack(foundTrack);
-        setIsTrackModalOpen(true);
-      } else {
-        // Clear the state if track not found for this artist
-        setIsTrackModalOpen(false);
-      }
-    } else {
-      setIsTrackModalOpen(false); // Close if no trackId
-    }
-  }, [searchParams, artist]); // Depend only on searchParams and artist
-
-  // Separate useEffect for closing the *other* modal when one opens
-  useEffect(() => {
-    if (isAlbumModalOpen) {
-      setIsTrackModalOpen(false);
-      setSelectedTrack(null);
-    }
-  }, [isAlbumModalOpen]);
-
-  useEffect(() => {
-    if (isTrackModalOpen) {
-      setIsAlbumModalOpen(false);
-      setSelectedAlbum(null);
-    }
-  }, [isTrackModalOpen]);
-
-  useEffect(() => {
-    const fetchArtist = async () => {
+  const fetchArtist = useCallback(async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem("userToken");
@@ -118,142 +49,123 @@ export default function ArtistDetail() {
         setArtist(data);
       } catch (err) {
         console.error("Error fetching artist:", err);
-        setError("Failed to load artist details");
+      setError(err instanceof Error ? err.message : "Failed to load artist details");
       } finally {
         setLoading(false);
       }
-    };
+  }, [artistId]);
 
+  useEffect(() => {
     if (artistId) fetchArtist();
     else {
       setError("Artist ID not found in URL");
       setLoading(false);
     }
-  }, [artistId]);
+  }, [artistId, fetchArtist]);
 
-  const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString("vi-VN");
+    } catch {
+      return "Invalid Date";
+    }
+  };
 
   const formatDuration = (seconds: number) => {
+    if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) {
+      return "0:00";
+    }
     const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
+    const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-  const filteredAlbums = useMemo(() => {
-    return (
-      artist?.albums?.filter((album) =>
-        album.title.toLowerCase().includes(filterText.toLowerCase())
-      ) || []
-    );
-  }, [artist?.albums, filterText]);
-
-  const sortedAlbums = useMemo(() => {
-    return [...filteredAlbums].sort(
-      (a, b) =>
-        new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
-    );
-  }, [filteredAlbums]);
-
-  const displayedAlbums = showAll.albums
-    ? sortedAlbums
-    : sortedAlbums.slice(0, 10);
-
-  const filteredSingles = useMemo(() => {
-    return (
-      artist?.tracks?.filter(
-        (track) =>
-          track.type === "SINGLE" &&
-          track.title.toLowerCase().includes(filterText.toLowerCase())
-      ) || []
-    );
-  }, [artist?.tracks, filterText]);
-
-  const sortedSingles = useMemo(() => {
-    return [...filteredSingles].sort(
-      (a, b) =>
-        new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
-    );
-  }, [filteredSingles]);
-
-  const displayedSingles = showAll.tracks
-    ? sortedSingles
-    : sortedSingles.slice(0, 10);
-
-  const sortedTracks = useMemo(
-    () =>
-      [
-        ...(artist?.tracks || []), // lấy tất cả tracks không thuộc album nào bằng spread operator
-        ...(artist?.albums || []).flatMap((album) => album.tracks), // lấy tất cả tracks thuộc album bằng flatMap
-      ].sort((a, b) => b.playCount - a.playCount), // sắp xếp theo playCount
-    [artist?.albums, artist?.tracks]
-  );
-
-  const handleDeleteTrack = async (trackId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this track? This action cannot be undone."
-      )
-    ) {
+  // Handler for submitting track edit
+  const handleEditTrackSubmit = async (trackId: string, formData: FormData) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
       return;
     }
-
     try {
-      const token = localStorage.getItem("userToken");
-      if (!token) {
-        toast.error("Authentication token not found");
-        return;
-      }
-
-      await api.tracks.delete(trackId, token);
-      toast.success("Track deleted successfully");
-
-      // Update the UI by removing the deleted track
-      if (artist) {
-        setArtist({
-          ...artist,
-          tracks: artist.tracks?.filter((track) => track.id !== trackId) || [],
-        });
-      }
-    } catch (error) {
-      console.error("Error deleting track:", error);
-      toast.error("Failed to delete track");
+      await api.tracks.update(trackId, formData, token);
+      toast.success('Track updated successfully!');
+      setIsEditTrackModalOpen(false);
+      setEditingTrack(null);
+      fetchArtist();
+    } catch (err: any) {
+      console.error('Error updating track:', err);
+      toast.error(err.message || 'Failed to update track.');
     }
   };
 
-  const handleDeleteAlbum = async (albumId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this album? This action cannot be undone."
-      )
-    ) {
+  // Handler for submitting album edit
+  const handleEditAlbumSubmit = async (albumId: string, formData: FormData) => {
+    const token = localStorage.getItem('userToken');
+      if (!token) {
+      toast.error('Authentication required.');
+        return;
+      }
+    try {
+      await api.albums.update(albumId, formData, token);
+      toast.success('Album updated successfully!');
+      setIsEditAlbumModalOpen(false);
+      setEditingAlbum(null);
+      fetchArtist();
+    } catch (err: any) {
+      console.error('Error updating album:', err);
+      toast.error(err.message || 'Failed to update album.');
+    }
+  };
+
+  // Handler for confirming deletion
+  const handleDeleteConfirm = async (ids: string[]) => {
+    if (!itemToDelete) return;
+
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      setIsDeleteModalOpen(false);
+      setItemToDelete(null);
       return;
     }
 
+    const { id, type, name } = itemToDelete;
+
     try {
-      const token = localStorage.getItem("userToken");
-      if (!token) {
-        toast.error("Authentication token not found");
-        return;
+      if (type === 'album') {
+        await api.albums.delete(id, token);
+        toast.success(`Album "${name}" deleted successfully.`);
+      } else if (type === 'track') {
+        await api.tracks.delete(id, token);
+        toast.success(`Track "${name}" deleted successfully.`);
       }
+      setIsDeleteModalOpen(false);
+      setItemToDelete(null);
+      fetchArtist();
+    } catch (err: any) {
+      console.error(`Error deleting ${type}:`, err);
+      toast.error(err.message || `Failed to delete ${type}.`);
+      setIsDeleteModalOpen(false);
+      setItemToDelete(null);
+    }
+  };
 
-      await api.albums.delete(albumId, token);
-      toast.success("Album deleted successfully");
-
-      // Update the UI by removing the deleted album
-      if (artist) {
-        setArtist({
-          ...artist,
-          albums: artist.albums?.filter((album) => album.id !== albumId) || [],
-        });
-      }
-    } catch (error) {
-      console.error("Error deleting album:", error);
-      toast.error("Failed to delete album");
+  // Handler for submitting artist edit
+  const handleEditArtistSubmit = async (artistId: string, formData: FormData) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      return;
+    }
+    try {
+      await api.admin.updateArtist(artistId, formData, token);
+      toast.success('Artist updated successfully!');
+      setIsEditArtistModalOpen(false);
+      fetchArtist(); // Refetch artist data
+    } catch (err: any) {
+      console.error('Error updating artist:', err);
+      toast.error(err.message || 'Failed to update artist.');
     }
   };
 
@@ -274,8 +186,9 @@ export default function ArtistDetail() {
   }
 
   return (
-    <div className="p-4 max-w-7xl mx-auto">
-      <div className="w-fit mb-6">
+    <div className="container mx-auto space-y-6 p-4 pb-20">
+      {/* Back Button */}
+      <div className="w-fit mb-2">
         <button
           onClick={() => router.back()}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
@@ -289,15 +202,16 @@ export default function ArtistDetail() {
         </button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6">
-        {/* Left column */}
-        <div className="w-full md:w-1/3">
+      {/* Artist Info Card */}
           <div
-            className={`${
+        className={`rounded-lg shadow-md p-6 mb-6 ${
               theme === "light" ? "bg-white" : "bg-gray-800"
-            } rounded-lg shadow-md overflow-hidden mb-6`}
+        }`}
           >
-            <div className="relative aspect-square">
+        <div className="flex flex-col md:flex-row gap-6 items-start">
+          {/* Avatar */}
+          <div className="w-full md:w-1/4 flex-shrink-0">
+            <div className="relative aspect-square rounded-lg overflow-hidden shadow-md">
               <Image
                 src={artist.avatar || "/placeholder.svg?height=300&width=300"}
                 alt={artist.artistName}
@@ -308,92 +222,8 @@ export default function ArtistDetail() {
             </div>
           </div>
 
-          <div
-            className={`${
-              theme === "light" ? "bg-white" : "bg-gray-800"
-            } rounded-lg shadow-md p-4`}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h2
-                className={`text-lg font-bold ${
-                  theme === "light" ? "text-gray-900" : "text-gray-100"
-                }`}
-              >
-                Top Tracks
-              </h2>
-              <div
-                className={`flex items-center text-sm ${
-                  theme === "light" ? "text-gray-900" : "text-gray-100"
-                }`}
-              >
-                <span className="mr-2">Popularity</span>
-                <span className="text-xs">|</span>
-                <span className="ml-2 text-blue-500">Top tracks</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {sortedTracks.slice(0, 10).map((track, index) => (
-                <div
-                  key={track.id}
-                  className={`flex items-center py-2 border-b ${
-                    theme === "light" ? "border-gray-100" : "border-gray-700"
-                  }`}
-                >
-                  <div
-                    className={`w-6 text-center ${
-                      theme === "light" ? "text-gray-500" : "text-gray-400"
-                    }`}
-                  >
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 ml-2">
-                    <div
-                      className={`font-medium ${
-                        theme === "light" ? "text-gray-900" : "text-gray-100"
-                      }`}
-                    >
-                      {track.title}
-                    </div>
-                    <div
-                      className={`text-xs ${
-                        theme === "light" ? "text-gray-500" : "text-gray-400"
-                      }`}
-                    >
-                      {track.album?.title || "Single"}
-                    </div>
-                  </div>
-                  <div
-                    className={`flex items-center gap-2 ${
-                      theme === "light" ? "text-gray-500" : "text-gray-400"
-                    } text-sm`}
-                  >
-                    <div className="flex items-center">
-                      {track.playCount > 2 ? (
-                        <Star className="w-4 h-4 fill-blue-500 text-blue-500 mr-1" />
-                      ) : track.playCount > 1 ? (
-                        <Star className="w-4 h-4 fill-gray-400 text-gray-400 mr-1" />
-                      ) : null}
-                      <span>{track.playCount.toLocaleString()}</span>
-                    </div>
-                    <div className="w-12 text-right">
-                      {formatDuration(track.duration)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right column */}
-        <div className="w-full md:w-2/3">
-          {/* Artist Info Card */}
-          <div
-            className={`${
-              theme === "light" ? "bg-white" : "bg-gray-800"
-            } rounded-lg shadow-md p-6 mb-6`}
-          >
+          {/* Details */}
+          <div className="w-full md:w-3/4">
             <div className="flex justify-between items-center mb-4">
               <h2
                 className={`text-3xl font-bold ${
@@ -402,112 +232,145 @@ export default function ArtistDetail() {
               >
                 {artist.artistName}
               </h2>
-              <MoreVertical
-                className={`cursor-pointer ${
-                  theme === "light" ? "text-gray-900" : "text-gray-100"
-                }`}
-                onClick={() => setIsEditModalOpen(true)}
-              />
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
+                  onClick={() => setIsEditArtistModalOpen(true)}
+                  aria-label={`Edit artist ${artist.artistName}`}
+                  disabled={loading}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4 mb-4">
+              {/* User Name */}
               {artist.user?.name && (
                 <div>
-                  <span
-                    className={`${
-                      theme === "light" ? "text-gray-500" : "text-gray-400"
-                    } text-sm`}
-                  >
-                    Name
+                  <span className={`text-sm font-medium ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
+                    User Name
                   </span>
-                  <p
-                    className={`${
-                      theme === "light" ? "text-gray-900" : "text-gray-100"
-                    }`}
-                  >
+                  <p className={`${theme === "light" ? "text-gray-900" : "text-gray-100"}`}>
                     {artist.user.name}
                   </p>
                 </div>
               )}
+
+              {/* Email */}
               {artist.user?.email && (
                 <div>
-                  <span
-                    className={`${
-                      theme === "light" ? "text-gray-500" : "text-gray-400"
-                    } text-sm`}
-                  >
+                  <span className={`text-sm font-medium ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
                     Email
                   </span>
-                  <p
-                    className={`${
-                      theme === "light" ? "text-gray-900" : "text-gray-100"
-                    }`}
-                  >
+                  <p className={`${theme === "light" ? "text-gray-900" : "text-gray-100"}`}>
                     {artist.user.email}
                   </p>
                 </div>
               )}
+
+              {/* Monthly Listeners */}
               {artist.monthlyListeners > 0 && (
                 <div>
-                  <span
-                    className={`${
-                      theme === "light" ? "text-gray-500" : "text-gray-400"
-                    } text-sm`}
-                  >
+                  <span className={`text-sm font-medium ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
                     Monthly Listeners
                   </span>
-                  <p
-                    className={`${
-                      theme === "light" ? "text-gray-900" : "text-gray-100"
-                    }`}
-                  >
+                  <p className={`${theme === "light" ? "text-gray-900" : "text-gray-100"}`}>
                     {artist.monthlyListeners.toLocaleString()}
                   </p>
                 </div>
               )}
+
+              {/* Verification Status */}
               {artist.isVerified !== undefined && (
                 <div>
-                  <span
-                    className={`${
-                      theme === "light" ? "text-gray-500" : "text-gray-400"
-                    } text-sm`}
-                  >
+                  <span className={`text-sm font-medium ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
                     Verification Status
                   </span>
-                  <p
-                    className={
-                      artist.isVerified ? "text-green-500" : "text-red-500"
-                    }
-                  >
+                  <p className={artist.isVerified ? "text-green-500" : "text-red-500"}>
                     {artist.isVerified ? "Verified" : "Not Verified"}
                   </p>
                 </div>
               )}
+
+               {/* Active Status */}
+               {artist.isActive !== undefined && (
+                 <div>
+                   <span className={`text-sm font-medium ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+                     Account Status
+                   </span>
+                   <p className={artist.isActive ? 'text-green-500' : 'text-red-500'}>
+                     {artist.isActive ? 'Active' : 'Inactive'}
+                   </p>
+                 </div>
+               )}
+               
+               {/* Created At */}
+               {artist.createdAt && (
+                <div>
+                  <span className={`text-sm font-medium ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+                    Joined
+                  </span>
+                  <p className={`${theme === 'light' ? 'text-gray-900' : 'text-gray-100'}`}>
+                    {formatDate(artist.createdAt)}
+                  </p>
+                </div>
+              )}
             </div>
+
+            {/* Bio */}
             {artist.bio && (
               <div className="mb-4">
-                <span
-                  className={`${
-                    theme === "light" ? "text-gray-500" : "text-gray-400"
-                  } text-sm`}
-                >
+                <span className={`text-sm font-medium ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
                   Bio
                 </span>
-                <p
-                  className={`mt-1 ${
-                    theme === "light" ? "text-gray-900" : "text-gray-100"
-                  }`}
-                >
+                <p className={`mt-1 text-sm ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'}`}>
                   {artist.bio}
                 </p>
               </div>
             )}
+
+            {/* Social Media  */}
+            {artist.socialMediaLinks && (artist.socialMediaLinks.facebook || artist.socialMediaLinks.instagram) && (
+              <div className="mb-4">
+                <span className={`text-sm font-medium ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+                  Social Media
+                </span>
+                <div className="flex flex-col space-y-1 mt-1">
+                  {artist.socialMediaLinks.facebook && (
+                    <div className="flex items-center gap-2">
+                      <Facebook className={`w-4 h-4 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`} />
+                      <a 
+                        href={artist.socialMediaLinks.facebook}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`text-sm hover:underline ${theme === 'light' ? 'text-blue-600' : 'text-blue-400'}`}
+                      >
+                        {artist.socialMediaLinks.facebook.replace(/^(https?:\/\/)?(www\.)?(facebook\.com|instagram\.com)\//, '')}
+                      </a>
+                    </div>
+                  )}
+                  {artist.socialMediaLinks.instagram && (
+                    <div className="flex items-center gap-2">
+                      <Instagram className={`w-4 h-4 ${theme === 'light' ? 'text-gray-600' : 'text-gray-400'}`} />
+                      <a 
+                        href={artist.socialMediaLinks.instagram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`text-sm hover:underline ${theme === 'light' ? 'text-blue-600' : 'text-blue-400'}`}
+                      >
+                        {artist.socialMediaLinks.instagram.replace(/^(https?:\/\/)?(www\.)?(facebook\.com|instagram\.com)\//, '')}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Genres */}
             {artist.genres && artist.genres.length > 0 && (
               <div>
-                <span
-                  className={`${
-                    theme === "light" ? "text-gray-500" : "text-gray-400"
-                  } text-sm`}
-                >
+                <span className={`text-sm font-medium ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
                   Genres
                 </span>
                 <div className="flex flex-wrap gap-2 mt-1">
@@ -516,8 +379,8 @@ export default function ArtistDetail() {
                       key={genreItem.genre.id}
                       className={`px-2 py-1 rounded-full text-xs ${
                         theme === "light"
-                          ? "bg-gray-100 text-gray-900"
-                          : "bg-gray-700 text-gray-100"
+                          ? "bg-gray-100 text-gray-800"
+                          : "bg-gray-700 text-gray-200"
                       }`}
                     >
                       {genreItem.genre.name}
@@ -527,325 +390,245 @@ export default function ArtistDetail() {
               </div>
             )}
           </div>
-
-          {/* Discography Section */}
-          <div
-            className={`${
-              theme === "light" ? "bg-white" : "bg-gray-800"
-            } rounded-lg shadow-md p-6`}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h2
-                className={`text-lg font-bold ${
-                  theme === "light" ? "text-gray-900" : "text-gray-100"
-                }`}
-              >
-                Discography{" "}
-                <span
-                  className={`${
-                    theme === "light" ? "text-gray-500" : "text-gray-400"
-                  } text-sm`}
-                >
-                  {(filteredAlbums.length || 0) + (filteredSingles.length || 0)}
-                </span>
-              </h2>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Filter discography"
-                  className={`pl-8 pr-4 py-1 rounded-full border ${
-                    theme === "light"
-                      ? "border-gray-300 text-gray-900 bg-white"
-                      : "border-gray-600 text-gray-100 bg-gray-700"
-                  }`}
-                  value={filterText}
-                  onChange={(e) => setFilterText(e.target.value)}
-                />
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               </div>
             </div>
 
-            {/* Albums Section */}
-            <div className="mb-8">
-              <div className="flex justify-between items-center mb-4">
-                <h3
-                  className={`text-sm font-medium ${
-                    theme === "light" ? "text-gray-900" : "text-gray-100"
-                  }`}
-                >
-                  Albums ({filteredAlbums.length})
-                </h3>
-                {filteredAlbums.length > 10 && (
+      {/* Tab Navigation */}
+      <div className="flex space-x-4 mb-4 border-b">
+        <button
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'albums'
+              ? `border-b-2 border-blue-500 ${theme === 'light' ? 'text-black' : 'text-white'}`
+              : `${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`
+          }`}
+          onClick={() => setActiveTab('albums')}
+        >
+          Albums ({artist.albums?.length || 0})
+        </button>
                   <button
-                    onClick={() =>
-                      setShowAll((prev) => ({ ...prev, albums: !prev.albums }))
-                    }
-                    className="text-sm text-blue-500 hover:underline"
-                  >
-                    {showAll.albums
-                      ? "Collapse"
-                      : `Showing all (${filteredAlbums.length})`}
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'tracks'
+              ? `border-b-2 border-blue-500 ${theme === 'light' ? 'text-black' : 'text-white'}`
+              : `${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`
+          }`}
+          onClick={() => setActiveTab('tracks')}
+        >
+          Tracks ({artist.tracks?.length || 0})
                   </button>
-                )}
               </div>
-              <div className="grid grid-cols-1 gap-4">
-                <div
-                  className={`grid grid-cols-12 text-xs font-medium ${
-                    theme === "light" ? "text-gray-500" : "text-gray-400"
-                  } border-b pb-2`}
-                >
-                  <div className="col-span-6">Title</div>
-                  <div className="col-span-2 text-center">Release Date</div>
-                  <div className="col-span-2 text-center">Duration</div>
-                  <div className="col-span-1 text-center">Plays</div>
-                  <div className="col-span-1"></div>
-                </div>
-                {displayedAlbums.map((album) => (
-                  <div
+
+      {/* Albums Table */}
+      {activeTab === 'albums' && (
+        <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
+          <table className={`w-full text-sm text-left ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <thead className={`text-xs uppercase ${theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-gray-50 text-gray-700'}`}>
+              <tr>
+                <th scope="col" className="py-3 px-6">Title</th>
+                <th scope="col" className="py-3 px-6">Release Date</th>
+                <th scope="col" className="py-3 px-6">Type</th>
+                <th scope="col" className="py-3 px-6">Tracks</th>
+                <th scope="col" className="py-3 px-6">Duration</th>
+                <th scope="col" className="py-3 px-6 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {artist.albums && artist.albums.length > 0 ? (
+                artist.albums.map((album) => (
+                  <tr 
                     key={album.id}
-                    className={`grid grid-cols-12 text-sm items-center ${
-                      theme === "light"
-                        ? "hover:bg-gray-100"
-                        : "hover:bg-gray-700"
-                    } cursor-pointer`}
-                    onClick={() => {
-                      setSelectedAlbum(album);
-                      setIsAlbumModalOpen(true);
-                    }}
+                    className={`border-b ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
                   >
-                    <div className="col-span-6 flex items-center gap-3">
+                    <td className={`py-4 px-6 font-medium whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                       <div className="flex items-center gap-3">
                         <img
-                          src={album.coverUrl}
+                          src={album.coverUrl || "/placeholder.svg"}
                           alt={album.title}
                           className="w-10 h-10 object-cover rounded"
                         />
-                        <div>
-                          <div
-                            className={`font-medium ${
-                              theme === "light"
-                                ? "text-gray-900"
-                                : "text-gray-100"
-                            }`}
-                          >
                             {album.title}
-                          </div>
-                          <div
-                            className={`text-xs ${
-                              theme === "light"
-                                ? "text-gray-500"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            {album.type}
-                          </div>
-                        </div>
                       </div>
+                    </td>
+                    <td className="py-4 px-6">{formatDate(album.releaseDate)}</td>
+                    <td className="py-4 px-6">{album.type}</td>
+                    <td className="py-4 px-6">{album.totalTracks}</td>
+                    <td className="py-4 px-6">{formatDuration(album.duration)}</td>
+                    <td className="py-4 px-6 text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
+                        aria-label={`Edit album ${album.title}`}
+                        onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setEditingAlbum(album);
+                            setIsEditAlbumModalOpen(true);
+                        }}
+                        disabled={loading}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ml-1 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
+                        aria-label={`Delete album ${album.title}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setItemToDelete({ id: album.id, name: album.title, type: 'album' });
+                            setIsDeleteModalOpen(true);
+                        }}
+                        disabled={loading}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="py-4 px-6 text-center">No albums found for this artist.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
                     </div>
-                    <div
-                      className={`col-span-2 text-center ${
-                        theme === "light" ? "text-gray-900" : "text-gray-100"
-                      }`}
-                    >
-                      {formatDate(album.releaseDate)}
-                    </div>
-                    <div
-                      className={`col-span-2 text-center ${
-                        theme === "light" ? "text-gray-900" : "text-gray-100"
-                      }`}
-                    >
-                      {formatDuration(album.duration)}
-                    </div>
-                    <div
-                      className={`col-span-1 text-center ${
-                        theme === "light" ? "text-gray-900" : "text-gray-100"
-                      }`}
-                    >
-                      {album.tracks
-                        .reduce((sum, track) => sum + track.playCount, 0)
-                        .toLocaleString()}
-                    </div>
-                    <div className="col-span-1 flex justify-center">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger>
-                          <MoreVertical className="h-4 w-4 cursor-pointer" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteAlbum(album.id)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete Album
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Singles Section */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3
-                  className={`text-sm font-medium ${
-                    theme === "light" ? "text-gray-900" : "text-gray-100"
-                  }`}
-                >
-                  Singles ({filteredSingles.length})
-                </h3>
-                {filteredSingles.length > 10 && (
-                  <button
-                    onClick={() =>
-                      setShowAll((prev) => ({ ...prev, tracks: !prev.tracks }))
-                    }
-                    className="text-sm text-blue-500 hover:underline"
-                  >
-                    {showAll.tracks
-                      ? "Collapse"
-                      : `Showing all (${filteredSingles.length})`}
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-4">
-                <div
-                  className={`grid grid-cols-12 text-xs font-medium ${
-                    theme === "light" ? "text-gray-500" : "text-gray-400"
-                  } border-b pb-2`}
-                >
-                  <div className="col-span-6">Title</div>
-                  <div className="col-span-2 text-center">Release Date</div>
-                  <div className="col-span-2 text-center">Duration</div>
-                  <div className="col-span-1 text-center">Plays</div>
-                  <div className="col-span-1"></div>
-                </div>
-                {displayedSingles.map((track) => (
-                  <div
+      )}
+      
+      {/* Tracks Table */}
+      {activeTab === 'tracks' && (
+        <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
+          <table className={`w-full text-sm text-left ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            <thead className={`text-xs uppercase ${theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-gray-50 text-gray-700'}`}>
+              <tr>
+                <th scope="col" className="py-3 px-6">Title</th>
+                <th scope="col" className="py-3 px-6">Album</th>
+                <th scope="col" className="py-3 px-6">Release Date</th>
+                <th scope="col" className="py-3 px-6">Duration</th>
+                <th scope="col" className="py-3 px-6">Plays</th>
+                <th scope="col" className="py-3 px-6 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {artist.tracks && artist.tracks.length > 0 ? (
+                artist.tracks.map((track) => (
+                  <tr 
                     key={track.id}
-                    className={`grid grid-cols-12 text-sm items-center ${
-                      theme === "light"
-                        ? "hover:bg-gray-50"
-                        : "hover:bg-gray-700"
-                    } cursor-pointer`}
-                    onClick={() => {
-                      setSelectedTrack(track);
-                      setIsTrackModalOpen(true);
-                    }}
+                    className={`border-b ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
                   >
-                    <div className="col-span-6 flex items-center gap-3">
+                    <td className={`py-4 px-6 font-medium whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                       <div className="flex items-center gap-3">
                         <img
-                          src={
-                            track.coverUrl ||
-                            "https://placehold.co/150x150?text=No+Cover"
-                          }
+                          src={track.coverUrl || "/placeholder.svg"}
                           alt={track.title}
                           className="w-10 h-10 object-cover rounded"
                         />
-                        <div>
-                          <div
-                            className={`font-medium ${
-                              theme === "light"
-                                ? "text-gray-900"
-                                : "text-gray-100"
-                            }`}
-                          >
                             {track.title}
-                          </div>
-                          <div
-                            className={`text-xs ${
-                              theme === "light"
-                                ? "text-gray-500"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            Single
-                          </div>
-                        </div>
                       </div>
-                    </div>
-                    <div
-                      className={`col-span-2 text-center ${
-                        theme === "light" ? "text-gray-900" : "text-gray-100"
-                      }`}
-                    >
-                      {formatDate(track.releaseDate)}
-                    </div>
-                    <div
-                      className={`col-span-2 text-center ${
-                        theme === "light" ? "text-gray-900" : "text-gray-100"
-                      }`}
-                    >
-                      {formatDuration(track.duration)}
-                    </div>
-                    <div
-                      className={`col-span-1 text-center ${
-                        theme === "light" ? "text-gray-900" : "text-gray-100"
-                      }`}
-                    >
-                      {track.playCount.toLocaleString()}
-                    </div>
-                    <div className="col-span-1 flex justify-center">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger>
-                          <MoreVertical className="h-4 w-4 cursor-pointer" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteTrack(track.id)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete Track
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {filteredAlbums.length === 0 && filteredSingles.length === 0 && (
-              <div
-                className={`text-center py-4 ${
-                  theme === "light" ? "text-gray-500" : "text-gray-400"
-                }`}
-              >
-                No items found matching "{filterText}"
-              </div>
-            )}
-          </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      {track.album ? track.album.title : "Single"}
+                    </td>
+                    <td className="py-4 px-6">{formatDate(track.releaseDate)}</td>
+                    <td className="py-4 px-6">{formatDuration(track.duration)}</td>
+                    <td className="py-4 px-6">{track.playCount.toLocaleString()}</td>
+                    <td className="py-4 px-6 text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
+                        aria-label={`Edit track ${track.title}`}
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setEditingTrack(track); 
+                          setIsEditTrackModalOpen(true); 
+                        }}
+                        disabled={loading}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ml-1 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
+                        aria-label={`Delete track ${track.title}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setItemToDelete({ id: track.id, name: track.title, type: 'track' });
+                            setIsDeleteModalOpen(true);
+                        }}
+                        disabled={loading}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="py-4 px-6 text-center">No tracks found for this artist.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
+      )}
 
-      {isEditModalOpen && (
+      {/* Edit Modal */}
+      {isEditArtistModalOpen && (
         <EditArtistModal
           artist={artist}
-          onClose={() => setIsEditModalOpen(false)}
-          onUpdate={(updatedArtist) =>
-            setArtist((prev) => (prev ? { ...prev, ...updatedArtist } : prev))
-          }
+          isOpen={isEditArtistModalOpen}
+          onClose={() => setIsEditArtistModalOpen(false)}
+          onSubmit={handleEditArtistSubmit}
           theme={theme}
         />
       )}
 
-      <AlbumDetailModal
-        album={selectedAlbum}
-        isOpen={isAlbumModalOpen}
-        onClose={() => setIsAlbumModalOpen(false)}
+      {/* Edit Track Modal */}
+      {isEditTrackModalOpen && editingTrack && (
+        <EditTrackModal
+          track={editingTrack}
+          isOpen={isEditTrackModalOpen}
+          onClose={() => {
+            setIsEditTrackModalOpen(false);
+            setEditingTrack(null);
+          }}
+          onSubmit={handleEditTrackSubmit}
+          theme={theme}
+        />
+      )}
+
+      {/* Edit Album Modal */}
+      {isEditAlbumModalOpen && editingAlbum && (
+          <EditAlbumModal
+            album={editingAlbum}
+            isOpen={isEditAlbumModalOpen}
+            onClose={() => {
+                setIsEditAlbumModalOpen(false);
+                setEditingAlbum(null);
+            }}
+            onSubmit={handleEditAlbumSubmit}
         theme={theme}
       />
+      )}
 
-      {isTrackModalOpen && selectedTrack && artistId && (
-        <TrackDetailModal
-          track={selectedTrack}
-          isOpen={isTrackModalOpen}
-          onClose={() => setIsTrackModalOpen(false)}
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && itemToDelete && (
+        <ConfirmDeleteModal
+          item={{
+            id: itemToDelete.id,
+            name: itemToDelete.name,
+            // ConfirmDeleteModal might not need email, adjust as necessary
+            email: '', // Provide a dummy or adjust modal if email not relevant
+          }}
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setItemToDelete(null);
+          }}
+          onConfirm={() => handleDeleteConfirm([itemToDelete.id])} // Pass ID in array if modal expects array
           theme={theme}
-          currentArtistId={artistId}
+          entityType={itemToDelete.type} // Pass the type (album/track)
         />
       )}
     </div>
