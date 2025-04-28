@@ -107,7 +107,7 @@ export default function SeeAllPage() {
                       alt={item.title}
                       width={160}
                       height={160}
-                      className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300"
+                      className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square"
                     />
                     <button className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3">
                       <Play className="w-6 h-6 text-white" fill="white" />
@@ -136,7 +136,7 @@ export default function SeeAllPage() {
                       alt={item.title}
                       width={160}
                       height={160}
-                      className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300"
+                      className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square"
                     />
                     <button className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3">
                       <Play className="w-6 h-6 text-white" fill="white" />
@@ -182,7 +182,7 @@ export default function SeeAllPage() {
                       alt={item.name}
                       width={160}
                       height={160}
-                      className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300"
+                      className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square"
                     />
                     <button className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3">
                       <Play className="w-6 h-6 text-white" fill="white" />
