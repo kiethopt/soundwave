@@ -71,10 +71,12 @@ export default function DiscoveryGenrePage({
           api.user.getGenreNewestTracks(id, storedToken),
           api.playlists.getUserSystemPlaylist(),
         ]);
+
+        const newestTrack = newest.filter((track: { type: string; }) => track.type === "SINGLE");
         setTopAlbums(albums);
         setTopTracks(tracks);
         setTopArtists(artists);
-        setNewestTracks(newest);
+        setNewestTracks(newestTrack);
         const sortedGenreSystemPlaylists = sortSystemPlaylists(systemPlaylists, id);
         console.log('Sorted Genre System Playlists:', sortedGenreSystemPlaylists);
         setGenreSystemPlaylists(sortedGenreSystemPlaylists);
@@ -327,7 +329,13 @@ export default function DiscoveryGenrePage({
                 <div
                   key={track.id}
                   className="rounded-xl group cursor-pointer transition-all duration-300"
-                  onClick={() => handleTrackPlay(track, 'topTracks', topTracks)}
+                  onClick={() => {
+                    if (track.album?.id) {
+                      router.push(`/album/${track.album.id}`);
+                    } else {
+                      router.push(`/track/${track.id}`);
+                    }
+                  }}
                 >
                   <div className="relative aspect-square rounded-md overflow-hidden mb-3">
                     <img
@@ -492,7 +500,13 @@ export default function DiscoveryGenrePage({
                 <div
                   key={track.id}
                   className="rounded-xl group cursor-pointer transition-all duration-300"
-                  onClick={() => handleTrackPlay(track, 'newestTracks', newestTracks)}
+                  onClick={() => {
+                    if (track.album?.id) {
+                      router.push(`/album/${track.album.id}`);
+                    } else {
+                      router.push(`/track/${track.id}`);
+                    }
+                  }}
                 >
                   <div className="relative aspect-square rounded-md overflow-hidden mb-3">
                     <img

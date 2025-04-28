@@ -27,7 +27,7 @@ export default function Home() {
     []
   );
   const [topTracks, setTopTracks] = useState<Track[]>([]);
-  const [userPlayHistory, setUserPlayHistory] = useState<History[]>([]);
+  const [userPlayHistory, setUserPlayHistory] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const {
     playTrack,
@@ -80,8 +80,6 @@ export default function Home() {
           setHotAlbums(hotAlbums || []);
           setUserPlayHistory(userPlayHistory || []);
           setTopTracks(topTracks || []);
-
-          console.log(userPlayHistory)
 
           // Process system playlists
           if (systemPlaylists && systemPlaylists.length > 0) {
@@ -599,7 +597,7 @@ export default function Home() {
       {trendingPlaylist && trendingPlaylist.tracks && (
         <Section
           title="Trending Hits"
-          viewAllLink={`/playlists/${trendingPlaylist.id}`}
+          viewAllLink={`/seeall/?type=trending-playlists`}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {trendingPlaylist.tracks.slice(0, 10).map((track, index) => (
@@ -663,7 +661,7 @@ export default function Home() {
       )}
 
       {/* New Releases Section - Horizontal scroll on mobile */}
-      <Section title="New Releases" viewAllLink="/browse/new-releases">
+      <Section title="New Releases" viewAllLink="/seeall?type=new-albums">
         <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
           {newestAlbums.slice(0, 8).map((album) => (
             <div
@@ -728,7 +726,7 @@ export default function Home() {
       </Section>
 
       {/* Popular Albums Section */}
-      <Section title="Everyone's Listening To..." viewAllLink="/browse/popular">
+      <Section title="Everyone's Listening To..." viewAllLink="/seeall?type=top-albums">
         <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
           {hotAlbums.slice(0, 8).map((album) => (
             <div
@@ -796,44 +794,48 @@ export default function Home() {
 
       {/* Update the dropdown menu in the Recently Played section */}
       {isAuthenticated && userPlayHistory.length > 0 && (
-        <Section title="Recently Played">
+        <Section title="Recently Played" viewAllLink="/seeall?type=recently-played">
           <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
-            {userPlayHistory
-              .filter((history): history is History & { track: Track } => !!history.track)
-              .map((history, index) => (
+            {userPlayHistory.slice(0, 8).map((track) => (
                 <div
-                  key={`${history.track.id}-${index}`}
+                  key={track.id}
                   className="cursor-pointer flex-shrink-0 w-40"
-                  onClick={() => router.push(`/track/${history.track.id}`)}
-                  onMouseEnter={() => setHoveredTrack(history.track.id)}
+                  onClick={() => {
+                    if (track.album?.id) {
+                      router.push(`/album/${track.album.id}`);
+                    } else {
+                      router.push(`/track/${track.id}`);
+                    }
+                  }}
+                  onMouseEnter={() => setHoveredTrack(track.id)}
                   onMouseLeave={() => setHoveredTrack(null)}
                 >
                   <div className="flex flex-col space-y-2">
                     <div className="relative aspect-square overflow-hidden rounded-lg">
                       <Image
-                        src={history.track.coverUrl || '/images/default-track.jpg'}
-                        alt={history.track.title}
+                        src={track.coverUrl || '/images/default-track.jpg'}
+                        alt={track.title}
                         fill
                         className="object-cover"
                       />
                       <div
                         className={`absolute inset-0 transition-all duration-150 ${
-                          hoveredTrack === history.track.id || isTrackPlaying(history.track.id)
+                          hoveredTrack === track.id || isTrackPlaying(track.id)
                             ? 'bg-black/30'
                             : 'bg-black/0'
                         }`}
                       ></div>
 
-                      {(hoveredTrack === history.track.id || isTrackPlaying(history.track.id)) && (
+                      {(hoveredTrack === track.id || isTrackPlaying(track.id)) && (
                         <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
                           <button
                             className="bg-black/50 rounded-full p-1.5 text-white hover:text-primary transition-colors"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handlePlayTrack(history.track, e);
+                              handlePlayTrack(track, e);
                             }}
                           >
-                            {isTrackPlaying(history.track.id) ? (
+                            {isTrackPlaying(track.id) ? (
                               <Pause className="w-4 h-4" />
                             ) : (
                               <Play className="w-4 h-4" />
@@ -844,10 +846,10 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="text-sm font-medium line-clamp-1">
-                        {history.track.title}
+                        {track.title}
                       </p>
                       <p className="text-xs text-muted-foreground line-clamp-1">
-                        {history.track.artist.artistName}
+                        {track.artist.artistName}
                       </p>
                     </div>
                   </div>

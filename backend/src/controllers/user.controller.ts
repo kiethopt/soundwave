@@ -453,3 +453,15 @@ export const setFollowVisibility = async (
     handleError(res, error, 'Set follow visibility');
   }
 }
+
+export const getPlayHistory = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const playHistory = await userService.getPlayHistory(req.user);
+    res.json(playHistory);
+  } catch (error) {
+    handleError(res, error, 'Get play history');
+  }
+}

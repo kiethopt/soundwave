@@ -647,7 +647,11 @@ function SearchContent() {
                             }`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/track/${track.id}`);
+                              if (track.album?.id) {
+                                router.push(`/album/${track.album.id}`);
+                              } else {
+                                router.push(`/track/${track.id}`);
+                              }
                             }}
                           >
                             {track.title}
@@ -811,7 +815,13 @@ function SearchContent() {
                   {results.tracks.map((track) => (
                     <div
                       key={track.id}
-                      onClick={() => router.push(`/track/${track.id}`)}
+                      onClick={() => {
+                        if (track.album?.id) {
+                          router.push(`/album/${track.album.id}`);
+                        } else {
+                          router.push(`/track/${track.id}`);
+                        }
+                      }}
                       className={`hidden md:block bg-white/5 p-4 rounded-lg group relative cursor-pointer
                       ${
                         currentlyPlaying === track.id

@@ -11,6 +11,7 @@ import { paginate } from '../utils/handle-utils';
 import { client, setCache } from '../middleware/cache.middleware';
 import * as emailService from './email.service';
 import { getIO } from '../config/socket';
+import * as trackService from './track.service'
 
 // Hàm helper để lấy ngày đầu tháng hiện tại
 const getMonthStartDate = (): Date => {
@@ -896,7 +897,7 @@ export const getRecommendedArtists = async (user: any) => {
 
   const genreIds = history
     .flatMap((h) => h.track?.artist.genres.map((g) => g.genre.id) || [])
-    .filter((id) => id !== null);
+    .filter((id): id is string => typeof id === 'string');
 
   const recommendedArtists = await prisma.artistProfile.findMany({
     where: {
@@ -1516,4 +1517,39 @@ export const setFollowVisibility = async (user: any, isPublic: boolean) => {
     where: { id: user.id },
     data: { followVisibility: isPublic },
   });
+};
+
+export const getPlayHistory = async (user: any) => {
+  if (!user) throw new Error('Unauthorized');
+
+  const history = await prisma.history.findMany({
+    where: {
+      userId: user.id,
+      type: HistoryType.PLAY,
+    },
+    select: {
+      id: true,
+      trackId: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
+  const trackIds = history.map(h => h.trackId).filter((id): id is string => typeof id === 'string');
+
+  // Fetch all tracks in one query for efficiency
+  const tracks = await prisma.track.findMany({
+    where: { id: { in: trackIds } },
+    select: searchTrackSelect,
+  });
+
+  // Map for quick lookup
+  const trackMap = new Map(tracks.map(track => [track.id, track]));
+
+  // Return history with full track info
+  return history
+    .filter(h => typeof h.trackId === 'string')
+    .map(h => trackMap.get(h.trackId as string))
+    .filter((track): track is NonNullable<typeof track> => track !== null);
 };

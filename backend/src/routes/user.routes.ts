@@ -24,6 +24,7 @@ import {
   getGenreTopArtists,
   getGenreNewestTracks,
   setFollowVisibility,
+  getPlayHistory,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -89,6 +90,7 @@ router.get('/topArtists', authenticate, getTopArtists);
 
 // Route lấy danh sách Album phổ biến nhất
 router.get('/topAlbums', authenticate, getTopAlbums);
+router.get('/playHistory', authenticate, getPlayHistory);
 
 router.get('/topAlbums/:id', authenticate, getUserTopAlbums);
 router.get('/topTracks/:id', authenticate, getUserTopTracks);
@@ -97,5 +99,6 @@ router.get('/genre/topAlbums/:id', authenticate, getGenreTopAlbums);
 router.get('/genre/topTracks/:id', authenticate, getGenreTopTracks);
 router.get('/genre/topArtists/:id', authenticate, getGenreTopArtists);
 router.get('/genre/newestTracks/:id', authenticate, getGenreNewestTracks);
+
 
 export default router;

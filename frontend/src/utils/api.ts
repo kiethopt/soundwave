@@ -697,6 +697,9 @@ export const api = {
         { method: "GET" },
         token
       ),
+      
+    getPlayHistory: async (token: string) =>
+      fetchWithAuth("/api/user/playHistory", { method: "GET" }, token),
   },
 
   artists: {

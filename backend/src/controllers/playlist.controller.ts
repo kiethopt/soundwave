@@ -6,6 +6,7 @@ import * as historyService from "../services/history.service"
 import { handleError } from "../utils/handle-utils"; // Import error handler
 import { PrismaClient, Prisma } from "@prisma/client";
 import prisma from "../config/db"; // Import configured prisma instance
+import { getPlayHistory } from '../services/user.service';
 
 // Tạo playlist mới
 export const createPlaylist: RequestHandler = async (
@@ -1290,7 +1291,7 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
           }),
           userService.getUserTopTracks(req.user),
           userService.getUserTopArtists(req.user),
-          historyService.getPlayHistoryService(req)
+          userService.getPlayHistory(req.user)
         ]);
 
         // Transform the data to match the expected format
@@ -1317,7 +1318,7 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
 
         responseData.userTopTracks = userTopTracks;
         responseData.userTopArtists = userTopArtists;
-        responseData.userPlayHistory = userPlayHistory.data;
+        responseData.userPlayHistory = userPlayHistory;
       } catch (error: any) {
         console.error("Error fetching user playlist data:", error);
       }

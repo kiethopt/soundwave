@@ -46,7 +46,7 @@ export const deleteAlbumById = async (id: string) => {
   });
 };
 
-export const getNewestAlbums = async (limit = 10) => {
+export const getNewestAlbums = async (limit = 20) => {
   return prisma.album.findMany({
     where: { isActive: true },
     orderBy: { releaseDate: 'desc' },
@@ -55,7 +55,7 @@ export const getNewestAlbums = async (limit = 10) => {
   });
 };
 
-export const getHotAlbums = async (limit = 10) => {
+export const getHotAlbums = async (limit = 20) => {
   return prisma.album.findMany({
     where: {
       isActive: true,

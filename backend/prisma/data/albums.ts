@@ -508,7 +508,7 @@ export const albums: AlbumData[] = [
   {
     artistName: 'Wren Evans',
     title: 'Chiều Hôm Ấy Anh Thấy Màu Đỏ',
-    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745729630/chieuhomay_ua3fnu.jpg',
+    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745807806/chieuhomay_qj4ql8.jpg',
     type: AlbumType.ALBUM,
     labelName: 'Universal Music Vietnam',
     genreNames: ['V-Pop', 'Pop Punk', 'Alternative'],
