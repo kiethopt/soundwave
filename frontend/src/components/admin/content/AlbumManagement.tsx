@@ -332,22 +332,6 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                   <th 
                     scope="col" 
                     className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
-                    onClick={() => handleSort('isActive')}
-                  >
-                    <div className="flex items-center">
-                      Status
-                      {sortConfig.key === 'isActive' ? (
-                        sortConfig.direction === 'asc' ?
-                          <ArrowUp className="ml-2 h-3 w-3" /> :
-                          <ArrowDown className="ml-2 h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    scope="col" 
-                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
                     onClick={() => handleSort('releaseDate')}
                   >
                     <div className="flex items-center">
@@ -387,14 +371,6 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                       </td>
                       <td className="py-4 px-6">{album.artist?.artistName || 'Unknown'}</td>
                       <td className="py-4 px-6">{album.type}</td>
-                      <td className="py-4 px-6">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${album.isActive
-                          ? (theme === 'dark' ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800')
-                          : (theme === 'dark' ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800')
-                        }`}>
-                          {album.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
                       <td className="py-4 px-6">{formatDate(album.releaseDate)}</td>
                       <td className="py-4 px-6">
                         <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -420,16 +396,6 @@ export const AlbumManagement: React.FC<AlbumManagementProps> = ({ theme }) => {
                             disabled={loading || actionLoading !== null}
                           >
                             <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`h-8 w-8 p-0 ${theme === 'dark' ? (album.isActive ? 'text-green-400 hover:text-green-300 hover:bg-green-500/20' : 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/20') : (album.isActive ? 'text-green-600 hover:text-green-700 hover:bg-green-100' : 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-100')}`}
-                            onClick={(e) => handleToggleVisibility(album.id, album.isActive, e)}
-                            aria-label={album.isActive ? `Hide album ${album.title}` : `Show album ${album.title}`}
-                            disabled={loading || actionLoading !== null || actionLoading === album.id}
-                          >
-                            {actionLoading === album.id ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div> : (album.isActive ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />)}
                           </Button>
                         </div>
                       </td>

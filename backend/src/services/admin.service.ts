@@ -1003,19 +1003,19 @@ export const updateAIModel = async (model?: string) => {
   try {
     // Validating model name
     const validModels = [
-      'gemini-2.5-pro-exp-03-25', // Newest experimental model
-      'gemini-2.0-flash', // Default model
-      'gemini-2.0-flash-lite', // Lighter version
-      'gemini-1.5-flash', // Older model - faster
-      'gemini-1.5-flash-8b', // Lighter older model
-      'gemini-1.5-pro', // Older but more complex reasoning
+      'gemini-2.5-flash-preview-04-17',
+      'gemini-2.5-pro-preview-03-25',
+      'gemini-2.0-flash', 
+      'gemini-2.0-flash-lite',
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-8b',
+      'gemini-1.5-pro',
     ];
 
-    const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash'; // Get current before potentially changing
+    const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
     const isEnabled = !!process.env.GEMINI_API_KEY;
 
-    // If no model is specified in the request, return current settings
-    if (model === undefined) { // Check for undefined instead of !model to allow empty string if needed
+    if (model === undefined) {
       return {
         success: true,
         message: 'Current AI model settings retrieved',
@@ -1034,9 +1034,9 @@ export const updateAIModel = async (model?: string) => {
       );
     }
 
-    // Determine .env path based on environment
+    // Xác định đường dẫn .env
     const envPath = process.env.NODE_ENV === 'production'
-        ? path.resolve(process.cwd(), '../.env') // Adjust if needed for prod structure
+        ? path.resolve(process.cwd(), '../.env')
         : path.resolve(process.cwd(), '.env');
 
     if (!fs.existsSync(envPath)) {
@@ -1082,57 +1082,4 @@ ${newLine}`; // Append if it doesn't exist
     // Or re-throw if the controller should handle it
     // throw error;
   }
-};
-
-// Cập nhật trạng thái bảo trì
-export const updateMaintenanceMode = async (enabled?: boolean): Promise<{enabled: boolean}> => {
-    try {
-        const envPath = process.env.NODE_ENV === 'production'
-            ? path.resolve(process.cwd(), '../.env')
-            : path.resolve(process.cwd(), '.env');
-
-        if (!fs.existsSync(envPath)) {
-            throw new Error(`.env file not found at ${envPath}`);
-        }
-
-        const currentStatus = process.env.MAINTENANCE_MODE === 'true';
-
-        // If enabled is undefined, return current status
-        if (enabled === undefined) {
-            return { enabled: currentStatus };
-        }
-
-        // If status isn't changing, do nothing
-        if (enabled === currentStatus) {
-             console.log(`[System] Maintenance mode already ${enabled ? 'enabled' : 'disabled'}.`);
-             return { enabled };
-        }
-
-        // Update .env file
-        let envContent = fs.readFileSync(envPath, 'utf8');
-        const regex = /MAINTENANCE_MODE=.*/;
-        const newLine = `MAINTENANCE_MODE=${enabled}`;
-
-        if (envContent.match(regex)) {
-            envContent = envContent.replace(regex, newLine);
-        } else {
-            envContent += `
-${newLine}`;
-        }
-        fs.writeFileSync(envPath, envContent);
-
-        // Update current process environment variable
-        process.env.MAINTENANCE_MODE = String(enabled);
-
-        console.log(
-            `[System] Maintenance mode ${enabled ? 'enabled' : 'disabled'}.`
-        );
-
-        return { enabled };
-    } catch (error) {
-        console.error('Error updating maintenance mode:', error);
-        // Return current status in case of error
-        const currentStatusAfterError = process.env.MAINTENANCE_MODE === 'true';
-        throw new Error(`Failed to update maintenance mode. Current status: ${currentStatusAfterError}`);
-    }
 };

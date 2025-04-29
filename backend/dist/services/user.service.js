@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
@@ -791,7 +791,7 @@ const getRecommendedArtists = async (user) => {
     });
     const genreIds = history
         .flatMap((h) => h.track?.artist.genres.map((g) => g.genre.id) || [])
-        .filter((id) => id !== null);
+        .filter((id) => typeof id === 'string');
     const recommendedArtists = await db_1.default.artistProfile.findMany({
         where: {
             isVerified: true,
@@ -1236,7 +1236,7 @@ const getGenreTopTracks = async (genreId) => {
         where: {
             isActive: true,
             genres: {
-                some: {
+                every: {
                     genreId,
                 },
             },
@@ -1263,7 +1263,7 @@ const getGenreNewestTracks = async (genreId) => {
         where: {
             isActive: true,
             genres: {
-                some: {
+                every: {
                     genreId,
                 },
             },
@@ -1328,4 +1328,32 @@ const setFollowVisibility = async (user, isPublic) => {
     });
 };
 exports.setFollowVisibility = setFollowVisibility;
+const getPlayHistory = async (user) => {
+    if (!user)
+        throw new Error('Unauthorized');
+    const history = await db_1.default.history.findMany({
+        where: {
+            userId: user.id,
+            type: client_1.HistoryType.PLAY,
+        },
+        select: {
+            id: true,
+            trackId: true,
+            createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+    });
+    const trackIds = history.map(h => h.trackId).filter((id) => typeof id === 'string');
+    const tracks = await db_1.default.track.findMany({
+        where: { id: { in: trackIds } },
+        select: prisma_selects_1.searchTrackSelect,
+    });
+    const trackMap = new Map(tracks.map(track => [track.id, track]));
+    return history
+        .filter(h => typeof h.trackId === 'string')
+        .map(h => trackMap.get(h.trackId))
+        .filter((track) => track !== null);
+};
+exports.getPlayHistory = getPlayHistory;
 //# sourceMappingURL=user.service.js.map

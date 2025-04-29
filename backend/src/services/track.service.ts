@@ -531,10 +531,6 @@ export const updateTrack = async (req: Request, id: string) => {
     type,
     trackNumber,
     albumId,
-    featuredArtists,
-    genreIds,
-    updateFeaturedArtists,
-    updateGenres,
     labelId,
   } = req.body;
 
@@ -544,8 +540,6 @@ export const updateTrack = async (req: Request, id: string) => {
       releaseDate: true,
       isActive: true,
       artistId: true,
-      featuredArtists: true,
-      genres: true,
       coverUrl: true,
       labelId: true,
     },
@@ -557,124 +551,150 @@ export const updateTrack = async (req: Request, id: string) => {
     throw new Error('You can only update your own tracks');
   }
 
-  const updateData: any = {};
+  const updateData: Prisma.TrackUpdateInput = {}; // Use Prisma type
 
-  if (title) updateData.title = title;
-  if (type) updateData.type = type;
-  if (trackNumber) updateData.trackNumber = Number(trackNumber);
-  if (albumId !== undefined) updateData.albumId = albumId || null;
+  // Handle basic field updates
+  if (title !== undefined) updateData.title = title;
+  if (type !== undefined) updateData.type = type;
+  if (trackNumber !== undefined) updateData.trackNumber = Number(trackNumber);
 
+  // Handle Album update using connect/disconnect
+  if (albumId !== undefined) {
+    if (albumId === null || albumId === '') {
+      updateData.album = { disconnect: true };
+    } else if (typeof albumId === 'string') {
+      // Optional: Validate album exists before connecting
+      const albumExists = await prisma.album.findUnique({ where: { id: albumId }, select: { id: true } });
+      if (!albumExists) throw new Error(`Invalid Album ID: ${albumId} does not exist`);
+      updateData.album = { connect: { id: albumId } };
+    } else {
+      throw new Error(`Invalid albumId type: expected string or null, got ${typeof albumId}`);
+    }
+  }
+
+  // Handle labelId update using connect/disconnect
   if (labelId !== undefined) {
-    if (typeof labelId !== 'string' && labelId !== null) {
+    if (labelId === null || labelId === '') {
+      updateData.label = { disconnect: true };
+    } else if (typeof labelId === 'string') {
+      const labelExists = await prisma.label.findUnique({ where: { id: labelId } });
+      if (!labelExists) throw new Error(`Invalid label ID: ${labelId} does not exist`);
+      updateData.label = { connect: { id: labelId } };
+    } else {
       throw new Error(`Invalid labelId type: expected string or null, got ${typeof labelId}`);
     }
-
-    if (labelId === null || labelId === '') {
-      updateData.labelId = null;
-    } else {
-      const labelExists = await prisma.label.findUnique({
-        where: { id: labelId },
-      });
-      if (!labelExists) throw new Error(`Invalid label ID: ${labelId} does not exist`);
-      updateData.labelId = labelId;
-    }
   }
 
+  // Handle cover file upload
   if (req.files && (req.files as any).coverFile) {
-    const coverFile = (req.files as any).coverFile[0];
-    const coverUpload = await uploadFile(coverFile.buffer, 'covers', 'image');
-    updateData.coverUrl = coverUpload.secure_url;
+      const coverFile = (req.files as any).coverFile[0];
+      const coverUpload = await uploadFile(coverFile.buffer, 'covers', 'image');
+      updateData.coverUrl = coverUpload.secure_url;
+  } else if (req.body.removeCover === 'true') { // Optional: Allow removing cover
+      updateData.coverUrl = null;
   }
 
-  if (releaseDate) {
-    const newReleaseDate = new Date(releaseDate);
-    const now = new Date();
-    updateData.isActive = newReleaseDate <= now;
-    updateData.releaseDate = newReleaseDate;
+  // Handle release date and isActive
+  if (releaseDate !== undefined) {
+      const newReleaseDate = new Date(releaseDate);
+      if (isNaN(newReleaseDate.getTime())) {
+          throw new Error('Invalid release date format');
+      }
+      const now = new Date();
+      updateData.isActive = newReleaseDate <= now;
+      updateData.releaseDate = newReleaseDate;
+  }
+  // Note: Add logic here if you want to update isActive independently via a separate field in req.body
+  if (req.body.isActive !== undefined) {
+      updateData.isActive = req.body.isActive === 'true' || req.body.isActive === true;
   }
 
   const updatedTrack = await prisma.$transaction(async (tx) => {
-    const updated = await tx.track.update({
+    await tx.track.update({
       where: { id },
-      data: updateData,
-      select: trackSelect,
+      data: updateData, 
     });
 
-    if (updateFeaturedArtists === 'true' || updateFeaturedArtists === true) {
-      await tx.trackArtist.deleteMany({
-        where: { trackId: id },
-      });
+    // --- Update Featured Artists ---
+    if (req.body.featuredArtists !== undefined) {
+        await tx.trackArtist.deleteMany({ where: { trackId: id } });
 
-      const artistsArray = !featuredArtists
-        ? []
-        : Array.isArray(featuredArtists)
-          ? featuredArtists.map((id: string) => id.trim()).filter(Boolean)
-          : typeof featuredArtists === 'string'
-            ? featuredArtists.split(',').map((id: string) => id.trim()).filter(Boolean)
+        const artistsInput = req.body.featuredArtists;
+        const artistsArray = !artistsInput
+            ? []
+            : Array.isArray(artistsInput)
+            ? artistsInput.map(String) 
+            : typeof artistsInput === 'string'
+            ? artistsInput.split(',').map((faId: string) => faId.trim()).filter(Boolean)
             : [];
 
-      if (artistsArray.length > 0) {
-        await tx.trackArtist.createMany({
-          data: artistsArray.map((artistId: string) => ({
-            trackId: id,
-            artistId: artistId.trim(),
-          })),
-          skipDuplicates: true,
-        });
-      }
-    }
+        if (artistsArray.length > 0) {
+            const existingArtists = await tx.artistProfile.findMany({
+                where: { id: { in: artistsArray } },
+                select: { id: true },
+            });
+            const validArtistIds = existingArtists.map(a => a.id);
+            const invalidArtistIds = artistsArray.filter(aId => !validArtistIds.includes(aId));
+            if (invalidArtistIds.length > 0) {
+                throw new Error(`Invalid featured artist IDs: ${invalidArtistIds.join(', ')}`);
+            }
 
-    if (updateGenres === 'true' || updateGenres === true) {
-      await tx.trackGenre.deleteMany({
-        where: { trackId: id },
-      });
-
-      let genresArray: string[] = [];
-      if (genreIds) {
-        if (Array.isArray(genreIds)) {
-          genresArray = genreIds.map((id: string) => id.trim()).filter(Boolean);
-        } else if (typeof genreIds === 'string') {
-          genresArray = genreIds.split(',').map((id: string) => id.trim()).filter(Boolean);
+            await tx.trackArtist.createMany({
+                data: validArtistIds.map((artistId: string) => ({
+                    trackId: id,
+                    artistId: artistId,
+                })),
+                skipDuplicates: true,
+            });
         }
-      }
-
-      // **Validation: Ensure at least one genre is provided if updating genres**
-      if (genresArray.length === 0) {
-          throw new Error("At least one genre is required when updating genres.");
-      }
-
-      // Check if provided genre IDs exist
-      const existingGenres = await tx.genre.findMany({
-        where: { id: { in: genresArray } },
-        select: { id: true },
-      });
-
-      const validGenreIds = existingGenres.map((genre) => genre.id);
-      const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
-
-      if (invalidGenreIds.length > 0) {
-        throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
-      }
-
-      await tx.trackGenre.createMany({
-        data: genresArray.map((genreId: string) => ({
-          trackId: id,
-          genreId: genreId.trim(),
-        })),
-        skipDuplicates: true,
-      });
     }
 
+    // --- Update Genres ---
+    if (req.body.genreIds !== undefined) {
+        await tx.trackGenre.deleteMany({ where: { trackId: id } });
+
+        const genresInput = req.body.genreIds;
+        let genresArray: string[] = [];
+        if (genresInput) {
+            if (Array.isArray(genresInput)) {
+                genresArray = genresInput.map(String).filter(Boolean);
+            } else if (typeof genresInput === 'string') {
+                genresArray = genresInput.split(',').map((gId: string) => gId.trim()).filter(Boolean);
+            }
+        }
+
+        if (genresArray.length > 0) {
+            // Check if provided genre IDs exist
+            const existingGenres = await tx.genre.findMany({
+                where: { id: { in: genresArray } },
+                select: { id: true },
+            });
+            const validGenreIds = existingGenres.map((genre) => genre.id);
+            const invalidGenreIds = genresArray.filter((gId) => !validGenreIds.includes(gId));
+            if (invalidGenreIds.length > 0) {
+                throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
+            }
+
+            await tx.trackGenre.createMany({
+                data: validGenreIds.map((genreId: string) => ({
+                    trackId: id,
+                    genreId: genreId,
+                })),
+                skipDuplicates: true,
+            });
+        }
+     
+    }
+
+    // Re-fetch the track within the transaction to get updated relations
     const finalUpdatedTrack = await tx.track.findUnique({
         where: { id },
-        select: trackSelect, // Ensure this includes genres and featuredArtists
+        select: trackSelect,
     });
-
     if (!finalUpdatedTrack) {
-        throw new Error("Failed to re-fetch track after updating relations.");
+      throw new Error("Failed to re-fetch track after updating relations.");
     }
-
-    return finalUpdatedTrack; // Return the track with updated relations from the transaction
+    return finalUpdatedTrack;
   });
 
   const io = getIO();

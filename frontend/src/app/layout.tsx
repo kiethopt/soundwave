@@ -8,14 +8,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Toaster } from 'react-hot-toast';
 import type React from 'react';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
-import { TrackProvider, useTrack } from '@/contexts/TrackContext';
+import { TrackProvider } from '@/contexts/TrackContext';
 import PlayerBar from '@/components/layout/PlayerBar/PlayerBar';
-import { MaintenanceProvider } from '@/contexts/MaintenanceContext';
-import { MaintenanceBanner } from '@/components/ui/MaintenanceBanner';
-import { useMaintenance } from '@/contexts/MaintenanceContext';
 import { BackgroundProvider, useBackground } from '@/contexts/BackgroundContext';
-import type { User } from '@/types';
-import { SessionProvider } from "@/contexts/SessionContext";
+import { SessionProvider, useSession } from "@/contexts/SessionContext";
 import { SocketProvider } from "@/contexts/SocketContext";
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
@@ -24,11 +20,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const { currentTrack } = useTrack();
-  const { isMaintenanceMode, isLoading } = useMaintenance();
   const { backgroundStyle } = useBackground();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userData, setUserData] = useState<User | null>(null);
+  const { user, isAuthenticated, loading } = useSession();
 
   const isAuthPage = useMemo(
     () =>
@@ -41,59 +34,22 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMounted(true);
-    const token = localStorage.getItem('userToken');
-    const storedUserData = localStorage.getItem('userData');
-    setIsAuthenticated(!!token);
-    
-    if (storedUserData) {
-      try {
-        setUserData(JSON.parse(storedUserData));
-      } catch (e) {
-        console.error("Error parsing user data in layout:", e);
-        setUserData(null);
-      }
-    } else {
-      setUserData(null);
-    }
-
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'userToken') {
-        setIsAuthenticated(!!localStorage.getItem('userToken'));
-      }
-      if (event.key === 'userData') {
-        const newUserData = localStorage.getItem('userData');
-        if (newUserData) {
-           try {
-             setUserData(JSON.parse(newUserData));
-           } catch (e) {
-             console.error("Error parsing updated user data in layout:", e);
-             setUserData(null);
-           }
-        } else {
-          setUserData(null);
-        }
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-
-  }, [pathname]);
+  }, []);
 
   useEffect(() => {
-    if (userData && pathname) {
+    if (user && pathname) {
       const isUserPage = (
         pathname === '/' ||
         pathname.startsWith('/search') ||
         pathname.startsWith('/discover') ||
-        pathname.startsWith('/playlist/') ||
+        pathname.startsWith('/playlists/') ||
         pathname.startsWith('/album/') ||
         pathname.startsWith('/genre/') ||
         (pathname.startsWith('/profile/') && pathname !== '/profile/me')
       );
 
-      const isAdmin = userData.role === 'ADMIN';
-      const isArtist = userData.currentProfile === 'ARTIST';
+      const isAdmin = user.role === 'ADMIN';
+      const isArtist = user.currentProfile === 'ARTIST';
 
       if (isUserPage && isAdmin) {
         console.log('Redirecting admin from user page:', pathname);
@@ -104,13 +60,13 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         router.push('/artist/dashboard');
       }
     }
-  }, [userData, pathname, router]);
+  }, [user, pathname, router]);
 
-  if (!mounted) {
+  if (!mounted || loading) {
     return null;
   }
 
-  const showPlayerBar = isAuthenticated && userData?.role !== 'ADMIN' && userData?.currentProfile === 'USER';
+  const showPlayerBar = isAuthenticated && user?.role !== 'ADMIN' && user?.currentProfile === 'USER';
 
   return (
     <div suppressHydrationWarning>
@@ -121,10 +77,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           suppressHydrationWarning
           className={`flex flex-col h-screen ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}
         >
-          {isMaintenanceMode && !isLoading && (
-            <div className="h-8" aria-hidden="true"></div>
-          )}
-
           <div className="md:hidden" suppressHydrationWarning>
             <Header
               isSidebarOpen={isSidebarOpen}
@@ -186,23 +138,23 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <ThemeProvider>
-        <SocketProvider>
-          <SessionProvider>
-            <TrackProvider>
-              <MaintenanceProvider>
-                <BackgroundProvider>
-                  <body className="bg-[#111]" suppressHydrationWarning>
-                    <MaintenanceBanner />
-                    <LayoutContent>{children}</LayoutContent>
-                    <Toaster position="top-center" />
-                  </body>
-                </BackgroundProvider>
-              </MaintenanceProvider>
-            </TrackProvider>
-          </SessionProvider>
-        </SocketProvider>
-      </ThemeProvider>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      </head>
+      <SocketProvider>
+        <SessionProvider>
+          <TrackProvider>
+            <ThemeProvider>
+              <BackgroundProvider>
+                <body className="bg-[#111]" suppressHydrationWarning>
+                  <LayoutContent>{children}</LayoutContent>
+                  <Toaster position="top-center" />
+                </body>
+              </BackgroundProvider>
+            </ThemeProvider>
+          </TrackProvider>
+        </SessionProvider>
+      </SocketProvider>
     </html>
   );
 }

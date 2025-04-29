@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'newjams-images.scdn.co',
+        hostname: 'image-cdn-ak.spotifycdn.com',
         port: '',
       },
       {

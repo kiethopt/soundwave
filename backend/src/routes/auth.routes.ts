@@ -8,7 +8,6 @@ import {
   resetPassword,
   switchProfile,
   logout,
-  getMaintenanceStatus,
   googleLogin,
   convertGoogleAvatar,
   getMe,
@@ -23,7 +22,6 @@ router.post('/login', login);
 router.post('/logout', authenticate, logout);
 router.post('/request-password-reset', requestPasswordReset);
 router.post('/reset-password', resetPassword);
-router.get('/maintenance-status', getMaintenanceStatus);
 router.get('/me', authenticate, getMe);
 
 // Route đăng ký admin (chỉ dành cho development)

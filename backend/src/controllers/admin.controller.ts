@@ -714,20 +714,6 @@ export const handleCacheStatus = async (
   }
 };
 
-// Lấy hoặc cập nhật trạng thái bảo trì - ADMIN only
-export const handleMaintenanceMode = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { enabled } = req.method === 'POST' ? req.body : {};
-    const result = await adminService.updateMaintenanceMode(enabled);
-    res.json(result);
-  } catch (error) {
-    handleError(res, error, 'Manage maintenance mode');
-  }
-};
-
 // Lấy và cập nhật trạng thái model AI - ADMIN only
 export const handleAIModelStatus = async (
   req: Request,

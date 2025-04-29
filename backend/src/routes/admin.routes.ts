@@ -19,7 +19,6 @@ import {
   updateArtist,
   handleCacheStatus,
   handleAIModelStatus,
-  handleMaintenanceMode,
   getSystemStatus,
 } from '../controllers/admin.controller';
 import * as genreController from '../controllers/genre.controller';
@@ -45,11 +44,7 @@ router
   .get(authenticate, authorize([Role.ADMIN]), handleCacheStatus)
   .post(authenticate, authorize([Role.ADMIN]), handleCacheStatus);
 
-// Cập nhật trạng thái bảo trì
-router
-  .route('/system/maintenance')
-  .get(authenticate, authorize([Role.ADMIN]), handleMaintenanceMode)
-  .post(authenticate, authorize([Role.ADMIN]), handleMaintenanceMode);
+// Cập nhật trạng thái bảo trì - REMOVED
 
 // Quản lý người dùng
 router.get('/users', authenticate, authorize([Role.ADMIN]), getAllUsers);

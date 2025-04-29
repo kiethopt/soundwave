@@ -124,6 +124,7 @@ export const trackSelect = {
   createdAt: true,
   updatedAt: true,
   artistId: true,
+  labelId: true,
   label: {
     select: {
       id: true,

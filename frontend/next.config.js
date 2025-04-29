@@ -15,6 +15,16 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'image-cdn-ak.spotifycdn.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'image-cdn-fa.spotifycdn.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'api.dicebear.com',
         port: '',
         pathname: '/7.x/pixel-art/**',

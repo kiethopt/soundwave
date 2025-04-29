@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.convertGoogleAvatar = exports.getMaintenanceStatus = exports.switchProfile = exports.resetPassword = exports.requestPasswordReset = exports.logout = exports.googleLogin = exports.login = exports.getMe = exports.register = exports.registerAdmin = exports.validateToken = void 0;
+exports.convertGoogleAvatar = exports.switchProfile = exports.resetPassword = exports.requestPasswordReset = exports.logout = exports.googleLogin = exports.login = exports.getMe = exports.register = exports.registerAdmin = exports.validateToken = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = __importDefault(require("../config/db"));
@@ -285,14 +285,6 @@ const login = async (req, res) => {
         });
         if (!user) {
             res.status(400).json({ message: "Invalid email/username or password" });
-            return;
-        }
-        const maintenanceMode = process.env.MAINTENANCE_MODE === "true";
-        if (maintenanceMode && user.role !== client_1.Role.ADMIN) {
-            res.status(503).json({
-                message: "The system is currently under maintenance. Please try again later.",
-                code: "MAINTENANCE_MODE",
-            });
             return;
         }
         if (!user.isActive) {
@@ -584,17 +576,6 @@ const switchProfile = async (req, res) => {
     }
 };
 exports.switchProfile = switchProfile;
-const getMaintenanceStatus = async (req, res) => {
-    try {
-        const maintenanceMode = process.env.MAINTENANCE_MODE === "true";
-        res.json({ enabled: maintenanceMode });
-    }
-    catch (error) {
-        console.error("Error getting maintenance status:", error);
-        res.status(500).json({ message: "Could not retrieve maintenance status" });
-    }
-};
-exports.getMaintenanceStatus = getMaintenanceStatus;
 const convertGoogleAvatar = async (req, res) => {
     try {
         const { googleAvatarUrl } = req.body;

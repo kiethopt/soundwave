@@ -78,7 +78,7 @@ const deleteAlbumById = async (id) => {
     });
 };
 exports.deleteAlbumById = deleteAlbumById;
-const getNewestAlbums = async (limit = 10) => {
+const getNewestAlbums = async (limit = 20) => {
     return db_1.default.album.findMany({
         where: { isActive: true },
         orderBy: { releaseDate: 'desc' },
@@ -87,7 +87,7 @@ const getNewestAlbums = async (limit = 10) => {
     });
 };
 exports.getNewestAlbums = getNewestAlbums;
-const getHotAlbums = async (limit = 10) => {
+const getHotAlbums = async (limit = 20) => {
     return db_1.default.album.findMany({
         where: {
             isActive: true,
@@ -113,7 +113,7 @@ const getAlbums = async (req) => {
         whereClause.OR = [
             { title: { contains: search, mode: 'insensitive' } },
             { artist: { artistName: { contains: search, mode: 'insensitive' } } },
-            { genres: { some: { genre: { name: { contains: search, mode: 'insensitive' } } } } },
+            { genres: { every: { genre: { name: { contains: search, mode: 'insensitive' } } } } },
         ];
     }
     const orderByClause = {};
@@ -350,7 +350,7 @@ const addTracksToAlbum = async (req) => {
 exports.addTracksToAlbum = addTracksToAlbum;
 const updateAlbum = async (req) => {
     const { id } = req.params;
-    const { title, releaseDate, type, genres, labelId } = req.body;
+    const { title, releaseDate, type, labelId } = req.body;
     const coverFile = req.file;
     const user = req.user;
     if (!user)
@@ -394,15 +394,16 @@ const updateAlbum = async (req) => {
             updateData.labelId = labelId;
         }
     }
-    if (genres !== undefined) {
+    if (req.body.genres !== undefined) {
         await db_1.default.albumGenre.deleteMany({ where: { albumId: id } });
-        const genresArray = !genres
+        const genresInput = req.body.genres;
+        const genresArray = !genresInput
             ? []
-            : Array.isArray(genres)
-                ? genres
-                : typeof genres === 'string'
-                    ? genres.split(',').map((g) => g.trim())
-                    : [genres];
+            : Array.isArray(genresInput)
+                ? genresInput.map(String).filter(Boolean)
+                : typeof genresInput === 'string'
+                    ? genresInput.split(',').map((g) => g.trim()).filter(Boolean)
+                    : [];
         if (genresArray.length > 0) {
             const existingGenres = await db_1.default.genre.findMany({
                 where: { id: { in: genresArray } },
@@ -414,11 +415,17 @@ const updateAlbum = async (req) => {
                 throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
             }
             updateData.genres = {
-                create: genresArray.map((genreId) => ({
-                    genre: { connect: { id: genreId.trim() } },
+                create: validGenreIds.map((genreId) => ({
+                    genre: { connect: { id: genreId } },
                 })),
             };
         }
+        else {
+            delete updateData.genres;
+        }
+    }
+    if (req.body.isActive !== undefined) {
+        updateData.isActive = req.body.isActive === 'true' || req.body.isActive === true;
     }
     const updatedAlbum = await db_1.default.album.update({
         where: { id },

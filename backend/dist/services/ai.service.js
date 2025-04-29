@@ -8,7 +8,6 @@ const generative_ai_1 = require("@google/generative-ai");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
 const client_1 = require("@prisma/client");
-const client_2 = require("@prisma/client");
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is not defined in environment variables");
@@ -28,87 +27,20 @@ catch (error) {
     throw new Error("Failed to initialize Gemini AI model. Please check your API key and model configuration.");
 }
 async function createEnhancedGenreFilter(genreInput) {
-    try {
-        const { mainGenreId, relatedGenres, subGenres, parentGenres } = await analyzeGenre(genreInput);
-        const allMainGenreIds = mainGenreId ? [mainGenreId] : [];
-        const allSubGenreIds = subGenres.map((g) => g.id);
-        const allRelatedGenreIds = relatedGenres.map((g) => g.id);
-        const allParentGenreIds = parentGenres.map((g) => g.id);
-        console.log(`[AI] Genre distribution for "${genreInput}":`);
-        if (allMainGenreIds.length > 0)
-            console.log(`[AI] - Main: ${allMainGenreIds.length} genres`);
-        if (allSubGenreIds.length > 0)
-            console.log(`[AI] - Sub: ${allSubGenreIds.length} genres`);
-        if (allRelatedGenreIds.length > 0)
-            console.log(`[AI] - Related: ${allRelatedGenreIds.length} genres`);
-        if (allParentGenreIds.length > 0)
-            console.log(`[AI] - Parent: ${allParentGenreIds.length} genres`);
-        const prioritizedGenreIds = [
-            ...allMainGenreIds,
-            ...allSubGenreIds,
-            ...allParentGenreIds,
-            ...allRelatedGenreIds,
-        ];
-        if (prioritizedGenreIds.length === 0) {
-            console.log(`[AI] No exact genre matches found, searching by name`);
-            const fallbackGenres = await db_1.default.genre.findMany({
-                where: {
-                    name: {
-                        contains: genreInput,
-                        mode: "insensitive",
-                    }
-                },
-                select: { id: true },
-            });
-            if (fallbackGenres.length > 0) {
-                return {
-                    genres: {
-                        some: {
-                            genreId: {
-                                in: fallbackGenres.map((g) => g.id),
-                            },
-                        },
-                    },
-                };
+    const { mainGenre, mainGenreId, relatedGenres, subGenres, parentGenres } = await analyzeGenre(genreInput);
+    const filter = mainGenreId ? {
+        genres: {
+            some: {
+                genreId: mainGenreId
             }
-            return {
-                genres: {
-                    some: {
-                        genre: {
-                            name: {
-                                contains: genreInput,
-                                mode: "insensitive",
-                            },
-                        },
-                    },
-                },
-            };
         }
-        return {
-            genres: {
-                some: {
-                    genreId: {
-                        in: prioritizedGenreIds,
-                    },
-                },
-            },
-        };
-    }
-    catch (error) {
-        console.error("[AI] Error creating enhanced genre filter:", error);
-        return {
-            genres: {
-                some: {
-                    genre: {
-                        name: {
-                            contains: genreInput,
-                            mode: "insensitive",
-                        },
-                    },
-                },
-            },
-        };
-    }
+    } : {};
+    console.log("[AI] Created genre filter:", {
+        mainGenre,
+        mainGenreId,
+        filter
+    });
+    return filter;
 }
 const generateAIPlaylist = async (userId, options = {}) => {
     let playlistId;
@@ -414,9 +346,9 @@ const generateAIPlaylist = async (userId, options = {}) => {
             popularRatio = 0.2;
         }
         else if (!hasMoodParam && hasGenreParam && !hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
-            artistRatio = 0.2;
-            genreRatio = 0.6;
-            popularRatio = 0.2;
+            artistRatio = 0;
+            genreRatio = 1;
+            popularRatio = 0;
         }
         else if (!hasMoodParam && hasGenreParam && hasArtistParam && !hasSongLengthParam && !hasReleaseTimeParam) {
             artistRatio = 1;
@@ -534,8 +466,8 @@ const generateAIPlaylist = async (userId, options = {}) => {
                     ...moodFilter,
                 },
                 orderBy: [
-                    { playCount: client_2.Prisma.SortOrder.desc },
-                    { createdAt: client_2.Prisma.SortOrder.desc },
+                    { playCount: client_1.Prisma.SortOrder.desc },
+                    { createdAt: client_1.Prisma.SortOrder.desc },
                 ],
                 take: artistTrackCount * 3,
             };
@@ -550,8 +482,8 @@ const generateAIPlaylist = async (userId, options = {}) => {
                         ...moodFilter,
                     },
                     orderBy: [
-                        { playCount: client_2.Prisma.SortOrder.desc },
-                        { createdAt: client_2.Prisma.SortOrder.desc },
+                        { playCount: client_1.Prisma.SortOrder.desc },
+                        { createdAt: client_1.Prisma.SortOrder.desc },
                     ],
                     take: remainingCount * 3,
                 };
@@ -582,7 +514,7 @@ const generateAIPlaylist = async (userId, options = {}) => {
                     id: { notIn: trackIds },
                     ...(options.basedOnGenre ? enhancedGenreFilter : targetGenreIds.length > 0 ? {
                         genres: {
-                            some: {
+                            every: {
                                 genreId: { in: targetGenreIds },
                             },
                         },
@@ -593,26 +525,17 @@ const generateAIPlaylist = async (userId, options = {}) => {
                         ? {
                             artist: {
                                 artistName: {
-                                    contains: options.basedOnArtist,
+                                    equals: options.basedOnArtist,
                                     mode: "insensitive",
                                 },
                             },
                         }
-                        :
-                            hasGenreParam && !hasArtistParam && trackIds.length > 0
-                                ? {
-                                    artistId: {
-                                        notIn: Array.from(new Set(trackIds
-                                            .map(id => {
-                                            const track = artistTracks.find(t => t.id === id);
-                                            return track?.artistId;
-                                        })
-                                            .filter(Boolean))),
-                                    },
-                                }
-                                : {}),
+                        : {}),
                 },
-                orderBy: [{ playCount: client_2.Prisma.SortOrder.desc }, { createdAt: client_2.Prisma.SortOrder.desc }],
+                orderBy: [
+                    { playCount: client_1.Prisma.SortOrder.desc },
+                    { createdAt: client_1.Prisma.SortOrder.desc },
+                ],
                 take: genreTrackCount * 3,
             };
             const genreTracks = await db_1.default.track.findMany(genreTracksQuery);
@@ -639,8 +562,8 @@ const generateAIPlaylist = async (userId, options = {}) => {
                     ...moodFilter,
                 },
                 orderBy: [
-                    { playCount: client_2.Prisma.SortOrder.desc },
-                    { createdAt: client_2.Prisma.SortOrder.desc }
+                    { playCount: client_1.Prisma.SortOrder.desc },
+                    { createdAt: client_1.Prisma.SortOrder.desc }
                 ],
                 take: remainingNeeded * 3,
             };
@@ -780,8 +703,8 @@ const generateAIPlaylist = async (userId, options = {}) => {
                                 }
                             },
                             orderBy: [
-                                { playCount: client_2.Prisma.SortOrder.desc },
-                                { createdAt: client_2.Prisma.SortOrder.desc }
+                                { playCount: client_1.Prisma.SortOrder.desc },
+                                { createdAt: client_1.Prisma.SortOrder.desc }
                             ],
                             take: replacementCount * 2,
                         };
@@ -1025,62 +948,85 @@ const generateDefaultPlaylistForNewUser = async (userId, options = {}) => {
 exports.generateDefaultPlaylistForNewUser = generateDefaultPlaylistForNewUser;
 async function getMoodFilter(mood) {
     const moodKeywords = {
-        happy: ['happy', 'joy', 'cheerful', 'upbeat', 'energetic', 'positive', 'sunny', 'bright'],
-        sad: ['sad', 'melancholy', 'depressing', 'down', 'emotional', 'heartbreak', 'tears'],
-        calm: ['calm', 'peaceful', 'relaxing', 'serene', 'tranquil', 'gentle', 'soothing'],
-        energetic: ['energetic', 'powerful', 'strong', 'intense', 'dynamic', 'power', 'force'],
-        romantic: ['romantic', 'love', 'passion', 'intimate', 'sweet', 'tender', 'affection'],
-        nostalgic: ['nostalgic', 'memories', 'retro', 'vintage', 'classic', 'old', 'remember'],
-        mysterious: ['mysterious', 'mystery', 'dark', 'enigmatic', 'secret', 'hidden', 'unknown'],
-        dreamy: ['dreamy', 'ethereal', 'atmospheric', 'ambient', 'floating', 'space', 'cloud'],
-        angry: ['angry', 'rage', 'furious', 'aggressive', 'intense', 'hate', 'frustrated'],
-        hopeful: ['hopeful', 'optimistic', 'inspiring', 'uplifting', 'motivation', 'dream', 'future']
+        happy: ['happy', 'joy', 'cheerful', 'upbeat', 'energetic', 'positive', 'sunny', 'bright', 'uplifting', 'fun', 'party', 'dance', 'celebrate', 'smile', 'laugh'],
+        sad: ['sad', 'melancholy', 'depressing', 'down', 'emotional', 'heartbreak', 'tears', 'cry', 'pain', 'lonely', 'missing', 'hurt', 'broken', 'sorrow', 'grief'],
+        calm: ['calm', 'peaceful', 'relaxing', 'serene', 'tranquil', 'gentle', 'soothing', 'quiet', 'meditation', 'zen', 'peace', 'soft', 'smooth', 'easy', 'light'],
+        energetic: ['energetic', 'powerful', 'strong', 'intense', 'dynamic', 'power', 'force', 'drive', 'pump', 'boost', 'high', 'rush', 'adrenaline', 'fast', 'loud'],
+        romantic: ['romantic', 'love', 'passion', 'intimate', 'sweet', 'tender', 'affection', 'heart', 'soul', 'forever', 'together', 'kiss', 'embrace', 'devotion', 'adore'],
+        nostalgic: ['nostalgic', 'memories', 'retro', 'vintage', 'classic', 'old', 'remember', 'past', 'yesterday', 'childhood', 'memory', 'throwback', 'throw back', 'old school'],
+        mysterious: ['mysterious', 'mystery', 'dark', 'enigmatic', 'secret', 'hidden', 'unknown', 'strange', 'weird', 'curious', 'enigma', 'puzzle', 'riddle', 'shadow', 'veil'],
+        dreamy: ['dreamy', 'ethereal', 'atmospheric', 'ambient', 'floating', 'space', 'cloud', 'dream', 'fantasy', 'magical', 'heavenly', 'celestial', 'cosmic', 'astral', 'ether'],
+        angry: ['angry', 'rage', 'furious', 'aggressive', 'intense', 'hate', 'frustrated', 'mad', 'angst', 'fury', 'wrath', 'outrage', 'violent', 'hostile', 'hostility'],
+        hopeful: ['hopeful', 'optimistic', 'inspiring', 'uplifting', 'motivation', 'dream', 'future', 'hope', 'faith', 'believe', 'trust', 'confidence', 'courage', 'strength', 'light']
+    };
+    const moodGenres = {
+        happy: ['pop', 'dance', 'disco', 'funk'],
+        sad: ['blues', 'soul', 'ballad', 'indie'],
+        calm: ['ambient', 'classical', 'jazz', 'acoustic'],
+        energetic: ['rock', 'metal', 'electronic', 'hip-hop'],
+        romantic: ['r&b', 'soul', 'jazz', 'pop'],
+        nostalgic: ['oldies', 'classic rock', 'folk', 'retro'],
+        mysterious: ['electronic', 'ambient', 'experimental', 'instrumental'],
+        dreamy: ['ambient', 'electronic', 'indie', 'alternative'],
+        angry: ['metal', 'rock', 'punk', 'hardcore'],
+        hopeful: ['gospel', 'pop', 'indie', 'alternative']
     };
     const normalizedMood = mood.toLowerCase().trim();
     let matchingKeywords = [];
+    let matchingCategory = '';
     for (const [category, keywords] of Object.entries(moodKeywords)) {
         if (keywords.some(keyword => normalizedMood.includes(keyword))) {
             matchingKeywords = keywords;
+            matchingCategory = category;
+            console.log(`[AI] Found mood category: ${category} with ${keywords.length} keywords`);
             break;
         }
     }
     if (matchingKeywords.length === 0) {
         matchingKeywords = [normalizedMood];
+        console.log(`[AI] No specific mood category found, using input mood: ${normalizedMood}`);
     }
-    return {
-        OR: [
-            {
-                title: {
-                    contains: matchingKeywords[0],
-                    mode: 'insensitive'
-                }
-            },
-            {
-                description: {
-                    contains: matchingKeywords[0],
-                    mode: 'insensitive'
-                }
-            },
-            {
-                genres: {
-                    some: {
-                        genre: {
-                            name: {
-                                contains: matchingKeywords[0],
-                                mode: 'insensitive'
-                            }
+    const selectedKeywords = matchingKeywords.slice(0, 5);
+    console.log(`[AI] Using keywords for mood filter: ${selectedKeywords.join(', ')}`);
+    const orConditions = selectedKeywords.flatMap(keyword => [
+        {
+            title: {
+                contains: keyword,
+                mode: client_1.Prisma.QueryMode.insensitive
+            }
+        },
+        {
+            genres: {
+                some: {
+                    genre: {
+                        name: {
+                            contains: keyword,
+                            mode: client_1.Prisma.QueryMode.insensitive
                         }
                     }
                 }
-            },
-            {
-                artist: {
-                    artistName: {
-                        contains: matchingKeywords[0],
-                        mode: 'insensitive'
+            }
+        }
+    ]);
+    if (matchingCategory && moodGenres[matchingCategory]) {
+        const genreConditions = moodGenres[matchingCategory].map(genre => ({
+            genres: {
+                some: {
+                    genre: {
+                        name: {
+                            contains: genre,
+                            mode: client_1.Prisma.QueryMode.insensitive
+                        }
                     }
                 }
             }
+        }));
+        orConditions.push(...genreConditions);
+    }
+    return {
+        AND: [
+            { isActive: true },
+            { OR: orConditions }
         ]
     };
 }
@@ -1093,14 +1039,11 @@ async function analyzeGenre(genreInput) {
     const foundSubGenres = [];
     const foundRelatedGenres = [];
     const foundParentGenres = [];
-    const exactGenre = await db_1.default.genre.findFirst({
-        where: {
-            name: {
-                equals: normalizedInput,
-                mode: "insensitive",
-            },
-        },
+    const allGenres = await db_1.default.genre.findMany({
+        select: { id: true, name: true },
     });
+    console.log(`[AI] Found ${allGenres.length} genres in database`);
+    const exactGenre = allGenres.find((genre) => genre.name.toLowerCase() === normalizedInput);
     if (exactGenre) {
         console.log(`[AI] Found exact genre match: ${exactGenre.name}`);
         mainGenre = exactGenre.name;
@@ -1111,14 +1054,7 @@ async function analyzeGenre(genreInput) {
             if (genre.toLowerCase() === normalizedInput ||
                 synonyms.some((s) => s.toLowerCase() === normalizedInput)) {
                 console.log(`[AI] Found genre from synonyms: ${genre}`);
-                const dbGenre = await db_1.default.genre.findFirst({
-                    where: {
-                        name: {
-                            equals: genre,
-                            mode: "insensitive",
-                        },
-                    },
-                });
+                const dbGenre = allGenres.find((g) => g.name.toLowerCase() === genre.toLowerCase());
                 if (dbGenre) {
                     mainGenre = dbGenre.name;
                     mainGenreId = dbGenre.id;
@@ -1127,29 +1063,60 @@ async function analyzeGenre(genreInput) {
             }
         }
         if (!mainGenre) {
-            const fuzzyResults = await db_1.default.genre.findMany({
-                where: {
-                    name: {
-                        contains: normalizedInput,
-                        mode: "insensitive",
-                    },
-                },
-                take: 5,
-            });
-            if (fuzzyResults.length > 0) {
-                let closestMatch = fuzzyResults[0];
-                let minDistance = levenshteinDistance(normalizedInput, closestMatch.name.toLowerCase());
-                for (const result of fuzzyResults) {
-                    const distance = levenshteinDistance(normalizedInput, result.name.toLowerCase());
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestMatch = result;
+            const keywordGenres = allGenres.filter((genre) => genre.name.toLowerCase().includes(normalizedInput));
+            if (keywordGenres.length > 0) {
+                let bestMatch = keywordGenres[0];
+                let bestScore = 0;
+                for (const genre of keywordGenres) {
+                    const genreName = genre.name.toLowerCase();
+                    let score = 0;
+                    if (genreName === normalizedInput) {
+                        score += 100;
+                    }
+                    else if (genreName.startsWith(normalizedInput)) {
+                        score += 80;
+                    }
+                    else if (genreName.endsWith(normalizedInput)) {
+                        score += 60;
+                    }
+                    else if (genreName.includes(normalizedInput)) {
+                        score += 40;
+                    }
+                    const lengthRatio = normalizedInput.length / genreName.length;
+                    if (lengthRatio > 0.8) {
+                        score += 20;
+                    }
+                    else if (lengthRatio > 0.5) {
+                        score += 10;
+                    }
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMatch = genre;
                     }
                 }
-                if (minDistance < 3) {
-                    console.log(`[AI] Found fuzzy match: ${closestMatch.name} (distance: ${minDistance})`);
-                    mainGenre = closestMatch.name;
-                    mainGenreId = closestMatch.id;
+                if (bestScore >= 40) {
+                    console.log(`[AI] Found best keyword match: ${bestMatch.name} (score: ${bestScore})`);
+                    mainGenre = bestMatch.name;
+                    mainGenreId = bestMatch.id;
+                }
+                else {
+                    const fuzzyResults = allGenres.filter((genre) => genre.name.toLowerCase().includes(normalizedInput.substring(0, 3)));
+                    if (fuzzyResults.length > 0) {
+                        let closestMatch = fuzzyResults[0];
+                        let minDistance = levenshteinDistance(normalizedInput, closestMatch.name.toLowerCase());
+                        for (const result of fuzzyResults) {
+                            const distance = levenshteinDistance(normalizedInput, result.name.toLowerCase());
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestMatch = result;
+                            }
+                        }
+                        if (minDistance < 2) {
+                            console.log(`[AI] Found fuzzy match: ${closestMatch.name} (distance: ${minDistance})`);
+                            mainGenre = closestMatch.name;
+                            mainGenreId = closestMatch.id;
+                        }
+                    }
                 }
             }
         }
@@ -1157,14 +1124,7 @@ async function analyzeGenre(genreInput) {
     if (mainGenre) {
         const subGenres = genreHierarchy[mainGenre.toLowerCase()] || [];
         for (const subGenre of subGenres) {
-            const dbSubGenre = await db_1.default.genre.findFirst({
-                where: {
-                    name: {
-                        equals: subGenre,
-                        mode: "insensitive",
-                    },
-                },
-            });
+            const dbSubGenre = allGenres.find((g) => g.name.toLowerCase() === subGenre.toLowerCase());
             if (dbSubGenre) {
                 foundSubGenres.push({
                     id: dbSubGenre.id,
@@ -1174,14 +1134,7 @@ async function analyzeGenre(genreInput) {
         }
         const related = relatedGenres[mainGenre.toLowerCase()] || [];
         for (const relatedGenre of related) {
-            const dbRelatedGenre = await db_1.default.genre.findFirst({
-                where: {
-                    name: {
-                        equals: relatedGenre,
-                        mode: "insensitive",
-                    },
-                },
-            });
+            const dbRelatedGenre = allGenres.find((g) => g.name.toLowerCase() === relatedGenre.toLowerCase());
             if (dbRelatedGenre) {
                 foundRelatedGenres.push({
                     id: dbRelatedGenre.id,
@@ -1191,14 +1144,7 @@ async function analyzeGenre(genreInput) {
         }
         for (const [parent, children] of Object.entries(genreHierarchy)) {
             if (children.some((child) => child.toLowerCase() === mainGenre.toLowerCase())) {
-                const dbParentGenre = await db_1.default.genre.findFirst({
-                    where: {
-                        name: {
-                            equals: parent,
-                            mode: "insensitive",
-                        },
-                    },
-                });
+                const dbParentGenre = allGenres.find((g) => g.name.toLowerCase() === parent.toLowerCase());
                 if (dbParentGenre) {
                     foundParentGenres.push({
                         id: dbParentGenre.id,
@@ -1251,6 +1197,7 @@ const genreHierarchy = {
         "j-pop",
         "power pop",
         "teen pop",
+        "V-Pop",
     ],
     "hip hop": [
         "trap",
@@ -1486,15 +1433,6 @@ const relatedGenres = {
     alternative: ["indie", "rock", "post-punk", "grunge", "shoegaze"],
     indie: ["alternative", "rock", "indie pop", "indie rock", "indie folk"],
     edm: ["electronic", "house", "techno", "trance", "dubstep"],
-};
-const genreVariations = {
-    rock: ["rock music", "rock and roll", "rocks"],
-    pop: ["popular", "pop music"],
-    "hip hop": ["hiphop", "rap", "hip-hop"],
-    electronic: ["electronica", "electronic music", "edm"],
-    classical: ["classic", "orchestra", "orchestral"],
-    ambient: ["ambient music", "atmospheric", "chill"],
-    jazz: ["jazzy", "jazz music"],
 };
 function levenshteinDistance(a, b) {
     const matrix = [];

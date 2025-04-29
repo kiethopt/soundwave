@@ -248,7 +248,7 @@ const getTracks = async (req) => {
             { album: { title: { contains: search, mode: 'insensitive' } } },
             {
                 genres: {
-                    some: {
+                    every: {
                         genre: {
                             name: { contains: search, mode: 'insensitive' },
                         },
@@ -460,15 +460,13 @@ const createTrack = async (req) => {
 };
 exports.createTrack = createTrack;
 const updateTrack = async (req, id) => {
-    const { title, releaseDate, type, trackNumber, albumId, featuredArtists, genreIds, updateFeaturedArtists, updateGenres, labelId, } = req.body;
+    const { title, releaseDate, type, trackNumber, albumId, labelId, } = req.body;
     const currentTrack = await db_1.default.track.findUnique({
         where: { id },
         select: {
             releaseDate: true,
             isActive: true,
             artistId: true,
-            featuredArtists: true,
-            genres: true,
             coverUrl: true,
             labelId: true,
         },
@@ -479,28 +477,38 @@ const updateTrack = async (req, id) => {
         throw new Error('You can only update your own tracks');
     }
     const updateData = {};
-    if (title)
+    if (title !== undefined)
         updateData.title = title;
-    if (type)
+    if (type !== undefined)
         updateData.type = type;
-    if (trackNumber)
+    if (trackNumber !== undefined)
         updateData.trackNumber = Number(trackNumber);
-    if (albumId !== undefined)
-        updateData.albumId = albumId || null;
-    if (labelId !== undefined) {
-        if (typeof labelId !== 'string' && labelId !== null) {
-            throw new Error(`Invalid labelId type: expected string or null, got ${typeof labelId}`);
+    if (albumId !== undefined) {
+        if (albumId === null || albumId === '') {
+            updateData.album = { disconnect: true };
         }
-        if (labelId === null || labelId === '') {
-            updateData.labelId = null;
+        else if (typeof albumId === 'string') {
+            const albumExists = await db_1.default.album.findUnique({ where: { id: albumId }, select: { id: true } });
+            if (!albumExists)
+                throw new Error(`Invalid Album ID: ${albumId} does not exist`);
+            updateData.album = { connect: { id: albumId } };
         }
         else {
-            const labelExists = await db_1.default.label.findUnique({
-                where: { id: labelId },
-            });
+            throw new Error(`Invalid albumId type: expected string or null, got ${typeof albumId}`);
+        }
+    }
+    if (labelId !== undefined) {
+        if (labelId === null || labelId === '') {
+            updateData.label = { disconnect: true };
+        }
+        else if (typeof labelId === 'string') {
+            const labelExists = await db_1.default.label.findUnique({ where: { id: labelId } });
             if (!labelExists)
                 throw new Error(`Invalid label ID: ${labelId} does not exist`);
-            updateData.labelId = labelId;
+            updateData.label = { connect: { id: labelId } };
+        }
+        else {
+            throw new Error(`Invalid labelId type: expected string or null, got ${typeof labelId}`);
         }
     }
     if (req.files && req.files.coverFile) {
@@ -508,71 +516,85 @@ const updateTrack = async (req, id) => {
         const coverUpload = await (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
         updateData.coverUrl = coverUpload.secure_url;
     }
-    if (releaseDate) {
+    else if (req.body.removeCover === 'true') {
+        updateData.coverUrl = null;
+    }
+    if (releaseDate !== undefined) {
         const newReleaseDate = new Date(releaseDate);
+        if (isNaN(newReleaseDate.getTime())) {
+            throw new Error('Invalid release date format');
+        }
         const now = new Date();
         updateData.isActive = newReleaseDate <= now;
         updateData.releaseDate = newReleaseDate;
     }
+    if (req.body.isActive !== undefined) {
+        updateData.isActive = req.body.isActive === 'true' || req.body.isActive === true;
+    }
     const updatedTrack = await db_1.default.$transaction(async (tx) => {
-        const updated = await tx.track.update({
+        await tx.track.update({
             where: { id },
             data: updateData,
-            select: prisma_selects_1.trackSelect,
         });
-        if (updateFeaturedArtists === 'true' || updateFeaturedArtists === true) {
-            await tx.trackArtist.deleteMany({
-                where: { trackId: id },
-            });
-            const artistsArray = !featuredArtists
+        if (req.body.featuredArtists !== undefined) {
+            await tx.trackArtist.deleteMany({ where: { trackId: id } });
+            const artistsInput = req.body.featuredArtists;
+            const artistsArray = !artistsInput
                 ? []
-                : Array.isArray(featuredArtists)
-                    ? featuredArtists.map((id) => id.trim()).filter(Boolean)
-                    : typeof featuredArtists === 'string'
-                        ? featuredArtists.split(',').map((id) => id.trim()).filter(Boolean)
+                : Array.isArray(artistsInput)
+                    ? artistsInput.map(String)
+                    : typeof artistsInput === 'string'
+                        ? artistsInput.split(',').map((faId) => faId.trim()).filter(Boolean)
                         : [];
             if (artistsArray.length > 0) {
+                const existingArtists = await tx.artistProfile.findMany({
+                    where: { id: { in: artistsArray } },
+                    select: { id: true },
+                });
+                const validArtistIds = existingArtists.map(a => a.id);
+                const invalidArtistIds = artistsArray.filter(aId => !validArtistIds.includes(aId));
+                if (invalidArtistIds.length > 0) {
+                    throw new Error(`Invalid featured artist IDs: ${invalidArtistIds.join(', ')}`);
+                }
                 await tx.trackArtist.createMany({
-                    data: artistsArray.map((artistId) => ({
+                    data: validArtistIds.map((artistId) => ({
                         trackId: id,
-                        artistId: artistId.trim(),
+                        artistId: artistId,
                     })),
                     skipDuplicates: true,
                 });
             }
         }
-        if (updateGenres === 'true' || updateGenres === true) {
-            await tx.trackGenre.deleteMany({
-                where: { trackId: id },
-            });
+        if (req.body.genreIds !== undefined) {
+            await tx.trackGenre.deleteMany({ where: { trackId: id } });
+            const genresInput = req.body.genreIds;
             let genresArray = [];
-            if (genreIds) {
-                if (Array.isArray(genreIds)) {
-                    genresArray = genreIds.map((id) => id.trim()).filter(Boolean);
+            if (genresInput) {
+                if (Array.isArray(genresInput)) {
+                    genresArray = genresInput.map(String).filter(Boolean);
                 }
-                else if (typeof genreIds === 'string') {
-                    genresArray = genreIds.split(',').map((id) => id.trim()).filter(Boolean);
+                else if (typeof genresInput === 'string') {
+                    genresArray = genresInput.split(',').map((gId) => gId.trim()).filter(Boolean);
                 }
             }
-            if (genresArray.length === 0) {
-                throw new Error("At least one genre is required when updating genres.");
+            if (genresArray.length > 0) {
+                const existingGenres = await tx.genre.findMany({
+                    where: { id: { in: genresArray } },
+                    select: { id: true },
+                });
+                const validGenreIds = existingGenres.map((genre) => genre.id);
+                const invalidGenreIds = genresArray.filter((gId) => !validGenreIds.includes(gId));
+                if (invalidGenreIds.length > 0) {
+                    throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
+                }
+                await tx.trackGenre.createMany({
+                    data: validGenreIds.map((genreId) => ({
+                        trackId: id,
+                        genreId: genreId,
+                    })),
+                    skipDuplicates: true,
+                });
             }
-            const existingGenres = await tx.genre.findMany({
-                where: { id: { in: genresArray } },
-                select: { id: true },
-            });
-            const validGenreIds = existingGenres.map((genre) => genre.id);
-            const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
-            if (invalidGenreIds.length > 0) {
-                throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
-            }
-            await tx.trackGenre.createMany({
-                data: genresArray.map((genreId) => ({
-                    trackId: id,
-                    genreId: genreId.trim(),
-                })),
-                skipDuplicates: true,
-            });
         }
         const finalUpdatedTrack = await tx.track.findUnique({
             where: { id },
@@ -849,7 +871,7 @@ const getTracksByGenre = async (req, genreId) => {
         throw new Error('Genre not found');
     const whereClause = {
         genres: {
-            some: {
+            every: {
                 genreId: genreId,
             },
         },
@@ -915,7 +937,7 @@ const getTracksByTypeAndGenre = async (req, type, genreId) => {
     const whereClause = {
         type: type,
         genres: {
-            some: {
+            every: {
                 genreId: genreId,
             },
         },

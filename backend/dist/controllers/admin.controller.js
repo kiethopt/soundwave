@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSystemStatus = exports.handleAIModelStatus = exports.handleMaintenanceMode = exports.handleCacheStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
+exports.getSystemStatus = exports.handleAIModelStatus = exports.handleCacheStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenre = exports.updateGenre = exports.createGenre = exports.getArtistById = exports.getAllArtists = exports.deleteArtist = exports.deleteUser = exports.updateArtist = exports.updateUser = exports.getArtistRequestDetail = exports.getAllArtistRequests = exports.getUserById = exports.getAllUsers = void 0;
 const handle_utils_1 = require("../utils/handle-utils");
 const db_1 = __importDefault(require("../config/db"));
 const adminService = __importStar(require("../services/admin.service"));
@@ -595,17 +595,6 @@ const handleCacheStatus = async (req, res) => {
     }
 };
 exports.handleCacheStatus = handleCacheStatus;
-const handleMaintenanceMode = async (req, res) => {
-    try {
-        const { enabled } = req.method === 'POST' ? req.body : {};
-        const result = await adminService.updateMaintenanceMode(enabled);
-        res.json(result);
-    }
-    catch (error) {
-        (0, handle_utils_1.handleError)(res, error, 'Manage maintenance mode');
-    }
-};
-exports.handleMaintenanceMode = handleMaintenanceMode;
 const handleAIModelStatus = async (req, res) => {
     try {
         const { model } = req.body;

@@ -60,6 +60,7 @@ router.get('/newestTracks', auth_middleware_1.authenticate, user_controller_1.ge
 router.get('/topTracks', auth_middleware_1.authenticate, user_controller_1.getTopTracks);
 router.get('/topArtists', auth_middleware_1.authenticate, user_controller_1.getTopArtists);
 router.get('/topAlbums', auth_middleware_1.authenticate, user_controller_1.getTopAlbums);
+router.get('/playHistory', auth_middleware_1.authenticate, user_controller_1.getPlayHistory);
 router.get('/topAlbums/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopAlbums);
 router.get('/topTracks/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopTracks);
 router.get('/topArtists/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopArtists);

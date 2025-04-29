@@ -445,7 +445,6 @@ export interface PlaylistResponse {
 
 export interface SystemSettings {
   cacheEnabled: boolean;
-  maintenanceMode: boolean;
   debugMode: boolean;
   sessionTimeout: number;
   maxUploadSize: number;

@@ -3209,6 +3209,7 @@ export function EditTrackModal({
   theme = "light",
 }: EditTrackModalProps) {
   const [formData, setFormData] = useState<Partial<Track>>({});
+  const [isActive, setIsActive] = useState<boolean>(track?.isActive || false); // Add state for isActive
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
@@ -3219,8 +3220,10 @@ export function EditTrackModal({
         releaseDate: track.releaseDate ? new Date(track.releaseDate).toISOString().split('T')[0] : '',
         trackNumber: track.trackNumber || 1,
       });
+      setIsActive(track.isActive); // Set initial isActive state
     } else {
       setFormData({});
+      setIsActive(false);
     }
   }, [track, isOpen]);
 
@@ -3242,9 +3245,22 @@ export function EditTrackModal({
     const form = new FormData();
     Object.entries(formData).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        form.append(key, value.toString()); 
+        // Ensure releaseDate is sent in correct format if changed
+        if (key === 'releaseDate' && value) {
+            try {
+              form.append(key, new Date(value.toString()).toISOString());
+            } catch (err) {
+              console.error("Invalid date format for releaseDate");
+              toast.error("Invalid release date format.");
+              return; // Prevent submission with invalid date
+            }
+        } else {
+           form.append(key, value.toString());
+        }
       }
     });
+    // Append the isActive state
+    form.append('isActive', String(isActive));
 
     try {
       setIsUploading(true);
@@ -3287,12 +3303,12 @@ export function EditTrackModal({
                   "text-sm mt-1",
                   theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
                 )}>
-                  Update track information
+                  Update track information and status
                 </DialogDescription>
               </div>
             </div>
-
-            <button
+            {/* ... Close Button ... */}
+             <button
               type="button"
               onClick={onClose}
               aria-label="Close"
@@ -3305,11 +3321,10 @@ export function EditTrackModal({
             </button>
           </div>
         </div>
-
         {/* Form */}
         <form onSubmit={handleSubmit} id="edit-track-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-            {/* Title */}
+            {/* ... Title, Track Number, Duration, Release Date fields ... */}
             <div className="col-span-2 space-y-2">
               <UILabel htmlFor="title" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
                 Title
@@ -3329,8 +3344,6 @@ export function EditTrackModal({
                 required
               />
             </div>
-
-            {/* Track Number */}
             <div className="space-y-2">
               <UILabel htmlFor="trackNumber" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
                 Track Number
@@ -3351,9 +3364,7 @@ export function EditTrackModal({
                 placeholder="Enter track number"
               />
             </div>
-
-            {/* Duration */}
-            <div className="space-y-2">
+             <div className="space-y-2">
               <UILabel htmlFor="duration" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
                 Duration (seconds)
               </UILabel>
@@ -3374,9 +3385,7 @@ export function EditTrackModal({
                 placeholder="Enter duration in seconds"
               />
             </div>
-
-            {/* Release Date */}
-            <div className="col-span-2 space-y-2">
+             <div className="col-span-2 space-y-2">
               <UILabel htmlFor="releaseDate" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
                 Release Date
               </UILabel>
@@ -3387,18 +3396,34 @@ export function EditTrackModal({
                 value={formData.releaseDate || ''}
                 onChange={handleInputChange}
                 className={cn(
-                  "w-full flex items-center", // Add flex items-center
+                  "w-full flex items-center",
                   theme === 'dark' 
                     ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                 )}
               />
             </div>
+
+            {/* Is Active Switch */}
+            <div className="col-span-2 flex items-center justify-between rounded-lg border p-4 mt-2">
+              <div className="space-y-0.5">
+                <UILabel className="text-base">
+                  Track Status
+                </UILabel>
+                <p className="text-sm text-muted-foreground">
+                  {isActive ? "Track is visible and playable." : "Track is hidden from users."}
+                </p>
+              </div>
+              <Switch
+                checked={isActive}
+                onCheckedChange={setIsActive}
+                aria-label="Toggle track visibility"
+              />
+            </div>
           </div>
         </form>
-
-        {/* Footer */}
-        <div className={cn(
+        {/* ... Footer ... */}
+         <div className={cn(
           "px-6 py-4 flex gap-3 border-t flex-shrink-0",
           theme === 'dark'
             ? 'border-gray-700 bg-gray-800'
@@ -3453,6 +3478,7 @@ export function EditAlbumModal({
   theme = "light",
 }: EditAlbumModalProps) {
   const [formData, setFormData] = useState<Partial<Album>>({});
+  const [isActive, setIsActive] = useState<boolean>(album?.isActive || false); // Add state for isActive
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
@@ -3462,8 +3488,10 @@ export function EditAlbumModal({
         releaseDate: album.releaseDate ? new Date(album.releaseDate).toISOString().split('T')[0] : '',
         type: album.type || 'ALBUM',
       });
+      setIsActive(album.isActive); // Set initial isActive state
     } else {
       setFormData({});
+      setIsActive(false);
     }
   }, [album, isOpen]);
 
@@ -3485,9 +3513,22 @@ export function EditAlbumModal({
     const form = new FormData();
     Object.entries(formData).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        form.append(key, value.toString()); 
+        // Ensure releaseDate is sent in correct format if changed
+         if (key === 'releaseDate' && value) {
+            try {
+              form.append(key, new Date(value.toString()).toISOString());
+            } catch (err) {
+              console.error("Invalid date format for releaseDate");
+              toast.error("Invalid release date format.");
+              return; // Prevent submission with invalid date
+            }
+         } else {
+           form.append(key, value.toString());
+         }
       }
     });
+    // Append the isActive state
+    form.append('isActive', String(isActive));
 
     try {
       setIsUploading(true);
@@ -3530,11 +3571,11 @@ export function EditAlbumModal({
                   "text-sm mt-1",
                   theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
                 )}>
-                  Update album information
+                  Update album information and status
                 </DialogDescription>
               </div>
             </div>
-
+            {/* ... Close Button ... */}
             <button
               type="button"
               onClick={onClose}
@@ -3548,12 +3589,11 @@ export function EditAlbumModal({
             </button>
           </div>
         </div>
-
         {/* Form */}
         <form onSubmit={handleSubmit} id="edit-album-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-            {/* Title */}
-            <div className="col-span-2 space-y-2">
+            {/* ... Title, Album Type, Release Date fields ... */}
+             <div className="col-span-2 space-y-2">
               <UILabel htmlFor="title" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
                 Title
               </UILabel>
@@ -3572,9 +3612,7 @@ export function EditAlbumModal({
                 required
               />
             </div>
-
-            {/* Album Type */}
-            <div className="col-span-2 space-y-2">
+             <div className="col-span-2 space-y-2">
               <UILabel htmlFor="type" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
                 Album Type
               </UILabel>
@@ -3595,8 +3633,6 @@ export function EditAlbumModal({
                 <option value="SINGLE">Single</option>
               </select>
             </div>
-
-            {/* Release Date */}
             <div className="col-span-2 space-y-2">
               <UILabel htmlFor="releaseDate" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
                 Release Date
@@ -3615,10 +3651,26 @@ export function EditAlbumModal({
                 )}
               />
             </div>
+
+             {/* Is Active Switch */}
+            <div className="col-span-2 flex items-center justify-between rounded-lg border p-4 mt-2">
+              <div className="space-y-0.5">
+                <UILabel className="text-base">
+                  Album Status
+                </UILabel>
+                <p className="text-sm text-muted-foreground">
+                  {isActive ? "Album is visible to users." : "Album is hidden from users."}
+                </p>
+              </div>
+              <Switch
+                checked={isActive}
+                onCheckedChange={setIsActive}
+                aria-label="Toggle album visibility"
+              />
+            </div>
           </div>
         </form>
-
-        {/* Footer */}
+        {/* ... Footer ... */}
         <div className={cn(
           "px-6 py-4 flex gap-3 border-t flex-shrink-0",
           theme === 'dark'

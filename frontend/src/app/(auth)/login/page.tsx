@@ -49,7 +49,6 @@ function LoginForm() {
         if (response.token && response.user) {
           // Lưu token và thông tin user
           localStorage.setItem('userToken', response.token);
-          localStorage.setItem('sessionId', response.sessionId);
           localStorage.setItem('userData', JSON.stringify(response.user));
 
           // Nếu Remember Me được chọn, lưu thông tin đăng nhập

@@ -351,7 +351,7 @@ export const addTracksToAlbum = async (req: Request) => {
 
 export const updateAlbum = async (req: Request) => {
   const { id } = req.params;
-  const { title, releaseDate, type, genres, labelId } = req.body;
+  const { title, releaseDate, type, labelId } = req.body;
   const coverFile = req.file;
   const user = req.user;
 
@@ -399,16 +399,18 @@ export const updateAlbum = async (req: Request) => {
     }
   }
 
-  // Xử lý genres
-  if (genres !== undefined) {
+  // Xử lý genres only if explicitly provided in the request body
+  if (req.body.genres !== undefined) {
     await prisma.albumGenre.deleteMany({ where: { albumId: id } });
-    const genresArray = !genres
+
+    const genresInput = req.body.genres;
+    const genresArray = !genresInput
       ? []
-      : Array.isArray(genres)
-        ? genres
-        : typeof genres === 'string'
-          ? genres.split(',').map((g: string) => g.trim())
-          : [genres];
+      : Array.isArray(genresInput)
+      ? genresInput.map(String).filter(Boolean)
+      : typeof genresInput === 'string'
+      ? genresInput.split(',').map((g: string) => g.trim()).filter(Boolean)
+      : [];
 
     if (genresArray.length > 0) {
       const existingGenres = await prisma.genre.findMany({
@@ -420,12 +422,20 @@ export const updateAlbum = async (req: Request) => {
       if (invalidGenreIds.length > 0) {
         throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
       }
+
       updateData.genres = {
-        create: genresArray.map((genreId: string) => ({
-          genre: { connect: { id: genreId.trim() } },
+        create: validGenreIds.map((genreId: string) => ({
+          genre: { connect: { id: genreId } },
         })),
       };
+    } else {
+      delete updateData.genres;
     }
+  }
+
+  // Handle isActive independently if provided
+  if (req.body.isActive !== undefined) {
+    updateData.isActive = req.body.isActive === 'true' || req.body.isActive === true;
   }
 
   const updatedAlbum = await prisma.album.update({

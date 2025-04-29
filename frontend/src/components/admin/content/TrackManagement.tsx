@@ -235,9 +235,6 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      formData.append('updateFeaturedArtists', 'true');
-      formData.append('updateGenres', 'true');
-
       await api.tracks.update(trackId, formData, token);
       toast.success('Track updated successfully');
       closeEditModal();
@@ -332,22 +329,6 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                       )}
                     </div>
                   </th>
-                  <th 
-                    scope="col" 
-                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
-                    onClick={() => handleSort('isActive')}
-                  >
-                    <div className="flex items-center">
-                      Status
-                      {sortConfig.key === 'isActive' ? (
-                        sortConfig.direction === 'asc' ?
-                          <ArrowUp className="ml-2 h-3 w-3" /> :
-                          <ArrowDown className="ml-2 h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
                   <th scope="col" className="py-3 px-6 rounded-tr-md text-center">Actions</th>
                 </tr>
               </thead>
@@ -376,14 +357,6 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                       <td className="py-4 px-6">{track.album?.title || 'Single'}</td>
                       <td className="py-4 px-6">{formatDuration(track.duration)}</td>
                       <td className="py-4 px-6">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${track.isActive
-                          ? (theme === 'dark' ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800')
-                          : (theme === 'dark' ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800')
-                        }`}>
-                          {track.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
                         <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
@@ -407,16 +380,6 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                             disabled={loading || actionLoading !== null}
                           >
                             <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`h-8 w-8 p-0 ${theme === 'dark' ? (track.isActive ? 'text-green-400 hover:text-green-300 hover:bg-green-500/20' : 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/20') : (track.isActive ? 'text-green-600 hover:text-green-700 hover:bg-green-100' : 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-100')}`}
-                            onClick={(e) => handleToggleVisibility(track.id, track.isActive, e)}
-                            aria-label={track.isActive ? `Hide track ${track.title}` : `Show track ${track.title}`}
-                            disabled={loading || actionLoading !== null || actionLoading === track.id}
-                          >
-                            {actionLoading === track.id ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div> : (track.isActive ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />)}
                           </Button>
                         </div>
                       </td>

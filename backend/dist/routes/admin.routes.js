@@ -49,10 +49,6 @@ router
     .route('/system/cache')
     .get(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleCacheStatus)
     .post(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleCacheStatus);
-router
-    .route('/system/maintenance')
-    .get(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleMaintenanceMode)
-    .post(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleMaintenanceMode);
 router.get('/users', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllUsers);
 router.get('/users/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), cache_middleware_1.cacheMiddleware, admin_controller_1.getUserById);
 router.put('/users/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), upload_middleware_1.default.single('avatar'), admin_controller_1.updateUser);

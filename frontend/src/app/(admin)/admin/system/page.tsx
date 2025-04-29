@@ -15,6 +15,7 @@ import {
   XCircle,
   PowerOff,
   HelpCircle,
+  Loader2,
 } from 'lucide-react';
 import {
   Card,
@@ -59,7 +60,6 @@ export default function SystemManagementPage() {
   const [refreshing, setRefreshing] = useState<string | null>(null);
   const [settings, setSettings] = useState<SystemSettings>({
     cacheEnabled: false,
-    maintenanceMode: false,
     debugMode: false,
     sessionTimeout: 60,
     maxUploadSize: 10,
@@ -76,11 +76,10 @@ export default function SystemManagementPage() {
         if (!token) return;
 
         // Fetch settings and system status
-        const [cacheResponse, aiModelResponse, maintenanceResponse, statusResponse] =
+        const [cacheResponse, aiModelResponse, statusResponse] =
           await Promise.all([
             api.admin.getCacheStatus(token),
             api.admin.getAIModelStatus(token),
-            api.admin.getMaintenanceStatus(token),
             api.admin.getSystemStatus(token),
           ]);
 
@@ -89,16 +88,16 @@ export default function SystemManagementPage() {
         setSettings((prev) => ({
           ...prev,
           cacheEnabled: cacheResponse.enabled,
-          aiModel: aiModelResponse.data?.model || 'gemini-2.5-pro-exp-03-25',
+          aiModel: aiModelResponse.data?.model || 'gemini-2.0-flash',
           supportedAIModels: aiModelResponse.data?.validModels || [
-            'gemini-2.5-pro-exp-03-25',
-            'gemini-2.0-flash',
+            'gemini-2.5-flash-preview-04-17',
+            'gemini-2.5-pro-preview-03-25',
+            'gemini-2.0-flash', 
             'gemini-2.0-flash-lite',
             'gemini-1.5-flash',
             'gemini-1.5-flash-8b',
             'gemini-1.5-pro',
           ],
-          maintenanceMode: maintenanceResponse.enabled || false,
         }));
 
         // Set system statuses
@@ -134,9 +133,6 @@ export default function SystemManagementPage() {
       } else if (key === 'aiModel') {
         await api.admin.updateAIModelStatus(value, token);
         toast.success('AI model updated successfully');
-      } else if (key === 'maintenanceMode') {
-        await api.admin.updateMaintenanceStatus(value, token);
-        toast.success('Maintenance mode updated successfully');
       }
 
       setSettings((prev) => ({ ...prev, [key]: value }));
@@ -161,23 +157,15 @@ export default function SystemManagementPage() {
             System Settings
           </h1>
           <h2 className="text-sm sm:text-base text-secondary">
-            Manage system configuration and maintenance
+            Manage system configuration and status
           </h2>
         </div>
       </div>
 
+      {/* Content Area */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className="h-48 rounded-lg animate-pulse"
-              style={{
-                backgroundColor:
-                  theme === 'light' ? '#f9fafb' : 'rgba(255, 255, 255, 0.05)',
-              }}
-            />
-          ))}
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -354,74 +342,6 @@ export default function SystemManagementPage() {
                     generation
                   </span>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* System Mode Card */}
-          <Card
-            className={
-              theme === 'light' ? 'bg-white' : 'bg-zinc-900 border-zinc-700'
-            }
-          >
-            <CardHeader className="relative z-1">
-              <CardTitle className="flex items-center gap-2">
-                <Server className="h-5 w-5 text-purple-500" />
-                System Mode
-              </CardTitle>
-              <CardDescription>
-                Configure system operational modes
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 relative z-1">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Maintenance Mode</Label>
-                  <p
-                    className={`text-sm ${
-                      theme === 'light' ? 'text-gray-500' : 'text-gray-400'
-                    }`}
-                  >
-                    Temporarily disable user access for maintenance
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.maintenanceMode}
-                  onCheckedChange={(checked) =>
-                    updateSetting('maintenanceMode', checked)
-                  }
-                />
-              </div>
-
-              {/* Add Status Text */}
-              <div className="text-sm flex items-center gap-1.5">
-                <span className="font-medium">Status:</span>
-                <span
-                  className={settings.maintenanceMode ? 'text-orange-600' : 'text-green-600'}
-                >
-                  {settings.maintenanceMode ? 'Maintenance Enabled' : 'Operational'}
-                </span>
-              </div>
-
-              <Separator
-                className={theme === 'light' ? 'bg-gray-200' : 'bg-gray-700'}
-              />
-
-              <div
-                className={`
-                  flex items-center gap-2 mt-3 p-3 rounded-md
-                  ${
-                    theme === 'light'
-                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                      : 'bg-amber-950/30 text-amber-400 border border-amber-900'
-                  }
-                `}
-              >
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                <span className="text-xs font-medium">
-                  When enabled, only administrators can access the system. All
-                  other users will see a maintenance message.
-                </span>
               </div>
             </CardContent>
           </Card>

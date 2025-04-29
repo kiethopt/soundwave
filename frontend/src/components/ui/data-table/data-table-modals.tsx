@@ -101,52 +101,33 @@ export function EditTrackModal({
     e.preventDefault();
     if (!track) return;
 
-    // **Inline Validation Check for Genres**
+    // Validate genres
     if (selectedGenres.length === 0) {
-      setGenreError("This field is required");
-      return; // Stop submission
-    } else {
-      setGenreError(null); // Clear error if validation passes
+      setGenreError("Genre is required");
+      return;
     }
+    setGenreError(null);
 
     const formData = new FormData(e.currentTarget);
+    formData.delete('featuredArtists');
+    formData.delete('genreIds');
+    formData.delete('labelId');
+    formData.append('featuredArtists', selectedFeaturedArtists.join(','));
+    formData.append('genreIds', selectedGenres.join(','));
 
-    formData.delete("featuredArtists");
-    formData.delete("genreIds");
-    formData.delete("labelId");
-
-    // Gửi featuredArtists
-    selectedFeaturedArtists.forEach((artistId) => {
-      formData.append("featuredArtists", artistId);
-    });
-
-    // Gửi genreIds
-    if (selectedGenres.length > 0) {
-      // Validation ensures this
-      selectedGenres.forEach((genreId) => {
-        formData.append("genreIds", genreId);
-      });
-    }
-    // No need for else case, as validation prevents empty selection
-
-    // Gửi labelId
-    if (selectedLabelId) {
-      formData.append("labelId", selectedLabelId);
+    // Handle label ID
+    if (selectedLabelId === null) {
+      formData.append('labelId', '');
     } else {
-      formData.append("labelId", ""); // Gửi chuỗi rỗng nếu không có label
+      formData.append('labelId', selectedLabelId);
     }
 
-    // Đảm bảo updateGenres và updateFeaturedArtists luôn được gửi
-    formData.append("updateGenres", "true");
-    formData.append("updateFeaturedArtists", "true");
+    const coverFile = fileInputRef.current?.files?.[0];
+    if (!coverFile) {
+        formData.delete('coverFile');
+    }
 
-    console.log("Form data being sent:", {
-      genreIds: selectedGenres,
-      updateGenres: formData.get("updateGenres"),
-      labelId: formData.get("labelId"),
-    }); // Logging để debug
-
-    onSubmit(track.id, formData);
+    onSubmit(track.id, formData); 
   };
 
   return (
@@ -508,8 +489,10 @@ export function EditAlbumModal({
       formData.append("genres", genreId);
     });
 
-    // Thêm labelId nếu được chọn
-    if (selectedLabelId) {
+    // Thêm labelId nếu được chọn, hoặc chuỗi rỗng nếu không có label nào được chọn (null)
+    if (selectedLabelId === null) {
+      formData.append("labelId", ""); // Gửi chuỗi rỗng để backend hiểu là xóa label
+    } else {
       formData.append("labelId", selectedLabelId);
     }
 

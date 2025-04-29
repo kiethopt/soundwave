@@ -158,17 +158,6 @@ export const api = {
     logout: async (token: string) =>
       fetchWithAuth("/api/auth/logout", { method: "POST" }, token),
 
-    getMaintenanceStatus: async (): Promise<{ enabled: boolean }> => {
-      try {
-        return await fetchWithAuth("/api/auth/maintenance-status", {
-          method: "GET",
-        });
-      } catch (error) {
-        console.error("Failed to fetch maintenance status:", error);
-        return { enabled: false };
-      }
-    },
-
     googleLogin: async (data: { token: string }) =>
       fetchWithAuth("/api/auth/google-login", {
         method: "POST",
@@ -443,19 +432,6 @@ export const api = {
     updateCacheStatus: async (enabled: boolean, token: string) =>
       fetchWithAuth(
         "/api/admin/system/cache",
-        {
-          method: "POST",
-          body: JSON.stringify({ enabled }),
-        },
-        token
-      ),
-
-    getMaintenanceStatus: async (token: string) =>
-      fetchWithAuth("/api/admin/system/maintenance", { method: "GET" }, token),
-
-    updateMaintenanceStatus: async (enabled: boolean, token: string) =>
-      fetchWithAuth(
-        "/api/admin/system/maintenance",
         {
           method: "POST",
           body: JSON.stringify({ enabled }),

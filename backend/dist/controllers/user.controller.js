@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setFollowVisibility = exports.getGenreNewestTracks = exports.getGenreTopArtists = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
+exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreNewestTracks = exports.getGenreTopArtists = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
 const userService = __importStar(require("../services/user.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const socket_1 = require("../config/socket");
@@ -430,4 +430,14 @@ const setFollowVisibility = async (req, res) => {
     }
 };
 exports.setFollowVisibility = setFollowVisibility;
+const getPlayHistory = async (req, res) => {
+    try {
+        const playHistory = await userService.getPlayHistory(req.user);
+        res.json(playHistory);
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Get play history');
+    }
+};
+exports.getPlayHistory = getPlayHistory;
 //# sourceMappingURL=user.controller.js.map
