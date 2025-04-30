@@ -235,8 +235,6 @@ function GoogleLoginButton({ onError }: GoogleLoginButtonProps) {
           // Điều hướng đến trang tương ứng
           if (backendResponse.user.role === 'ADMIN') {
             window.location.href = '/admin/dashboard';
-          } else if (backendResponse.user.currentProfile === 'ARTIST') {
-            window.location.href = '/artist/dashboard';
           } else {
             window.location.href = '/';
           }

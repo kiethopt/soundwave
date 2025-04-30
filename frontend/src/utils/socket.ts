@@ -7,17 +7,22 @@ let socket: Socket | null = null;
 export const getSocket = (): Socket => {
   if (!socket) {
     socket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling']
     });
 
     socket.on('connect', () => {
+       console.log('🔌 Socket connected successfully with transport:', socket?.io.engine.transport.name);
     });
 
     socket.on('disconnect', (reason) => {
-      socket = null;
+       console.warn(`🔌 Socket disconnected: ${reason}`);
+       socket = null;
     });
 
     socket.on('connect_error', (err) => {
-      socket = null;
+       console.error('🔌 Socket connection error:', err.message);
+       console.error('   Error details:', err);
+       socket = null;
     });
   }
   return socket;

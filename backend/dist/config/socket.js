@@ -10,7 +10,8 @@ const initializeSocket = (server) => {
             origin: process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000",
             methods: ["GET", "POST"],
             credentials: true
-        }
+        },
+        transports: ['websocket', 'polling'],
     });
     io.on('connection', (socket) => {
         socket.on('register_user', (userId) => {

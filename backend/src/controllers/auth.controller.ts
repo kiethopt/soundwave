@@ -8,7 +8,6 @@ import { addHours } from "date-fns";
 import { userSelect } from "../utils/prisma-selects";
 import * as emailService from "../services/email.service";
 import * as aiService from "../services/ai.service";
-import { OAuth2Client } from "google-auth-library";
 import fetch from "node-fetch";
 import { uploadToCloudinary } from "../utils/cloudinary";
 
@@ -16,8 +15,6 @@ const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error("Missing JWT_SECRET in environment variables");
 }
-
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Hàm kiểm tra định dạng email
 const validateEmail = (email: string): string | null => {
@@ -47,7 +44,7 @@ const validateRegisterData = (data: any): string | null => {
 };
 
 // Helper function để tạo JWT token
-const generateToken = (userId: string, role: Role, artistProfile?: any) => {
+const generateToken = (userId: string, role: Role) => {
   return jwt.sign(
     {
       id: userId,
@@ -397,7 +394,7 @@ export const googleLogin = async (
       return;
     }
 
-    const { email, name, sub: googleId, picture: googleAvatarUrl } = userInfo;
+    const { email, name, picture: googleAvatarUrl } = userInfo;
 
     // Check if user exists
     let user = await prisma.user.findUnique({ where: { email } });

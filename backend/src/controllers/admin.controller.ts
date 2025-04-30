@@ -524,6 +524,7 @@ export const approveArtistRequest = async (
         isRead: false,
       },
     });
+
     // Send email
     if (updatedProfile.user.email) {
       try {
@@ -542,31 +543,9 @@ export const approveArtistRequest = async (
       );
     }
 
-    // --- Phát sự kiện Socket.IO --- 
-    try {
-        const io = getIO();
-        const userSockets = getUserSockets();
-        const targetUserId = updatedProfile.user.id;
-        const targetSocketId = userSockets.get(targetUserId);
-
-        if (targetSocketId) {
-            console.log(`🚀 Emitting artist_status_updated (approved) to user ${targetUserId} via socket ${targetSocketId}`);
-            io.to(targetSocketId).emit('artist_status_updated', {
-                status: 'approved',
-                message: 'Your request to become an Artist has been approved!',
-                artistProfile: updatedProfile
-            });
-        } else {
-            console.log(`Socket not found for user ${targetUserId}. Cannot emit update.`);
-        }
-    } catch (socketError) {
-        console.error('Failed to emit socket event for artist approval:', socketError);
-    }
-    // ---------------------------
-
     res.json({
       message: 'Artist role approved successfully',
-      user: updatedProfile.user, // Trả về thông tin user đã được cập nhật (nếu có)
+      user: updatedProfile.user, 
     });
   } catch (error) {
     if (
@@ -627,30 +606,9 @@ export const rejectArtistRequest = async (
       );
     }
 
-    // --- Phát sự kiện Socket.IO --- 
-    try {
-        const io = getIO();
-        const userSockets = getUserSockets();
-        const targetSocketId = userSockets.get(result.user.id);
-
-        if (targetSocketId) {
-            console.log(`🚀 Emitting artist_status_updated (rejected) to user ${result.user.id} via socket ${targetSocketId}`);
-            io.to(targetSocketId).emit('artist_status_updated', {
-                status: 'rejected',
-                message: notificationMessage, // Gửi cả lý do từ chối nếu có
-            });
-        } else {
-            console.log(`Socket not found for user ${result.user.id}. Cannot emit update.`);
-        }
-    } catch (socketError) {
-        console.error('Failed to emit socket event for artist rejection:', socketError);
-    }
-    // ---------------------------
-
     res.json({
       message: 'Artist role request rejected successfully',
-      // user: result.user, // Có thể không cần trả về user ở đây vì profile đã bị xóa
-      hasPendingRequest: result.hasPendingRequest, // = false
+      user: result.user,
     });
 
   } catch (error) {

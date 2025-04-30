@@ -1,17 +1,11 @@
 import prisma from '../config/db';
-import { HistoryType, Prisma } from '@prisma/client';
+import { HistoryType } from '@prisma/client';
 import { historySelect } from '../utils/prisma-selects';
 import { paginate } from 'src/utils/handle-utils';
 import { Request } from 'express';
 import { trackSelect } from '../utils/prisma-selects';
 import { albumSelect } from '../utils/prisma-selects';
-import { artistProfileSelect } from '../utils/prisma-selects';
-
-const suggestionSelect = {
-  track: { select: { ...trackSelect, artist: { select: { id: true, artistName: true } }, album: { select: { id: true, title: true, coverUrl: true } } } },
-  artist: { select: { id: true, artistName: true, avatar: true } },
-  album: { select: { ...albumSelect, artist: { select: { id: true, artistName: true } } } },
-};
+import { updateVibeRewindPlaylist } from './playlist.service';
 
 export const savePlayHistoryService = async (
   userId: string,
@@ -78,6 +72,13 @@ export const savePlayHistoryService = async (
         playCount: { increment: 1 },
       },
     });
+
+    // Trigger Vibe Rewind update nếu track được nghe hoàn tất
+    try {
+      await updateVibeRewindPlaylist(userId);
+    } catch (error) {
+      console.error(`[HistoryService] Error updating Vibe Rewind for user ${userId}:`, error);
+    }
   }
 
   return history;

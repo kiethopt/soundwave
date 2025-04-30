@@ -531,6 +531,35 @@ const updateTrack = async (req, id) => {
     if (req.body.isActive !== undefined) {
         updateData.isActive = req.body.isActive === 'true' || req.body.isActive === true;
     }
+    if (req.body.genres !== undefined) {
+        await db_1.default.trackGenre.deleteMany({ where: { trackId: id } });
+        const genresInput = req.body.genres;
+        const genresArray = !genresInput
+            ? []
+            : Array.isArray(genresInput)
+                ? genresInput.map(String).filter(Boolean)
+                : typeof genresInput === 'string'
+                    ? genresInput.split(',').map((g) => g.trim()).filter(Boolean)
+                    : [];
+        if (genresArray.length > 0) {
+            const existingGenres = await db_1.default.genre.findMany({
+                where: { id: { in: genresArray } },
+                select: { id: true },
+            });
+            const validGenreIds = existingGenres.map((genre) => genre.id);
+            const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
+            if (invalidGenreIds.length > 0) {
+                throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
+            }
+            updateData.genres = {
+                create: validGenreIds.map((genreId) => ({
+                    genre: { connect: { id: genreId } },
+                })),
+            };
+        }
+        else {
+        }
+    }
     const updatedTrack = await db_1.default.$transaction(async (tx) => {
         await tx.track.update({
             where: { id },
@@ -560,37 +589,6 @@ const updateTrack = async (req, id) => {
                     data: validArtistIds.map((artistId) => ({
                         trackId: id,
                         artistId: artistId,
-                    })),
-                    skipDuplicates: true,
-                });
-            }
-        }
-        if (req.body.genreIds !== undefined) {
-            await tx.trackGenre.deleteMany({ where: { trackId: id } });
-            const genresInput = req.body.genreIds;
-            let genresArray = [];
-            if (genresInput) {
-                if (Array.isArray(genresInput)) {
-                    genresArray = genresInput.map(String).filter(Boolean);
-                }
-                else if (typeof genresInput === 'string') {
-                    genresArray = genresInput.split(',').map((gId) => gId.trim()).filter(Boolean);
-                }
-            }
-            if (genresArray.length > 0) {
-                const existingGenres = await tx.genre.findMany({
-                    where: { id: { in: genresArray } },
-                    select: { id: true },
-                });
-                const validGenreIds = existingGenres.map((genre) => genre.id);
-                const invalidGenreIds = genresArray.filter((gId) => !validGenreIds.includes(gId));
-                if (invalidGenreIds.length > 0) {
-                    throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
-                }
-                await tx.trackGenre.createMany({
-                    data: validGenreIds.map((genreId) => ({
-                        trackId: id,
-                        genreId: genreId,
                     })),
                     skipDuplicates: true,
                 });
@@ -823,11 +821,47 @@ const getAllTracksAdminArtist = async (req) => {
             },
         };
     }
-    const result = await (0, exports.getTracks)(req);
-    return {
-        tracks: result.data,
-        pagination: result.pagination,
-    };
+    const conditions = [];
+    if (search) {
+        conditions.push({
+            OR: [
+                { title: { contains: String(search), mode: 'insensitive' } },
+                {
+                    artist: {
+                        artistName: { contains: String(search), mode: 'insensitive' },
+                    },
+                },
+            ],
+        });
+    }
+    if (status) {
+        conditions.push({ isActive: status === 'true' });
+    }
+    if (genres) {
+        const genreIds = Array.isArray(genres) ? genres.map((g) => String(g)) : [String(genres)];
+        conditions.push({
+            genres: {
+                some: {
+                    genreId: { in: genreIds },
+                },
+            },
+        });
+    }
+    if (conditions.length > 0)
+        whereClause.AND = conditions;
+    let orderBy = { releaseDate: 'desc' };
+    const { sortBy, sortOrder } = req.query;
+    const validSortFields = ['title', 'duration', 'playCount', 'isActive', 'releaseDate', 'trackNumber'];
+    if (sortBy && validSortFields.includes(String(sortBy))) {
+        const order = sortOrder === 'asc' ? 'asc' : 'desc';
+        orderBy = [{ [String(sortBy)]: order }, { id: 'asc' }];
+    }
+    const result = await (0, handle_utils_1.paginate)(db_1.default.track, req, {
+        where: whereClause,
+        select: prisma_selects_1.trackSelect,
+        orderBy: orderBy,
+    });
+    return { tracks: result.data, pagination: result.pagination };
 };
 exports.getAllTracksAdminArtist = getAllTracksAdminArtist;
 const getTrackById = async (req, id) => {

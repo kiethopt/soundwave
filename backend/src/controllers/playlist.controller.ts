@@ -377,10 +377,8 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       return;
     }
 
-    // Add a field to indicate if the user can edit this playlist
-    // Only ADMIN can edit SYSTEM playlists, and only owner can edit their playlists
     const canEdit =
-      isAuthenticated && // Must be authenticated to edit anything
+      isAuthenticated && 
       ((isSystemPlaylist && userRole === "ADMIN") ||
         (!isSystemPlaylist && playlist.userId === userId));
 
@@ -388,7 +386,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
     const formattedTracks = playlist.tracks.map((pt) => ({
       id: pt.track.id,
       title: pt.track.title,
-      audioUrl: pt.track.audioUrl, // Add this line to ensure audioUrl is included
+      audioUrl: pt.track.audioUrl,
       duration: pt.track.duration,
       coverUrl: pt.track.coverUrl,
       artist: pt.track.artist,

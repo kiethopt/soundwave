@@ -594,8 +594,42 @@ export const getAdminAllAlbums = async (req: Request) => {
 
   if (conditions.length > 0) whereClause.AND = conditions;
 
-  const result = await getAlbums(req);
-  return { albums: result.data, pagination: result.pagination };
+  // Determine sorting
+  let orderBy: Prisma.AlbumOrderByWithRelationInput | Prisma.AlbumOrderByWithRelationInput[] = { releaseDate: 'desc' }; // Default sort
+  const { sortBy, sortOrder } = req.query;
+  const validSortFields = ['title', 'type', 'totalTracks', 'isActive', 'releaseDate'];
+  if (sortBy && validSortFields.includes(String(sortBy))) {
+      const order = sortOrder === 'asc' ? 'asc' : 'desc';
+      if (sortBy === 'totalTracks') {
+          orderBy = [{ tracks: { _count: order } }, { id: 'asc' }];
+      } else {
+          orderBy = [{ [String(sortBy)]: order }, { id: 'asc' }]; 
+      }
+  } else {
+      orderBy = [{ releaseDate: 'desc' }, { id: 'asc' }];
+  }
+
+  const result = await paginate<any>(prisma.album, req, {
+      where: whereClause,
+      include: {
+          artist: { select: { id: true, artistName: true, avatar: true, isVerified: true } },
+          genres: { include: { genre: true } },
+          tracks: { 
+              where: { isActive: true },
+              select: trackSelect,
+              orderBy: { trackNumber: 'asc' },
+          },
+          label: { select: { id: true, name: true, logoUrl: true } },
+      },
+      orderBy: orderBy,
+  });
+
+  const formattedAlbums = result.data.map((album: any) => ({
+      ...album,
+      totalTracks: album.tracks?.length ?? 0, 
+  }));
+
+  return { albums: formattedAlbums, pagination: result.pagination };
 };
 
 export const getAlbumById = async (req: Request) => {

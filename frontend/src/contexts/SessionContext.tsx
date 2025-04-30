@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from '@/types';
 import { useSocket } from './SocketContext';
 import { toast } from 'react-hot-toast';
+import { api } from '@/utils/api';
 
 interface SessionContextType {
   user: User | null;
@@ -26,18 +27,19 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { socket, isConnected } = useSocket();
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       setLoading(true);
       const token = localStorage.getItem('userToken');
-      const userData = localStorage.getItem('userData');
-      
-      if (token && userData) {
+
+      if (token) {
         try {
-          const parsedUser = JSON.parse(userData) as User;
-          setUser(parsedUser);
+          const fetchedUser = await api.auth.getMe(token);
+          setUser(fetchedUser);
           setIsAuthenticated(true);
+          localStorage.setItem('userData', JSON.stringify(fetchedUser));
+          console.log('SessionContext: User data refreshed from backend.');
         } catch (error) {
-          console.error('Error parsing user data:', error);
+          console.error('SessionContext: Error fetching user data with token:', error);
           setUser(null);
           setIsAuthenticated(false);
           localStorage.removeItem('userToken');
@@ -46,6 +48,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } else {
         setUser(null);
         setIsAuthenticated(false);
+        localStorage.removeItem('userData');
       }
       setLoading(false);
     };
@@ -54,7 +57,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'userToken' || e.key === 'userData') {
-        console.log('Storage changed, re-checking auth...');
+        console.log('SessionContext: Storage changed, re-checking auth...');
         checkAuth();
       }
     };
@@ -134,10 +137,28 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       socket.on('artist_status_updated', handleArtistStatusUpdate);
       socket.on('artist_request_submitted', handleArtistRequestSubmitted);
 
+      const handleProfileUpdate = (updatedUser: User) => {
+        console.log('Received profile_updated event:', updatedUser);
+        setUser(currentUser => {
+          if (!currentUser || currentUser.id !== updatedUser.id) return currentUser;
+          const mergedUser = { ...currentUser, ...updatedUser };
+          try {
+            localStorage.setItem('userData', JSON.stringify(mergedUser));
+            console.log('User data updated in localStorage after profile_updated event.');
+          } catch (error) {
+            console.error('Failed to save updated user data to localStorage after profile_updated:', error);
+          }
+          return mergedUser;
+        });
+      };
+
+      socket.on('profile_updated', handleProfileUpdate);
+
       return () => {
         console.log('🚫 Stopping listening for socket events.');
         socket.off('artist_status_updated', handleArtistStatusUpdate);
         socket.off('artist_request_submitted', handleArtistRequestSubmitted);
+        socket.off('profile_updated', handleProfileUpdate);
       };
     }
   }, [socket, isConnected, isAuthenticated, user]);

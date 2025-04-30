@@ -42,7 +42,6 @@ const db_1 = __importDefault(require("../config/db"));
 const adminService = __importStar(require("../services/admin.service"));
 const emailService = __importStar(require("../services/email.service"));
 const client_1 = require("@prisma/client");
-const socket_1 = require("../config/socket");
 const getAllUsers = async (req, res) => {
     try {
         if (!req.user) {
@@ -454,26 +453,6 @@ const approveArtistRequest = async (req, res) => {
         else {
             console.warn(`Could not send approval email: No email found for user ${updatedProfile.user.id}`);
         }
-        try {
-            const io = (0, socket_1.getIO)();
-            const userSockets = (0, socket_1.getUserSockets)();
-            const targetUserId = updatedProfile.user.id;
-            const targetSocketId = userSockets.get(targetUserId);
-            if (targetSocketId) {
-                console.log(`🚀 Emitting artist_status_updated (approved) to user ${targetUserId} via socket ${targetSocketId}`);
-                io.to(targetSocketId).emit('artist_status_updated', {
-                    status: 'approved',
-                    message: 'Your request to become an Artist has been approved!',
-                    artistProfile: updatedProfile
-                });
-            }
-            else {
-                console.log(`Socket not found for user ${targetUserId}. Cannot emit update.`);
-            }
-        }
-        catch (socketError) {
-            console.error('Failed to emit socket event for artist approval:', socketError);
-        }
         res.json({
             message: 'Artist role approved successfully',
             user: updatedProfile.user,
@@ -521,27 +500,9 @@ const rejectArtistRequest = async (req, res) => {
         else {
             console.warn(`Could not send rejection email: No email found for user ${result.user.id}`);
         }
-        try {
-            const io = (0, socket_1.getIO)();
-            const userSockets = (0, socket_1.getUserSockets)();
-            const targetSocketId = userSockets.get(result.user.id);
-            if (targetSocketId) {
-                console.log(`🚀 Emitting artist_status_updated (rejected) to user ${result.user.id} via socket ${targetSocketId}`);
-                io.to(targetSocketId).emit('artist_status_updated', {
-                    status: 'rejected',
-                    message: notificationMessage,
-                });
-            }
-            else {
-                console.log(`Socket not found for user ${result.user.id}. Cannot emit update.`);
-            }
-        }
-        catch (socketError) {
-            console.error('Failed to emit socket event for artist rejection:', socketError);
-        }
         res.json({
             message: 'Artist role request rejected successfully',
-            hasPendingRequest: result.hasPendingRequest,
+            user: result.user,
         });
     }
     catch (error) {

@@ -1,573 +1,639 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import type { Track, Genre } from '@/types';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
-import {
-  ColumnFiltersState,
-  getCoreRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  SortingState,
-  useReactTable,
-  VisibilityState,
-  RowSelectionState,
-} from '@tanstack/react-table';
-import { DataTableWrapper } from '@/components/ui/data-table/data-table-wrapper';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Plus, Eye, EyeOff } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import Link from 'next/link';
-import { EditTrackModal } from '@/components/ui/data-table/data-table-modals';
-import { getTrackColumns } from '@/components/ui/data-table/data-table-columns';
-import { useDataTable } from '@/hooks/useDataTable';
-import type { Track, ArtistProfile, Genre, Label } from '@/types';
-import io, { Socket } from 'socket.io-client';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ConfirmDeleteModal } from '@/components/ui/admin-modals';
+import { EditTrackModal } from '@/components/ui/artist-modals';
 
-export default function TrackManagement() {
+interface SortConfig {
+  key: keyof Track | null;
+  direction: 'asc' | 'desc';
+}
+
+export default function SimpleTrackManagement() {
   const { theme } = useTheme();
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
+  const [deletingTrack, setDeletingTrack] = useState<Track | null>(null);
+  const [isBulkDeleteConfirm, setIsBulkDeleteConfirm] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [activeSearchTerm, setActiveSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [genreFilter, setGenreFilter] = useState<string>('ALL');
+  const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'releaseDate', direction: 'desc' });
   const limit = 10;
 
-  const {
-    data: tracks,
-    setData: setTracks,
-    loading,
-    totalPages,
-    currentPage,
-    setActionLoading,
-    searchInput,
-    setSearchInput,
-    statusFilter,
-    setStatusFilter,
-    genreFilter,
-    setGenreFilter,
-    selectedRows,
-    setSelectedRows,
-    updateQueryParam,
-    refreshData,
-  } = useDataTable<Track>({
-    fetchData: async (page, params) => {
-      const token = localStorage.getItem('userToken') || '';
-      const response = await api.tracks.getTracks(
-        token,
-        page,
-        limit,
-        params.toString()
-      );
-      console.log('API Response Tracks:', response.tracks); // Log để xem cấu trúc dữ liệu
-      return {
-        data: response.tracks,
-        pagination: response.pagination,
-      };
-    },
-    limit,
-  });
-
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-
-  const [editingTrack, setEditingTrack] = useState<Track | null>(null);
-  const [availableArtists, setAvailableArtists] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [availableGenres, setAvailableGenres] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<
-    string[]
-  >([]);
+  // Additional states for the track edit modal
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [availableLabels, setAvailableLabels] = useState<{ id: string; name: string }[]>([]);
+  const [selectedFeaturedArtists, setSelectedFeaturedArtists] = useState<string[]>([]);
+  const [availableArtists, setAvailableArtists] = useState<{ id: string; name: string }[]>([]);
   const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
+  const [availableLabels, setAvailableLabels] = useState<{ id: string; name: string }[]>([]);
+
+  const fetchTracks = useCallback(async (page: number, search: string, status: 'ALL' | 'ACTIVE' | 'INACTIVE', genre: string, sort: SortConfig) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('userToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      if (search) {
+        params.append('search', search);
+      }
+      if (status !== 'ALL') {
+        params.append('status', status === 'ACTIVE' ? 'true' : 'false');
+      }
+      if (genre !== 'ALL') {
+        params.append('genres', genre);
+      }
+      if (sort.key) {
+        params.append('sortBy', sort.key);
+        params.append('sortOrder', sort.direction);
+      }
+
+      const response = await api.tracks.getTracks(token, page, limit, params.toString());
+      setTracks(response.tracks || []);
+      setTotalPages(response.pagination?.totalPages || 1);
+    } catch (err: any) {
+      console.error('Error fetching tracks:', err);
+      setError(err.message || 'Could not load tracks');
+      toast.error(err.message || 'Could not load tracks');
+      setTracks([]);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
+    }
+  }, [limit]);
 
   const fetchMetadata = useCallback(async () => {
-    setSelectedFeaturedArtists([]);
-    setSelectedGenres([]);
-    setSelectedLabelId(null);
-
     try {
       const token = localStorage.getItem('userToken');
       if (!token) return;
-
-      const [artistsResponse, genresResponse, labelsResponse] = await Promise.all([
+      
+      // Fetch both genres and artists in parallel
+      const [genresResponse, artistsResponse, labelsResponse] = await Promise.all([
+        api.genres.getAll(token, 1, 1000),
         api.artists.getAllArtistsProfile(token, 1, 500),
-        api.genres.getAll(token, 1, 100),
-        api.labels.getAll(token, 1, 500),
+        api.labels.getAll(token, 1, 500)
       ]);
-
-      const artists = artistsResponse.artists.map((artist: ArtistProfile) => ({
+      
+      setAvailableGenres(genresResponse.genres || []);
+      
+      const artists = artistsResponse.artists?.map((artist: any) => ({
         id: artist.id,
         name: artist.artistName,
-      }));
-      const genres = genresResponse.genres.map((genre: Genre) => ({
-        id: genre.id,
-        name: genre.name,
-      }));
-      const labels = labelsResponse.labels.map((label: { id: string; name: string }) => ({
+      })) || [];
+      setAvailableArtists(artists);
+
+      const labels = labelsResponse.labels?.map((label: any) => ({
         id: label.id,
         name: label.name,
-      }));
-
-      setAvailableArtists(artists);
-      setAvailableGenres(genres);
+      })) || [];
       setAvailableLabels(labels);
-
-      if (editingTrack) {
-        setSelectedFeaturedArtists(
-          editingTrack.featuredArtists?.map((fa) => fa.artistProfile.id) || []
-        );
-        setSelectedGenres(editingTrack.genres?.map((g) => g.genre.id) || []);
-
-        // Sử dụng labelId thay vì label
-        if (editingTrack.labelId) {
-          const matchedLabel = labels.find((label: { id: string; name: string }) =>
-            label.id === editingTrack.labelId
-          );
-          if (matchedLabel) {
-            setSelectedLabelId(matchedLabel.id);
-            console.log('Matched Label:', matchedLabel);
-          } else {
-            console.warn('Label ID not found in availableLabels:', editingTrack.labelId);
-          }
-        } else {
-          console.log('No label ID in editingTrack');
-        }
-      }
+      
     } catch (error) {
-      console.error('Failed to fetch metadata:', error);
-      toast.error('Failed to load required select options');
+      console.error('Error fetching metadata:', error);
     }
-  }, [editingTrack]);
+  }, []);
+
+  const refreshTable = useCallback(() => {
+    fetchTracks(currentPage, activeSearchTerm, statusFilter, genreFilter, sortConfig);
+    setSelectedTrackIds(new Set());
+  }, [currentPage, activeSearchTerm, statusFilter, genreFilter, sortConfig, fetchTracks]);
 
   useEffect(() => {
-    if (editingTrack) {
-      fetchMetadata();
-    }
-  }, [editingTrack, fetchMetadata]);
+    refreshTable();
+  }, [refreshTable]);
 
-  const handleTrackVisibility = async (trackId: string, isActive: boolean) => {
+  useEffect(() => {
+    fetchMetadata();
+  }, [fetchMetadata]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeSearchTerm, statusFilter, genreFilter, sortConfig]);
+
+  const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setActiveSearchTerm(searchInput);
+  };
+
+  const handleSort = (key: keyof Track | null) => {
+    if (!key) return;
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      const allIds = new Set(tracks.map(t => t.id));
+      setSelectedTrackIds(allIds);
+    } else {
+      setSelectedTrackIds(new Set());
+    }
+  };
+
+  const handleSelectRow = (trackId: string, checked: boolean | 'indeterminate') => {
+    setSelectedTrackIds(prev => {
+      const newSet = new Set(prev);
+      if (checked === true) {
+        newSet.add(trackId);
+      } else {
+        newSet.delete(trackId);
+      }
+      return newSet;
+    });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-GB');
+    } catch {
+      return 'Invalid Date';
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    if (!seconds) return '0:00';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleAction = (action: string, track: Track) => {
+    if (action === 'edit') {
+      setEditingTrack(track);
+      setSelectedGenres(track.genres?.map((g) => g.genre.id) || []);
+      setSelectedFeaturedArtists(track.featuredArtists?.map((a) => a.artistProfile.id) || []);
+      setSelectedLabelId(track.labelId || null);
+      setIsEditModalOpen(true);
+    } else if (action === 'delete') {
+      setDeletingTrack(track);
+      setIsBulkDeleteConfirm(false);
+      setIsDeleteModalOpen(true);
+    } else if (action === 'toggleVisibility') {
+      handleTrackVisibility(track.id, track.isActive);
+    }
+  };
+
+  const handleDeleteConfirm = (ids: string[]) => {
+    if (ids.length === 0 && isBulkDeleteConfirm) {
+      handleBulkDeleteConfirm(Array.from(selectedTrackIds));
+    } else if (ids.length === 1 && !isBulkDeleteConfirm && deletingTrack) {
+      handleSingleDeleteConfirm(ids[0]);
+    } else {
+      console.error("Inconsistent state in handleDeleteConfirm");
+    }
+    setIsDeleteModalOpen(false);
+    setDeletingTrack(null);
+    setIsBulkDeleteConfirm(false);
+  };
+
+  const handleSingleDeleteConfirm = async (trackId: string) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      return;
+    }
     setActionLoading(trackId);
     try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
+      await api.tracks.delete(trackId, token);
+      toast.success(`Successfully deleted track.`);
+      refreshTable();
+      setSelectedTrackIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(trackId);
+        return newSet;
+      });
+    } catch (err: any) {
+      console.error('Error deleting track:', err);
+      toast.error(err.message || 'Failed to delete track.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleTrackVisibility = async (trackId: string, isActive: boolean) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      return;
+    }
+    setActionLoading(trackId);
+    try {
       await api.tracks.toggleVisibility(trackId, token);
-      setTracks((prev) =>
-        prev.map((track) =>
+      setTracks(prev => 
+        prev.map(track => 
           track.id === trackId ? { ...track, isActive: !isActive } : track
         )
       );
-      toast.success(
-        `Track ${isActive ? 'hidden' : 'made visible'} successfully`
-      );
-    } catch (error) {
-      setTracks((prev) =>
-        prev.map((track) =>
-          track.id === trackId ? { ...track, isActive: isActive } : track
-        )
-      );
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Failed to update track visibility';
-      toast.error(errorMessage);
+      toast.success(`Track ${isActive ? 'hidden' : 'made visible'} successfully`);
+    } catch (err: any) {
+      console.error('Error toggling track visibility:', err);
+      toast.error(err.message || 'Failed to update track visibility.');
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleDeleteTracks = async (trackIds: string | string[]) => {
-    const idsToDelete = Array.isArray(trackIds) ? trackIds : [trackIds];
-    if (idsToDelete.length === 0) return;
-
-    const confirmMessage =
-      idsToDelete.length === 1
-        ? 'Are you sure you want to delete this track?'
-        : `Delete ${idsToDelete.length} selected tracks?`;
-    if (!confirm(confirmMessage)) return;
-
-    idsToDelete.forEach((id) => setActionLoading(id));
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-      await Promise.all(idsToDelete.map((id) => api.tracks.delete(id, token)));
-      setRowSelection({});
-      setSelectedRows([]);
-      toast.success(
-        idsToDelete.length === 1
-          ? 'Track deleted successfully'
-          : `Deleted ${idsToDelete.length} tracks successfully`
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to delete track(s)';
-      toast.error(errorMessage);
-      idsToDelete.forEach((id) => setActionLoading(null));
+  const handleEditTrack = async (trackId: string, formData: FormData) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      return;
     }
-  };
-
-  const handleUpdateTrack = async (trackId: string, formData: FormData) => {
     setActionLoading(trackId);
     try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-
-      // Đảm bảo labelId đã được thêm vào formData từ handleFormSubmit
       await api.tracks.update(trackId, formData, token);
-      setEditingTrack(null);
       toast.success('Track updated successfully');
-    } catch (error) {
-      console.error('Update track error:', error);
-      const errorMessage =
-        (error as any)?.response?.data?.message || 'Failed to update track';
-      toast.error(errorMessage);
+      refreshTable();
+      setIsEditModalOpen(false);
+      setEditingTrack(null);
+    } catch (err: any) {
+      console.error('Error updating track:', err);
+      toast.error(err.message || 'Failed to update track.');
     } finally {
       setActionLoading(null);
     }
   };
 
-  const columns = getTrackColumns({
-    theme,
-    onVisibilityChange: handleTrackVisibility,
-    onDelete: handleDeleteTracks,
-    onEdit: (track: Track) => {
-      setEditingTrack(track);
-    },
-  });
+  const handleBulkDeleteClick = () => {
+    if (selectedTrackIds.size === 0) {
+      toast('No tracks selected.', { icon: '⚠️' });
+      return;
+    }
+    setDeletingTrack(null);
+    setIsBulkDeleteConfirm(true);
+    setIsDeleteModalOpen(true);
+  };
 
-  const table = useReactTable({
-    data: tracks,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: (updater) => {
-      const newRowSelection =
-        typeof updater === 'function' ? updater(rowSelection) : updater;
-      setRowSelection(newRowSelection);
-      const selectedIndexes = Object.keys(newRowSelection).filter(
-        (key) => newRowSelection[key]
-      );
-      const newlySelectedRows = selectedIndexes
-        .map((index) => tracks[parseInt(index, 10)])
-        .filter(Boolean);
-      setSelectedRows(newlySelectedRows);
-    },
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
-      rowSelection,
-      pagination: { pageIndex: currentPage - 1, pageSize: limit },
-    },
-    pageCount: totalPages,
-    manualPagination: true,
-    manualSorting: true,
-    debugTable: process.env.NODE_ENV === 'development',
-  });
-
-  // Add useEffect for WebSocket updates
-  useEffect(() => {
-    let artistId: string | null = null;
+  const handleBulkDeleteConfirm = async (trackIds: string[]) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      return;
+    }
+    setActionLoading('bulk-delete');
     try {
-        const userDataString = localStorage.getItem('userData');
-        if (userDataString) {
-            const userData = JSON.parse(userDataString);
-            artistId = userData?.artistProfile?.id || null;
-        }
-    } catch (error) {
-        console.error("Error parsing userData from localStorage:", error);
+      await Promise.all(trackIds.map(id => api.tracks.delete(id, token)));
+      toast.success(`Successfully deleted ${trackIds.length} track(s).`);
+      
+      let targetPage = currentPage;
+      if (tracks.length === trackIds.length && currentPage > 1) {
+        targetPage = currentPage - 1;
+      }
+
+      if (targetPage !== currentPage) {
+        setCurrentPage(targetPage);
+      } else {
+        refreshTable();
+      }
+
+      setSelectedTrackIds(new Set());
+    } catch (err: any) {
+      console.error('Error deleting tracks:', err);
+      toast.error(err.message || 'Failed to delete tracks.');
+    } finally {
+      setActionLoading(null);
     }
+  };
 
-    if (!artistId) {
-        console.warn("[WebSocket] Artist ID not found, WebSocket connection not established.");
-        return; // Don't connect if not an artist or ID not found
+  const handleRowClick = (track: Track, e: React.MouseEvent<HTMLTableRowElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('[role="checkbox"]') || target.closest('button')) {
+      return;
     }
+    // Navigate to track detail or edit page
+  };
 
-    let socket: Socket | null = null;
-    const connectTimer = setTimeout(() => {
-        socket = io(process.env.NEXT_PUBLIC_API_URL!);
-
-        socket.on('connect', () => {
-            console.log("[WebSocket] Connected for Artist Tracks");
-        });
-
-        socket.on('disconnect', (reason: string) => {
-            console.log("[WebSocket] Disconnected:", reason);
-        });
-
-        socket.on('connect_error', (error: Error) => {
-            console.error("[WebSocket] Connection Error:", error);
-        });
-
-        socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
-            setTracks((currentTracks) => {
-                const trackIndex = currentTracks.findIndex(t => t.id === data.trackId);
-                if (trackIndex !== -1 && currentTracks[trackIndex].artistId === artistId) {
-                    console.log('[Artist] Track visibility changed via WebSocket:', data);
-                    return currentTracks.map((track) =>
-                        track.id === data.trackId ? { ...track, isActive: data.isActive } : track
-                    );
-                }
-                return currentTracks;
-            });
-        });
-
-        socket.on('track:updated', (data: { track: Track }) => {
-            if (data.track.artistId === artistId) {
-                console.log('[Artist] Track updated via WebSocket:', data);
-                setTracks((currentTracks) =>
-                    currentTracks.map((track) =>
-                        track.id === data.track.id ? { ...track, ...data.track } : track
-                    )
-                );
-            }
-        });
-
-        socket.on('track:deleted', (data: { trackId: string }) => {
-            setTracks((currentTracks) => {
-                const trackExists = currentTracks.some(t => t.id === data.trackId && t.artistId === artistId);
-                if (trackExists) {
-                    console.log('[Artist] Track deleted via WebSocket:', data);
-                    return currentTracks.filter((track) => track.id !== data.trackId);
-                }
-                return currentTracks;
-            });
-        });
-    }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
-
-    // Cleanup on component unmount
-    return () => {
-      clearTimeout(connectTimer);
-      if (socket) {
-          console.log("[WebSocket] Disconnecting for Artist Tracks...");
-          socket.off('connect');
-          socket.off('disconnect');
-          socket.off('connect_error');
-          socket.off('track:visibilityChanged');
-          socket.off('track:updated');
-          socket.off('track:deleted');
-          socket.disconnect();
-      }
-    };
-  }, [setTracks]); // Dependency array only needs setTracks
-
-  // Add useEffect for auto-refresh when release dates pass
-  useEffect(() => {
-    if (tracks.length === 0 || loading) return;
-
-    let nextReleaseTimeout: NodeJS.Timeout | null = null;
-    let shouldRefresh = false;
-
-    const checkForUpcomingReleases = () => {
-      const now = new Date();
-      let closestReleaseTime: Date | null = null;
-      let timeUntilNextRelease = Infinity;
-
-      // Find the closest upcoming release date
-      tracks.forEach((track) => {
-        const releaseDate = new Date(track.releaseDate);
-        const timeUntilRelease = releaseDate.getTime() - now.getTime();
-
-        // If release date is in the future but coming up soon (within 1 hour)
-        if (
-          timeUntilRelease > 0 &&
-          timeUntilRelease < 3600000 &&
-          timeUntilRelease < timeUntilNextRelease
-        ) {
-          timeUntilNextRelease = timeUntilRelease;
-          closestReleaseTime = releaseDate;
-        }
-
-        // If release date just passed (within last 5 seconds) and item is not active
-        if (
-          timeUntilRelease >= -5000 &&
-          timeUntilRelease <= 0 &&
-          !track.isActive
-        ) {
-          shouldRefresh = true;
-        }
-      });
-
-      // If we should refresh now (a release date just passed)
-      if (shouldRefresh) {
-        refreshData();
-        shouldRefresh = false;
-      }
-
-      // If there's an upcoming release, set a timeout to refresh at that time
-      if (closestReleaseTime) {
-        const delayMs = Math.max(100, timeUntilNextRelease);
-
-        if (nextReleaseTimeout) {
-          clearTimeout(nextReleaseTimeout);
-        }
-
-        nextReleaseTimeout = setTimeout(() => {
-          refreshData();
-          // After refresh, check again for next release
-          checkForUpcomingReleases();
-        }, delayMs);
-      }
-    };
-
-    // Initial check
-    checkForUpcomingReleases();
-
-    // Set up an interval to periodically check (every 30 seconds)
-    const intervalId = setInterval(checkForUpcomingReleases, 30000);
-
-    return () => {
-      clearInterval(intervalId);
-      if (nextReleaseTimeout) {
-        clearTimeout(nextReleaseTimeout);
-      }
-    };
-  }, [tracks, loading, refreshData]);
+  const isAllSelected = tracks.length > 0 && selectedTrackIds.size === tracks.length;
+  const isIndeterminate = selectedTrackIds.size > 0 && selectedTrackIds.size < tracks.length;
 
   return (
-    <div
-      className={`container mx-auto space-y-4 p-4 pb-20 ${theme === 'dark' ? 'text-white' : ''
-        }`}
-    >
-      <div className="flex flex-col sm:flex-row sm:justify-between gap-4 mb-6">
-        <div>
-          <h1
-            className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'
-              }`}
-          >
-            Track Management
-          </h1>
-          <p
-            className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : ''
-              }`}
-          >
-            Manage and monitor your tracks
-          </p>
-        </div>
-        <Link
-          href="/artist/tracks/new"
-          className={`px-4 py-2 rounded-md font-medium transition-colors w-fit h-fit ${theme === 'light'
-            ? 'bg-gray-900 text-white hover:bg-gray-800'
-            : 'bg-white text-[#121212] hover:bg-white/90'
-            }`}
-        >
-          New Track
-        </Link>
+    <div className={`container mx-auto space-y-6 p-4 pb-20 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+      <div className="mb-6">
+        <h1 className={`text-2xl md:text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+           Track Management
+        </h1>
+        <p className={`text-muted-foreground ${theme === 'dark' ? 'text-white/60' : 'text-gray-600'}`}>
+           Manage and organize your tracks
+        </p>
       </div>
 
-      <DataTableWrapper
-        table={table}
-        columns={columns}
-        data={tracks}
-        pageCount={totalPages}
-        pageIndex={currentPage - 1}
-        loading={loading}
-        onPageChange={(page) => updateQueryParam({ page: page + 1 })}
-        theme={theme}
-        toolbar={{
-          searchValue: searchInput,
-          onSearchChange: (value) => {
-            setSearchInput(value);
-            updateQueryParam({ q: value });
-          },
-          selectedRowsCount: selectedRows.length,
-          onDelete: () => handleDeleteTracks(selectedRows.map((row) => row.id)),
-          showExport: true,
-          exportData: {
-            data: tracks,
-            columns: [
-              { key: 'title', header: 'Track Title' },
-              { key: 'album.title', header: 'Album' },
-              {
-                key: 'featuredArtists',
-                header: 'Featured Artists',
-                format: (val: any[]) =>
-                  val?.map((a) => a.artistProfile.artistName).join(', '),
-              },
-              {
-                key: 'genres',
-                header: 'Genres',
-                format: (val: any[]) =>
-                  val?.map((g) => g.genre.name).join(', '),
-              },
-              { key: 'label.name', header: 'Label' },
-              { key: 'duration', header: 'Duration' },
-              { key: 'playCount', header: 'Plays' },
-              {
-                key: 'isActive',
-                header: 'Status',
-                format: (val: boolean) => (val ? 'Visible' : 'Hidden'),
-              },
-              {
-                key: 'releaseDate',
-                header: 'Release Date',
-                format: (val: string) =>
-                  val ? new Date(val).toLocaleString() : '',
-              },
-              {
-                key: 'createdAt',
-                header: 'Created At',
-                format: (val: string) =>
-                  val ? new Date(val).toLocaleString() : '',
-              },
-              {
-                key: 'updatedAt',
-                header: 'Updated At',
-                format: (val: string) =>
-                  val ? new Date(val).toLocaleString() : '',
-              },
-            ],
-            filename: 'tracks-export',
-          },
-          searchPlaceholder: 'Search tracks by title...',
-          statusFilter: {
-            value: statusFilter,
-            onChange: (value) => {
-              setStatusFilter(value);
-              updateQueryParam({
-                status: value.length === 1 ? value[0] : null,
-              });
-            },
-          },
-          genreFilter: {
-            value: genreFilter,
-            onChange: (value) => {
-              setGenreFilter(value);
-              updateQueryParam({ genres: value.length > 0 ? value : null });
-            },
-            options: availableGenres.map((genre) => ({
-              value: genre.id,
-              label: genre.name,
-            })),
-          },
+      <div className="flex flex-col sm:flex-row gap-4 mb-4">
+        <form onSubmit={handleSearchSubmit} className="relative flex-grow">
+           <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+           <Input
+             type="text"
+             placeholder="Search tracks and press Enter..."
+             value={searchInput}
+             onChange={(e) => setSearchInput(e.target.value)}
+             className={`pl-10 pr-4 py-2 w-full rounded-md border h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}
+           />
+           <button type="submit" className="hidden">Search</button>
+        </form>
+
+        <div className="flex gap-2">
+          <Select value={statusFilter} onValueChange={(value: 'ALL' | 'ACTIVE' | 'INACTIVE') => setStatusFilter(value)}>
+            <SelectTrigger className={`w-[140px] rounded-md h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}>
+              <SelectValue placeholder="Filter by Status" />
+            </SelectTrigger>
+            <SelectContent className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
+              <SelectItem value="ALL">All Status</SelectItem>
+              <SelectItem value="ACTIVE">Visible</SelectItem>
+              <SelectItem value="INACTIVE">Hidden</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={genreFilter} onValueChange={(value: string) => setGenreFilter(value)}>
+            <SelectTrigger className={`w-[140px] rounded-md h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}>
+              <SelectValue placeholder="Filter by Genre" />
+            </SelectTrigger>
+            <SelectContent className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
+              <SelectItem value="ALL">All Genres</SelectItem>
+              {availableGenres.map((genre) => (
+                <SelectItem key={genre.id} value={genre.id}>{genre.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Link href="/artist/tracks/new">
+            <Button 
+              variant="default"
+              size="default"
+              className={`h-10 px-6 ${theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Track
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {loading && !deletingTrack && !editingTrack && <p>Loading tracks...</p>}
+      {error && <p className="text-red-500">{error}</p>}
+
+      {!error && (
+        <>
+          <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
+            <table className={`w-full text-sm text-left ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              <thead className={`text-xs uppercase ${theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-gray-50 text-gray-700'}`}>
+                <tr>
+                  <th scope="col" className="p-4 rounded-tl-md">
+                     <Checkbox
+                       id="select-all-checkbox"
+                       checked={isAllSelected ? true : isIndeterminate ? 'indeterminate' : false}
+                       onCheckedChange={handleSelectAll}
+                       aria-label="Select all rows on this page"
+                       className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
+                       disabled={loading || actionLoading !== null}
+                     />
+                  </th>
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('title')}
+                  >
+                    <div className="flex items-center">
+                      Title
+                      {sortConfig.key === 'title' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  <th scope="col" className="py-3 px-6">Album</th>
+                  <th scope="col" className="py-3 px-6">Genres</th>
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('duration')}
+                  >
+                    <div className="flex items-center">
+                      Duration
+                      {sortConfig.key === 'duration' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('playCount')}
+                  >
+                    <div className="flex items-center">
+                      Plays
+                      {sortConfig.key === 'playCount' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    scope="col" 
+                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
+                    onClick={() => handleSort('isActive')}
+                  >
+                    <div className="flex items-center">
+                      Status
+                      {sortConfig.key === 'isActive' ? (
+                        sortConfig.direction === 'asc' ?
+                          <ArrowUp className="ml-2 h-3 w-3" /> :
+                          <ArrowDown className="ml-2 h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
+                      )}
+                    </div>
+                  </th>
+                  <th scope="col" className="py-3 px-6 rounded-tr-md text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tracks.length > 0 ? (
+                  tracks.map((track) => (
+                    <tr
+                      key={track.id}
+                      onClick={(e) => handleRowClick(track, e)}
+                      className={`border-b cursor-pointer ${theme === 'dark' ? 'bg-gray-800 border-gray-700 hover:bg-gray-600' : 'bg-white border-gray-200 hover:bg-gray-50'} ${selectedTrackIds.has(track.id) ? (theme === 'dark' ? 'bg-gray-700/50' : 'bg-blue-50') : ''} ${actionLoading === track.id ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      <td className="w-4 p-4">
+                         <Checkbox
+                           id={`select-row-${track.id}`}
+                           checked={selectedTrackIds.has(track.id)}
+                           onCheckedChange={(checked) => handleSelectRow(track.id, checked)}
+                           aria-label={`Select row for track ${track.title}`}
+                           className={`${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'}`}
+                           disabled={loading || actionLoading !== null}
+                         />
+                      </td>
+                      <td className={`py-4 px-6 font-medium whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                        {track.title}
+                      </td>
+                      <td className="py-4 px-6">{track.album?.title || 'Single'}</td>
+                      <td className="py-4 px-6">
+                        {track.genres?.map(g => g.genre.name).join(', ')}
+                      </td>
+                      <td className="py-4 px-6">{formatDuration(track.duration)}</td>
+                      <td className="py-4 px-6">{track.playCount.toLocaleString()}</td>
+                      <td className="py-4 px-6">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${track.isActive
+                            ? (theme === 'dark' ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800')
+                            : (theme === 'dark' ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800')
+                          }`}>
+                          {track.isActive ? 'Visible' : 'Hidden'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                         <div className="flex items-center justify-center gap-1">
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
+                             onClick={(e) => { e.stopPropagation(); handleAction('delete', track); }}
+                             aria-label={`Delete track ${track.title}`}
+                             disabled={loading || actionLoading !== null}
+                           >
+                             <Trash2 className="h-4 w-4" />
+                           </Button>
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
+                             onClick={(e) => { e.stopPropagation(); handleAction('edit', track); }}
+                             aria-label={`Edit track ${track.title}`}
+                             disabled={loading || actionLoading !== null}
+                           >
+                             <Edit className="h-4 w-4" />
+                           </Button>
+                         </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="py-4 px-6 text-center">No tracks found {activeSearchTerm || statusFilter !== 'ALL' || genreFilter !== 'ALL' ? 'matching your criteria' : ''}.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-between items-center mt-4">
+            <div className="min-w-[200px]">
+              {selectedTrackIds.size > 0 && (
+                <Button
+                  onClick={handleBulkDeleteClick}
+                  variant="destructive"
+                  size="default"
+                  disabled={loading || actionLoading !== null}
+                  className={`${theme === 'dark' ? 'bg-red-700 hover:bg-red-800' : ''}`}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Selected ({selectedTrackIds.size})
+                </Button>
+              )}
+            </div>
+            <div className="flex justify-end">
+              {totalPages > 1 && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1 || loading || actionLoading !== null}
+                    variant="outline"
+                    size="sm">
+                    Previous
+                  </Button>
+                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages || loading || actionLoading !== null}
+                    variant="outline"
+                    size="sm">
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      <ConfirmDeleteModal
+        item={isBulkDeleteConfirm ? null : (deletingTrack ? { id: deletingTrack.id, name: deletingTrack.title, email: '' } : null)}
+        count={isBulkDeleteConfirm ? selectedTrackIds.size : undefined}
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+            setIsDeleteModalOpen(false);
+            setDeletingTrack(null);
+            setIsBulkDeleteConfirm(false);
         }}
+        onConfirm={handleDeleteConfirm}
+        theme={theme}
+        entityType="track"
       />
 
-      {editingTrack && (
-        <EditTrackModal
-          track={editingTrack}
-          onClose={() => {
-            setEditingTrack(null);
-            setSelectedFeaturedArtists([]);
-            setSelectedGenres([]);
-            setSelectedLabelId(null);
-          }}
-          onSubmit={handleUpdateTrack}
-          availableArtists={availableArtists}
-          availableGenres={availableGenres}
-          availableLabels={availableLabels}
-          selectedLabelId={selectedLabelId}
-          setSelectedLabelId={setSelectedLabelId}
-          selectedFeaturedArtists={selectedFeaturedArtists}
-          setSelectedFeaturedArtists={setSelectedFeaturedArtists}
-          selectedGenres={selectedGenres}
-          setSelectedGenres={setSelectedGenres}
-          theme={theme}
-        />
-      )}
+      <EditTrackModal
+        track={editingTrack}
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingTrack(null);
+        }}
+        onSubmit={handleEditTrack}
+        theme={theme}
+        availableGenres={availableGenres}
+        availableLabels={availableLabels}
+        availableArtists={availableArtists}
+      />
     </div>
   );
 }

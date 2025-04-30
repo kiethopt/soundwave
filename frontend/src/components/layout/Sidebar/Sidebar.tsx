@@ -760,6 +760,30 @@ export default function Sidebar({
                         </>
                       )}
                     </Link>
+
+                    {/* Old Album Management */}
+                    {/* <Link
+                      href="/artist/albums"
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                        pathname && pathname.startsWith("/artist/albums")
+                          ? theme === "light"
+                            ? "bg-gray-200 text-gray-900"
+                            : "bg-white/10 text-white"
+                          : theme === "light"
+                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {isCollapsed ? (
+                        <Album className="w-6 h-6" />
+                      ) : (
+                        <>
+                          <Album className="w-6 h-6" />
+                          <span>Albums</span>
+                        </>
+                      )}
+                    </Link> */}
+
                     <Link
                       href="/artist/albums"
                       className={`flex items-center gap-3 px-3 py-2 rounded-md ${
@@ -781,6 +805,30 @@ export default function Sidebar({
                         </>
                       )}
                     </Link>
+
+                    {/* Old Track Management */}
+                    {/* <Link
+                      href="/artist/tracks"
+                      className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                        pathname && pathname.startsWith("/artist/tracks")
+                          ? theme === "light"
+                            ? "bg-gray-200 text-gray-900"
+                            : "bg-white/10 text-white"
+                          : theme === "light"
+                          ? "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {isCollapsed ? (
+                        <Music className="w-6 h-6" />
+                      ) : (
+                        <>
+                          <Music className="w-6 h-6" />
+                          <span>Tracks</span>
+                        </>
+                      )}
+                    </Link> */}
+
                     <Link
                       href="/artist/tracks"
                       className={`flex items-center gap-3 px-3 py-2 rounded-md ${
@@ -802,6 +850,7 @@ export default function Sidebar({
                         </>
                       )}
                     </Link>
+
                     <Link
                       href="/artist/stats"
                       className={`flex items-center gap-3 px-3 py-2 rounded-md ${

@@ -8,9 +8,11 @@ import Link from 'next/link';
 import { api } from '@/utils/api';
 import { getDominantHexColor } from '@/utils/tailwind-color-map';
 import { useRouter } from 'next/navigation';
+import { useBackground } from '@/contexts/BackgroundContext';
 
 export default function DiscoveryPage() {
   const { theme, updateGenreData } = useTheme();
+  const { setBackgroundStyle } = useBackground();
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,20 +116,32 @@ export default function DiscoveryPage() {
 
   const currentBackgroundColor = hoveredGenreColor || firstGenreColor;
 
+  // Effect to update background using context
+  useEffect(() => {
+    const newBackground = currentBackgroundColor
+      ? `linear-gradient(180deg, 
+          ${currentBackgroundColor}50 0%, 
+          ${currentBackgroundColor}25 15%, 
+          ${currentBackgroundColor}10 30%, 
+          ${theme === 'light' ? '#ffffff' : '#121212'} 100%)`
+      : theme === 'light'
+      ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
+      : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)';
+      
+    setBackgroundStyle(newBackground);
+
+    // Cleanup function to reset background on unmount
+    return () => {
+       const defaultBackground = theme === 'light'
+         ? '#ffffff' 
+         : '#121212';
+       setBackgroundStyle(defaultBackground);
+    };
+  }, [currentBackgroundColor, theme, setBackgroundStyle]);
+
   return (
     <div 
-    className="container mx-auto p-4 md:p-6 mb-16 md:mb-0 transition-colors duration-1000 ease"
-    style={{
-        background: currentBackgroundColor
-          ? `linear-gradient(180deg, 
-              ${currentBackgroundColor}50 0%, 
-              ${currentBackgroundColor}25 15%, 
-              ${currentBackgroundColor}10 30%, 
-              ${theme === 'light' ? '#ffffff' : '#121212'} 100%)`
-          : theme === 'light'
-          ? 'linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)'
-          : 'linear-gradient(180deg, #2c2c2c 0%, #121212 100%)',
-      }}
+      className="container mx-auto p-4 md:p-6 mb-16 md:mb-0 transition-colors duration-1000 ease"
     >
       <div className="mb-8">
         <h1 className={`text-3xl font-bold mb-2 ${theme === 'light' ? 'text-gray-900' : 'text-white'}`}>

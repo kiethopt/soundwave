@@ -8,13 +8,7 @@ const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const handle_utils_1 = require("src/utils/handle-utils");
-const prisma_selects_2 = require("../utils/prisma-selects");
-const prisma_selects_3 = require("../utils/prisma-selects");
-const suggestionSelect = {
-    track: { select: { ...prisma_selects_2.trackSelect, artist: { select: { id: true, artistName: true } }, album: { select: { id: true, title: true, coverUrl: true } } } },
-    artist: { select: { id: true, artistName: true, avatar: true } },
-    album: { select: { ...prisma_selects_3.albumSelect, artist: { select: { id: true, artistName: true } } } },
-};
+const playlist_service_1 = require("./playlist.service");
 const savePlayHistoryService = async (userId, trackId, duration, completed) => {
     const track = await db_1.default.track.findUnique({
         where: { id: trackId },
@@ -69,6 +63,12 @@ const savePlayHistoryService = async (userId, trackId, duration, completed) => {
                 playCount: { increment: 1 },
             },
         });
+        try {
+            await (0, playlist_service_1.updateVibeRewindPlaylist)(userId);
+        }
+        catch (error) {
+            console.error(`[HistoryService] Error updating Vibe Rewind for user ${userId}:`, error);
+        }
     }
     return history;
 };

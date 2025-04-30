@@ -609,6 +609,41 @@ export const updateTrack = async (req: Request, id: string) => {
       updateData.isActive = req.body.isActive === 'true' || req.body.isActive === true;
   }
 
+  // Handle Genres
+  if (req.body.genres !== undefined) {
+    await prisma.trackGenre.deleteMany({ where: { trackId: id } });
+
+    // Then, add the new associations if any genres are provided
+    const genresInput = req.body.genres;
+    const genresArray = !genresInput
+      ? []
+      : Array.isArray(genresInput)
+      ? genresInput.map(String).filter(Boolean)
+      : typeof genresInput === 'string'
+      ? genresInput.split(',').map((g: string) => g.trim()).filter(Boolean)
+      : [];
+
+    if (genresArray.length > 0) {
+      const existingGenres = await prisma.genre.findMany({
+        where: { id: { in: genresArray } },
+        select: { id: true },
+      });
+      const validGenreIds = existingGenres.map((genre) => genre.id);
+      const invalidGenreIds = genresArray.filter((id) => !validGenreIds.includes(id));
+      if (invalidGenreIds.length > 0) {
+        throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
+      }
+      
+      // Prepare data for creating new associations
+      updateData.genres = {
+        create: validGenreIds.map((genreId: string) => ({
+          genre: { connect: { id: genreId } },
+        })),
+      };
+    } else {
+    }
+  }
+
   const updatedTrack = await prisma.$transaction(async (tx) => {
     await tx.track.update({
       where: { id },
@@ -647,43 +682,6 @@ export const updateTrack = async (req: Request, id: string) => {
                 skipDuplicates: true,
             });
         }
-    }
-
-    // --- Update Genres ---
-    if (req.body.genreIds !== undefined) {
-        await tx.trackGenre.deleteMany({ where: { trackId: id } });
-
-        const genresInput = req.body.genreIds;
-        let genresArray: string[] = [];
-        if (genresInput) {
-            if (Array.isArray(genresInput)) {
-                genresArray = genresInput.map(String).filter(Boolean);
-            } else if (typeof genresInput === 'string') {
-                genresArray = genresInput.split(',').map((gId: string) => gId.trim()).filter(Boolean);
-            }
-        }
-
-        if (genresArray.length > 0) {
-            // Check if provided genre IDs exist
-            const existingGenres = await tx.genre.findMany({
-                where: { id: { in: genresArray } },
-                select: { id: true },
-            });
-            const validGenreIds = existingGenres.map((genre) => genre.id);
-            const invalidGenreIds = genresArray.filter((gId) => !validGenreIds.includes(gId));
-            if (invalidGenreIds.length > 0) {
-                throw new Error(`Invalid genre IDs: ${invalidGenreIds.join(', ')}`);
-            }
-
-            await tx.trackGenre.createMany({
-                data: validGenreIds.map((genreId: string) => ({
-                    trackId: id,
-                    genreId: genreId,
-                })),
-                skipDuplicates: true,
-            });
-        }
-     
     }
 
     // Re-fetch the track within the transaction to get updated relations
@@ -947,11 +945,55 @@ export const getAllTracksAdminArtist = async (req: Request) => {
     };
   }
 
-  const result = await getTracks(req);
-  return {
-    tracks: result.data,
-    pagination: result.pagination,
-  };
+  const conditions: Prisma.TrackWhereInput[] = [];
+  if (search) {
+    conditions.push({
+      OR: [
+        { title: { contains: String(search), mode: 'insensitive' } },
+        {
+          artist: {
+            artistName: { contains: String(search), mode: 'insensitive' },
+          },
+        },
+      ],
+    });
+  }
+
+  if (status) {
+    conditions.push({ isActive: status === 'true' });
+  }
+
+  if (genres) {
+    const genreIds = Array.isArray(genres) ? genres.map((g) => String(g)) : [String(genres)];
+    conditions.push({
+      genres: {
+        some: {
+          genreId: { in: genreIds },
+        },
+      },
+    });
+  }
+
+  if (conditions.length > 0) whereClause.AND = conditions;
+
+  // Determine sorting
+  let orderBy: Prisma.TrackOrderByWithRelationInput | Prisma.TrackOrderByWithRelationInput[] = { releaseDate: 'desc' }; // Default sort
+  const { sortBy, sortOrder } = req.query;
+  const validSortFields = ['title', 'duration', 'playCount', 'isActive', 'releaseDate', 'trackNumber'];
+  if (sortBy && validSortFields.includes(String(sortBy))) {
+      const order = sortOrder === 'asc' ? 'asc' : 'desc';
+      orderBy = [{ [String(sortBy)]: order }, { id: 'asc' }]; // Add secondary sort for stability
+  }
+
+  // Directly use paginate with the constructed whereClause and select
+  const result = await paginate<any>(prisma.track, req, {
+      where: whereClause,
+      select: trackSelect, // Use the standard trackSelect
+      orderBy: orderBy,
+  });
+
+  // Return the paginated result directly
+  return { tracks: result.data, pagination: result.pagination };
 };
 
 // Lấy track theo ID

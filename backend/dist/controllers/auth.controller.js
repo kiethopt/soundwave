@@ -46,14 +46,12 @@ const date_fns_1 = require("date-fns");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const emailService = __importStar(require("../services/email.service"));
 const aiService = __importStar(require("../services/ai.service"));
-const google_auth_library_1 = require("google-auth-library");
 const node_fetch_1 = __importDefault(require("node-fetch"));
 const cloudinary_1 = require("../utils/cloudinary");
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error("Missing JWT_SECRET in environment variables");
 }
-const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -80,7 +78,7 @@ const validateRegisterData = (data) => {
         return "Username cannot contain spaces";
     return null;
 };
-const generateToken = (userId, role, artistProfile) => {
+const generateToken = (userId, role) => {
     return jsonwebtoken_1.default.sign({
         id: userId,
         role,
@@ -337,7 +335,7 @@ const googleLogin = async (req, res) => {
             res.status(400).json({ message: "Invalid Google token" });
             return;
         }
-        const { email, name, sub: googleId, picture: googleAvatarUrl } = userInfo;
+        const { email, name, picture: googleAvatarUrl } = userInfo;
         let user = await db_1.default.user.findUnique({ where: { email } });
         if (!user) {
             const randomPassword = (0, uuid_1.v4)();

@@ -633,9 +633,8 @@ export const approveArtistRequest = async (requestId: string) => {
     where: {
       id: requestId,
       verificationRequestedAt: { not: null },
-      isVerified: false, // Ensure it's not already verified
+      isVerified: false,
     },
-    // Include user to get email later
     include: {
       user: { select: { id: true, email: true, name: true, username: true } }
     }
@@ -645,9 +644,8 @@ export const approveArtistRequest = async (requestId: string) => {
     throw new Error('Artist request not found, already verified, or rejected.');
   }
 
-  // Use transaction to update profile and user role atomically
+  // Dùng transaction để cập nhật profile atomically
   const updatedProfile = await prisma.$transaction(async (tx) => {
-     // Update ArtistProfile
      const profile = await tx.artistProfile.update({
          where: { id: requestId },
          data: {
@@ -672,10 +670,10 @@ export const rejectArtistRequest = async (requestId: string) => {
     where: {
       id: requestId,
       verificationRequestedAt: { not: null },
-      isVerified: false, // Ensure it's not already verified or rejected (by deletion)
+      isVerified: false,
     },
     include: {
-      user: { select: userSelect }, // Select necessary user fields
+      user: { select: userSelect },
     },
   });
 
@@ -683,14 +681,12 @@ export const rejectArtistRequest = async (requestId: string) => {
     throw new Error('Artist request not found, already verified, or rejected.');
   }
 
-  // Just delete the artist profile on rejection
   await prisma.artistProfile.delete({
     where: { id: requestId },
   });
 
-  // Return the user data and indication that there's no longer a pending request
   return {
-    user: artistProfile.user, // Return the user data selected earlier
+    user: artistProfile.user,
     hasPendingRequest: false,
   };
 };

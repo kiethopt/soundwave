@@ -2,7 +2,6 @@
 
 import type { Album, ArtistProfile, Track, TrackEditForm, Genre } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { api } from '@/utils/api';
 import { useParams, useRouter } from 'next/navigation';
 import TrackUploadForm from '@/components/admin/TrackUploadForm';
@@ -27,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useTheme } from '@/contexts/ThemeContext';
-import io, { Socket } from 'socket.io-client'; // Import Socket
+import io, { Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
