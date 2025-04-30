@@ -8,25 +8,16 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MoreHorizontal, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, UserCog, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { UserInfoModal } from '@/components/ui/data-table/data-table-modals';
-import { EditUserModal, ConfirmDeleteModal, DeactivateModal, MakeAdminModal } from '@/components/ui/admin-modals';
+import { EditUserModal, ConfirmDeleteModal } from '@/components/ui/admin-modals';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 
 interface SortConfig {
   key: keyof User | null;
@@ -45,13 +36,9 @@ export default function UserManagement() {
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
-  const [deactivatingUser, setDeactivatingUser] = useState<User | null>(null);
-  const [makingAdminUser, setMakingAdminUser] = useState<User | null>(null);
   const [isBulkDeleteConfirm, setIsBulkDeleteConfirm] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
-  const [isMakeAdminModalOpen, setIsMakeAdminModalOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [activeSearchTerm, setActiveSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<'ALL' | 'ADMIN' | 'USER'>('ALL');
@@ -171,70 +158,6 @@ export default function UserManagement() {
       setDeletingUser(user);
       setIsBulkDeleteConfirm(false);
       setIsDeleteModalOpen(true);
-    } else if (action === 'makeAdmin') {
-      setMakingAdminUser(user);
-      setIsMakeAdminModalOpen(true);
-    } else if (action === 'activate') {
-        handleActivateUser(user);
-    } else if (action === 'deactivate') {
-        handleDeactivateUserClick(user);
-    }
-  };
-
-  const handleActivateUser = async (user: User) => {
-    if (!user) return;
-    if (!window.confirm(`Are you sure you want to activate ${user.name || user.email}?`)) {
-        return;
-    }
-
-    const token = localStorage.getItem('userToken');
-    if (!token) {
-      toast.error('Authentication required.');
-      return;
-    }
-    setActionLoading(user.id);
-    try {
-      await api.admin.updateUser(user.id, { isActive: true }, token);
-      toast.success(`${user.name || user.email} activated successfully!`);
-      refreshTable();
-    } catch (err: any) {
-      console.error('Error activating user:', err);
-      toast.error(err.message || 'Failed to activate user.');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleDeactivateUserClick = (user: User) => {
-    if (!user) return;
-    setDeactivatingUser(user);
-    setIsDeactivateModalOpen(true);
-  };
-
-  const handleDeactivateConfirm = async (reason: string) => {
-    if (!deactivatingUser) return;
-
-    const token = localStorage.getItem('userToken');
-    if (!token) {
-      toast.error('Authentication required.');
-      setIsDeactivateModalOpen(false);
-      setDeactivatingUser(null);
-      return;
-    }
-    setActionLoading(deactivatingUser.id);
-    try {
-      await api.admin.updateUser(deactivatingUser.id, { isActive: false, reason }, token);
-      toast.success(`${deactivatingUser.name || deactivatingUser.email} deactivated successfully.`);
-      setIsDeactivateModalOpen(false);
-      setDeactivatingUser(null);
-      refreshTable();
-    } catch (err: any) {
-      console.error('Error deactivating user:', err);
-      toast.error(err.message || 'Failed to deactivate user.');
-      setIsDeactivateModalOpen(false);
-      setDeactivatingUser(null);
-    } finally {
-      setActionLoading(null);
     }
   };
 
@@ -283,10 +206,6 @@ export default function UserManagement() {
     }
     setActionLoading(userId);
     try {
-      if (editFormData.has('isActive')) {
-        editFormData.delete('isActive');
-      }
-
       await api.admin.updateUser(userId, editFormData, token);
       toast.success('User updated successfully!');
       setIsEditModalOpen(false);
@@ -301,37 +220,6 @@ export default function UserManagement() {
       }
     } finally {
       setActionLoading(null);
-    }
-  };
-
-  const handleMakeAdminConfirm = async (userId: string) => {
-    const userToMakeAdmin = users.find(u => u.id === userId);
-    if (!userToMakeAdmin || userToMakeAdmin.role === 'ADMIN') {
-      toast.error("Cannot make this user an admin or user is already an admin.");
-      setIsMakeAdminModalOpen(false);
-      setMakingAdminUser(null);
-      return;
-    }
-
-    const token = localStorage.getItem('userToken');
-    if (!token) {
-      toast.error('Authentication required.');
-      setIsMakeAdminModalOpen(false);
-      setMakingAdminUser(null);
-      return;
-    }
-    setActionLoading(userId);
-    try {
-      await api.admin.updateUser(userId, { role: 'ADMIN', adminLevel: 2 }, token);
-      toast.success(`${userToMakeAdmin.name || userToMakeAdmin.email} is now an Admin (Level 2).`);
-      refreshTable();
-    } catch (err: any) {
-      console.error('Error making user admin:', err);
-      toast.error(err.message || 'Failed to make user admin.');
-    } finally {
-      setActionLoading(null);
-      setIsMakeAdminModalOpen(false);
-      setMakingAdminUser(null);
     }
   };
 
@@ -441,7 +329,7 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {loading && !viewingUser && !editingUser && !deletingUser && !deactivatingUser && !makingAdminUser && <p>Loading users...</p>}
+      {loading && !viewingUser && !editingUser && !deletingUser && <p>Loading users...</p>}
       {error && <p className="text-red-500">{error}</p>}
 
       {!error && (
@@ -591,6 +479,16 @@ export default function UserManagement() {
                            <Button
                              variant="ghost"
                              size="icon"
+                             className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
+                             onClick={(e) => { e.stopPropagation(); handleAction('edit', user); }}
+                             aria-label={`Edit user ${user.name || user.email}`}
+                             disabled={loading || actionLoading !== null}
+                           >
+                             <Edit className="h-4 w-4" />
+                           </Button>
+                           <Button
+                             variant="ghost"
+                             size="icon"
                              className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
                              onClick={(e) => { e.stopPropagation(); handleAction('delete', user); }}
                              aria-label={`Delete user ${user.name || user.email}`}
@@ -598,55 +496,6 @@ export default function UserManagement() {
                            >
                              <Trash2 className="h-4 w-4" />
                            </Button>
-                           <DropdownMenu>
-                             <DropdownMenuTrigger asChild>
-                               <Button variant="ghost" className="h-8 w-8 p-0" data-radix-dropdown-menu-trigger disabled={loading || actionLoading !== null}>
-                                 <span className="sr-only">Open menu</span>
-                                 <MoreHorizontal className="h-4 w-4" />
-                               </Button>
-                             </DropdownMenuTrigger>
-                             <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
-                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                               <DropdownMenuItem onClick={(e) => {e.stopPropagation(); handleAction('view', user)} } disabled={loading || actionLoading === user.id}>
-                                   <Search className="mr-2 h-4 w-4" /> View Details
-                                </DropdownMenuItem>
-                               <DropdownMenuItem onClick={(e) => {e.stopPropagation(); handleAction('edit', user)} } disabled={loading || actionLoading === user.id}>
-                                   <Edit className="mr-2 h-4 w-4" /> Edit User
-                                </DropdownMenuItem>
-                               {user.role !== 'ADMIN' && (
-                                 <DropdownMenuItem onClick={(e) => {e.stopPropagation(); handleAction('makeAdmin', user)} } disabled={loading || actionLoading === user.id}>
-                                   <UserCog className="mr-2 h-4 w-4" /> Make Admin (L2)
-                                 </DropdownMenuItem>
-                               )}
-                                <DropdownMenuSeparator className={theme === 'dark' ? 'bg-gray-600' : ''} />
-                                {user.isActive ? (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {e.stopPropagation(); handleAction('deactivate', user)}}
-                                    className={cn(
-                                      theme === 'light'
-                                        ? "text-orange-600 focus:text-orange-700 focus:bg-orange-100"
-                                        : "text-orange-400 focus:bg-orange-500/20 focus:text-orange-300",
-                                    )}
-                                    disabled={loading || actionLoading === user.id}
-                                  >
-                                    <ShieldAlert className="mr-2 h-4 w-4" /> Deactivate User
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {e.stopPropagation(); handleAction('activate', user)}}
-                                    className={cn(
-                                      "focus:bg-opacity-50",
-                                      theme === 'light'
-                                        ? "text-green-700 focus:text-green-800 focus:bg-green-100"
-                                        : "text-green-400 focus:bg-green-500/20 focus:text-green-300",
-                                    )}
-                                    disabled={loading || actionLoading === user.id}
-                                   >
-                                     <ShieldCheck className="mr-2 h-4 w-4" /> Activate User
-                                   </DropdownMenuItem>
-                                )}
-                             </DropdownMenuContent>
-                           </DropdownMenu>
                          </div>
                       </td>
                     </tr>
@@ -731,28 +580,6 @@ export default function UserManagement() {
         theme={theme}
         entityType="user"
       />
-
-       <DeactivateModal
-         isOpen={isDeactivateModalOpen}
-         onClose={() => {
-             setIsDeactivateModalOpen(false);
-             setDeactivatingUser(null);
-         }}
-         onConfirm={handleDeactivateConfirm}
-         theme={theme}
-         entityType="user"
-       />
-
-       <MakeAdminModal
-         user={makingAdminUser}
-         isOpen={isMakeAdminModalOpen}
-         onClose={() => {
-           setIsMakeAdminModalOpen(false);
-           setMakingAdminUser(null);
-         }}
-         onConfirm={handleMakeAdminConfirm}
-         theme={theme}
-       />
     </div>
   );
 } 

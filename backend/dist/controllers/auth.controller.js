@@ -140,7 +140,6 @@ const registerAdmin = async (req, res) => {
                 name,
                 username,
                 role: client_1.Role.ADMIN,
-                adminLevel: 1,
             },
             select: prisma_selects_1.userSelect,
         });

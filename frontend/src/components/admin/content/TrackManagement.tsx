@@ -361,6 +361,16 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className={`hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-500/20' : 'text-blue-600 hover:text-blue-700 hover:bg-blue-100'}`}
+                            onClick={(e) => handleEditTrackClick(track, e)}
+                            aria-label={`Edit track ${track.title}`}
+                            disabled={loading || actionLoading !== null}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className={`hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-red-500 hover:text-red-400 hover:bg-red-500/20' : 'text-red-600 hover:text-red-700 hover:bg-red-100'}`}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -370,16 +380,6 @@ export const TrackManagement: React.FC<TrackManagementProps> = ({ theme }) => {
                             disabled={loading || actionLoading !== null}
                           >
                             <Trash2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-500/20' : 'text-blue-600 hover:text-blue-700 hover:bg-blue-100'}`}
-                            onClick={(e) => handleEditTrackClick(track, e)}
-                            aria-label={`Edit track ${track.title}`}
-                            disabled={loading || actionLoading !== null}
-                          >
-                            <Edit className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>

@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Plus, Eye, EyeOff } from 'lucide-react';
+import { Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import {

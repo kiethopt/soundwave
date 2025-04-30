@@ -1258,6 +1258,7 @@ export function LayoutGrid(props: React.SVGProps<SVGSVGElement>) {
 export function BarChartBig(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
+      {...props}
       xmlns="http://www.w3.org/2000/svg"
       width="24"
       height="24"
@@ -1267,12 +1268,10 @@ export function BarChartBig(props: React.SVGProps<SVGSVGElement>) {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      {...props}
     >
       <path d="M3 3v18h18" />
-      <path d="M7 12v5" />
-      <path d="M12 8v9" />
-      <path d="M17 4v13" />
+      <rect width="4" height="7" x="7" y="10" rx="1" />
+      <rect width="4" height="12" x="15" y="5" rx="1" />
     </svg>
   );
 }
@@ -1281,6 +1280,7 @@ export function BarChartBig(props: React.SVGProps<SVGSVGElement>) {
 export function ListMusic(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
+      {...props}
       xmlns="http://www.w3.org/2000/svg"
       width="24"
       height="24"
@@ -1290,7 +1290,6 @@ export function ListMusic(props: React.SVGProps<SVGSVGElement>) {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      {...props}
     >
       <path d="M21 15V6" />
       <path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />

@@ -5,21 +5,12 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Search, CheckCircle, XCircle, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { ArtistRequest } from '@/types';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
 import { RejectModal, ApproveModal, ConfirmDeleteModal } from '@/components/ui/admin-modals';
 
 export default function ArtistRequestManagement() {
@@ -412,44 +403,6 @@ export default function ArtistRequestManagement() {
                       >
                         <XCircle className="h-4 w-4" />
                       </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0" data-radix-dropdown-menu-trigger disabled={loading || actionLoading !== null}>
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={(e) => {e.stopPropagation(); handleAction('view', request); }} disabled={loading || actionLoading === request.id}>
-                            <Search className="mr-2 h-4 w-4" /> View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className={theme === 'dark' ? 'bg-gray-600' : ''} />
-                          <DropdownMenuItem 
-                            onClick={(e) => {e.stopPropagation(); handleAction('approve', request)}}
-                            className={cn(
-                              "focus:bg-opacity-50",
-                              theme === 'light'
-                                ? "text-green-700 focus:text-green-800 focus:bg-green-100"
-                                : "text-green-400 focus:bg-green-500/20 focus:text-green-300",
-                            )}
-                            disabled={loading || actionLoading === request.id}
-                          >
-                            <CheckCircle className="mr-2 h-4 w-4" /> Approve Request
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={(e) => {e.stopPropagation(); handleAction('reject', request)}}
-                            className={cn(
-                              theme === 'light'
-                                ? "text-red-600 focus:text-red-700 focus:bg-red-100"
-                                : "text-red-400 focus:bg-red-500/20 focus:text-red-300",
-                            )}
-                            disabled={loading || actionLoading === request.id}
-                          >
-                            <XCircle className="mr-2 h-4 w-4" /> Reject Request
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </div>
                   </td>
                 </tr>

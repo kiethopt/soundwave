@@ -382,7 +382,6 @@ export const userSelect = {
   name: true,
   avatar: true,
   role: true, // USER hoặc ADMIN
-  adminLevel: true,
   isActive: true,
   followVisibility: true,
   currentProfile: true,

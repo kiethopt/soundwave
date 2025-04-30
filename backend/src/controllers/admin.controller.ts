@@ -11,7 +11,7 @@ import { User as PrismaUser, Role } from '@prisma/client';
 import { getIO, getUserSockets } from '../config/socket';
 
 // Define User type including adminLevel for controller scope
-type UserWithAdminLevel = PrismaUser & { adminLevel?: number | null };
+type UserWithAdminLevel = PrismaUser;
 
 // Lấy danh sách tất cả người dùng - ADMIN only
 export const getAllUsers = async (

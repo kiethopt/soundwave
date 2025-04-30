@@ -53,10 +53,7 @@ const emailService = __importStar(require("./email.service"));
 const getUsers = async (req, requestingUser) => {
     const { search = '', status, role, sortBy, sortOrder } = req.query;
     let roleFilter = {};
-    if (requestingUser.adminLevel !== 1) {
-        roleFilter = client_1.Role.USER;
-    }
-    if (requestingUser.adminLevel === 1 && role) {
+    if (requestingUser.role === client_1.Role.ADMIN && role) {
         const requestedRoles = Array.isArray(role)
             ? role
             : [role];
@@ -69,7 +66,7 @@ const getUsers = async (req, requestingUser) => {
     }
     const where = {
         ...(Object.keys(roleFilter).length > 0 ? { role: roleFilter } : {}),
-        ...(requestingUser.adminLevel === 1 ? { id: { not: requestingUser.id } } : {}),
+        id: { not: requestingUser.id },
         ...(search
             ? {
                 OR: [
@@ -189,29 +186,14 @@ const updateUserInfo = async (id, data, requestingUser, avatarFile) => {
     if (!existingUser) {
         throw new Error('User not found');
     }
-    if (requestingUser.adminLevel !== 1 && existingUser.role === client_1.Role.ADMIN) {
-        throw new Error(`Permission denied: You cannot modify an Admin user.`);
+    if (requestingUser.role === client_1.Role.ADMIN && requestingUser.id !== id && existingUser.role === client_1.Role.ADMIN) {
+        throw new Error(`Permission denied: Admins cannot modify other Admin users.`);
     }
-    if ((updateData.role !== undefined || updateData.adminLevel !== undefined) && requestingUser.adminLevel !== 1) {
-        throw new Error(`Permission denied: Only Level 1 Admins can change user roles or admin levels.`);
+    if (updateData.role !== undefined && requestingUser.role !== client_1.Role.ADMIN) {
+        throw new Error(`Permission denied: Only Admins can change user roles.`);
     }
-    if (requestingUser.id === id && (updateData.role !== undefined || updateData.adminLevel !== undefined)) {
-        throw new Error(`Permission denied: Cannot change your own role or admin level.`);
-    }
-    if (requestingUser.id === id && requestingUser.adminLevel === 1 && updateData.adminLevel !== undefined) {
-        throw new Error("Permission denied: Level 1 Admins cannot change their own level.");
-    }
-    if (updateData.adminLevel === 1) {
-        throw new Error("Permission denied: Cannot promote user to Level 1 Admin.");
-    }
-    if (updateData.adminLevel !== undefined && updateData.adminLevel !== null) {
-        const parsedLevel = parseInt(String(updateData.adminLevel), 10);
-        if (isNaN(parsedLevel) || parsedLevel < 2) {
-            updateData.adminLevel = null;
-        }
-        else {
-            updateData.adminLevel = parsedLevel;
-        }
+    if (requestingUser.id === id && updateData.role !== undefined) {
+        throw new Error(`Permission denied: Cannot change your own role.`);
     }
     if (updateData.name !== undefined)
         updateData.name = updateData.name;
@@ -226,6 +208,9 @@ const updateUserInfo = async (id, data, requestingUser, avatarFile) => {
             throw new Error('Username already exists');
     }
     if (updateData.isActive !== undefined) {
+        if (requestingUser.id === id && (0, handle_utils_1.toBooleanValue)(updateData.isActive) === false) {
+            throw new Error("Permission denied: Cannot deactivate your own account.");
+        }
         updateData.isActive = (0, handle_utils_1.toBooleanValue)(updateData.isActive);
     }
     if (newPassword) {
@@ -307,23 +292,19 @@ exports.updateArtistInfo = updateArtistInfo;
 const deleteUserById = async (id, requestingUser, reason) => {
     const userToDelete = await db_1.default.user.findUnique({
         where: { id },
-        select: { role: true, adminLevel: true, email: true, name: true, username: true },
+        select: { role: true, email: true, name: true, username: true },
     });
     if (!userToDelete) {
         throw new Error('User not found');
     }
-    if (!requestingUser || typeof requestingUser.adminLevel !== 'number') {
+    if (!requestingUser || !requestingUser.role) {
         throw new Error('Permission denied: Invalid requesting user data.');
     }
     if (userToDelete.role === client_1.Role.ADMIN) {
         if (requestingUser.id === id) {
             throw new Error('Permission denied: Admins cannot delete themselves.');
         }
-        const targetAdminLevel = userToDelete.adminLevel ?? Infinity;
-        const requesterAdminLevel = requestingUser.adminLevel ?? Infinity;
-        if (requesterAdminLevel >= targetAdminLevel) {
-            throw new Error('Permission denied: Cannot delete an admin with the same or higher level.');
-        }
+        throw new Error('Permission denied: Admins cannot delete other admins.');
     }
     if (userToDelete.email) {
         try {

@@ -9,24 +9,16 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MoreHorizontal, Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle, XCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Trash2, Search, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle, XCircle, ShieldCheck, ShieldAlert, Edit } from 'lucide-react';
 import { ConfirmDeleteModal, DeactivateModal } from '@/components/ui/admin-modals';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { EditArtistModal } from '@/components/ui/admin-modals';
 
 interface SortConfig {
   key: keyof ArtistProfile | null;
@@ -48,6 +40,8 @@ export default function ArtistManagement() {
   const [isBulkDeleteConfirm, setIsBulkDeleteConfirm] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [isEditArtistModalOpen, setIsEditArtistModalOpen] = useState(false);
+  const [editingArtist, setEditingArtist] = useState<ArtistProfile | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [activeSearchTerm, setActiveSearchTerm] = useState('');
   const [verifiedFilter, setVerifiedFilter] = useState<'ALL' | 'VERIFIED' | 'UNVERIFIED'>('ALL');
@@ -159,7 +153,8 @@ export default function ArtistManagement() {
 
   const handleAction = (action: string, artist: ArtistProfile) => {
     if (action === 'view') {
-      router.push(`/admin/artists/${artist.id}`);
+      setEditingArtist(artist);
+      setIsEditArtistModalOpen(true);
     } else if (action === 'delete') {
       setDeletingArtist(artist);
       setIsBulkDeleteConfirm(false);
@@ -322,6 +317,28 @@ export default function ArtistManagement() {
 
   const isAllSelected = artists.length > 0 && selectedArtistIds.size === artists.length;
   const isIndeterminate = selectedArtistIds.size > 0 && selectedArtistIds.size < artists.length;
+
+  // Handler for submitting artist edit from the modal
+  const handleEditArtistSubmit = async (artistId: string, formData: FormData) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      return;
+    }
+    setActionLoading(artistId); // Indicate loading for this specific artist
+    try {
+      await api.admin.updateArtist(artistId, formData, token);
+      toast.success('Artist updated successfully!');
+      setIsEditArtistModalOpen(false);
+      setEditingArtist(null);
+      refreshTable(); // Refetch artist data to update the table
+    } catch (err: any) {
+      console.error('Error updating artist:', err);
+      toast.error(err.message || 'Failed to update artist.');
+    } finally {
+      setActionLoading(null); // Clear loading indicator
+    }
+  };
 
   return (
     <div className={`container mx-auto space-y-6 p-4 pb-20 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
@@ -535,6 +552,16 @@ export default function ArtistManagement() {
                            <Button
                              variant="ghost"
                              size="icon"
+                             className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
+                             onClick={(e) => { e.stopPropagation(); handleAction('view', artist); }}
+                             aria-label={`Edit artist ${artist.artistName}`}
+                             disabled={loading || actionLoading !== null}
+                           >
+                             <Edit className="h-4 w-4" />
+                           </Button>
+                           <Button
+                             variant="ghost"
+                             size="icon"
                              className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
                              onClick={(e) => { e.stopPropagation(); handleAction('delete', artist); }}
                              aria-label={`Delete artist ${artist.artistName}`}
@@ -542,47 +569,6 @@ export default function ArtistManagement() {
                            >
                              <Trash2 className="h-4 w-4" />
                            </Button>
-                           <DropdownMenu>
-                             <DropdownMenuTrigger asChild>
-                               <Button variant="ghost" className="h-8 w-8 p-0" data-radix-dropdown-menu-trigger disabled={loading || actionLoading !== null}>
-                                 <span className="sr-only">Open menu</span>
-                                 <MoreHorizontal className="h-4 w-4" />
-                               </Button>
-                             </DropdownMenuTrigger>
-                             <DropdownMenuContent align="end" className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
-                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                               <DropdownMenuItem onClick={(e) => {e.stopPropagation(); handleAction('view', artist)} } disabled={loading || actionLoading === artist.id}>
-                                   <Search className="mr-2 h-4 w-4" /> View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator className={theme === 'dark' ? 'bg-gray-600' : ''} />
-                                {artist.isActive ? (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {e.stopPropagation(); handleAction('deactivate', artist)}}
-                                    className={cn(
-                                      theme === 'light'
-                                        ? "text-orange-600 focus:text-orange-700 focus:bg-orange-100"
-                                        : "text-orange-400 focus:bg-orange-500/20 focus:text-orange-300",
-                                    )}
-                                    disabled={loading || actionLoading === artist.id}
-                                  >
-                                    <ShieldAlert className="mr-2 h-4 w-4" /> Deactivate Artist
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem
-                                    onClick={(e) => {e.stopPropagation(); handleAction('activate', artist)}}
-                                    className={cn(
-                                      "focus:bg-opacity-50",
-                                      theme === 'light'
-                                        ? "text-green-700 focus:text-green-800 focus:bg-green-100"
-                                        : "text-green-400 focus:bg-green-500/20 focus:text-green-300",
-                                    )}
-                                    disabled={loading || actionLoading === artist.id}
-                                   >
-                                     <ShieldCheck className="mr-2 h-4 w-4" /> Activate Artist
-                                   </DropdownMenuItem>
-                                )}
-                             </DropdownMenuContent>
-                           </DropdownMenu>
                          </div>
                       </td>
                     </tr>
@@ -661,6 +647,20 @@ export default function ArtistManagement() {
          theme={theme}
          entityType="artist"
        />
+
+      {/* Add Edit Artist Modal */}
+      {isEditArtistModalOpen && editingArtist && (
+        <EditArtistModal
+          artist={editingArtist}
+          isOpen={isEditArtistModalOpen}
+          onClose={() => {
+            setIsEditArtistModalOpen(false);
+            setEditingArtist(null);
+          }}
+          onSubmit={handleEditArtistSubmit}
+          theme={theme}
+        />
+      )}
     </div>
   );
 } 

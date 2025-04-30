@@ -378,7 +378,6 @@ exports.userSelect = {
     name: true,
     avatar: true,
     role: true,
-    adminLevel: true,
     isActive: true,
     followVisibility: true,
     currentProfile: true,

@@ -12,11 +12,11 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { XIcon, Trash2, ShieldAlert, UserCog, Eye, EyeOff, XCircle, CheckCircle, Plus, AlbumIcon } from 'lucide-react';
+import { XIcon, Trash2, ShieldAlert, UserCog, Eye, EyeOff, XCircle, CheckCircle, Plus, AlbumIcon, ShieldCheck, Tags } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { UserIcon } from 'lucide-react';
-import { Edit, Tags } from './Icons';
+import { Edit, Spinner } from './Icons';
 import Image from 'next/image';
 import {
   Tabs,
@@ -38,6 +38,7 @@ import { useDominantColor } from '@/hooks/useDominantColor';
 import { Album, Track } from '@/types';
 import { Calendar } from 'lucide-react';
 import { ArtistProfile } from '@/types';
+import { Separator } from '@/components/ui/separator';
 
 // Edit User Modal
 interface EditUserModalProps {
@@ -60,24 +61,46 @@ export function EditUserModal({
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+  const [deactivationReason, setDeactivationReason] = useState('');
+  const [showDeactivateSection, setShowDeactivateSection] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
+
+  const predefinedReasons = [
+    "Violation of terms of service",
+    "Inappropriate content or behavior",
+    "Account inactivity",
+    "Security concerns",
+    "User requested deactivation",
+    "Other (specify below)",
+  ];
 
   useEffect(() => {
     if (user) {
       setFormData({
         name: user.name || '',
         username: user.username || '',
-        email: user.email || ''
+        email: user.email || '',
+        isActive: user.isActive
       });
       setNewPassword('');
       setConfirmNewPassword('');
       setShowNewPassword(false);
       setShowConfirmPassword(false);
+      setIsDeactivating(false);
+      setDeactivationReason('');
+      setShowDeactivateSection(false);
+      setIsActivating(false);
     } else {
       setFormData({});
       setNewPassword('');
       setConfirmNewPassword('');
       setShowNewPassword(false);
       setShowConfirmPassword(false);
+      setIsDeactivating(false);
+      setDeactivationReason('');
+      setShowDeactivateSection(false);
+      setIsActivating(false);
     }
   }, [user, isOpen]);
 
@@ -90,6 +113,10 @@ export function EditUserModal({
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleReasonClick = (reason: string) => {
+    setDeactivationReason(reason);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -106,15 +133,32 @@ export function EditUserModal({
     }
 
     const dataToSend = new FormData();
-    if (formData.name !== undefined && formData.name !== user.name) dataToSend.append('name', formData.name);
-    if (formData.username !== undefined && formData.username !== user.username) dataToSend.append('username', formData.username);
-    if (formData.email !== undefined && formData.email !== user.email) dataToSend.append('email', formData.email);
+    let hasChanges = false;
+
+    // Append basic info if changed
+    if (formData.name !== undefined && formData.name !== user.name) { dataToSend.append('name', formData.name); hasChanges = true; }
+    if (formData.username !== undefined && formData.username !== user.username) { dataToSend.append('username', formData.username); hasChanges = true; }
+    if (formData.email !== undefined && formData.email !== user.email) { dataToSend.append('email', formData.email); hasChanges = true; }
     if (newPassword) {
       dataToSend.append('newPassword', newPassword);
+      hasChanges = true;
     }
-
-    let hasChanges = false;
-    dataToSend.forEach((value, key) => { hasChanges = true; });
+    
+    // Handle activation
+    if (isActivating && !user.isActive) {
+      dataToSend.append('isActive', 'true');
+      hasChanges = true;
+    }
+    // Handle deactivation (only if not activating)
+    else if (isDeactivating && user.isActive) {
+      if (!deactivationReason.trim()) {
+        toast.error("Please provide a reason for deactivation.");
+        return;
+      }
+      dataToSend.append('isActive', 'false');
+      dataToSend.append('reason', deactivationReason);
+      hasChanges = true;
+    }
 
     if (hasChanges) {
       await onSubmit(user.id, dataToSend);
@@ -154,7 +198,7 @@ export function EditUserModal({
                   "text-sm mt-1",
                   theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
                 )}>
-                  Update user information
+                  Update user information or status
                 </DialogDescription>
               </div>
             </div>
@@ -192,6 +236,7 @@ export function EditUserModal({
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                 )}
                 placeholder="Enter full name"
+                disabled={isActivating || isDeactivating}
               />
             </div>
 
@@ -211,6 +256,7 @@ export function EditUserModal({
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                 )}
                 placeholder="Enter username"
+                disabled={isActivating || isDeactivating}
               />
             </div>
 
@@ -231,43 +277,41 @@ export function EditUserModal({
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                 )}
                 placeholder="Enter email address"
+                disabled={isActivating || isDeactivating}
               />
             </div>
 
             <div className="space-y-2">
               <UILabel htmlFor="newPassword" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
-                New Password
+                New Password (optional)
               </UILabel>
               <div className="relative">
                 <Input
                   id="newPassword"
-                  name="newPassword"
                   type={showNewPassword ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className={cn(
                     "w-full pr-10",
-                    theme === 'dark'
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                    theme === 'dark' 
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
                       : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                   )}
-                  placeholder="Leave blank to keep current"
+                  placeholder="Enter new password"
+                  disabled={isActivating || isDeactivating}
                 />
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "absolute inset-y-0 right-0 h-full w-10",
-                    theme === 'dark'
-                      ? 'text-gray-400 hover:text-gray-200 focus:bg-transparent hover:bg-transparent'
-                      : 'text-gray-500 hover:text-gray-700 focus:bg-transparent hover:bg-transparent'
-                  )}
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  aria-label={showNewPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  disabled={isActivating || isDeactivating}
                 >
-                  {showNewPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </Button>
+                  {showNewPassword ? (
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -278,71 +322,177 @@ export function EditUserModal({
               <div className="relative">
                 <Input
                   id="confirmNewPassword"
-                  name="confirmNewPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmNewPassword}
                   onChange={(e) => setConfirmNewPassword(e.target.value)}
                   className={cn(
                     "w-full pr-10",
-                    theme === 'dark'
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                    theme === 'dark' 
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
                       : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                   )}
                   placeholder="Confirm new password"
+                  disabled={isActivating || isDeactivating}
                 />
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "absolute inset-y-0 right-0 h-full w-10",
-                    theme === 'dark'
-                      ? 'text-gray-400 hover:text-gray-200 focus:bg-transparent hover:bg-transparent'
-                      : 'text-gray-500 hover:text-gray-700 focus:bg-transparent hover:bg-transparent'
-                  )}
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  disabled={isActivating || isDeactivating}
                 >
-                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </Button>
+                  {showConfirmPassword ? (
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
               </div>
             </div>
+
+            {/* Status Section */}
+            <div className="col-span-2 mt-4">
+              <Separator className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} />
+              <div className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {user.isActive ? (
+                      <ShieldCheck className={cn(
+                        "h-5 w-5",
+                        theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                      )} />
+                    ) : (
+                      <ShieldAlert className={cn(
+                        "h-5 w-5",
+                        theme === 'dark' ? 'text-orange-400' : 'text-orange-600'
+                      )} />
+                    )}
+                    <span className={cn(
+                      "font-medium",
+                      theme === 'dark' ? 'text-white' : 'text-gray-900'
+                    )}>
+                      Account Status: {user.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  
+                  {/* Activate Button */}
+                  {!user.isActive && (
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsActivating(true);
+                        setShowDeactivateSection(false);
+                        setIsDeactivating(false);
+                      }}
+                      className={cn(
+                        "text-xs",
+                        theme === 'dark' 
+                          ? 'border-green-700 text-green-300 hover:bg-green-600/20' 
+                          : 'border-green-600 text-green-700 hover:bg-green-50',
+                         isActivating ? (theme === 'dark' ? 'bg-green-700/30' : 'bg-green-100') : ''
+                      )}
+                    >
+                      {isActivating ? <Spinner className="h-4 w-4 mr-1 animate-spin"/> : <ShieldCheck className="h-4 w-4 mr-1" />} 
+                      Activate Account
+                    </Button>
+                  )}
+
+                  {/* Deactivate Button */}
+                  {user.isActive && (
+                    <Button 
+                      type="button"
+                      variant={showDeactivateSection ? "outline" : "destructive"}
+                      size="sm"
+                      onClick={() => {
+                        const nextShowState = !showDeactivateSection;
+                        setShowDeactivateSection(nextShowState);
+                        setIsDeactivating(nextShowState);
+                        if (!nextShowState) setDeactivationReason('');
+                      }}
+                      className={cn(
+                        "text-xs",
+                        showDeactivateSection 
+                          ? (theme === 'dark' ? 'border-gray-600' : 'border-gray-300') 
+                          : (theme === 'dark' ? 'bg-red-700 hover:bg-red-600' : 'bg-red-600 hover:bg-red-700 text-white')
+                      )}
+                    >
+                      {showDeactivateSection ? 'Cancel Deactivation' : 'Deactivate Account'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Deactivation reason */}
+            {showDeactivateSection && user.isActive && (
+              <div className="col-span-2 space-y-4 mt-2">
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {predefinedReasons.map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      onClick={() => handleReasonClick(reason)}
+                      className={cn(
+                        "px-3 py-1 rounded-full text-xs font-medium transition-colors",
+                        deactivationReason === reason
+                          ? theme === 'dark'
+                            ? 'bg-orange-900 text-orange-100'
+                            : 'bg-orange-100 text-orange-800'
+                          : theme === 'dark'
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      )}
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <UILabel 
+                    htmlFor="deactivationReason" 
+                    className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}
+                  >
+                    Deactivation Reason
+                  </UILabel>
+                  <Textarea
+                    id="deactivationReason"
+                    value={deactivationReason}
+                    onChange={(e) => setDeactivationReason(e.target.value)}
+                    placeholder="Enter reason for deactivation..."
+                    className={cn(
+                      "resize-none min-h-[100px]",
+                      theme === 'dark' 
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    )}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="mt-6 pt-6 border-t flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className={theme === 'dark' ? 'border-gray-600 text-white hover:bg-gray-700' : ''}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className={cn(
+                theme === 'dark' ? 'bg-neutral-900 hover:bg-neutral-900/90' : 'bg-neutral-900 hover:bg-neutral-900/90 text-white',
+                (isActivating || isDeactivating) && (theme === 'dark' ? 'opacity-70' : 'opacity-80') // Style when activating/deactivating
+              )}
+            >
+              Save Changes
+            </Button>
           </div>
         </form>
-
-        {/* Footer */}
-        <div className={cn(
-          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
-          theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'
-        )}>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            className={cn(
-              "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
-                : 'bg-white hover:bg-gray-50 border-gray-300'
-            )}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="edit-user-form"
-            className={cn(
-              "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-neutral-900 hover:bg-neutral-900/90'
-            )}
-          >
-            Save Changes
-          </Button>
-        </div>
       </DialogContent>
     </Dialog>
   );
@@ -366,15 +516,39 @@ export function EditArtistModal({
 }: EditArtistModalProps) {
   const [formData, setFormData] = useState<Partial<ArtistProfile>>({});
   const [isUploading, setIsUploading] = useState(false);
-  
+  const [isDeactivating, setIsDeactivating] = useState(false);
+  const [deactivationReason, setDeactivationReason] = useState('');
+  const [showDeactivateSection, setShowDeactivateSection] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
+
+  const predefinedReasons = [
+    "Violation of terms of service",
+    "Inappropriate content or behavior",
+    "Account inactivity",
+    "Security concerns",
+    "Artist requested deactivation",
+    "Other (specify below)",
+  ];
+
   useEffect(() => {
     if (artist) {
       setFormData({
         artistName: artist.artistName || '',
         bio: artist.bio || '',
+        isActive: artist.isActive, // Include isActive state
       });
+      // Reset state related to activation/deactivation
+      setIsDeactivating(false);
+      setDeactivationReason('');
+      setShowDeactivateSection(false);
+      setIsActivating(false);
     } else {
       setFormData({});
+       // Reset state related to activation/deactivation
+      setIsDeactivating(false);
+      setDeactivationReason('');
+      setShowDeactivateSection(false);
+      setIsActivating(false);
     }
   }, [artist, isOpen]);
 
@@ -389,24 +563,50 @@ export function EditArtistModal({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleReasonClick = (reason: string) => {
+    setDeactivationReason(reason);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!artist) return;
 
-    const form = new FormData();
-    
-    // Handle basic fields only
-    if (formData.artistName) form.append('artistName', formData.artistName);
-    if (formData.bio) form.append('bio', formData.bio);
+    const dataToSend = new FormData();
+    let hasChanges = false;
 
-    try {
-      setIsUploading(true);
-      await onSubmit(artist.id, form);
+    // Append basic info if changed
+    if (formData.artistName !== undefined && formData.artistName !== artist.artistName) { dataToSend.append('artistName', formData.artistName); hasChanges = true; }
+    if (formData.bio !== undefined && formData.bio !== artist.bio) { dataToSend.append('bio', formData.bio); hasChanges = true; }
+
+    // Handle activation
+    if (isActivating && !artist.isActive) {
+      dataToSend.append('isActive', 'true');
+      hasChanges = true;
+    }
+    // Handle deactivation (only if not activating)
+    else if (isDeactivating && artist.isActive) {
+      if (!deactivationReason.trim()) {
+        toast.error("Please provide a reason for deactivation.");
+        return;
+      }
+      dataToSend.append('isActive', 'false');
+      dataToSend.append('reason', deactivationReason);
+      hasChanges = true;
+    }
+
+    if (hasChanges) {
+      setIsUploading(true); // Use isUploading state for loading indicator
+      try {
+        await onSubmit(artist.id, dataToSend);
+        onClose();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to update artist');
+      } finally {
+        setIsUploading(false);
+      }
+    } else {
+      toast('No changes detected.', { icon: 'ℹ️' });
       onClose();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update artist');
-    } finally {
-      setIsUploading(false);
     }
   };
 
@@ -479,6 +679,7 @@ export function EditArtistModal({
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                 )}
                 placeholder="Enter artist name"
+                disabled={isActivating || isDeactivating || isUploading}
               />
             </div>
 
@@ -499,9 +700,135 @@ export function EditArtistModal({
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                 )}
                 placeholder="Enter artist biography"
+                disabled={isActivating || isDeactivating || isUploading}
               />
             </div>
 
+            {/* Status Section */}
+            <div className="col-span-1 mt-4">
+              <Separator className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} />
+              <div className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {artist.isActive ? (
+                      <ShieldCheck className={cn(
+                        "h-5 w-5",
+                        theme === 'dark' ? 'text-green-400' : 'text-green-600'
+                      )} />
+                    ) : (
+                      <ShieldAlert className={cn(
+                        "h-5 w-5",
+                        theme === 'dark' ? 'text-orange-400' : 'text-orange-600'
+                      )} />
+                    )}
+                    <span className={cn(
+                      "font-medium",
+                      theme === 'dark' ? 'text-white' : 'text-gray-900'
+                    )}>
+                      Artist Status: {artist.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  
+                  {/* Activate Button */}
+                  {!artist.isActive && (
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsActivating(true);
+                        setShowDeactivateSection(false);
+                        setIsDeactivating(false);
+                      }}
+                      className={cn(
+                        "text-xs",
+                        theme === 'dark' 
+                          ? 'border-green-700 text-green-300 hover:bg-green-600/20' 
+                          : 'border-green-600 text-green-700 hover:bg-green-50',
+                         isActivating ? (theme === 'dark' ? 'bg-green-700/30' : 'bg-green-100') : ''
+                      )}
+                      disabled={isUploading}
+                    >
+                      {isActivating ? <Spinner className="h-4 w-4 mr-1 animate-spin"/> : <ShieldCheck className="h-4 w-4 mr-1" />} 
+                      Activate Artist
+                    </Button>
+                  )}
+
+                  {/* Deactivate Button */}
+                  {artist.isActive && (
+                    <Button 
+                      type="button"
+                      variant={showDeactivateSection ? "outline" : "destructive"}
+                      size="sm"
+                      onClick={() => {
+                        const nextShowState = !showDeactivateSection;
+                        setShowDeactivateSection(nextShowState);
+                        setIsDeactivating(nextShowState);
+                        if (!nextShowState) setDeactivationReason(''); // Clear reason on cancel
+                      }}
+                      className={cn(
+                        "text-xs",
+                        showDeactivateSection 
+                          ? (theme === 'dark' ? 'border-gray-600' : 'border-gray-300') 
+                          : (theme === 'dark' ? 'bg-red-700 hover:bg-red-600' : 'bg-red-600 hover:bg-red-700 text-white')
+                      )}
+                      disabled={isUploading}
+                    >
+                      {showDeactivateSection ? 'Cancel Deactivation' : 'Deactivate Artist'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Deactivation reason */}
+            {showDeactivateSection && artist.isActive && (
+              <div className="col-span-1 space-y-4 mt-2">
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {predefinedReasons.map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      onClick={() => handleReasonClick(reason)}
+                      className={cn(
+                        "px-3 py-1 rounded-full text-xs font-medium transition-colors",
+                        deactivationReason === reason
+                          ? theme === 'dark'
+                            ? 'bg-orange-900 text-orange-100'
+                            : 'bg-orange-100 text-orange-800'
+                          : theme === 'dark'
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      )}
+                      disabled={isUploading}
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <UILabel 
+                    htmlFor="deactivationReasonArtist" 
+                    className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}
+                  >
+                    Deactivation Reason
+                  </UILabel>
+                  <Textarea
+                    id="deactivationReasonArtist"
+                    value={deactivationReason}
+                    onChange={(e) => setDeactivationReason(e.target.value)}
+                    placeholder="Enter reason for deactivation..."
+                    className={cn(
+                      "resize-none min-h-[100px]",
+                      theme === 'dark' 
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    )}
+                    disabled={isUploading}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </form>
 
@@ -531,10 +858,11 @@ export function EditArtistModal({
               "flex-1 text-center justify-center",
               theme === 'dark' 
                 ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-neutral-900 hover:bg-neutral-900/90'
+                : 'bg-neutral-900 hover:bg-neutral-900/90',
+               (isActivating || isDeactivating) && (theme === 'dark' ? 'opacity-70' : 'opacity-80') // Style when changing status
             )}
           >
-            {isUploading ? 'Saving...' : 'Save Changes'}
+            {isUploading ? (isActivating ? 'Activating...' : isDeactivating ? 'Deactivating...' : 'Saving...') : 'Save Changes'}
           </Button>
         </div>
       </DialogContent>

@@ -133,7 +133,6 @@ export const registerAdmin = async (
         name,
         username,
         role: Role.ADMIN, // Role là ADMIN
-        adminLevel: 1, // Set adminLevel to 1 for initial admins
       },
       select: userSelect, // Sử dụng userSelect để trả về thông tin người dùng
     });
