@@ -111,6 +111,12 @@ export interface ArtistProfile {
   events?: Event[];
   followers?: UserFollow[];
   notifications?: Notification[];
+  labelId?: string;
+  label?: {
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+  };
 }
 
 export interface UserFollow {
@@ -147,6 +153,12 @@ export interface Artist {
     isActive: boolean;
   };
   genres?: { genre: Genre }[];
+  labelId?: string;
+  label?: {
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+  };
 }
 
 export interface ArtistRequest {

@@ -56,9 +56,11 @@ model ArtistProfile {
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
   userId                  String         @unique
+  labelId                 String?        // Foreign key for Label
   albums                  Album[]
   genres                  ArtistGenre[]
   user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label                   Label?         @relation(fields: [labelId], references: [id], onDelete: SetNull) // Relation to Label
   notifications           Notification[] @relation("ArtistNotifications")
   TrackArtist             TrackArtist[]
   tracks                  Track[]
@@ -67,6 +69,7 @@ model ArtistProfile {
   @@index([artistName])
   @@index([isVerified])
   @@index([verifiedAt])
+  @@index([labelId])
   @@map("artist_profiles")
 }
 
@@ -91,6 +94,7 @@ model Label {
   updatedAt   DateTime @updatedAt
   tracks      Track[]
   albums      Album[]
+  artists     ArtistProfile[] // Relation back to ArtistProfile
 
   @@map("labels")
 }

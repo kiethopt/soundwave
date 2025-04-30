@@ -198,6 +198,13 @@ exports.artistProfileSelect = {
     verifiedAt: true,
     createdAt: true,
     updatedAt: true,
+    label: {
+        select: {
+            id: true,
+            name: true,
+            logoUrl: true,
+        }
+    },
     genres: {
         select: {
             genre: {
@@ -397,6 +404,13 @@ exports.userSelect = {
             role: true,
             socialMediaLinks: true,
             verifiedAt: true,
+            label: {
+                select: {
+                    id: true,
+                    name: true,
+                    logoUrl: true,
+                }
+            },
             albums: {
                 select: {
                     id: true,

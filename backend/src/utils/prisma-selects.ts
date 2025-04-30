@@ -200,6 +200,13 @@ export const artistProfileSelect = {
   verifiedAt: true,
   createdAt: true,
   updatedAt: true,
+  label: {
+    select: {
+      id: true,
+      name: true,
+      logoUrl: true,
+    }
+  },
   genres: {
     select: {
       genre: {
@@ -401,6 +408,13 @@ export const userSelect = {
       role: true, // Role ARTIST
       socialMediaLinks: true,
       verifiedAt: true,
+      label: {
+        select: {
+          id: true,
+          name: true,
+          logoUrl: true,
+        }
+      },
       albums: {
         select: {
           id: true,
