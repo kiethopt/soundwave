@@ -237,7 +237,7 @@ export function AlbumTracks({
         <div key={track.id}>
           {/* Desktop Layout */}
           <div
-            className={`hidden md:grid grid-cols-[48px_1.5fr_1fr_1fr_100px_50px] gap-4 px-6 py-4 group ${
+            className={`hidden md:grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_50px] gap-4 px-6 py-4 group ${
               theme === "light" ? "hover:bg-gray-50" : "hover:bg-white/5"
             } cursor-pointer`}
             onClick={() => handleTrackPlay(track)}
@@ -325,6 +325,36 @@ export function AlbumTracks({
               >
                 {track.playCount || 0}
               </span>
+            </div>
+
+            <div className="flex items-center justify-center">
+              {favoriteTrackIds.has(track.id) ? (
+                <button
+                  className={`flex items-center justify-center p-1 rounded-full text-[#A57865] hover:text-[#A57865]/80 transition-colors duration-150 ease-in-out`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleFavorite(track.id, true);
+                  }}
+                  aria-label={"Remove from favorites"}
+                >
+                  <Heart className="w-4 h-4" fill="currentColor" />
+                </button>
+              ) : (
+                <button
+                  className={`flex items-center justify-center p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-in-out ${
+                    theme === "light"
+                      ? "text-gray-400 hover:text-gray-600"
+                      : "text-white/50 hover:text-white/80"
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleFavorite(track.id, false);
+                  }}
+                  aria-label={"Add to favorites"}
+                >
+                  <Heart className="w-4 h-4" fill="none" />
+                </button>
+              )}
             </div>
 
             <div

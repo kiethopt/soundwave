@@ -391,7 +391,8 @@ export const approveArtistRequest = async (
 
     res.json({
       message: 'Artist role approved successfully',
-      user: updatedProfile.user, 
+      user: updatedProfile.user,
+      hasPendingRequest: false
     });
   } catch (error) {
     if (
@@ -455,6 +456,7 @@ export const rejectArtistRequest = async (
     res.json({
       message: 'Artist role request rejected successfully',
       user: result.user,
+      hasPendingRequest: result.hasPendingRequest
     });
 
   } catch (error) {

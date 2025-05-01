@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
+exports.getPlaylistSuggestions = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const handle_utils_1 = require("../utils/handle-utils");
@@ -631,4 +631,194 @@ const updateAllSystemPlaylists = async () => {
     }
 };
 exports.updateAllSystemPlaylists = updateAllSystemPlaylists;
+const getPlaylistSuggestions = async (req) => {
+    const user = req.user;
+    if (!user)
+        throw new Error('Unauthorized');
+    const { playlistId } = req.query;
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    let existingTrackIds = new Set();
+    if (playlistId && typeof playlistId === 'string') {
+        try {
+            const playlist = await db_1.default.playlist.findUnique({
+                where: { id: playlistId },
+                include: {
+                    tracks: {
+                        select: { trackId: true }
+                    }
+                }
+            });
+            if (playlist) {
+                existingTrackIds = new Set(playlist.tracks.map(track => track.trackId));
+            }
+        }
+        catch (error) {
+            console.error('Error fetching playlist tracks:', error);
+        }
+    }
+    const userHistory = await db_1.default.history.findMany({
+        where: {
+            userId: user.id,
+            type: "PLAY",
+            createdAt: { gte: thirtyDaysAgo },
+        },
+        include: {
+            track: {
+                include: {
+                    genres: {
+                        include: {
+                            genre: true,
+                        },
+                    },
+                },
+            },
+        },
+        orderBy: {
+            updatedAt: "desc",
+        },
+        take: 50,
+    });
+    if (userHistory.length === 0) {
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        const [popularTracks, newReleasedTracks] = await Promise.all([
+            db_1.default.track.findMany({
+                where: {
+                    isActive: true,
+                    id: {
+                        notIn: Array.from(existingTrackIds)
+                    }
+                },
+                orderBy: { playCount: "desc" },
+                take: 20,
+                include: {
+                    artist: true,
+                    album: true,
+                    genres: {
+                        include: {
+                            genre: true,
+                        },
+                    },
+                },
+            }),
+            db_1.default.track.findMany({
+                where: {
+                    isActive: true,
+                    createdAt: { gte: threeMonthsAgo },
+                    id: {
+                        notIn: Array.from(existingTrackIds)
+                    }
+                },
+                orderBy: { createdAt: "desc" },
+                take: 20,
+                include: {
+                    artist: true,
+                    album: true,
+                    genres: {
+                        include: {
+                            genre: true,
+                        },
+                    },
+                },
+            })
+        ]);
+        const combinedTracks = [...popularTracks, ...newReleasedTracks]
+            .filter((track, index, self) => index === self.findIndex((t) => t.id === track.id))
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 20);
+        return {
+            message: "Recommendations based on popular and new releases",
+            tracks: combinedTracks,
+            basedOn: "discovery",
+        };
+    }
+    const genreCounts = {};
+    userHistory.forEach(history => {
+        if (history.track) {
+            history.track.genres.forEach(genreRel => {
+                const genreId = genreRel.genre.id;
+                const genreName = genreRel.genre.name;
+                if (!genreCounts[genreName]) {
+                    genreCounts[genreName] = { count: 0, id: genreId };
+                }
+                genreCounts[genreName].count += 1;
+            });
+        }
+    });
+    const topGenres = Object.entries(genreCounts)
+        .sort(([, a], [, b]) => b.count - a.count)
+        .slice(0, 3)
+        .map(([name, data]) => ({
+        name,
+        id: data.id,
+        count: data.count
+    }));
+    if (topGenres.length === 0) {
+        const popularTracks = await db_1.default.track.findMany({
+            where: {
+                isActive: true,
+                id: {
+                    notIn: Array.from(existingTrackIds)
+                }
+            },
+            orderBy: { playCount: "desc" },
+            take: 20,
+            include: {
+                artist: true,
+                album: true,
+                genres: {
+                    include: {
+                        genre: true,
+                    },
+                },
+            },
+        });
+        return {
+            message: "Recommendations based on popular tracks",
+            tracks: popularTracks,
+            basedOn: "popular",
+        };
+    }
+    const userTrackIds = userHistory
+        .filter(history => history.track)
+        .map(history => history.track.id);
+    const excludeTrackIds = [...new Set([...userTrackIds, ...Array.from(existingTrackIds)])];
+    const recommendedTracks = await db_1.default.track.findMany({
+        where: {
+            isActive: true,
+            id: {
+                notIn: excludeTrackIds
+            },
+            genres: {
+                some: {
+                    genreId: {
+                        in: topGenres.map(genre => genre.id)
+                    }
+                }
+            },
+        },
+        orderBy: [
+            { playCount: "desc" },
+            { createdAt: "desc" },
+        ],
+        take: 20,
+        include: {
+            artist: true,
+            album: true,
+            genres: {
+                include: {
+                    genre: true,
+                },
+            },
+        },
+    });
+    return {
+        message: `Recommendations based on your top genres: ${topGenres.map(g => g.name).join(', ')}`,
+        tracks: recommendedTracks,
+        basedOn: "genres",
+        topGenres: topGenres,
+    };
+};
+exports.getPlaylistSuggestions = getPlaylistSuggestions;
 //# sourceMappingURL=playlist.service.js.map

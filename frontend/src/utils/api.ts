@@ -1464,8 +1464,9 @@ export const api = {
     },
 
     getPlaylistSuggest: async (token: string, playlistId?: string) => {
+      const queryParams = playlistId ? `?playlistId=${playlistId}` : '';
       return fetchWithAuth(
-        `/api/playlists/suggest${playlistId ? `?playlistId=${playlistId}` : ''}`,
+        `/api/playlists/suggest${queryParams}`,
         { method: "GET" },
         token
       );

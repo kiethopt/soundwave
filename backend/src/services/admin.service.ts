@@ -8,7 +8,6 @@ import {
   artistRequestDetailsSelect,
   genreSelect,
 } from '../utils/prisma-selects';
-import { uploadFile } from './upload.service';
 import { paginate, toBooleanValue } from '../utils/handle-utils';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -163,10 +162,21 @@ export const getArtistRequests = async (req: Request) => {
 };
 
 export const getArtistRequestDetail = async (id: string) => {
-  const request = await prisma.artistProfile.findUnique({
+  let request = await prisma.artistProfile.findUnique({
     where: { id },
     select: artistRequestDetailsSelect,
   });
+
+  // Nếu không tìm thấy artist profile, thử tìm bằng userId
+  if (!request) {
+    request = await prisma.artistProfile.findFirst({
+      where: { 
+        userId: id,
+        verificationRequestedAt: { not: null }
+      },
+      select: artistRequestDetailsSelect,
+    });
+  }
 
   if (!request) {
     throw new Error('Request not found');
@@ -175,7 +185,6 @@ export const getArtistRequestDetail = async (id: string) => {
   return request;
 };
 
-// Interface for allowed update data
 interface UpdateUserData {
   name?: string;
   username?: string;
@@ -799,7 +808,10 @@ export const approveArtistRequest = async (requestId: string) => {
      return finalProfile;
   });
 
-  return updatedProfile;
+  return {
+    ...updatedProfile,
+    hasPendingRequest: false
+  };
 };
 
 export const rejectArtistRequest = async (requestId: string) => {

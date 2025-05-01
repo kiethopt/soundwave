@@ -669,7 +669,7 @@ export const requestArtistRole = async (
   }
 
   // Tạo ArtistProfile với thông tin cung cấp
-  return prisma.artistProfile.create({
+  const createdProfile = await prisma.artistProfile.create({
     data: {
       artistName,
       bio,
@@ -685,6 +685,25 @@ export const requestArtistRole = async (
       },
     },
   });
+
+  // Send email notification to admin(s)
+  const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
+  if (adminNotificationEmail) {
+    try {
+      const emailOptions = emailService.createArtistRequestNotificationEmail(
+        adminNotificationEmail,
+        artistName,
+        user.name || user.username || 'User',
+        user.id,
+        createdProfile.id
+      );
+      await emailService.sendEmail(emailOptions);
+      console.log(`Admin notification email sent for artist request: ${createdProfile.id}`);
+    } catch (emailError) {
+      console.error('Failed to send admin notification email:', emailError);
+    }
+  }
+  return createdProfile;
 };
 
 // Lấy thông tin yêu cầu trở thành nghệ sĩ của người dùng

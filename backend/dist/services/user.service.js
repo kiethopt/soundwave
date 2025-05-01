@@ -579,7 +579,7 @@ const requestArtistRole = async (user, data, avatarFile) => {
         const uploadResult = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artist-avatars');
         avatarUrl = uploadResult.secure_url;
     }
-    return db_1.default.artistProfile.create({
+    const createdProfile = await db_1.default.artistProfile.create({
         data: {
             artistName,
             bio,
@@ -595,6 +595,18 @@ const requestArtistRole = async (user, data, avatarFile) => {
             },
         },
     });
+    const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
+    if (adminNotificationEmail) {
+        try {
+            const emailOptions = emailService.createArtistRequestNotificationEmail(adminNotificationEmail, artistName, user.name || user.username || 'User', user.id, createdProfile.id);
+            await emailService.sendEmail(emailOptions);
+            console.log(`Admin notification email sent for artist request: ${createdProfile.id}`);
+        }
+        catch (emailError) {
+            console.error('Failed to send admin notification email:', emailError);
+        }
+    }
+    return createdProfile;
 };
 exports.requestArtistRole = requestArtistRole;
 const getArtistRequest = async (userId) => {

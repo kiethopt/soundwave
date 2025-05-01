@@ -7,7 +7,7 @@ import { TrackList } from "@/components/user/track/TrackList";
 import { EditPlaylistDialog } from "@/components/user/playlist/EditPlaylistDialog";
 import { DeletePlaylistDialog } from "@/components/user/playlist/DeletePlaylistDialog";
 import { api } from "@/utils/api";
-import { Playlist, PlaylistPrivacy, Track } from "@/types";
+import { Playlist, Track } from "@/types";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import { MusicAuthDialog } from "@/components/ui/data-table/data-table-modals";
@@ -25,23 +25,14 @@ import {
   Trash2,
   Lock,
   Globe,
-  Clock,
-  ListMusic,
-  Music2,
-  User,
-  Album,
-  CalendarDays,
+  Clock
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useSocket } from "@/contexts/SocketContext";
 import { Card } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
-import { CheckCircle2 } from "lucide-react";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { RecommendedTrackList } from "@/components/user/track/RecommendedTrackList";
-
-// Khai báo event bus đơn giản để gọi fetchPlaylists từ sidebar
-const playlistUpdateEvent = new CustomEvent("playlist-updated");
 
 // Helper function to format duration (seconds) into "X phút Y giây"
 const formatDuration = (totalSeconds: number): string => {
@@ -774,7 +765,7 @@ export default function PlaylistPage() {
               }`}
             >
               <div
-                className={`grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_50px] gap-4 items-center text-sm font-medium`}
+                className={`grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_60px] gap-4 items-center text-sm font-medium`}
               >
                 <div className="flex justify-center">#</div>
                 <div>Title</div>
@@ -783,10 +774,10 @@ export default function PlaylistPage() {
                   Date Added
                 </div>
                 <div className="w-[40px] flex justify-center"></div>
-                <div className="flex items-center justify-center">
+                <div className="flex items-center justify-end">
                   <Clock className="w-4 h-4 mr-1" />
                 </div>
-                <div className="w-[50px] flex justify-center"></div>
+                <div className="w-[60px] flex justify-center"></div>
               </div>
             </div>
 
@@ -862,6 +853,7 @@ export default function PlaylistPage() {
                 size="sm" 
                 onClick={fetchRecommendations}
                 disabled={loadingRecommendations}
+                className="text-sm font-medium"
               >
                 Refresh
               </Button>

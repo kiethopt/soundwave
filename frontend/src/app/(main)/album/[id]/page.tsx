@@ -373,7 +373,7 @@ export default function AlbumDetailPage() {
                 }`}
               >
                 <div
-                  className={`grid grid-cols-[48px_1.5fr_1fr_1fr_100px_50px] gap-4 text-sm ${
+                  className={`grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_50px] gap-4 text-sm ${
                     theme === 'light' ? 'text-gray-500' : 'text-white/60'
                   }`}
                 >
@@ -381,6 +381,7 @@ export default function AlbumDetailPage() {
                   <div>Title</div>
                   <div>Artists</div>
                   <div className="text-center">Play Count</div>
+                  <div className="w-[40px]"></div>
                   <div className="text-right">Duration</div>
                   <div></div>
                 </div>
@@ -403,7 +404,7 @@ export default function AlbumDetailPage() {
             </div>
 
             {album.label && (
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-6">
                 <span className={`text-xs font-medium ${theme === 'light' ? 'text-gray-500' : 'text-white/60'}`}>
                   © {album.label.name}
                 </span>
