@@ -711,12 +711,14 @@ export const deleteGenreById = async (id: string) => {
 };
 
 export const approveArtistRequest = async (requestId: string) => {
+  // Fetch the profile including socialMediaLinks
   const artistProfile = await prisma.artistProfile.findFirst({
     where: {
       id: requestId,
       verificationRequestedAt: { not: null },
       isVerified: false,
     },
+    // Ensure socialMediaLinks is selected (Prisma includes JSON by default unless explicitly excluded)
     include: {
       user: { select: { id: true, email: true, name: true, username: true } }
     }
@@ -726,21 +728,76 @@ export const approveArtistRequest = async (requestId: string) => {
     throw new Error('Artist request not found, already verified, or rejected.');
   }
 
+  // Extract potential temporary label and prepare cleaned social links *before* transaction
+  let requestedLabelName: string | null = null;
+  let cleanedSocialMediaLinks: Record<string, any> = {};
+
+  // Check if socialMediaLinks is a valid object and extract the temporary key
+  if (artistProfile.socialMediaLinks && typeof artistProfile.socialMediaLinks === 'object' && !Array.isArray(artistProfile.socialMediaLinks)) {
+    const currentSocialLinks = artistProfile.socialMediaLinks as Record<string, any>;
+    if (currentSocialLinks._requestedLabel && typeof currentSocialLinks._requestedLabel === 'string') {
+      requestedLabelName = currentSocialLinks._requestedLabel;
+    }
+    // Create a cleaned version excluding the temporary key
+    cleanedSocialMediaLinks = { ...currentSocialLinks };
+    delete cleanedSocialMediaLinks._requestedLabel;
+  } else {
+      // If socialMediaLinks was null, empty, or not an object, default to empty
+      cleanedSocialMediaLinks = {};
+  }
+
   const updatedProfile = await prisma.$transaction(async (tx) => {
-     const profile = await tx.artistProfile.update({
+     // 1. First update: Verify the artist profile (role, verified status, timestamps)
+     const verifiedProfile = await tx.artistProfile.update({
          where: { id: requestId },
          data: {
-             role: Role.ARTIST, 
+             role: Role.ARTIST,
              isVerified: true,
              verifiedAt: new Date(),
              verificationRequestedAt: null,
+             // NOTE: Do not update labelId or socialMediaLinks in this step
          },
-         include: { user: { select: userSelect }}
+         select: { id: true } // Only select ID needed for the next step
      });
 
-     return profile;
-  });
+     let finalLabelId: string | null = null;
 
+     // 2. Handle Label Creation/Connection if requested
+     if (requestedLabelName) {
+        const labelRecord = await tx.label.upsert({
+            where: { name: requestedLabelName },
+            update: {}, // No update needed if label already exists
+            create: { name: requestedLabelName },
+            select: { id: true } // Select only the ID
+        });
+        finalLabelId = labelRecord.id;
+     }
+
+     // 3. Second update: Set the actual labelId and the cleaned socialMediaLinks
+     await tx.artistProfile.update({
+         where: { id: verifiedProfile.id }, // Target the profile updated in step 1
+         data: {
+             labelId: finalLabelId, // Link to the created/found label (or null)
+             socialMediaLinks: cleanedSocialMediaLinks, // Save the cleaned JSON
+         }
+     });
+
+     // 4. Re-fetch the fully updated profile to return complete data
+     const finalProfile = await tx.artistProfile.findUnique({
+         where: { id: verifiedProfile.id },
+         include: {
+             user: { select: userSelect },
+             label: true // Include the associated label
+         }
+     });
+
+     if (!finalProfile) {
+        // Should not happen within a transaction, but good practice
+        throw new Error("Failed to retrieve updated profile after transaction.");
+     }
+
+     return finalProfile;
+  });
 
   return updatedProfile;
 };

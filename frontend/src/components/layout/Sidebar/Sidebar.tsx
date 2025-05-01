@@ -846,7 +846,7 @@ export default function Sidebar({
                       ) : (
                         <>
                           <Music className="w-6 h-6" />
-                          <span>Tracks</span>
+                          <span>Track</span>
                         </>
                       )}
                     </Link>

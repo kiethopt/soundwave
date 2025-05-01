@@ -37,9 +37,14 @@ export const validateArtistData = (data: any): string | null => {
       return 'socialMediaLinks must be an object';
     }
 
-    // Chỉ cho phép facebook và instagram
+    // Chỉ cho phép facebook và instagram, nhưng BỎ QUA key tạm thời _requestedLabel
     const allowedPlatforms = ['facebook', 'instagram'];
     for (const key in socialMediaLinks) {
+      // Bỏ qua key tạm thời của chúng ta
+      if (key === '_requestedLabel') {
+        continue;
+      }
+      // Kiểm tra các key còn lại
       if (!allowedPlatforms.includes(key)) {
         return `Invalid social media platform: ${key}`;
       }
@@ -604,15 +609,25 @@ export const requestArtistRole = async (
   } = data;
 
   // Chuyển đổi socialMediaLinks từ chuỗi JSON sang đối tượng JavaScript
-  let socialMediaLinks = {};
+  let socialMediaLinksObject: Record<string, any> = {}; // Type for flexibility
   if (socialMediaLinksString) {
-    socialMediaLinks = JSON.parse(socialMediaLinksString);
+    try {
+      socialMediaLinksObject = JSON.parse(socialMediaLinksString);
+    } catch (e) {
+      console.error("Error parsing socialMediaLinksString:", e);
+      throw new Error("Invalid format for social media links.");
+    }
+  }
+
+  // Add temporary label name to the object if provided
+  if (label && typeof label === 'string' && label.trim() !== '') {
+      socialMediaLinksObject['_requestedLabel'] = label.trim();
   }
 
   // Chuyển đổi genres từ chuỗi sang mảng
   let genres = [];
   if (genresString) {
-    genres = genresString.split(','); // Chuyển chuỗi thành mảng dựa trên dấu phẩy
+    genres = genresString.split(',');
   }
 
   // Validate dữ liệu nghệ sĩ
@@ -620,7 +635,7 @@ export const requestArtistRole = async (
     artistName,
     bio,
     label,
-    socialMediaLinks,
+    socialMediaLinks: socialMediaLinksObject,
     genres,
   });
   if (validationError) {
@@ -658,13 +673,7 @@ export const requestArtistRole = async (
     data: {
       artistName,
       bio,
-      label: label ? { 
-        connectOrCreate: { 
-          where: { name: label }, 
-          create: { name: label } 
-        } 
-      } : undefined,
-      socialMediaLinks,
+      socialMediaLinks: socialMediaLinksObject,
       avatar: avatarUrl,
       role: Role.ARTIST,
       verificationRequestedAt: new Date(),

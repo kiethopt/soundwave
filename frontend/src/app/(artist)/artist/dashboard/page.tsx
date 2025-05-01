@@ -128,11 +128,6 @@ export default function ArtistDashboard() {
             Overview of your performance
           </h2>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button className="flex-1 sm:flex-none px-3 py-1.5 sm:px-4 sm:py-2 bg-[#A57865] text-white rounded-lg hover:bg-[#A57865]/90 text-xs sm:text-sm font-medium">
-            Export Data
-          </button>
-        </div>
       </div>
 
       {loading ? (
