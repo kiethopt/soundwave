@@ -103,61 +103,13 @@ exports.getArtistRequestDetail = getArtistRequestDetail;
 const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const avatarFile = req.file;
         const userData = { ...req.body };
         const requestingUser = req.user;
         if (!requestingUser) {
             res.status(401).json({ message: "Unauthorized: Requesting user data missing." });
             return;
         }
-        const originalIsActiveInput = userData.isActive;
-        const updatedUser = await adminService.updateUserInfo(id, userData, requestingUser, avatarFile);
-        if (originalIsActiveInput !== undefined) {
-            const intendedState = userData.isActive;
-            if (updatedUser.isActive === false && intendedState === false) {
-                const reason = userData.reason || '';
-                const userName = updatedUser.name || updatedUser.username || 'User';
-                db_1.default.notification.create({
-                    data: {
-                        type: 'ACCOUNT_DEACTIVATED',
-                        message: `Your account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`,
-                        recipientType: 'USER',
-                        userId: id,
-                        isRead: false,
-                    },
-                }).catch(err => console.error('[Async Notify Error] Failed to create deactivation notification:', err));
-                if (updatedUser.email) {
-                    try {
-                        const emailOptions = emailService.createAccountDeactivatedEmail(updatedUser.email, userName, 'user', reason);
-                        emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send deactivation email:', err));
-                    }
-                    catch (syncError) {
-                        console.error('[Email Setup Error] Failed to create deactivation email options:', syncError);
-                    }
-                }
-            }
-            else if (updatedUser.isActive === true && intendedState === true) {
-                const userName = updatedUser.name || updatedUser.username || 'User';
-                db_1.default.notification.create({
-                    data: {
-                        type: 'ACCOUNT_ACTIVATED',
-                        message: 'Your account has been reactivated.',
-                        recipientType: 'USER',
-                        userId: id,
-                        isRead: false,
-                    },
-                }).catch(err => console.error('[Async Notify Error] Failed to create activation notification:', err));
-                if (updatedUser.email) {
-                    try {
-                        const emailOptions = emailService.createAccountActivatedEmail(updatedUser.email, userName, 'user');
-                        emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send activation email:', err));
-                    }
-                    catch (syncError) {
-                        console.error('[Email Setup Error] Failed to create activation email options:', syncError);
-                    }
-                }
-            }
-        }
+        const updatedUser = await adminService.updateUserInfo(id, userData, requestingUser);
         res.json({
             message: 'User updated successfully',
             user: updatedUser,
@@ -202,73 +154,12 @@ exports.updateUser = updateUser;
 const updateArtist = async (req, res) => {
     try {
         const { id } = req.params;
-        const avatarFile = req.file;
-        const { isActive, reason, isVerified, ...artistData } = req.body;
-        const originalIsActiveInput = isActive;
-        let intendedIsActiveState = undefined;
-        if (isActive !== undefined) {
-            intendedIsActiveState = isActive === 'true' || isActive === true;
+        const artistData = { ...req.body };
+        if (!id) {
+            res.status(400).json({ message: 'Artist ID is required' });
+            return;
         }
-        const dataForService = {
-            ...artistData,
-        };
-        if (intendedIsActiveState !== undefined) {
-            dataForService.isActive = intendedIsActiveState;
-        }
-        if (isVerified !== undefined) {
-            dataForService.isVerified = isVerified === 'true' || isVerified === true;
-        }
-        const updatedArtist = await adminService.updateArtistInfo(id, dataForService, avatarFile);
-        if (originalIsActiveInput !== undefined) {
-            const finalIsActiveState = updatedArtist.isActive;
-            const ownerUser = updatedArtist.user;
-            const ownerUserName = ownerUser?.name || ownerUser?.username || 'Artist';
-            if (finalIsActiveState === false && intendedIsActiveState === false) {
-                if (ownerUser?.id) {
-                    const notificationMessage = `Your artist account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`;
-                    db_1.default.notification.create({
-                        data: {
-                            type: 'ACCOUNT_DEACTIVATED',
-                            message: notificationMessage,
-                            recipientType: 'USER',
-                            userId: ownerUser.id,
-                            isRead: false,
-                        },
-                    }).catch(err => console.error('[Async Notify Error] Failed to create artist deactivation notification:', err));
-                }
-                if (ownerUser?.email) {
-                    try {
-                        const emailOptions = emailService.createAccountDeactivatedEmail(ownerUser.email, ownerUserName, 'artist', reason);
-                        emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist deactivation email:', err));
-                    }
-                    catch (syncError) {
-                        console.error('[Email Setup Error] Failed to create artist deactivation email options:', syncError);
-                    }
-                }
-            }
-            else if (finalIsActiveState === true && intendedIsActiveState === true) {
-                if (ownerUser?.id) {
-                    db_1.default.notification.create({
-                        data: {
-                            type: 'ACCOUNT_ACTIVATED',
-                            message: 'Your artist account has been reactivated.',
-                            recipientType: 'USER',
-                            userId: ownerUser.id,
-                            isRead: false,
-                        },
-                    }).catch(err => console.error('[Async Notify Error] Failed to create artist activation notification:', err));
-                }
-                if (ownerUser?.email) {
-                    try {
-                        const emailOptions = emailService.createAccountActivatedEmail(ownerUser.email, ownerUserName, 'artist');
-                        emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist activation email:', err));
-                    }
-                    catch (syncError) {
-                        console.error('[Email Setup Error] Failed to create artist activation email options:', syncError);
-                    }
-                }
-            }
-        }
+        const updatedArtist = await adminService.updateArtistInfo(id, artistData);
         res.json({
             message: 'Artist updated successfully',
             artist: updatedArtist,
@@ -284,13 +175,12 @@ const updateArtist = async (req, res) => {
                 res.status(400).json({ message: 'Artist name already exists' });
                 return;
             }
-            else {
-                (0, handle_utils_1.handleError)(res, error, 'Update artist');
+            else if (error.message.includes('Validation failed')) {
+                res.status(400).json({ message: error.message });
+                return;
             }
         }
-        else {
-            (0, handle_utils_1.handleError)(res, error, 'Update artist');
-        }
+        (0, handle_utils_1.handleError)(res, error, 'Update artist');
     }
 };
 exports.updateArtist = updateArtist;
@@ -558,25 +448,19 @@ const handleCacheStatus = async (req, res) => {
 exports.handleCacheStatus = handleCacheStatus;
 const handleAIModelStatus = async (req, res) => {
     try {
-        const { model } = req.body;
         if (req.method === 'GET') {
-            const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-            const isEnabled = !!process.env.GEMINI_API_KEY;
+            const aiStatus = await adminService.getAIModelStatus();
+            res.json({ success: true, data: aiStatus });
+        }
+        else if (req.method === 'POST') {
+            const { model } = req.body;
+            const result = await adminService.updateAIModel(model);
             res.status(200).json({
                 success: true,
-                data: {
-                    model: currentModel,
-                    enabled: isEnabled,
-                },
+                message: 'AI model settings updated successfully',
+                data: result,
             });
-            return;
         }
-        const result = await adminService.updateAIModel(model);
-        res.status(200).json({
-            success: true,
-            message: 'AI model settings updated successfully',
-            data: result,
-        });
     }
     catch (error) {
         console.error('Error updating AI model settings:', error);

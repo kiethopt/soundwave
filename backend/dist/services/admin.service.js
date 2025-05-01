@@ -36,11 +36,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAIModel = exports.updateCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
-const upload_service_1 = require("./upload.service");
 const handle_utils_1 = require("../utils/handle-utils");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -50,39 +49,45 @@ const client_2 = require("@prisma/client");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const date_fns_1 = require("date-fns");
 const emailService = __importStar(require("./email.service"));
+const VALID_GEMINI_MODELS = [
+    'gemini-2.5-flash-preview-04-17',
+    'gemini-2.5-pro-preview-03-25',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+    'gemini-1.5-pro',
+];
 const getUsers = async (req, requestingUser) => {
-    const { search = '', status, role, sortBy, sortOrder } = req.query;
-    let roleFilter = {};
-    if (requestingUser.role === client_1.Role.ADMIN && role) {
-        const requestedRoles = Array.isArray(role)
-            ? role
-            : [role];
-        const validRoles = requestedRoles
-            .map((r) => r.toUpperCase())
-            .filter((r) => Object.values(client_1.Role).includes(r));
-        if (validRoles.length > 0) {
-            roleFilter = { in: validRoles };
-        }
-    }
+    const { search, status, sortBy, sortOrder } = req.query;
     const where = {
-        ...(Object.keys(roleFilter).length > 0 ? { role: roleFilter } : {}),
         id: { not: requestingUser.id },
-        ...(search
-            ? {
-                OR: [
-                    { email: { contains: String(search), mode: 'insensitive' } },
-                    { username: { contains: String(search), mode: 'insensitive' } },
-                    { name: { contains: String(search), mode: 'insensitive' } },
-                ],
-            }
-            : {}),
-        ...(status !== undefined ? { isActive: (0, handle_utils_1.toBooleanValue)(status) } : {}),
     };
+    if (search && typeof search === 'string') {
+        where.OR = [
+            { email: { contains: search, mode: 'insensitive' } },
+            { username: { contains: search, mode: 'insensitive' } },
+            { name: { contains: search, mode: 'insensitive' } },
+        ];
+    }
+    if (status && typeof status === 'string' && status !== 'ALL') {
+        where.isActive = status === 'true';
+    }
     let orderBy = { createdAt: 'desc' };
-    const validSortFields = ['name', 'email', 'username', 'role', 'isActive', 'createdAt', 'lastLoginAt'];
-    if (sortBy && validSortFields.includes(String(sortBy))) {
-        const order = sortOrder === 'asc' ? 'asc' : 'desc';
-        orderBy = { [String(sortBy)]: order };
+    const validSortFields = [
+        'name',
+        'email',
+        'username',
+        'role',
+        'isActive',
+        'createdAt',
+        'lastLoginAt',
+    ];
+    if (sortBy &&
+        typeof sortBy === 'string' &&
+        validSortFields.includes(sortBy)) {
+        const direction = sortOrder === 'asc' ? 'asc' : 'desc';
+        orderBy = { [sortBy]: direction };
     }
     const options = {
         where,
@@ -108,7 +113,7 @@ const getUserById = async (id) => {
 };
 exports.getUserById = getUserById;
 const getArtistRequests = async (req) => {
-    const { search, status, startDate, endDate } = req.query;
+    const { search, startDate, endDate } = req.query;
     const where = {
         verificationRequestedAt: { not: null },
         user: {
@@ -180,38 +185,43 @@ const getArtistRequestDetail = async (id) => {
     return request;
 };
 exports.getArtistRequestDetail = getArtistRequestDetail;
-const updateUserInfo = async (id, data, requestingUser, avatarFile) => {
-    const { currentPassword, newPassword, confirmPassword, reason, ...updateData } = data;
+const updateUserInfo = async (id, data, requestingUser) => {
+    const { name, username, email, newPassword, isActive, reason } = data;
     const existingUser = await db_1.default.user.findUnique({ where: { id } });
     if (!existingUser) {
         throw new Error('User not found');
     }
+    if (requestingUser.role !== client_1.Role.ADMIN && existingUser.role === client_1.Role.ADMIN) {
+        throw new Error(`Permission denied: Cannot modify Admin users.`);
+    }
     if (requestingUser.role === client_1.Role.ADMIN && requestingUser.id !== id && existingUser.role === client_1.Role.ADMIN) {
         throw new Error(`Permission denied: Admins cannot modify other Admin users.`);
     }
-    if (updateData.role !== undefined && requestingUser.role !== client_1.Role.ADMIN) {
-        throw new Error(`Permission denied: Only Admins can change user roles.`);
+    const updateData = {};
+    if (name !== undefined) {
+        updateData.name = name;
     }
-    if (requestingUser.id === id && updateData.role !== undefined) {
-        throw new Error(`Permission denied: Cannot change your own role.`);
-    }
-    if (updateData.name !== undefined)
-        updateData.name = updateData.name;
-    if (updateData.email !== undefined && updateData.email !== existingUser.email) {
-        const existingEmail = await db_1.default.user.findFirst({ where: { email: updateData.email, NOT: { id } } });
+    if (email !== undefined && email !== existingUser.email) {
+        const existingEmail = await db_1.default.user.findFirst({ where: { email, NOT: { id } } });
         if (existingEmail)
             throw new Error('Email already exists');
+        updateData.email = email;
     }
-    if (updateData.username !== undefined && updateData.username !== existingUser.username) {
-        const existingUsername = await db_1.default.user.findFirst({ where: { username: updateData.username, NOT: { id } } });
+    if (username !== undefined && username !== existingUser.username) {
+        const existingUsername = await db_1.default.user.findFirst({ where: { username, NOT: { id } } });
         if (existingUsername)
             throw new Error('Username already exists');
+        updateData.username = username;
     }
-    if (updateData.isActive !== undefined) {
-        if (requestingUser.id === id && (0, handle_utils_1.toBooleanValue)(updateData.isActive) === false) {
+    if (isActive !== undefined) {
+        const isActiveBool = (0, handle_utils_1.toBooleanValue)(isActive);
+        if (isActiveBool === undefined) {
+            throw new Error('Invalid value for isActive status');
+        }
+        if (requestingUser.id === id && !isActiveBool) {
             throw new Error("Permission denied: Cannot deactivate your own account.");
         }
-        updateData.isActive = (0, handle_utils_1.toBooleanValue)(updateData.isActive);
+        updateData.isActive = isActiveBool;
     }
     if (newPassword) {
         if (newPassword.length < 6) {
@@ -219,14 +229,7 @@ const updateUserInfo = async (id, data, requestingUser, avatarFile) => {
         }
         updateData.password = await bcrypt_1.default.hash(newPassword, 10);
     }
-    if (avatarFile) {
-        const uploadResult = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'users/avatars');
-        updateData.avatar = uploadResult.secure_url;
-    }
-    else if (data.avatar === null && existingUser.avatar) {
-        updateData.avatar = null;
-    }
-    if (Object.keys(updateData).length === 0 && !avatarFile && !(data.avatar === null && existingUser.avatar)) {
+    if (Object.keys(updateData).length === 0) {
         throw new Error("No valid data provided for update.");
     }
     const updatedUser = await db_1.default.user.update({
@@ -234,26 +237,82 @@ const updateUserInfo = async (id, data, requestingUser, avatarFile) => {
         data: updateData,
         select: prisma_selects_1.userSelect,
     });
+    if (updateData.isActive !== undefined && updateData.isActive !== existingUser.isActive) {
+        const userName = updatedUser.name || updatedUser.username || 'User';
+        if (updatedUser.isActive === false) {
+            db_1.default.notification.create({
+                data: {
+                    type: 'ACCOUNT_DEACTIVATED',
+                    message: `Your account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`,
+                    recipientType: 'USER',
+                    userId: id,
+                    isRead: false,
+                },
+            }).catch(err => console.error('[Async Notify Error] Failed to create deactivation notification:', err));
+            if (updatedUser.email) {
+                try {
+                    const emailOptions = emailService.createAccountDeactivatedEmail(updatedUser.email, userName, 'user', reason);
+                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send deactivation email:', err));
+                }
+                catch (syncError) {
+                    console.error('[Email Setup Error] Failed to create deactivation email options:', syncError);
+                }
+            }
+        }
+        else if (updatedUser.isActive === true) {
+            db_1.default.notification.create({
+                data: {
+                    type: 'ACCOUNT_ACTIVATED',
+                    message: 'Your account has been reactivated.',
+                    recipientType: 'USER',
+                    userId: id,
+                    isRead: false,
+                },
+            }).catch(err => console.error('[Async Notify Error] Failed to create activation notification:', err));
+            if (updatedUser.email) {
+                try {
+                    const emailOptions = emailService.createAccountActivatedEmail(updatedUser.email, userName, 'user');
+                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send activation email:', err));
+                }
+                catch (syncError) {
+                    console.error('[Email Setup Error] Failed to create activation email options:', syncError);
+                }
+            }
+        }
+    }
     return updatedUser;
 };
 exports.updateUserInfo = updateUserInfo;
-const updateArtistInfo = async (id, data, avatarFile) => {
+const updateArtistInfo = async (id, data) => {
+    const { artistName, bio, isActive, reason } = data;
     const existingArtist = await db_1.default.artistProfile.findUnique({
         where: { id },
         select: {
             id: true,
             artistName: true,
             isActive: true,
-            isVerified: true,
-            socialMediaLinks: true,
             userId: true,
-            user: { select: { email: true, name: true, username: true } }
+            user: { select: { id: true, email: true, name: true, username: true } }
         }
     });
     if (!existingArtist) {
         throw new Error('Artist not found');
     }
-    const { artistName, bio, isActive, isVerified } = data;
+    const validationErrors = [];
+    if (artistName !== undefined) {
+        if (artistName.length < 3) {
+            validationErrors.push('Artist name must be at least 3 characters');
+        }
+        if (artistName.length > 100) {
+            validationErrors.push('Artist name cannot exceed 100 characters');
+        }
+    }
+    if (bio !== undefined && bio.length > 1000) {
+        validationErrors.push('Biography cannot exceed 1000 characters');
+    }
+    if (validationErrors.length > 0) {
+        throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
     let validatedArtistName = undefined;
     if (artistName && artistName !== existingArtist.artistName) {
         const nameExists = await db_1.default.artistProfile.findFirst({
@@ -267,25 +326,76 @@ const updateArtistInfo = async (id, data, avatarFile) => {
         }
         validatedArtistName = artistName;
     }
-    let avatarUrl = undefined;
-    if (avatarFile) {
-        const result = await (0, upload_service_1.uploadFile)(avatarFile.buffer, 'artists/avatars', 'image');
-        avatarUrl = result.secure_url;
+    const updateData = {};
+    if (validatedArtistName !== undefined) {
+        updateData.artistName = validatedArtistName;
+    }
+    if (bio !== undefined) {
+        updateData.bio = bio;
+    }
+    if (isActive !== undefined) {
+        const isActiveBool = (0, handle_utils_1.toBooleanValue)(isActive);
+        if (isActiveBool === undefined) {
+            throw new Error('Invalid value for isActive status');
+        }
+        updateData.isActive = isActiveBool;
+    }
+    if (Object.keys(updateData).length === 0) {
+        throw new Error('No valid data provided for update');
     }
     const updatedArtist = await db_1.default.artistProfile.update({
         where: { id },
-        data: {
-            ...(validatedArtistName && { artistName: validatedArtistName }),
-            ...(bio !== undefined && { bio }),
-            ...(isActive !== undefined && { isActive: (0, handle_utils_1.toBooleanValue)(isActive) }),
-            ...(isVerified !== undefined && {
-                isVerified: (0, handle_utils_1.toBooleanValue)(isVerified),
-                verifiedAt: (0, handle_utils_1.toBooleanValue)(isVerified) ? new Date() : null,
-            }),
-            ...(avatarUrl && { avatar: avatarUrl }),
-        },
+        data: updateData,
         select: prisma_selects_1.artistProfileSelect,
     });
+    if (isActive !== undefined && existingArtist.isActive !== updatedArtist.isActive) {
+        const ownerUser = existingArtist.user;
+        const ownerUserName = ownerUser?.name || ownerUser?.username || 'Artist';
+        if (updatedArtist.isActive === false) {
+            if (ownerUser?.id) {
+                db_1.default.notification.create({
+                    data: {
+                        type: 'ACCOUNT_DEACTIVATED',
+                        message: `Your artist account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`,
+                        recipientType: 'USER',
+                        userId: ownerUser.id,
+                        isRead: false,
+                    },
+                }).catch(err => console.error('[Async Notify Error] Failed to create artist deactivation notification:', err));
+            }
+            if (ownerUser?.email) {
+                try {
+                    const emailOptions = emailService.createAccountDeactivatedEmail(ownerUser.email, ownerUserName, 'artist', reason);
+                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist deactivation email:', err));
+                }
+                catch (syncError) {
+                    console.error('[Email Setup Error] Failed to create artist deactivation email options:', syncError);
+                }
+            }
+        }
+        else if (updatedArtist.isActive === true) {
+            if (ownerUser?.id) {
+                db_1.default.notification.create({
+                    data: {
+                        type: 'ACCOUNT_ACTIVATED',
+                        message: 'Your artist account has been reactivated.',
+                        recipientType: 'USER',
+                        userId: ownerUser.id,
+                        isRead: false,
+                    },
+                }).catch(err => console.error('[Async Notify Error] Failed to create artist activation notification:', err));
+            }
+            if (ownerUser?.email) {
+                try {
+                    const emailOptions = emailService.createAccountActivatedEmail(ownerUser.email, ownerUserName, 'artist');
+                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist activation email:', err));
+                }
+                catch (syncError) {
+                    console.error('[Email Setup Error] Failed to create artist activation email options:', syncError);
+                }
+            }
+        }
+    }
     return updatedArtist;
 };
 exports.updateArtistInfo = updateArtistInfo;
@@ -355,38 +465,34 @@ const deleteArtistById = async (id, reason) => {
 };
 exports.deleteArtistById = deleteArtistById;
 const getArtists = async (req) => {
-    const { search = '', status, isVerified, sortBy, sortOrder } = req.query;
+    const { search, status, sortBy, sortOrder } = req.query;
     const where = {
         role: client_1.Role.ARTIST,
-        verificationRequestedAt: null,
-        ...(isVerified !== undefined && { isVerified: isVerified === 'true' }),
-        ...(search
-            ? {
-                OR: [
-                    { artistName: { contains: String(search), mode: 'insensitive' } },
-                    {
-                        user: {
-                            email: { contains: String(search), mode: 'insensitive' },
-                        },
-                    },
-                    {
-                        user: {
-                            name: { contains: String(search), mode: 'insensitive' },
-                        },
-                    },
-                ],
-            }
-            : {}),
-        ...(status !== undefined ? { isActive: status === 'true' } : {}),
     };
-    let orderBy;
-    const validSortFields = ['artistName', 'isVerified', 'isActive', 'monthlyListeners', 'createdAt'];
-    if (sortBy && validSortFields.includes(String(sortBy))) {
-        const order = sortOrder === 'asc' ? 'asc' : 'desc';
-        orderBy = [{ [String(sortBy)]: order }, { id: 'asc' }];
+    if (search && typeof search === 'string') {
+        where.OR = [
+            { artistName: { contains: search, mode: 'insensitive' } },
+            { user: { email: { contains: search, mode: 'insensitive' } } },
+            { user: { name: { contains: search, mode: 'insensitive' } } },
+        ];
     }
-    else {
-        orderBy = [{ createdAt: 'desc' }, { id: 'asc' }];
+    if (status && typeof status === 'string' && status !== 'ALL') {
+        where.isActive = status === 'true';
+    }
+    let orderBy = {
+        createdAt: 'desc',
+    };
+    const validSortFields = [
+        'artistName',
+        'isActive',
+        'monthlyListeners',
+        'createdAt',
+    ];
+    if (sortBy &&
+        typeof sortBy === 'string' &&
+        validSortFields.includes(sortBy)) {
+        const direction = sortOrder === 'asc' ? 'asc' : 'desc';
+        orderBy = { [sortBy]: direction };
     }
     const options = {
         where,
@@ -734,6 +840,30 @@ const getSystemStatus = async () => {
     return statuses;
 };
 exports.getSystemStatus = getSystemStatus;
+const getCacheStatus = async () => {
+    const useCache = process.env.USE_REDIS_CACHE === 'true';
+    let redisConnected = false;
+    if (cache_middleware_1.client && cache_middleware_1.client.isOpen) {
+        try {
+            await cache_middleware_1.client.ping();
+            redisConnected = true;
+        }
+        catch (error) {
+            console.error("Redis ping failed:", error);
+            redisConnected = false;
+        }
+    }
+    return { enabled: useCache && redisConnected };
+};
+exports.getCacheStatus = getCacheStatus;
+const getAIModelStatus = async () => {
+    const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    return {
+        model: currentModel,
+        validModels: VALID_GEMINI_MODELS,
+    };
+};
+exports.getAIModelStatus = getAIModelStatus;
 const updateCacheStatus = async (enabled) => {
     try {
         const envPath = process.env.NODE_ENV === 'production'

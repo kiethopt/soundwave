@@ -347,20 +347,19 @@ export default function ArtistRequestManagement() {
               </th>
               <th className="py-3 px-6 text-left font-medium">Artist Name</th>
               <th className="py-3 px-6 text-left font-medium">Email</th>
-              <th className="py-3 px-6 text-left font-medium">Requested At</th>
-              <th className="py-3 px-6 rounded-tr-md text-center">Actions</th>
+              <th className="py-3 px-6 text-left font-medium rounded-tr-md">Requested At</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
+                <td colSpan={4} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
                   Loading artist requests...
                 </td>
               </tr>
             ) : requests.length === 0 ? (
               <tr>
-                <td colSpan={5} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
+                <td colSpan={4} className={`py-8 text-center ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-500'}`}>
                   No artist requests found
                 </td>
               </tr>
@@ -386,30 +385,6 @@ export default function ArtistRequestManagement() {
                   </td>
                   <td className="py-4 px-6">{request.user?.email || 'N/A'}</td>
                   <td className="py-4 px-6">{formatDate(request.verificationRequestedAt)}</td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center justify-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`text-green-600 hover:bg-green-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-green-500/20' : 'hover:bg-green-100'}`}
-                        onClick={(e) => { e.stopPropagation(); handleAction('approve', request); }}
-                        aria-label={`Approve request from ${request.artistName}`}
-                        disabled={loading || actionLoading !== null}
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
-                        onClick={(e) => { e.stopPropagation(); handleAction('reject', request); }}
-                        aria-label={`Reject request from ${request.artistName}`}
-                        disabled={loading || actionLoading !== null}
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
                 </tr>
               ))
             )}

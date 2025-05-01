@@ -245,7 +245,7 @@ export function TrackList({
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span
-                      className={`font-medium truncate ${
+                      className={`font-medium truncate hover:underline cursor-pointer underline-offset-2 ${
                         isCurrentTrack
                           ? "text-[#A57865]"
                           : theme === "light"
@@ -253,6 +253,15 @@ export function TrackList({
                           : "text-white"
                       }`}
                       title={track.title}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (track.album) {
+                          router.push(`/album/${track.album.id}`);
+                        }
+                        else {
+                          router.push(`/track/${track.id}`);
+                        }
+                      }}
                     >
                       {track.title}
                     </span>
@@ -276,12 +285,20 @@ export function TrackList({
                   onClick={() => handleTrackPlay(track)}
                 >
                   <span
-                    className={`truncate text-sm ${
-                      theme === "light" ? "text-gray-500" : "text-white/60"
+                    className={`truncate text-sm hover:underline cursor-pointer underline-offset-2 ${
+                      theme === "light" ? "text-gray-500" : "text-white/60" 
                     }`}
                     title={track.album?.title || "Unknown Album"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (track.album) {
+                        router.push(`/album/${track.album.id}`);
+                      } else {
+                        router.push(`/track/${track.id}`);
+                      }
+                    }}
                   >
-                    {track.album?.title || "-"}
+                    {track.album?.title || track.title}
                   </span>
                 </div>
 

@@ -149,14 +149,14 @@ export default function ArtistRequestDetail({
             <div className="flex justify-center sm:justify-end gap-2">
               <button
                 onClick={handleApproveClick}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-green-500/20 text-green-400 rounded-lg text-xs sm:text-sm min-w-[120px] sm:min-w-[140px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-green-600 text-white hover:bg-green-700 rounded-lg text-xs sm:text-sm min-w-[120px] sm:min-w-[140px] transition-colors duration-150"
               >
                 <Check className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>Approve</span>
               </button>
               <button
                 onClick={handleRejectClick}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-red-500/20 text-red-400 rounded-lg text-xs sm:text-sm min-w-[120px] sm:min-w-[140px]"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 bg-red-600 text-white hover:bg-red-700 rounded-lg text-xs sm:text-sm min-w-[120px] sm:min-w-[140px] transition-colors duration-150"
               >
                 <X className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>Reject</span>

@@ -3,6 +3,7 @@ import {
   handleError,
   runValidations,
   validateField,
+  toBooleanValue,
 } from '../utils/handle-utils';
 import prisma from '../config/db';
 import * as adminService from '../services/admin.service';
@@ -95,104 +96,31 @@ export const updateUser = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const avatarFile = req.file;
     const userData = { ...req.body };
     const requestingUser = req.user as UserWithAdminLevel;
 
-    // CRITICAL: Ensure requestingUser is defined before calling the service
     if (!requestingUser) {
       res.status(401).json({ message: "Unauthorized: Requesting user data missing." });
       return;
     }
 
-
-    const originalIsActiveInput = userData.isActive; // Keep for notification logic
-
     const updatedUser = await adminService.updateUserInfo(
       id,
       userData,
-      requestingUser, // Pass the requesting user to the service
-      avatarFile
+      requestingUser,
     );
 
-    // --- Asynchronous Notification & Email --- 
-    if (originalIsActiveInput !== undefined) {
-        const intendedState = userData.isActive;
-
-        if (updatedUser.isActive === false && intendedState === false) { 
-            const reason = userData.reason || '';
-            const userName = updatedUser.name || updatedUser.username || 'User';
-
-            // Create notification (fire-and-forget)
-            prisma.notification.create({ 
-                data: {
-                    type: 'ACCOUNT_DEACTIVATED',
-                    message: `Your account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`,
-                    recipientType: 'USER',
-                    userId: id,
-                    isRead: false,
-                },
-             }).catch(err => console.error('[Async Notify Error] Failed to create deactivation notification:', err));
-
-            // Send email (fire-and-forget)
-            if (updatedUser.email) {
-                try {
-                    const emailOptions = emailService.createAccountDeactivatedEmail(
-                        updatedUser.email,
-                        userName,
-                        'user',
-                        reason
-                    );
-                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send deactivation email:', err));
-                } catch (syncError) {
-                    console.error('[Email Setup Error] Failed to create deactivation email options:', syncError);
-                }
-            }
-        } else if (updatedUser.isActive === true && intendedState === true) { 
-            const userName = updatedUser.name || updatedUser.username || 'User';
-
-            // Create notification (fire-and-forget)
-            prisma.notification.create({ 
-                data: {
-                    type: 'ACCOUNT_ACTIVATED',
-                    message: 'Your account has been reactivated.',
-                    recipientType: 'USER',
-                    userId: id,
-                    isRead: false,
-                },
-             }).catch(err => console.error('[Async Notify Error] Failed to create activation notification:', err));
-
-            // Send email (fire-and-forget)
-            if (updatedUser.email) {
-                 try {
-                    const emailOptions = emailService.createAccountActivatedEmail(
-                        updatedUser.email,
-                        userName,
-                        'user'
-                    );
-                    emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send activation email:', err));
-                } catch (syncError) {
-                    console.error('[Email Setup Error] Failed to create activation email options:', syncError);
-                }
-            }
-        }
-    }
-
-    // Send the successful response immediately
     res.json({
       message: 'User updated successfully',
-      user: updatedUser, // Return the updated user data
+      user: updatedUser,
     });
 
   } catch (error) {
-    // --- Specific Error Handling FIRST ---
     if (error instanceof Error) {
-      // Handle Permission Errors from the service
       if (error.message.startsWith('Permission denied:')) {
         res.status(403).json({ message: error.message });
         return;
       }
-      // Handle other known errors
       if (error.message === 'User not found') {
         res.status(404).json({ message: 'User not found' });
         return;
@@ -216,7 +144,6 @@ export const updateUser = async (
          return;
       }
     }
-    // General error handler
     handleError(res, error, 'Update user');
   }
 };
@@ -228,100 +155,19 @@ export const updateArtist = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const avatarFile = req.file;
-    const { isActive, reason, isVerified, ...artistData } = req.body;
+    const artistData = { ...req.body };
 
-    const originalIsActiveInput = isActive;
-    let intendedIsActiveState: boolean | undefined = undefined;
-    if (isActive !== undefined) {
-      intendedIsActiveState = isActive === 'true' || isActive === true;
+    if (!id) {
+      res.status(400).json({ message: 'Artist ID is required' });
+      return;
     }
 
-    // Prepare data for the service call
-    const dataForService: any = {
-      ...artistData,
-    };
-    if (intendedIsActiveState !== undefined) {
-      dataForService.isActive = intendedIsActiveState;
-    }
-    if (isVerified !== undefined) {
-      dataForService.isVerified = isVerified === 'true' || isVerified === true;
-    }
+    const updatedArtist = await adminService.updateArtistInfo(id, artistData);
 
-    // Call the service to update the artist info
-    const updatedArtist = await adminService.updateArtistInfo(
-      id,
-      dataForService,
-      avatarFile
-    );
-
-    // --- Asynchronous Notification & Email --- 
-    if (originalIsActiveInput !== undefined) {
-      const finalIsActiveState = updatedArtist.isActive;
-      const ownerUser = updatedArtist.user; 
-      const ownerUserName = ownerUser?.name || ownerUser?.username || 'Artist';
-
-      if (finalIsActiveState === false && intendedIsActiveState === false) {
-        // Artist was deactivated
-        if (ownerUser?.id) {
-          const notificationMessage = `Your artist account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`;
-          prisma.notification.create({ 
-            data: {
-                type: 'ACCOUNT_DEACTIVATED',
-                message: notificationMessage,
-                recipientType: 'USER', // Notifications go to the User profile
-                userId: ownerUser.id,
-                isRead: false,
-            },
-          }).catch(err => console.error('[Async Notify Error] Failed to create artist deactivation notification:', err));
-        }
-        if (ownerUser?.email) {
-          try {
-            const emailOptions = emailService.createAccountDeactivatedEmail(
-                ownerUser.email,
-                ownerUserName,
-                'artist', 
-                reason
-            );
-            emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist deactivation email:', err));
-          } catch (syncError) {
-            console.error('[Email Setup Error] Failed to create artist deactivation email options:', syncError);
-          }
-        }
-      } else if (finalIsActiveState === true && intendedIsActiveState === true) {
-        // Artist was activated
-        if (ownerUser?.id) {
-            prisma.notification.create({ 
-                data: {
-                    type: 'ACCOUNT_ACTIVATED',
-                    message: 'Your artist account has been reactivated.',
-                    recipientType: 'USER', // Notifications go to the User profile
-                    userId: ownerUser.id,
-                    isRead: false,
-                },
-            }).catch(err => console.error('[Async Notify Error] Failed to create artist activation notification:', err));
-        }
-        if (ownerUser?.email) {
-          try {
-            const emailOptions = emailService.createAccountActivatedEmail(
-                ownerUser.email,
-                ownerUserName,
-                'artist'
-            );
-            emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist activation email:', err));
-          } catch (syncError) {
-            console.error('[Email Setup Error] Failed to create artist activation email options:', syncError);
-          }
-        }
-      }
-    }
-
-    // Send the successful response immediately
     res.json({
       message: 'Artist updated successfully',
       artist: updatedArtist,
     });
-
   } catch (error) {
     if (error instanceof Error) {
       if (error.message === 'Artist not found') {
@@ -330,12 +176,12 @@ export const updateArtist = async (
       } else if (error.message === 'Artist name already exists') {
         res.status(400).json({ message: 'Artist name already exists' });
         return;
-      } else {
-         handleError(res, error, 'Update artist');
+      } else if (error.message.includes('Validation failed')) {
+        res.status(400).json({ message: error.message });
+        return;
       }
-    } else {
-        handleError(res, error, 'Update artist');
     }
+    handleError(res, error, 'Update artist');
   }
 };
 
@@ -678,31 +524,21 @@ export const handleAIModelStatus = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { model } = req.body;
-
-    // If this is a GET request, just return current status
     if (req.method === 'GET') {
-      const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-      const isEnabled = !!process.env.GEMINI_API_KEY;
-
+      // GET request: Retrieve current status
+      // Correctly call getAIModelStatus, not getCacheStatus
+      const aiStatus = await adminService.getAIModelStatus(); 
+      res.json({ success: true, data: aiStatus }); // Return the correct AI status data
+    } else if (req.method === 'POST') {
+      // POST request: Update model
+      const { model } = req.body;
+      const result = await adminService.updateAIModel(model);
       res.status(200).json({
         success: true,
-        data: {
-          model: currentModel,
-          enabled: isEnabled,
-        },
+        message: 'AI model settings updated successfully',
+        data: result,
       });
-      return;
     }
-
-    // Update the AI model
-    const result = await adminService.updateAIModel(model);
-
-    res.status(200).json({
-      success: true,
-      message: 'AI model settings updated successfully',
-      data: result,
-    });
   } catch (error) {
     console.error('Error updating AI model settings:', error);
     res.status(500).json({
