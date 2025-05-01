@@ -1575,7 +1575,7 @@ const suggestMoreTracksUsingAI = async (playlistId, userId, count = 5) => {
             prompt += "\n";
         }
         if (topGenres.length > 0) {
-            prompt += "Top genres in the playlist:\n";
+            prompt += "Top thể loại trong playlist:\n";
             topGenres.forEach(genre => {
                 prompt += `- ${genre.name} (${genre.count} tracks)\n`;
             });
@@ -1614,7 +1614,7 @@ const suggestMoreTracksUsingAI = async (playlistId, userId, count = 5) => {
             take: 20,
         });
         if (userHistory.length > 0) {
-            prompt += "User's recent listening history (not necessarily in the playlist):\n";
+            prompt += "Lịch sử nghe nhạc của người dùng (không nhất thiết phải trong playlist):\n";
             userHistory.slice(0, 5).forEach((history, index) => {
                 if (history.track) {
                     prompt += `${index + 1}. "${history.track.title}" by ${history.track.artist?.artistName || 'Unknown'}\n`;
@@ -1763,13 +1763,13 @@ You can select tracks from our database that match these criteria. Return ONLY a
                     const idRegex = /"([a-fA-F0-9-]{36})"/g;
                     const matches = [...responseText.matchAll(idRegex)];
                     suggestedTrackIds = matches.map(match => match[1]);
-                    console.log("[AI] Extracted track IDs with regex:", suggestedTrackIds);
+                    console.log("[AI] Trích xuất ID bài hát với regex:", suggestedTrackIds);
                 }
             }
             catch (error) {
                 console.error("[AI] Error parsing track IDs from response:", error);
                 suggestedTrackIds = suggestedTracks.slice(0, count).map(t => t.id);
-                console.log("[AI] Using fallback track suggestions:", suggestedTrackIds);
+                console.log("[AI] Sử dụng đề xuất bài hát fallback:", suggestedTrackIds);
             }
             const validatedTrackIds = await db_1.default.track.findMany({
                 where: {

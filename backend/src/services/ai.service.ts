@@ -1938,11 +1938,11 @@ function calculateTrackScore(track: any, params: any): number {
 }
 
 /**
- * Suggests additional tracks for an existing playlist using Gemini AI
- * @param playlistId - The ID of the playlist to suggest tracks for
- * @param userId - The user ID who owns the playlist
- * @param count - The number of tracks to suggest (default: 5)
- * @returns A Promise resolving to an array of track IDs
+ * Gợi ý thêm bài hát cho playlist dựa trên AI
+ * @param playlistId - ID của playlist để đề xuất bài hát
+ * @param userId - ID của người dùng sở hữu playlist
+ * @param count - Số lượng bài hát đề xuất (mặc định: 5)
+ * @returns Một Promise trả về mảng ID bài hát
  */
 export const suggestMoreTracksUsingAI = async (
   playlistId: string,
@@ -1952,7 +1952,7 @@ export const suggestMoreTracksUsingAI = async (
   try {
     console.log(`[AI] Suggesting more tracks for playlist ${playlistId}, user ${userId}`);
     
-    // Get the playlist details with existing tracks
+    // Lấy thông tin playlist và bài hát
     const playlist = await prisma.playlist.findUnique({
       where: { id: playlistId },
       include: {
@@ -1981,15 +1981,15 @@ export const suggestMoreTracksUsingAI = async (
       throw new Error("Playlist not found");
     }
 
-    // Extract existing track IDs to exclude them from suggestions
+    // Trích xuất ID bài hát hiện có để loại trừ chúng khỏi đề xuất
     const existingTrackIds = playlist.tracks.map(pt => pt.track.id);
     
-    // Extract genre information from the playlist
+    // Trích xuất thông tin thể loại từ playlist
     const genreCounts: Record<string, { count: number; name: string }> = {};
     const artistCounts: Record<string, { count: number; name: string }> = {};
     
     playlist.tracks.forEach(pt => {
-      // Count genres
+      // Đếm thể loại
       pt.track.genres.forEach(genreRel => {
         const genreId = genreRel.genre.id;
         const genreName = genreRel.genre.name;
@@ -2000,7 +2000,7 @@ export const suggestMoreTracksUsingAI = async (
         genreCounts[genreId].count += 1;
       });
       
-      // Count artists
+      // Đếm nghệ sĩ
       const artistId = pt.track.artist?.id;
       const artistName = pt.track.artist?.artistName;
       
@@ -2012,7 +2012,7 @@ export const suggestMoreTracksUsingAI = async (
       }
     });
     
-    // Get top genres
+    // Lấy top thể loại
     const topGenres = Object.entries(genreCounts)
       .sort(([, a], [, b]) => b.count - a.count)
       .slice(0, 3)
@@ -2022,7 +2022,7 @@ export const suggestMoreTracksUsingAI = async (
         count: data.count 
       }));
       
-    // Get top artists
+    // Lấy top nghệ sĩ
     const topArtists = Object.entries(artistCounts)
       .sort(([, a], [, b]) => b.count - a.count)
       .slice(0, 3)
@@ -2032,10 +2032,10 @@ export const suggestMoreTracksUsingAI = async (
         count: data.count 
       }));
     
-    // Create prompt for Gemini AI
+    // Tạo prompt cho Gemini AI
     let prompt = `I need to suggest ${count} more tracks for a playlist based on the current tracks in the playlist. The playlist has ${playlist.tracks.length} tracks and includes these artists and genres:\n\n`;
     
-    // Add top artists to prompt
+    // Thêm top nghệ sĩ vào prompt
     if (topArtists.length > 0) {
       prompt += "Top artists in the playlist:\n";
       topArtists.forEach(artist => {
@@ -2044,16 +2044,16 @@ export const suggestMoreTracksUsingAI = async (
       prompt += "\n";
     }
     
-    // Add top genres to prompt
+    // Thêm top thể loại vào prompt
     if (topGenres.length > 0) {
-      prompt += "Top genres in the playlist:\n";
+      prompt += "Top thể loại trong playlist:\n";
       topGenres.forEach(genre => {
         prompt += `- ${genre.name} (${genre.count} tracks)\n`;
       });
       prompt += "\n";
     }
     
-    // Add sample tracks
+    // Thêm bài hát mẫu vào prompt
     const sampleTracks = playlist.tracks.slice(0, 10);
     if (sampleTracks.length > 0) {
       prompt += "Sample tracks in the playlist:\n";
@@ -2063,7 +2063,7 @@ export const suggestMoreTracksUsingAI = async (
       prompt += "\n";
     }
     
-    // Get user's listening history to understand preferences
+    // Lấy lịch sử nghe nhạc của người dùng để hiểu sở thích
     const userHistory = await prisma.history.findMany({
       where: {
         userId,
@@ -2089,9 +2089,9 @@ export const suggestMoreTracksUsingAI = async (
       take: 20, // Consider recent 20 tracks
     });
     
-    // Add user history to prompt
+    // Thêm lịch sử nghe nhạc vào prompt
     if (userHistory.length > 0) {
-      prompt += "User's recent listening history (not necessarily in the playlist):\n";
+      prompt += "Lịch sử nghe nhạc của người dùng (không nhất thiết phải trong playlist):\n";
       userHistory.slice(0, 5).forEach((history, index) => {
         if (history.track) {
           prompt += `${index + 1}. "${history.track.title}" by ${history.track.artist?.artistName || 'Unknown'}\n`;
@@ -2100,12 +2100,12 @@ export const suggestMoreTracksUsingAI = async (
       prompt += "\n";
     }
     
-    // Final instructions
+    // Prompt cuối cùng
     prompt += `Based on this information, suggest ${count} more tracks that would fit well with this playlist. Consider both the artist style and genre consistency. I need the exact track IDs for the suggestions.
 
 You can select tracks from our database that match these criteria. Return ONLY a list of track IDs formatted as a valid JSON array of strings.`;
 
-    // Call Gemini API with the prompt
+    // Gọi API Gemini với prompt
     try {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
@@ -2125,11 +2125,11 @@ You can select tracks from our database that match these criteria. Return ONLY a
         }
       });
       
-      // Query the database for tracks that match the genres in the playlist
+      // Truy vấn cơ sở dữ liệu để tìm bài hát phù hợp với thể loại trong playlist
       let suggestedTracks: any[] = [];
       
       if (topGenres.length > 0) {
-        // Build a query based on the top genres
+        // Xây dựng một truy vấn dựa trên top thể loại
         suggestedTracks = await prisma.track.findMany({
           where: {
             isActive: true,
@@ -2157,7 +2157,7 @@ You can select tracks from our database that match these criteria. Return ONLY a
         });
       }
       
-      // If not enough tracks by genre, try by artist
+      // Nếu không có đủ bài hát theo thể loại, thử bằng nghệ sĩ
       if (suggestedTracks.length < count && topArtists.length > 0) {
         const artistTracks = await prisma.track.findMany({
           where: {
@@ -2186,7 +2186,7 @@ You can select tracks from our database that match these criteria. Return ONLY a
         suggestedTracks = [...suggestedTracks, ...artistTracks];
       }
       
-      // Still not enough tracks? Get popular tracks
+      // Vẫn không có đủ bài hát? Lấy bài hát phổ biến
       if (suggestedTracks.length < count) {
         const popularTracks = await prisma.track.findMany({
           where: {
@@ -2212,7 +2212,7 @@ You can select tracks from our database that match these criteria. Return ONLY a
         suggestedTracks = [...suggestedTracks, ...popularTracks];
       }
       
-      // Format tracks for Gemini's analysis
+      // Định dạng bài hát cho phân tích của Gemini
       let suggestedTracksInfo = "Potential tracks to add (you can choose from these or suggest others):\n";
       suggestedTracks.slice(0, 15).forEach((track, i) => {
         const genres = track.genres.map((g: any) => g.genre.name).join(", ");
@@ -2223,7 +2223,7 @@ You can select tracks from our database that match these criteria. Return ONLY a
       
       console.log("[AI] Sending prompt to Gemini for track suggestions");
       
-      // Retry mechanism for API calls
+      // Cơ chế retry cho cuộc gọi API
       const maxRetries = 3;
       let retryCount = 0;
       let result;
@@ -2253,32 +2253,32 @@ You can select tracks from our database that match these criteria. Return ONLY a
       
       console.log("[AI] Gemini response:", responseText);
       
-      // Extract track IDs from the response
+      // Trích xuất ID bài hát từ phản hồi
       let suggestedTrackIds: string[] = [];
       
       try {
-        // Find a JSON array in the response
+        // Tìm một mảng JSON trong phản hồi
         const jsonMatch = responseText.match(/\[[\s\S]*?\]/);
         if (jsonMatch) {
           const jsonString = jsonMatch[0];
           suggestedTrackIds = JSON.parse(jsonString);
           console.log("[AI] Parsed track IDs from JSON:", suggestedTrackIds);
         } else {
-          // If no JSON found, try to extract IDs by searching for the ID pattern
+          // Nếu không tìm thấy JSON, thử trích xuất ID bằng cách tìm kiếm mẫu ID
           const idRegex = /"([a-fA-F0-9-]{36})"/g;
           const matches = [...responseText.matchAll(idRegex)];
           suggestedTrackIds = matches.map(match => match[1]);
-          console.log("[AI] Extracted track IDs with regex:", suggestedTrackIds);
+          console.log("[AI] Trích xuất ID bài hát với regex:", suggestedTrackIds);
         }
       } catch (error) {
         console.error("[AI] Error parsing track IDs from response:", error);
         
-        // Fallback: Use tracks from our database query
+        // Fallback: Sử dụng bài hát từ truy vấn cơ sở dữ liệu
         suggestedTrackIds = suggestedTracks.slice(0, count).map(t => t.id);
-        console.log("[AI] Using fallback track suggestions:", suggestedTrackIds);
+        console.log("[AI] Sử dụng đề xuất bài hát fallback:", suggestedTrackIds);
       }
       
-      // Validate that the track IDs exist in the database
+      // Kiểm tra xem các ID bài hát có tồn tại trong cơ sở dữ liệu
       const validatedTrackIds = await prisma.track.findMany({
         where: {
           id: { in: suggestedTrackIds },
@@ -2289,7 +2289,7 @@ You can select tracks from our database that match these criteria. Return ONLY a
       
       const validTrackIds = validatedTrackIds.map(t => t.id);
       
-      // If we still don't have enough tracks, use some from our initial database query
+      // Nếu vẫn không có đủ bài hát, sử dụng một số từ truy vấn cơ sở dữ liệu ban đầu
       if (validTrackIds.length < count && suggestedTracks.length > 0) {
         const additionalIds = suggestedTracks
           .filter(t => !validTrackIds.includes(t.id))
@@ -2305,7 +2305,7 @@ You can select tracks from our database that match these criteria. Return ONLY a
     } catch (error) {
       console.error("[AI] Error getting track suggestions from Gemini:", error);
       
-      // Fallback: Get tracks based on the playlist's genres
+      // Fallback: Lấy bài hát dựa trên thể loại của playlist
       if (topGenres.length > 0) {
         const fallbackTracks = await prisma.track.findMany({
           where: {
