@@ -36,10 +36,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
+exports.suggestMoreTracksForPlaylist = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
 const playlistService = __importStar(require("../services/playlist.service"));
 const albumService = __importStar(require("../services/album.service"));
 const userService = __importStar(require("../services/user.service"));
+const aiService = __importStar(require("../services/ai.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
@@ -1103,4 +1104,69 @@ const getPlaylistSuggestions = async (req, res, next) => {
     }
 };
 exports.getPlaylistSuggestions = getPlaylistSuggestions;
+const suggestMoreTracksForPlaylist = async (req, res, next) => {
+    try {
+        const { id: playlistId } = req.params;
+        const userId = req.user?.id;
+        const count = req.query.count ? parseInt(req.query.count, 10) : 5;
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                message: "Unauthorized, please login",
+            });
+            return;
+        }
+        const playlist = await db_1.default.playlist.findUnique({
+            where: { id: playlistId },
+            select: { userId: true, type: true }
+        });
+        if (!playlist) {
+            res.status(404).json({
+                success: false,
+                message: "Playlist not found",
+            });
+            return;
+        }
+        if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
+            res.status(403).json({
+                success: false,
+                message: "You do not have permission to modify this playlist",
+            });
+            return;
+        }
+        const suggestedTrackIds = await aiService.suggestMoreTracksUsingAI(playlistId, userId, count);
+        const suggestedTracks = await db_1.default.track.findMany({
+            where: {
+                id: { in: suggestedTrackIds },
+                isActive: true,
+            },
+            include: {
+                artist: true,
+                album: true,
+            }
+        });
+        res.status(200).json({
+            success: true,
+            message: `Generated ${suggestedTrackIds.length} track suggestions for the playlist`,
+            data: suggestedTracks.map(track => ({
+                id: track.id,
+                title: track.title,
+                artist: track.artist,
+                album: track.album,
+                duration: track.duration,
+                coverUrl: track.coverUrl,
+                audioUrl: track.audioUrl,
+            })),
+        });
+    }
+    catch (error) {
+        console.error("Playlist suggestion error:", error instanceof Error ? error.message : 'Unknown error');
+        res.status(500).json({
+            success: false,
+            message: "Failed to generate track suggestions",
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+};
+exports.suggestMoreTracksForPlaylist = suggestMoreTracksForPlaylist;
 //# sourceMappingURL=playlist.controller.js.map

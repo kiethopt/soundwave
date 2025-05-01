@@ -53,6 +53,7 @@ model ArtistProfile {
   isActive                Boolean        @default(true)
   verificationRequestedAt DateTime?
   verifiedAt              DateTime?
+  requestedLabelName      String?
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
   userId                  String         @unique

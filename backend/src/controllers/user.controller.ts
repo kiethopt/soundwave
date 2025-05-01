@@ -19,28 +19,30 @@ export const requestToBecomeArtist = async (
     // Gọi service để tạo yêu cầu, service sẽ trả về profile nếu thành công
     const createdProfile = await userService.requestArtistRole(currentUser, req.body, req.file);
 
-    // --- Phát sự kiện Socket.IO cho user --- 
+    // --- Phát sự kiện Socket.IO cho user (with added error handling) --- 
     try {
         const io = getIO();
         const userSockets = getUserSockets();
-        const targetSocketId = userSockets.get(currentUser.id);
+        if (currentUser && currentUser.id) {
+            const targetSocketId = userSockets.get(currentUser.id);
 
-        if (targetSocketId) {
-            console.log(`🚀 Emitting artist_request_submitted to user ${currentUser.id} via socket ${targetSocketId}`);
-            // Gửi trạng thái có yêu cầu đang chờ
-            io.to(targetSocketId).emit('artist_request_submitted', {
-                hasPendingRequest: true,
-                // Có thể gửi kèm profile vừa tạo nếu cần
-                // artistProfile: createdProfile 
-            });
+            if (targetSocketId) {
+                console.log(`🚀 Emitting artist_request_submitted to user ${currentUser.id} via socket ${targetSocketId}`);
+                io.to(targetSocketId).emit('artist_request_submitted', {
+                    hasPendingRequest: true,
+                    artistProfileId: createdProfile.id 
+                });
+            } else {
+                console.log(`Socket not found for user ${currentUser.id}. Cannot emit request submission update.`);
+            }
         } else {
-            console.log(`Socket not found for user ${currentUser.id}. Cannot emit request submission update.`);
+            console.warn('[Socket Emit] currentUser or currentUser.id is undefined. Cannot emit socket event.');
         }
     } catch (socketError) {
-        console.error('Failed to emit socket event for artist request submission:', socketError);
+        console.error('[Controller] Failed to emit socket event for artist request submission:', socketError);
     }
-    // ------------------------------------
-
+    
+    // Send success response regardless of socket emission outcome
     res.json({ message: 'Artist role request submitted successfully' });
   } catch (error) {
     if (error instanceof Error) {

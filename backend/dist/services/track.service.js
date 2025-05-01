@@ -319,7 +319,7 @@ const createTrack = async (req) => {
     const user = req.user;
     if (!user)
         throw new Error('Unauthorized');
-    const { title, releaseDate, trackNumber, albumId, featuredArtists, artistId, genreIds, labelId, } = req.body;
+    const { title, releaseDate, trackNumber, albumId, featuredArtists, artistId, genreIds, } = req.body;
     const finalArtistId = user.role === 'ADMIN' && artistId ? artistId : user.artistProfile?.id;
     if (!finalArtistId) {
         throw new Error(user.role === 'ADMIN'
@@ -328,9 +328,16 @@ const createTrack = async (req) => {
     }
     const artistProfile = await db_1.default.artistProfile.findUnique({
         where: { id: finalArtistId },
-        select: { artistName: true },
+        select: {
+            artistName: true,
+            labelId: true
+        },
     });
-    const artistName = artistProfile?.artistName || 'Nghệ sĩ';
+    if (!artistProfile) {
+        throw new Error('Artist profile not found.');
+    }
+    const artistName = artistProfile.artistName || 'Nghệ sĩ';
+    const artistLabelId = artistProfile.labelId;
     if (!req.files)
         throw new Error('No files uploaded');
     const files = req.files;
@@ -377,45 +384,29 @@ const createTrack = async (req) => {
             genresArray = genreIds.split(',').map((id) => id.trim()).filter(Boolean);
         }
     }
-    let finalLabelId = null;
-    if (labelId) {
-        const labelExists = await db_1.default.label.findUnique({
-            where: { id: labelId },
-        });
-        if (!labelExists)
-            throw new Error('Invalid label ID');
-        finalLabelId = labelId;
+    const trackData = {
+        title,
+        duration,
+        releaseDate: trackReleaseDate,
+        trackNumber: trackNumber ? Number(trackNumber) : null,
+        coverUrl,
+        audioUrl: audioUpload.secure_url,
+        artist: { connect: { id: finalArtistId } },
+        album: albumId ? { connect: { id: albumId } } : undefined,
+        type: albumId ? undefined : 'SINGLE',
+        isActive,
+        featuredArtists: artistsArray.length > 0
+            ? { create: artistsArray.map((featArtistId) => ({ artistProfile: { connect: { id: featArtistId } } })) }
+            : undefined,
+        genres: genresArray.length > 0
+            ? { create: genresArray.map((genreId) => ({ genre: { connect: { id: genreId } } })) }
+            : undefined,
+    };
+    if (artistLabelId) {
+        trackData.label = { connect: { id: artistLabelId } };
     }
     const track = await db_1.default.track.create({
-        data: {
-            title,
-            duration,
-            releaseDate: trackReleaseDate,
-            trackNumber: trackNumber ? Number(trackNumber) : null,
-            coverUrl,
-            audioUrl: audioUpload.secure_url,
-            artistId: finalArtistId,
-            albumId: albumId || null,
-            type: albumId ? undefined : 'SINGLE',
-            isActive,
-            labelId: finalLabelId,
-            featuredArtists: artistsArray.length > 0
-                ? {
-                    create: artistsArray.map((featArtistId) => ({
-                        artistId: featArtistId,
-                    })),
-                }
-                : undefined,
-            genres: genresArray.length > 0
-                ? {
-                    create: genresArray.map((genreId) => ({
-                        genre: {
-                            connect: { id: genreId },
-                        },
-                    })),
-                }
-                : undefined,
-        },
+        data: trackData,
         select: prisma_selects_1.trackSelect,
     });
     const followers = await db_1.default.userFollow.findMany({
@@ -433,7 +424,7 @@ const createTrack = async (req) => {
         });
         const notificationsData = followers.map((follower) => ({
             type: client_1.NotificationType.NEW_TRACK,
-            message: `${artistName} just released a new tracks: ${title}`,
+            message: `${artistName} just released a new track: ${title}`,
             recipientType: client_1.RecipientType.USER,
             userId: follower.followerId,
             artistId: finalArtistId,

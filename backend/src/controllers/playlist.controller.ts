@@ -2,6 +2,7 @@ import { RequestHandler } from "express";
 import * as playlistService from "../services/playlist.service";
 import * as albumService from "../services/album.service";
 import * as userService from "../services/user.service";
+import * as aiService from "../services/ai.service";
 import { handleError } from "../utils/handle-utils";
 import {  Prisma } from "@prisma/client";
 import prisma from "../config/db";
@@ -1364,3 +1365,84 @@ export const getPlaylistSuggestions: RequestHandler = async (
     next(error);
   }
 }
+
+// New controller for suggesting more tracks for a playlist using AI
+export const suggestMoreTracksForPlaylist: RequestHandler = async (
+  req,
+  res,
+  next
+): Promise<void> => {
+  try {
+    const { id: playlistId } = req.params;
+    const userId = req.user?.id;
+    const count = req.query.count ? parseInt(req.query.count as string, 10) : 5;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized, please login",
+      });
+      return;
+    }
+
+    // Validate playlist ownership
+    const playlist = await prisma.playlist.findUnique({
+      where: { id: playlistId },
+      select: { userId: true, type: true }
+    });
+
+    if (!playlist) {
+      res.status(404).json({
+        success: false,
+        message: "Playlist not found",
+      });
+      return;
+    }
+
+    // Check if the user owns this playlist or it's a SYSTEM playlist
+    if (playlist.type !== "SYSTEM" && playlist.userId !== userId) {
+      res.status(403).json({
+        success: false,
+        message: "You do not have permission to modify this playlist",
+      });
+      return;
+    }
+
+    // Use the AI service to suggest more tracks
+    const suggestedTrackIds = await aiService.suggestMoreTracksUsingAI(playlistId, userId, count);
+
+    // Get more details about the suggested tracks
+    const suggestedTracks = await prisma.track.findMany({
+      where: {
+        id: { in: suggestedTrackIds },
+        isActive: true,
+      },
+      include: {
+        artist: true,
+        album: true,
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Generated ${suggestedTrackIds.length} track suggestions for the playlist`,
+      data: suggestedTracks.map(track => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        duration: track.duration,
+        coverUrl: track.coverUrl,
+        audioUrl: track.audioUrl,
+      })),
+    });
+  } catch (error) {
+    // Simplified error logging
+    console.error("Playlist suggestion error:", error instanceof Error ? error.message : 'Unknown error');
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate track suggestions",
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};

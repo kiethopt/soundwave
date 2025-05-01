@@ -58,6 +58,21 @@ const getLabelById = async (id) => {
         where: { id },
         select: {
             ...prisma_selects_1.labelSelect,
+            artists: {
+                select: {
+                    id: true,
+                    artistName: true,
+                    avatar: true,
+                    isVerified: true,
+                    _count: {
+                        select: {
+                            albums: { where: { isActive: true } },
+                            tracks: { where: { isActive: true } },
+                        },
+                    },
+                },
+                orderBy: { artistName: 'asc' },
+            },
             albums: {
                 where: { isActive: true },
                 select: {
@@ -108,41 +123,14 @@ const getLabelById = async (id) => {
     });
     if (!label)
         return null;
-    const artistMap = new Map();
-    label.albums?.forEach((album) => {
-        if (album.artist) {
-            const artistId = album.artist.id;
-            if (!artistMap.has(artistId)) {
-                artistMap.set(artistId, {
-                    ...album.artist,
-                    albumCount: 0,
-                    trackCount: 0,
-                });
-            }
-            const artist = artistMap.get(artistId);
-            artist.albumCount += 1;
-            artistMap.set(artistId, artist);
-        }
-    });
-    label.tracks?.forEach((track) => {
-        if (track.artist) {
-            const artistId = track.artist.id;
-            if (!artistMap.has(artistId)) {
-                artistMap.set(artistId, {
-                    ...track.artist,
-                    albumCount: 0,
-                    trackCount: 0,
-                });
-            }
-            const artist = artistMap.get(artistId);
-            artist.trackCount += 1;
-            artistMap.set(artistId, artist);
-        }
-    });
-    const artists = Array.from(artistMap.values()).sort((a, b) => a.artistName.localeCompare(b.artistName));
+    const artistsWithCounts = label.artists.map(artist => ({
+        ...artist,
+        albumCount: artist._count.albums,
+        trackCount: artist._count.tracks,
+    }));
     return {
         ...label,
-        artists,
+        artists: artistsWithCounts,
     };
 };
 exports.getLabelById = getLabelById;

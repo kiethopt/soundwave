@@ -171,7 +171,7 @@ const createArtistRequestApprovedEmail = (to, userName) => {
       <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Hello ${userName},</p>
       <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">Congratulations! Your request to become an artist on SoundWave has been approved by an administrator. You can now start uploading your works.</p>
     `;
-    const html = createRichHtmlTemplate(subject, mainContentHtml, to, undefined, `${FRONTEND_URL}/studio/dashboard`, 'Go to Studio');
+    const html = createRichHtmlTemplate(subject, mainContentHtml, to, undefined, `${FRONTEND_URL}/artist/dashboard`, 'Go to Artist Dashboard');
     return { to, subject, html };
 };
 exports.createArtistRequestApprovedEmail = createArtistRequestApprovedEmail;

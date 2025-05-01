@@ -720,15 +720,16 @@ export const deleteGenreById = async (id: string) => {
 };
 
 export const approveArtistRequest = async (requestId: string) => {
-  // Fetch the profile including socialMediaLinks
   const artistProfile = await prisma.artistProfile.findFirst({
     where: {
       id: requestId,
       verificationRequestedAt: { not: null },
       isVerified: false,
     },
-    // Ensure socialMediaLinks is selected (Prisma includes JSON by default unless explicitly excluded)
-    include: {
+    select: {
+      id: true,
+      userId: true,
+      requestedLabelName: true,
       user: { select: { id: true, email: true, name: true, username: true } }
     }
   });
@@ -737,76 +738,86 @@ export const approveArtistRequest = async (requestId: string) => {
     throw new Error('Artist request not found, already verified, or rejected.');
   }
 
-  // Extract potential temporary label and prepare cleaned social links *before* transaction
-  let requestedLabelName: string | null = null;
-  let cleanedSocialMediaLinks: Record<string, any> = {};
-
-  // Check if socialMediaLinks is a valid object and extract the temporary key
-  if (artistProfile.socialMediaLinks && typeof artistProfile.socialMediaLinks === 'object' && !Array.isArray(artistProfile.socialMediaLinks)) {
-    const currentSocialLinks = artistProfile.socialMediaLinks as Record<string, any>;
-    if (currentSocialLinks._requestedLabel && typeof currentSocialLinks._requestedLabel === 'string') {
-      requestedLabelName = currentSocialLinks._requestedLabel;
-    }
-    // Create a cleaned version excluding the temporary key
-    cleanedSocialMediaLinks = { ...currentSocialLinks };
-    delete cleanedSocialMediaLinks._requestedLabel;
-  } else {
-      // If socialMediaLinks was null, empty, or not an object, default to empty
-      cleanedSocialMediaLinks = {};
-  }
+  const requestedLabelName = artistProfile.requestedLabelName;
+  const userForNotification = artistProfile.user;
 
   const updatedProfile = await prisma.$transaction(async (tx) => {
-     // 1. First update: Verify the artist profile (role, verified status, timestamps)
-     const verifiedProfile = await tx.artistProfile.update({
-         where: { id: requestId },
-         data: {
-             role: Role.ARTIST,
-             isVerified: true,
-             verifiedAt: new Date(),
-             verificationRequestedAt: null,
-             // NOTE: Do not update labelId or socialMediaLinks in this step
-         },
-         select: { id: true } // Only select ID needed for the next step
-     });
+    const verifiedProfile = await tx.artistProfile.update({
+      where: { id: requestId },
+      data: {
+        role: Role.ARTIST,
+        isVerified: true,
+        verifiedAt: new Date(),
+        verificationRequestedAt: null,
+        requestedLabelName: null,
+      },
+      select: { id: true }
+    });
 
-     let finalLabelId: string | null = null;
+    let finalLabelId: string | null = null;
 
-     // 2. Handle Label Creation/Connection if requested
-     if (requestedLabelName) {
-        const labelRecord = await tx.label.upsert({
-            where: { name: requestedLabelName },
-            update: {}, // No update needed if label already exists
-            create: { name: requestedLabelName },
-            select: { id: true } // Select only the ID
-        });
-        finalLabelId = labelRecord.id;
-     }
+    if (requestedLabelName) {
+      const labelRecord = await tx.label.upsert({
+        where: { name: requestedLabelName },
+        update: {},
+        create: { name: requestedLabelName },
+        select: { id: true }
+      });
+      finalLabelId = labelRecord.id;
+    }
 
-     // 3. Second update: Set the actual labelId and the cleaned socialMediaLinks
-     await tx.artistProfile.update({
-         where: { id: verifiedProfile.id }, // Target the profile updated in step 1
-         data: {
-             labelId: finalLabelId, // Link to the created/found label (or null)
-             socialMediaLinks: cleanedSocialMediaLinks, // Save the cleaned JSON
-         }
-     });
+    if (finalLabelId) {
+      await tx.artistProfile.update({
+        where: { id: verifiedProfile.id },
+        data: {
+          labelId: finalLabelId,
+        }
+      });
+    }
 
-     // 4. Re-fetch the fully updated profile to return complete data
-     const finalProfile = await tx.artistProfile.findUnique({
-         where: { id: verifiedProfile.id },
-         include: {
-             user: { select: userSelect },
-             label: true // Include the associated label
-         }
-     });
+    const finalProfile = await tx.artistProfile.findUnique({
+      where: { id: verifiedProfile.id },
+      include: {
+        user: { select: userSelect },
+        label: true
+      }
+    });
 
-     if (!finalProfile) {
-        // Should not happen within a transaction, but good practice
-        throw new Error("Failed to retrieve updated profile after transaction.");
-     }
+    if (!finalProfile) {
+      throw new Error("Failed to retrieve updated profile after transaction.");
+    }
 
-     return finalProfile;
+    return finalProfile;
   });
+
+  if (userForNotification) {
+    prisma.notification.create({
+      data: {
+        type: 'ARTIST_REQUEST_APPROVE',
+        message: 'Your request to become an Artist has been approved!',
+        recipientType: 'USER',
+        userId: userForNotification.id,
+      },
+    }).catch(err => console.error('[Async Notify Error] Failed to create approval notification:', err));
+
+    if (userForNotification.email) {
+      try {
+        const emailOptions = emailService.createArtistRequestApprovedEmail(
+          userForNotification.email,
+          userForNotification.name || userForNotification.username || 'User'
+        );
+        emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send approval email:', err));
+      } catch (syncError) {
+        console.error('[Email Setup Error] Failed to create approval email options:', syncError);
+      }
+    } else {
+      console.warn(
+        `Could not send approval email: No email found for user ${userForNotification.id}`
+      );
+    }
+  } else {
+    console.error('[Approve Request] User data missing for notification/email.');
+  }
 
   return {
     ...updatedProfile,

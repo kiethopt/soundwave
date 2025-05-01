@@ -242,9 +242,9 @@ export const createArtistRequestApprovedEmail = (
     subject,
     mainContentHtml,
     to,
-    undefined, // No cover image
-    `${FRONTEND_URL}/studio/dashboard`,
-    'Go to Studio'
+    undefined,
+    `${FRONTEND_URL}/artist/dashboard`,
+    'Go to Artist Dashboard'
   );
   return { to, subject, html };
 };

@@ -609,26 +609,85 @@ const approveArtistRequest = async (requestId) => {
             verificationRequestedAt: { not: null },
             isVerified: false,
         },
-        include: {
+        select: {
+            id: true,
+            userId: true,
+            requestedLabelName: true,
             user: { select: { id: true, email: true, name: true, username: true } }
         }
     });
     if (!artistProfile) {
         throw new Error('Artist request not found, already verified, or rejected.');
     }
+    const requestedLabelName = artistProfile.requestedLabelName;
+    const userForNotification = artistProfile.user;
     const updatedProfile = await db_1.default.$transaction(async (tx) => {
-        const profile = await tx.artistProfile.update({
+        const verifiedProfile = await tx.artistProfile.update({
             where: { id: requestId },
             data: {
                 role: client_1.Role.ARTIST,
                 isVerified: true,
                 verifiedAt: new Date(),
                 verificationRequestedAt: null,
+                requestedLabelName: null,
             },
-            include: { user: { select: prisma_selects_1.userSelect } }
+            select: { id: true }
         });
-        return profile;
+        let finalLabelId = null;
+        if (requestedLabelName) {
+            const labelRecord = await tx.label.upsert({
+                where: { name: requestedLabelName },
+                update: {},
+                create: { name: requestedLabelName },
+                select: { id: true }
+            });
+            finalLabelId = labelRecord.id;
+        }
+        if (finalLabelId) {
+            await tx.artistProfile.update({
+                where: { id: verifiedProfile.id },
+                data: {
+                    labelId: finalLabelId,
+                }
+            });
+        }
+        const finalProfile = await tx.artistProfile.findUnique({
+            where: { id: verifiedProfile.id },
+            include: {
+                user: { select: prisma_selects_1.userSelect },
+                label: true
+            }
+        });
+        if (!finalProfile) {
+            throw new Error("Failed to retrieve updated profile after transaction.");
+        }
+        return finalProfile;
     });
+    if (userForNotification) {
+        db_1.default.notification.create({
+            data: {
+                type: 'ARTIST_REQUEST_APPROVE',
+                message: 'Your request to become an Artist has been approved!',
+                recipientType: 'USER',
+                userId: userForNotification.id,
+            },
+        }).catch(err => console.error('[Async Notify Error] Failed to create approval notification:', err));
+        if (userForNotification.email) {
+            try {
+                const emailOptions = emailService.createArtistRequestApprovedEmail(userForNotification.email, userForNotification.name || userForNotification.username || 'User');
+                emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send approval email:', err));
+            }
+            catch (syncError) {
+                console.error('[Email Setup Error] Failed to create approval email options:', syncError);
+            }
+        }
+        else {
+            console.warn(`Could not send approval email: No email found for user ${userForNotification.id}`);
+        }
+    }
+    else {
+        console.error('[Approve Request] User data missing for notification/email.');
+    }
     return {
         ...updatedProfile,
         hasPendingRequest: false

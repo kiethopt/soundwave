@@ -1470,6 +1470,14 @@ export const api = {
         { method: "GET" },
         token
       );
+    },
+
+    suggestMoreTracksForPlaylist: async (playlistId: string, token: string, count: number = 5) => {
+      return fetchWithAuth(
+        `/api/playlists/${playlistId}/suggest-more?count=${count}`,
+        { method: "GET" },
+        token
+      );
     }
   },
 

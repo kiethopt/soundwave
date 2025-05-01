@@ -619,23 +619,17 @@ export const requestArtistRole = async (
     }
   }
 
-  // Add temporary label name to the object if provided
-  if (label && typeof label === 'string' && label.trim() !== '') {
-      socialMediaLinksObject['_requestedLabel'] = label.trim();
-  }
-
   // Chuyển đổi genres từ chuỗi sang mảng
   let genres = [];
   if (genresString) {
     genres = genresString.split(',');
   }
 
-  // Validate dữ liệu nghệ sĩ
+  // Validate artist data (excluding label from social links validation)
   const validationError = validateArtistData({
     artistName,
     bio,
-    label,
-    socialMediaLinks: socialMediaLinksObject,
+    socialMediaLinks: socialMediaLinksObject, // Keep validating actual social links
     genres,
   });
   if (validationError) {
@@ -673,10 +667,11 @@ export const requestArtistRole = async (
     data: {
       artistName,
       bio,
-      socialMediaLinks: socialMediaLinksObject,
+      socialMediaLinks: socialMediaLinksObject, // Store only actual social links
       avatar: avatarUrl,
       role: Role.ARTIST,
       verificationRequestedAt: new Date(),
+      requestedLabelName: label && typeof label === 'string' ? label.trim() : null, // Use the new field
       user: { connect: { id: user.id } },
       genres: {
         create: genres.map((genreId: string) => ({

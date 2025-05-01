@@ -27,6 +27,7 @@ router.patch("/:id", upload_middleware_1.default.single("cover"), playlist_contr
 router.delete("/:id", playlist_controller_1.deletePlaylist);
 router.delete("/:playlistId/tracks/:trackId", playlist_controller_1.removeTrackFromPlaylist);
 router.post("/:id/tracks", playlist_controller_1.addTrackToPlaylist);
+router.get("/:id/suggest-more", playlist_controller_1.suggestMoreTracksForPlaylist);
 router.use("/admin", (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]));
 router.post("/admin/system/base", upload_middleware_1.default.single("cover"), playlist_controller_1.createBaseSystemPlaylist);
 router.get("/admin/system/base", playlist_controller_1.getAllBaseSystemPlaylists);

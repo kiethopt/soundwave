@@ -143,6 +143,42 @@ export default function RequestArtistPage() {
     fetchGenres();
   }, []);
 
+  // --- Handle Input Change --- 
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // --- Handle Genre Change --- 
+  const handleGenreChange = (selectedGenreIds: string[]) => {
+    setFormData((prev) => ({ ...prev, genres: selectedGenreIds }));
+    setGenreError(null); // Clear genre error when selection changes
+  };
+
+  // --- Handle Avatar Change --- 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Avatar file size exceeds the limit of 5MB');
+        setAvatarPreview(null);
+        setFormData((prev) => ({ ...prev, avatarFile: null }));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      setFormData((prev) => ({ ...prev, avatarFile: file }));
+    } else {
+      setAvatarPreview(null);
+      setFormData((prev) => ({ ...prev, avatarFile: null }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -194,15 +230,12 @@ export default function RequestArtistPage() {
       submitFormData.append('label', formData.label);
       submitFormData.append('genres', formData.genres.join(','));
 
-      // Send the full URLs
+      // Construct and append socialMediaLinks JSON string (only FB/Insta)
       const socialMediaLinks = {
-        facebook: formData.facebookLink, 
-        instagram: formData.instagramLink,
+        ...(formData.facebookLink !== 'https://www.facebook.com/' && { facebook: formData.facebookLink }),
+        ...(formData.instagramLink !== 'https://www.instagram.com/' && { instagram: formData.instagramLink }),
       };
-      submitFormData.append(
-        'socialMediaLinks',
-        JSON.stringify(socialMediaLinks)
-      );
+      submitFormData.append('socialMediaLinks', JSON.stringify(socialMediaLinks));
 
       if (formData.avatarFile) {
         submitFormData.append('avatar', formData.avatarFile);
@@ -346,29 +379,7 @@ export default function RequestArtistPage() {
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file && file.size > 5 * 1024 * 1024) {
-                  toast.error('File size exceeds the limit of 5MB');
-                  e.target.value = ''; // Clear the input
-                  setFormData({ ...formData, avatarFile: null });
-                  setAvatarPreview(null);
-                  return;
-                }
-                setFormData({
-                  ...formData,
-                  avatarFile: file || null,
-                });
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    setAvatarPreview(reader.result as string);
-                  };
-                  reader.readAsDataURL(file);
-                } else {
-                  setAvatarPreview(null);
-                }
-              }}
+              onChange={handleAvatarChange}
               required
             />
             <p className="text-xs text-muted-foreground pt-1">Upload a profile picture (JPG, PNG, GIF - max 5MB).</p>
@@ -386,11 +397,10 @@ export default function RequestArtistPage() {
               </label>
               <input
                 id="artistName"
+                name="artistName"
                 type="text"
                 value={formData.artistName}
-                onChange={(e) =>
-                  setFormData({ ...formData, artistName: e.target.value })
-                }
+                onChange={handleChange}
                 className="w-full px-4 py-2.5 bg-white/[0.05] rounded-lg border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-colors placeholder-white/40"
                 placeholder="Enter your artist name"
                 required
@@ -405,11 +415,10 @@ export default function RequestArtistPage() {
               </label>
               <input
                 id="label"
+                name="label"
                 type="text"
                 value={formData.label}
-                onChange={(e) =>
-                  setFormData({ ...formData, label: e.target.value })
-                }
+                onChange={handleChange}
                 className="w-full px-4 py-2.5 bg-white/[0.05] rounded-lg border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-colors placeholder-white/40"
                 placeholder="Your personal label name (e.g., 'My Music Records')"
                 required
@@ -424,10 +433,9 @@ export default function RequestArtistPage() {
               </label>
               <textarea
                 id="bio"
+                name="bio"
                 value={formData.bio}
-                onChange={(e) =>
-                  setFormData({ ...formData, bio: e.target.value })
-                }
+                onChange={handleChange}
                 className="w-full px-4 py-2.5 bg-white/[0.05] rounded-lg border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-colors placeholder-white/40 min-h-[120px]"
                 rows={4}
                 placeholder="Tell us about yourself and your music"
@@ -451,11 +459,10 @@ export default function RequestArtistPage() {
                 </label>
                 <input
                   id="facebookLink"
+                  name="facebookLink"
                   type="url"
                   value={formData.facebookLink}
-                  onChange={(e) =>
-                    setFormData({ ...formData, facebookLink: e.target.value })
-                  }
+                  onChange={handleChange}
                   className="w-full px-4 py-2.5 bg-white/[0.05] rounded-lg border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-colors placeholder-white/40"
                   placeholder="https://www.facebook.com/yourprofile"
                 />
@@ -469,11 +476,10 @@ export default function RequestArtistPage() {
                 </label>
                 <input
                   id="instagramLink"
+                  name="instagramLink"
                   type="url"
                   value={formData.instagramLink}
-                  onChange={(e) =>
-                    setFormData({ ...formData, instagramLink: e.target.value })
-                  }
+                  onChange={handleChange}
                   className="w-full px-4 py-2.5 bg-white/[0.05] rounded-lg border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-colors placeholder-white/40"
                   placeholder="https://www.instagram.com/yourprofile"
                 />
@@ -483,31 +489,20 @@ export default function RequestArtistPage() {
 
           <hr className="border-white/[0.1]" />
 
-          {/* Section: Music Profile - Moved Up */}
+          {/* Section: Music Profile */}
           <div className="space-y-6">
             <SectionHeading icon={Music} title="Music Profile" />
             <div>
               <label className="block text-sm font-medium mb-2 text-white/70">Genres *</label>
-              {/* Apply conditional styling based on genreError */}
-              {/* Wrap SearchableSelect for error styling */}
-              {/* Ensure this uses genreError */} 
               <div className={cn(genreError && 'rounded-md border border-red-500')}>
                 <SearchableSelect
                   options={genreOptions}
                   value={formData.genres}
-                  onChange={(selected) => {
-                    const newGenres = Array.isArray(selected) ? selected : [selected];
-                    setFormData({
-                      ...formData,
-                      genres: newGenres,
-                    });
-                  }}
+                  onChange={handleGenreChange}
                   placeholder="Select genres "
                   multiple={true}
                 />
               </div>
-              {/* Show error message only when genreError is set */} 
-              {/* Ensure this uses genreError */}
               {genreError ? (
                 <p className="text-xs text-red-500 mt-1.5">{genreError}</p>
               ) : (

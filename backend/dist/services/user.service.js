@@ -63,6 +63,9 @@ const validateArtistData = (data) => {
         }
         const allowedPlatforms = ['facebook', 'instagram'];
         for (const key in socialMediaLinks) {
+            if (key === '_requestedLabel') {
+                continue;
+            }
             if (!allowedPlatforms.includes(key)) {
                 return `Invalid social media platform: ${key}`;
             }
@@ -544,10 +547,16 @@ const getUserFollowing = async (userId) => {
 };
 exports.getUserFollowing = getUserFollowing;
 const requestArtistRole = async (user, data, avatarFile) => {
-    const { artistName, bio, socialMediaLinks: socialMediaLinksString, genres: genresString, } = data;
-    let socialMediaLinks = {};
+    const { artistName, bio, label, socialMediaLinks: socialMediaLinksString, genres: genresString, } = data;
+    let socialMediaLinksObject = {};
     if (socialMediaLinksString) {
-        socialMediaLinks = JSON.parse(socialMediaLinksString);
+        try {
+            socialMediaLinksObject = JSON.parse(socialMediaLinksString);
+        }
+        catch (e) {
+            console.error("Error parsing socialMediaLinksString:", e);
+            throw new Error("Invalid format for social media links.");
+        }
     }
     let genres = [];
     if (genresString) {
@@ -556,7 +565,7 @@ const requestArtistRole = async (user, data, avatarFile) => {
     const validationError = (0, exports.validateArtistData)({
         artistName,
         bio,
-        socialMediaLinks,
+        socialMediaLinks: socialMediaLinksObject,
         genres,
     });
     if (validationError) {
@@ -583,10 +592,11 @@ const requestArtistRole = async (user, data, avatarFile) => {
         data: {
             artistName,
             bio,
-            socialMediaLinks,
+            socialMediaLinks: socialMediaLinksObject,
             avatar: avatarUrl,
             role: client_1.Role.ARTIST,
             verificationRequestedAt: new Date(),
+            requestedLabelName: label && typeof label === 'string' ? label.trim() : null,
             user: { connect: { id: user.id } },
             genres: {
                 create: genres.map((genreId) => ({

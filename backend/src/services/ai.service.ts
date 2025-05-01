@@ -1937,3 +1937,404 @@ function calculateTrackScore(track: any, params: any): number {
   return score;
 }
 
+/**
+ * Suggests additional tracks for an existing playlist using Gemini AI
+ * @param playlistId - The ID of the playlist to suggest tracks for
+ * @param userId - The user ID who owns the playlist
+ * @param count - The number of tracks to suggest (default: 5)
+ * @returns A Promise resolving to an array of track IDs
+ */
+export const suggestMoreTracksUsingAI = async (
+  playlistId: string,
+  userId: string,
+  count: number = 5
+): Promise<string[]> => {
+  try {
+    console.log(`[AI] Suggesting more tracks for playlist ${playlistId}, user ${userId}`);
+    
+    // Get the playlist details with existing tracks
+    const playlist = await prisma.playlist.findUnique({
+      where: { id: playlistId },
+      include: {
+        tracks: {
+          include: {
+            track: {
+              include: {
+                artist: true,
+                genres: {
+                  include: {
+                    genre: true,
+                  },
+                },
+                album: true,
+              },
+            },
+          },
+          orderBy: {
+            trackOrder: "asc",
+          },
+        },
+      },
+    });
+
+    if (!playlist) {
+      throw new Error("Playlist not found");
+    }
+
+    // Extract existing track IDs to exclude them from suggestions
+    const existingTrackIds = playlist.tracks.map(pt => pt.track.id);
+    
+    // Extract genre information from the playlist
+    const genreCounts: Record<string, { count: number; name: string }> = {};
+    const artistCounts: Record<string, { count: number; name: string }> = {};
+    
+    playlist.tracks.forEach(pt => {
+      // Count genres
+      pt.track.genres.forEach(genreRel => {
+        const genreId = genreRel.genre.id;
+        const genreName = genreRel.genre.name;
+        
+        if (!genreCounts[genreId]) {
+          genreCounts[genreId] = { count: 0, name: genreName };
+        }
+        genreCounts[genreId].count += 1;
+      });
+      
+      // Count artists
+      const artistId = pt.track.artist?.id;
+      const artistName = pt.track.artist?.artistName;
+      
+      if (artistId && artistName) {
+        if (!artistCounts[artistId]) {
+          artistCounts[artistId] = { count: 0, name: artistName };
+        }
+        artistCounts[artistId].count += 1;
+      }
+    });
+    
+    // Get top genres
+    const topGenres = Object.entries(genreCounts)
+      .sort(([, a], [, b]) => b.count - a.count)
+      .slice(0, 3)
+      .map(([id, data]) => ({ 
+        id, 
+        name: data.name, 
+        count: data.count 
+      }));
+      
+    // Get top artists
+    const topArtists = Object.entries(artistCounts)
+      .sort(([, a], [, b]) => b.count - a.count)
+      .slice(0, 3)
+      .map(([id, data]) => ({ 
+        id, 
+        name: data.name, 
+        count: data.count 
+      }));
+    
+    // Create prompt for Gemini AI
+    let prompt = `I need to suggest ${count} more tracks for a playlist based on the current tracks in the playlist. The playlist has ${playlist.tracks.length} tracks and includes these artists and genres:\n\n`;
+    
+    // Add top artists to prompt
+    if (topArtists.length > 0) {
+      prompt += "Top artists in the playlist:\n";
+      topArtists.forEach(artist => {
+        prompt += `- ${artist.name} (${artist.count} tracks)\n`;
+      });
+      prompt += "\n";
+    }
+    
+    // Add top genres to prompt
+    if (topGenres.length > 0) {
+      prompt += "Top genres in the playlist:\n";
+      topGenres.forEach(genre => {
+        prompt += `- ${genre.name} (${genre.count} tracks)\n`;
+      });
+      prompt += "\n";
+    }
+    
+    // Add sample tracks
+    const sampleTracks = playlist.tracks.slice(0, 10);
+    if (sampleTracks.length > 0) {
+      prompt += "Sample tracks in the playlist:\n";
+      sampleTracks.forEach((pt, index) => {
+        prompt += `${index + 1}. "${pt.track.title}" by ${pt.track.artist?.artistName || 'Unknown'}\n`;
+      });
+      prompt += "\n";
+    }
+    
+    // Get user's listening history to understand preferences
+    const userHistory = await prisma.history.findMany({
+      where: {
+        userId,
+        type: "PLAY",
+      },
+      include: {
+        track: {
+          select: {
+            id: true,
+            title: true,
+            artistId: true,
+            artist: {
+              select: {
+                artistName: true,
+              }
+            }
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+      take: 20, // Consider recent 20 tracks
+    });
+    
+    // Add user history to prompt
+    if (userHistory.length > 0) {
+      prompt += "User's recent listening history (not necessarily in the playlist):\n";
+      userHistory.slice(0, 5).forEach((history, index) => {
+        if (history.track) {
+          prompt += `${index + 1}. "${history.track.title}" by ${history.track.artist?.artistName || 'Unknown'}\n`;
+        }
+      });
+      prompt += "\n";
+    }
+    
+    // Final instructions
+    prompt += `Based on this information, suggest ${count} more tracks that would fit well with this playlist. Consider both the artist style and genre consistency. I need the exact track IDs for the suggestions.
+
+You can select tracks from our database that match these criteria. Return ONLY a list of track IDs formatted as a valid JSON array of strings.`;
+
+    // Call Gemini API with the prompt
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.error("[AI] GEMINI_API_KEY is not set in environment variables");
+        throw new Error("Gemini API key not configured");
+      }
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const modelName = process.env.GEMINI_MODEL || "gemini-pro";
+      const model = genAI.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 1024,
+        }
+      });
+      
+      // Query the database for tracks that match the genres in the playlist
+      let suggestedTracks: any[] = [];
+      
+      if (topGenres.length > 0) {
+        // Build a query based on the top genres
+        suggestedTracks = await prisma.track.findMany({
+          where: {
+            isActive: true,
+            id: { notIn: existingTrackIds },
+            genres: {
+              some: {
+                genreId: {
+                  in: topGenres.map(g => g.id)
+                }
+              }
+            },
+          },
+          include: {
+            artist: true,
+            genres: {
+              include: {
+                genre: true
+              }
+            }
+          },
+          orderBy: {
+            playCount: "desc"
+          },
+          take: count * 5 // Get more than needed to allow for filtering
+        });
+      }
+      
+      // If not enough tracks by genre, try by artist
+      if (suggestedTracks.length < count && topArtists.length > 0) {
+        const artistTracks = await prisma.track.findMany({
+          where: {
+            isActive: true,
+            id: { 
+              notIn: [...existingTrackIds, ...suggestedTracks.map(t => t.id)] 
+            },
+            artistId: {
+              in: topArtists.map(a => a.id)
+            }
+          },
+          include: {
+            artist: true,
+            genres: {
+              include: {
+                genre: true
+              }
+            }
+          },
+          orderBy: {
+            playCount: "desc"
+          },
+          take: count * 3
+        });
+        
+        suggestedTracks = [...suggestedTracks, ...artistTracks];
+      }
+      
+      // Still not enough tracks? Get popular tracks
+      if (suggestedTracks.length < count) {
+        const popularTracks = await prisma.track.findMany({
+          where: {
+            isActive: true,
+            id: { 
+              notIn: [...existingTrackIds, ...suggestedTracks.map(t => t.id)] 
+            },
+          },
+          include: {
+            artist: true,
+            genres: {
+              include: {
+                genre: true
+              }
+            }
+          },
+          orderBy: {
+            playCount: "desc"
+          },
+          take: count * 2
+        });
+        
+        suggestedTracks = [...suggestedTracks, ...popularTracks];
+      }
+      
+      // Format tracks for Gemini's analysis
+      let suggestedTracksInfo = "Potential tracks to add (you can choose from these or suggest others):\n";
+      suggestedTracks.slice(0, 15).forEach((track, i) => {
+        const genres = track.genres.map((g: any) => g.genre.name).join(", ");
+        suggestedTracksInfo += `${i + 1}. ID: "${track.id}" - "${track.title}" by ${track.artist.artistName} (Genres: ${genres})\n`;
+      });
+      
+      prompt += "\n\n" + suggestedTracksInfo;
+      
+      console.log("[AI] Sending prompt to Gemini for track suggestions");
+      
+      // Retry mechanism for API calls
+      const maxRetries = 3;
+      let retryCount = 0;
+      let result;
+      
+      while (retryCount < maxRetries) {
+        try {
+          result = await model.generateContent(prompt);
+          break;
+        } catch (error: any) {
+          if (error.status === 429 && retryCount < maxRetries - 1) {
+            const retryDelay = 30 * 1000; // 30 seconds
+            console.log(`[AI] Rate limit hit, waiting ${retryDelay/1000}s before retry...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            retryCount++;
+            continue;
+          }
+          throw error;
+        }
+      }
+      
+      if (!result) {
+        throw new Error("Failed to generate content after retries");
+      }
+      
+      const response = await result.response;
+      const responseText = response.text();
+      
+      console.log("[AI] Gemini response:", responseText);
+      
+      // Extract track IDs from the response
+      let suggestedTrackIds: string[] = [];
+      
+      try {
+        // Find a JSON array in the response
+        const jsonMatch = responseText.match(/\[[\s\S]*?\]/);
+        if (jsonMatch) {
+          const jsonString = jsonMatch[0];
+          suggestedTrackIds = JSON.parse(jsonString);
+          console.log("[AI] Parsed track IDs from JSON:", suggestedTrackIds);
+        } else {
+          // If no JSON found, try to extract IDs by searching for the ID pattern
+          const idRegex = /"([a-fA-F0-9-]{36})"/g;
+          const matches = [...responseText.matchAll(idRegex)];
+          suggestedTrackIds = matches.map(match => match[1]);
+          console.log("[AI] Extracted track IDs with regex:", suggestedTrackIds);
+        }
+      } catch (error) {
+        console.error("[AI] Error parsing track IDs from response:", error);
+        
+        // Fallback: Use tracks from our database query
+        suggestedTrackIds = suggestedTracks.slice(0, count).map(t => t.id);
+        console.log("[AI] Using fallback track suggestions:", suggestedTrackIds);
+      }
+      
+      // Validate that the track IDs exist in the database
+      const validatedTrackIds = await prisma.track.findMany({
+        where: {
+          id: { in: suggestedTrackIds },
+          isActive: true
+        },
+        select: { id: true }
+      });
+      
+      const validTrackIds = validatedTrackIds.map(t => t.id);
+      
+      // If we still don't have enough tracks, use some from our initial database query
+      if (validTrackIds.length < count && suggestedTracks.length > 0) {
+        const additionalIds = suggestedTracks
+          .filter(t => !validTrackIds.includes(t.id))
+          .slice(0, count - validTrackIds.length)
+          .map(t => t.id);
+        
+        validTrackIds.push(...additionalIds);
+      }
+      
+      console.log(`[AI] Final suggestion: ${validTrackIds.length} tracks for playlist ${playlistId}`);
+      return validTrackIds.slice(0, count);
+      
+    } catch (error) {
+      console.error("[AI] Error getting track suggestions from Gemini:", error);
+      
+      // Fallback: Get tracks based on the playlist's genres
+      if (topGenres.length > 0) {
+        const fallbackTracks = await prisma.track.findMany({
+          where: {
+            isActive: true,
+            id: { notIn: existingTrackIds },
+            genres: {
+              some: {
+                genreId: {
+                  in: topGenres.map(g => g.id)
+                }
+              }
+            },
+          },
+          orderBy: {
+            playCount: "desc"
+          },
+          take: count
+        });
+        
+        console.log(`[AI] Using fallback suggestions with ${fallbackTracks.length} tracks`);
+        return fallbackTracks.map(t => t.id);
+      } else {
+        console.log("[AI] No genre information available for fallback, returning empty list");
+        return [];
+      }
+    }
+  } catch (error) {
+    console.error("[AI] Error suggesting more tracks:", error);
+    throw error;
+  }
+};
+

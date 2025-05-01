@@ -48,19 +48,25 @@ const requestToBecomeArtist = async (req, res) => {
         try {
             const io = (0, socket_1.getIO)();
             const userSockets = (0, socket_1.getUserSockets)();
-            const targetSocketId = userSockets.get(currentUser.id);
-            if (targetSocketId) {
-                console.log(`🚀 Emitting artist_request_submitted to user ${currentUser.id} via socket ${targetSocketId}`);
-                io.to(targetSocketId).emit('artist_request_submitted', {
-                    hasPendingRequest: true,
-                });
+            if (currentUser && currentUser.id) {
+                const targetSocketId = userSockets.get(currentUser.id);
+                if (targetSocketId) {
+                    console.log(`🚀 Emitting artist_request_submitted to user ${currentUser.id} via socket ${targetSocketId}`);
+                    io.to(targetSocketId).emit('artist_request_submitted', {
+                        hasPendingRequest: true,
+                        artistProfileId: createdProfile.id
+                    });
+                }
+                else {
+                    console.log(`Socket not found for user ${currentUser.id}. Cannot emit request submission update.`);
+                }
             }
             else {
-                console.log(`Socket not found for user ${currentUser.id}. Cannot emit request submission update.`);
+                console.warn('[Socket Emit] currentUser or currentUser.id is undefined. Cannot emit socket event.');
             }
         }
         catch (socketError) {
-            console.error('Failed to emit socket event for artist request submission:', socketError);
+            console.error('[Controller] Failed to emit socket event for artist request submission:', socketError);
         }
         res.json({ message: 'Artist role request submitted successfully' });
     }

@@ -25,7 +25,8 @@ import {
   Trash2,
   Lock,
   Globe,
-  Clock
+  Clock,
+  Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useSocket } from "@/contexts/SocketContext";
@@ -84,6 +85,7 @@ export default function PlaylistPage() {
   );
   const [recommendations, setRecommendations] = useState<{ tracks: Track[], basedOn: string, topGenres?: any[] }>(); 
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const { theme } = useTheme();
@@ -279,27 +281,53 @@ export default function PlaylistPage() {
     };
   }, []);
 
-  // Recommendations fetch function
+  // Function to refresh the playlist data
+  const refreshPlaylistData = useCallback(async () => {
+    if (!id) return;
+    
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("userToken");
+      
+      const response = await api.playlists.getById(id as string, token ?? undefined);
+      
+      if (response.success) {
+        setPlaylist(response.data);
+        if (response.data.type === "FAVORITE") {
+          setFavoritePlaylistTotalTracks(response.data.totalTracks);
+        }
+      } else {
+        console.error("Failed to refresh playlist:", response.message);
+      }
+    } catch (error) {
+      console.error("Error refreshing playlist:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  // Function to fetch recommendations for the playlist
   const fetchRecommendations = useCallback(async () => {
-    // Only fetch recommendations for user's normal playlists
-    if (!isAuthenticated || !isNormalPlaylist) return;
+    if (!isNormalPlaylist || !id || !isAuthenticated) return;
     
     try {
       setLoadingRecommendations(true);
       const token = localStorage.getItem("userToken");
       if (!token) return;
-
-      // Pass the playlistId parameter to filter out tracks already in the playlist
+      
       const response = await api.playlists.getPlaylistSuggest(token, id as string);
-      if (response.success) {
+      
+      if (response.success && response.data) {
         setRecommendations(response.data);
+      } else {
+        console.error("Failed to fetch recommendations:", response.message);
       }
     } catch (error) {
       console.error("Error fetching recommendations:", error);
     } finally {
       setLoadingRecommendations(false);
     }
-  }, [isAuthenticated, isNormalPlaylist, id]);
+  }, [isNormalPlaylist, id, isAuthenticated]);
 
   // Fetch recommendations after playlist is loaded
   useEffect(() => {
@@ -307,6 +335,47 @@ export default function PlaylistPage() {
       fetchRecommendations();
     }
   }, [isNormalPlaylist, recommendations, fetchRecommendations]);
+
+  // Add the suggestMoreTracks handler
+  const suggestMoreTracks = async () => {
+    if (!id || !isAuthenticated) return;
+    
+    try {
+      setIsSuggestionLoading(true);
+      const token = localStorage.getItem("userToken");
+      if (!token) return;
+      
+      const response = await api.playlists.suggestMoreTracksForPlaylist(id as string, token, 5);
+      
+      if (response.success) {
+        // Add the suggested tracks to the playlist
+        const suggestedTracks = response.data;
+        
+        // Add tracks one by one to playlist
+        let addedCount = 0;
+        for (const track of suggestedTracks) {
+          try {
+            await api.playlists.addTrack(id as string, track.id, token);
+            addedCount++;
+          } catch (error) {
+            console.error(`Failed to add track ${track.id} to playlist:`, error);
+          }
+        }
+        
+        // Show success message
+        toast.success(`Added ${addedCount} new suggested tracks to your playlist!`);
+        
+        // Refresh the playlist to show new tracks
+        refreshPlaylistData();
+      } else {
+        toast.error(response.message || "Failed to get suggestions");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to add suggested tracks");
+    } finally {
+      setIsSuggestionLoading(false);
+    }
+  };
 
   const handleCoverClick = () => {
     if (!canEditPlaylist || isUploadingCover) return;
@@ -462,31 +531,6 @@ export default function PlaylistPage() {
     const newPrivacy = currentPrivacy === "PRIVATE" ? "PUBLIC" : "PRIVATE";
     handleUpdatePlaylist("privacy", newPrivacy);
   };
-
-  // Function to refresh the playlist data
-  const refreshPlaylistData = useCallback(async () => {
-    if (!id) return;
-    
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("userToken");
-      
-      const response = await api.playlists.getById(id as string, token ?? undefined);
-      
-      if (response.success) {
-        setPlaylist(response.data);
-        if (response.data.type === "FAVORITE") {
-          setFavoritePlaylistTotalTracks(response.data.totalTracks);
-        }
-      } else {
-        console.error("Error refreshing playlist:", response.message);
-      }
-    } catch (error: any) {
-      console.error("Error refreshing playlist:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
 
   // Listen for the playlist-updated event
   useEffect(() => {
@@ -693,56 +737,81 @@ export default function PlaylistPage() {
             )}
           </div>
 
-          {canEditPlaylist && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-white/70 hover:text-white hover:bg-white/10 mt-1 rounded-full h-8 w-8 -ml-2"
-                  title="More options"
-                >
-                  <MoreHorizontal className="w-5 h-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuItem
-                  onSelect={() =>
-                    handleProtectedAction(() => setIsEditOpen(true))
-                  }
-                  className="cursor-pointer"
-                >
-                  <Pencil className="w-4 h-4 mr-2" />
-                  Edit details
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => handleProtectedAction(handleTogglePrivacy)}
-                  className="cursor-pointer"
-                >
-                  {playlist.privacy === "PRIVATE" ? (
-                    <>
-                      <Globe className="w-4 h-4 mr-2" />
-                      Make public
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="w-4 h-4 mr-2" />
-                      Make private
-                    </>
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    handleProtectedAction(() => setIsDeleteOpen(true))
-                  }
-                  className="text-red-500 focus:text-red-500 cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete playlist
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          {/* Added conditional buttons */}
+          <div className="flex items-center gap-2 mt-1">
+            {isNormalPlaylist && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={suggestMoreTracks}
+                disabled={isSuggestionLoading}
+                className="text-sm font-medium flex items-center gap-1.5"
+              >
+                {isSuggestionLoading ? (
+                  <>
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                    Suggesting...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Suggest More
+                  </>
+                )}
+              </Button>
+            )}
+
+            {canEditPlaylist && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full h-8 w-8"
+                    title="More options"
+                  >
+                    <MoreHorizontal className="w-5 h-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      handleProtectedAction(() => setIsEditOpen(true))
+                    }
+                    className="cursor-pointer"
+                  >
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Edit details
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => handleProtectedAction(handleTogglePrivacy)}
+                    className="cursor-pointer"
+                  >
+                    {playlist.privacy === "PRIVATE" ? (
+                      <>
+                        <Globe className="w-4 h-4 mr-2" />
+                        Make public
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-4 h-4 mr-2" />
+                        Make private
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      handleProtectedAction(() => setIsDeleteOpen(true))
+                    }
+                    className="text-red-500 focus:text-red-500 cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete playlist
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </div>
 
@@ -848,15 +917,17 @@ export default function PlaylistPage() {
                 </p>
               </div>
 
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={fetchRecommendations}
-                disabled={loadingRecommendations}
-                className="text-sm font-medium"
-              >
-                Refresh
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={fetchRecommendations}
+                  disabled={loadingRecommendations}
+                  className="text-sm font-medium"
+                >
+                  Refresh
+                </Button>
+              </div>
             </div>
 
             {loadingRecommendations ? (

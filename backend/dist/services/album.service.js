@@ -160,7 +160,7 @@ const createAlbum = async (req) => {
     const user = req.user;
     if (!user)
         throw new Error('Forbidden');
-    const { title, releaseDate, type = client_1.AlbumType.ALBUM, genres = [], artistId, labelId } = req.body;
+    const { title, releaseDate, type = client_1.AlbumType.ALBUM, genres = [], artistId } = req.body;
     const coverFile = req.file;
     const genreArray = Array.isArray(genres) ? genres : genres ? [genres] : [];
     const validationError = validateAlbumData({ title, releaseDate, type });
@@ -171,7 +171,7 @@ const createAlbum = async (req) => {
     if (user.role === client_1.Role.ADMIN && artistId) {
         const targetArtist = await db_1.default.artistProfile.findFirst({
             where: { id: artistId, isVerified: true, role: client_1.Role.ARTIST },
-            select: { id: true, artistName: true },
+            select: { id: true, artistName: true, labelId: true },
         });
         if (!targetArtist)
             throw new Error('Artist profile not found or not verified');
@@ -182,13 +182,17 @@ const createAlbum = async (req) => {
         targetArtistProfileId = user.artistProfile.id;
         fetchedArtistProfile = await db_1.default.artistProfile.findUnique({
             where: { id: targetArtistProfileId },
-            select: { artistName: true },
+            select: { id: true, artistName: true, labelId: true },
         });
     }
     else {
         throw new Error('Not authorized to create albums');
     }
-    const artistName = fetchedArtistProfile?.artistName || 'Nghệ sĩ';
+    if (!fetchedArtistProfile) {
+        throw new Error('Could not retrieve artist profile information.');
+    }
+    const artistName = fetchedArtistProfile.artistName || 'Nghệ sĩ';
+    const artistLabelId = fetchedArtistProfile.labelId;
     let coverUrl = null;
     if (coverFile) {
         const coverUpload = await (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image');
@@ -196,34 +200,22 @@ const createAlbum = async (req) => {
     }
     const releaseDateObj = new Date(releaseDate);
     const isActive = releaseDateObj <= new Date();
-    let finalLabelId = null;
-    if (labelId !== undefined) {
-        if (typeof labelId !== 'string' && labelId !== null) {
-            throw new Error(`Invalid labelId type: expected string or null, got ${typeof labelId}`);
-        }
-        if (labelId === null || labelId === '') {
-            finalLabelId = null;
-        }
-        else {
-            const labelExists = await db_1.default.label.findUnique({ where: { id: labelId } });
-            if (!labelExists)
-                throw new Error(`Invalid label ID: ${labelId} does not exist`);
-            finalLabelId = labelId;
-        }
+    const albumData = {
+        title,
+        coverUrl,
+        releaseDate: releaseDateObj,
+        type,
+        duration: 0,
+        totalTracks: 0,
+        artist: { connect: { id: targetArtistProfileId } },
+        isActive,
+        genres: { create: genreArray.map((genreId) => ({ genre: { connect: { id: genreId } } })) },
+    };
+    if (artistLabelId) {
+        albumData.label = { connect: { id: artistLabelId } };
     }
     const album = await db_1.default.album.create({
-        data: {
-            title,
-            coverUrl,
-            releaseDate: releaseDateObj,
-            type,
-            duration: 0,
-            totalTracks: 0,
-            artistId: targetArtistProfileId,
-            isActive,
-            labelId: finalLabelId,
-            genres: { create: genreArray.map((genreId) => ({ genre: { connect: { id: genreId } } })) },
-        },
+        data: albumData,
         select: prisma_selects_1.albumSelect,
     });
     const followers = await db_1.default.userFollow.findMany({
@@ -270,14 +262,22 @@ const addTracksToAlbum = async (req) => {
     const { albumId } = req.params;
     if (!user)
         throw new Error('Forbidden');
-    const album = await db_1.default.album.findUnique({
+    const albumWithLabel = await db_1.default.album.findUnique({
         where: { id: albumId },
-        select: { artistId: true, type: true, coverUrl: true, isActive: true, tracks: { select: { trackNumber: true } } },
+        select: {
+            artistId: true,
+            type: true,
+            coverUrl: true,
+            isActive: true,
+            labelId: true,
+            tracks: { select: { trackNumber: true } }
+        }
     });
-    if (!album)
+    if (!albumWithLabel)
         throw new Error('Album not found');
-    if (!canManageAlbum(user, album.artistId))
+    if (!canManageAlbum(user, albumWithLabel.artistId))
         throw new Error('You can only add tracks to your own albums');
+    const albumLabelId = albumWithLabel.labelId;
     const files = req.files;
     if (!files || !files.length)
         throw new Error('No files uploaded');
@@ -300,38 +300,34 @@ const addTracksToAlbum = async (req) => {
         const duration = Math.floor(metadata.format.duration || 0);
         const uploadResult = await (0, upload_service_1.uploadFile)(file.buffer, 'tracks', 'auto');
         const existingTrack = await db_1.default.track.findFirst({
-            where: { title: titles[index], artistId: album.artistId },
+            where: { title: titles[index], artistId: albumWithLabel.artistId },
         });
         if (existingTrack)
             throw new Error(`Track with title "${titles[index]}" already exists for this artist.`);
         const newTrackNumber = maxTrackNumber + index + 1;
+        const trackData = {
+            title: titles[index],
+            duration,
+            releaseDate: new Date(releaseDates[index] || Date.now()),
+            trackNumber: newTrackNumber,
+            coverUrl: albumWithLabel.coverUrl,
+            audioUrl: uploadResult.secure_url,
+            artist: { connect: { id: albumWithLabel.artistId } },
+            album: { connect: { id: albumId } },
+            type: albumWithLabel.type,
+            isActive: albumWithLabel.isActive,
+            featuredArtists: featuredArtists[index]?.length > 0
+                ? { create: featuredArtists[index].map((artistProfileId) => ({ artistProfile: { connect: { id: artistProfileId } } })) }
+                : undefined,
+            genres: genres[index]?.length > 0
+                ? { create: genres[index].map((genreId) => ({ genre: { connect: { id: genreId } } })) }
+                : undefined,
+        };
+        if (albumLabelId) {
+            trackData.label = { connect: { id: albumLabelId } };
+        }
         const track = await db_1.default.track.create({
-            data: {
-                title: titles[index],
-                duration,
-                releaseDate: new Date(releaseDates[index] || Date.now()),
-                trackNumber: newTrackNumber,
-                coverUrl: album.coverUrl,
-                audioUrl: uploadResult.secure_url,
-                artistId: album.artistId,
-                albumId,
-                type: album.type,
-                isActive: album.isActive,
-                ...(featuredArtists[index]?.length && {
-                    featuredArtists: {
-                        create: featuredArtists[index].map((artistProfileId) => ({
-                            artistProfile: { connect: { id: artistProfileId } },
-                        })),
-                    },
-                }),
-                ...(genres[index]?.length && {
-                    genres: {
-                        create: genres[index].map((genreId) => ({
-                            genre: { connect: { id: genreId } },
-                        })),
-                    },
-                }),
-            },
+            data: trackData,
             select: prisma_selects_1.trackSelect,
         });
         return track;

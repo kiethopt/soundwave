@@ -25,6 +25,7 @@ import {
   getHomePageData,
   getUserSystemPlaylists,
   getPlaylistSuggestions,
+  suggestMoreTracksForPlaylist,
 } from "../controllers/playlist.controller";
 import { Role } from "@prisma/client";
 import upload from "../middleware/upload.middleware";
@@ -60,6 +61,7 @@ router.patch("/:id", upload.single("cover"), updatePlaylist);
 router.delete("/:id", deletePlaylist);
 router.delete("/:playlistId/tracks/:trackId", removeTrackFromPlaylist);
 router.post("/:id/tracks", addTrackToPlaylist);
+router.get("/:id/suggest-more", suggestMoreTracksForPlaylist);
 
 // == Admin-only routes ==
 router.use("/admin", authorize([Role.ADMIN]));
