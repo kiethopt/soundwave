@@ -432,4 +432,42 @@ export const createWelcomeEmail = (
   return { to, subject, html };
 };
 
+/**
+ * Create email content for admin notification when a new artist request is submitted
+ */
+export const createArtistRequestNotificationEmail = (
+  to: string,
+  artistName: string,
+  userName: string,
+  userId: string,
+  artistProfileId: string
+): EmailOptions => {
+  const subject = `New Artist Request: ${artistName}`;
+  const actionLink = `${FRONTEND_URL}/admin/artist-requests/${userId}`;
+  
+  const mainContentHtml = `
+    <h2 style="color: ${TEXT_DARK}; margin-top: 0; margin-bottom: 20px; font-size: 24px; text-align: center;">New Artist Request</h2>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">A new artist request has been submitted and requires review:</p>
+    <div style="margin: 0 0 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+      <p style="margin: 0 0 10px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK};">
+        <strong>Artist Name:</strong> ${artistName}
+      </p>
+      <p style="margin: 0 0 10px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK};">
+        <strong>Requested by:</strong> ${userName} (ID: ${userId})
+      </p>
+    </div>
+  `;
+  
+  const html = createRichHtmlTemplate(
+    subject,
+    mainContentHtml,
+    to,
+    undefined,
+    actionLink,
+    'Review Request'
+  );
+  
+  return { to, subject, html };
+};
+
 export { transporter };

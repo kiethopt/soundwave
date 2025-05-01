@@ -2,11 +2,10 @@ import { RequestHandler } from "express";
 import * as playlistService from "../services/playlist.service";
 import * as albumService from "../services/album.service";
 import * as userService from "../services/user.service";
-import * as historyService from "../services/history.service"
-import { handleError } from "../utils/handle-utils"; // Import error handler
-import { PrismaClient, Prisma } from "@prisma/client";
-import prisma from "../config/db"; // Import configured prisma instance
-import { getPlayHistory } from '../services/user.service';
+import { handleError } from "../utils/handle-utils";
+import {  Prisma } from "@prisma/client";
+import prisma from "../config/db";
+import { uploadFile } from "../services/upload.service";
 
 // Tạo playlist mới
 export const createPlaylist: RequestHandler = async (
@@ -703,9 +702,6 @@ export const updatePlaylist: RequestHandler = async (
     // Xử lý upload file nếu có
     if (req.file) {
       try {
-        // Import service upload cho Cloudinary
-        const { uploadFile } = require("../services/upload.service");
-
         // Upload file vào Cloudinary
         const result = await uploadFile(
           req.file.buffer,

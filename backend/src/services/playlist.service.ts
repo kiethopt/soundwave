@@ -869,10 +869,8 @@ export const getPlaylistSuggestions = async (req: Request) => {
   const user = req.user;
   if (!user) throw new Error('Unauthorized');
   
-  // Get playlistId from query params
   const { playlistId } = req.query;
 
-  // Get user's recently played tracks from the last 30 days
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 

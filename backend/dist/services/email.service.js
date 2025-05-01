@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.transporter = exports.createWelcomeEmail = exports.createPasswordResetEmail = exports.createAccountDeletedEmail = exports.createAccountDeactivatedEmail = exports.createAccountActivatedEmail = exports.createNewReleaseEmail = exports.createArtistRequestRejectedEmail = exports.createArtistRequestApprovedEmail = exports.createNewFollowerEmail = exports.sendEmail = void 0;
+exports.transporter = exports.createArtistRequestNotificationEmail = exports.createWelcomeEmail = exports.createPasswordResetEmail = exports.createAccountDeletedEmail = exports.createAccountDeactivatedEmail = exports.createAccountActivatedEmail = exports.createNewReleaseEmail = exports.createArtistRequestRejectedEmail = exports.createArtistRequestApprovedEmail = exports.createNewFollowerEmail = exports.sendEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
@@ -266,4 +266,23 @@ const createWelcomeEmail = (to, userName) => {
     return { to, subject, html };
 };
 exports.createWelcomeEmail = createWelcomeEmail;
+const createArtistRequestNotificationEmail = (to, artistName, userName, userId, artistProfileId) => {
+    const subject = `New Artist Request: ${artistName}`;
+    const actionLink = `${FRONTEND_URL}/admin/artist-requests/${userId}`;
+    const mainContentHtml = `
+    <h2 style="color: ${TEXT_DARK}; margin-top: 0; margin-bottom: 20px; font-size: 24px; text-align: center;">New Artist Request</h2>
+    <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK}; text-align: center;">A new artist request has been submitted and requires review:</p>
+    <div style="margin: 0 0 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+      <p style="margin: 0 0 10px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK};">
+        <strong>Artist Name:</strong> ${artistName}
+      </p>
+      <p style="margin: 0 0 10px; font-size: 16px; line-height: 1.6; color: ${TEXT_DARK};">
+        <strong>Requested by:</strong> ${userName} (ID: ${userId})
+      </p>
+    </div>
+  `;
+    const html = createRichHtmlTemplate(subject, mainContentHtml, to, undefined, actionLink, 'Review Request');
+    return { to, subject, html };
+};
+exports.createArtistRequestNotificationEmail = createArtistRequestNotificationEmail;
 //# sourceMappingURL=email.service.js.map

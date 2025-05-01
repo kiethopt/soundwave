@@ -195,7 +195,7 @@ export function TrackList({
           return (
             <div key={track.id}>
               <div
-                className={`hidden md:grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_50px] gap-4 px-6 py-4 group ${
+                className={`hidden md:grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_60px] gap-4 px-6 py-4 group ${
                   theme === "light" ? "hover:bg-gray-100" : "hover:bg-white/10"
                 } cursor-pointer transition-colors duration-150 ease-in-out items-center`}
               >
@@ -346,7 +346,7 @@ export function TrackList({
                 </div>
 
                 <div
-                  className="flex items-center justify-center"
+                  className="flex items-center justify-end"
                   onClick={() => handleTrackPlay(track)}
                 >
                   <span

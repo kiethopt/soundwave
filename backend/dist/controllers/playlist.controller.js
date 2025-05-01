@@ -36,13 +36,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
+exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
 const playlistService = __importStar(require("../services/playlist.service"));
 const albumService = __importStar(require("../services/album.service"));
 const userService = __importStar(require("../services/user.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
+const upload_service_1 = require("../services/upload.service");
 const createPlaylist = async (req, res, next) => {
     try {
         const userId = req.user?.id;
@@ -602,8 +603,7 @@ const updatePlaylist = async (req, res) => {
         };
         if (req.file) {
             try {
-                const { uploadFile } = require("../services/upload.service");
-                const result = await uploadFile(req.file.buffer, "playlists/covers", "image");
+                const result = await (0, upload_service_1.uploadFile)(req.file.buffer, "playlists/covers", "image");
                 updateData.coverUrl = result.secure_url;
                 console.log("Uploaded new cover image to Cloudinary:", result.secure_url);
             }
@@ -1074,4 +1074,33 @@ const getHomePageData = async (req, res, next) => {
     }
 };
 exports.getHomePageData = getHomePageData;
+const getPlaylistSuggestions = async (req, res, next) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            res.status(401).json({
+                success: false,
+                message: "Unauthorized",
+            });
+            return;
+        }
+        const suggestions = await playlistService.getPlaylistSuggestions(req);
+        if (!suggestions) {
+            res.status(404).json({
+                success: false,
+                message: "No playlist suggestions found",
+            });
+            return;
+        }
+        res.status(200).json({
+            success: true,
+            data: suggestions,
+        });
+    }
+    catch (error) {
+        console.error("Error fetching playlist suggestions:", error);
+        next(error);
+    }
+};
+exports.getPlaylistSuggestions = getPlaylistSuggestions;
 //# sourceMappingURL=playlist.controller.js.map

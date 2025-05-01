@@ -163,7 +163,11 @@ export default function SystemManagementPage() {
                   return (
                     <div key={component.name} className="flex items-center justify-between text-sm border-b pb-2 last:border-b-0 last:pb-0 pt-1 first:pt-0 border-border/30">
                       <span className="font-medium text-primary">{component.name}</span>
-                      <span className={`font-semibold ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'}`}>
+                      <span className={`font-semibold ${
+                        component.status === 'Available' 
+                          ? 'text-green-600 dark:text-green-500' 
+                          : 'text-red-600 dark:text-red-500'
+                      }`}>
                         {component.status}
                       </span>
                     </div>

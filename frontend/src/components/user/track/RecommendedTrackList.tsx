@@ -229,8 +229,8 @@ export function RecommendedTrackList({
                 {/* Add button */}
                 <Button
                   size="sm"
-                  variant="outline" 
-                  className="flex items-center justify-center gap-1 text-xs h-8 px-3"
+                  variant="default" 
+                  className="flex items-center justify-center gap-1 text-xs h-8 px-3 rounded-full font-medium"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleAddToPlaylist(track.id);

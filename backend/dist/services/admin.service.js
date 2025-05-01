@@ -175,10 +175,19 @@ const getArtistRequests = async (req) => {
 };
 exports.getArtistRequests = getArtistRequests;
 const getArtistRequestDetail = async (id) => {
-    const request = await db_1.default.artistProfile.findUnique({
+    let request = await db_1.default.artistProfile.findUnique({
         where: { id },
         select: prisma_selects_1.artistRequestDetailsSelect,
     });
+    if (!request) {
+        request = await db_1.default.artistProfile.findFirst({
+            where: {
+                userId: id,
+                verificationRequestedAt: { not: null }
+            },
+            select: prisma_selects_1.artistRequestDetailsSelect,
+        });
+    }
     if (!request) {
         throw new Error('Request not found');
     }
@@ -620,7 +629,10 @@ const approveArtistRequest = async (requestId) => {
         });
         return profile;
     });
-    return updatedProfile;
+    return {
+        ...updatedProfile,
+        hasPendingRequest: false
+    };
 };
 exports.approveArtistRequest = approveArtistRequest;
 const rejectArtistRequest = async (requestId) => {

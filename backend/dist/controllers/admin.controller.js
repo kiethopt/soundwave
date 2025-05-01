@@ -346,6 +346,7 @@ const approveArtistRequest = async (req, res) => {
         res.json({
             message: 'Artist role approved successfully',
             user: updatedProfile.user,
+            hasPendingRequest: false
         });
     }
     catch (error) {
@@ -393,6 +394,7 @@ const rejectArtistRequest = async (req, res) => {
         res.json({
             message: 'Artist role request rejected successfully',
             user: result.user,
+            hasPendingRequest: result.hasPendingRequest
         });
     }
     catch (error) {

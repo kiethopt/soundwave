@@ -57,8 +57,12 @@ export default function ArtistRequestDetail({
       const token = localStorage.getItem('userToken');
       if (!token) throw new Error('No authentication token found');
 
-      await api.admin.approveArtistRequest(request!.id, token);
-      toast.success('Artist request approved successfully!');
+      const response = await api.admin.approveArtistRequest(request!.id, token);
+      if (response.hasPendingRequest === false) {
+        toast.success('Artist request approved successfully!');
+      } else {
+        toast.error('Failed to update request status');
+      }
       router.push('/admin/artist-requests');
     } catch (err) {
       toast.error(
