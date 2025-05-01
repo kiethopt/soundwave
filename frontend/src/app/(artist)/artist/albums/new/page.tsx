@@ -30,23 +30,28 @@ export default function NewAlbum() {
     Array<{ id: string; name: string }>
   >([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  // --- Thêm State cho Label ---
-  const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null); // Lưu ID label được chọn (null nếu không chọn)
-  // --- Kết thúc thêm State cho Label ---
+  // State to store the artist's default label name
+  const [artistLabelName, setArtistLabelName] = useState<string | null>(null);
   const { theme } = useTheme();
 
   useEffect(() => {
+    // Fetch genres and artist profile data
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('userToken');
-        if (!token) return;
+        if (!token) {
+          toast.error("Authentication required. Please log in.");
+          router.push('/login'); // Redirect to login if no token
+          return;
+        };
 
-        const [genresResponse, labelsResponse] = await Promise.all([
+        // Fetch genres and artist profile in parallel
+        const [genresResponse, profileResponse] = await Promise.all([
           api.artists.getAllGenres(token, 1, 100),
-          api.labels.getAll(token, 1, 100), // Giả sử API này tồn tại và trả về { labels: [...] }
+          api.auth.getMe(token) // Use getMe to fetch profile
         ]);
 
+        // Set Genres
         setAvailableGenres(
           genresResponse.genres.map((genre: { id: string; name: string }) => ({
             id: genre.id,
@@ -54,22 +59,21 @@ export default function NewAlbum() {
           }))
         );
 
-        // --- Cập nhật State cho Labels ---
-        setAvailableLabels(
-          labelsResponse.labels.map((label: Label) => ({
-            id: label.id,
-            name: label.name,
-          }))
-        );
-        // --- Kết thúc Cập nhật State cho Labels ---
+        // Set Artist Label Name from profile
+        if (profileResponse?.artistProfile?.label?.name) {
+          setArtistLabelName(profileResponse.artistProfile.label.name);
+        } else {
+          setArtistLabelName(null);
+        }
+
       } catch (error) {
-        console.error('Failed to fetch data:', error);
-        toast.error('Failed to load required data (genres or labels)');
+        console.error('Failed to fetch initial data:', error);
+        toast.error('Failed to load required data (genres or profile)');
       }
     };
 
     fetchData();
-  }, []);
+  }, [router]); // Add router to dependencies
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -119,12 +123,6 @@ export default function NewAlbum() {
       selectedGenres.forEach((genreId) => {
         formData.append('genres', genreId);
       });
-
-      // --- Thêm labelId vào FormData nếu đã chọn ---
-      if (selectedLabelId) {
-        formData.append('labelId', selectedLabelId);
-      }
-      // --- Kết thúc thêm labelId ---
 
       await api.albums.create(formData, token);
       toast.success('Album created successfully');
@@ -268,26 +266,27 @@ export default function NewAlbum() {
                 />
               </div>
 
-              {/* --- Thêm trường chọn Label --- */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="label"
-                  className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                    }`}
-                >
-                  Label
-                </label>
-                <SearchableSelect
-                  options={availableLabels}
-                  value={selectedLabelId ? [selectedLabelId] : []}
-                  onChange={(selectedIds) => {
-                    setSelectedLabelId(selectedIds.length > 0 ? selectedIds[0] : null);
-                  }}
-                  placeholder="Select a label..."
-                  multiple={false} // Chỉ cho phép chọn một label
-                />
-              </div>
-              {/* --- Kết thúc thêm trường chọn Label --- */}
+              {/* Display Artist's Default Label (Read-only) */}
+              {artistLabelName && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="labelDisplay"
+                    className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
+                  >
+                    Label 
+                  </label>
+                  <input
+                    type="text"
+                    id="labelDisplay"
+                    value={artistLabelName}
+                    disabled
+                    className={`w-full px-3 py-2 rounded-md border focus:outline-none ${theme === 'light'
+                        ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-white/[0.05] border-white/[0.1] text-white/50 cursor-not-allowed'
+                      }`}
+                  />
+                </div>
+              )}
 
               {/* Cover Image */}
               <div className="space-y-2">

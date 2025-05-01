@@ -25,6 +25,7 @@ export default function RequestArtistPage() {
   const [formData, setFormData] = useState({
     artistName: '',
     bio: '',
+    label: '',
     facebookLink: 'https://www.facebook.com/',
     instagramLink: 'https://www.instagram.com/',
     genres: [] as string[],
@@ -190,6 +191,7 @@ export default function RequestArtistPage() {
       const submitFormData = new FormData();
       submitFormData.append('artistName', formData.artistName);
       submitFormData.append('bio', formData.bio);
+      submitFormData.append('label', formData.label);
       submitFormData.append('genres', formData.genres.join(','));
 
       // Send the full URLs
@@ -395,7 +397,29 @@ export default function RequestArtistPage() {
               />
             </div>
             <div>
-              <label htmlFor="bio" className="block text-sm font-medium mb-2 text-white/70">
+              <label
+                htmlFor="label"
+                className="block text-sm font-medium mb-2 text-white/70"
+              >
+                Label *
+              </label>
+              <input
+                id="label"
+                type="text"
+                value={formData.label}
+                onChange={(e) =>
+                  setFormData({ ...formData, label: e.target.value })
+                }
+                className="w-full px-4 py-2.5 bg-white/[0.05] rounded-lg border border-white/[0.1] focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-transparent transition-colors placeholder-white/40"
+                placeholder="Your personal label name (e.g., 'My Music Records')"
+                required
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="bio"
+                className="block text-sm font-medium mb-2 text-white/70"
+              >
                 Bio *
               </label>
               <textarea
@@ -513,7 +537,7 @@ export default function RequestArtistPage() {
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !formData.artistName || !formData.bio || !formData.avatarFile}
+              disabled={isSubmitting || !formData.artistName || !formData.bio || !formData.avatarFile || !formData.label}
               className="flex items-center gap-2"
             >
               {isSubmitting ? (

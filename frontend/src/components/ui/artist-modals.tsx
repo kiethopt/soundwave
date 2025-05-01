@@ -54,6 +54,7 @@ export function EditAlbumModal({
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [labelDisplayName, setLabelDisplayName] = useState<string>('No Label Assigned');
 
   useEffect(() => {
     if (album) {
@@ -66,6 +67,7 @@ export function EditAlbumModal({
       setSelectedGenres(album.genres?.map(g => g.genre.id) || []);
       setSelectedLabelId(album.labelId || null);
       setCoverPreview(album.coverUrl || null);
+      setLabelDisplayName(album.label?.name || 'No Label Assigned');
     } else {
       resetForm();
     }
@@ -78,6 +80,7 @@ export function EditAlbumModal({
     setSelectedLabelId(null);
     setCoverFile(null);
     setCoverPreview(null);
+    setLabelDisplayName('No Label Assigned');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,13 +137,6 @@ export function EditAlbumModal({
       selectedGenres.forEach(genreId => {
         form.append('genres[]', genreId);
       });
-    }
-
-    // Label - Send empty string to clear
-    if (selectedLabelId === null || selectedLabelId === 'none') {
-      form.append('labelId', ''); 
-    } else if (selectedLabelId) {
-      form.append('labelId', selectedLabelId);
     }
 
     // Active status
@@ -326,21 +322,22 @@ export function EditAlbumModal({
                 />
                     </div>
 
-              {/* Label */}
+              {/* Display Label (Read-only) */}
               <div className="space-y-2 col-span-2">
                 <UILabel className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
-                  Label
+                  Label 
                 </UILabel>
-                <SearchableSelect
-                  options={[{id: 'none', name: 'No Label'}, ...availableLabels.map(label => ({
-                    id: label.id,
-                    name: label.name
-                  }))]}
-                  value={selectedLabelId ? [selectedLabelId] : []} 
-                  onChange={(value) => setSelectedLabelId(value.length > 0 && value[0] !== 'none' ? value[0] : null)}
-                  placeholder="Select a label"
-                  multiple={false}
-                />
+                 <Input
+                    id="labelDisplay"
+                    value={labelDisplayName}
+                    disabled
+                    className={cn(
+                      "w-full",
+                      theme === 'dark'
+                        ? 'bg-gray-700/50 border-gray-600 text-gray-300 cursor-not-allowed' 
+                        : 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                    )}
+                  />
               </div>
 
               {/* Visibility Toggle */}
@@ -434,6 +431,7 @@ export function EditTrackModal({
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [labelDisplayName, setLabelDisplayName] = useState<string>('No Label Assigned');
 
   useEffect(() => {
     if (track) {
@@ -446,6 +444,7 @@ export function EditTrackModal({
       setSelectedFeaturedArtists(track.featuredArtists?.map(fa => fa.artistProfile.id) || []);
       setSelectedLabelId(track.labelId || null);
       setCoverPreview(track.coverUrl || null);
+      setLabelDisplayName(track.label?.name || 'No Label Assigned');
     } else {
       resetForm();
     }
@@ -459,6 +458,7 @@ export function EditTrackModal({
     setSelectedLabelId(null);
     setCoverFile(null);
     setCoverPreview(null);
+    setLabelDisplayName('No Label Assigned');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -522,13 +522,6 @@ export function EditTrackModal({
       selectedFeaturedArtists.forEach(artistId => {
         form.append('featuredArtists[]', artistId);
       });
-    }
-
-    // Label - Send empty string to clear
-    if (selectedLabelId === null || selectedLabelId === 'none') {
-      form.append('labelId', '');
-    } else if (selectedLabelId) {
-      form.append('labelId', selectedLabelId);
     }
 
     // Active status
@@ -682,14 +675,19 @@ export function EditTrackModal({
                   required={true}
                 />
               </div>
+              {/* Display Label (Read-only) */}
               <div className="space-y-2 col-span-1">
                 <UILabel className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>Label</UILabel>
-                <SearchableSelect
-                  options={[{id: 'none', name: 'No Label'}, ...availableLabels.map(label => ({ id: label.id, name: label.name }))]}
-                  value={selectedLabelId ? [selectedLabelId] : []}
-                  onChange={(value) => setSelectedLabelId(value.length > 0 && value[0] !== 'none' ? value[0] : null)}
-                  placeholder="Select a label"
-                  multiple={false}
+                <Input
+                  id="labelDisplay"
+                  value={labelDisplayName}
+                  disabled
+                  className={cn(
+                    "w-full",
+                    theme === 'dark'
+                      ? 'bg-gray-700/50 border-gray-600 text-gray-300 cursor-not-allowed' 
+                      : 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                  )}
                 />
               </div>
 

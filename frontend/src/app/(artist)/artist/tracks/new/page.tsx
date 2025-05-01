@@ -33,25 +33,28 @@ export default function NewTrack() {
   const [availableGenres, setAvailableGenres] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
-  // --- Thêm State cho Label ---
-  const [availableLabels, setAvailableLabels] = useState<Array<{ id: string; name: string }>>([]);
-  const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null); // Lưu ID label được chọn (null nếu không chọn)
-  // --- Kết thúc thêm State cho Label ---
+  // State to store the artist's default label name
+  const [artistLabelName, setArtistLabelName] = useState<string | null>(null);
   const { theme } = useTheme();
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('userToken');
-        if (!token) return;
+        if (!token) {
+          toast.error("Authentication required. Please log in.");
+          router.push('/login');
+          return;
+        }
 
-        // --- Fetch thêm danh sách Labels ---
-        const [artistsResponse, genresResponse, labelsResponse] = await Promise.all([
+        // Fetch artists, genres, and profile in parallel
+        const [artistsResponse, genresResponse, profileResponse] = await Promise.all([
           api.artists.getAllArtistsProfile(token, 1, 100),
           api.genres.getAll(token, 1, 100),
-          api.labels.getAll(token, 1, 100), // Giả sử API này tồn tại và trả về { labels: [...] }
+          api.auth.getMe(token), // Fetch current user profile
         ]);
-        // --- Kết thúc Fetch thêm danh sách Labels ---
 
+        // Set available artists (excluding self if needed, though maybe allow for features)
         setAvailableArtists(
           artistsResponse.artists.map((artist: ArtistProfile) => ({
             id: artist.id,
@@ -59,6 +62,7 @@ export default function NewTrack() {
           }))
         );
 
+        // Set available genres
         setAvailableGenres(
           genresResponse.genres.map((genre: { id: string; name: string }) => ({
             id: genre.id,
@@ -66,23 +70,21 @@ export default function NewTrack() {
           }))
         );
 
-        // --- Cập nhật State cho Labels ---
-        setAvailableLabels(
-          labelsResponse.labels.map((label: Label) => ({ // Sử dụng interface Label đã định nghĩa
-            id: label.id,
-            name: label.name,
-          }))
-        );
-        // --- Kết thúc Cập nhật State cho Labels ---
+        // Set Artist Label Name from profile
+        if (profileResponse?.artistProfile?.label?.name) {
+          setArtistLabelName(profileResponse.artistProfile.label.name);
+        } else {
+          setArtistLabelName(null);
+        }
 
       } catch (error) {
-        console.error('Failed to fetch data:', error);
-        toast.error('Failed to load required data (artists, genres, or labels)');
+        console.error('Failed to fetch initial data:', error);
+        toast.error('Failed to load required data (artists, genres, or profile)');
       }
     };
 
     fetchData();
-  }, []);
+  }, [router]); // Depend on router
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -155,12 +157,6 @@ export default function NewTrack() {
       selectedGenres.forEach((genreId) => {
         formData.append('genreIds[]', genreId);
       });
-
-      // --- Thêm labelId vào FormData nếu đã chọn ---
-      if (selectedLabelId) {
-        formData.append('labelId', selectedLabelId);
-      }
-      // --- Kết thúc thêm labelId ---
 
       await api.tracks.create(formData, token); // Gọi API tạo track
       toast.success('Track created successfully');
@@ -321,55 +317,27 @@ export default function NewTrack() {
                 />
               </div>
 
-              {/* --- Thêm trường chọn Label --- */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="label"
-                  className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                    }`}
-                >
-                  Label
-                </label>
-                {/* Sử dụng SearchableSelect cho nhất quán, nhưng đặt multiple={false} */}
-                <SearchableSelect
-                  options={availableLabels}
-                  // SearchableSelect có thể trả về mảng kể cả khi multiple=false,
-                  // nên cần xử lý lấy phần tử đầu tiên hoặc null.
-                  // value cần là mảng chứa ID hoặc mảng rỗng.
-                  value={selectedLabelId ? [selectedLabelId] : []}
-                  onChange={(selectedIds) => {
-                    // Giả sử onChange luôn trả về mảng ID. Lấy phần tử đầu tiên.
-                    // Kiểm tra lại cách component SearchableSelect hoạt động với single select.
-                    setSelectedLabelId(selectedIds.length > 0 ? selectedIds[0] : null);
-                  }}
-                  placeholder="Select a label..."
-                  multiple={false} // Chỉ cho phép chọn một label
-                />
-                {/* Hoặc dùng select HTML tiêu chuẩn nếu đơn giản hơn */}
-                {/*
-                 <select
-                   id="label"
-                   name="label"
-                   value={selectedLabelId || ''} // Giá trị là ID hoặc chuỗi rỗng
-                   onChange={(e) => setSelectedLabelId(e.target.value || null)} // Cập nhật state, đặt null nếu chọn giá trị rỗng
-                   className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 appearance-none ${
-                     theme === 'light'
-                       ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                       : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
-                   }`}
-                 >
-                   <option value="" className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}>
-                     -- Select a Label (Optional) --
-                   </option>
-                   {availableLabels.map((label) => (
-                     <option key={label.id} value={label.id} className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}>
-                       {label.name}
-                     </option>
-                   ))}
-                 </select>
-                 */}
-              </div>
-              {/* --- Kết thúc thêm trường chọn Label --- */}
+              {/* Display Artist's Default Label (Read-only) */}
+              {artistLabelName && (
+                <div className="space-y-2">
+                  <label
+                    htmlFor="labelDisplay"
+                    className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
+                  >
+                    Label 
+                  </label>
+                  <input
+                    type="text"
+                    id="labelDisplay"
+                    value={artistLabelName}
+                    disabled
+                    className={`w-full px-3 py-2 rounded-md border focus:outline-none ${theme === 'light'
+                        ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-white/[0.05] border-white/[0.1] text-white/50 cursor-not-allowed'
+                      }`}
+                  />
+                </div>
+              )}
 
               {/* Audio File */}
               <div className="space-y-2">
