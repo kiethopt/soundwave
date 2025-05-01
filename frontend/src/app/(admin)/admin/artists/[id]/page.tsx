@@ -281,29 +281,17 @@ export default function ArtistDetail({ params }: { params: Promise<{ id: string 
                 </div>
               )}
 
-              {/* Verification Status */}
-              {artist.isVerified !== undefined && (
+              {/* Active Status */}
+              {artist.isActive !== undefined && (
                 <div>
-                  <span className={`text-sm font-medium ${theme === "light" ? "text-gray-500" : "text-gray-400"}`}>
-                    Verification Status
+                  <span className={`text-sm font-medium ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+                    Account Status
                   </span>
-                  <p className={artist.isVerified ? "text-green-500" : "text-red-500"}>
-                    {artist.isVerified ? "Verified" : "Not Verified"}
+                  <p className={artist.isActive ? 'text-green-500' : 'text-red-500'}>
+                    {artist.isActive ? 'Active' : 'Inactive'}
                   </p>
                 </div>
               )}
-
-               {/* Active Status */}
-               {artist.isActive !== undefined && (
-                 <div>
-                   <span className={`text-sm font-medium ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
-                     Account Status
-                   </span>
-                   <p className={artist.isActive ? 'text-green-500' : 'text-red-500'}>
-                     {artist.isActive ? 'Active' : 'Inactive'}
-                   </p>
-                 </div>
-               )}
                
                {/* Created At */}
                {artist.createdAt && (

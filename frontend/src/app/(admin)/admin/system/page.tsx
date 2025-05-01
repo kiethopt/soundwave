@@ -10,11 +10,6 @@ import {
   Server,
   Bot,
   AlertCircle,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  PowerOff,
-  HelpCircle,
   Loader2,
 } from 'lucide-react';
 import {
@@ -38,22 +33,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-// Helper function to get status icon and color
-const getStatusVisuals = (status: SystemComponentStatus['status']) => {
-  switch (status) {
-    case 'Available':
-      return { Icon: CheckCircle2, color: 'text-green-500' };
-    case 'Issue':
-      return { Icon: AlertTriangle, color: 'text-yellow-500' };
-    case 'Outage':
-      return { Icon: XCircle, color: 'text-red-500' };
-    case 'Disabled':
-      return { Icon: PowerOff, color: 'text-gray-500' };
-    default:
-      return { Icon: HelpCircle, color: 'text-gray-400' };
-  }
-};
-
 export default function SystemManagementPage() {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
@@ -63,7 +42,7 @@ export default function SystemManagementPage() {
     debugMode: false,
     sessionTimeout: 60,
     maxUploadSize: 10,
-    aiModel: 'gemini-2.0-flash',
+    aiModel: '',
     supportedAIModels: [],
   });
   const [systemStatuses, setSystemStatuses] = useState<SystemComponentStatus[]>([]);
@@ -83,22 +62,18 @@ export default function SystemManagementPage() {
             api.admin.getSystemStatus(token),
           ]);
 
-        console.log('AI Model Response:', aiModelResponse);
+        console.log('[System Page] Raw AI Model Response:', aiModelResponse);
 
-        setSettings((prev) => ({
-          ...prev,
-          cacheEnabled: cacheResponse.enabled,
-          aiModel: aiModelResponse.data?.model || 'gemini-2.0-flash',
-          supportedAIModels: aiModelResponse.data?.validModels || [
-            'gemini-2.5-flash-preview-04-17',
-            'gemini-2.5-pro-preview-03-25',
-            'gemini-2.0-flash', 
-            'gemini-2.0-flash-lite',
-            'gemini-1.5-flash',
-            'gemini-1.5-flash-8b',
-            'gemini-1.5-pro',
-          ],
-        }));
+        setSettings((prev) => {
+          const newState = {
+            ...prev,
+            cacheEnabled: cacheResponse.enabled,
+            aiModel: aiModelResponse.data?.model || '',
+            supportedAIModels: aiModelResponse.data?.validModels || [],
+          };
+          console.log('[System Page] Updated settings state:', newState);
+          return newState;
+        });
 
         // Set system statuses
         if (statusResponse?.success && Array.isArray(statusResponse.data)) {
@@ -185,16 +160,12 @@ export default function SystemManagementPage() {
             <CardContent className="space-y-3">
               {systemStatuses.length > 0 ? (
                 systemStatuses.map((component) => {
-                  const { Icon, color } = getStatusVisuals(component.status);
                   return (
                     <div key={component.name} className="flex items-center justify-between text-sm border-b pb-2 last:border-b-0 last:pb-0 pt-1 first:pt-0 border-border/30">
                       <span className="font-medium text-primary">{component.name}</span>
-                      <div className="flex items-center gap-2">
-                        <Icon className={`h-4 w-4 ${color}`} />
-                        <span className={`font-semibold ${color}`}>
-                          {component.status}
-                        </span>
-                      </div>
+                      <span className={`font-semibold ${theme === 'light' ? 'text-gray-700' : 'text-gray-300'}`}>
+                        {component.status}
+                      </span>
                     </div>
                   );
                 })

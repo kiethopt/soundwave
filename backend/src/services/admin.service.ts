@@ -21,46 +21,55 @@ import bcrypt from 'bcrypt';
 import { subMonths, endOfMonth } from 'date-fns';
 import * as emailService from './email.service';
 
+// Define a list of valid models here
+const VALID_GEMINI_MODELS = [
+  'gemini-2.5-flash-preview-04-17',
+  'gemini-2.5-pro-preview-03-25',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
+  'gemini-1.5-pro',
+];
+
 type User = PrismaUser;
 
 export const getUsers = async (req: Request, requestingUser: User) => {
-  const { search = '', status, role, sortBy, sortOrder } = req.query;
-
-  let roleFilter: Prisma.UserWhereInput['role'] = {};
-  if (requestingUser.role === Role.ADMIN && role) {
-    const requestedRoles = Array.isArray(role)
-      ? (role as string[])
-      : [role as string];
-
-    const validRoles = requestedRoles
-      .map((r) => r.toUpperCase())
-      .filter((r) => Object.values(Role).includes(r as Role)) as Role[];
-
-    if (validRoles.length > 0) {
-      roleFilter = { in: validRoles };
-    }
-  }
+  const { search, status, sortBy, sortOrder } = req.query;
 
   const where: Prisma.UserWhereInput = {
-    ...(Object.keys(roleFilter).length > 0 ? { role: roleFilter } : {}),
     id: { not: requestingUser.id },
-    ...(search
-      ? {
-          OR: [
-            { email: { contains: String(search), mode: 'insensitive' } },
-            { username: { contains: String(search), mode: 'insensitive' } },
-            { name: { contains: String(search), mode: 'insensitive' } },
-          ],
-        }
-      : {}),
-    ...(status !== undefined ? { isActive: toBooleanValue(status) } : {}),
   };
 
+  if (search && typeof search === 'string') {
+    where.OR = [
+      { email: { contains: search, mode: 'insensitive' } },
+      { username: { contains: search, mode: 'insensitive' } },
+      { name: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  if (status && typeof status === 'string' && status !== 'ALL') {
+    where.isActive = status === 'true';
+  }
+
   let orderBy: Prisma.UserOrderByWithRelationInput = { createdAt: 'desc' };
-  const validSortFields = ['name', 'email', 'username', 'role', 'isActive', 'createdAt', 'lastLoginAt'];
-  if (sortBy && validSortFields.includes(String(sortBy))) {
-    const order = sortOrder === 'asc' ? 'asc' : 'desc';
-    orderBy = { [String(sortBy)]: order };
+  const validSortFields = [
+    'name',
+    'email',
+    'username',
+    'role',
+    'isActive',
+    'createdAt',
+    'lastLoginAt',
+  ];
+  if (
+    sortBy &&
+    typeof sortBy === 'string' &&
+    validSortFields.includes(sortBy)
+  ) {
+    const direction = sortOrder === 'asc' ? 'asc' : 'desc';
+    orderBy = { [sortBy]: direction };
   }
 
   const options = {
@@ -91,7 +100,7 @@ export const getUserById = async (id: string) => {
 };
 
 export const getArtistRequests = async (req: Request) => {
-  const { search, status, startDate, endDate } = req.query;
+  const { search, startDate, endDate } = req.query;
 
   const where: Prisma.ArtistProfileWhereInput = {
     verificationRequestedAt: { not: null },
@@ -166,50 +175,68 @@ export const getArtistRequestDetail = async (id: string) => {
   return request;
 };
 
+// Interface for allowed update data
+interface UpdateUserData {
+  name?: string;
+  username?: string;
+  email?: string;
+  newPassword?: string;
+  isActive?: boolean;
+  reason?: string;
+}
+
 export const updateUserInfo = async (
   id: string,
-  data: any,
-  requestingUser: User,
-  avatarFile?: Express.Multer.File
+  data: UpdateUserData,
+  requestingUser: User
 ) => {
-  const { currentPassword, newPassword, confirmPassword, reason, ...updateData } = data;
+  const { name, username, email, newPassword, isActive, reason } = data;
 
   const existingUser = await prisma.user.findUnique({ where: { id } });
   if (!existingUser) {
     throw new Error('User not found');
   }
 
+  // Prevent non-admins from modifying admins
+  if (requestingUser.role !== Role.ADMIN && existingUser.role === Role.ADMIN) {
+      throw new Error(`Permission denied: Cannot modify Admin users.`); 
+  }
+  // Prevent admins from modifying other admins (optional, but can be a safety measure)
   if (requestingUser.role === Role.ADMIN && requestingUser.id !== id && existingUser.role === Role.ADMIN) {
       throw new Error(`Permission denied: Admins cannot modify other Admin users.`); 
   }
 
-  if (updateData.role !== undefined && requestingUser.role !== Role.ADMIN) {
-      throw new Error(`Permission denied: Only Admins can change user roles.`);
+  // Prepare data for Prisma update
+  const updateData: Prisma.UserUpdateInput = {};
+
+  if (name !== undefined) {
+    updateData.name = name;
   }
 
-  if (requestingUser.id === id && updateData.role !== undefined) {
-    throw new Error(`Permission denied: Cannot change your own role.`);
-  }
-
-  if (updateData.name !== undefined) updateData.name = updateData.name;
-
-  if (updateData.email !== undefined && updateData.email !== existingUser.email) {
-    const existingEmail = await prisma.user.findFirst({ where: { email: updateData.email, NOT: { id } } });
+  if (email !== undefined && email !== existingUser.email) {
+    const existingEmail = await prisma.user.findFirst({ where: { email, NOT: { id } } });
     if (existingEmail) throw new Error('Email already exists');
+    updateData.email = email;
   }
 
-  if (updateData.username !== undefined && updateData.username !== existingUser.username) {
-    const existingUsername = await prisma.user.findFirst({ where: { username: updateData.username, NOT: { id } } });
+  if (username !== undefined && username !== existingUser.username) {
+    const existingUsername = await prisma.user.findFirst({ where: { username, NOT: { id } } });
     if (existingUsername) throw new Error('Username already exists');
+    updateData.username = username;
   }
 
-  if (updateData.isActive !== undefined) {
-    if (requestingUser.id === id && toBooleanValue(updateData.isActive) === false) {
+  if (isActive !== undefined) {
+    const isActiveBool = toBooleanValue(isActive);
+    if (isActiveBool === undefined) {
+      throw new Error('Invalid value for isActive status');
+    }
+    if (requestingUser.id === id && !isActiveBool) {
       throw new Error("Permission denied: Cannot deactivate your own account.");
     }
-    updateData.isActive = toBooleanValue(updateData.isActive);
+    updateData.isActive = isActiveBool;
   }
 
+  // Update password if newPassword is provided
   if (newPassword) {
     if (newPassword.length < 6) {
       throw new Error('Password must be at least 6 characters long.');
@@ -217,14 +244,7 @@ export const updateUserInfo = async (
     updateData.password = await bcrypt.hash(newPassword, 10);
   }
 
-  if (avatarFile) {
-    const uploadResult = await uploadFile(avatarFile.buffer, 'users/avatars');
-    updateData.avatar = uploadResult.secure_url;
-  } else if (data.avatar === null && existingUser.avatar) {
-    updateData.avatar = null;
-  }
-
-  if (Object.keys(updateData).length === 0 && !avatarFile && !(data.avatar === null && existingUser.avatar)) {
+  if (Object.keys(updateData).length === 0) {
       throw new Error("No valid data provided for update.");
   }
 
@@ -234,24 +254,84 @@ export const updateUserInfo = async (
     select: userSelect,
   });
 
+  // --- Send Notification/Email based on isActive change --- 
+  if (updateData.isActive !== undefined && updateData.isActive !== existingUser.isActive) {
+      const userName = updatedUser.name || updatedUser.username || 'User';
+      if (updatedUser.isActive === false) { 
+          prisma.notification.create({ 
+              data: {
+                  type: 'ACCOUNT_DEACTIVATED',
+                  message: `Your account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`,
+                  recipientType: 'USER',
+                  userId: id,
+                  isRead: false,
+              },
+           }).catch(err => console.error('[Async Notify Error] Failed to create deactivation notification:', err));
+
+          if (updatedUser.email) {
+              try {
+                  const emailOptions = emailService.createAccountDeactivatedEmail(
+                      updatedUser.email,
+                      userName,
+                      'user',
+                      reason
+                  );
+                  emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send deactivation email:', err));
+              } catch (syncError) {
+                  console.error('[Email Setup Error] Failed to create deactivation email options:', syncError);
+              }
+          }
+      } else if (updatedUser.isActive === true) { 
+          prisma.notification.create({ 
+              data: {
+                  type: 'ACCOUNT_ACTIVATED',
+                  message: 'Your account has been reactivated.',
+                  recipientType: 'USER',
+                  userId: id,
+                  isRead: false,
+              },
+           }).catch(err => console.error('[Async Notify Error] Failed to create activation notification:', err));
+
+          if (updatedUser.email) {
+               try {
+                  const emailOptions = emailService.createAccountActivatedEmail(
+                      updatedUser.email,
+                      userName,
+                      'user'
+                  );
+                  emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send activation email:', err));
+              } catch (syncError) {
+                  console.error('[Email Setup Error] Failed to create activation email options:', syncError);
+              }
+          }
+      }
+  }
+
   return updatedUser;
 };
 
+interface UpdateArtistData {
+  artistName?: string;
+  bio?: string;
+  isActive?: boolean;
+  reason?: string; // For deactivation reason
+}
+
 export const updateArtistInfo = async (
   id: string,
-  data: any,
-  avatarFile?: Express.Multer.File
+  data: UpdateArtistData
 ) => {
+  const { artistName, bio, isActive, reason } = data;
+  
+  // Find the existing artist
   const existingArtist = await prisma.artistProfile.findUnique({
     where: { id },
     select: {
       id: true,
       artistName: true,
       isActive: true,
-      isVerified: true,
-      socialMediaLinks: true,
       userId: true,
-      user: { select: { email: true, name: true, username: true } }
+      user: { select: { id: true, email: true, name: true, username: true } }
     }
   });
 
@@ -259,8 +339,27 @@ export const updateArtistInfo = async (
     throw new Error('Artist not found');
   }
 
-  const { artistName, bio, isActive, isVerified } = data;
+  // Validate fields
+  const validationErrors = [];
+  
+  if (artistName !== undefined) {
+    if (artistName.length < 3) {
+      validationErrors.push('Artist name must be at least 3 characters');
+    }
+    if (artistName.length > 100) {
+      validationErrors.push('Artist name cannot exceed 100 characters');
+    }
+  }
+  
+  if (bio !== undefined && bio.length > 1000) {
+    validationErrors.push('Biography cannot exceed 1000 characters');
+  }
+  
+  if (validationErrors.length > 0) {
+    throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+  }
 
+  // Check for duplicate artist name
   let validatedArtistName = undefined;
   if (artistName && artistName !== existingArtist.artistName) {
     const nameExists = await prisma.artistProfile.findFirst({
@@ -276,30 +375,97 @@ export const updateArtistInfo = async (
     validatedArtistName = artistName;
   }
 
-  let avatarUrl = undefined;
-  if (avatarFile) {
-    const result = await uploadFile(
-      avatarFile.buffer,
-      'artists/avatars',
-      'image'
-    );
-    avatarUrl = result.secure_url;
+  // Prepare update data
+  const updateData: Prisma.ArtistProfileUpdateInput = {};
+  
+  if (validatedArtistName !== undefined) {
+    updateData.artistName = validatedArtistName;
+  }
+  
+  if (bio !== undefined) {
+    updateData.bio = bio;
+  }
+  
+  if (isActive !== undefined) {
+    const isActiveBool = toBooleanValue(isActive);
+    if (isActiveBool === undefined) {
+      throw new Error('Invalid value for isActive status');
+    }
+    updateData.isActive = isActiveBool;
   }
 
+  // If there's nothing to update, throw error
+  if (Object.keys(updateData).length === 0) {
+    throw new Error('No valid data provided for update');
+  }
+
+  // Update the artist profile
   const updatedArtist = await prisma.artistProfile.update({
     where: { id },
-    data: {
-      ...(validatedArtistName && { artistName: validatedArtistName }),
-      ...(bio !== undefined && { bio }),
-      ...(isActive !== undefined && { isActive: toBooleanValue(isActive) }),
-      ...(isVerified !== undefined && {
-        isVerified: toBooleanValue(isVerified),
-        verifiedAt: toBooleanValue(isVerified) ? new Date() : null,
-      }),
-      ...(avatarUrl && { avatar: avatarUrl }),
-    },
+    data: updateData,
     select: artistProfileSelect,
   });
+
+  // Handle notifications and emails if isActive status changed
+  if (isActive !== undefined && existingArtist.isActive !== updatedArtist.isActive) {
+    const ownerUser = existingArtist.user;
+    const ownerUserName = ownerUser?.name || ownerUser?.username || 'Artist';
+
+    if (updatedArtist.isActive === false) {
+      // Handle deactivation notification and email
+      if (ownerUser?.id) {
+        prisma.notification.create({
+          data: {
+            type: 'ACCOUNT_DEACTIVATED',
+            message: `Your artist account has been deactivated.${reason ? ` Reason: ${reason}` : ''}`,
+            recipientType: 'USER',
+            userId: ownerUser.id,
+            isRead: false,
+          },
+        }).catch(err => console.error('[Async Notify Error] Failed to create artist deactivation notification:', err));
+      }
+
+      if (ownerUser?.email) {
+        try {
+          const emailOptions = emailService.createAccountDeactivatedEmail(
+            ownerUser.email,
+            ownerUserName,
+            'artist',
+            reason
+          );
+          emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist deactivation email:', err));
+        } catch (syncError) {
+          console.error('[Email Setup Error] Failed to create artist deactivation email options:', syncError);
+        }
+      }
+    } else if (updatedArtist.isActive === true) {
+      // Handle activation notification and email
+      if (ownerUser?.id) {
+        prisma.notification.create({
+          data: {
+            type: 'ACCOUNT_ACTIVATED',
+            message: 'Your artist account has been reactivated.',
+            recipientType: 'USER',
+            userId: ownerUser.id,
+            isRead: false,
+          },
+        }).catch(err => console.error('[Async Notify Error] Failed to create artist activation notification:', err));
+      }
+
+      if (ownerUser?.email) {
+        try {
+          const emailOptions = emailService.createAccountActivatedEmail(
+            ownerUser.email,
+            ownerUserName,
+            'artist'
+          );
+          emailService.sendEmail(emailOptions).catch(err => console.error('[Async Email Error] Failed to send artist activation email:', err));
+        } catch (syncError) {
+          console.error('[Email Setup Error] Failed to create artist activation email options:', syncError);
+        }
+      }
+    }
+  }
 
   return updatedArtist;
 };
@@ -396,40 +562,42 @@ export const deleteArtistById = async (id: string, reason?: string) => {
 };
 
 export const getArtists = async (req: Request) => {
-  const { search = '', status, isVerified, sortBy, sortOrder } = req.query;
+  const { search, status, sortBy, sortOrder } = req.query;
 
   const where: Prisma.ArtistProfileWhereInput = {
     role: Role.ARTIST,
-    verificationRequestedAt: null,
-    ...(isVerified !== undefined && { isVerified: isVerified === 'true' }),
-    ...(search
-      ? {
-          OR: [
-            { artistName: { contains: String(search), mode: 'insensitive' } },
-            {
-              user: {
-                email: { contains: String(search), mode: 'insensitive' },
-              },
-            },
-            {
-              user: {
-                name: { contains: String(search), mode: 'insensitive' },
-              },
-            },
-          ],
-        }
-      : {}),
-    ...(status !== undefined ? { isActive: status === 'true' } : {}),
   };
 
-  let orderBy: Prisma.ArtistProfileOrderByWithRelationInput | Prisma.ArtistProfileOrderByWithRelationInput[];
-  const validSortFields = ['artistName', 'isVerified', 'isActive', 'monthlyListeners', 'createdAt'];
+  if (search && typeof search === 'string') {
+    where.OR = [
+      { artistName: { contains: search, mode: 'insensitive' } },
+      { user: { email: { contains: search, mode: 'insensitive' } } },
+      { user: { name: { contains: search, mode: 'insensitive' } } },
+    ];
+  }
 
-  if (sortBy && validSortFields.includes(String(sortBy))) {
-    const order = sortOrder === 'asc' ? 'asc' : 'desc'; 
-    orderBy = [{ [String(sortBy)]: order }, { id: 'asc' }];
-  } else {
-    orderBy = [{ createdAt: 'desc' }, { id: 'asc' }];
+  if (status && typeof status === 'string' && status !== 'ALL') {
+    where.isActive = status === 'true';
+  }
+
+  let orderBy: Prisma.ArtistProfileOrderByWithRelationInput | Prisma.ArtistProfileOrderByWithRelationInput[] = {
+    createdAt: 'desc',
+  };
+
+  const validSortFields = [
+    'artistName',
+    'isActive',
+    'monthlyListeners',
+    'createdAt',
+  ];
+
+  if (
+    sortBy &&
+    typeof sortBy === 'string' &&
+    validSortFields.includes(sortBy)
+  ) {
+    const direction = sortOrder === 'asc' ? 'asc' : 'desc';
+    orderBy = { [sortBy]: direction };
   }
 
   const options = {
@@ -812,6 +980,29 @@ export const getSystemStatus = async (): Promise<SystemComponentStatus[]> => {
   }
 
   return statuses;
+};
+
+export const getCacheStatus = async (): Promise<{ enabled: boolean }> => {
+  const useCache = process.env.USE_REDIS_CACHE === 'true';
+  let redisConnected = false;
+  if (redisClient && redisClient.isOpen) {
+      try {
+          await redisClient.ping();
+          redisConnected = true;
+      } catch (error) {
+          console.error("Redis ping failed:", error);
+          redisConnected = false;
+      }
+  }
+  return { enabled: useCache && redisConnected };
+};
+
+export const getAIModelStatus = async (): Promise<{ model: string; validModels: string[] }> => {
+  const currentModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  return {
+    model: currentModel,
+    validModels: VALID_GEMINI_MODELS,
+  };
 };
 
 export const updateCacheStatus = async (enabled?: boolean): Promise<{ enabled: boolean }> => {

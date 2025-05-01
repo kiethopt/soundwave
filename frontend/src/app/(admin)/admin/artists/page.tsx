@@ -364,17 +364,6 @@ export default function ArtistManagement() {
            <button type="submit" className="hidden">Search</button>
          </form>
         <div className="flex gap-2">
-          <Select value={verifiedFilter} onValueChange={(value: 'ALL' | 'VERIFIED' | 'UNVERIFIED') => setVerifiedFilter(value)}>
-            <SelectTrigger className={`w-[180px] rounded-md h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}>
-              <SelectValue placeholder="Filter by Verification" />
-            </SelectTrigger>
-            <SelectContent className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
-              <SelectItem value="ALL">All Verification</SelectItem>
-              <SelectItem value="VERIFIED">Verified</SelectItem>
-              <SelectItem value="UNVERIFIED">Not Verified</SelectItem>
-            </SelectContent>
-          </Select>
-
           <Select value={statusFilter} onValueChange={(value: 'ALL' | 'ACTIVE' | 'INACTIVE') => setStatusFilter(value)}>
             <SelectTrigger className={`w-[140px] rounded-md h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}>
               <SelectValue placeholder="Filter by Status" />
@@ -428,24 +417,6 @@ export default function ArtistManagement() {
                   
                   {/* User Email column - not sortable */}
                   <th scope="col" className="py-3 px-6">User Email</th>
-                  
-                  {/* Verified column */}
-                  <th 
-                    scope="col" 
-                    className={`py-3 px-6 cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
-                    onClick={() => handleSort('isVerified')}
-                  >
-                    <div className="flex items-center">
-                      Verified
-                      {sortConfig.key === 'isVerified' ? (
-                        sortConfig.direction === 'asc' ?
-                          <ArrowUp className="ml-2 h-3 w-3" /> :
-                          <ArrowDown className="ml-2 h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />
-                      )}
-                    </div>
-                  </th>
                   
                   {/* Status column */}
                   <th 
@@ -527,17 +498,6 @@ export default function ArtistManagement() {
                       </td>
                       <td className="py-4 px-6">{artist.user?.email || 'N/A'}</td>
                       <td className="py-4 px-6">
-                        {artist.isVerified ? (
-                          <span className={`inline-flex items-center ${theme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
-                            <CheckCircle className="h-4 w-4 mr-1" /> Verified
-                          </span>
-                        ) : (
-                          <span className={`inline-flex items-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
-                            <XCircle className="h-4 w-4 mr-1" /> Unverified
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-4 px-6">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${artist.isActive
                             ? (theme === 'dark' ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800')
                             : (theme === 'dark' ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800')
@@ -575,7 +535,7 @@ export default function ArtistManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="py-4 px-6 text-center">No artists found {activeSearchTerm || verifiedFilter !== 'ALL' || statusFilter !== 'ALL' ? 'matching your criteria' : ''}.</td>
+                    <td colSpan={7} className="py-4 px-6 text-center">No artists found {activeSearchTerm || statusFilter !== 'ALL' ? 'matching your criteria' : ''}.</td>
                   </tr>
                 )}
               </tbody>

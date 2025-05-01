@@ -535,16 +535,14 @@ export function EditArtistModal({
       setFormData({
         artistName: artist.artistName || '',
         bio: artist.bio || '',
-        isActive: artist.isActive, // Include isActive state
+        isActive: artist.isActive,
       });
-      // Reset state related to activation/deactivation
       setIsDeactivating(false);
       setDeactivationReason('');
       setShowDeactivateSection(false);
       setIsActivating(false);
     } else {
       setFormData({});
-       // Reset state related to activation/deactivation
       setIsDeactivating(false);
       setDeactivationReason('');
       setShowDeactivateSection(false);
@@ -595,7 +593,7 @@ export function EditArtistModal({
     }
 
     if (hasChanges) {
-      setIsUploading(true); // Use isUploading state for loading indicator
+      setIsUploading(true);
       try {
         await onSubmit(artist.id, dataToSend);
         onClose();
