@@ -864,3 +864,230 @@ export const updateAllSystemPlaylists = async (): Promise<{
     };
   }
 };
+
+export const getPlaylistSuggestions = async (req: Request) => {
+  const user = req.user;
+  if (!user) throw new Error('Unauthorized');
+  
+  // Get playlistId from query params
+  const { playlistId } = req.query;
+
+  // Get user's recently played tracks from the last 30 days
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  // If playlistId is provided, get the tracks that are already in the playlist
+  let existingTrackIds: Set<string> = new Set();
+  if (playlistId && typeof playlistId === 'string') {
+    try {
+      const playlist = await prisma.playlist.findUnique({
+        where: { id: playlistId },
+        include: {
+          tracks: {
+            select: { trackId: true }
+          }
+        }
+      });
+      
+      if (playlist) {
+        existingTrackIds = new Set(playlist.tracks.map(track => track.trackId));
+      }
+    } catch (error) {
+      console.error('Error fetching playlist tracks:', error);
+    }
+  }
+
+  // Get user's listening history to analyze genre preferences
+  const userHistory = await prisma.history.findMany({
+    where: {
+      userId: user.id,
+      type: "PLAY",
+      createdAt: { gte: thirtyDaysAgo },
+    },
+    include: {
+      track: {
+        include: {
+          genres: {
+            include: {
+              genre: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+    take: 50, // Consider most recent 50 tracks
+  });
+
+  // If no history, return a mix of popular tracks and new releases
+  if (userHistory.length === 0) {
+    // Get recently released tracks (last 3 months)
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+    // Get a mix of popular tracks and new releases
+    const [popularTracks, newReleasedTracks] = await Promise.all([
+      // Popular tracks
+      prisma.track.findMany({
+        where: { 
+          isActive: true,
+          id: {
+            notIn: Array.from(existingTrackIds) // Exclude tracks already in the playlist
+          }
+        },
+        orderBy: { playCount: "desc" },
+        take: 20,
+        include: {
+          artist: true,
+          album: true,
+          genres: {
+            include: {
+              genre: true,
+            },
+          },
+        },
+      }),
+      
+      // New released tracks from the last 3 months
+      prisma.track.findMany({
+        where: { 
+          isActive: true,
+          createdAt: { gte: threeMonthsAgo },
+          id: {
+            notIn: Array.from(existingTrackIds) // Exclude tracks already in the playlist
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        include: {
+          artist: true,
+          album: true,
+          genres: {
+            include: {
+              genre: true,
+            },
+          },
+        },
+      })
+    ]);
+
+    // Combine and shuffle the results to give equal opportunity to new tracks
+    const combinedTracks = [...popularTracks, ...newReleasedTracks]
+      .filter((track, index, self) => 
+        index === self.findIndex((t) => t.id === track.id)
+      )
+      // Simple shuffle algorithm
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 20);
+
+    return {
+      message: "Recommendations based on popular and new releases",
+      tracks: combinedTracks,
+      basedOn: "discovery",
+    };
+  }
+
+  // Count genre occurrences in user history
+  const genreCounts: Record<string, { count: number; id: string }> = {};
+  
+  userHistory.forEach(history => {
+    if (history.track) {
+      history.track.genres.forEach(genreRel => {
+        const genreId = genreRel.genre.id;
+        const genreName = genreRel.genre.name;
+        
+        if (!genreCounts[genreName]) {
+          genreCounts[genreName] = { count: 0, id: genreId };
+        }
+        genreCounts[genreName].count += 1;
+      });
+    }
+  });
+
+  // Sort genres by count and get top 3
+  const topGenres = Object.entries(genreCounts)
+    .sort(([, a], [, b]) => b.count - a.count)
+    .slice(0, 3)
+    .map(([name, data]) => ({ 
+      name, 
+      id: data.id, 
+      count: data.count 
+    }));
+
+  if (topGenres.length === 0) {
+    // Fallback to popular tracks if no genres found
+    const popularTracks = await prisma.track.findMany({
+      where: { 
+        isActive: true,
+        id: {
+          notIn: Array.from(existingTrackIds) // Exclude tracks already in the playlist
+        }
+      },
+      orderBy: { playCount: "desc" },
+      take: 20,
+      include: {
+        artist: true,
+        album: true,
+        genres: {
+          include: {
+            genre: true,
+          },
+        },
+      },
+    });
+
+    return {
+      message: "Recommendations based on popular tracks",
+      tracks: popularTracks,
+      basedOn: "popular",
+    };
+  }
+
+  // Get track IDs from user history to exclude them from recommendations
+  const userTrackIds = userHistory
+    .filter(history => history.track)
+    .map(history => history.track!.id);
+
+  // Combine user history track IDs with existing playlist track IDs 
+  const excludeTrackIds = [...new Set([...userTrackIds, ...Array.from(existingTrackIds)])];
+
+  // Get recommended tracks based on top genres
+  const recommendedTracks = await prisma.track.findMany({
+    where: {
+      isActive: true,
+      id: { 
+        notIn: excludeTrackIds // Exclude both listened tracks and playlist tracks
+      },
+      genres: {
+        some: {
+          genreId: {
+            in: topGenres.map(genre => genre.id)
+          }
+        }
+      },
+    },
+    orderBy: [
+      { playCount: "desc" },
+      { createdAt: "desc" },
+    ],
+    take: 20,
+    include: {
+      artist: true,
+      album: true,
+      genres: {
+        include: {
+          genre: true,
+        },
+      },
+    },
+  });
+
+  return {
+    message: `Recommendations based on your top genres: ${topGenres.map(g => g.name).join(', ')}`,
+    tracks: recommendedTracks,
+    basedOn: "genres",
+    topGenres: topGenres,
+  };
+}

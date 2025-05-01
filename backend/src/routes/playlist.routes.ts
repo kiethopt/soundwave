@@ -24,6 +24,7 @@ import {
   getAllBaseSystemPlaylists,
   getHomePageData,
   getUserSystemPlaylists,
+  getPlaylistSuggestions,
 } from "../controllers/playlist.controller";
 import { Role } from "@prisma/client";
 import upload from "../middleware/upload.middleware";
@@ -32,13 +33,7 @@ const router = express.Router();
 
 // == Public routes (no authentication required) ==
 router.get("/home", optionalAuthenticate, getHomePageData);
-router.get(
-  "/system-all",
-  authenticate,
-  authorize([Role.ADMIN]),
-  getSystemPlaylists
-);
-router.get("/:id", optionalAuthenticate, getPlaylistById);
+router.get("/system-all", authenticate, authorize([Role.ADMIN]), getSystemPlaylists);
 
 // == Authenticated user routes ==
 router.use(authenticate);
@@ -46,10 +41,11 @@ router.use(authenticate);
 // Standard playlist management routes
 router.get("/", getPlaylists);
 router.post("/", createPlaylist);
-router.patch("/:id", upload.single("cover"), updatePlaylist);
-router.delete("/:id", deletePlaylist);
-router.delete("/:playlistId/tracks/:trackId", removeTrackFromPlaylist);
-router.post("/:id/tracks", addTrackToPlaylist);
+router.get("/suggest", getPlaylistSuggestions);
+
+// User-specific system playlist routes
+router.post("/vibe-rewind", updateVibeRewindPlaylist);
+router.get("/system/user", getUserSystemPlaylists);
 
 // AI playlist routes
 router.post("/ai-generate", generateAIPlaylist);
@@ -58,9 +54,12 @@ router.post("/ai-generate/artist/:artistName", (req, res, next) => {
   generateAIPlaylist(req, res, next);
 });
 
-// User-specific system playlist routes
-router.post("/vibe-rewind", updateVibeRewindPlaylist);
-router.get("/system/user", authenticate, getUserSystemPlaylists);
+// Specific playlist ID routes - must be after all other specific routes
+router.get("/:id", optionalAuthenticate, getPlaylistById);
+router.patch("/:id", upload.single("cover"), updatePlaylist);
+router.delete("/:id", deletePlaylist);
+router.delete("/:playlistId/tracks/:trackId", removeTrackFromPlaylist);
+router.post("/:id/tracks", addTrackToPlaylist);
 
 // == Admin-only routes ==
 router.use("/admin", authorize([Role.ADMIN]));

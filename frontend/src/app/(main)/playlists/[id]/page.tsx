@@ -38,6 +38,7 @@ import { Card } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
 import { CheckCircle2 } from "lucide-react";
 import { useDominantColor } from "@/hooks/useDominantColor";
+import { RecommendedTrackList } from "@/components/user/track/RecommendedTrackList";
 
 // Khai báo event bus đơn giản để gọi fetchPlaylists từ sidebar
 const playlistUpdateEvent = new CustomEvent("playlist-updated");
@@ -90,6 +91,8 @@ export default function PlaylistPage() {
   const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(
     new Set()
   );
+  const [recommendations, setRecommendations] = useState<{ tracks: Track[], basedOn: string, topGenres?: any[] }>(); 
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const { theme } = useTheme();
@@ -285,6 +288,35 @@ export default function PlaylistPage() {
     };
   }, []);
 
+  // Recommendations fetch function
+  const fetchRecommendations = useCallback(async () => {
+    // Only fetch recommendations for user's normal playlists
+    if (!isAuthenticated || !isNormalPlaylist) return;
+    
+    try {
+      setLoadingRecommendations(true);
+      const token = localStorage.getItem("userToken");
+      if (!token) return;
+
+      // Pass the playlistId parameter to filter out tracks already in the playlist
+      const response = await api.playlists.getPlaylistSuggest(token, id as string);
+      if (response.success) {
+        setRecommendations(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching recommendations:", error);
+    } finally {
+      setLoadingRecommendations(false);
+    }
+  }, [isAuthenticated, isNormalPlaylist, id]);
+
+  // Fetch recommendations after playlist is loaded
+  useEffect(() => {
+    if (isNormalPlaylist && !recommendations) {
+      fetchRecommendations();
+    }
+  }, [isNormalPlaylist, recommendations, fetchRecommendations]);
+
   const handleCoverClick = () => {
     if (!canEditPlaylist || isUploadingCover) return;
     coverInputRef.current?.click();
@@ -439,6 +471,44 @@ export default function PlaylistPage() {
     const newPrivacy = currentPrivacy === "PRIVATE" ? "PUBLIC" : "PRIVATE";
     handleUpdatePlaylist("privacy", newPrivacy);
   };
+
+  // Function to refresh the playlist data
+  const refreshPlaylistData = useCallback(async () => {
+    if (!id) return;
+    
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("userToken");
+      
+      const response = await api.playlists.getById(id as string, token ?? undefined);
+      
+      if (response.success) {
+        setPlaylist(response.data);
+        if (response.data.type === "FAVORITE") {
+          setFavoritePlaylistTotalTracks(response.data.totalTracks);
+        }
+      } else {
+        console.error("Error refreshing playlist:", response.message);
+      }
+    } catch (error: any) {
+      console.error("Error refreshing playlist:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  // Listen for the playlist-updated event
+  useEffect(() => {
+    const handlePlaylistUpdated = () => {
+      refreshPlaylistData();
+    };
+    
+    window.addEventListener("playlist-updated", handlePlaylistUpdated);
+    
+    return () => {
+      window.removeEventListener("playlist-updated", handlePlaylistUpdated);
+    };
+  }, [refreshPlaylistData]);
 
   if (loading) return <div>Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
@@ -766,6 +836,57 @@ export default function PlaylistPage() {
           </div>
         )}
       </Card>
+
+      {/* Recommendations Section - Only show for normal playlists */}
+      {isNormalPlaylist && (
+        <Card
+          className={`mx-6 mb-6 rounded-xl border backdrop-blur-sm ${
+            theme === "light"
+              ? "bg-white/80 border-gray-200"
+              : "bg-black/20 border-white/10"
+          }`}
+        >
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-xl font-bold">
+                  Recommended
+                </h2>
+                <p className="text-sm text-gray-400">
+                  Based on your listening history
+                </p>
+              </div>
+
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={fetchRecommendations}
+                disabled={loadingRecommendations}
+              >
+                Refresh
+              </Button>
+            </div>
+
+            {loadingRecommendations ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-pulse text-sm opacity-70">Loading recommendations...</div>
+              </div>
+            ) : recommendations && recommendations.tracks && recommendations.tracks.length > 0 ? (
+              <RecommendedTrackList 
+                tracks={recommendations.tracks.slice(0, 10)} 
+                playlistId={id as string}
+                playlists={userPlaylists}
+                favoriteTrackIds={favoriteTrackIds}
+                  onRefresh={fetchRecommendations}
+              />
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm opacity-70">No recommendations available at the moment.</p>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {playlist && (
         <EditPlaylistDialog

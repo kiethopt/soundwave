@@ -1,4 +1,5 @@
 import { ArtistRequestFilters, CreatePlaylistData } from "@/types";
+import { getPlaylistSuggestions } from '../../../backend/src/controllers/playlist.controller';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -1461,6 +1462,14 @@ export const api = {
         token
       );
     },
+
+    getPlaylistSuggest: async (token: string, playlistId?: string) => {
+      return fetchWithAuth(
+        `/api/playlists/suggest${playlistId ? `?playlistId=${playlistId}` : ''}`,
+        { method: "GET" },
+        token
+      );
+    }
   },
 
   upload: {

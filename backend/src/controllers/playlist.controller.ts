@@ -269,6 +269,7 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
       });
       return;
     }
+    
     // If the playlist is the Recommended Playlist, update it automatically
     if (
       playlistExists.type === "NORMAL" &&
@@ -1332,3 +1333,38 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getPlaylistSuggestions: RequestHandler = async (
+  req,
+  res,
+  next
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+      return;
+    }
+
+    const suggestions = await playlistService.getPlaylistSuggestions(req);
+
+    if (!suggestions) {
+      res.status(404).json({
+        success: false,
+        message: "No playlist suggestions found",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: suggestions,
+    });
+  } catch (error) {
+    console.error("Error fetching playlist suggestions:", error);
+    next(error);
+  }
+}
