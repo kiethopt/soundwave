@@ -25,13 +25,6 @@ import { useAuth } from "@/hooks/useAuth";
 
 const DEFAULT_AVATAR = "/images/default-avatar.jpg";
 
-// Define the names of playlists to filter out
-const filteredPlaylistNames = new Set([
-  "Vibe Rewind",
-  "Welcome Mix",
-  "Favorites",
-]);
-
 export default function UserProfilePage({
   params,
 }: {
