@@ -1,4 +1,4 @@
-import { RequestHandler } from "express";
+import { NextFunction, Request, Response } from "express";
 import * as playlistService from "../services/playlist.service";
 import * as albumService from "../services/album.service";
 import * as userService from "../services/user.service";
@@ -9,10 +9,10 @@ import prisma from "../config/db";
 import { uploadFile } from "../services/upload.service";
 
 // Tạo playlist mới
-export const createPlaylist: RequestHandler = async (
-  req,
-  res,
-  next
+export const createPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -71,10 +71,10 @@ export const createPlaylist: RequestHandler = async (
 };
 
 // Lấy danh sách playlist của user
-export const getPlaylists: RequestHandler = async (
-  req,
-  res,
-  next
+export const getPlaylists = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -236,7 +236,11 @@ export const getPlaylists: RequestHandler = async (
 };
 
 // Lấy playlist theo id
-export const getPlaylistById: RequestHandler = async (req, res, next) => {
+export const getPlaylistById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id; // Will be undefined for unauthenticated users
@@ -410,7 +414,11 @@ export const getPlaylistById: RequestHandler = async (req, res, next) => {
 };
 
 // Thêm bài hát vào playlist
-export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
+export const addTrackToPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     console.log("AddToPlaylist request:", {
       params: req.params,
@@ -549,10 +557,10 @@ export const addTrackToPlaylist: RequestHandler = async (req, res, next) => {
 };
 
 // Xóa bài hát khỏi playlist
-export const removeTrackFromPlaylist: RequestHandler = async (
-  req,
-  res,
-  next
+export const removeTrackFromPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ) => {
   try {
     const { playlistId, trackId } = req.params;
@@ -631,9 +639,9 @@ export const removeTrackFromPlaylist: RequestHandler = async (
 };
 
 // Cập nhật playlist
-export const updatePlaylist: RequestHandler = async (
-  req,
-  res
+export const updatePlaylist = async (
+  req: Request,
+  res: Response,
 ): Promise<void> => {
   try {
     const { id } = req.params;
@@ -773,10 +781,10 @@ export const updatePlaylist: RequestHandler = async (
 };
 
 // Xóa playlist
-export const deletePlaylist: RequestHandler = async (
-  req,
-  res,
-  next
+export const deletePlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const { id } = req.params;
@@ -836,7 +844,11 @@ export const deletePlaylist: RequestHandler = async (
 };
 
 // Lấy các playlist từ hệ thống
-export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
+export const getSystemPlaylists = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     // Call the service function, passing the request object for pagination
     const result = await playlistService.getSystemPlaylists(req);
@@ -856,10 +868,10 @@ export const getSystemPlaylists: RequestHandler = async (req, res, next) => {
   }
 };
 
-export const getUserSystemPlaylists: RequestHandler = async (
-  req,
-  res,
-  next
+export const getUserSystemPlaylists = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ) => {
   try {
     const result = await playlistService.getUserSystemPlaylists(req);
@@ -872,10 +884,10 @@ export const getUserSystemPlaylists: RequestHandler = async (
 };
 
 // Update the Vibe Rewind playlist (tracks user has listened to)
-export const updateVibeRewindPlaylist: RequestHandler = async (
-  req,
-  res,
-  next
+export const updateVibeRewindPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const user = req.user;
@@ -901,9 +913,10 @@ export const updateVibeRewindPlaylist: RequestHandler = async (
 };
 
 // Generating AI playlists
-export const generateAIPlaylist: RequestHandler = async (
-  req,
-  res
+export const generateAIPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -987,9 +1000,10 @@ export const generateAIPlaylist: RequestHandler = async (
 // ------ SYSTEM PLAYLIST CONTROLLERS ------
 
 // Cập nhật tất cả system playlists cho tất cả users (Admin only - cho cron job)
-export const updateAllSystemPlaylists: RequestHandler = async (
-  req,
-  res
+export const updateAllSystemPlaylists = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     // Admin check is handled by middleware
@@ -1034,9 +1048,10 @@ export const updateAllSystemPlaylists: RequestHandler = async (
 };
 
 // Create Base System Playlist (Admin Only)
-export const createBaseSystemPlaylist: RequestHandler = async (
-  req,
-  res
+export const createBaseSystemPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     // Lấy cả tham số AI từ form data
@@ -1099,9 +1114,10 @@ export const createBaseSystemPlaylist: RequestHandler = async (
 };
 
 // Update Base System Playlist (Admin Only)
-export const updateBaseSystemPlaylist: RequestHandler = async (
-  req,
-  res
+export const updateBaseSystemPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const { id } = req.params;
@@ -1169,9 +1185,10 @@ export const updateBaseSystemPlaylist: RequestHandler = async (
 };
 
 // Delete Base System Playlist (Admin Only)
-export const deleteBaseSystemPlaylist: RequestHandler = async (
-  req,
-  res
+export const deleteBaseSystemPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const { id } = req.params;
@@ -1190,9 +1207,10 @@ export const deleteBaseSystemPlaylist: RequestHandler = async (
 };
 
 // Get All Base System Playlists (Admin Only)
-export const getAllBaseSystemPlaylists: RequestHandler = async (
-  req,
-  res
+export const getAllBaseSystemPlaylists = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const result = await playlistService.getAllBaseSystemPlaylists(req);
@@ -1203,7 +1221,11 @@ export const getAllBaseSystemPlaylists: RequestHandler = async (
 };
 
 // Get data for the home page (newest albums, hot albums, system playlists, and user playlists)
-export const getHomePageData: RequestHandler = async (req, res, next) => {
+export const getHomePageData = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const userId = req.user?.id;
     const isAuthenticated = !!userId;
@@ -1331,10 +1353,10 @@ export const getHomePageData: RequestHandler = async (req, res, next) => {
   }
 };
 
-export const getPlaylistSuggestions: RequestHandler = async (
-  req,
-  res,
-  next
+export const getPlaylistSuggestions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -1367,10 +1389,10 @@ export const getPlaylistSuggestions: RequestHandler = async (
 }
 
 // New controller for suggesting more tracks for a playlist using AI
-export const suggestMoreTracksForPlaylist: RequestHandler = async (
-  req,
-  res,
-  next
+export const suggestMoreTracksForPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ): Promise<void> => {
   try {
     const { id: playlistId } = req.params;

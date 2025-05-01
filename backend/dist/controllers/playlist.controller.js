@@ -757,7 +757,7 @@ const updateVibeRewindPlaylist = async (req, res, next) => {
     }
 };
 exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
-const generateAIPlaylist = async (req, res) => {
+const generateAIPlaylist = async (req, res, next) => {
     try {
         const userId = req.user?.id;
         if (!userId) {
@@ -812,7 +812,7 @@ const generateAIPlaylist = async (req, res) => {
     }
 };
 exports.generateAIPlaylist = generateAIPlaylist;
-const updateAllSystemPlaylists = async (req, res) => {
+const updateAllSystemPlaylists = async (req, res, next) => {
     try {
         res.status(200).json({
             success: true,
@@ -843,7 +843,7 @@ const updateAllSystemPlaylists = async (req, res) => {
     }
 };
 exports.updateAllSystemPlaylists = updateAllSystemPlaylists;
-const createBaseSystemPlaylist = async (req, res) => {
+const createBaseSystemPlaylist = async (req, res, next) => {
     try {
         const { name, description, privacy, basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime, trackCount, } = req.body;
         const coverFile = req.file;
@@ -888,7 +888,7 @@ const createBaseSystemPlaylist = async (req, res) => {
     }
 };
 exports.createBaseSystemPlaylist = createBaseSystemPlaylist;
-const updateBaseSystemPlaylist = async (req, res) => {
+const updateBaseSystemPlaylist = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { name, description, privacy, basedOnMood, basedOnGenre, basedOnArtist, basedOnSongLength, basedOnReleaseTime, trackCount, } = req.body;
@@ -939,7 +939,7 @@ const updateBaseSystemPlaylist = async (req, res) => {
     }
 };
 exports.updateBaseSystemPlaylist = updateBaseSystemPlaylist;
-const deleteBaseSystemPlaylist = async (req, res) => {
+const deleteBaseSystemPlaylist = async (req, res, next) => {
     try {
         const { id } = req.params;
         await playlistService.deleteBaseSystemPlaylist(id);
@@ -958,7 +958,7 @@ const deleteBaseSystemPlaylist = async (req, res) => {
     }
 };
 exports.deleteBaseSystemPlaylist = deleteBaseSystemPlaylist;
-const getAllBaseSystemPlaylists = async (req, res) => {
+const getAllBaseSystemPlaylists = async (req, res, next) => {
     try {
         const result = await playlistService.getAllBaseSystemPlaylists(req);
         res.status(200).json({ success: true, ...result });
