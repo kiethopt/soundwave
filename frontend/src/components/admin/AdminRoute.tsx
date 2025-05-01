@@ -31,12 +31,6 @@ export default function AdminRoute({ children }: AdminRouteProps) {
           return;
         }
 
-        if (pathname.startsWith('/admin/system') && user.adminLevel !== 1) {
-          toast.error('Permission Denied: Access restricted to Level 1 Admins.');
-          router.push('/admin/dashboard');
-          return;
-        }
-
         await api.auth.validateToken(token);
         setIsVerified(true);
       } catch (error) {

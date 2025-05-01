@@ -305,17 +305,6 @@ export default function UserManagement() {
            <button type="submit" className="hidden">Search</button>
          </form>
         <div className="flex gap-2">
-          <Select value={roleFilter} onValueChange={(value: 'ALL' | 'ADMIN' | 'USER') => setRoleFilter(value)}>
-            <SelectTrigger className={`w-[140px] rounded-md h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}>
-              <SelectValue placeholder="Filter by Role" />
-            </SelectTrigger>
-            <SelectContent className={theme === 'dark' ? 'bg-[#2a2a2a] border-gray-600 text-white' : ''}>
-              <SelectItem value="ALL">All Roles</SelectItem>
-              <SelectItem value="ADMIN">Admin</SelectItem>
-              <SelectItem value="USER">User</SelectItem>
-            </SelectContent>
-          </Select>
-
           <Select value={statusFilter} onValueChange={(value: 'ALL' | 'ACTIVE' | 'INACTIVE') => setStatusFilter(value)}>
             <SelectTrigger className={`w-[140px] rounded-md h-10 ${theme === 'dark' ? 'bg-[#3a3a3a] border-gray-600 text-white' : 'border-gray-300'}`}>
               <SelectValue placeholder="Filter by Status" />
@@ -464,7 +453,7 @@ export default function UserManagement() {
                         {user.name || user.username || 'N/A'}
                       </td>
                       <td className="py-4 px-6">{user.email}</td>
-                      <td className="py-4 px-6">{user.role}{user.adminLevel ? ` (L${user.adminLevel})` : ''}</td>
+                      <td className="py-4 px-6">{user.role}</td>
                       <td className="py-4 px-6">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.isActive
                             ? (theme === 'dark' ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800')
@@ -502,7 +491,7 @@ export default function UserManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="py-4 px-6 text-center">No users found {activeSearchTerm || roleFilter !== 'ALL' || statusFilter !== 'ALL' ? 'matching your criteria' : ''}.</td>
+                    <td colSpan={6} className="py-4 px-6 text-center">No users found {activeSearchTerm || statusFilter !== 'ALL' ? 'matching your criteria' : ''}.</td>
                   </tr>
                 )}
               </tbody>
