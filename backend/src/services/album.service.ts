@@ -132,7 +132,7 @@ export const createAlbum = async (req: Request) => {
   const user = req.user;
   if (!user) throw new Error('Forbidden');
 
-  const { title, releaseDate, type = AlbumType.ALBUM, genres = [], artistId, labelId } = req.body;
+  const { title, releaseDate, type = AlbumType.ALBUM, genres = [], artistId } = req.body;
   const coverFile = req.file;
 
   const genreArray = Array.isArray(genres) ? genres : genres ? [genres] : [];
@@ -140,12 +140,16 @@ export const createAlbum = async (req: Request) => {
   if (validationError) throw new Error(validationError);
 
   let targetArtistProfileId: string;
-  let fetchedArtistProfile: { artistName: string | null } | null = null;
+  let fetchedArtistProfile: { 
+    artistName: string | null; 
+    labelId: string | null;
+    id: string;
+  } | null = null;
 
   if (user.role === Role.ADMIN && artistId) {
     const targetArtist = await prisma.artistProfile.findFirst({
       where: { id: artistId, isVerified: true, role: Role.ARTIST },
-      select: { id: true, artistName: true },
+      select: { id: true, artistName: true, labelId: true },
     });
     if (!targetArtist) throw new Error('Artist profile not found or not verified');
     targetArtistProfileId = targetArtist.id;
@@ -154,13 +158,19 @@ export const createAlbum = async (req: Request) => {
     targetArtistProfileId = user.artistProfile.id;
     fetchedArtistProfile = await prisma.artistProfile.findUnique({
       where: { id: targetArtistProfileId },
-      select: { artistName: true },
+      select: { id: true, artistName: true, labelId: true },
     });
   } else {
     throw new Error('Not authorized to create albums');
   }
 
-  const artistName = fetchedArtistProfile?.artistName || 'Nghệ sĩ';
+  if (!fetchedArtistProfile) {
+    throw new Error('Could not retrieve artist profile information.');
+  }
+
+  const artistName = fetchedArtistProfile.artistName || 'Nghệ sĩ';
+  const artistLabelId = fetchedArtistProfile.labelId;
+  
   let coverUrl: string | null = null;
   if (coverFile) {
     const coverUpload = await uploadFile(coverFile.buffer, 'covers', 'image');
@@ -170,33 +180,24 @@ export const createAlbum = async (req: Request) => {
   const releaseDateObj = new Date(releaseDate);
   const isActive = releaseDateObj <= new Date();
 
-  let finalLabelId: string | null = null;
-  if (labelId !== undefined) {
-    if (typeof labelId !== 'string' && labelId !== null) {
-      throw new Error(`Invalid labelId type: expected string or null, got ${typeof labelId}`);
-    }
-    if (labelId === null || labelId === '') {
-      finalLabelId = null;
-    } else {
-      const labelExists = await prisma.label.findUnique({ where: { id: labelId } });
-      if (!labelExists) throw new Error(`Invalid label ID: ${labelId} does not exist`);
-      finalLabelId = labelId;
-    }
-  }
-
-  const album = await prisma.album.create({
-    data: {
+  const albumData: Prisma.AlbumCreateInput = {
       title,
       coverUrl,
       releaseDate: releaseDateObj,
       type,
       duration: 0,
       totalTracks: 0,
-      artistId: targetArtistProfileId,
+      artist: { connect: { id: targetArtistProfileId } },
       isActive,
-      labelId: finalLabelId,
       genres: { create: genreArray.map((genreId: string) => ({ genre: { connect: { id: genreId } } })) },
-    },
+  };
+
+  if (artistLabelId) {
+      albumData.label = { connect: { id: artistLabelId } };
+  }
+
+  const album = await prisma.album.create({
+    data: albumData,
     select: albumSelect,
   });
 
@@ -260,13 +261,23 @@ export const addTracksToAlbum = async (req: Request) => {
 
   if (!user) throw new Error('Forbidden');
 
-  const album = await prisma.album.findUnique({
+  // Fetch the album WITH its labelId
+  const albumWithLabel = await prisma.album.findUnique({
     where: { id: albumId },
-    select: { artistId: true, type: true, coverUrl: true, isActive: true, tracks: { select: { trackNumber: true } } },
+    select: { 
+      artistId: true, 
+      type: true, 
+      coverUrl: true, 
+      isActive: true, 
+      labelId: true, // Select the labelId directly
+      tracks: { select: { trackNumber: true } }
+    }
   });
 
-  if (!album) throw new Error('Album not found');
-  if (!canManageAlbum(user, album.artistId)) throw new Error('You can only add tracks to your own albums');
+  if (!albumWithLabel) throw new Error('Album not found');
+  if (!canManageAlbum(user, albumWithLabel.artistId)) throw new Error('You can only add tracks to your own albums');
+  
+  const albumLabelId = albumWithLabel.labelId; // Use the fetched labelId
 
   const files = req.files as Express.Multer.File[];
   if (!files || !files.length) throw new Error('No files uploaded');
@@ -295,38 +306,40 @@ export const addTracksToAlbum = async (req: Request) => {
       const uploadResult = await uploadFile(file.buffer, 'tracks', 'auto');
 
       const existingTrack = await prisma.track.findFirst({
-        where: { title: titles[index], artistId: album.artistId },
+        where: { title: titles[index], artistId: albumWithLabel.artistId },
       });
       if (existingTrack) throw new Error(`Track with title "${titles[index]}" already exists for this artist.`);
 
       const newTrackNumber = maxTrackNumber + index + 1;
-      const track = await prisma.track.create({
-        data: {
+      
+      const trackData: Prisma.TrackCreateInput = {
           title: titles[index],
           duration,
           releaseDate: new Date(releaseDates[index] || Date.now()),
           trackNumber: newTrackNumber,
-          coverUrl: album.coverUrl,
+          coverUrl: albumWithLabel.coverUrl,
           audioUrl: uploadResult.secure_url,
-          artistId: album.artistId,
-          albumId,
-          type: album.type,
-          isActive: album.isActive,
-          ...(featuredArtists[index]?.length && {
-            featuredArtists: {
-              create: featuredArtists[index].map((artistProfileId: string) => ({
-                artistProfile: { connect: { id: artistProfileId } },
-              })),
-            },
-          }),
-          ...(genres[index]?.length && {
-            genres: {
-              create: genres[index].map((genreId: string) => ({
-                genre: { connect: { id: genreId } },
-              })),
-            },
-          }),
-        },
+          artist: { connect: { id: albumWithLabel.artistId } },
+          album: { connect: { id: albumId } },
+          type: albumWithLabel.type,
+          isActive: albumWithLabel.isActive,
+          featuredArtists: 
+            featuredArtists[index]?.length > 0
+              ? { create: featuredArtists[index].map((artistProfileId: string) => ({ artistProfile: { connect: { id: artistProfileId } } })) }
+              : undefined,
+          genres:
+            genres[index]?.length > 0
+              ? { create: genres[index].map((genreId: string) => ({ genre: { connect: { id: genreId } } })) }
+              : undefined,
+      };
+
+      // Automatically connect the track to the album's label if it exists
+      if (albumLabelId) {
+        trackData.label = { connect: { id: albumLabelId } }; // Use connect with ID
+      }
+
+      const track = await prisma.track.create({
+        data: trackData,
         select: trackSelect,
       });
       return track;

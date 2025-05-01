@@ -598,6 +598,7 @@ export const requestArtistRole = async (
   const {
     artistName,
     bio,
+    label,
     socialMediaLinks: socialMediaLinksString,
     genres: genresString,
   } = data;
@@ -618,6 +619,7 @@ export const requestArtistRole = async (
   const validationError = validateArtistData({
     artistName,
     bio,
+    label,
     socialMediaLinks,
     genres,
   });
@@ -656,6 +658,12 @@ export const requestArtistRole = async (
     data: {
       artistName,
       bio,
+      label: label ? { 
+        connectOrCreate: { 
+          where: { name: label }, 
+          create: { name: label } 
+        } 
+      } : undefined,
       socialMediaLinks,
       avatar: avatarUrl,
       role: Role.ARTIST,

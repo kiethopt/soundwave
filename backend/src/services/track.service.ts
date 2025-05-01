@@ -350,7 +350,6 @@ export const createTrack = async (req: Request) => {
     featuredArtists,
     artistId,
     genreIds,
-    labelId,
   } = req.body;
 
   const finalArtistId =
@@ -364,11 +363,21 @@ export const createTrack = async (req: Request) => {
     );
   }
 
+  // Fetch artist profile including the label
   const artistProfile = await prisma.artistProfile.findUnique({
     where: { id: finalArtistId },
-    select: { artistName: true },
+    select: { 
+      artistName: true,
+      labelId: true // Fetch the labelId
+     },
   });
-  const artistName = artistProfile?.artistName || 'Nghệ sĩ';
+
+  if (!artistProfile) {
+    throw new Error('Artist profile not found.'); 
+  }
+  
+  const artistName = artistProfile.artistName || 'Nghệ sĩ';
+  const artistLabelId = artistProfile.labelId; // Get the artist's registered label ID
 
   if (!req.files) throw new Error('No files uploaded');
 
@@ -424,54 +433,44 @@ export const createTrack = async (req: Request) => {
     }
   }
 
-  let finalLabelId: string | null = null;
-  if (labelId) {
-    const labelExists = await prisma.label.findUnique({
-      where: { id: labelId },
-    });
-    if (!labelExists) throw new Error('Invalid label ID');
-    finalLabelId = labelId;
-  }
-
-  const track = await prisma.track.create({
-    data: {
+  // Construct the track data object BEFORE notification logic
+  const trackData: Prisma.TrackCreateInput = {
       title,
       duration,
       releaseDate: trackReleaseDate,
       trackNumber: trackNumber ? Number(trackNumber) : null,
       coverUrl,
       audioUrl: audioUpload.secure_url,
-      artistId: finalArtistId,
-      albumId: albumId || null,
+      artist: { connect: { id: finalArtistId } }, 
+      album: albumId ? { connect: { id: albumId } } : undefined,
       type: albumId ? undefined : 'SINGLE',
       isActive,
-      labelId: finalLabelId,
       featuredArtists:
         artistsArray.length > 0
-          ? {
-            create: artistsArray.map((featArtistId: string) => ({
-              artistId: featArtistId,
-            })),
-          }
+          ? { create: artistsArray.map((featArtistId: string) => ({ artistProfile: { connect: { id: featArtistId } } })) }
           : undefined,
       genres:
         genresArray.length > 0
-          ? {
-            create: genresArray.map((genreId: string) => ({
-              genre: {
-                connect: { id: genreId },
-              },
-            })),
-          }
+          ? { create: genresArray.map((genreId: string) => ({ genre: { connect: { id: genreId } } })) }
           : undefined,
-    },
+  };
+
+  // Conditionally connect the track to the artist's label
+  if (artistLabelId) {
+    trackData.label = { connect: { id: artistLabelId } }; // Use connect with ID
+  }
+
+  // Create the track first
+  const track = await prisma.track.create({
+    data: trackData, 
     select: trackSelect,
   });
 
+  // --- Notification Logic START ---
   const followers = await prisma.userFollow.findMany({
     where: {
       followingArtistId: finalArtistId,
-      followingType: 'ARTIST',
+      followingType: 'ARTIST', // Type assertion might not be needed if Prisma types are correct
     },
     select: { followerId: true },
   });
@@ -483,9 +482,10 @@ export const createTrack = async (req: Request) => {
       select: { id: true, email: true },
     });
 
-    const notificationsData = followers.map((follower) => ({
+    // Explicitly type the notification data array
+    const notificationsData: Prisma.NotificationCreateManyInput[] = followers.map((follower) => ({
       type: NotificationType.NEW_TRACK,
-      message: `${artistName} just released a new tracks: ${title}`,
+      message: `${artistName} just released a new track: ${title}`,
       recipientType: RecipientType.USER,
       userId: follower.followerId,
       artistId: finalArtistId,
@@ -519,6 +519,7 @@ export const createTrack = async (req: Request) => {
       }
     }
   }
+  // --- Notification Logic END ---
 
   return { message: 'Track created successfully', track };
 };

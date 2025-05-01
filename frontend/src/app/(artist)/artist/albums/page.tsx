@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Album, Genre } from '@/types';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -26,6 +27,7 @@ interface SortConfig {
 }
 
 export default function SimpleAlbumManagement() {
+  const router = useRouter();
   const { theme } = useTheme();
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
@@ -323,7 +325,7 @@ export default function SimpleAlbumManagement() {
     if (target.closest('[role="checkbox"]') || target.closest('button')) {
       return;
     }
-    // Navigate to album detail or edit page
+    router.push(`/artist/albums/${album.id}`);
   };
 
   const isAllSelected = albums.length > 0 && selectedAlbumIds.size === albums.length;

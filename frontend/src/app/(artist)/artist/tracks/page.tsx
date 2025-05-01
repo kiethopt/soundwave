@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Track, Genre } from '@/types';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
@@ -26,6 +27,7 @@ interface SortConfig {
 }
 
 export default function SimpleTrackManagement() {
+  const router = useRouter();
   const { theme } = useTheme();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
@@ -341,7 +343,7 @@ export default function SimpleTrackManagement() {
     if (target.closest('[role="checkbox"]') || target.closest('button')) {
       return;
     }
-    // Navigate to track detail or edit page
+    router.push(`/track/${track.id}`);
   };
 
   const isAllSelected = tracks.length > 0 && selectedTrackIds.size === tracks.length;

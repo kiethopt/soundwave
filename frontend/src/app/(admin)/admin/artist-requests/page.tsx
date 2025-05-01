@@ -170,14 +170,19 @@ export default function ArtistRequestManagement() {
     try {
       await api.admin.approveArtistRequest(requestToApprove.id, token);
       toast.success(`${requestToApprove.artistName} approved successfully!`);
-      refreshTable();
     } catch (err: any) {
       console.error('Error approving request:', err);
-      toast.error(err.message || 'Failed to approve request.');
+      // Check for the specific backend error message
+      if (err.message && err.message.includes('Artist request not found, already verified, or rejected')) {
+        toast.error('Could not approve: Request may have already been processed or deleted.');
+      } else {
+        toast.error(err.message || 'Failed to approve request.');
+      }
     } finally {
       setActionLoading(null);
       setIsApproveModalOpen(false);
       setRequestToApprove(null);
+      refreshTable();
     }
   };
 
