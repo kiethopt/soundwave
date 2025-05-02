@@ -1,5 +1,5 @@
 import prisma from "../config/db";
-import { Prisma, PlaylistPrivacy, PlaylistType } from "@prisma/client";
+import { Prisma, PlaylistPrivacy, PlaylistType, Role } from "@prisma/client";
 import { Request } from "express";
 import { paginate } from "../utils/handle-utils";
 import {
@@ -867,8 +867,8 @@ export const updateAllSystemPlaylists = async (): Promise<{
 
 export const getPlaylistSuggestions = async (req: Request) => {
   const user = req.user;
-  if (!user) throw new Error('Unauthorized');
-  
+  if (!user) throw new Error("Unauthorized");
+
   const { playlistId } = req.query;
 
   const thirtyDaysAgo = new Date();
@@ -876,22 +876,24 @@ export const getPlaylistSuggestions = async (req: Request) => {
 
   // If playlistId is provided, get the tracks that are already in the playlist
   let existingTrackIds: Set<string> = new Set();
-  if (playlistId && typeof playlistId === 'string') {
+  if (playlistId && typeof playlistId === "string") {
     try {
       const playlist = await prisma.playlist.findUnique({
         where: { id: playlistId },
         include: {
           tracks: {
-            select: { trackId: true }
-          }
-        }
+            select: { trackId: true },
+          },
+        },
       });
-      
+
       if (playlist) {
-        existingTrackIds = new Set(playlist.tracks.map(track => track.trackId));
+        existingTrackIds = new Set(
+          playlist.tracks.map((track) => track.trackId)
+        );
       }
     } catch (error) {
-      console.error('Error fetching playlist tracks:', error);
+      console.error("Error fetching playlist tracks:", error);
     }
   }
 
@@ -929,11 +931,11 @@ export const getPlaylistSuggestions = async (req: Request) => {
     const [popularTracks, newReleasedTracks] = await Promise.all([
       // Popular tracks
       prisma.track.findMany({
-        where: { 
+        where: {
           isActive: true,
           id: {
-            notIn: Array.from(existingTrackIds) // Exclude tracks already in the playlist
-          }
+            notIn: Array.from(existingTrackIds), // Exclude tracks already in the playlist
+          },
         },
         orderBy: { playCount: "desc" },
         take: 20,
@@ -947,15 +949,15 @@ export const getPlaylistSuggestions = async (req: Request) => {
           },
         },
       }),
-      
+
       // New released tracks from the last 3 months
       prisma.track.findMany({
-        where: { 
+        where: {
           isActive: true,
           createdAt: { gte: threeMonthsAgo },
           id: {
-            notIn: Array.from(existingTrackIds) // Exclude tracks already in the playlist
-          }
+            notIn: Array.from(existingTrackIds), // Exclude tracks already in the playlist
+          },
         },
         orderBy: { createdAt: "desc" },
         take: 20,
@@ -968,13 +970,14 @@ export const getPlaylistSuggestions = async (req: Request) => {
             },
           },
         },
-      })
+      }),
     ]);
 
     // Combine and shuffle the results to give equal opportunity to new tracks
     const combinedTracks = [...popularTracks, ...newReleasedTracks]
-      .filter((track, index, self) => 
-        index === self.findIndex((t) => t.id === track.id)
+      .filter(
+        (track, index, self) =>
+          index === self.findIndex((t) => t.id === track.id)
       )
       // Simple shuffle algorithm
       .sort(() => Math.random() - 0.5)
@@ -989,13 +992,13 @@ export const getPlaylistSuggestions = async (req: Request) => {
 
   // Count genre occurrences in user history
   const genreCounts: Record<string, { count: number; id: string }> = {};
-  
-  userHistory.forEach(history => {
+
+  userHistory.forEach((history) => {
     if (history.track) {
-      history.track.genres.forEach(genreRel => {
+      history.track.genres.forEach((genreRel) => {
         const genreId = genreRel.genre.id;
         const genreName = genreRel.genre.name;
-        
+
         if (!genreCounts[genreName]) {
           genreCounts[genreName] = { count: 0, id: genreId };
         }
@@ -1008,20 +1011,20 @@ export const getPlaylistSuggestions = async (req: Request) => {
   const topGenres = Object.entries(genreCounts)
     .sort(([, a], [, b]) => b.count - a.count)
     .slice(0, 3)
-    .map(([name, data]) => ({ 
-      name, 
-      id: data.id, 
-      count: data.count 
+    .map(([name, data]) => ({
+      name,
+      id: data.id,
+      count: data.count,
     }));
 
   if (topGenres.length === 0) {
     // Fallback to popular tracks if no genres found
     const popularTracks = await prisma.track.findMany({
-      where: { 
+      where: {
         isActive: true,
         id: {
-          notIn: Array.from(existingTrackIds) // Exclude tracks already in the playlist
-        }
+          notIn: Array.from(existingTrackIds), // Exclude tracks already in the playlist
+        },
       },
       orderBy: { playCount: "desc" },
       take: 20,
@@ -1045,31 +1048,30 @@ export const getPlaylistSuggestions = async (req: Request) => {
 
   // Get track IDs from user history to exclude them from recommendations
   const userTrackIds = userHistory
-    .filter(history => history.track)
-    .map(history => history.track!.id);
+    .filter((history) => history.track)
+    .map((history) => history.track!.id);
 
-  // Combine user history track IDs with existing playlist track IDs 
-  const excludeTrackIds = [...new Set([...userTrackIds, ...Array.from(existingTrackIds)])];
+  // Combine user history track IDs with existing playlist track IDs
+  const excludeTrackIds = [
+    ...new Set([...userTrackIds, ...Array.from(existingTrackIds)]),
+  ];
 
   // Get recommended tracks based on top genres
   const recommendedTracks = await prisma.track.findMany({
     where: {
       isActive: true,
-      id: { 
-        notIn: excludeTrackIds // Exclude both listened tracks and playlist tracks
+      id: {
+        notIn: excludeTrackIds, // Exclude both listened tracks and playlist tracks
       },
       genres: {
         some: {
           genreId: {
-            in: topGenres.map(genre => genre.id)
-          }
-        }
+            in: topGenres.map((genre) => genre.id),
+          },
+        },
       },
     },
-    orderBy: [
-      { playCount: "desc" },
-      { createdAt: "desc" },
-    ],
+    orderBy: [{ playCount: "desc" }, { createdAt: "desc" }],
     take: 20,
     include: {
       artist: true,
@@ -1083,9 +1085,114 @@ export const getPlaylistSuggestions = async (req: Request) => {
   });
 
   return {
-    message: `Recommendations based on your top genres: ${topGenres.map(g => g.name).join(', ')}`,
+    message: `Recommendations based on your top genres: ${topGenres
+      .map((g) => g.name)
+      .join(", ")}`,
     tracks: recommendedTracks,
     basedOn: "genres",
     topGenres: topGenres,
   };
-}
+};
+
+// Reorder tracks within a specific playlist
+export const reorderPlaylistTracks = async (
+  playlistId: string,
+  orderedTrackIds: string[], // Array of track IDs in the desired order
+  requestingUserId?: string, // ID of the user making the request
+  requestingUserRole?: Role // Role of the user making the request
+): Promise<{ success: boolean; message?: string; statusCode?: number }> => {
+  try {
+    // 1. Find the playlist and check permissions
+    const playlist = await prisma.playlist.findUnique({
+      where: { id: playlistId },
+      select: { userId: true, type: true }, // Select only necessary fields
+    });
+
+    if (!playlist) {
+      return { success: false, message: "Playlist not found", statusCode: 404 };
+    }
+
+    // Permission check: Only owner of NORMAL playlist or ADMIN can reorder
+    const isOwner = playlist.userId === requestingUserId;
+    const isAdmin = requestingUserRole === Role.ADMIN;
+
+    if (!(playlist.type === "NORMAL" && isOwner) && !isAdmin) {
+      return {
+        success: false,
+        message:
+          "You do not have permission to reorder tracks in this playlist",
+        statusCode: 403,
+      };
+    }
+
+    // 2. Perform reordering within a transaction
+    await prisma.$transaction(async (tx) => {
+      // Fetch existing PlaylistTrack entries to verify tracks belong to the playlist
+      const existingTracks = await tx.playlistTrack.findMany({
+        where: {
+          playlistId: playlistId,
+          trackId: { in: orderedTrackIds },
+        },
+        select: { trackId: true }, // Select only trackId
+      });
+
+      const existingTrackIdSet = new Set(
+        existingTracks.map((pt) => pt.trackId)
+      );
+
+      // Validate that all provided trackIds actually exist in this playlist
+      if (existingTrackIdSet.size !== orderedTrackIds.length) {
+        const missingIds = orderedTrackIds.filter(
+          (id) => !existingTrackIdSet.has(id)
+        );
+        console.error(
+          `Attempted to reorder playlist ${playlistId} with invalid/missing track IDs:`,
+          missingIds
+        );
+        throw new Error(
+          `Invalid or missing track IDs provided for playlist ${playlistId}.`
+        );
+      }
+
+      // Prepare update operations
+      const updateOperations = orderedTrackIds.map((trackId, index) => {
+        return tx.playlistTrack.updateMany({
+          where: {
+            playlistId: playlistId,
+            trackId: trackId,
+          },
+          data: {
+            trackOrder: index, // Set trackOrder to the index in the new array
+          },
+        });
+      });
+
+      // Execute all updates concurrently within the transaction
+      await Promise.all(updateOperations);
+    });
+
+    console.log(
+      `[PlaylistService] Successfully reordered tracks for playlist ${playlistId}`
+    );
+    return { success: true };
+  } catch (error) {
+    console.error(
+      `[PlaylistService] Error reordering tracks for playlist ${playlistId}:`,
+      error
+    );
+    // Determine if it was a validation error or server error
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to reorder tracks due to an internal error";
+    const isValidationError = errorMessage.includes(
+      "Invalid or missing track IDs"
+    );
+
+    return {
+      success: false,
+      message: errorMessage,
+      statusCode: isValidationError ? 400 : 500,
+    };
+  }
+};

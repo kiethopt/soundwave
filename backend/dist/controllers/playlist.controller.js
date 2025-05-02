@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.suggestMoreTracksForPlaylist = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
+exports.reorderPlaylistTracks = exports.suggestMoreTracksForPlaylist = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
 const playlistService = __importStar(require("../services/playlist.service"));
 const albumService = __importStar(require("../services/album.service"));
 const userService = __importStar(require("../services/user.service"));
@@ -502,9 +502,9 @@ const removeTrackFromPlaylist = async (req, res, next) => {
                     id: trackId,
                 },
                 select: {
-                    duration: true
-                }
-            })
+                    duration: true,
+                },
+            }),
         ]);
         if (!playlist) {
             res.status(404).json({
@@ -549,8 +549,8 @@ const removeTrackFromPlaylist = async (req, res, next) => {
                     decrement: 1,
                 },
                 totalDuration: {
-                    decrement: track.duration
-                }
+                    decrement: track.duration,
+                },
             },
         });
         res.json({
@@ -1054,7 +1054,7 @@ const getHomePageData = async (req, res, next) => {
                     }),
                     userService.getUserTopTracks(req.user),
                     userService.getUserTopArtists(req.user),
-                    userService.getPlayHistory(req.user)
+                    userService.getPlayHistory(req.user),
                 ]);
                 responseData.systemPlaylists = systemPlaylists.map((playlist) => ({
                     ...playlist,
@@ -1133,7 +1133,7 @@ const suggestMoreTracksForPlaylist = async (req, res, next) => {
         }
         const playlist = await db_1.default.playlist.findUnique({
             where: { id: playlistId },
-            select: { userId: true, type: true }
+            select: { userId: true, type: true },
         });
         if (!playlist) {
             res.status(404).json({
@@ -1158,12 +1158,12 @@ const suggestMoreTracksForPlaylist = async (req, res, next) => {
             include: {
                 artist: true,
                 album: true,
-            }
+            },
         });
         res.status(200).json({
             success: true,
             message: `Generated ${suggestedTrackIds.length} track suggestions for the playlist`,
-            data: suggestedTracks.map(track => ({
+            data: suggestedTracks.map((track) => ({
                 id: track.id,
                 title: track.title,
                 artist: track.artist,
@@ -1175,8 +1175,9 @@ const suggestMoreTracksForPlaylist = async (req, res, next) => {
         });
     }
     catch (error) {
-        console.error("Playlist suggestion error:", error instanceof Error ? error.message : 'Unknown error');
-        if (error instanceof Error && error.message.includes("Playlist must have at least 3 tracks")) {
+        console.error("Playlist suggestion error:", error instanceof Error ? error.message : "Unknown error");
+        if (error instanceof Error &&
+            error.message.includes("Playlist must have at least 3 tracks")) {
             res.status(400).json({
                 success: false,
                 message: error.message,
@@ -1186,10 +1187,48 @@ const suggestMoreTracksForPlaylist = async (req, res, next) => {
             res.status(500).json({
                 success: false,
                 message: "Failed to generate track suggestions",
-                error: error instanceof Error ? error.message : 'Unknown error'
+                error: error instanceof Error ? error.message : "Unknown error",
             });
         }
     }
 };
 exports.suggestMoreTracksForPlaylist = suggestMoreTracksForPlaylist;
+const reorderPlaylistTracks = async (req, res, next) => {
+    try {
+        const { playlistId } = req.params;
+        const { trackIds } = req.body;
+        const userId = req.user?.id;
+        const userRole = req.user?.role;
+        if (!playlistId) {
+            res
+                .status(400)
+                .json({ success: false, message: "Playlist ID is required" });
+            return;
+        }
+        if (!Array.isArray(trackIds) || trackIds.length === 0) {
+            res
+                .status(400)
+                .json({ success: false, message: "Track IDs array is required" });
+            return;
+        }
+        const result = await playlistService.reorderPlaylistTracks(playlistId, trackIds, userId, userRole);
+        if (result.success) {
+            res.json({
+                success: true,
+                message: "Playlist tracks reordered successfully",
+            });
+        }
+        else {
+            res.status(result.statusCode || 400).json({
+                success: false,
+                message: result.message || "Failed to reorder tracks",
+            });
+        }
+    }
+    catch (error) {
+        console.error("Error in reorderPlaylistTracks controller:", error);
+        next(error);
+    }
+};
+exports.reorderPlaylistTracks = reorderPlaylistTracks;
 //# sourceMappingURL=playlist.controller.js.map

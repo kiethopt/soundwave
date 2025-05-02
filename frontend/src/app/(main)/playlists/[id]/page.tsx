@@ -26,7 +26,7 @@ import {
   Lock,
   Globe,
   Clock,
-  Sparkles
+  Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useSocket } from "@/contexts/SocketContext";
@@ -35,6 +35,23 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { RecommendedTrackList } from "@/components/user/track/RecommendedTrackList";
 import { Spinner } from "@/components/ui/Icons";
+
+// Import DND Kit components
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
 // Helper function to format duration (seconds) into "X phút Y giây"
 const formatDuration = (totalSeconds: number): string => {
@@ -84,7 +101,11 @@ export default function PlaylistPage() {
   const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(
     new Set()
   );
-  const [recommendations, setRecommendations] = useState<{ tracks: Track[], basedOn: string, topGenres?: any[] }>(); 
+  const [recommendations, setRecommendations] = useState<{
+    tracks: Track[];
+    basedOn: string;
+    topGenres?: any[];
+  }>();
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [isSuggestionLoading, setIsSuggestionLoading] = useState(false);
 
@@ -115,6 +136,22 @@ export default function PlaylistPage() {
     playlist?.name !== "Welcome Mix";
 
   const canEditPlaylist = playlist?.canEdit && playlist?.type === "NORMAL";
+
+  // Setup DND sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      // Require the mouse to move by 5 pixels before activating
+      // Require the user to hold for 150ms before activating
+      activationConstraint: {
+        distance: 5,
+        delay: 150,
+        tolerance: 0, // No additional tolerance needed with delay
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     // Check if user is authenticated
@@ -265,13 +302,16 @@ export default function PlaylistPage() {
   // Function to refresh the playlist data
   const refreshPlaylistData = useCallback(async () => {
     if (!id) return;
-    
+
     try {
       setLoading(true);
       const token = localStorage.getItem("userToken");
-      
-      const response = await api.playlists.getById(id as string, token ?? undefined);
-      
+
+      const response = await api.playlists.getById(
+        id as string,
+        token ?? undefined
+      );
+
       if (response.success) {
         setPlaylist(response.data);
         if (response.data.type === "FAVORITE") {
@@ -290,14 +330,17 @@ export default function PlaylistPage() {
   // Function to fetch recommendations for the playlist
   const fetchRecommendations = useCallback(async () => {
     if (!isNormalPlaylist || !id || !isAuthenticated) return;
-    
+
     try {
       setLoadingRecommendations(true);
       const token = localStorage.getItem("userToken");
       if (!token) return;
-      
-      const response = await api.playlists.getPlaylistSuggest(token, id as string);
-      
+
+      const response = await api.playlists.getPlaylistSuggest(
+        token,
+        id as string
+      );
+
       if (response.success && response.data) {
         setRecommendations(response.data);
       } else {
@@ -320,18 +363,22 @@ export default function PlaylistPage() {
   // Add the suggestMoreTracks handler
   const suggestMoreTracks = async () => {
     if (!id || !isAuthenticated) return;
-    
+
     try {
       setIsSuggestionLoading(true);
       const token = localStorage.getItem("userToken");
       if (!token) return;
-      
-      const response = await api.playlists.suggestMoreTracksForPlaylist(id as string, token, 5);
-      
+
+      const response = await api.playlists.suggestMoreTracksForPlaylist(
+        id as string,
+        token,
+        5
+      );
+
       if (response.success) {
         // Add the suggested tracks to the playlist
         const suggestedTracks = response.data;
-        
+
         // Add tracks one by one to playlist
         let addedCount = 0;
         for (const track of suggestedTracks) {
@@ -339,13 +386,18 @@ export default function PlaylistPage() {
             await api.playlists.addTrack(id as string, track.id, token);
             addedCount++;
           } catch (error) {
-            console.error(`Failed to add track ${track.id} to playlist:`, error);
+            console.error(
+              `Failed to add track ${track.id} to playlist:`,
+              error
+            );
           }
         }
-        
+
         // Show success message
-        toast.success(`Added ${addedCount} new suggested tracks to your playlist!`);
-        
+        toast.success(
+          `Added ${addedCount} new suggested tracks to your playlist!`
+        );
+
         // Refresh the playlist to show new tracks
         refreshPlaylistData();
       } else {
@@ -420,7 +472,7 @@ export default function PlaylistPage() {
         if (!token || !playlist) return;
 
         // Find the track being removed to get its duration
-        const trackToRemove = playlist.tracks.find(t => t.id === trackId);
+        const trackToRemove = playlist.tracks.find((t) => t.id === trackId);
         if (!trackToRemove) return;
 
         await api.playlists.removeTrack(id as string, trackId, token);
@@ -428,7 +480,7 @@ export default function PlaylistPage() {
           ...playlist,
           tracks: playlist.tracks.filter((t) => t.id !== trackId),
           totalTracks: playlist.totalTracks - 1,
-          totalDuration: playlist.totalDuration - (trackToRemove.duration || 0)
+          totalDuration: playlist.totalDuration - (trackToRemove.duration || 0),
         });
       } catch (error) {
         console.error("Error removing track:", error);
@@ -520,13 +572,92 @@ export default function PlaylistPage() {
     const handlePlaylistUpdated = () => {
       refreshPlaylistData();
     };
-    
+
     window.addEventListener("playlist-updated", handlePlaylistUpdated);
-    
+
     return () => {
       window.removeEventListener("playlist-updated", handlePlaylistUpdated);
     };
   }, [refreshPlaylistData]);
+
+  // --- DND Kit Drag End Handler ---
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setPlaylist((currentPlaylist) => {
+        if (!currentPlaylist || !currentPlaylist.tracks) {
+          return currentPlaylist;
+        }
+
+        const oldIndex = currentPlaylist.tracks.findIndex(
+          (track) => track.id === active.id
+        );
+        const newIndex = currentPlaylist.tracks.findIndex(
+          (track) => track.id === over.id
+        );
+
+        if (oldIndex === -1 || newIndex === -1) {
+          return currentPlaylist; // Should not happen if IDs are correct
+        }
+
+        const reorderedTracks = arrayMove(
+          currentPlaylist.tracks,
+          oldIndex,
+          newIndex
+        );
+
+        console.log(
+          "Reordered Tracks (Optimistic UI):",
+          reorderedTracks.map((t) => t.title)
+        );
+        console.log(
+          `Moved track ${active.id} from index ${oldIndex} to ${newIndex}`
+        );
+
+        // Call backend API to save the new order
+        const token = localStorage.getItem("userToken");
+        if (token && currentPlaylist.id) {
+          const newOrderTrackIds = reorderedTracks.map((t) => t.id);
+
+          api.playlists
+            .reorderTracks(currentPlaylist.id, newOrderTrackIds, token)
+            .then((response) => {
+              if (!response.success) {
+                console.error(
+                  "Failed to save reordered tracks:",
+                  response.message
+                );
+                toast.error("Failed to save new track order. Reverting.");
+                // Revert UI on failure - Refetch or revert state manually
+                // For simplicity, let's refetch the playlist data
+                refreshPlaylistData();
+              } else {
+                console.log("Successfully saved new track order.");
+                // Optionally show a success toast, but usually optimistic UI is enough
+              }
+            })
+            .catch((error) => {
+              console.error("Error calling reorder API:", error);
+              toast.error("Error saving new track order. Reverting.");
+              // Revert UI on failure - Refetch or revert state manually
+              refreshPlaylistData();
+            });
+        } else {
+          console.warn("Cannot save reorder: Missing token or playlist ID.");
+          toast.error("Could not save track order. Please try again.");
+          // Revert UI immediately if we know we can't save
+          refreshPlaylistData();
+        }
+
+        // Return updated playlist for optimistic UI update
+        return {
+          ...currentPlaylist,
+          tracks: reorderedTracks,
+        };
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -727,15 +858,15 @@ export default function PlaylistPage() {
           {/* Added conditional buttons */}
           <div className="flex items-center gap-2 mt-1">
             {canEditPlaylist && (
-              <Button 
-                size="default" 
+              <Button
+                size="default"
                 onClick={suggestMoreTracks}
                 disabled={isSuggestionLoading}
                 className="text-sm font-medium flex items-center gap-1.5 bg-[#A57865] text-white hover:bg-[#8a6353] disabled:opacity-50 rounded-full transition-colors duration-200 ease-in-out"
               >
                 {isSuggestionLoading ? (
                   <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2"></div> 
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2"></div>
                     <span>Suggesting...</span>
                   </>
                 ) : (
@@ -836,20 +967,42 @@ export default function PlaylistPage() {
               </div>
             </div>
 
-            {/* Divider and TrackList */}
+            {/* Divider and TrackList Wrapper with DND Context */}
             <div
               className={`divide-y ${
                 theme === "light" ? "divide-gray-200" : "divide-white/10"
               }`}
             >
-              <TrackList
-                tracks={playlist.tracks}
-                allowRemove={playlist.canEdit && playlist.type === "NORMAL"}
-                onRemove={handleRemoveTrack}
-                requiresAuth={!isAuthenticated}
-                playlists={userPlaylists}
-                favoriteTrackIds={favoriteTrackIds}
-              />
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={playlist.tracks.map((track) => track.id)} // Pass track IDs for SortableContext
+                  strategy={verticalListSortingStrategy}
+                >
+                  <TrackList
+                    tracks={playlist.tracks}
+                    allowRemove={
+                      !!playlist &&
+                      playlist.canEdit === true &&
+                      playlist.type === "NORMAL"
+                    }
+                    onRemove={handleRemoveTrack}
+                    requiresAuth={!isAuthenticated}
+                    playlists={userPlaylists}
+                    favoriteTrackIds={favoriteTrackIds}
+                    theme={theme}
+                    // Pass down necessary props for drag-and-drop
+                    isDraggable={
+                      !!playlist &&
+                      playlist.canEdit === true &&
+                      playlist.type === "NORMAL"
+                    }
+                  />
+                </SortableContext>
+              </DndContext>
             </div>
           </>
         ) : (
@@ -895,18 +1048,16 @@ export default function PlaylistPage() {
           <div className="p-6">
             <div className="flex justify-between items-center mb-4">
               <div className="flex flex-col gap-2">
-                <h2 className="text-xl font-bold">
-                  Recommended
-                </h2>
+                <h2 className="text-xl font-bold">Recommended</h2>
                 <p className="text-sm text-gray-400">
                   Based on your listening history
                 </p>
               </div>
 
               <div className="flex gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={fetchRecommendations}
                   disabled={loadingRecommendations}
                   className="text-sm font-medium"
@@ -918,19 +1069,25 @@ export default function PlaylistPage() {
 
             {loadingRecommendations ? (
               <div className="flex justify-center items-center h-32">
-                <div className="animate-pulse text-sm opacity-70">Loading recommendations...</div>
+                <div className="animate-pulse text-sm opacity-70">
+                  Loading recommendations...
+                </div>
               </div>
-            ) : recommendations && recommendations.tracks && recommendations.tracks.length > 0 ? (
-              <RecommendedTrackList 
-                tracks={recommendations.tracks.slice(0, 10)} 
+            ) : recommendations &&
+              recommendations.tracks &&
+              recommendations.tracks.length > 0 ? (
+              <RecommendedTrackList
+                tracks={recommendations.tracks.slice(0, 10)}
                 playlistId={id as string}
                 playlists={userPlaylists}
                 favoriteTrackIds={favoriteTrackIds}
-                  onRefresh={fetchRecommendations}
+                onRefresh={fetchRecommendations}
               />
             ) : (
               <div className="text-center py-8">
-                <p className="text-sm opacity-70">No recommendations available at the moment.</p>
+                <p className="text-sm opacity-70">
+                  No recommendations available at the moment.
+                </p>
               </div>
             )}
           </div>

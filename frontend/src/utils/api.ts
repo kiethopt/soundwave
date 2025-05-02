@@ -23,7 +23,7 @@ const fetchWithAuth = async (
     headers,
   });
 
-  // --- Simplified Error Handling --- 
+  // --- Simplified Error Handling ---
   if (!response.ok) {
     let errorMessage = `HTTP error! status: ${response.status}`;
     let errorCode = "";
@@ -35,22 +35,24 @@ const fetchWithAuth = async (
       errorData = errorBody.data || null;
 
       // Specific handling for TRACK_ALREADY_IN_PLAYLIST - return instead of throw
-       if (errorCode === "TRACK_ALREADY_IN_PLAYLIST") {
-         console.warn(`Handled duplicate track error: ${errorMessage}`);
-         return {
-           success: false,
-           code: "TRACK_ALREADY_IN_PLAYLIST",
-           message: errorMessage,
-           data: errorData,
-         };
-       }
-      
-      // Specific handling for ACCOUNT_DEACTIVATED or ARTIST_DEACTIVATED
-      if (errorCode === "ACCOUNT_DEACTIVATED" || errorCode === "ARTIST_DEACTIVATED"){
-          // Optionally re-throw a specific error type or modify message
-          // For now, just ensure the message is passed
+      if (errorCode === "TRACK_ALREADY_IN_PLAYLIST") {
+        console.warn(`Handled duplicate track error: ${errorMessage}`);
+        return {
+          success: false,
+          code: "TRACK_ALREADY_IN_PLAYLIST",
+          message: errorMessage,
+          data: errorData,
+        };
       }
-      
+
+      // Specific handling for ACCOUNT_DEACTIVATED or ARTIST_DEACTIVATED
+      if (
+        errorCode === "ACCOUNT_DEACTIVATED" ||
+        errorCode === "ARTIST_DEACTIVATED"
+      ) {
+        // Optionally re-throw a specific error type or modify message
+        // For now, just ensure the message is passed
+      }
     } catch (jsonError) {
       // If JSON parsing fails, try to get the raw text
       try {
@@ -67,7 +69,7 @@ const fetchWithAuth = async (
     // Optional: Attach code/data if needed elsewhere, but rely on message for display
     (errorToThrow as any).code = errorCode;
     (errorToThrow as any).data = errorData;
-    throw errorToThrow; 
+    throw errorToThrow;
   }
   // --- End Simplified Error Handling ---
 
@@ -367,8 +369,8 @@ export const api = {
       reason?: string
     ): Promise<{ message: string }> => {
       const options: RequestInit = {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
       };
       if (reason) {
         options.body = JSON.stringify({ reason });
@@ -382,8 +384,8 @@ export const api = {
       reason?: string
     ): Promise<{ message: string }> => {
       const options: RequestInit = {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
       };
       if (reason) {
         options.body = JSON.stringify({ reason });
@@ -607,7 +609,10 @@ export const api = {
       );
     },
 
-    setFollowVisibility: async (token: string, data: { isVisible: boolean }) => {
+    setFollowVisibility: async (
+      token: string,
+      data: { isVisible: boolean }
+    ) => {
       return fetchWithAuth(
         "/api/user/set-follow-visibility",
         {
@@ -673,7 +678,7 @@ export const api = {
         { method: "GET" },
         token
       ),
-      
+
     getPlayHistory: async (token: string) =>
       fetchWithAuth("/api/user/playHistory", { method: "GET" }, token),
   },
@@ -1047,7 +1052,7 @@ export const api = {
         return response;
       } catch (error) {
         // console.error(`Error fetching album ${albumId}:`, error);
-         // Still return or throw error so the calling component knows about it
+        // Still return or throw error so the calling component knows about it
         return { success: false, message: "Failed to fetch album details" }; // Assuming return based on code, adjust if it should throw
       }
     },
@@ -1463,7 +1468,7 @@ export const api = {
     },
 
     getPlaylistSuggest: async (token: string, playlistId?: string) => {
-      const queryParams = playlistId ? `?playlistId=${playlistId}` : '';
+      const queryParams = playlistId ? `?playlistId=${playlistId}` : "";
       return fetchWithAuth(
         `/api/playlists/suggest${queryParams}`,
         { method: "GET" },
@@ -1471,13 +1476,32 @@ export const api = {
       );
     },
 
-    suggestMoreTracksForPlaylist: async (playlistId: string, token: string, count: number = 5) => {
+    suggestMoreTracksForPlaylist: async (
+      playlistId: string,
+      token: string,
+      count: number = 5
+    ) => {
       return fetchWithAuth(
         `/api/playlists/${playlistId}/suggest-more?count=${count}`,
         { method: "GET" },
         token
       );
-    }
+    },
+
+    reorderTracks: async (
+      playlistId: string,
+      trackIds: string[], // Array of track IDs in the new order
+      token: string
+    ) => {
+      return fetchWithAuth(
+        `/api/playlists/${playlistId}/reorder`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ trackIds }), // Send the array of IDs
+        },
+        token
+      );
+    },
   },
 
   upload: {

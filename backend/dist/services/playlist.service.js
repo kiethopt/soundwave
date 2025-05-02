@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPlaylistSuggestions = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
+exports.reorderPlaylistTracks = exports.getPlaylistSuggestions = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const handle_utils_1 = require("../utils/handle-utils");
@@ -634,27 +634,27 @@ exports.updateAllSystemPlaylists = updateAllSystemPlaylists;
 const getPlaylistSuggestions = async (req) => {
     const user = req.user;
     if (!user)
-        throw new Error('Unauthorized');
+        throw new Error("Unauthorized");
     const { playlistId } = req.query;
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     let existingTrackIds = new Set();
-    if (playlistId && typeof playlistId === 'string') {
+    if (playlistId && typeof playlistId === "string") {
         try {
             const playlist = await db_1.default.playlist.findUnique({
                 where: { id: playlistId },
                 include: {
                     tracks: {
-                        select: { trackId: true }
-                    }
-                }
+                        select: { trackId: true },
+                    },
+                },
             });
             if (playlist) {
-                existingTrackIds = new Set(playlist.tracks.map(track => track.trackId));
+                existingTrackIds = new Set(playlist.tracks.map((track) => track.trackId));
             }
         }
         catch (error) {
-            console.error('Error fetching playlist tracks:', error);
+            console.error("Error fetching playlist tracks:", error);
         }
     }
     const userHistory = await db_1.default.history.findMany({
@@ -687,8 +687,8 @@ const getPlaylistSuggestions = async (req) => {
                 where: {
                     isActive: true,
                     id: {
-                        notIn: Array.from(existingTrackIds)
-                    }
+                        notIn: Array.from(existingTrackIds),
+                    },
                 },
                 orderBy: { playCount: "desc" },
                 take: 20,
@@ -707,8 +707,8 @@ const getPlaylistSuggestions = async (req) => {
                     isActive: true,
                     createdAt: { gte: threeMonthsAgo },
                     id: {
-                        notIn: Array.from(existingTrackIds)
-                    }
+                        notIn: Array.from(existingTrackIds),
+                    },
                 },
                 orderBy: { createdAt: "desc" },
                 take: 20,
@@ -721,7 +721,7 @@ const getPlaylistSuggestions = async (req) => {
                         },
                     },
                 },
-            })
+            }),
         ]);
         const combinedTracks = [...popularTracks, ...newReleasedTracks]
             .filter((track, index, self) => index === self.findIndex((t) => t.id === track.id))
@@ -734,9 +734,9 @@ const getPlaylistSuggestions = async (req) => {
         };
     }
     const genreCounts = {};
-    userHistory.forEach(history => {
+    userHistory.forEach((history) => {
         if (history.track) {
-            history.track.genres.forEach(genreRel => {
+            history.track.genres.forEach((genreRel) => {
                 const genreId = genreRel.genre.id;
                 const genreName = genreRel.genre.name;
                 if (!genreCounts[genreName]) {
@@ -752,15 +752,15 @@ const getPlaylistSuggestions = async (req) => {
         .map(([name, data]) => ({
         name,
         id: data.id,
-        count: data.count
+        count: data.count,
     }));
     if (topGenres.length === 0) {
         const popularTracks = await db_1.default.track.findMany({
             where: {
                 isActive: true,
                 id: {
-                    notIn: Array.from(existingTrackIds)
-                }
+                    notIn: Array.from(existingTrackIds),
+                },
             },
             orderBy: { playCount: "desc" },
             take: 20,
@@ -781,27 +781,26 @@ const getPlaylistSuggestions = async (req) => {
         };
     }
     const userTrackIds = userHistory
-        .filter(history => history.track)
-        .map(history => history.track.id);
-    const excludeTrackIds = [...new Set([...userTrackIds, ...Array.from(existingTrackIds)])];
+        .filter((history) => history.track)
+        .map((history) => history.track.id);
+    const excludeTrackIds = [
+        ...new Set([...userTrackIds, ...Array.from(existingTrackIds)]),
+    ];
     const recommendedTracks = await db_1.default.track.findMany({
         where: {
             isActive: true,
             id: {
-                notIn: excludeTrackIds
+                notIn: excludeTrackIds,
             },
             genres: {
                 some: {
                     genreId: {
-                        in: topGenres.map(genre => genre.id)
-                    }
-                }
+                        in: topGenres.map((genre) => genre.id),
+                    },
+                },
             },
         },
-        orderBy: [
-            { playCount: "desc" },
-            { createdAt: "desc" },
-        ],
+        orderBy: [{ playCount: "desc" }, { createdAt: "desc" }],
         take: 20,
         include: {
             artist: true,
@@ -814,11 +813,75 @@ const getPlaylistSuggestions = async (req) => {
         },
     });
     return {
-        message: `Recommendations based on your top genres: ${topGenres.map(g => g.name).join(', ')}`,
+        message: `Recommendations based on your top genres: ${topGenres
+            .map((g) => g.name)
+            .join(", ")}`,
         tracks: recommendedTracks,
         basedOn: "genres",
         topGenres: topGenres,
     };
 };
 exports.getPlaylistSuggestions = getPlaylistSuggestions;
+const reorderPlaylistTracks = async (playlistId, orderedTrackIds, requestingUserId, requestingUserRole) => {
+    try {
+        const playlist = await db_1.default.playlist.findUnique({
+            where: { id: playlistId },
+            select: { userId: true, type: true },
+        });
+        if (!playlist) {
+            return { success: false, message: "Playlist not found", statusCode: 404 };
+        }
+        const isOwner = playlist.userId === requestingUserId;
+        const isAdmin = requestingUserRole === client_1.Role.ADMIN;
+        if (!(playlist.type === "NORMAL" && isOwner) && !isAdmin) {
+            return {
+                success: false,
+                message: "You do not have permission to reorder tracks in this playlist",
+                statusCode: 403,
+            };
+        }
+        await db_1.default.$transaction(async (tx) => {
+            const existingTracks = await tx.playlistTrack.findMany({
+                where: {
+                    playlistId: playlistId,
+                    trackId: { in: orderedTrackIds },
+                },
+                select: { trackId: true },
+            });
+            const existingTrackIdSet = new Set(existingTracks.map((pt) => pt.trackId));
+            if (existingTrackIdSet.size !== orderedTrackIds.length) {
+                const missingIds = orderedTrackIds.filter((id) => !existingTrackIdSet.has(id));
+                console.error(`Attempted to reorder playlist ${playlistId} with invalid/missing track IDs:`, missingIds);
+                throw new Error(`Invalid or missing track IDs provided for playlist ${playlistId}.`);
+            }
+            const updateOperations = orderedTrackIds.map((trackId, index) => {
+                return tx.playlistTrack.updateMany({
+                    where: {
+                        playlistId: playlistId,
+                        trackId: trackId,
+                    },
+                    data: {
+                        trackOrder: index,
+                    },
+                });
+            });
+            await Promise.all(updateOperations);
+        });
+        console.log(`[PlaylistService] Successfully reordered tracks for playlist ${playlistId}`);
+        return { success: true };
+    }
+    catch (error) {
+        console.error(`[PlaylistService] Error reordering tracks for playlist ${playlistId}:`, error);
+        const errorMessage = error instanceof Error
+            ? error.message
+            : "Failed to reorder tracks due to an internal error";
+        const isValidationError = errorMessage.includes("Invalid or missing track IDs");
+        return {
+            success: false,
+            message: errorMessage,
+            statusCode: isValidationError ? 400 : 500,
+        };
+    }
+};
+exports.reorderPlaylistTracks = reorderPlaylistTracks;
 //# sourceMappingURL=playlist.service.js.map

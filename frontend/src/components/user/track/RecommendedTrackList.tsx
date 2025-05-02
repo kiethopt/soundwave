@@ -34,18 +34,22 @@ export function RecommendedTrackList({
   favoriteTrackIds,
   playlists,
   onRefresh,
-  onPlaylistUpdate
+  onPlaylistUpdate,
 }: RecommendedTrackListProps) {
   const { theme } = useTheme();
   const router = useRouter();
   const { dialogOpen, setDialogOpen, handleProtectedAction } = useAuth();
-  const { playTrack, currentTrack, trackQueue, isPlaying, pauseTrack } = useTrack();
-  const [isAlreadyExistsDialogOpen, setIsAlreadyExistsDialogOpen] = useState(false);
+  const { playTrack, currentTrack, trackQueue, isPlaying, pauseTrack } =
+    useTrack();
+  const [isAlreadyExistsDialogOpen, setIsAlreadyExistsDialogOpen] =
+    useState(false);
   const [duplicateInfo, setDuplicateInfo] = useState<{
     playlistName: string;
     trackTitle?: string;
   } | null>(null);
-  const [tracksInPlaylist, setTracksInPlaylist] = useState<Set<string>>(new Set());
+  const [tracksInPlaylist, setTracksInPlaylist] = useState<Set<string>>(
+    new Set()
+  );
 
   const handleTrackPlay = (track: Track) => {
     handleProtectedAction(() => {
@@ -65,12 +69,12 @@ export function RecommendedTrackList({
         const availablePlaylists = playlists.filter(
           (p) => !filteredPlaylistNames.has(p.name)
         );
-        
+
         if (availablePlaylists.length === 0) {
           toast.error("No playlists available to add track to");
           return;
         }
-        
+
         // Use first available playlist
         const firstPlaylist = availablePlaylists[0];
         await addTrackToPlaylist(firstPlaylist.id, trackId);
@@ -81,7 +85,10 @@ export function RecommendedTrackList({
     });
   };
 
-  const addTrackToPlaylist = async (targetPlaylistId: string, trackId: string) => {
+  const addTrackToPlaylist = async (
+    targetPlaylistId: string,
+    trackId: string
+  ) => {
     const token = localStorage.getItem("userToken");
     if (!token) {
       router.push("/login");
@@ -89,26 +96,30 @@ export function RecommendedTrackList({
     }
 
     try {
-      const response = await api.playlists.addTrack(targetPlaylistId, trackId, token);
+      const response = await api.playlists.addTrack(
+        targetPlaylistId,
+        trackId,
+        token
+      );
 
       if (response.success) {
         toast.success("Added to playlist");
-        
+
         // Update the local tracksInPlaylist state to reflect the change
-        setTracksInPlaylist(prev => {
+        setTracksInPlaylist((prev) => {
           const newSet = new Set(prev);
           newSet.add(trackId);
           return newSet;
         });
-        
+
         // Dispatch playlist-updated event to refresh the playlist display
         window.dispatchEvent(new CustomEvent("playlist-updated"));
-        
+
         // Refresh the main playlist data if the callback is provided
         if (onPlaylistUpdate) {
           onPlaylistUpdate();
         }
-        
+
         // Trigger recommendations refresh if callback exists
         if (onRefresh) {
           onRefresh();
@@ -135,16 +146,18 @@ export function RecommendedTrackList({
     <>
       <div className="w-full space-y-2">
         {tracks.map((track) => {
-          const albumDisplay = track.album 
-            ? `${track.album.title}` 
-            : (track.type === "SINGLE" ? `${track.title}` : "");
-          
+          const albumDisplay = track.album
+            ? `${track.album.title}`
+            : track.type === "SINGLE"
+            ? `${track.title}`
+            : "";
+
           const isCurrentTrack = currentTrack?.id === track.id;
           const isCurrentlyPlaying = isCurrentTrack && isPlaying;
-            
+
           return (
-            <div 
-              key={track.id} 
+            <div
+              key={track.id}
               className={`flex items-center p-2 rounded-lg group ${
                 theme === "light" ? "hover:bg-gray-100" : "hover:bg-white/5"
               } cursor-pointer`}
@@ -160,9 +173,9 @@ export function RecommendedTrackList({
                     height={40}
                     className="w-full h-full object-cover"
                   />
-                  
+
                   {/* Play/Pause Overlay */}
-                  <div 
+                  <div
                     className={`absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity`}
                   >
                     {isCurrentlyPlaying ? (
@@ -172,28 +185,30 @@ export function RecommendedTrackList({
                     )}
                   </div>
                 </div>
-                
+
                 {/* Track title */}
                 <div className="flex flex-col min-w-0">
-                  <div 
+                  <div
                     className={`font-medium text-sm truncate hover:underline cursor-pointer underline-offset-2${
-                      isCurrentTrack ? "text-[#A57865]" : 
-                      theme === "light" ? "text-gray-900" : "text-white"
+                      isCurrentTrack
+                        ? "text-[#A57865]"
+                        : theme === "light"
+                        ? "text-gray-900"
+                        : "text-white"
                     }`}
                     title={track.title}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (track.album) {
                         router.push(`/album/${track.album.id}`);
-                      }
-                      else {
+                      } else {
                         router.push(`/track/${track.id}`);
                       }
                     }}
                   >
                     {track.title}
                   </div>
-                  <div 
+                  <div
                     className={`text-xs truncate cursor-pointer hover:underline underline-offset-2 ${
                       theme === "light" ? "text-gray-600" : "text-white/70"
                     }`}
@@ -207,9 +222,10 @@ export function RecommendedTrackList({
                   </div>
                 </div>
               </div>
-              
+
               {/* Middle: Album name */}
-              <div className="hidden md:flex flex-1 text-center mx-4 hover:underline cursor-pointer underline-offset-2"
+              <div
+                className="hidden md:flex flex-1 text-center mx-4 hover:underline cursor-pointer underline-offset-2"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (track.album) {
@@ -220,7 +236,7 @@ export function RecommendedTrackList({
                 }}
               >
                 {albumDisplay && (
-                  <div 
+                  <div
                     className={`text-xs truncate ${
                       theme === "light" ? "text-gray-500" : "text-white/60"
                     }`}
@@ -230,13 +246,13 @@ export function RecommendedTrackList({
                   </div>
                 )}
               </div>
-              
+
               {/* Right side: Add button */}
               <div className="flex items-center">
                 {/* Add button */}
                 <Button
                   size="sm"
-                  variant="default" 
+                  variant="default"
                   className="flex items-center justify-center gap-1 text-xs h-8 px-3 rounded-full font-medium"
                   onClick={(e) => {
                     e.stopPropagation();

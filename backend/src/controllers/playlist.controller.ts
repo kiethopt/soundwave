@@ -4,7 +4,7 @@ import * as albumService from "../services/album.service";
 import * as userService from "../services/user.service";
 import * as aiService from "../services/ai.service";
 import { handleError } from "../utils/handle-utils";
-import {  Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import prisma from "../config/db";
 import { uploadFile } from "../services/upload.service";
 import { trackSelect } from "../utils/prisma-selects";
@@ -274,7 +274,7 @@ export const getPlaylistById = async (
       });
       return;
     }
-    
+
     // If the playlist is the Recommended Playlist, update it automatically
     if (
       playlistExists.type === "NORMAL" &&
@@ -384,7 +384,7 @@ export const getPlaylistById = async (
     }
 
     const canEdit =
-      isAuthenticated && 
+      isAuthenticated &&
       ((isSystemPlaylist && userRole === "ADMIN") ||
         (!isSystemPlaylist && playlist.userId === userId));
 
@@ -586,9 +586,9 @@ export const removeTrackFromPlaylist = async (
           id: trackId,
         },
         select: {
-          duration: true
-        }
-      })
+          duration: true,
+        },
+      }),
     ]);
 
     if (!playlist) {
@@ -643,8 +643,8 @@ export const removeTrackFromPlaylist = async (
           decrement: 1,
         },
         totalDuration: {
-          decrement: track.duration
-        }
+          decrement: track.duration,
+        },
       },
     });
 
@@ -663,7 +663,7 @@ export const removeTrackFromPlaylist = async (
 // Cập nhật playlist
 export const updatePlaylist = async (
   req: Request,
-  res: Response,
+  res: Response
 ): Promise<void> => {
   try {
     const { id } = req.params;
@@ -1331,7 +1331,7 @@ export const getHomePageData = async (
           }),
           userService.getUserTopTracks(req.user),
           userService.getUserTopArtists(req.user),
-          userService.getPlayHistory(req.user)
+          userService.getPlayHistory(req.user),
         ]);
 
         // Transform the data to match the expected format
@@ -1408,7 +1408,7 @@ export const getPlaylistSuggestions = async (
     console.error("Error fetching playlist suggestions:", error);
     next(error);
   }
-}
+};
 
 // New controller for suggesting more tracks for a playlist using AI
 export const suggestMoreTracksForPlaylist = async (
@@ -1432,7 +1432,7 @@ export const suggestMoreTracksForPlaylist = async (
     // Validate playlist ownership
     const playlist = await prisma.playlist.findUnique({
       where: { id: playlistId },
-      select: { userId: true, type: true }
+      select: { userId: true, type: true },
     });
 
     if (!playlist) {
@@ -1453,7 +1453,11 @@ export const suggestMoreTracksForPlaylist = async (
     }
 
     // Use the AI service to suggest more tracks
-    const suggestedTrackIds = await aiService.suggestMoreTracksUsingAI(playlistId, userId, count);
+    const suggestedTrackIds = await aiService.suggestMoreTracksUsingAI(
+      playlistId,
+      userId,
+      count
+    );
 
     // Get more details about the suggested tracks
     const suggestedTracks = await prisma.track.findMany({
@@ -1464,13 +1468,13 @@ export const suggestMoreTracksForPlaylist = async (
       include: {
         artist: true,
         album: true,
-      }
+      },
     });
 
     res.status(200).json({
       success: true,
       message: `Generated ${suggestedTrackIds.length} track suggestions for the playlist`,
-      data: suggestedTracks.map(track => ({
+      data: suggestedTracks.map((track) => ({
         id: track.id,
         title: track.title,
         artist: track.artist,
@@ -1481,9 +1485,16 @@ export const suggestMoreTracksForPlaylist = async (
       })),
     });
   } catch (error) {
-    console.error("Playlist suggestion error:", error instanceof Error ? error.message : 'Unknown error');
-    if (error instanceof Error && error.message.includes("Playlist must have at least 3 tracks")) {
-      res.status(400).json({ // 400 Bad Request
+    console.error(
+      "Playlist suggestion error:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
+    if (
+      error instanceof Error &&
+      error.message.includes("Playlist must have at least 3 tracks")
+    ) {
+      res.status(400).json({
+        // 400 Bad Request
         success: false,
         message: error.message,
       });
@@ -1492,8 +1503,60 @@ export const suggestMoreTracksForPlaylist = async (
       res.status(500).json({
         success: false,
         message: "Failed to generate track suggestions",
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
+  }
+};
+
+// Reorder tracks in a playlist
+export const reorderPlaylistTracks = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { playlistId } = req.params;
+    const { trackIds } = req.body; // Expecting an array of track IDs in the new order
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+
+    if (!playlistId) {
+      res
+        .status(400)
+        .json({ success: false, message: "Playlist ID is required" });
+      return;
+    }
+
+    if (!Array.isArray(trackIds) || trackIds.length === 0) {
+      res
+        .status(400)
+        .json({ success: false, message: "Track IDs array is required" });
+      return;
+    }
+
+    // Call the service function to handle the reordering logic
+    const result = await playlistService.reorderPlaylistTracks(
+      playlistId,
+      trackIds,
+      userId,
+      userRole
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: "Playlist tracks reordered successfully",
+      });
+    } else {
+      // Use the status code provided by the service or default to 400/500
+      res.status(result.statusCode || 400).json({
+        success: false,
+        message: result.message || "Failed to reorder tracks",
+      });
+    }
+  } catch (error) {
+    console.error("Error in reorderPlaylistTracks controller:", error);
+    next(error); // Pass error to the global error handler
   }
 };

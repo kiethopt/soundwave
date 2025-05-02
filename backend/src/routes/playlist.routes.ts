@@ -26,6 +26,7 @@ import {
   getUserSystemPlaylists,
   getPlaylistSuggestions,
   suggestMoreTracksForPlaylist,
+  reorderPlaylistTracks,
 } from "../controllers/playlist.controller";
 import { Role } from "@prisma/client";
 import upload from "../middleware/upload.middleware";
@@ -34,7 +35,12 @@ const router = express.Router();
 
 // == Public routes (no authentication required) ==
 router.get("/home", optionalAuthenticate, getHomePageData);
-router.get("/system-all", authenticate, authorize([Role.ADMIN]), getSystemPlaylists);
+router.get(
+  "/system-all",
+  authenticate,
+  authorize([Role.ADMIN]),
+  getSystemPlaylists
+);
 
 // == Authenticated user routes ==
 router.use(authenticate);
@@ -62,6 +68,9 @@ router.delete("/:id", deletePlaylist);
 router.delete("/:playlistId/tracks/:trackId", removeTrackFromPlaylist);
 router.post("/:id/tracks", addTrackToPlaylist);
 router.get("/:id/suggest-more", suggestMoreTracksForPlaylist);
+
+// Route to update track order in a playlist
+router.patch("/:playlistId/reorder", authenticate, reorderPlaylistTracks);
 
 // == Admin-only routes ==
 router.use("/admin", authorize([Role.ADMIN]));
