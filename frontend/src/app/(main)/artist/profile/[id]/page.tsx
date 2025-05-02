@@ -94,7 +94,6 @@ export default function ArtistProfilePage({
         tracksResponse,
         singlesResponse,
         relatedArtistsResponse,
-        genresResponse,
       ] = await Promise.all([
         api.artists.getProfile(id, token),
         api.user.getUserFollowing(userData.id, token),
@@ -102,12 +101,10 @@ export default function ArtistProfilePage({
         api.artists.getTrackByArtistId(id, token),
         api.artists.getTrackByArtistId(id, token, "SINGLE"),
         api.artists.getRelatedArtists(id, token),
-        api.genres.getAll(token),
       ]);
 
       setArtist(artistData);
       setFollowerCount(artistData.monthlyListeners || 0);
-      setAvailableGenres(genresResponse.genres || []);
 
       if (followingResponse) {
         const isFollowing = followingResponse.some(
@@ -120,6 +117,17 @@ export default function ArtistProfilePage({
         const isOwner = userData.artistProfile?.id === id;
         setFollow(isFollowing);
         setIsOwner(isOwner);
+
+        // Only fetch genres if the user is the profile owner
+        if (isOwner) {
+          try {
+            const genresResponse = await api.genres.getAll(token);
+            setAvailableGenres(genresResponse.genres || []);
+          } catch (error) {
+            console.error("Error fetching genres:", error);
+            setAvailableGenres([]);
+          }
+        }
       }
 
       setAlbums(albumsResponse.albums);

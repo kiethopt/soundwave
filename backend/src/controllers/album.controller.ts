@@ -102,7 +102,7 @@ export const playAlbum = async (req: Request, res: Response): Promise<void> => {
 
 export const getNewestAlbums = async (req: Request, res: Response): Promise<void> => {
   try {
-    const albums = await albumService.getNewestAlbums(Number(req.query.limit) || 10);
+    const albums = await albumService.getNewestAlbums(Number(req.query.limit) || 25);
     res.json({ albums });
   } catch (error: unknown) {
     console.error('Get newest albums error:', error);
@@ -113,7 +113,7 @@ export const getNewestAlbums = async (req: Request, res: Response): Promise<void
 
 export const getHotAlbums = async (req: Request, res: Response): Promise<void> => {
   try {
-    const albums = await albumService.getHotAlbums(Number(req.query.limit) || 10);
+    const albums = await albumService.getHotAlbums(Number(req.query.limit) || 25);
     res.json({ albums });
   } catch (error: unknown) {
     console.error('Get hot albums error:', error);
