@@ -810,7 +810,7 @@ export const generateAIPlaylist = async (
               temperature: 0.7,
               topK: 40,
               topP: 0.95,
-              maxOutputTokens: 1024,
+              maxOutputTokens: 2048, // Increased from 1024
             }
           });
           
@@ -843,7 +843,17 @@ export const generateAIPlaylist = async (
           const response = await result.response;
           const text = response.text();
           
-          console.log("[AI] Gemini verification result:", text);
+          console.log("[AI] Received Gemini analysis");
+
+          // --- BEGIN ADDED LOGS ---
+          console.log("[AI] Prompt Feedback:", response.promptFeedback);
+          console.log("[AI] Candidate Finish Reason:", response.candidates?.[0]?.finishReason);
+          console.log("[AI] Candidate Safety Ratings:", response.candidates?.[0]?.safetyRatings);
+          // --- END ADDED LOGS ---
+
+          console.log("[AI] Raw Gemini response (first 500 chars):", text.substring(0, 500));
+          console.log("[AI] Response length:", text.length);
+          console.log("[AI] Response contains JSON array:", text.includes("[") && text.includes("]"));
           
           // Phân tích kết quả từ Gemini
           const lines = text.split('\n');
@@ -2016,9 +2026,8 @@ export const suggestMoreTracksUsingAI = async (
 
     // Check nếu trong playlist có ít nhất 3 track hay chưa
     if (playlist.tracks.length < 3) {
-      throw new Error("Bạn cần thêm ít nhất 3 bài hát để sử dụng chức năng này");
+      throw new Error("Playlist must have at least 3 tracks to use this feature.");
     }
-
     // Lấy trackId từ Tracks trong Playlist
     const existingTrackIds = playlist.tracks.map(pt => pt.track.id);
 
@@ -2195,13 +2204,13 @@ export const suggestMoreTracksUsingAI = async (
 
     Sample tracks from current playlist:
     ${playlist.tracks.slice(0, 5).map(pt => 
-      `- "${pt.track.title}" by ${pt.track.artist?.artistName || 'Unknown'} (${pt.track.genres.map(g => g.genre.name).join(', ')})`
+      `- "${pt.track.id}" by ${pt.track.artist?.artistName || 'Unknown'} (${pt.track.genres.map(g => g.genre.name).join(', ')})`
     ).join('\n')}
 
     ${userHistory.length > 0 ? `
     User's Recent Play History (Last ${userHistory.length} tracks):
     ${validUserHistory.map(h => 
-      `- "${h.track.title}" by ${h.track.artist?.artistName || 'Unknown'} (${h.track.genres.map(g => g.genre.name).join(', ')})`
+      `- "${h.track.id}" by ${h.track.artist?.artistName || 'Unknown'} (${h.track.genres.map(g => g.genre.name).join(', ')})`
     ).join('\n')}
     ` : ''}
 
@@ -2209,22 +2218,22 @@ export const suggestMoreTracksUsingAI = async (
 
     1. More tracks by same artists:
     ${artistTracks.map(t => 
-      `- "${t.title}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
+      `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
     ).join('\n')}
 
     2. Tracks featuring playlist artists:
     ${featuredTracks.map(t => 
-      `- "${t.title}" by ${t.artist?.artistName || 'Unknown'} ft. ${t.featuredArtists.map(f => f.artistProfile?.artistName).join(', ')} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
+      `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} ft. ${t.featuredArtists.map(f => f.artistProfile?.artistName).join(', ')} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
     ).join('\n')}
 
     3. Tracks by collaborating artists:
     ${collaboratorTracks.map(t => 
-      `- "${t.title}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
+      `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
     ).join('\n')}
 
     4. Genre-based suggestions:
     ${genreTracks.map(t => 
-      `- "${t.title}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
+      `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
     ).join('\n')}
 
     For each track, analyze if it would be a good fit for the playlist based on:
@@ -2236,7 +2245,7 @@ export const suggestMoreTracksUsingAI = async (
 
     IMPORTANT: Include at least one track that the user hasn't played before (marked as [New]) in your recommendations.
 
-    Return a JSON array of track IDs that you recommend, ordered by relevance. Include only the most suitable tracks.
+    Return ONLY a valid JSON array containing the string IDs of the recommended tracks. The IDs should look like 'cma...' or similar. Do not include song titles or any other text outside the JSON array.
     Format: ["track_id1", "track_id2", ...]
 
     Make sure your selection includes:
@@ -2259,7 +2268,7 @@ export const suggestMoreTracksUsingAI = async (
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 2048, // Increased from 1024
         }
       });
 
@@ -2270,6 +2279,16 @@ export const suggestMoreTracksUsingAI = async (
       const responseText = response.text();
       
       console.log("[AI] Received Gemini analysis");
+
+      // --- BEGIN ADDED LOGS ---
+      console.log("[AI] Prompt Feedback:", response.promptFeedback);
+      console.log("[AI] Candidate Finish Reason:", response.candidates?.[0]?.finishReason);
+      console.log("[AI] Candidate Safety Ratings:", response.candidates?.[0]?.safetyRatings);
+      // --- END ADDED LOGS ---
+
+      console.log("[AI] Raw Gemini response (first 500 chars):", responseText.substring(0, 500));
+      console.log("[AI] Response length:", responseText.length);
+      console.log("[AI] Response contains JSON array:", responseText.includes("[") && responseText.includes("]"));
 
       // Lấy trackId từ response của Gemini
       let aiRecommendedIds: string[] = [];

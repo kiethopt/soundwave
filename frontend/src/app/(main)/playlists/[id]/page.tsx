@@ -472,9 +472,6 @@ export default function PlaylistPage() {
         // Show success message
         toast.success("Playlist deleted successfully");
 
-        // Dispatch event for Sidebar to update
-        window.dispatchEvent(new CustomEvent("playlist-updated"));
-
         // Navigate to home page instead of reloading
         router.push("/");
       } catch (error: any) {

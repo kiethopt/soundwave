@@ -221,17 +221,11 @@ export default function Sidebar({
       fetchPlaylists();
     }
 
-    const handlePlaylistUpdate = () => {
-      console.log("Playlist updated event received, refreshing playlists");
-      fetchPlaylists();
-    };
-
     const handleFavoritesChanged = () => {
       console.log("Favorites changed event received, refreshing playlists");
       fetchPlaylists();
     };
 
-    window.addEventListener("playlist-updated", handlePlaylistUpdate);
     window.addEventListener("favorites-changed", handleFavoritesChanged);
 
     // Socket event listeners for real-time updates
@@ -259,7 +253,6 @@ export default function Sidebar({
     }
 
     return () => {
-      window.removeEventListener("playlist-updated", handlePlaylistUpdate);
       window.removeEventListener("favorites-changed", handleFavoritesChanged);
 
       // Clean up socket listeners
@@ -269,7 +262,7 @@ export default function Sidebar({
         socket.off("favorites-updated");
       }
     };
-  }, [isAuthenticated, socket, userId]);
+  }, [isAuthenticated, socket, userId, pathname]);
 
   const handleCreateInstantPlaylist = async () => {
     if (isCreatingPlaylist) return;

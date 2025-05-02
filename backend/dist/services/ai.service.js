@@ -629,7 +629,7 @@ const generateAIPlaylist = async (userId, options = {}) => {
                             temperature: 0.7,
                             topK: 40,
                             topP: 0.95,
-                            maxOutputTokens: 1024,
+                            maxOutputTokens: 2048,
                         }
                     });
                     const maxRetries = 3;
@@ -656,7 +656,13 @@ const generateAIPlaylist = async (userId, options = {}) => {
                     }
                     const response = await result.response;
                     const text = response.text();
-                    console.log("[AI] Gemini verification result:", text);
+                    console.log("[AI] Received Gemini analysis");
+                    console.log("[AI] Prompt Feedback:", response.promptFeedback);
+                    console.log("[AI] Candidate Finish Reason:", response.candidates?.[0]?.finishReason);
+                    console.log("[AI] Candidate Safety Ratings:", response.candidates?.[0]?.safetyRatings);
+                    console.log("[AI] Raw Gemini response (first 500 chars):", text.substring(0, 500));
+                    console.log("[AI] Response length:", text.length);
+                    console.log("[AI] Response contains JSON array:", text.includes("[") && text.includes("]"));
                     const lines = text.split('\n');
                     const mismatchedTracks = [];
                     for (let i = 0; i < lines.length; i++) {
@@ -1503,6 +1509,30 @@ function calculateTrackScore(track, params) {
 const suggestMoreTracksUsingAI = async (playlistId, userId, count = 5) => {
     try {
         console.log(`[AI] Suggesting more tracks for playlist ${playlistId}, user ${userId}`);
+        const userHistory = await db_1.default.history.findMany({
+            where: {
+                userId,
+                type: "PLAY",
+            },
+            include: {
+                track: {
+                    include: {
+                        artist: true,
+                        genres: {
+                            include: {
+                                genre: true,
+                            },
+                        },
+                    },
+                },
+            },
+            orderBy: {
+                updatedAt: "desc",
+            },
+            take: 20,
+        });
+        const validUserHistory = userHistory.filter((h) => h.track !== null);
+        const userPlayedTrackIds = new Set(validUserHistory.map(h => h.track.id));
         const playlist = await db_1.default.playlist.findUnique({
             where: { id: playlistId },
             include: {
@@ -1517,6 +1547,11 @@ const suggestMoreTracksUsingAI = async (playlistId, userId, count = 5) => {
                                     },
                                 },
                                 album: true,
+                                featuredArtists: {
+                                    include: {
+                                        artistProfile: true
+                                    }
+                                }
                             },
                         },
                     },
@@ -1529,102 +1564,200 @@ const suggestMoreTracksUsingAI = async (playlistId, userId, count = 5) => {
         if (!playlist) {
             throw new Error("Playlist not found");
         }
+        if (playlist.tracks.length < 3) {
+            throw new Error("Playlist must have at least 3 tracks to use this feature.");
+        }
         const existingTrackIds = playlist.tracks.map(pt => pt.track.id);
-        const genreCounts = {};
-        const artistCounts = {};
+        const playlistArtists = new Set();
+        const artistNames = new Set();
+        const relevantGenres = new Set();
+        const featuredArtistIds = new Set();
         playlist.tracks.forEach(pt => {
-            pt.track.genres.forEach(genreRel => {
-                const genreId = genreRel.genre.id;
-                const genreName = genreRel.genre.name;
-                if (!genreCounts[genreId]) {
-                    genreCounts[genreId] = { count: 0, name: genreName };
-                }
-                genreCounts[genreId].count += 1;
-            });
-            const artistId = pt.track.artist?.id;
-            const artistName = pt.track.artist?.artistName;
-            if (artistId && artistName) {
-                if (!artistCounts[artistId]) {
-                    artistCounts[artistId] = { count: 0, name: artistName };
-                }
-                artistCounts[artistId].count += 1;
+            if (pt.track.artist?.id) {
+                playlistArtists.add(pt.track.artist.id);
+                artistNames.add(pt.track.artist.artistName);
             }
+            pt.track.genres.forEach(g => {
+                if (g.genre) {
+                    relevantGenres.add(g.genre.id);
+                }
+            });
+            pt.track.featuredArtists.forEach(f => {
+                if (f.artistProfile) {
+                    featuredArtistIds.add(f.artistProfile.id);
+                    artistNames.add(f.artistProfile.artistName);
+                }
+            });
         });
-        const topGenres = Object.entries(genreCounts)
-            .sort(([, a], [, b]) => b.count - a.count)
-            .slice(0, 3)
-            .map(([id, data]) => ({
-            id,
-            name: data.name,
-            count: data.count
-        }));
-        const topArtists = Object.entries(artistCounts)
-            .sort(([, a], [, b]) => b.count - a.count)
-            .slice(0, 3)
-            .map(([id, data]) => ({
-            id,
-            name: data.name,
-            count: data.count
-        }));
-        let prompt = `I need to suggest ${count} more tracks for a playlist based on the current tracks in the playlist. The playlist has ${playlist.tracks.length} tracks and includes these artists and genres:\n\n`;
-        if (topArtists.length > 0) {
-            prompt += "Top artists in the playlist:\n";
-            topArtists.forEach(artist => {
-                prompt += `- ${artist.name} (${artist.count} tracks)\n`;
-            });
-            prompt += "\n";
-        }
-        if (topGenres.length > 0) {
-            prompt += "Top thể loại trong playlist:\n";
-            topGenres.forEach(genre => {
-                prompt += `- ${genre.name} (${genre.count} tracks)\n`;
-            });
-            prompt += "\n";
-        }
-        const sampleTracks = playlist.tracks.slice(0, 10);
-        if (sampleTracks.length > 0) {
-            prompt += "Sample tracks in the playlist:\n";
-            sampleTracks.forEach((pt, index) => {
-                prompt += `${index + 1}. "${pt.track.title}" by ${pt.track.artist?.artistName || 'Unknown'}\n`;
-            });
-            prompt += "\n";
-        }
-        const userHistory = await db_1.default.history.findMany({
+        console.log(`[AI] Found ${playlistArtists.size} main artists and ${featuredArtistIds.size} featured artists in playlist`);
+        const artistTracks = playlistArtists.size > 0 ? await db_1.default.track.findMany({
             where: {
-                userId,
-                type: "PLAY",
+                isActive: true,
+                id: { notIn: existingTrackIds },
+                artistId: {
+                    in: Array.from(playlistArtists)
+                }
             },
             include: {
-                track: {
-                    select: {
-                        id: true,
-                        title: true,
-                        artistId: true,
-                        artist: {
-                            select: {
-                                artistName: true,
-                            }
-                        }
-                    },
+                artist: true,
+                genres: {
+                    include: {
+                        genre: true
+                    }
                 },
+                featuredArtists: {
+                    include: {
+                        artistProfile: true
+                    }
+                }
             },
             orderBy: {
-                updatedAt: "desc",
+                playCount: 'desc'
             },
-            take: 20,
-        });
-        if (userHistory.length > 0) {
-            prompt += "Lịch sử nghe nhạc của người dùng (không nhất thiết phải trong playlist):\n";
-            userHistory.slice(0, 5).forEach((history, index) => {
-                if (history.track) {
-                    prompt += `${index + 1}. "${history.track.title}" by ${history.track.artist?.artistName || 'Unknown'}\n`;
+            take: count * 2
+        }) : [];
+        const featuredTracks = playlistArtists.size > 0 ? await db_1.default.track.findMany({
+            where: {
+                isActive: true,
+                id: {
+                    notIn: [...existingTrackIds, ...artistTracks.map(t => t.id)]
+                },
+                featuredArtists: {
+                    some: {
+                        artistProfile: {
+                            id: {
+                                in: Array.from(playlistArtists)
+                            }
+                        }
+                    }
                 }
-            });
-            prompt += "\n";
-        }
-        prompt += `Based on this information, suggest ${count} more tracks that would fit well with this playlist. Consider both the artist style and genre consistency. I need the exact track IDs for the suggestions.
+            },
+            include: {
+                artist: true,
+                genres: {
+                    include: {
+                        genre: true
+                    }
+                },
+                featuredArtists: {
+                    include: {
+                        artistProfile: true
+                    }
+                }
+            },
+            orderBy: {
+                playCount: 'desc'
+            },
+            take: count * 2
+        }) : [];
+        const collaboratorTracks = featuredArtistIds.size > 0 ? await db_1.default.track.findMany({
+            where: {
+                isActive: true,
+                id: {
+                    notIn: [...existingTrackIds, ...artistTracks.map(t => t.id), ...featuredTracks.map(t => t.id)]
+                },
+                artistId: {
+                    in: Array.from(featuredArtistIds)
+                }
+            },
+            include: {
+                artist: true,
+                genres: {
+                    include: {
+                        genre: true
+                    }
+                },
+                featuredArtists: {
+                    include: {
+                        artistProfile: true
+                    }
+                }
+            },
+            orderBy: {
+                playCount: 'desc'
+            },
+            take: count * 2
+        }) : [];
+        const genreTracks = relevantGenres.size > 0 ? await db_1.default.track.findMany({
+            where: {
+                isActive: true,
+                id: {
+                    notIn: [
+                        ...existingTrackIds,
+                        ...artistTracks.map(t => t.id),
+                        ...featuredTracks.map(t => t.id),
+                        ...collaboratorTracks.map(t => t.id)
+                    ]
+                },
+                genres: {
+                    some: {
+                        genreId: {
+                            in: Array.from(relevantGenres)
+                        }
+                    }
+                }
+            },
+            include: {
+                artist: true,
+                genres: {
+                    include: {
+                        genre: true
+                    }
+                },
+                featuredArtists: {
+                    include: {
+                        artistProfile: true
+                    }
+                }
+            },
+            orderBy: {
+                playCount: 'desc'
+            },
+            take: count * 2
+        }) : [];
+        let prompt = `I need to analyze a playlist and its potential suggested tracks to ensure they match well. Here's the information:
+    Current Playlist Analysis:
+    Artists: ${Array.from(artistNames).join(', ')}
+    Genres: ${Array.from(new Set(playlist.tracks.flatMap(pt => pt.track.genres.map(g => g.genre.name)))).join(', ')}
 
-You can select tracks from our database that match these criteria. Return ONLY a list of track IDs formatted as a valid JSON array of strings.`;
+    Sample tracks from current playlist:
+    ${playlist.tracks.slice(0, 5).map(pt => `- "${pt.track.id}" by ${pt.track.artist?.artistName || 'Unknown'} (${pt.track.genres.map(g => g.genre.name).join(', ')})`).join('\n')}
+
+    ${userHistory.length > 0 ? `
+    User's Recent Play History (Last ${userHistory.length} tracks):
+    ${validUserHistory.map(h => `- "${h.track.id}" by ${h.track.artist?.artistName || 'Unknown'} (${h.track.genres.map(g => g.genre.name).join(', ')})`).join('\n')}
+    ` : ''}
+
+    Potential suggestions to analyze:
+
+    1. More tracks by same artists:
+    ${artistTracks.map(t => `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`).join('\n')}
+
+    2. Tracks featuring playlist artists:
+    ${featuredTracks.map(t => `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} ft. ${t.featuredArtists.map(f => f.artistProfile?.artistName).join(', ')} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`).join('\n')}
+
+    3. Tracks by collaborating artists:
+    ${collaboratorTracks.map(t => `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`).join('\n')}
+
+    4. Genre-based suggestions:
+    ${genreTracks.map(t => `- "${t.id}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`).join('\n')}
+
+    For each track, analyze if it would be a good fit for the playlist based on:
+    1. Artist compatibility
+    2. Genre consistency
+    3. Musical style and mood
+    4. Collaboration patterns
+    5. User's listening history (prefer a mix of familiar and new tracks)
+
+    IMPORTANT: Include at least one track that the user hasn't played before (marked as [New]) in your recommendations.
+
+    Return ONLY a valid JSON array containing the string IDs of the recommended tracks. The IDs should look like 'cma...' or similar. Do not include song titles or any other text outside the JSON array.
+    Format: ["track_id1", "track_id2", ...]
+
+    Make sure your selection includes:
+    - A balanced mix of familiar and new tracks
+    - At least one track marked as [New]
+    - Tracks that align with both the playlist's theme and user's taste`;
         try {
             const apiKey = process.env.GEMINI_API_KEY;
             if (!apiKey) {
@@ -1639,184 +1772,77 @@ You can select tracks from our database that match these criteria. Return ONLY a
                     temperature: 0.7,
                     topK: 40,
                     topP: 0.95,
-                    maxOutputTokens: 1024,
+                    maxOutputTokens: 2048,
                 }
             });
-            let suggestedTracks = [];
-            if (topGenres.length > 0) {
-                suggestedTracks = await db_1.default.track.findMany({
-                    where: {
-                        isActive: true,
-                        id: { notIn: existingTrackIds },
-                        genres: {
-                            some: {
-                                genreId: {
-                                    in: topGenres.map(g => g.id)
-                                }
-                            }
-                        },
-                    },
-                    include: {
-                        artist: true,
-                        genres: {
-                            include: {
-                                genre: true
-                            }
-                        }
-                    },
-                    orderBy: {
-                        playCount: "desc"
-                    },
-                    take: count * 5
-                });
-            }
-            if (suggestedTracks.length < count && topArtists.length > 0) {
-                const artistTracks = await db_1.default.track.findMany({
-                    where: {
-                        isActive: true,
-                        id: {
-                            notIn: [...existingTrackIds, ...suggestedTracks.map(t => t.id)]
-                        },
-                        artistId: {
-                            in: topArtists.map(a => a.id)
-                        }
-                    },
-                    include: {
-                        artist: true,
-                        genres: {
-                            include: {
-                                genre: true
-                            }
-                        }
-                    },
-                    orderBy: {
-                        playCount: "desc"
-                    },
-                    take: count * 3
-                });
-                suggestedTracks = [...suggestedTracks, ...artistTracks];
-            }
-            if (suggestedTracks.length < count) {
-                const popularTracks = await db_1.default.track.findMany({
-                    where: {
-                        isActive: true,
-                        id: {
-                            notIn: [...existingTrackIds, ...suggestedTracks.map(t => t.id)]
-                        },
-                    },
-                    include: {
-                        artist: true,
-                        genres: {
-                            include: {
-                                genre: true
-                            }
-                        }
-                    },
-                    orderBy: {
-                        playCount: "desc"
-                    },
-                    take: count * 2
-                });
-                suggestedTracks = [...suggestedTracks, ...popularTracks];
-            }
-            let suggestedTracksInfo = "Potential tracks to add (you can choose from these or suggest others):\n";
-            suggestedTracks.slice(0, 15).forEach((track, i) => {
-                const genres = track.genres.map((g) => g.genre.name).join(", ");
-                suggestedTracksInfo += `${i + 1}. ID: "${track.id}" - "${track.title}" by ${track.artist.artistName} (Genres: ${genres})\n`;
-            });
-            prompt += "\n\n" + suggestedTracksInfo;
-            console.log("[AI] Sending prompt to Gemini for track suggestions");
-            const maxRetries = 3;
-            let retryCount = 0;
-            let result;
-            while (retryCount < maxRetries) {
-                try {
-                    result = await model.generateContent(prompt);
-                    break;
-                }
-                catch (error) {
-                    if (error.status === 429 && retryCount < maxRetries - 1) {
-                        const retryDelay = 30 * 1000;
-                        console.log(`[AI] Rate limit hit, waiting ${retryDelay / 1000}s before retry...`);
-                        await new Promise(resolve => setTimeout(resolve, retryDelay));
-                        retryCount++;
-                        continue;
-                    }
-                    throw error;
-                }
-            }
-            if (!result) {
-                throw new Error("Failed to generate content after retries");
-            }
+            console.log("[AI] Sending playlist analysis to Gemini");
+            const result = await model.generateContent(prompt);
             const response = await result.response;
             const responseText = response.text();
-            console.log("[AI] Gemini response:", responseText);
-            let suggestedTrackIds = [];
+            console.log("[AI] Received Gemini analysis");
+            console.log("[AI] Prompt Feedback:", response.promptFeedback);
+            console.log("[AI] Candidate Finish Reason:", response.candidates?.[0]?.finishReason);
+            console.log("[AI] Candidate Safety Ratings:", response.candidates?.[0]?.safetyRatings);
+            console.log("[AI] Raw Gemini response (first 500 chars):", responseText.substring(0, 500));
+            console.log("[AI] Response length:", responseText.length);
+            console.log("[AI] Response contains JSON array:", responseText.includes("[") && responseText.includes("]"));
+            let aiRecommendedIds = [];
             try {
                 const jsonMatch = responseText.match(/\[[\s\S]*?\]/);
                 if (jsonMatch) {
                     const jsonString = jsonMatch[0];
-                    suggestedTrackIds = JSON.parse(jsonString);
-                    console.log("[AI] Parsed track IDs from JSON:", suggestedTrackIds);
-                }
-                else {
-                    const idRegex = /"([a-fA-F0-9-]{36})"/g;
-                    const matches = [...responseText.matchAll(idRegex)];
-                    suggestedTrackIds = matches.map(match => match[1]);
-                    console.log("[AI] Trích xuất ID bài hát với regex:", suggestedTrackIds);
+                    aiRecommendedIds = JSON.parse(jsonString);
+                    console.log("[AI] Successfully parsed recommended track IDs from Gemini");
                 }
             }
             catch (error) {
-                console.error("[AI] Error parsing track IDs from response:", error);
-                suggestedTrackIds = suggestedTracks.slice(0, count).map(t => t.id);
-                console.log("[AI] Sử dụng đề xuất bài hát fallback:", suggestedTrackIds);
+                console.error("[AI] Error parsing Gemini response:", error);
             }
-            const validatedTrackIds = await db_1.default.track.findMany({
-                where: {
-                    id: { in: suggestedTrackIds },
-                    isActive: true
-                },
-                select: { id: true }
-            });
-            const validTrackIds = validatedTrackIds.map(t => t.id);
-            if (validTrackIds.length < count && suggestedTracks.length > 0) {
-                const additionalIds = suggestedTracks
-                    .filter(t => !validTrackIds.includes(t.id))
-                    .slice(0, count - validTrackIds.length)
-                    .map(t => t.id);
-                validTrackIds.push(...additionalIds);
+            if (aiRecommendedIds.length > 0) {
+                const allTracks = [...artistTracks, ...featuredTracks, ...collaboratorTracks, ...genreTracks];
+                const aiFilteredTracks = aiRecommendedIds
+                    .map(id => allTracks.find(t => t.id === id))
+                    .filter((t) => t !== undefined);
+                const hasNewTrack = aiFilteredTracks.some(t => !userPlayedTrackIds.has(t.id));
+                if (!hasNewTrack && aiFilteredTracks.length > 0) {
+                    const newTrack = allTracks.find(t => !userPlayedTrackIds.has(t.id));
+                    if (newTrack) {
+                        aiFilteredTracks.pop();
+                        aiFilteredTracks.push(newTrack);
+                        console.log("[AI] Added one new track to recommendations");
+                    }
+                }
+                if (aiFilteredTracks.length > 0) {
+                    console.log(`[AI] Using ${aiFilteredTracks.length} AI-filtered recommendations`);
+                    return aiFilteredTracks.slice(0, count).map(t => t.id);
+                }
             }
-            console.log(`[AI] Final suggestion: ${validTrackIds.length} tracks for playlist ${playlistId}`);
-            return validTrackIds.slice(0, count);
         }
         catch (error) {
-            console.error("[AI] Error getting track suggestions from Gemini:", error);
-            if (topGenres.length > 0) {
-                const fallbackTracks = await db_1.default.track.findMany({
-                    where: {
-                        isActive: true,
-                        id: { notIn: existingTrackIds },
-                        genres: {
-                            some: {
-                                genreId: {
-                                    in: topGenres.map(g => g.id)
-                                }
-                            }
-                        },
-                    },
-                    orderBy: {
-                        playCount: "desc"
-                    },
-                    take: count
-                });
-                console.log(`[AI] Using fallback suggestions with ${fallbackTracks.length} tracks`);
-                return fallbackTracks.map(t => t.id);
-            }
-            else {
-                console.log("[AI] No genre information available for fallback, returning empty list");
-                return [];
+            console.error("[AI] Error during Gemini analysis:", error);
+        }
+        const allSuggestedTracks = [
+            ...artistTracks,
+            ...featuredTracks,
+            ...collaboratorTracks,
+            ...genreTracks,
+        ];
+        console.log(`[AI] Using fallback recommendations:
+      - Artist tracks: ${artistTracks.length}
+      - Featured tracks: ${featuredTracks.length}
+      - Collaborator tracks: ${collaboratorTracks.length}
+      - Genre tracks: ${genreTracks.length}
+    `);
+        const suggestedTrackIds = allSuggestedTracks.slice(0, count).map(t => t.id);
+        const hasNewTrack = suggestedTrackIds.some(id => !userPlayedTrackIds.has(id));
+        if (!hasNewTrack && suggestedTrackIds.length > 0) {
+            const newTrack = allSuggestedTracks.find(t => !userPlayedTrackIds.has(t.id));
+            if (newTrack) {
+                suggestedTrackIds[suggestedTrackIds.length - 1] = newTrack.id;
+                console.log("[AI] Added one new track to fallback recommendations");
             }
         }
+        return suggestedTrackIds;
     }
     catch (error) {
         console.error("[AI] Error suggesting more tracks:", error);

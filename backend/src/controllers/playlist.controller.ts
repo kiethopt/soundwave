@@ -7,6 +7,7 @@ import { handleError } from "../utils/handle-utils";
 import {  Prisma } from "@prisma/client";
 import prisma from "../config/db";
 import { uploadFile } from "../services/upload.service";
+import { trackSelect } from "../utils/prisma-selects";
 
 // Tạo playlist mới
 export const createPlaylist = async (
@@ -420,11 +421,11 @@ export const addTrackToPlaylist = async (
   next: NextFunction
 ) => {
   try {
-    console.log("AddToPlaylist request:", {
-      params: req.params,
-      body: req.body,
-      user: req.user,
-    });
+    // console.log("AddToPlaylist request:", {
+    //   params: req.params,
+    //   body: req.body,
+    //   user: req.user,
+    // });
 
     const { id: playlistId } = req.params;
     const { trackId } = req.body;
@@ -1480,12 +1481,19 @@ export const suggestMoreTracksForPlaylist = async (
       })),
     });
   } catch (error) {
-    // Simplified error logging
     console.error("Playlist suggestion error:", error instanceof Error ? error.message : 'Unknown error');
-    res.status(500).json({
-      success: false,
-      message: "Failed to generate track suggestions",
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+    if (error instanceof Error && error.message.includes("Playlist must have at least 3 tracks")) {
+      res.status(400).json({ // 400 Bad Request
+        success: false,
+        message: error.message,
+      });
+    } else {
+      // 500 Internal Server Error
+      res.status(500).json({
+        success: false,
+        message: "Failed to generate track suggestions",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 };

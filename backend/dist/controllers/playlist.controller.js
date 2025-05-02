@@ -374,11 +374,6 @@ const getPlaylistById = async (req, res, next) => {
 exports.getPlaylistById = getPlaylistById;
 const addTrackToPlaylist = async (req, res, next) => {
     try {
-        console.log("AddToPlaylist request:", {
-            params: req.params,
-            body: req.body,
-            user: req.user,
-        });
         const { id: playlistId } = req.params;
         const { trackId } = req.body;
         const userId = req.user?.id;
@@ -496,15 +491,32 @@ const removeTrackFromPlaylist = async (req, res, next) => {
             trackId,
             userId,
         });
-        const playlist = await db_1.default.playlist.findUnique({
-            where: {
-                id: playlistId,
-            },
-        });
+        const [playlist, track] = await Promise.all([
+            db_1.default.playlist.findUnique({
+                where: {
+                    id: playlistId,
+                },
+            }),
+            db_1.default.track.findUnique({
+                where: {
+                    id: trackId,
+                },
+                select: {
+                    duration: true
+                }
+            })
+        ]);
         if (!playlist) {
             res.status(404).json({
                 success: false,
                 message: "Playlist not found",
+            });
+            return;
+        }
+        if (!track) {
+            res.status(404).json({
+                success: false,
+                message: "Track not found",
             });
             return;
         }
@@ -536,6 +548,9 @@ const removeTrackFromPlaylist = async (req, res, next) => {
                 totalTracks: {
                     decrement: 1,
                 },
+                totalDuration: {
+                    decrement: track.duration
+                }
             },
         });
         res.json({
@@ -1161,11 +1176,19 @@ const suggestMoreTracksForPlaylist = async (req, res, next) => {
     }
     catch (error) {
         console.error("Playlist suggestion error:", error instanceof Error ? error.message : 'Unknown error');
-        res.status(500).json({
-            success: false,
-            message: "Failed to generate track suggestions",
-            error: error instanceof Error ? error.message : 'Unknown error'
-        });
+        if (error instanceof Error && error.message.includes("Playlist must have at least 3 tracks")) {
+            res.status(400).json({
+                success: false,
+                message: error.message,
+            });
+        }
+        else {
+            res.status(500).json({
+                success: false,
+                message: "Failed to generate track suggestions",
+                error: error instanceof Error ? error.message : 'Unknown error'
+            });
+        }
     }
 };
 exports.suggestMoreTracksForPlaylist = suggestMoreTracksForPlaylist;

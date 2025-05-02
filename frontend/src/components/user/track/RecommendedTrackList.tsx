@@ -25,6 +25,7 @@ interface RecommendedTrackListProps {
   favoriteTrackIds: Set<string>;
   playlists: Playlist[];
   onRefresh?: () => void;
+  onPlaylistUpdate?: () => void;
 }
 
 export function RecommendedTrackList({
@@ -32,7 +33,8 @@ export function RecommendedTrackList({
   playlistId,
   favoriteTrackIds,
   playlists,
-  onRefresh
+  onRefresh,
+  onPlaylistUpdate
 }: RecommendedTrackListProps) {
   const { theme } = useTheme();
   const router = useRouter();
@@ -101,6 +103,11 @@ export function RecommendedTrackList({
         
         // Dispatch playlist-updated event to refresh the playlist display
         window.dispatchEvent(new CustomEvent("playlist-updated"));
+        
+        // Refresh the main playlist data if the callback is provided
+        if (onPlaylistUpdate) {
+          onPlaylistUpdate();
+        }
         
         // Trigger recommendations refresh if callback exists
         if (onRefresh) {

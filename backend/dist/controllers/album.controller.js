@@ -145,7 +145,7 @@ const playAlbum = async (req, res) => {
 exports.playAlbum = playAlbum;
 const getNewestAlbums = async (req, res) => {
     try {
-        const albums = await albumService.getNewestAlbums(Number(req.query.limit) || 10);
+        const albums = await albumService.getNewestAlbums(Number(req.query.limit) || 25);
         res.json({ albums });
     }
     catch (error) {
@@ -157,7 +157,7 @@ const getNewestAlbums = async (req, res) => {
 exports.getNewestAlbums = getNewestAlbums;
 const getHotAlbums = async (req, res) => {
     try {
-        const albums = await albumService.getHotAlbums(Number(req.query.limit) || 10);
+        const albums = await albumService.getHotAlbums(Number(req.query.limit) || 25);
         res.json({ albums });
     }
     catch (error) {
