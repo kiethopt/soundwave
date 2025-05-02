@@ -726,7 +726,7 @@ export default function PlaylistPage() {
 
           {/* Added conditional buttons */}
           <div className="flex items-center gap-2 mt-1">
-            {isNormalPlaylist && (
+            {canEditPlaylist && (
               <Button 
                 size="default" 
                 onClick={suggestMoreTracks}

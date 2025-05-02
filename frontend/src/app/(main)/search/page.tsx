@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useRef, useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Track, Album, Artist, User, Playlist } from "@/types";
 import { api } from "@/utils/api";
@@ -17,7 +17,6 @@ import {
   DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { Heart, ListMusic, MoreHorizontal, Share2 } from "lucide-react";
-import { getSocket } from "@/utils/socket";
 import toast from "react-hot-toast";
 import { useTrack } from "@/contexts/TrackContext";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
@@ -83,24 +82,13 @@ function SearchContent() {
   const {
     currentTrack,
     isPlaying,
-    volume,
-    progress,
-    loop,
-    shuffle,
     playTrack,
     pauseTrack,
-    setVolume,
-    seekTrack,
-    toggleLoop,
-    toggleShuffle,
-    skipNext,
-    skipPrevious,
     queueType,
     setQueueType,
     trackQueue,
   } = useTrack();
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Filter buttons
   const filterButtons: { label: string; value: FilterType }[] = [
@@ -175,50 +163,6 @@ function SearchContent() {
 
     fetchResults();
   }, [query, router]);
-
-  // Lắng nghe sự kiện Socket.IO
-  useEffect(() => {
-    const socket = getSocket();
-
-    const handleAudioControl = (data: any) => {
-      if (data.type === "STOP_OTHER_SESSIONS") {
-        console.log("Received STOP_OTHER_SESSIONS via Socket.IO");
-        if (audioRef.current && isPlaying) {
-          pauseTrack();
-        }
-      }
-    };
-
-    socket.on("audio-control", handleAudioControl);
-
-    // Listener for favorite changes
-    const handleFavoritesChanged = (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        action: "add" | "remove";
-        trackId: string;
-      }>;
-      if (!customEvent.detail) return;
-      const { action, trackId } = customEvent.detail;
-      setFavoriteTrackIds((prevIds) => {
-        const newIds = new Set(prevIds);
-        if (action === "add") {
-          newIds.add(trackId);
-        } else {
-          newIds.delete(trackId);
-        }
-        return newIds;
-      });
-    };
-
-    window.addEventListener("favorites-changed", handleFavoritesChanged);
-
-    // Cleanup listener
-    return () => {
-      console.log("Cleaning up Search page socket listener");
-      socket.off("audio-control", handleAudioControl);
-      window.removeEventListener("favorites-changed", handleFavoritesChanged);
-    };
-  }, [isPlaying, pauseTrack]);
 
   useEffect(() => {
     if (currentTrack && queueType !== "album" && queueType !== "artist") {

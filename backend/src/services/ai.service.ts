@@ -345,7 +345,7 @@ export const generateAIPlaylist = async (
       }
     }
 
-    
+    // Lọc theo độ dài bài hát
     if (options.basedOnSongLength) {
       const lengthValue = Number(options.basedOnSongLength); 
       if (!isNaN(lengthValue)) {
@@ -2268,7 +2268,7 @@ export const suggestMoreTracksUsingAI = async (
           temperature: 0.7,
           topK: 40,
           topP: 0.95,
-          maxOutputTokens: 2048, // Increased from 1024
+          maxOutputTokens: 2048,
         }
       });
 
