@@ -34,6 +34,7 @@ import { Card } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { RecommendedTrackList } from "@/components/user/track/RecommendedTrackList";
+import { Spinner } from "@/components/ui/Icons";
 
 // Helper function to format duration (seconds) into "X phút Y giây"
 const formatDuration = (totalSeconds: number): string => {
@@ -547,18 +548,22 @@ export default function PlaylistPage() {
     };
   }, [refreshPlaylistData]);
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Spinner className="w-12 h-12 text-[#A57865]" />
+      </div>
+    );
+  }
   if (error) return <div className="text-red-500">{error}</div>;
   if (!playlist) return <div>Playlist not found</div>;
 
-  // Use the existing totalDuration field and format it
   const formattedDuration = formatDuration(playlist.totalDuration || 0);
 
   return (
     <div
       className="flex flex-col min-h-screen rounded-lg"
       style={{
-        // Quay lại logic gốc: Luôn dùng dominantColor nếu có, fallback về theme color
         background: dominantColor
           ? `linear-gradient(180deg, ${dominantColor} 0%, ${dominantColor}99 15%, ${dominantColor}40 30%, ${
               theme === "light" ? "#ffffff" : "#121212"
@@ -743,21 +748,20 @@ export default function PlaylistPage() {
           <div className="flex items-center gap-2 mt-1">
             {isNormalPlaylist && (
               <Button 
-                variant="outline" 
-                size="sm" 
+                size="default" 
                 onClick={suggestMoreTracks}
                 disabled={isSuggestionLoading}
-                className="text-sm font-medium flex items-center gap-1.5"
+                className="text-sm font-medium flex items-center gap-1.5 bg-[#A57865] text-white hover:bg-[#8a6353] disabled:opacity-50 rounded-full transition-colors duration-200 ease-in-out"
               >
                 {isSuggestionLoading ? (
                   <>
-                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
-                    Suggesting...
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2"></div> 
+                    <span>Suggesting...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Suggest More
+                    <Sparkles className="h-4 w-4" />
+                    <span>Suggest More</span>
                   </>
                 )}
               </Button>
@@ -769,7 +773,7 @@ export default function PlaylistPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full h-8 w-8"
+                    className="text-white/70 hover:text-white hover:bg-white/10 rounded-full h-9 w-9"
                     title="More options"
                   >
                     <MoreHorizontal className="w-5 h-5" />
