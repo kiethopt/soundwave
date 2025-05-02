@@ -159,27 +159,7 @@ export default function PlaylistPage() {
     }
   }, [id]);
 
-  // Add socket listener for favorites updates
-  useEffect(() => {
-    if (!socket || !id) return;
-
-    socket.on(
-      "favorites-updated",
-      (data: { action: "add" | "remove"; trackId: string }) => {
-        if (playlist?.type === "FAVORITE") {
-          setFavoritePlaylistTotalTracks(
-            (prev) => prev + (data.action === "add" ? 1 : -1)
-          );
-        }
-      }
-    );
-
-    return () => {
-      socket.off("favorites-updated");
-    };
-  }, [socket, id, playlist?.type]);
-
-  // Placeholder: Add a useEffect to fetch user playlists for the dropdown menu
+  // useEffect to fetch user playlists for the dropdown menu
   useEffect(() => {
     const fetchUserPlaylists = async () => {
       const token = localStorage.getItem("userToken");
