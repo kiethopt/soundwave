@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Genre, User, Label } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label as UILabel } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import React, { useState, useEffect, useRef } from "react";
+import { Genre, User, Label } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label as UILabel } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -11,34 +11,42 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { XIcon, Trash2, ShieldAlert, UserCog, Eye, EyeOff, XCircle, CheckCircle, Plus, AlbumIcon, ShieldCheck, Tags } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { cn } from '@/lib/utils';
-import { UserIcon } from 'lucide-react';
-import { Edit, Spinner } from './Icons';
-import Image from 'next/image';
+} from "@/components/ui/dialog";
 import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from '@/components/ui/tabs';
+  XIcon,
+  Trash2,
+  ShieldAlert,
+  UserCog,
+  Eye,
+  EyeOff,
+  XCircle,
+  CheckCircle,
+  Plus,
+  AlbumIcon,
+  ShieldCheck,
+  Tags,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import { cn } from "@/lib/utils";
+import { UserIcon } from "lucide-react";
+import { Edit, Spinner } from "./Icons";
+import Image from "next/image";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Music } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useDominantColor } from '@/hooks/useDominantColor';
-import { Album, Track } from '@/types';
-import { Calendar } from 'lucide-react';
-import { ArtistProfile } from '@/types';
-import { Separator } from '@/components/ui/separator';
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Music } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useDominantColor } from "@/hooks/useDominantColor";
+import { Album, Track } from "@/types";
+import { Calendar } from "lucide-react";
+import { ArtistProfile } from "@/types";
+import { Separator } from "@/components/ui/separator";
 
 // Edit User Modal
 interface EditUserModalProps {
@@ -57,12 +65,12 @@ export function EditUserModal({
   theme = "light",
 }: EditUserModalProps) {
   const [formData, setFormData] = useState<Partial<User>>({});
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
-  const [deactivationReason, setDeactivationReason] = useState('');
+  const [deactivationReason, setDeactivationReason] = useState("");
   const [showDeactivateSection, setShowDeactivateSection] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
 
@@ -78,27 +86,27 @@ export function EditUserModal({
   useEffect(() => {
     if (user) {
       setFormData({
-        name: user.name || '',
-        username: user.username || '',
-        email: user.email || '',
-        isActive: user.isActive
+        name: user.name || "",
+        username: user.username || "",
+        email: user.email || "",
+        isActive: user.isActive,
       });
-      setNewPassword('');
-      setConfirmNewPassword('');
+      setNewPassword("");
+      setConfirmNewPassword("");
       setShowNewPassword(false);
       setShowConfirmPassword(false);
       setIsDeactivating(false);
-      setDeactivationReason('');
+      setDeactivationReason("");
       setShowDeactivateSection(false);
       setIsActivating(false);
     } else {
       setFormData({});
-      setNewPassword('');
-      setConfirmNewPassword('');
+      setNewPassword("");
+      setConfirmNewPassword("");
       setShowNewPassword(false);
       setShowConfirmPassword(false);
       setIsDeactivating(false);
-      setDeactivationReason('');
+      setDeactivationReason("");
       setShowDeactivateSection(false);
       setIsActivating(false);
     }
@@ -136,17 +144,29 @@ export function EditUserModal({
     let hasChanges = false;
 
     // Append basic info if changed
-    if (formData.name !== undefined && formData.name !== user.name) { dataToSend.append('name', formData.name); hasChanges = true; }
-    if (formData.username !== undefined && formData.username !== user.username) { dataToSend.append('username', formData.username); hasChanges = true; }
-    if (formData.email !== undefined && formData.email !== user.email) { dataToSend.append('email', formData.email); hasChanges = true; }
-    if (newPassword) {
-      dataToSend.append('newPassword', newPassword);
+    if (formData.name !== undefined && formData.name !== user.name) {
+      dataToSend.append("name", formData.name);
       hasChanges = true;
     }
-    
+    if (
+      formData.username !== undefined &&
+      formData.username !== user.username
+    ) {
+      dataToSend.append("username", formData.username);
+      hasChanges = true;
+    }
+    if (formData.email !== undefined && formData.email !== user.email) {
+      dataToSend.append("email", formData.email);
+      hasChanges = true;
+    }
+    if (newPassword) {
+      dataToSend.append("newPassword", newPassword);
+      hasChanges = true;
+    }
+
     // Handle activation
     if (isActivating && !user.isActive) {
-      dataToSend.append('isActive', 'true');
+      dataToSend.append("isActive", "true");
       hasChanges = true;
     }
     // Handle deactivation (only if not activating)
@@ -155,49 +175,62 @@ export function EditUserModal({
         toast.error("Please provide a reason for deactivation.");
         return;
       }
-      dataToSend.append('isActive', 'false');
-      dataToSend.append('reason', deactivationReason);
+      dataToSend.append("isActive", "false");
+      dataToSend.append("reason", deactivationReason);
       hasChanges = true;
     }
 
     if (hasChanges) {
       await onSubmit(user.id, dataToSend);
     } else {
-      toast('No changes detected.', { icon: 'ℹ️' });
+      toast("No changes detected.", { icon: "ℹ️" });
       onClose();
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
-        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
-      )}>
+      <DialogContent
+        className={cn(
+          "sm:max-w-lg p-0 overflow-hidden flex flex-col",
+          theme === "dark"
+            ? "bg-gray-800 text-white border-gray-700"
+            : "bg-white"
+        )}
+      >
         {/* Header */}
         <div className="px-6 pt-6">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-4">
-              <div className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full",
-                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
-              )}>
-                <UserIcon className={cn(
-                  "w-7 h-7",
-                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
-                )} strokeWidth={1.5} />
+              <div
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center rounded-full",
+                  theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+                )}
+              >
+                <UserIcon
+                  className={cn(
+                    "w-7 h-7",
+                    theme === "dark" ? "text-blue-300" : "text-blue-600"
+                  )}
+                  strokeWidth={1.5}
+                />
               </div>
               <div>
-                <DialogTitle className={cn(
-                  "text-lg font-bold",
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                )}>
+                <DialogTitle
+                  className={cn(
+                    "text-lg font-bold",
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  )}
+                >
                   Edit User
                 </DialogTitle>
-                <DialogDescription className={cn(
-                  "text-sm mt-1",
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                )}>
+                <DialogDescription
+                  className={cn(
+                    "text-sm mt-1",
+                    theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  )}
+                >
                   Update user information or status
                 </DialogDescription>
               </div>
@@ -209,7 +242,7 @@ export function EditUserModal({
               aria-label="Close"
               className={cn(
                 "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+                theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
               )}
             >
               <XIcon className="w-5 h-5" />
@@ -218,22 +251,29 @@ export function EditUserModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} id="edit-user-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+        <form
+          onSubmit={handleSubmit}
+          id="edit-user-form"
+          className="px-6 pt-4 pb-6 overflow-y-auto flex-grow"
+        >
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
             <div className="space-y-2">
-              <UILabel htmlFor="name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="name"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Full Name
               </UILabel>
               <Input
                 id="name"
                 name="name"
-                value={formData.name || ''}
+                value={formData.name || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 placeholder="Enter full name"
                 disabled={isActivating || isDeactivating}
@@ -241,19 +281,22 @@ export function EditUserModal({
             </div>
 
             <div className="space-y-2">
-              <UILabel htmlFor="username" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="username"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Username
               </UILabel>
               <Input
                 id="username"
                 name="username"
-                value={formData.username || ''}
+                value={formData.username || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 placeholder="Enter username"
                 disabled={isActivating || isDeactivating}
@@ -261,20 +304,23 @@ export function EditUserModal({
             </div>
 
             <div className="space-y-2 col-span-2">
-              <UILabel htmlFor="email" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="email"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Email Address
               </UILabel>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                value={formData.email || ''}
+                value={formData.email || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 placeholder="Enter email address"
                 disabled={isActivating || isDeactivating}
@@ -282,20 +328,23 @@ export function EditUserModal({
             </div>
 
             <div className="space-y-2">
-              <UILabel htmlFor="newPassword" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="newPassword"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 New Password (optional)
               </UILabel>
               <div className="relative">
                 <Input
                   id="newPassword"
-                  type={showNewPassword ? 'text' : 'password'}
+                  type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className={cn(
                     "w-full pr-10",
-                    theme === 'dark' 
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                      : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                   )}
                   placeholder="Enter new password"
                   disabled={isActivating || isDeactivating}
@@ -316,20 +365,23 @@ export function EditUserModal({
             </div>
 
             <div className="space-y-2">
-              <UILabel htmlFor="confirmNewPassword" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="confirmNewPassword"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Confirm New Password
               </UILabel>
               <div className="relative">
                 <Input
                   id="confirmNewPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
+                  type={showConfirmPassword ? "text" : "password"}
                   value={confirmNewPassword}
                   onChange={(e) => setConfirmNewPassword(e.target.value)}
                   className={cn(
                     "w-full pr-10",
-                    theme === 'dark' 
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                      : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                   )}
                   placeholder="Confirm new password"
                   disabled={isActivating || isDeactivating}
@@ -351,32 +403,42 @@ export function EditUserModal({
 
             {/* Status Section */}
             <div className="col-span-2 mt-4">
-              <Separator className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} />
+              <Separator
+                className={theme === "dark" ? "bg-gray-700" : "bg-gray-200"}
+              />
               <div className="pt-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {user.isActive ? (
-                      <ShieldCheck className={cn(
-                        "h-5 w-5",
-                        theme === 'dark' ? 'text-green-400' : 'text-green-600'
-                      )} />
+                      <ShieldCheck
+                        className={cn(
+                          "h-5 w-5",
+                          theme === "dark" ? "text-green-400" : "text-green-600"
+                        )}
+                      />
                     ) : (
-                      <ShieldAlert className={cn(
-                        "h-5 w-5",
-                        theme === 'dark' ? 'text-orange-400' : 'text-orange-600'
-                      )} />
+                      <ShieldAlert
+                        className={cn(
+                          "h-5 w-5",
+                          theme === "dark"
+                            ? "text-orange-400"
+                            : "text-orange-600"
+                        )}
+                      />
                     )}
-                    <span className={cn(
-                      "font-medium",
-                      theme === 'dark' ? 'text-white' : 'text-gray-900'
-                    )}>
-                      Account Status: {user.isActive ? 'Active' : 'Inactive'}
+                    <span
+                      className={cn(
+                        "font-medium",
+                        theme === "dark" ? "text-white" : "text-gray-900"
+                      )}
+                    >
+                      Account Status: {user.isActive ? "Active" : "Inactive"}
                     </span>
                   </div>
-                  
+
                   {/* Activate Button */}
                   {!user.isActive && (
-                    <Button 
+                    <Button
                       type="button"
                       variant="outline"
                       size="sm"
@@ -387,37 +449,53 @@ export function EditUserModal({
                       }}
                       className={cn(
                         "text-xs",
-                        theme === 'dark' 
-                          ? 'border-green-700 text-green-300 hover:bg-green-600/20' 
-                          : 'border-green-600 text-green-700 hover:bg-green-50',
-                         isActivating ? (theme === 'dark' ? 'bg-green-700/30' : 'bg-green-100') : ''
+                        theme === "dark"
+                          ? "border-green-700 text-green-300 hover:bg-green-600/20"
+                          : "border-green-600 text-green-700 hover:bg-green-50",
+                        isActivating
+                          ? theme === "dark"
+                            ? "bg-green-700/30"
+                            : "bg-green-100"
+                          : ""
                       )}
                     >
-                      {isActivating ? <Spinner className="h-4 w-4 mr-1 animate-spin"/> : <ShieldCheck className="h-4 w-4 mr-1" />} 
+                      {isActivating ? (
+                        <Spinner className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <ShieldCheck className="h-4 w-4 mr-1" />
+                      )}
                       Activate Account
                     </Button>
                   )}
 
                   {/* Deactivate Button */}
                   {user.isActive && (
-                    <Button 
+                    <Button
                       type="button"
-                      variant={showDeactivateSection ? "outline" : "destructive"}
+                      variant={
+                        showDeactivateSection ? "outline" : "destructive"
+                      }
                       size="sm"
                       onClick={() => {
                         const nextShowState = !showDeactivateSection;
                         setShowDeactivateSection(nextShowState);
                         setIsDeactivating(nextShowState);
-                        if (!nextShowState) setDeactivationReason('');
+                        if (!nextShowState) setDeactivationReason("");
                       }}
                       className={cn(
                         "text-xs",
-                        showDeactivateSection 
-                          ? (theme === 'dark' ? 'border-gray-600' : 'border-gray-300') 
-                          : (theme === 'dark' ? 'bg-red-700 hover:bg-red-600' : 'bg-red-600 hover:bg-red-700 text-white')
+                        showDeactivateSection
+                          ? theme === "dark"
+                            ? "border-gray-600"
+                            : "border-gray-300"
+                          : theme === "dark"
+                          ? "bg-red-700 hover:bg-red-600"
+                          : "bg-red-600 hover:bg-red-700 text-white"
                       )}
                     >
-                      {showDeactivateSection ? 'Cancel Deactivation' : 'Deactivate Account'}
+                      {showDeactivateSection
+                        ? "Cancel Deactivation"
+                        : "Deactivate Account"}
                     </Button>
                   )}
                 </div>
@@ -436,12 +514,12 @@ export function EditUserModal({
                       className={cn(
                         "px-3 py-1 rounded-full text-xs font-medium transition-colors",
                         deactivationReason === reason
-                          ? theme === 'dark'
-                            ? 'bg-orange-900 text-orange-100'
-                            : 'bg-orange-100 text-orange-800'
-                          : theme === 'dark'
-                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          ? theme === "dark"
+                            ? "bg-orange-900 text-orange-100"
+                            : "bg-orange-100 text-orange-800"
+                          : theme === "dark"
+                          ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       )}
                     >
                       {reason}
@@ -449,9 +527,11 @@ export function EditUserModal({
                   ))}
                 </div>
                 <div className="space-y-2">
-                  <UILabel 
-                    htmlFor="deactivationReason" 
-                    className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}
+                  <UILabel
+                    htmlFor="deactivationReason"
+                    className={
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }
                   >
                     Deactivation Reason
                   </UILabel>
@@ -462,9 +542,9 @@ export function EditUserModal({
                     placeholder="Enter reason for deactivation..."
                     className={cn(
                       "resize-none min-h-[100px]",
-                      theme === 'dark' 
-                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                      theme === "dark"
+                        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                     )}
                   />
                 </div>
@@ -478,15 +558,22 @@ export function EditUserModal({
               type="button"
               variant="outline"
               onClick={onClose}
-              className={theme === 'dark' ? 'border-gray-600 text-white hover:bg-gray-700' : ''}
+              className={
+                theme === "dark"
+                  ? "border-gray-600 text-white hover:bg-gray-700"
+                  : ""
+              }
             >
               Cancel
             </Button>
             <Button
               type="submit"
               className={cn(
-                theme === 'dark' ? 'bg-neutral-900 hover:bg-neutral-900/90' : 'bg-neutral-900 hover:bg-neutral-900/90 text-white',
-                (isActivating || isDeactivating) && (theme === 'dark' ? 'opacity-70' : 'opacity-80') // Style when activating/deactivating
+                theme === "dark"
+                  ? "bg-neutral-900 hover:bg-neutral-900/90"
+                  : "bg-neutral-900 hover:bg-neutral-900/90 text-white",
+                (isActivating || isDeactivating) &&
+                  (theme === "dark" ? "opacity-70" : "opacity-80") // Style when activating/deactivating
               )}
             >
               Save Changes
@@ -517,7 +604,7 @@ export function EditArtistModal({
   const [formData, setFormData] = useState<Partial<ArtistProfile>>({});
   const [isUploading, setIsUploading] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
-  const [deactivationReason, setDeactivationReason] = useState('');
+  const [deactivationReason, setDeactivationReason] = useState("");
   const [showDeactivateSection, setShowDeactivateSection] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
 
@@ -533,18 +620,18 @@ export function EditArtistModal({
   useEffect(() => {
     if (artist) {
       setFormData({
-        artistName: artist.artistName || '',
-        bio: artist.bio || '',
+        artistName: artist.artistName || "",
+        bio: artist.bio || "",
         isActive: artist.isActive,
       });
       setIsDeactivating(false);
-      setDeactivationReason('');
+      setDeactivationReason("");
       setShowDeactivateSection(false);
       setIsActivating(false);
     } else {
       setFormData({});
       setIsDeactivating(false);
-      setDeactivationReason('');
+      setDeactivationReason("");
       setShowDeactivateSection(false);
       setIsActivating(false);
     }
@@ -573,12 +660,21 @@ export function EditArtistModal({
     let hasChanges = false;
 
     // Append basic info if changed
-    if (formData.artistName !== undefined && formData.artistName !== artist.artistName) { dataToSend.append('artistName', formData.artistName); hasChanges = true; }
-    if (formData.bio !== undefined && formData.bio !== artist.bio) { dataToSend.append('bio', formData.bio); hasChanges = true; }
+    if (
+      formData.artistName !== undefined &&
+      formData.artistName !== artist.artistName
+    ) {
+      dataToSend.append("artistName", formData.artistName);
+      hasChanges = true;
+    }
+    if (formData.bio !== undefined && formData.bio !== artist.bio) {
+      dataToSend.append("bio", formData.bio);
+      hasChanges = true;
+    }
 
     // Handle activation
     if (isActivating && !artist.isActive) {
-      dataToSend.append('isActive', 'true');
+      dataToSend.append("isActive", "true");
       hasChanges = true;
     }
     // Handle deactivation (only if not activating)
@@ -587,8 +683,8 @@ export function EditArtistModal({
         toast.error("Please provide a reason for deactivation.");
         return;
       }
-      dataToSend.append('isActive', 'false');
-      dataToSend.append('reason', deactivationReason);
+      dataToSend.append("isActive", "false");
+      dataToSend.append("reason", deactivationReason);
       hasChanges = true;
     }
 
@@ -598,46 +694,61 @@ export function EditArtistModal({
         await onSubmit(artist.id, dataToSend);
         onClose();
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to update artist');
+        toast.error(
+          error instanceof Error ? error.message : "Failed to update artist"
+        );
       } finally {
         setIsUploading(false);
       }
     } else {
-      toast('No changes detected.', { icon: 'ℹ️' });
+      toast("No changes detected.", { icon: "ℹ️" });
       onClose();
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
-        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
-      )}>
+      <DialogContent
+        className={cn(
+          "sm:max-w-lg p-0 overflow-hidden flex flex-col",
+          theme === "dark"
+            ? "bg-gray-800 text-white border-gray-700"
+            : "bg-white"
+        )}
+      >
         {/* Header */}
         <div className="px-6 pt-6">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-4">
-              <div className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full",
-                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
-              )}>
-                <Music className={cn(
-                  "w-7 h-7",
-                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
-                )} strokeWidth={1.5} />
+              <div
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center rounded-full",
+                  theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+                )}
+              >
+                <Music
+                  className={cn(
+                    "w-7 h-7",
+                    theme === "dark" ? "text-blue-300" : "text-blue-600"
+                  )}
+                  strokeWidth={1.5}
+                />
               </div>
               <div>
-                <DialogTitle className={cn(
-                  "text-lg font-bold",
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                )}>
+                <DialogTitle
+                  className={cn(
+                    "text-lg font-bold",
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  )}
+                >
                   Edit Artist
                 </DialogTitle>
-                <DialogDescription className={cn(
-                  "text-sm mt-1",
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                )}>
+                <DialogDescription
+                  className={cn(
+                    "text-sm mt-1",
+                    theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  )}
+                >
                   Update artist information
                 </DialogDescription>
               </div>
@@ -649,7 +760,7 @@ export function EditArtistModal({
               aria-label="Close"
               className={cn(
                 "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+                theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
               )}
             >
               <XIcon className="w-5 h-5" />
@@ -658,23 +769,30 @@ export function EditArtistModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} id="edit-artist-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+        <form
+          onSubmit={handleSubmit}
+          id="edit-artist-form"
+          className="px-6 pt-4 pb-6 overflow-y-auto flex-grow"
+        >
           <div className="grid grid-cols-1 gap-x-4 gap-y-4">
             {/* Artist Name */}
             <div className="space-y-2">
-              <UILabel htmlFor="artistName" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="artistName"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Artist Name
               </UILabel>
               <Input
                 id="artistName"
                 name="artistName"
-                value={formData.artistName || ''}
+                value={formData.artistName || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 placeholder="Enter artist name"
                 disabled={isActivating || isDeactivating || isUploading}
@@ -683,19 +801,22 @@ export function EditArtistModal({
 
             {/* Bio */}
             <div className="space-y-2">
-              <UILabel htmlFor="bio" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="bio"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Biography
               </UILabel>
               <Textarea
                 id="bio"
                 name="bio"
-                value={formData.bio || ''}
+                value={formData.bio || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full min-h-[100px]",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 placeholder="Enter artist biography"
                 disabled={isActivating || isDeactivating || isUploading}
@@ -704,32 +825,42 @@ export function EditArtistModal({
 
             {/* Status Section */}
             <div className="col-span-1 mt-4">
-              <Separator className={theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} />
+              <Separator
+                className={theme === "dark" ? "bg-gray-700" : "bg-gray-200"}
+              />
               <div className="pt-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {artist.isActive ? (
-                      <ShieldCheck className={cn(
-                        "h-5 w-5",
-                        theme === 'dark' ? 'text-green-400' : 'text-green-600'
-                      )} />
+                      <ShieldCheck
+                        className={cn(
+                          "h-5 w-5",
+                          theme === "dark" ? "text-green-400" : "text-green-600"
+                        )}
+                      />
                     ) : (
-                      <ShieldAlert className={cn(
-                        "h-5 w-5",
-                        theme === 'dark' ? 'text-orange-400' : 'text-orange-600'
-                      )} />
+                      <ShieldAlert
+                        className={cn(
+                          "h-5 w-5",
+                          theme === "dark"
+                            ? "text-orange-400"
+                            : "text-orange-600"
+                        )}
+                      />
                     )}
-                    <span className={cn(
-                      "font-medium",
-                      theme === 'dark' ? 'text-white' : 'text-gray-900'
-                    )}>
-                      Artist Status: {artist.isActive ? 'Active' : 'Inactive'}
+                    <span
+                      className={cn(
+                        "font-medium",
+                        theme === "dark" ? "text-white" : "text-gray-900"
+                      )}
+                    >
+                      Artist Status: {artist.isActive ? "Active" : "Inactive"}
                     </span>
                   </div>
-                  
+
                   {/* Activate Button */}
                   {!artist.isActive && (
-                    <Button 
+                    <Button
                       type="button"
                       variant="outline"
                       size="sm"
@@ -740,39 +871,55 @@ export function EditArtistModal({
                       }}
                       className={cn(
                         "text-xs",
-                        theme === 'dark' 
-                          ? 'border-green-700 text-green-300 hover:bg-green-600/20' 
-                          : 'border-green-600 text-green-700 hover:bg-green-50',
-                         isActivating ? (theme === 'dark' ? 'bg-green-700/30' : 'bg-green-100') : ''
+                        theme === "dark"
+                          ? "border-green-700 text-green-300 hover:bg-green-600/20"
+                          : "border-green-600 text-green-700 hover:bg-green-50",
+                        isActivating
+                          ? theme === "dark"
+                            ? "bg-green-700/30"
+                            : "bg-green-100"
+                          : ""
                       )}
                       disabled={isUploading}
                     >
-                      {isActivating ? <Spinner className="h-4 w-4 mr-1 animate-spin"/> : <ShieldCheck className="h-4 w-4 mr-1" />} 
+                      {isActivating ? (
+                        <Spinner className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <ShieldCheck className="h-4 w-4 mr-1" />
+                      )}
                       Activate Artist
                     </Button>
                   )}
 
                   {/* Deactivate Button */}
                   {artist.isActive && (
-                    <Button 
+                    <Button
                       type="button"
-                      variant={showDeactivateSection ? "outline" : "destructive"}
+                      variant={
+                        showDeactivateSection ? "outline" : "destructive"
+                      }
                       size="sm"
                       onClick={() => {
                         const nextShowState = !showDeactivateSection;
                         setShowDeactivateSection(nextShowState);
                         setIsDeactivating(nextShowState);
-                        if (!nextShowState) setDeactivationReason(''); // Clear reason on cancel
+                        if (!nextShowState) setDeactivationReason(""); // Clear reason on cancel
                       }}
                       className={cn(
                         "text-xs",
-                        showDeactivateSection 
-                          ? (theme === 'dark' ? 'border-gray-600' : 'border-gray-300') 
-                          : (theme === 'dark' ? 'bg-red-700 hover:bg-red-600' : 'bg-red-600 hover:bg-red-700 text-white')
+                        showDeactivateSection
+                          ? theme === "dark"
+                            ? "border-gray-600"
+                            : "border-gray-300"
+                          : theme === "dark"
+                          ? "bg-red-700 hover:bg-red-600"
+                          : "bg-red-600 hover:bg-red-700 text-white"
                       )}
                       disabled={isUploading}
                     >
-                      {showDeactivateSection ? 'Cancel Deactivation' : 'Deactivate Artist'}
+                      {showDeactivateSection
+                        ? "Cancel Deactivation"
+                        : "Deactivate Artist"}
                     </Button>
                   )}
                 </div>
@@ -791,12 +938,12 @@ export function EditArtistModal({
                       className={cn(
                         "px-3 py-1 rounded-full text-xs font-medium transition-colors",
                         deactivationReason === reason
-                          ? theme === 'dark'
-                            ? 'bg-orange-900 text-orange-100'
-                            : 'bg-orange-100 text-orange-800'
-                          : theme === 'dark'
-                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          ? theme === "dark"
+                            ? "bg-orange-900 text-orange-100"
+                            : "bg-orange-100 text-orange-800"
+                          : theme === "dark"
+                          ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       )}
                       disabled={isUploading}
                     >
@@ -805,9 +952,11 @@ export function EditArtistModal({
                   ))}
                 </div>
                 <div className="space-y-2">
-                  <UILabel 
-                    htmlFor="deactivationReasonArtist" 
-                    className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}
+                  <UILabel
+                    htmlFor="deactivationReasonArtist"
+                    className={
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }
                   >
                     Deactivation Reason
                   </UILabel>
@@ -818,9 +967,9 @@ export function EditArtistModal({
                     placeholder="Enter reason for deactivation..."
                     className={cn(
                       "resize-none min-h-[100px]",
-                      theme === 'dark' 
-                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                      theme === "dark"
+                        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                        : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                     )}
                     disabled={isUploading}
                   />
@@ -831,19 +980,23 @@ export function EditArtistModal({
         </form>
 
         {/* Footer */}
-        <div className={cn(
-          "flex items-center justify-end gap-3 px-6 py-4 border-t",
-          theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
-        )}>
+        <div
+          className={cn(
+            "flex items-center justify-end gap-3 px-6 py-4 border-t",
+            theme === "dark"
+              ? "bg-gray-800 border-gray-700"
+              : "bg-gray-50 border-gray-200"
+          )}
+        >
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
-                : 'bg-white hover:bg-gray-50 border-gray-300'
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                : "bg-white hover:bg-gray-50 border-gray-300"
             )}
           >
             Cancel
@@ -854,13 +1007,20 @@ export function EditArtistModal({
             disabled={isUploading}
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-neutral-900 hover:bg-neutral-900/90',
-               (isActivating || isDeactivating) && (theme === 'dark' ? 'opacity-70' : 'opacity-80') // Style when changing status
+              theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-neutral-900 hover:bg-neutral-900/90",
+              (isActivating || isDeactivating) &&
+                (theme === "dark" ? "opacity-70" : "opacity-80") // Style when changing status
             )}
           >
-            {isUploading ? (isActivating ? 'Activating...' : isDeactivating ? 'Deactivating...' : 'Saving...') : 'Save Changes'}
+            {isUploading
+              ? isActivating
+                ? "Activating..."
+                : isDeactivating
+                ? "Deactivating..."
+                : "Saving..."
+              : "Save Changes"}
           </Button>
         </div>
       </DialogContent>
@@ -880,7 +1040,13 @@ interface ActionReasonModalProps {
   predefinedReasons?: string[];
   placeholderText?: string;
   actionIcon?: React.ReactNode;
-  actionVariant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  actionVariant?:
+    | "default"
+    | "destructive"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "link";
   confirmDisabled?: boolean;
 }
 
@@ -933,13 +1099,25 @@ export function ActionReasonModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`sm:max-w-[450px] ${theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'}`}
+        className={`sm:max-w-[450px] ${
+          theme === "dark"
+            ? "bg-gray-800 text-white border-gray-700"
+            : "bg-white"
+        }`}
       >
         <DialogHeader>
-          <DialogTitle className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : ''}`}>
+          <DialogTitle
+            className={`text-lg font-semibold ${
+              theme === "dark" ? "text-white" : ""
+            }`}
+          >
             {title}
           </DialogTitle>
-          <DialogDescription className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+          <DialogDescription
+            className={`text-sm ${
+              theme === "dark" ? "text-gray-400" : "text-gray-600"
+            }`}
+          >
             {description}
           </DialogDescription>
         </DialogHeader>
@@ -947,7 +1125,11 @@ export function ActionReasonModal({
         <div className="mt-4 space-y-3">
           {predefinedReasons.length > 0 && (
             <div className="space-y-2">
-              <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+              <p
+                className={`text-sm font-medium ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
                 Select a reason:
               </p>
               <div className="flex flex-wrap gap-2">
@@ -958,7 +1140,17 @@ export function ActionReasonModal({
                     variant="outline"
                     size="sm"
                     onClick={() => handlePredefinedClick(preReason)}
-                    className={`${theme === 'dark' ? 'text-white border-gray-600 hover:bg-gray-700' : ''} ${reason === preReason && !customReason ? (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200') : ''}`}
+                    className={`${
+                      theme === "dark"
+                        ? "text-white border-gray-600 hover:bg-gray-700"
+                        : ""
+                    } ${
+                      reason === preReason && !customReason
+                        ? theme === "dark"
+                          ? "bg-gray-600"
+                          : "bg-gray-200"
+                        : ""
+                    }`}
                   >
                     {preReason}
                   </Button>
@@ -971,7 +1163,9 @@ export function ActionReasonModal({
             <div className="space-y-1">
               <UILabel
                 htmlFor="actionReason"
-                className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}
+                className={`block text-sm font-medium ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
               >
                 Reason (Required)
               </UILabel>
@@ -980,7 +1174,11 @@ export function ActionReasonModal({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder={placeholderText}
-                className={`min-h-[80px] w-full rounded-md border p-2 text-sm ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
+                className={`min-h-[80px] w-full rounded-md border p-2 text-sm ${
+                  theme === "dark"
+                    ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
+                    : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                }`}
               />
             </div>
           )}
@@ -990,7 +1188,11 @@ export function ActionReasonModal({
           <Button
             variant="outline"
             onClick={onClose}
-            className={theme === 'dark' ? 'text-white border-gray-600 hover:bg-gray-700' : ''}
+            className={
+              theme === "dark"
+                ? "text-white border-gray-600 hover:bg-gray-700"
+                : ""
+            }
           >
             Cancel
           </Button>
@@ -998,7 +1200,11 @@ export function ActionReasonModal({
             variant={actionVariant}
             onClick={handleConfirm}
             disabled={isConfirmDisabled}
-            className={theme === 'dark' && actionVariant === 'destructive' ? 'bg-red-700 hover:bg-red-600 text-white' : ''}
+            className={
+              theme === "dark" && actionVariant === "destructive"
+                ? "bg-red-700 hover:bg-red-600 text-white"
+                : ""
+            }
           >
             {actionIcon && <span className="mr-2">{actionIcon}</span>}
             {actionText}
@@ -1062,7 +1268,7 @@ interface ConfirmDeleteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (ids: string[]) => void;
-  theme?: 'light' | 'dark';
+  theme?: "light" | "dark";
   entityType?: string;
 }
 
@@ -1072,20 +1278,23 @@ export function ConfirmDeleteModal({
   isOpen,
   onClose,
   onConfirm,
-  theme = 'light',
-  entityType = 'item',
+  theme = "light",
+  entityType = "item",
 }: ConfirmDeleteModalProps) {
-
   if (!isOpen || (!item && !count)) {
     return null;
   }
 
   const isBulkDelete = count !== undefined && count > 0;
-  const title = isBulkDelete ? `Delete ${count} ${entityType}(s)` : `Delete ${entityType}`;
+  const title = isBulkDelete
+    ? `Delete ${count} ${entityType}(s)`
+    : `Delete ${entityType}`;
   const itemName = item?.name || item?.email;
   const description = isBulkDelete
     ? `Are you sure you want to delete the selected ${count} ${entityType}(s)? This action cannot be undone.`
-    : `Are you sure you want to delete the ${entityType} ${itemName ? `"${itemName}"` : 'this item'}? This action cannot be undone.`;
+    : `Are you sure you want to delete the ${entityType} ${
+        itemName ? `"${itemName}"` : "this item"
+      }? This action cannot be undone.`;
 
   const handleConfirm = () => {
     if (isBulkDelete && count) {
@@ -1100,9 +1309,11 @@ export function ConfirmDeleteModal({
       <DialogContent
         className={`
           sm:max-w-[400px] p-0 overflow-hidden
-          ${theme === 'dark'
-            ? 'bg-gray-800 text-white border-gray-700'
-            : 'bg-white'}
+          ${
+            theme === "dark"
+              ? "bg-gray-800 text-white border-gray-700"
+              : "bg-white"
+          }
         `}
       >
         {/* ---------- Header ---------- */}
@@ -1121,9 +1332,7 @@ export function ConfirmDeleteModal({
               aria-label="Close"
               className={`
                 w-8 h-8 rounded-md flex items-center justify-center transition-colors
-                ${theme === 'dark'
-                  ? 'hover:bg-white/10'
-                  : 'hover:bg-black/5'}
+                ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"}
               `}
             >
               <XIcon className="w-5 h-5" />
@@ -1134,7 +1343,7 @@ export function ConfirmDeleteModal({
           <DialogTitle
             className={`
               mt-4 text-lg font-bold text-left
-              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}
+              ${theme === "dark" ? "text-white" : "text-gray-900"}
             `}
           >
             {title}
@@ -1142,7 +1351,7 @@ export function ConfirmDeleteModal({
           <p
             className={`
               mt-1 text-sm text-left
-              ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}
+              ${theme === "dark" ? "text-gray-300" : "text-gray-600"}
             `}
           >
             {description}
@@ -1150,25 +1359,33 @@ export function ConfirmDeleteModal({
         </div>
 
         {/* ---------- Actions ---------- */}
-        <div className={`
+        <div
+          className={`
           mt-6 px-6 py-4 flex gap-3 border-t
-          ${theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'}
-        `}>
+          ${
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          }
+        `}
+        >
           <Button
             variant="outline"
             className={`flex-1 text-center justify-center bg-white
-              ${theme === 'dark' 
-                ? 'text-gray-900 hover:bg-gray-100 border-gray-300' 
-                : 'hover:bg-gray-50 border-gray-300'}`}
+              ${
+                theme === "dark"
+                  ? "text-gray-900 hover:bg-gray-100 border-gray-300"
+                  : "hover:bg-gray-50 border-gray-300"
+              }`}
             onClick={onClose}
           >
             Cancel
           </Button>
           <Button
             variant="destructive"
-            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-red-700 hover:bg-red-600' : ''}`}
+            className={`flex-1 text-center justify-center ${
+              theme === "dark" ? "bg-red-700 hover:bg-red-600" : ""
+            }`}
             onClick={handleConfirm}
           >
             Delete {isBulkDelete ? `${count} ${entityType}(s)` : entityType}
@@ -1185,7 +1402,7 @@ interface MakeAdminModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (userId: string) => void; // Accepts userId
-  theme?: 'light' | 'dark';
+  theme?: "light" | "dark";
   adminLevelToSet?: number;
 }
 
@@ -1194,17 +1411,18 @@ export function MakeAdminModal({
   isOpen,
   onClose,
   onConfirm,
-  theme = 'light',
+  theme = "light",
   adminLevelToSet = 2, // Default to Level 2
 }: MakeAdminModalProps) {
-
   if (!isOpen || !user) {
     return null;
   }
 
   const title = `Make Admin (Level ${adminLevelToSet})`;
   const userName = user?.name || user?.email;
-  const description = `Are you sure you want to grant Admin (Level ${adminLevelToSet}) privileges to ${userName ? `"${userName}"` : 'this user'}? They will gain access to administrative functions.`;
+  const description = `Are you sure you want to grant Admin (Level ${adminLevelToSet}) privileges to ${
+    userName ? `"${userName}"` : "this user"
+  }? They will gain access to administrative functions.`;
 
   const handleConfirm = () => {
     if (user) {
@@ -1217,9 +1435,11 @@ export function MakeAdminModal({
       <DialogContent
         className={`
           sm:max-w-[400px] p-0 overflow-hidden
-          ${theme === 'dark'
-            ? 'bg-gray-800 text-white border-gray-700'
-            : 'bg-white'}
+          ${
+            theme === "dark"
+              ? "bg-gray-800 text-white border-gray-700"
+              : "bg-white"
+          }
         `}
       >
         {/* ---------- Header ---------- */}
@@ -1227,8 +1447,17 @@ export function MakeAdminModal({
           {/* Header with Icon and Close button */}
           <div className="flex items-center justify-between w-full">
             {/* Icon */}
-            <div className={`w-12 h-12 flex items-center justify-center rounded-full ${theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'}`}>
-              <UserCog className={`w-7 h-7 ${theme === 'dark' ? 'text-blue-300' : 'text-blue-600'}`} strokeWidth={1.5} />
+            <div
+              className={`w-12 h-12 flex items-center justify-center rounded-full ${
+                theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+              }`}
+            >
+              <UserCog
+                className={`w-7 h-7 ${
+                  theme === "dark" ? "text-blue-300" : "text-blue-600"
+                }`}
+                strokeWidth={1.5}
+              />
             </div>
 
             {/* Close button */}
@@ -1238,9 +1467,7 @@ export function MakeAdminModal({
               aria-label="Close"
               className={`
                 w-8 h-8 rounded-md flex items-center justify-center transition-colors
-                ${theme === 'dark'
-                  ? 'hover:bg-white/10'
-                  : 'hover:bg-black/5'}
+                ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"}
               `}
             >
               <XIcon className="w-5 h-5" />
@@ -1251,7 +1478,7 @@ export function MakeAdminModal({
           <DialogTitle
             className={`
               mt-4 text-lg font-bold text-left
-              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}
+              ${theme === "dark" ? "text-white" : "text-gray-900"}
             `}
           >
             {title}
@@ -1259,7 +1486,7 @@ export function MakeAdminModal({
           <DialogDescription
             className={`
               mt-1 text-sm text-left
-              ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}
+              ${theme === "dark" ? "text-gray-300" : "text-gray-600"}
             `}
           >
             {description}
@@ -1267,25 +1494,37 @@ export function MakeAdminModal({
         </div>
 
         {/* ---------- Actions ---------- */}
-        <div className={`
+        <div
+          className={`
           mt-6 px-6 py-4 flex gap-3 border-t
-          ${theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'}
-        `}>
+          ${
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          }
+        `}
+        >
           <Button
             variant="outline"
-            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-white hover:bg-gray-50'}`}
+            className={`flex-1 text-center justify-center ${
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-white"
+                : "bg-white hover:bg-gray-50"
+            }`}
             onClick={onClose}
           >
             Cancel
           </Button>
           <Button
             variant="default" // Use default variant for confirmation
-            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-neutral-900 hover:bg-neutral-900/90'}`}
+            className={`flex-1 text-center justify-center ${
+              theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-neutral-900 hover:bg-neutral-900/90"
+            }`}
             onClick={handleConfirm}
           >
-             Confirm Make Admin
+            Confirm Make Admin
           </Button>
         </div>
       </DialogContent>
@@ -1349,9 +1588,11 @@ export function RejectModal({
       <DialogContent
         className={`
           sm:max-w-[450px] p-0 overflow-hidden
-          ${theme === 'dark'
-            ? 'bg-gray-800 text-white border-gray-700'
-            : 'bg-white'}
+          ${
+            theme === "dark"
+              ? "bg-gray-800 text-white border-gray-700"
+              : "bg-white"
+          }
         `}
       >
         {/* ---------- Header ---------- */}
@@ -1370,9 +1611,7 @@ export function RejectModal({
               aria-label="Close"
               className={`
                 w-8 h-8 rounded-md flex items-center justify-center transition-colors
-                ${theme === 'dark'
-                  ? 'hover:bg-white/10'
-                  : 'hover:bg-black/5'}
+                ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"}
               `}
             >
               <XIcon className="w-5 h-5" />
@@ -1383,7 +1622,7 @@ export function RejectModal({
           <DialogTitle
             className={`
               mt-4 text-lg font-bold text-left
-              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}
+              ${theme === "dark" ? "text-white" : "text-gray-900"}
             `}
           >
             Reject Artist Request
@@ -1391,10 +1630,11 @@ export function RejectModal({
           <p
             className={`
               mt-1 text-sm text-left
-              ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}
+              ${theme === "dark" ? "text-gray-300" : "text-gray-600"}
             `}
           >
-            Please provide a reason for rejecting this artist request. This reason may be communicated to the user.
+            Please provide a reason for rejecting this artist request. This
+            reason may be communicated to the user.
           </p>
         </div>
 
@@ -1402,7 +1642,11 @@ export function RejectModal({
         <div className="px-6 py-4">
           {predefinedReasons.length > 0 && (
             <div className="space-y-2">
-              <p className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+              <p
+                className={`text-sm font-medium ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+              >
                 Select a reason:
               </p>
               <div className="flex flex-wrap gap-2">
@@ -1413,7 +1657,17 @@ export function RejectModal({
                     variant="outline"
                     size="sm"
                     onClick={() => handlePredefinedClick(preReason)}
-                    className={`${theme === 'dark' ? 'text-white border-gray-600 hover:bg-gray-700' : ''} ${reason === preReason && !customReason ? (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200') : ''}`}
+                    className={`${
+                      theme === "dark"
+                        ? "text-white border-gray-600 hover:bg-gray-700"
+                        : ""
+                    } ${
+                      reason === preReason && !customReason
+                        ? theme === "dark"
+                          ? "bg-gray-600"
+                          : "bg-gray-200"
+                        : ""
+                    }`}
                   >
                     {preReason}
                   </Button>
@@ -1426,7 +1680,9 @@ export function RejectModal({
             <div className="space-y-1 mt-4">
               <UILabel
                 htmlFor="rejectReason"
-                className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}
+                className={`block text-sm font-medium ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
               >
                 Reason (Required)
               </UILabel>
@@ -1435,29 +1691,43 @@ export function RejectModal({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Enter reason for rejection..."
-                className={`min-h-[80px] w-full rounded-md border p-2 text-sm ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
+                className={`min-h-[80px] w-full rounded-md border p-2 text-sm ${
+                  theme === "dark"
+                    ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
+                    : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                }`}
               />
             </div>
           )}
         </div>
 
         {/* ---------- Actions ---------- */}
-        <div className={`
+        <div
+          className={`
           px-6 py-4 flex gap-3 border-t
-          ${theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'}
-        `}>
+          ${
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          }
+        `}
+        >
           <Button
             variant="outline"
-            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-300'}`}
+            className={`flex-1 text-center justify-center ${
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                : "bg-white hover:bg-gray-50 border-gray-300"
+            }`}
             onClick={onClose}
           >
             Cancel
           </Button>
           <Button
             variant="destructive"
-            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-red-700 hover:bg-red-600' : ''}`}
+            className={`flex-1 text-center justify-center ${
+              theme === "dark" ? "bg-red-700 hover:bg-red-600" : ""
+            }`}
             onClick={handleConfirm}
             disabled={!reason.trim()}
           >
@@ -1493,9 +1763,11 @@ export function ApproveModal({
       <DialogContent
         className={`
           sm:max-w-[450px] p-0 overflow-hidden
-          ${theme === 'dark'
-            ? 'bg-gray-800 text-white border-gray-700'
-            : 'bg-white'}
+          ${
+            theme === "dark"
+              ? "bg-gray-800 text-white border-gray-700"
+              : "bg-white"
+          }
         `}
       >
         {/* ---------- Header ---------- */}
@@ -1504,7 +1776,10 @@ export function ApproveModal({
           <div className="flex items-center justify-between w-full">
             {/* Check icon */}
             <div className="w-12 h-12 flex items-center justify-center rounded-full bg-green-100">
-              <CheckCircle className="w-7 h-7 text-green-600" strokeWidth={1.5} />
+              <CheckCircle
+                className="w-7 h-7 text-green-600"
+                strokeWidth={1.5}
+              />
             </div>
 
             {/* Close button */}
@@ -1514,9 +1789,7 @@ export function ApproveModal({
               aria-label="Close"
               className={`
                 w-8 h-8 rounded-md flex items-center justify-center transition-colors
-                ${theme === 'dark'
-                  ? 'hover:bg-white/10'
-                  : 'hover:bg-black/5'}
+                ${theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"}
               `}
             >
               <XIcon className="w-5 h-5" />
@@ -1527,7 +1800,7 @@ export function ApproveModal({
           <DialogTitle
             className={`
               mt-4 text-lg font-bold text-left
-              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}
+              ${theme === "dark" ? "text-white" : "text-gray-900"}
             `}
           >
             Approve Artist Request
@@ -1535,32 +1808,44 @@ export function ApproveModal({
           <p
             className={`
               mt-1 text-sm text-left
-              ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}
+              ${theme === "dark" ? "text-gray-300" : "text-gray-600"}
             `}
           >
-            {artistName 
+            {artistName
               ? `Are you sure you want to approve "${artistName}"? This action will grant artist status to the user.`
               : `Are you sure you want to approve this artist request? This action will grant artist status to the user.`}
           </p>
         </div>
 
         {/* ---------- Actions ---------- */}
-        <div className={`
+        <div
+          className={`
           mt-6 px-6 py-4 flex gap-3 border-t
-          ${theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'}
-        `}>
+          ${
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          }
+        `}
+        >
           <Button
             variant="outline"
-            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-300'}`}
+            className={`flex-1 text-center justify-center ${
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                : "bg-white hover:bg-gray-50 border-gray-300"
+            }`}
             onClick={onClose}
           >
             Cancel
           </Button>
           <Button
             variant="default"
-            className={`flex-1 text-center justify-center ${theme === 'dark' ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+            className={`flex-1 text-center justify-center ${
+              theme === "dark"
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-green-600 hover:bg-green-700 text-white"
+            }`}
             onClick={onConfirm}
           >
             <CheckCircle className="w-4 h-4 mr-2" />
@@ -1599,7 +1884,7 @@ export function AddGenreModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    
+
     setIsSubmitting(true);
     try {
       await onSubmit(name.trim());
@@ -1613,34 +1898,47 @@ export function AddGenreModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
-        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
-      )}>
+      <DialogContent
+        className={cn(
+          "sm:max-w-lg p-0 overflow-hidden flex flex-col",
+          theme === "dark"
+            ? "bg-gray-800 text-white border-gray-700"
+            : "bg-white"
+        )}
+      >
         {/* Header */}
         <div className="px-6 pt-6">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-4">
-              <div className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full",
-                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
-              )}>
-                <Tags className={cn(
-                  "w-7 h-7",
-                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
-                )} strokeWidth={1.5} />
+              <div
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center rounded-full",
+                  theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+                )}
+              >
+                <Tags
+                  className={cn(
+                    "w-7 h-7",
+                    theme === "dark" ? "text-blue-300" : "text-blue-600"
+                  )}
+                  strokeWidth={1.5}
+                />
               </div>
               <div>
-                <DialogTitle className={cn(
-                  "text-lg font-bold",
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                )}>
+                <DialogTitle
+                  className={cn(
+                    "text-lg font-bold",
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  )}
+                >
                   Add New Genre
                 </DialogTitle>
-                <p className={cn(
-                  "text-sm mt-1",
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                )}>
+                <p
+                  className={cn(
+                    "text-sm mt-1",
+                    theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  )}
+                >
                   Create a new music genre category
                 </p>
               </div>
@@ -1652,7 +1950,7 @@ export function AddGenreModal({
               aria-label="Close"
               className={cn(
                 "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+                theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
               )}
             >
               <XIcon className="w-5 h-5" />
@@ -1661,10 +1959,17 @@ export function AddGenreModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} id="add-genre-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+        <form
+          onSubmit={handleSubmit}
+          id="add-genre-form"
+          className="px-6 pt-4 pb-6 overflow-y-auto flex-grow"
+        >
           <div className="space-y-4">
             <div className="space-y-2">
-              <UILabel htmlFor="genre-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="genre-name"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Genre Name
               </UILabel>
               <Input
@@ -1675,9 +1980,9 @@ export function AddGenreModal({
                 placeholder="Enter genre name"
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 maxLength={50}
                 required
@@ -1688,21 +1993,23 @@ export function AddGenreModal({
         </form>
 
         {/* Footer */}
-        <div className={cn(
-          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
-          theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'
-        )}>
+        <div
+          className={cn(
+            "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          )}
+        >
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
-                : 'bg-white hover:bg-gray-50 border-gray-300'
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                : "bg-white hover:bg-gray-50 border-gray-300"
             )}
             disabled={isSubmitting}
           >
@@ -1713,9 +2020,9 @@ export function AddGenreModal({
             form="add-genre-form"
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-neutral-900 hover:bg-neutral-900/90'
+              theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-neutral-900 hover:bg-neutral-900/90"
             )}
             disabled={isSubmitting}
           >
@@ -1757,7 +2064,7 @@ export function EditGenreModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!genre || !name.trim()) return;
-    
+
     setIsSubmitting(true);
     try {
       await onSubmit(genre.id, name.trim());
@@ -1772,34 +2079,47 @@ export function EditGenreModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
-        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
-      )}>
+      <DialogContent
+        className={cn(
+          "sm:max-w-lg p-0 overflow-hidden flex flex-col",
+          theme === "dark"
+            ? "bg-gray-800 text-white border-gray-700"
+            : "bg-white"
+        )}
+      >
         {/* Header */}
         <div className="px-6 pt-6">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-4">
-              <div className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full",
-                theme === 'dark' ? 'bg-amber-900/30' : 'bg-amber-100'
-              )}>
-                <Edit className={cn(
-                  "w-7 h-7",
-                  theme === 'dark' ? 'text-amber-300' : 'text-amber-600'
-                )} strokeWidth={1.5} />
+              <div
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center rounded-full",
+                  theme === "dark" ? "bg-amber-900/30" : "bg-amber-100"
+                )}
+              >
+                <Edit
+                  className={cn(
+                    "w-7 h-7",
+                    theme === "dark" ? "text-amber-300" : "text-amber-600"
+                  )}
+                  strokeWidth={1.5}
+                />
               </div>
               <div>
-                <DialogTitle className={cn(
-                  "text-lg font-bold",
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                )}>
+                <DialogTitle
+                  className={cn(
+                    "text-lg font-bold",
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  )}
+                >
                   Edit Genre
                 </DialogTitle>
-                <p className={cn(
-                  "text-sm mt-1",
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                )}>
+                <p
+                  className={cn(
+                    "text-sm mt-1",
+                    theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  )}
+                >
                   Update genre information
                 </p>
               </div>
@@ -1811,7 +2131,7 @@ export function EditGenreModal({
               aria-label="Close"
               className={cn(
                 "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+                theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
               )}
             >
               <XIcon className="w-5 h-5" />
@@ -1820,10 +2140,17 @@ export function EditGenreModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} id="edit-genre-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+        <form
+          onSubmit={handleSubmit}
+          id="edit-genre-form"
+          className="px-6 pt-4 pb-6 overflow-y-auto flex-grow"
+        >
           <div className="space-y-4">
             <div className="space-y-2">
-              <UILabel htmlFor="edit-genre-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="edit-genre-name"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Genre Name
               </UILabel>
               <Input
@@ -1834,9 +2161,9 @@ export function EditGenreModal({
                 placeholder="Enter genre name"
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 maxLength={50}
                 required
@@ -1847,21 +2174,23 @@ export function EditGenreModal({
         </form>
 
         {/* Footer */}
-        <div className={cn(
-          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
-          theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'
-        )}>
+        <div
+          className={cn(
+            "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          )}
+        >
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
-                : 'bg-white hover:bg-gray-50 border-gray-300'
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                : "bg-white hover:bg-gray-50 border-gray-300"
             )}
             disabled={isSubmitting}
           >
@@ -1872,9 +2201,9 @@ export function EditGenreModal({
             form="edit-genre-form"
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-neutral-900 hover:bg-neutral-900/90'
+              theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-neutral-900 hover:bg-neutral-900/90"
             )}
             disabled={isSubmitting}
           >
@@ -1951,34 +2280,47 @@ export function AddLabelModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
-        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
-      )}>
+      <DialogContent
+        className={cn(
+          "sm:max-w-lg p-0 overflow-hidden flex flex-col",
+          theme === "dark"
+            ? "bg-gray-800 text-white border-gray-700"
+            : "bg-white"
+        )}
+      >
         {/* Header */}
         <div className="px-6 pt-6">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-4">
-              <div className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full",
-                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
-              )}>
-                <Tags className={cn(
-                  "w-7 h-7",
-                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
-                )} strokeWidth={1.5} />
+              <div
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center rounded-full",
+                  theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+                )}
+              >
+                <Tags
+                  className={cn(
+                    "w-7 h-7",
+                    theme === "dark" ? "text-blue-300" : "text-blue-600"
+                  )}
+                  strokeWidth={1.5}
+                />
               </div>
               <div>
-                <DialogTitle className={cn(
-                  "text-lg font-bold",
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                )}>
+                <DialogTitle
+                  className={cn(
+                    "text-lg font-bold",
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  )}
+                >
                   Add New Label
                 </DialogTitle>
-                <p className={cn(
-                  "text-sm mt-1",
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                )}>
+                <p
+                  className={cn(
+                    "text-sm mt-1",
+                    theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  )}
+                >
                   Create a new record label
                 </p>
               </div>
@@ -1990,7 +2332,7 @@ export function AddLabelModal({
               aria-label="Close"
               className={cn(
                 "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+                theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
               )}
             >
               <XIcon className="w-5 h-5" />
@@ -1999,92 +2341,119 @@ export function AddLabelModal({
         </div>
 
         {/* Form */}
-        <form ref={formRef} onSubmit={handleSubmit} id="add-label-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow space-y-4">
-           <div className="flex flex-col items-center space-y-3">
-             <UILabel
-               htmlFor="newLogoFile"
-               className={`w-28 h-28 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center ${theme === 'dark' ? 'border-gray-600 bg-gray-700 hover:bg-gray-600' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'}`}
-             >
-               {previewLogo ? (
-                 <Image
-                   src={previewLogo}
-                   alt="Label Logo Preview"
-                   width={112}
-                   height={112}
-                   className="w-full h-full object-cover"
-                 />
-               ) : (
-                 <div className="flex flex-col items-center justify-center text-center">
-                   <Tags className={`w-8 h-8 mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
-                   <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Upload Logo</span>
-                 </div>
-               )}
-             </UILabel>
-             <input
-               type="file"
-               id="newLogoFile"
-               accept="image/*"
-               onChange={handleFileChange}
-               className="hidden"
-             />
-           </div>
+        <form
+          ref={formRef}
+          onSubmit={handleSubmit}
+          id="add-label-form"
+          className="px-6 pt-4 pb-6 overflow-y-auto flex-grow space-y-4"
+        >
+          <div className="flex flex-col items-center space-y-3">
+            <UILabel
+              htmlFor="newLogoFile"
+              className={`w-28 h-28 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center ${
+                theme === "dark"
+                  ? "border-gray-600 bg-gray-700 hover:bg-gray-600"
+                  : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+              }`}
+            >
+              {previewLogo ? (
+                <Image
+                  src={previewLogo}
+                  alt="Label Logo Preview"
+                  width={112}
+                  height={112}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center">
+                  <Tags
+                    className={`w-8 h-8 mb-1 ${
+                      theme === "dark" ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  />
+                  <span
+                    className={`text-xs ${
+                      theme === "dark" ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    Upload Logo
+                  </span>
+                </div>
+              )}
+            </UILabel>
+            <input
+              type="file"
+              id="newLogoFile"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
 
-           <div className="space-y-2">
-             <UILabel htmlFor="add-label-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
-               Label Name
-             </UILabel>
-             <Input
-               id="add-label-name"
-               name="name"
-               placeholder="Enter label name"
-               className={cn(
-                 "w-full",
-                 theme === 'dark' 
-                   ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-               )}
-               maxLength={100}
-               required
-               disabled={isSubmitting}
-             />
-           </div>
+          <div className="space-y-2">
+            <UILabel
+              htmlFor="add-label-name"
+              className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+            >
+              Label Name
+            </UILabel>
+            <Input
+              id="add-label-name"
+              name="name"
+              placeholder="Enter label name"
+              className={cn(
+                "w-full",
+                theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              )}
+              maxLength={100}
+              required
+              disabled={isSubmitting}
+            />
+          </div>
 
-            <div className="space-y-2">
-              <UILabel htmlFor="add-label-description" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
-                Description
-              </UILabel>
-              <Textarea
-                id="add-label-description"
-                name="description"
-                placeholder="Enter label description (optional)"
-                className={cn(
-                  "w-full min-h-[80px]",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                )}
-                maxLength={500}
-                disabled={isSubmitting}
-              />
-            </div>
+          <div className="space-y-2">
+            <UILabel
+              htmlFor="add-label-description"
+              className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+            >
+              Description
+            </UILabel>
+            <Textarea
+              id="add-label-description"
+              name="description"
+              placeholder="Enter label description (optional)"
+              className={cn(
+                "w-full min-h-[80px]",
+                theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              )}
+              maxLength={500}
+              disabled={isSubmitting}
+            />
+          </div>
         </form>
 
         {/* Footer */}
-        <div className={cn(
-          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
-          theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'
-        )}>
+        <div
+          className={cn(
+            "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          )}
+        >
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
-                : 'bg-white hover:bg-gray-50 border-gray-300'
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                : "bg-white hover:bg-gray-50 border-gray-300"
             )}
             disabled={isSubmitting}
           >
@@ -2095,9 +2464,9 @@ export function AddLabelModal({
             form="add-label-form"
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-neutral-900 hover:bg-neutral-900/90'
+              theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-neutral-900 hover:bg-neutral-900/90"
             )}
             disabled={isSubmitting}
           >
@@ -2138,15 +2507,19 @@ export function EditLabelModal({
       setPreviewLogo(label.logoUrl);
       setLogoFile(null);
       if (formRef.current) {
-         const nameInput = formRef.current.elements.namedItem('name') as HTMLInputElement;
-         const descriptionInput = formRef.current.elements.namedItem('description') as HTMLTextAreaElement;
-         if (nameInput) nameInput.value = label.name;
-         if (descriptionInput) descriptionInput.value = label.description || '';
+        const nameInput = formRef.current.elements.namedItem(
+          "name"
+        ) as HTMLInputElement;
+        const descriptionInput = formRef.current.elements.namedItem(
+          "description"
+        ) as HTMLTextAreaElement;
+        if (nameInput) nameInput.value = label.name;
+        if (descriptionInput) descriptionInput.value = label.description || "";
       }
       setIsSubmitting(false);
     } else if (!isOpen) {
-        setPreviewLogo(null);
-        setLogoFile(null);
+      setPreviewLogo(null);
+      setLogoFile(null);
     }
   }, [isOpen, label]);
 
@@ -2194,34 +2567,47 @@ export function EditLabelModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
-        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
-      )}>
+      <DialogContent
+        className={cn(
+          "sm:max-w-lg p-0 overflow-hidden flex flex-col",
+          theme === "dark"
+            ? "bg-gray-800 text-white border-gray-700"
+            : "bg-white"
+        )}
+      >
         {/* Header */}
         <div className="px-6 pt-6">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-4">
-              <div className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full",
-                theme === 'dark' ? 'bg-amber-900/30' : 'bg-amber-100'
-              )}>
-                <Edit className={cn(
-                  "w-7 h-7",
-                  theme === 'dark' ? 'text-amber-300' : 'text-amber-600'
-                )} strokeWidth={1.5} />
+              <div
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center rounded-full",
+                  theme === "dark" ? "bg-amber-900/30" : "bg-amber-100"
+                )}
+              >
+                <Edit
+                  className={cn(
+                    "w-7 h-7",
+                    theme === "dark" ? "text-amber-300" : "text-amber-600"
+                  )}
+                  strokeWidth={1.5}
+                />
               </div>
               <div>
-                <DialogTitle className={cn(
-                  "text-lg font-bold",
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                )}>
+                <DialogTitle
+                  className={cn(
+                    "text-lg font-bold",
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  )}
+                >
                   Edit Label
                 </DialogTitle>
-                <p className={cn(
-                  "text-sm mt-1",
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                )}>
+                <p
+                  className={cn(
+                    "text-sm mt-1",
+                    theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  )}
+                >
                   Update label information
                 </p>
               </div>
@@ -2233,7 +2619,7 @@ export function EditLabelModal({
               aria-label="Close"
               className={cn(
                 "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+                theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
               )}
             >
               <XIcon className="w-5 h-5" />
@@ -2242,95 +2628,122 @@ export function EditLabelModal({
         </div>
 
         {/* Form */}
-        <form ref={formRef} onSubmit={handleSubmit} id="edit-label-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow space-y-4">
-           <div className="flex flex-col items-center space-y-3">
-             <UILabel
-               htmlFor="editLogoFile"
-               className={`w-28 h-28 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center ${theme === 'dark' ? 'border-gray-600 bg-gray-700 hover:bg-gray-600' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'}`}
-             >
-               {previewLogo ? (
-                 <Image
-                   src={previewLogo}
-                   alt="Label Logo Preview"
-                   width={112}
-                   height={112}
-                   className="w-full h-full object-cover"
-                 />
-               ) : (
-                 <div className="flex flex-col items-center justify-center text-center">
-                   <Tags className={`w-8 h-8 mb-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
-                   <span className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Upload Logo</span>
-                 </div>
-               )}
-             </UILabel>
-             <input
-               type="file"
-               id="editLogoFile"
-               name="logoFile"
-               accept="image/*"
-               onChange={handleFileChange}
-               className="hidden"
-             />
-           </div>
+        <form
+          ref={formRef}
+          onSubmit={handleSubmit}
+          id="edit-label-form"
+          className="px-6 pt-4 pb-6 overflow-y-auto flex-grow space-y-4"
+        >
+          <div className="flex flex-col items-center space-y-3">
+            <UILabel
+              htmlFor="editLogoFile"
+              className={`w-28 h-28 rounded-full overflow-hidden cursor-pointer border-2 flex items-center justify-center ${
+                theme === "dark"
+                  ? "border-gray-600 bg-gray-700 hover:bg-gray-600"
+                  : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+              }`}
+            >
+              {previewLogo ? (
+                <Image
+                  src={previewLogo}
+                  alt="Label Logo Preview"
+                  width={112}
+                  height={112}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center">
+                  <Tags
+                    className={`w-8 h-8 mb-1 ${
+                      theme === "dark" ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  />
+                  <span
+                    className={`text-xs ${
+                      theme === "dark" ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    Upload Logo
+                  </span>
+                </div>
+              )}
+            </UILabel>
+            <input
+              type="file"
+              id="editLogoFile"
+              name="logoFile"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
 
-           <div className="space-y-2">
-             <UILabel htmlFor="edit-label-name" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
-               Label Name
-             </UILabel>
-             <Input
-               id="edit-label-name"
-               name="name"
-               defaultValue={label.name}
-               placeholder="Enter label name"
-               className={cn(
-                 "w-full",
-                 theme === 'dark' 
-                   ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-               )}
-               maxLength={100}
-               required
-               disabled={isSubmitting}
-             />
-           </div>
+          <div className="space-y-2">
+            <UILabel
+              htmlFor="edit-label-name"
+              className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+            >
+              Label Name
+            </UILabel>
+            <Input
+              id="edit-label-name"
+              name="name"
+              defaultValue={label.name}
+              placeholder="Enter label name"
+              className={cn(
+                "w-full",
+                theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              )}
+              maxLength={100}
+              required
+              disabled={isSubmitting}
+            />
+          </div>
 
-            <div className="space-y-2">
-              <UILabel htmlFor="edit-label-description" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
-                Description
-              </UILabel>
-              <Textarea
-                id="edit-label-description"
-                name="description"
-                defaultValue={label.description || ''}
-                placeholder="Enter label description (optional)"
-                className={cn(
-                  "w-full min-h-[80px]",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                )}
-                maxLength={500}
-                disabled={isSubmitting}
-              />
-            </div>
+          <div className="space-y-2">
+            <UILabel
+              htmlFor="edit-label-description"
+              className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+            >
+              Description
+            </UILabel>
+            <Textarea
+              id="edit-label-description"
+              name="description"
+              defaultValue={label.description || ""}
+              placeholder="Enter label description (optional)"
+              className={cn(
+                "w-full min-h-[80px]",
+                theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                  : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+              )}
+              maxLength={500}
+              disabled={isSubmitting}
+            />
+          </div>
         </form>
 
         {/* Footer */}
-        <div className={cn(
-          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
-          theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'
-        )}>
+        <div
+          className={cn(
+            "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          )}
+        >
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
-                : 'bg-white hover:bg-gray-50 border-gray-300'
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                : "bg-white hover:bg-gray-50 border-gray-300"
             )}
             disabled={isSubmitting}
           >
@@ -2341,9 +2754,9 @@ export function EditLabelModal({
             form="edit-label-form"
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-neutral-900 hover:bg-neutral-900/90'
+              theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-neutral-900 hover:bg-neutral-900/90"
             )}
             disabled={isSubmitting}
           >
@@ -2413,6 +2826,60 @@ export function SystemPlaylistModal({
   const [trackCount, setTrackCount] = useState(initialData.trackCount || 10);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevIsOpen = useRef(isOpen); // Thêm ref để theo dõi trạng thái trước đó của isOpen
+
+  // Reset form when opening in create mode or populate when opening in edit mode
+  useEffect(() => {
+    // Chỉ thực hiện khi modal chuyển từ đóng sang mở
+    const justOpened = isOpen && !prevIsOpen.current;
+
+    if (justOpened) {
+      if (mode === "create") {
+        // Reset form chỉ khi mở modal ở chế độ create
+        setName("");
+        setDescription("");
+        setPrivacy("PUBLIC");
+        setCoverFile(null);
+        setCoverPreview(null);
+        setIsAIGenerated(true); // Mặc định là AI generated khi tạo mới
+        setBasedOnMood("");
+        setBasedOnGenre("");
+        setBasedOnArtist("");
+        setBasedOnSongLength("");
+        setBasedOnReleaseTime("");
+        setTrackCount(10); // Default track count for creation
+      } else {
+        // Populate fields chỉ khi mở modal ở chế độ edit
+        setName(initialData.name || "");
+        setDescription(initialData.description || "");
+        setPrivacy(initialData.privacy || "PUBLIC");
+        setCoverFile(null); // Don't retain the file, just the preview
+        setCoverPreview(initialData.coverUrl || null);
+        // Set AI state based on initialData - check if any AI fields exist
+        const hasAIData =
+          initialData.basedOnMood ||
+          initialData.basedOnGenre ||
+          initialData.basedOnArtist ||
+          initialData.basedOnSongLength ||
+          initialData.basedOnReleaseTime ||
+          initialData.trackCount !== undefined; // Check if trackCount exists specifically
+        // If editing, set isAIGenerated based on whether *any* AI criteria exist
+        setIsAIGenerated(!!hasAIData);
+        setBasedOnMood(initialData.basedOnMood || "");
+        setBasedOnGenre(initialData.basedOnGenre || "");
+        setBasedOnArtist(initialData.basedOnArtist || "");
+        setBasedOnSongLength(initialData.basedOnSongLength || "");
+        setBasedOnReleaseTime(initialData.basedOnReleaseTime || "");
+        // Ensure trackCount from initialData is used if available, otherwise default to 10
+        setTrackCount(
+          initialData.trackCount !== undefined ? initialData.trackCount : 10
+        );
+      }
+    }
+
+    // Cập nhật trạng thái `isOpen` trước đó cho lần render tiếp theo
+    prevIsOpen.current = isOpen;
+  }, [isOpen, mode, initialData]); // Giữ dependencies để đảm bảo dữ liệu được cập nhật đúng khi mở modal edit với initialData khác nhau
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2646,9 +3113,9 @@ export function SystemPlaylistModal({
                           </UILabel>
                           <Select
                             value={privacy}
-                            onValueChange={(
-                              value: "PUBLIC" | "PRIVATE"
-                            ) => setPrivacy(value)}
+                            onValueChange={(value: "PUBLIC" | "PRIVATE") =>
+                              setPrivacy(value)
+                            }
                           >
                             <SelectTrigger
                               className={
@@ -2761,7 +3228,9 @@ export function SystemPlaylistModal({
                             id="basedOnSongLength"
                             type="number"
                             value={basedOnSongLength}
-                            onChange={(e) => setBasedOnSongLength(e.target.value)}
+                            onChange={(e) =>
+                              setBasedOnSongLength(e.target.value)
+                            }
                             placeholder="e.g., 180 (for 3 minutes)"
                             className={
                               theme === "dark"
@@ -2780,7 +3249,9 @@ export function SystemPlaylistModal({
                           <Input
                             id="basedOnReleaseTime"
                             value={basedOnReleaseTime}
-                            onChange={(e) => setBasedOnReleaseTime(e.target.value)}
+                            onChange={(e) =>
+                              setBasedOnReleaseTime(e.target.value)
+                            }
                             placeholder="e.g., last_month, last_year, 2020s"
                             className={
                               theme === "dark"
@@ -2886,7 +3357,9 @@ export function AlbumDetailModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`${theme === "dark" ? "bg-[#1e1e1e] border-[#404040]" : "bg-white"}
+        className={`${
+          theme === "dark" ? "bg-[#1e1e1e] border-[#404040]" : "bg-white"
+        }
          p-0 rounded-lg shadow-lg w-full max-w-5xl max-h-[90vh] overflow-hidden`}
       >
         <DialogTitle className="sr-only">{album.title}</DialogTitle>
@@ -2900,8 +3373,8 @@ export function AlbumDetailModal({
                   ${dominantColor}40 30%,
                   ${theme === "light" ? "#ffffff" : "#1e1e1e"} 100%)`
               : theme === "light"
-                ? "linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)"
-                : "linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)",
+              ? "linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)"
+              : "linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)",
           }}
         >
           {/* Close button */}
@@ -2914,9 +3387,11 @@ export function AlbumDetailModal({
               aria-label="Close"
               className={`
                 w-8 h-8 rounded-full flex items-center justify-center 
-                ${theme === 'dark'
-                  ? 'bg-black/20 hover:bg-black/40 text-white/90'
-                  : 'bg-white/20 hover:bg-white/40 text-black/90'}
+                ${
+                  theme === "dark"
+                    ? "bg-black/20 hover:bg-black/40 text-white/90"
+                    : "bg-white/20 hover:bg-white/40 text-black/90"
+                }
               `}
             >
               <XIcon className="w-5 h-5" />
@@ -2935,7 +3410,7 @@ export function AlbumDetailModal({
                       theme === "light"
                         ? "shadow-gray-200/50"
                         : "shadow-black/50"
-                      }`}
+                    }`}
                   />
                 </div>
               )}
@@ -2945,14 +3420,16 @@ export function AlbumDetailModal({
                 <h2
                   className={`text-2xl md:text-3xl font-bold ${
                     theme === "light" ? "text-gray-900" : "text-white"
-                    }`}
+                  }`}
                 >
                   {album.title}
                 </h2>
 
                 <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
                   <span
-                    className={theme === "light" ? "text-gray-900" : "text-white/90"}
+                    className={
+                      theme === "light" ? "text-gray-900" : "text-white/90"
+                    }
                   >
                     {album.artist?.artistName || "Unknown Artist"}
                   </span>
@@ -2962,7 +3439,7 @@ export function AlbumDetailModal({
                   <div
                     className={`flex items-center gap-1.5 ${
                       theme === "light" ? "text-gray-600" : "text-white/60"
-                      }`}
+                    }`}
                   >
                     <Calendar className="w-4 h-4" />
                     <span>
@@ -2976,7 +3453,7 @@ export function AlbumDetailModal({
                   <div
                     className={`flex items-center gap-1.5 ${
                       theme === "light" ? "text-gray-600" : "text-white/60"
-                      }`}
+                    }`}
                   >
                     <Music className="w-4 h-4" />
                     <span>{album.totalTracks || 0} tracks</span>
@@ -2992,7 +3469,7 @@ export function AlbumDetailModal({
                           theme === "light"
                             ? "bg-gray-100 text-gray-800"
                             : "bg-white/10 text-white/80"
-                          }`}
+                        }`}
                       >
                         {genre?.name || "Unknown Genre"}
                       </span>
@@ -3011,19 +3488,19 @@ export function AlbumDetailModal({
                   theme === "light"
                     ? "bg-gray-50/90 border-gray-200"
                     : "bg-black/20 border-white/10"
-                  }`}
+                }`}
               >
                 {/* Header - Desktop only */}
                 <div
                   className={`hidden md:block px-6 py-3 border-b ${
                     theme === "light" ? "border-gray-200" : "border-white/10"
-                    }
+                  }
                     }`}
                 >
                   <div
                     className={`grid grid-cols-[48px_4fr_2fr_250px_100px] gap-4 text-xs ${
                       theme === "light" ? "text-gray-600" : "text-white/60"
-                      }
+                    }
                     }`}
                   >
                     <div className="text-center">#</div>
@@ -3037,7 +3514,7 @@ export function AlbumDetailModal({
                 <div
                   className={`divide-y ${
                     theme === "light" ? "divide-gray-200" : "divide-white/10"
-                    }`}
+                  }`}
                 >
                   {sortedTracks.map((track) => (
                     <div
@@ -3046,13 +3523,13 @@ export function AlbumDetailModal({
                         theme === "light"
                           ? "hover:bg-gray-100"
                           : "hover:bg-white/5"
-                        }`}
+                      }`}
                     >
                       {/* Track number */}
                       <div
                         className={`hidden md:flex items-center justify-center ${
                           theme === "light" ? "text-gray-600" : "text-white/60"
-                          }`}
+                        }`}
                       >
                         {track.trackNumber}
                       </div>
@@ -3066,7 +3543,7 @@ export function AlbumDetailModal({
                                 theme === "light"
                                   ? "text-gray-900"
                                   : "text-white"
-                                }`}
+                              }`}
                             >
                               {track.title}
                             </span>
@@ -3075,14 +3552,16 @@ export function AlbumDetailModal({
                                 theme === "light"
                                   ? "text-gray-600"
                                   : "text-white/60"
-                                }`}
+                              }`}
                             >
                               {track.artist?.artistName || "Unknown Artist"}
                               {track.featuredArtists?.length > 0 && (
                                 <span
-                                  className={theme === "light"
-                                    ? "text-gray-400"
-                                    : "text-white/40"}
+                                  className={
+                                    theme === "light"
+                                      ? "text-gray-400"
+                                      : "text-white/40"
+                                  }
                                 >
                                   {" "}
                                   • feat.{" "}
@@ -3102,7 +3581,7 @@ export function AlbumDetailModal({
                               theme === "light"
                                 ? "text-gray-600"
                                 : "text-white/60"
-                              }`}
+                            }`}
                           >
                             {formatDuration(track.duration)}
                           </span>
@@ -3131,7 +3610,7 @@ export function AlbumDetailModal({
                       <div
                         className={`hidden md:flex items-center min-w-0 ${
                           theme === "light" ? "text-gray-900" : "text-white"
-                          }`}
+                        }`}
                       >
                         <span className="font-medium line-clamp-1">
                           {track.title}
@@ -3145,7 +3624,7 @@ export function AlbumDetailModal({
                               theme === "light"
                                 ? "text-gray-900"
                                 : "text-white/90"
-                              }`}
+                            }`}
                           >
                             {track.artist?.artistName || "Unknown Artist"}
                           </span>
@@ -3156,7 +3635,7 @@ export function AlbumDetailModal({
                               theme === "light"
                                 ? "text-gray-500"
                                 : "text-white/50"
-                              }`}
+                            }`}
                           >
                             feat.{" "}
                             {track.featuredArtists
@@ -3191,7 +3670,7 @@ export function AlbumDetailModal({
                       <div
                         className={`hidden md:flex items-center justify-end ${
                           theme === "light" ? "text-gray-600" : "text-white/60"
-                          }`}
+                        }`}
                       >
                         {formatDuration(track.duration)}
                       </div>
@@ -3204,7 +3683,7 @@ export function AlbumDetailModal({
                   <div
                     className={`px-6 py-3 text-xs ${
                       theme === "light" ? "text-gray-500" : "text-white/40"
-                      }`}
+                    }`}
                   >
                     © {album.label.name || "Unknown Label"}
                   </div>
@@ -3250,14 +3729,16 @@ export function TrackDetailModal({
 
   const handleArtistClick = (artistId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    onClose(); 
+    onClose();
     router.push(`/admin/artists/${artistId}`);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className={`${theme === "dark" ? "bg-[#1e1e1e] border-[#404040]" : "bg-white"}
+        className={`${
+          theme === "dark" ? "bg-[#1e1e1e] border-[#404040]" : "bg-white"
+        }
          p-0 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden`}
       >
         <DialogTitle className="sr-only">{track.title}</DialogTitle>
@@ -3271,8 +3752,8 @@ export function TrackDetailModal({
                   ${dominantColor}40 30%,
                   ${theme === "light" ? "#ffffff" : "#1e1e1e"} 100%)`
               : theme === "light"
-                ? "linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)"
-                : "linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)",
+              ? "linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)"
+              : "linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)",
           }}
         >
           {/* Close button */}
@@ -3285,9 +3766,11 @@ export function TrackDetailModal({
               aria-label="Close"
               className={`
                 w-8 h-8 rounded-full flex items-center justify-center 
-                ${theme === 'dark'
-                  ? 'bg-black/20 hover:bg-black/40 text-white/90'
-                  : 'bg-white/20 hover:bg-white/40 text-black/90'}
+                ${
+                  theme === "dark"
+                    ? "bg-black/20 hover:bg-black/40 text-white/90"
+                    : "bg-white/20 hover:bg-white/40 text-black/90"
+                }
               `}
             >
               <XIcon className="w-5 h-5" />
@@ -3299,13 +3782,15 @@ export function TrackDetailModal({
               {/* Track Cover */}
               <div className="w-[200px] flex-shrink-0">
                 <img
-                  src={track.coverUrl ||
+                  src={
+                    track.coverUrl ||
                     track.album?.coverUrl ||
-                    "https://placehold.co/200x200?text=No+Cover"}
+                    "https://placehold.co/200x200?text=No+Cover"
+                  }
                   alt={track.title}
                   className={`w-full aspect-square object-cover rounded-xl shadow-2xl ${
                     theme === "light" ? "shadow-gray-200/50" : "shadow-black/50"
-                    }`}
+                  }`}
                 />
               </div>
 
@@ -3314,7 +3799,7 @@ export function TrackDetailModal({
                 <h2
                   className={`text-2xl md:text-3xl font-bold ${
                     theme === "light" ? "text-gray-900" : "text-white"
-                    }`}
+                  }`}
                 >
                   {track.title}
                 </h2>
@@ -3323,11 +3808,13 @@ export function TrackDetailModal({
                 <div className="flex items-center justify-center md:justify-start gap-2">
                   <span
                     className={`font-medium ${
-                      track.artist?.id !== currentArtistId ? "cursor-pointer hover:underline" : ""
+                      track.artist?.id !== currentArtistId
+                        ? "cursor-pointer hover:underline"
+                        : ""
                     } ${theme === "light" ? "text-gray-900" : "text-white"}`}
-                    onClick={(e: React.MouseEvent) => 
-                      track.artist?.id && 
-                      track.artist.id !== currentArtistId && 
+                    onClick={(e: React.MouseEvent) =>
+                      track.artist?.id &&
+                      track.artist.id !== currentArtistId &&
                       handleArtistClick(track.artist.id, e)
                     }
                   >
@@ -3343,10 +3830,12 @@ export function TrackDetailModal({
                         theme === "light"
                           ? "bg-gray-100 text-gray-700"
                           : "bg-gray-800/40 text-gray-300"
-                        } px-2.5 py-1 rounded-full text-sm`}
+                      } px-2.5 py-1 rounded-full text-sm`}
                     >
                       <span
-                        className={theme === "light" ? "text-gray-500" : "text-gray-400"}
+                        className={
+                          theme === "light" ? "text-gray-500" : "text-gray-400"
+                        }
                       >
                         feat.
                       </span>
@@ -3381,7 +3870,7 @@ export function TrackDetailModal({
                   <div
                     className={`flex items-center gap-1.5 ${
                       theme === "light" ? "text-gray-600" : "text-white/60"
-                      }`}
+                    }`}
                   >
                     <Calendar className="w-4 h-4" />
                     <span>
@@ -3395,7 +3884,7 @@ export function TrackDetailModal({
                   <div
                     className={`flex items-center gap-1.5 ${
                       theme === "light" ? "text-gray-600" : "text-white/60"
-                      }`}
+                    }`}
                   >
                     <Music className="w-4 h-4" />
                     <span>{formatDuration(track.duration)}</span>
@@ -3407,26 +3896,33 @@ export function TrackDetailModal({
                     <span
                       className={`text-sm font-medium ${
                         theme === "light" ? "text-gray-500" : "text-gray-400"
-                        }`}
+                      }`}
                     >
                       From the album:
                     </span>
                     <div className="flex items-center gap-2 mt-1">
                       <img
-                        src={track.album.coverUrl || "https://placehold.co/150x150?text=No+Cover"}
+                        src={
+                          track.album.coverUrl ||
+                          "https://placehold.co/150x150?text=No+Cover"
+                        }
                         alt={track.album.title}
                         className="w-12 h-12 object-cover rounded"
                       />
                       <div>
                         <div
-                          className={`text-sm font-medium ${theme === "light" ? "text-gray-900" : "text-white"}`}
+                          className={`text-sm font-medium ${
+                            theme === "light" ? "text-gray-900" : "text-white"
+                          }`}
                         >
                           {track.album.title}
                         </div>
                         <div
-                          className={`text-xs ${theme === "light"
+                          className={`text-xs ${
+                            theme === "light"
                               ? "text-gray-600"
-                              : "text-gray-400"}`}
+                              : "text-gray-400"
+                          }`}
                         >
                           {track.album.type}
                           {"releaseDate" in track.album &&
@@ -3448,7 +3944,7 @@ export function TrackDetailModal({
                           theme === "light"
                             ? "bg-gray-100 text-gray-800"
                             : "bg-white/10 text-white/80"
-                          }`}
+                        }`}
                       >
                         {genre?.name || "Unknown Genre"}
                       </span>
@@ -3458,22 +3954,30 @@ export function TrackDetailModal({
 
                 <div className="mt-2">
                   <div
-                    className={`flex items-center gap-2 ${theme === "light" ? "text-gray-600" : "text-white/60"}`}
+                    className={`flex items-center gap-2 ${
+                      theme === "light" ? "text-gray-600" : "text-white/60"
+                    }`}
                   >
                     <span>Track #:</span>
                     <span
-                      className={theme === "light" ? "text-gray-900" : "text-white"}
+                      className={
+                        theme === "light" ? "text-gray-900" : "text-white"
+                      }
                     >
                       {track.trackNumber}
                     </span>
                   </div>
 
                   <div
-                    className={`flex items-center gap-2 mt-1 ${theme === "light" ? "text-gray-600" : "text-white/60"}`}
+                    className={`flex items-center gap-2 mt-1 ${
+                      theme === "light" ? "text-gray-600" : "text-white/60"
+                    }`}
                   >
                     <span>Play count:</span>
                     <span
-                      className={theme === "light" ? "text-gray-900" : "text-white"}
+                      className={
+                        theme === "light" ? "text-gray-900" : "text-white"
+                      }
                     >
                       {track.playCount.toLocaleString()}
                     </span>
@@ -3485,7 +3989,9 @@ export function TrackDetailModal({
 
           {/* Track Label */}
           <div
-            className={`px-6 pb-4 pt-2 text-xs ${theme === "dark" ? "text-white/40" : "text-gray-500"}`}
+            className={`px-6 pb-4 pt-2 text-xs ${
+              theme === "dark" ? "text-white/40" : "text-gray-500"
+            }`}
           >
             {track.label && (
               <span>© {track.label.name || "Unknown Label"}</span>
@@ -3498,9 +4004,11 @@ export function TrackDetailModal({
               <audio
                 controls
                 src={track.audioUrl}
-                className={`w-full rounded-lg ${theme === "dark"
+                className={`w-full rounded-lg ${
+                  theme === "dark"
                     ? "bg-[#282828] shadow-md shadow-black/30"
-                    : "bg-gray-100 shadow-sm"}`}
+                    : "bg-gray-100 shadow-sm"
+                }`}
                 style={{
                   filter:
                     theme === "dark"
@@ -3541,9 +4049,11 @@ export function EditTrackModal({
   useEffect(() => {
     if (track) {
       setFormData({
-        title: track.title || '',
+        title: track.title || "",
         duration: track.duration || 0,
-        releaseDate: track.releaseDate ? new Date(track.releaseDate).toISOString().split('T')[0] : '',
+        releaseDate: track.releaseDate
+          ? new Date(track.releaseDate).toISOString().split("T")[0]
+          : "",
         trackNumber: track.trackNumber || 1,
       });
       setIsActive(track.isActive); // Set initial isActive state
@@ -3572,28 +4082,30 @@ export function EditTrackModal({
     Object.entries(formData).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         // Ensure releaseDate is sent in correct format if changed
-        if (key === 'releaseDate' && value) {
-            try {
-              form.append(key, new Date(value.toString()).toISOString());
-            } catch (err) {
-              console.error("Invalid date format for releaseDate");
-              toast.error("Invalid release date format.");
-              return; // Prevent submission with invalid date
-            }
+        if (key === "releaseDate" && value) {
+          try {
+            form.append(key, new Date(value.toString()).toISOString());
+          } catch (err) {
+            console.error("Invalid date format for releaseDate");
+            toast.error("Invalid release date format.");
+            return; // Prevent submission with invalid date
+          }
         } else {
-           form.append(key, value.toString());
+          form.append(key, value.toString());
         }
       }
     });
     // Append the isActive state
-    form.append('isActive', String(isActive));
+    form.append("isActive", String(isActive));
 
     try {
       setIsUploading(true);
       await onSubmit(track.id, form);
       onClose();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update track');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update track"
+      );
     } finally {
       setIsUploading(false);
     }
@@ -3601,46 +4113,59 @@ export function EditTrackModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
-        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
-      )}>
+      <DialogContent
+        className={cn(
+          "sm:max-w-lg p-0 overflow-hidden flex flex-col",
+          theme === "dark"
+            ? "bg-gray-800 text-white border-gray-700"
+            : "bg-white"
+        )}
+      >
         {/* Header */}
         <div className="px-6 pt-6">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-4">
-              <div className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full",
-                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
-              )}>
-                <Music className={cn(
-                  "w-7 h-7",
-                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
-                )} strokeWidth={1.5} />
+              <div
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center rounded-full",
+                  theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+                )}
+              >
+                <Music
+                  className={cn(
+                    "w-7 h-7",
+                    theme === "dark" ? "text-blue-300" : "text-blue-600"
+                  )}
+                  strokeWidth={1.5}
+                />
               </div>
               <div>
-                <DialogTitle className={cn(
-                  "text-lg font-bold",
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                )}>
+                <DialogTitle
+                  className={cn(
+                    "text-lg font-bold",
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  )}
+                >
                   Edit Track
                 </DialogTitle>
-                <DialogDescription className={cn(
-                  "text-sm mt-1",
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                )}>
+                <DialogDescription
+                  className={cn(
+                    "text-sm mt-1",
+                    theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  )}
+                >
                   Update track information and status
                 </DialogDescription>
               </div>
             </div>
             {/* ... Close Button ... */}
-             <button
+            <button
               type="button"
               onClick={onClose}
               aria-label="Close"
               className={cn(
                 "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+                theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
               )}
             >
               <XIcon className="w-5 h-5" />
@@ -3648,30 +4173,40 @@ export function EditTrackModal({
           </div>
         </div>
         {/* Form */}
-        <form onSubmit={handleSubmit} id="edit-track-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+        <form
+          onSubmit={handleSubmit}
+          id="edit-track-form"
+          className="px-6 pt-4 pb-6 overflow-y-auto flex-grow"
+        >
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
             {/* ... Title, Track Number, Duration, Release Date fields ... */}
             <div className="col-span-2 space-y-2">
-              <UILabel htmlFor="title" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="title"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Title
               </UILabel>
               <Input
                 id="title"
                 name="title"
-                value={formData.title || ''}
+                value={formData.title || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 placeholder="Enter track title"
                 required
               />
             </div>
             <div className="space-y-2">
-              <UILabel htmlFor="trackNumber" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="trackNumber"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Track Number
               </UILabel>
               <Input
@@ -3679,19 +4214,22 @@ export function EditTrackModal({
                 name="trackNumber"
                 type="number"
                 min="1"
-                value={formData.trackNumber || ''}
+                value={formData.trackNumber || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 placeholder="Enter track number"
               />
             </div>
-             <div className="space-y-2">
-              <UILabel htmlFor="duration" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+            <div className="space-y-2">
+              <UILabel
+                htmlFor="duration"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Duration (seconds)
               </UILabel>
               <Input
@@ -3700,32 +4238,35 @@ export function EditTrackModal({
                 type="number"
                 min="0"
                 step="1"
-                value={formData.duration || ''}
+                value={formData.duration || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 placeholder="Enter duration in seconds"
               />
             </div>
-             <div className="col-span-2 space-y-2">
-              <UILabel htmlFor="releaseDate" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+            <div className="col-span-2 space-y-2">
+              <UILabel
+                htmlFor="releaseDate"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Release Date
               </UILabel>
               <Input
                 id="releaseDate"
                 name="releaseDate"
                 type="date"
-                value={formData.releaseDate || ''}
+                value={formData.releaseDate || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full flex items-center",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
               />
             </div>
@@ -3733,11 +4274,11 @@ export function EditTrackModal({
             {/* Is Active Switch */}
             <div className="col-span-2 flex items-center justify-between rounded-lg border p-4 mt-2">
               <div className="space-y-0.5">
-                <UILabel className="text-base">
-                  Track Status
-                </UILabel>
+                <UILabel className="text-base">Track Status</UILabel>
                 <p className="text-sm text-muted-foreground">
-                  {isActive ? "Track is visible and playable." : "Track is hidden from users."}
+                  {isActive
+                    ? "Track is visible and playable."
+                    : "Track is hidden from users."}
                 </p>
               </div>
               <Switch
@@ -3749,21 +4290,23 @@ export function EditTrackModal({
           </div>
         </form>
         {/* ... Footer ... */}
-         <div className={cn(
-          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
-          theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'
-        )}>
+        <div
+          className={cn(
+            "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          )}
+        >
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
-                : 'bg-white hover:bg-gray-50 border-gray-300'
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                : "bg-white hover:bg-gray-50 border-gray-300"
             )}
           >
             Cancel
@@ -3774,12 +4317,12 @@ export function EditTrackModal({
             disabled={isUploading}
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-neutral-900 hover:bg-neutral-900/90'
+              theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-neutral-900 hover:bg-neutral-900/90"
             )}
           >
-            {isUploading ? 'Saving...' : 'Save Changes'}
+            {isUploading ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </DialogContent>
@@ -3810,9 +4353,11 @@ export function EditAlbumModal({
   useEffect(() => {
     if (album) {
       setFormData({
-        title: album.title || '',
-        releaseDate: album.releaseDate ? new Date(album.releaseDate).toISOString().split('T')[0] : '',
-        type: album.type || 'ALBUM',
+        title: album.title || "",
+        releaseDate: album.releaseDate
+          ? new Date(album.releaseDate).toISOString().split("T")[0]
+          : "",
+        type: album.type || "ALBUM",
       });
       setIsActive(album.isActive); // Set initial isActive state
     } else {
@@ -3826,7 +4371,9 @@ export function EditAlbumModal({
   }
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -3840,28 +4387,30 @@ export function EditAlbumModal({
     Object.entries(formData).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         // Ensure releaseDate is sent in correct format if changed
-         if (key === 'releaseDate' && value) {
-            try {
-              form.append(key, new Date(value.toString()).toISOString());
-            } catch (err) {
-              console.error("Invalid date format for releaseDate");
-              toast.error("Invalid release date format.");
-              return; // Prevent submission with invalid date
-            }
-         } else {
-           form.append(key, value.toString());
-         }
+        if (key === "releaseDate" && value) {
+          try {
+            form.append(key, new Date(value.toString()).toISOString());
+          } catch (err) {
+            console.error("Invalid date format for releaseDate");
+            toast.error("Invalid release date format.");
+            return; // Prevent submission with invalid date
+          }
+        } else {
+          form.append(key, value.toString());
+        }
       }
     });
     // Append the isActive state
-    form.append('isActive', String(isActive));
+    form.append("isActive", String(isActive));
 
     try {
       setIsUploading(true);
       await onSubmit(album.id, form);
       onClose();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update album');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update album"
+      );
     } finally {
       setIsUploading(false);
     }
@@ -3869,34 +4418,47 @@ export function EditAlbumModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        'sm:max-w-lg p-0 overflow-hidden flex flex-col',
-        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white'
-      )}>
+      <DialogContent
+        className={cn(
+          "sm:max-w-lg p-0 overflow-hidden flex flex-col",
+          theme === "dark"
+            ? "bg-gray-800 text-white border-gray-700"
+            : "bg-white"
+        )}
+      >
         {/* Header */}
         <div className="px-6 pt-6">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-4">
-              <div className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full",
-                theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'
-              )}>
-                <AlbumIcon className={cn(
-                  "w-7 h-7",
-                  theme === 'dark' ? 'text-blue-300' : 'text-blue-600'
-                )} strokeWidth={1.5} />
+              <div
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center rounded-full",
+                  theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+                )}
+              >
+                <AlbumIcon
+                  className={cn(
+                    "w-7 h-7",
+                    theme === "dark" ? "text-blue-300" : "text-blue-600"
+                  )}
+                  strokeWidth={1.5}
+                />
               </div>
               <div>
-                <DialogTitle className={cn(
-                  "text-lg font-bold",
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                )}>
+                <DialogTitle
+                  className={cn(
+                    "text-lg font-bold",
+                    theme === "dark" ? "text-white" : "text-gray-900"
+                  )}
+                >
                   Edit Album
                 </DialogTitle>
-                <DialogDescription className={cn(
-                  "text-sm mt-1",
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
-                )}>
+                <DialogDescription
+                  className={cn(
+                    "text-sm mt-1",
+                    theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  )}
+                >
                   Update album information and status
                 </DialogDescription>
               </div>
@@ -3908,7 +4470,7 @@ export function EditAlbumModal({
               aria-label="Close"
               className={cn(
                 "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'
+                theme === "dark" ? "hover:bg-white/10" : "hover:bg-black/5"
               )}
             >
               <XIcon className="w-5 h-5" />
@@ -3916,42 +4478,52 @@ export function EditAlbumModal({
           </div>
         </div>
         {/* Form */}
-        <form onSubmit={handleSubmit} id="edit-album-form" className="px-6 pt-4 pb-6 overflow-y-auto flex-grow">
+        <form
+          onSubmit={handleSubmit}
+          id="edit-album-form"
+          className="px-6 pt-4 pb-6 overflow-y-auto flex-grow"
+        >
           <div className="grid grid-cols-2 gap-x-4 gap-y-4">
             {/* ... Title, Album Type, Release Date fields ... */}
-             <div className="col-span-2 space-y-2">
-              <UILabel htmlFor="title" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+            <div className="col-span-2 space-y-2">
+              <UILabel
+                htmlFor="title"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Title
               </UILabel>
               <Input
                 id="title"
                 name="title"
-                value={formData.title || ''}
+                value={formData.title || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
                 placeholder="Enter album title"
                 required
               />
             </div>
-             <div className="col-span-2 space-y-2">
-              <UILabel htmlFor="type" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+            <div className="col-span-2 space-y-2">
+              <UILabel
+                htmlFor="type"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Album Type
               </UILabel>
               <select
                 id="type"
                 name="type"
-                value={formData.type || 'ALBUM'}
+                value={formData.type || "ALBUM"}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full h-9 rounded-md px-3 py-2 text-sm border",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-gray-900'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white"
+                    : "bg-white border-gray-300 text-gray-900"
                 )}
               >
                 <option value="ALBUM">Album</option>
@@ -3960,32 +4532,35 @@ export function EditAlbumModal({
               </select>
             </div>
             <div className="col-span-2 space-y-2">
-              <UILabel htmlFor="releaseDate" className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>
+              <UILabel
+                htmlFor="releaseDate"
+                className={theme === "dark" ? "text-gray-300" : "text-gray-700"}
+              >
                 Release Date
               </UILabel>
               <Input
                 id="releaseDate"
                 name="releaseDate"
                 type="date"
-                value={formData.releaseDate || ''}
+                value={formData.releaseDate || ""}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
                 )}
               />
             </div>
 
-             {/* Is Active Switch */}
+            {/* Is Active Switch */}
             <div className="col-span-2 flex items-center justify-between rounded-lg border p-4 mt-2">
               <div className="space-y-0.5">
-                <UILabel className="text-base">
-                  Album Status
-                </UILabel>
+                <UILabel className="text-base">Album Status</UILabel>
                 <p className="text-sm text-muted-foreground">
-                  {isActive ? "Album is visible to users." : "Album is hidden from users."}
+                  {isActive
+                    ? "Album is visible to users."
+                    : "Album is hidden from users."}
                 </p>
               </div>
               <Switch
@@ -3997,21 +4572,23 @@ export function EditAlbumModal({
           </div>
         </form>
         {/* ... Footer ... */}
-        <div className={cn(
-          "px-6 py-4 flex gap-3 border-t flex-shrink-0",
-          theme === 'dark'
-            ? 'border-gray-700 bg-gray-800'
-            : 'border-gray-100 bg-gray-50'
-        )}>
+        <div
+          className={cn(
+            "px-6 py-4 flex gap-3 border-t flex-shrink-0",
+            theme === "dark"
+              ? "border-gray-700 bg-gray-800"
+              : "border-gray-100 bg-gray-50"
+          )}
+        >
           <Button
             type="button"
             variant="outline"
             onClick={onClose}
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' 
-                : 'bg-white hover:bg-gray-50 border-gray-300'
+              theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                : "bg-white hover:bg-gray-50 border-gray-300"
             )}
           >
             Cancel
@@ -4022,12 +4599,12 @@ export function EditAlbumModal({
             disabled={isUploading}
             className={cn(
               "flex-1 text-center justify-center",
-              theme === 'dark' 
-                ? 'bg-blue-600 hover:bg-blue-700' 
-                : 'bg-neutral-900 hover:bg-neutral-900/90'
+              theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-neutral-900 hover:bg-neutral-900/90"
             )}
           >
-            {isUploading ? 'Saving...' : 'Save Changes'}
+            {isUploading ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </DialogContent>
