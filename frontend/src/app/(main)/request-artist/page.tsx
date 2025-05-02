@@ -12,6 +12,7 @@ import type { User as UserType } from '@/types';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const SectionHeading = ({ icon: Icon, title }: { icon: React.ElementType, title: string }) => (
   <div className="flex items-center gap-3 mb-4">
@@ -38,21 +39,20 @@ export default function RequestArtistPage() {
     { id: string; name: string }[]
   >([]);
   const [hasPendingRequest, setHasPendingRequest] = useState<boolean>(false);
-  const [genreError, setGenreError] = useState<string | null>(null); // New state for genre error
-  const [submissionTimestamp, setSubmissionTimestamp] = useState<number | null>(null); // Add state for timestamp
+  const [genreError, setGenreError] = useState<string | null>(null);
+  const [submissionTimestamp, setSubmissionTimestamp] = useState<number | null>(null);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   useEffect(() => {
     const storedPending = localStorage.getItem('hasPendingRequest');
-    const storedTimestamp = localStorage.getItem('submissionTimestamp'); // Read timestamp
+    const storedTimestamp = localStorage.getItem('submissionTimestamp');
     setHasPendingRequest(storedPending ? JSON.parse(storedPending) : false);
-    setSubmissionTimestamp(storedTimestamp ? JSON.parse(storedTimestamp) : null); // Set timestamp state
+    setSubmissionTimestamp(storedTimestamp ? JSON.parse(storedTimestamp) : null);
   }, []);
 
-  // Lắng nghe sự kiện Socket.IO
   useEffect(() => {
     const socket = getSocket();
 
-    // Listen for artist request status updates
     const handleArtistRequestStatus = (
       data: { type: string; message: string; hasPendingRequest?: boolean; userId?: string }
     ) => {
@@ -72,14 +72,12 @@ export default function RequestArtistPage() {
 
     socket.on('artist-request-status', handleArtistRequestStatus);
 
-    // Cleanup listener
     return () => {
       console.log('Cleaning up Request Artist page socket listener');
       socket.off('artist-request-status', handleArtistRequestStatus);
     };
   }, []);
 
-  // Kiểm tra xem người dùng đã có yêu cầu trở thành Artist chưa
   useEffect(() => {
     const checkPendingRequest = async () => {
       let user: UserType | null = null;
@@ -94,17 +92,14 @@ export default function RequestArtistPage() {
           }
         }
 
-        // Sửa lỗi linter: Kiểm tra sự tồn tại và trạng thái active của artistProfile
         if (user && user.artistProfile && user.artistProfile.isActive) {
             console.log('User đã là Artist active, chuyển hướng...');
-            router.push(`/artist/profile/${user.artistProfile.id}`); // Chuyển hướng đến trang artist profile
+            router.push(`/artist/profile/${user.artistProfile.id}`);
             return;
         }
 
-        // Chỉ kiểm tra request nếu chưa phải là artist active
         const token = localStorage.getItem('userToken');
         if (!token) {
-          // Không cần throw lỗi ở đây, chỉ đơn giản là không kiểm tra được
           console.warn('Không tìm thấy token để kiểm tra artist request.');
           return;
         }
@@ -120,14 +115,12 @@ export default function RequestArtistPage() {
 
       } catch (err) {
         console.error('Error checking pending request:', err);
-        // Có thể thêm xử lý lỗi cụ thể hơn nếu cần
       }
     };
 
     checkPendingRequest();
   }, [router]);
 
-  // Lấy danh sách thể loại
   useEffect(() => {
     const fetchGenres = async () => {
       try {
@@ -143,7 +136,6 @@ export default function RequestArtistPage() {
     fetchGenres();
   }, []);
 
-  // --- Handle Input Change --- 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -151,13 +143,11 @@ export default function RequestArtistPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // --- Handle Genre Change --- 
   const handleGenreChange = (selectedGenreIds: string[]) => {
     setFormData((prev) => ({ ...prev, genres: selectedGenreIds }));
-    setGenreError(null); // Clear genre error when selection changes
+    setGenreError(null);
   };
 
-  // --- Handle Avatar Change --- 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -182,19 +172,22 @@ export default function RequestArtistPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Reset general error and specific errors
     setError(null);
-    setGenreError(null); // Reset specific genre error
+    setGenreError(null);
 
-    // --- Genre Validation --- 
     if (formData.genres.length === 0) {
-        setGenreError('This field is required'); // Set specific genre error message
+        setGenreError('This field is required');
         toast.error('Please select at least one genre.');
-        return; // Stop submission
+        return;
     } 
-    // --- End Genre Validation ---
 
-    setIsSubmitting(true); // Set submitting state only if validation passes
+    if (!agreedToTerms) {
+      toast.error('You must agree to the Terms of Use.');
+      setError('Please agree to the Terms of Use to continue.');
+      return;
+    }
+
+    setIsSubmitting(true);
 
     let userData: UserType | null = null;
     try {
@@ -216,7 +209,7 @@ export default function RequestArtistPage() {
           throw new Error('User data not found. Please log in again.');
       }
 
-      if (!userData) { // Kiểm tra lại userData sau khi parse
+      if (!userData) {
           throw new Error('Failed to load user data.');
       }
 
@@ -230,7 +223,6 @@ export default function RequestArtistPage() {
       submitFormData.append('label', formData.label);
       submitFormData.append('genres', formData.genres.join(','));
 
-      // Construct and append socialMediaLinks JSON string (only FB/Insta)
       const socialMediaLinks = {
         ...(formData.facebookLink !== 'https://www.facebook.com/' && { facebook: formData.facebookLink }),
         ...(formData.instagramLink !== 'https://www.instagram.com/' && { instagram: formData.instagramLink }),
@@ -243,18 +235,16 @@ export default function RequestArtistPage() {
 
       await api.user.requestArtistRole(token, submitFormData);
 
-      const timestamp = Date.now(); // Get current timestamp
+      const timestamp = Date.now();
       setHasPendingRequest(true);
-      setSubmissionTimestamp(timestamp); // Set timestamp state
+      setSubmissionTimestamp(timestamp);
       localStorage.setItem('hasPendingRequest', JSON.stringify(true));
-      localStorage.setItem('submissionTimestamp', JSON.stringify(timestamp)); // Store timestamp
+      localStorage.setItem('submissionTimestamp', JSON.stringify(timestamp));
       toast.success('Your request has been submitted successfully!', { duration: 2000 });
 
-      // Sửa lỗi linter: Lưu userId vào biến trước khi dùng trong setTimeout
       if (userData?.id) {
-        const userId = userData.id; // Lưu id vào biến
+        const userId = userData.id;
         setTimeout(() => {
-          // Sử dụng biến userId đã được kiểm tra
           router.push(`/profile/${userId}`);
         }, 2000);
       } else {
@@ -301,7 +291,6 @@ export default function RequestArtistPage() {
                 You have already submitted a request to become an artist. Please
                 wait for admin approval.
               </span>
-              {/* Display submission time if available */}
               {submissionTimestamp && (
                 <span className="text-base text-white/60 mt-2">
                   Submitted on:{' '}
@@ -344,7 +333,6 @@ export default function RequestArtistPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Integrated Avatar Preview & Upload */}
           <div className="flex flex-col items-center justify-center mb-6 space-y-2">
             <label
               htmlFor="avatar-upload"
@@ -361,7 +349,7 @@ export default function RequestArtistPage() {
                   alt="Avatar Preview"
                   layout="fill"
                   objectFit="cover"
-                  className="rounded-full" // Ensure image itself is rounded if needed
+                  className="rounded-full"
                 />
               ) : (
                 <div className="text-center text-white/40 p-4">
@@ -369,7 +357,6 @@ export default function RequestArtistPage() {
                   <span className="text-xs block">Click to upload</span>
                 </div>
               )}
-              {/* Hover overlay */}
               <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <ImageIcon className="w-8 h-8 text-white/80" />
               </div>
@@ -446,7 +433,6 @@ export default function RequestArtistPage() {
 
           <hr className="border-white/[0.1]" />
 
-          {/* Section: Social Links - Moved Up */}
           <div className="space-y-6">
             <SectionHeading icon={Link2} title="Social Links" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -489,7 +475,6 @@ export default function RequestArtistPage() {
 
           <hr className="border-white/[0.1]" />
 
-          {/* Section: Music Profile */}
           <div className="space-y-6">
             <SectionHeading icon={Music} title="Music Profile" />
             <div>
@@ -506,12 +491,32 @@ export default function RequestArtistPage() {
               {genreError ? (
                 <p className="text-xs text-red-500 mt-1.5">{genreError}</p>
               ) : (
-                null // Render nothing if no error
+                null
               )}
             </div>
           </div>
 
           <hr className="border-white/[0.1]" />
+
+          <div className="flex items-start space-x-3 mt-6">
+            <Checkbox
+              id="terms"
+              checked={agreedToTerms}
+              onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+              className="mt-1 border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black"
+            />
+            <div className="grid gap-1.5 leading-none">
+              <label
+                htmlFor="terms"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-white/80 cursor-pointer"
+              >
+                I agree to the Terms of Use *
+              </label>
+              <p className="text-xs text-muted-foreground">
+                By submitting, you confirm that you own the rights to your music or have been granted the necessary permissions.
+              </p>
+            </div>
+          </div>
 
           {error && (
              <div className="bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
@@ -532,7 +537,7 @@ export default function RequestArtistPage() {
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !formData.artistName || !formData.bio || !formData.avatarFile || !formData.label}
+              disabled={isSubmitting || !formData.artistName || !formData.bio || !formData.avatarFile || !formData.label || !agreedToTerms}
               className="flex items-center gap-2"
             >
               {isSubmitting ? (
