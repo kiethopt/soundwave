@@ -95,13 +95,6 @@ const authorize = (roles) => {
                     });
                     return;
                 }
-                if (user.currentProfile !== 'ARTIST') {
-                    res.status(403).json({
-                        message: 'Please switch to Artist profile to access this page',
-                        code: 'SWITCH_TO_ARTIST_PROFILE',
-                    });
-                    return;
-                }
                 return next();
             }
             if (roles.includes(client_1.Role.USER) && user.role === client_1.Role.USER) {

@@ -127,15 +127,6 @@ export const authorize = (roles: Role[]) => {
           return;
         }
 
-        // Kiểm tra nếu chưa switch sang profile ARTIST
-        if (user.currentProfile !== 'ARTIST') {
-          res.status(403).json({
-            message: 'Please switch to Artist profile to access this page',
-            code: 'SWITCH_TO_ARTIST_PROFILE',
-          });
-          return;
-        }
-
         return next();
       }
 

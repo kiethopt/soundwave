@@ -4,38 +4,20 @@ import { use, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/utils/api";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Album, AlbumType, ArtistProfile, Track, Playlist } from "@/types";
+import { Album, AlbumType, ArtistProfile, Track, Playlist, Genre } from "@/types";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { Verified, Play, Pause, Edit, Up, Down } from "@/components/ui/Icons";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Tag } from "lucide-react";
 import { useTrack } from "@/contexts/TrackContext";
 import HorizontalTrackListItem from "@/components/user/track/HorizontalTrackListItem";
 import { EditArtistProfileModal } from "@/components/ui/data-table/data-table-modals";
+import { EditArtistGenresModal } from "@/components/ui/artist-modals";
 import Image from "next/image";
 import io, { Socket } from "socket.io-client";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
 import { useAuth } from "@/hooks/useAuth";
-import { Heart, ListMusic, MoreHorizontal, Share2 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuPortal,
-  DropdownMenuSubContent,
-} from "@/components/ui/dropdown-menu";
-
-// Define the names of playlists to filter out
-const filteredPlaylistNames = new Set([
-  "Vibe Rewind",
-  "Welcome Mix",
-  "Favorites",
-]);
 
 function getBrightness(hexColor: string) {
   const r = parseInt(hexColor.substr(1, 2), 16);
@@ -83,6 +65,8 @@ export default function ArtistProfilePage({
   const [activeTab, setActiveTab] = useState<"popular" | "albums" | "singles">(
     "popular"
   );
+  const [isGenresModalOpen, setIsGenresModalOpen] = useState(false);
+  const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
 
   const {
     currentTrack,
@@ -110,6 +94,7 @@ export default function ArtistProfilePage({
         tracksResponse,
         singlesResponse,
         relatedArtistsResponse,
+        genresResponse,
       ] = await Promise.all([
         api.artists.getProfile(id, token),
         api.user.getUserFollowing(userData.id, token),
@@ -117,10 +102,12 @@ export default function ArtistProfilePage({
         api.artists.getTrackByArtistId(id, token),
         api.artists.getTrackByArtistId(id, token, "SINGLE"),
         api.artists.getRelatedArtists(id, token),
+        api.genres.getAll(token),
       ]);
 
       setArtist(artistData);
       setFollowerCount(artistData.monthlyListeners || 0);
+      setAvailableGenres(genresResponse.genres || []);
 
       if (followingResponse) {
         const isFollowing = followingResponse.some(
@@ -973,6 +960,18 @@ export default function ArtistProfilePage({
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [artist]);
 
+  // Add handler for updating genres
+  const handleGenresUpdate = async (artistId: string, formData: FormData) => {
+    try {
+      await api.artists.updateProfile(artistId, formData, token);
+      toast.success("Genres updated successfully");
+      fetchData(); // Refresh data
+    } catch (error) {
+      console.error("Error updating genres:", error);
+      toast.error("Failed to update genres");
+    }
+  };
+
   if (!artist) return null;
 
   return (
@@ -1025,16 +1024,26 @@ export default function ArtistProfilePage({
                 </button>
 
                 {isOwner && (
-                  <button
-                    onClick={() => setIsEditOpen(true)}
-                    className={`p-2 rounded-lg transition-all ${
-                      theme === "light"
-                        ? "bg-white/80 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm hover:shadow"
-                        : "bg-black/20 hover:bg-black/30 text-white/80 hover:text-white"
-                    }`}
-                  >
-                    <Edit className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant={theme === "dark" ? "outline" : "outline"}
+                      size="sm"
+                      onClick={() => setIsEditOpen(true)}
+                      className="flex-shrink-0 gap-2"
+                    >
+                      <Edit className="w-4 h-4" />
+                      Edit Profile
+                    </Button>
+                    <Button
+                      variant={theme === "dark" ? "outline" : "outline"}
+                      size="sm"
+                      onClick={() => setIsGenresModalOpen(true)}
+                      className="flex-shrink-0 gap-2"
+                    >
+                      <Tag className="w-4 h-4" />
+                      Edit Genres
+                    </Button>
+                  </div>
                 )}
               </div>
 
@@ -1114,6 +1123,26 @@ export default function ArtistProfilePage({
               )}
             </div>
           </div>
+
+          {/* Genres Display - show current genres */}
+          {artist.genres && artist.genres.length > 0 && (
+            <div className="px-4 md:px-6 py-2">
+              <div className="flex flex-wrap gap-2">
+                {artist.genres.map((genreItem) => (
+                  <span
+                    key={genreItem.genre.id}
+                    className={`px-3 py-1 text-sm rounded-full ${
+                      theme === 'light'
+                        ? 'bg-gray-200 text-gray-800'
+                        : 'bg-gray-800 text-gray-200'
+                    }`}
+                  >
+                    {genreItem.genre.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Track Section */}
           <div className="px-4 md:px-6 py-6 flex flex-col-reverse lg:flex-row gap-4 lg:gap-12">
@@ -1287,6 +1316,15 @@ export default function ArtistProfilePage({
               toast.success("Profile updated! Refreshing data...");
               fetchData();
             }}
+          />
+
+          <EditArtistGenresModal
+            artistProfile={artist}
+            isOpen={isGenresModalOpen}
+            onClose={() => setIsGenresModalOpen(false)}
+            onSubmit={handleGenresUpdate}
+            theme={theme}
+            availableGenres={availableGenres}
           />
         </div>
       )}

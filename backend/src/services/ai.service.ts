@@ -1938,11 +1938,11 @@ function calculateTrackScore(track: any, params: any): number {
 }
 
 /**
- * Suggests additional tracks for an existing playlist using Gemini AI
- * @param playlistId - The ID of the playlist to suggest tracks for
- * @param userId - The user ID who owns the playlist
- * @param count - The number of tracks to suggest (default: 5)
- * @returns A Promise resolving to an array of track IDs
+ * Gợi ý thêm bài hát cho playlist dựa trên AI
+ * @param playlistId - ID của playlist để đề xuất bài hát
+ * @param userId - ID của người dùng sở hữu playlist
+ * @param count - Số lượng bài hát đề xuất (mặc định: 5)
+ * @returns Một Promise trả về mảng ID bài hát
  */
 export const suggestMoreTracksUsingAI = async (
   playlistId: string,
