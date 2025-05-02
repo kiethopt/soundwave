@@ -438,11 +438,16 @@ export default function PlaylistPage() {
         const token = localStorage.getItem("userToken");
         if (!token || !playlist) return;
 
+        // Find the track being removed to get its duration
+        const trackToRemove = playlist.tracks.find(t => t.id === trackId);
+        if (!trackToRemove) return;
+
         await api.playlists.removeTrack(id as string, trackId, token);
         setPlaylist({
           ...playlist,
           tracks: playlist.tracks.filter((t) => t.id !== trackId),
           totalTracks: playlist.totalTracks - 1,
+          totalDuration: playlist.totalDuration - (trackToRemove.duration || 0)
         });
       } catch (error) {
         console.error("Error removing track:", error);

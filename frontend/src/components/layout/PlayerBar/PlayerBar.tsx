@@ -200,7 +200,7 @@ export default function PlayerBar() {
                 <h3
                   className="text-white font-medium text-ellipsis overflow-hidden whitespace-nowrap hover:underline cursor-pointer underline-offset-2"
                   onClick={() => {
-                    if (currentTrack.album?.id) {
+                    if (currentTrack.album) {
                       router.push(`/album/${currentTrack.album.id}`);
                     } else {
                       router.push(`/track/${currentTrack.id}`);

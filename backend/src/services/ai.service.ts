@@ -1952,7 +1952,35 @@ export const suggestMoreTracksUsingAI = async (
   try {
     console.log(`[AI] Suggesting more tracks for playlist ${playlistId}, user ${userId}`);
     
-    // Get the playlist details with existing tracks
+    // Get user's play history
+    const userHistory = await prisma.history.findMany({
+      where: {
+        userId,
+        type: "PLAY",
+      },
+      include: {
+        track: {
+          include: {
+            artist: true,
+            genres: {
+              include: {
+                genre: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+      take: 20, // Get last 20 played tracks
+    });
+
+    // Filter out null tracks and create a type-safe array
+    const validUserHistory = userHistory.filter((h): h is typeof userHistory[0] & { track: NonNullable<typeof h.track> } => h.track !== null);
+    const userPlayedTrackIds = new Set(validUserHistory.map(h => h.track.id));
+    
+    // Lấy playlist hiện tại
     const playlist = await prisma.playlist.findUnique({
       where: { id: playlistId },
       include: {
@@ -1967,6 +1995,11 @@ export const suggestMoreTracksUsingAI = async (
                   },
                 },
                 album: true,
+                featuredArtists: {
+                  include: {
+                    artistProfile: true
+                  }
+                }
               },
             },
           },
@@ -1981,131 +2014,236 @@ export const suggestMoreTracksUsingAI = async (
       throw new Error("Playlist not found");
     }
 
-    // Extract existing track IDs to exclude them from suggestions
+    // Check nếu trong playlist có ít nhất 3 track hay chưa
+    if (playlist.tracks.length < 3) {
+      throw new Error("Bạn cần thêm ít nhất 3 bài hát để sử dụng chức năng này");
+    }
+
+    // Lấy trackId từ Tracks trong Playlist
     const existingTrackIds = playlist.tracks.map(pt => pt.track.id);
-    
-    // Extract genre information from the playlist
-    const genreCounts: Record<string, { count: number; name: string }> = {};
-    const artistCounts: Record<string, { count: number; name: string }> = {};
-    
+
+    // Lấy tất cả artist có trong playlist (gồm main artists và featured artists)
+    const playlistArtists = new Set<string>();
+    const artistNames = new Set<string>();
+    const relevantGenres = new Set<string>();
+    const featuredArtistIds = new Set<string>();
+
+    // Lấy main artist, genres, và featured Artist từ Track trong Playlist
     playlist.tracks.forEach(pt => {
-      // Count genres
-      pt.track.genres.forEach(genreRel => {
-        const genreId = genreRel.genre.id;
-        const genreName = genreRel.genre.name;
-        
-        if (!genreCounts[genreId]) {
-          genreCounts[genreId] = { count: 0, name: genreName };
-        }
-        genreCounts[genreId].count += 1;
-      });
-      
-      // Count artists
-      const artistId = pt.track.artist?.id;
-      const artistName = pt.track.artist?.artistName;
-      
-      if (artistId && artistName) {
-        if (!artistCounts[artistId]) {
-          artistCounts[artistId] = { count: 0, name: artistName };
-        }
-        artistCounts[artistId].count += 1;
+      // Add main artist
+      if (pt.track.artist?.id) {
+        playlistArtists.add(pt.track.artist.id);
+        artistNames.add(pt.track.artist.artistName);
       }
+
+      // Add genres
+      pt.track.genres.forEach(g => {
+        if (g.genre) {
+          relevantGenres.add(g.genre.id);
+        }
+      });
+
+      // Add featured artists
+      pt.track.featuredArtists.forEach(f => {
+        if (f.artistProfile) {
+          featuredArtistIds.add(f.artistProfile.id);
+          artistNames.add(f.artistProfile.artistName);
+        }
+      });
     });
-    
-    // Get top genres
-    const topGenres = Object.entries(genreCounts)
-      .sort(([, a], [, b]) => b.count - a.count)
-      .slice(0, 3)
-      .map(([id, data]) => ({ 
-        id, 
-        name: data.name, 
-        count: data.count 
-      }));
-      
-    // Get top artists
-    const topArtists = Object.entries(artistCounts)
-      .sort(([, a], [, b]) => b.count - a.count)
-      .slice(0, 3)
-      .map(([id, data]) => ({ 
-        id, 
-        name: data.name, 
-        count: data.count 
-      }));
-    
-    // Create prompt for Gemini AI
-    let prompt = `I need to suggest ${count} more tracks for a playlist based on the current tracks in the playlist. The playlist has ${playlist.tracks.length} tracks and includes these artists and genres:\n\n`;
-    
-    // Add top artists to prompt
-    if (topArtists.length > 0) {
-      prompt += "Top artists in the playlist:\n";
-      topArtists.forEach(artist => {
-        prompt += `- ${artist.name} (${artist.count} tracks)\n`;
-      });
-      prompt += "\n";
-    }
-    
-    // Add top genres to prompt
-    if (topGenres.length > 0) {
-      prompt += "Top genres in the playlist:\n";
-      topGenres.forEach(genre => {
-        prompt += `- ${genre.name} (${genre.count} tracks)\n`;
-      });
-      prompt += "\n";
-    }
-    
-    // Add sample tracks
-    const sampleTracks = playlist.tracks.slice(0, 10);
-    if (sampleTracks.length > 0) {
-      prompt += "Sample tracks in the playlist:\n";
-      sampleTracks.forEach((pt, index) => {
-        prompt += `${index + 1}. "${pt.track.title}" by ${pt.track.artist?.artistName || 'Unknown'}\n`;
-      });
-      prompt += "\n";
-    }
-    
-    // Get user's listening history to understand preferences
-    const userHistory = await prisma.history.findMany({
+
+    console.log(`[AI] Found ${playlistArtists.size} main artists and ${featuredArtistIds.size} featured artists in playlist`);
+
+    // 1. Lấy thêm track của artist không có trong playlist
+    const artistTracks = playlistArtists.size > 0 ? await prisma.track.findMany({
       where: {
-        userId,
-        type: "PLAY",
+        isActive: true,
+        id: { notIn: existingTrackIds },
+        artistId: {
+          in: Array.from(playlistArtists)
+        }
       },
       include: {
-        track: {
-          select: {
-            id: true,
-            title: true,
-            artistId: true,
-            artist: {
-              select: {
-                artistName: true,
-              }
-            }
-          },
+        artist: true,
+        genres: {
+          include: {
+            genre: true
+          }
         },
+        featuredArtists: {
+          include: {
+            artistProfile: true
+          }
+        }
       },
       orderBy: {
-        updatedAt: "desc",
+        playCount: 'desc'
       },
-      take: 20, // Consider recent 20 tracks
-    });
-    
-    // Add user history to prompt
-    if (userHistory.length > 0) {
-      prompt += "User's recent listening history (not necessarily in the playlist):\n";
-      userHistory.slice(0, 5).forEach((history, index) => {
-        if (history.track) {
-          prompt += `${index + 1}. "${history.track.title}" by ${history.track.artist?.artistName || 'Unknown'}\n`;
+      take: count * 2
+    }) : [];
+
+    // 2. Lấy track có featured artist là main artist
+    const featuredTracks = playlistArtists.size > 0 ? await prisma.track.findMany({
+      where: {
+        isActive: true,
+        id: { 
+          notIn: [...existingTrackIds, ...artistTracks.map(t => t.id)]
+        },
+        featuredArtists: {
+          some: {
+            artistProfile: {
+              id: {
+                in: Array.from(playlistArtists)
+              }
+            }
+          }
         }
-      });
-      prompt += "\n";
-    }
-    
-    // Final instructions
-    prompt += `Based on this information, suggest ${count} more tracks that would fit well with this playlist. Consider both the artist style and genre consistency. I need the exact track IDs for the suggestions.
+      },
+      include: {
+        artist: true,
+        genres: {
+          include: {
+            genre: true
+          }
+        },
+        featuredArtists: {
+          include: {
+            artistProfile: true
+          }
+        }
+      },
+      orderBy: {
+        playCount: 'desc'
+      },
+      take: count * 2
+    }) : [];
 
-You can select tracks from our database that match these criteria. Return ONLY a list of track IDs formatted as a valid JSON array of strings.`;
+    // 3. Lấy track của featured artist có trong Playlist
+    const collaboratorTracks = featuredArtistIds.size > 0 ? await prisma.track.findMany({
+      where: {
+        isActive: true,
+        id: { 
+          notIn: [...existingTrackIds, ...artistTracks.map(t => t.id), ...featuredTracks.map(t => t.id)]
+        },
+        artistId: {
+          in: Array.from(featuredArtistIds)
+        }
+      },
+      include: {
+        artist: true,
+        genres: {
+          include: {
+            genre: true
+          }
+        },
+        featuredArtists: {
+          include: {
+            artistProfile: true
+          }
+        }
+      },
+      orderBy: {
+        playCount: 'desc'
+      },
+      take: count * 2
+    }) : [];
 
-    // Call Gemini API with the prompt
+    // 4. Lấy tracks có cùng thể loại với track trong Playlist
+    const genreTracks = relevantGenres.size > 0 ? await prisma.track.findMany({
+      where: {
+        isActive: true,
+        id: { 
+          notIn: [
+            ...existingTrackIds, 
+            ...artistTracks.map(t => t.id), 
+            ...featuredTracks.map(t => t.id), 
+            ...collaboratorTracks.map(t => t.id)
+          ]
+        },
+        genres: {
+          some: {
+            genreId: {
+              in: Array.from(relevantGenres)
+            }
+          }
+        }
+      },
+      include: {
+        artist: true,
+        genres: {
+          include: {
+            genre: true
+          }
+        },
+        featuredArtists: {
+          include: {
+            artistProfile: true
+          }
+        }
+      },
+      orderBy: {
+        playCount: 'desc'
+      },
+      take: count * 2
+    }) : [];
+
+    // Tạo prompt để gửi cho Gemini phân tích
+    let prompt = `I need to analyze a playlist and its potential suggested tracks to ensure they match well. Here's the information:
+    Current Playlist Analysis:
+    Artists: ${Array.from(artistNames).join(', ')}
+    Genres: ${Array.from(new Set(playlist.tracks.flatMap(pt => pt.track.genres.map(g => g.genre.name)))).join(', ')}
+
+    Sample tracks from current playlist:
+    ${playlist.tracks.slice(0, 5).map(pt => 
+      `- "${pt.track.title}" by ${pt.track.artist?.artistName || 'Unknown'} (${pt.track.genres.map(g => g.genre.name).join(', ')})`
+    ).join('\n')}
+
+    ${userHistory.length > 0 ? `
+    User's Recent Play History (Last ${userHistory.length} tracks):
+    ${validUserHistory.map(h => 
+      `- "${h.track.title}" by ${h.track.artist?.artistName || 'Unknown'} (${h.track.genres.map(g => g.genre.name).join(', ')})`
+    ).join('\n')}
+    ` : ''}
+
+    Potential suggestions to analyze:
+
+    1. More tracks by same artists:
+    ${artistTracks.map(t => 
+      `- "${t.title}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
+    ).join('\n')}
+
+    2. Tracks featuring playlist artists:
+    ${featuredTracks.map(t => 
+      `- "${t.title}" by ${t.artist?.artistName || 'Unknown'} ft. ${t.featuredArtists.map(f => f.artistProfile?.artistName).join(', ')} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
+    ).join('\n')}
+
+    3. Tracks by collaborating artists:
+    ${collaboratorTracks.map(t => 
+      `- "${t.title}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
+    ).join('\n')}
+
+    4. Genre-based suggestions:
+    ${genreTracks.map(t => 
+      `- "${t.title}" by ${t.artist?.artistName || 'Unknown'} (${t.genres.map(g => g.genre.name).join(', ')}) [${userPlayedTrackIds.has(t.id) ? 'Previously Played' : 'New'}]`
+    ).join('\n')}
+
+    For each track, analyze if it would be a good fit for the playlist based on:
+    1. Artist compatibility
+    2. Genre consistency
+    3. Musical style and mood
+    4. Collaboration patterns
+    5. User's listening history (prefer a mix of familiar and new tracks)
+
+    IMPORTANT: Include at least one track that the user hasn't played before (marked as [New]) in your recommendations.
+
+    Return a JSON array of track IDs that you recommend, ordered by relevance. Include only the most suitable tracks.
+    Format: ["track_id1", "track_id2", ...]
+
+    Make sure your selection includes:
+    - A balanced mix of familiar and new tracks
+    - At least one track marked as [New]
+    - Tracks that align with both the playlist's theme and user's taste`;
+
     try {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
@@ -2124,214 +2262,85 @@ You can select tracks from our database that match these criteria. Return ONLY a
           maxOutputTokens: 1024,
         }
       });
+
+      console.log("[AI] Sending playlist analysis to Gemini");
       
-      // Query the database for tracks that match the genres in the playlist
-      let suggestedTracks: any[] = [];
-      
-      if (topGenres.length > 0) {
-        // Build a query based on the top genres
-        suggestedTracks = await prisma.track.findMany({
-          where: {
-            isActive: true,
-            id: { notIn: existingTrackIds },
-            genres: {
-              some: {
-                genreId: {
-                  in: topGenres.map(g => g.id)
-                }
-              }
-            },
-          },
-          include: {
-            artist: true,
-            genres: {
-              include: {
-                genre: true
-              }
-            }
-          },
-          orderBy: {
-            playCount: "desc"
-          },
-          take: count * 5 // Get more than needed to allow for filtering
-        });
-      }
-      
-      // If not enough tracks by genre, try by artist
-      if (suggestedTracks.length < count && topArtists.length > 0) {
-        const artistTracks = await prisma.track.findMany({
-          where: {
-            isActive: true,
-            id: { 
-              notIn: [...existingTrackIds, ...suggestedTracks.map(t => t.id)] 
-            },
-            artistId: {
-              in: topArtists.map(a => a.id)
-            }
-          },
-          include: {
-            artist: true,
-            genres: {
-              include: {
-                genre: true
-              }
-            }
-          },
-          orderBy: {
-            playCount: "desc"
-          },
-          take: count * 3
-        });
-        
-        suggestedTracks = [...suggestedTracks, ...artistTracks];
-      }
-      
-      // Still not enough tracks? Get popular tracks
-      if (suggestedTracks.length < count) {
-        const popularTracks = await prisma.track.findMany({
-          where: {
-            isActive: true,
-            id: { 
-              notIn: [...existingTrackIds, ...suggestedTracks.map(t => t.id)] 
-            },
-          },
-          include: {
-            artist: true,
-            genres: {
-              include: {
-                genre: true
-              }
-            }
-          },
-          orderBy: {
-            playCount: "desc"
-          },
-          take: count * 2
-        });
-        
-        suggestedTracks = [...suggestedTracks, ...popularTracks];
-      }
-      
-      // Format tracks for Gemini's analysis
-      let suggestedTracksInfo = "Potential tracks to add (you can choose from these or suggest others):\n";
-      suggestedTracks.slice(0, 15).forEach((track, i) => {
-        const genres = track.genres.map((g: any) => g.genre.name).join(", ");
-        suggestedTracksInfo += `${i + 1}. ID: "${track.id}" - "${track.title}" by ${track.artist.artistName} (Genres: ${genres})\n`;
-      });
-      
-      prompt += "\n\n" + suggestedTracksInfo;
-      
-      console.log("[AI] Sending prompt to Gemini for track suggestions");
-      
-      // Retry mechanism for API calls
-      const maxRetries = 3;
-      let retryCount = 0;
-      let result;
-      
-      while (retryCount < maxRetries) {
-        try {
-          result = await model.generateContent(prompt);
-          break;
-        } catch (error: any) {
-          if (error.status === 429 && retryCount < maxRetries - 1) {
-            const retryDelay = 30 * 1000; // 30 seconds
-            console.log(`[AI] Rate limit hit, waiting ${retryDelay/1000}s before retry...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            retryCount++;
-            continue;
-          }
-          throw error;
-        }
-      }
-      
-      if (!result) {
-        throw new Error("Failed to generate content after retries");
-      }
-      
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const responseText = response.text();
       
-      console.log("[AI] Gemini response:", responseText);
-      
-      // Extract track IDs from the response
-      let suggestedTrackIds: string[] = [];
-      
+      console.log("[AI] Received Gemini analysis");
+
+      // Lấy trackId từ response của Gemini
+      let aiRecommendedIds: string[] = [];
       try {
-        // Find a JSON array in the response
+        // Tìm mảng JSON có trong response
         const jsonMatch = responseText.match(/\[[\s\S]*?\]/);
         if (jsonMatch) {
           const jsonString = jsonMatch[0];
-          suggestedTrackIds = JSON.parse(jsonString);
-          console.log("[AI] Parsed track IDs from JSON:", suggestedTrackIds);
-        } else {
-          // If no JSON found, try to extract IDs by searching for the ID pattern
-          const idRegex = /"([a-fA-F0-9-]{36})"/g;
-          const matches = [...responseText.matchAll(idRegex)];
-          suggestedTrackIds = matches.map(match => match[1]);
-          console.log("[AI] Extracted track IDs with regex:", suggestedTrackIds);
+          aiRecommendedIds = JSON.parse(jsonString);
+          console.log("[AI] Successfully parsed recommended track IDs from Gemini");
         }
       } catch (error) {
-        console.error("[AI] Error parsing track IDs from response:", error);
-        
-        // Fallback: Use tracks from our database query
-        suggestedTrackIds = suggestedTracks.slice(0, count).map(t => t.id);
-        console.log("[AI] Using fallback track suggestions:", suggestedTrackIds);
+        console.error("[AI] Error parsing Gemini response:", error);
       }
-      
-      // Validate that the track IDs exist in the database
-      const validatedTrackIds = await prisma.track.findMany({
-        where: {
-          id: { in: suggestedTrackIds },
-          isActive: true
-        },
-        select: { id: true }
-      });
-      
-      const validTrackIds = validatedTrackIds.map(t => t.id);
-      
-      // If we still don't have enough tracks, use some from our initial database query
-      if (validTrackIds.length < count && suggestedTracks.length > 0) {
-        const additionalIds = suggestedTracks
-          .filter(t => !validTrackIds.includes(t.id))
-          .slice(0, count - validTrackIds.length)
-          .map(t => t.id);
-        
-        validTrackIds.push(...additionalIds);
+
+      // If AI provided recommendations, use them to filter and reorder our suggestions
+      if (aiRecommendedIds.length > 0) {
+        const allTracks = [...artistTracks, ...featuredTracks, ...collaboratorTracks, ...genreTracks];
+        const aiFilteredTracks = aiRecommendedIds
+          .map(id => allTracks.find(t => t.id === id))
+          .filter((t): t is typeof allTracks[0] => t !== undefined);
+
+        // Ensure at least one new track is included
+        const hasNewTrack = aiFilteredTracks.some(t => !userPlayedTrackIds.has(t.id));
+        if (!hasNewTrack && aiFilteredTracks.length > 0) {
+          // Find a new track from our pool
+          const newTrack = allTracks.find(t => !userPlayedTrackIds.has(t.id));
+          if (newTrack) {
+            aiFilteredTracks.pop(); // Remove last track
+            aiFilteredTracks.push(newTrack); // Add new track
+            console.log("[AI] Added one new track to recommendations");
+          }
+        }
+
+        // If AI filtering worked, use it
+        if (aiFilteredTracks.length > 0) {
+          console.log(`[AI] Using ${aiFilteredTracks.length} AI-filtered recommendations`);
+          return aiFilteredTracks.slice(0, count).map(t => t.id);
+        }
       }
-      
-      console.log(`[AI] Final suggestion: ${validTrackIds.length} tracks for playlist ${playlistId}`);
-      return validTrackIds.slice(0, count);
-      
     } catch (error) {
-      console.error("[AI] Error getting track suggestions from Gemini:", error);
-      
-      // Fallback: Get tracks based on the playlist's genres
-      if (topGenres.length > 0) {
-        const fallbackTracks = await prisma.track.findMany({
-          where: {
-            isActive: true,
-            id: { notIn: existingTrackIds },
-            genres: {
-              some: {
-                genreId: {
-                  in: topGenres.map(g => g.id)
-                }
-              }
-            },
-          },
-          orderBy: {
-            playCount: "desc"
-          },
-          take: count
-        });
-        
-        console.log(`[AI] Using fallback suggestions with ${fallbackTracks.length} tracks`);
-        return fallbackTracks.map(t => t.id);
-      } else {
-        console.log("[AI] No genre information available for fallback, returning empty list");
-        return [];
+      console.error("[AI] Error during Gemini analysis:", error);
+    }
+
+    // Fallback to original prioritized suggestions if AI analysis fails
+    const allSuggestedTracks = [
+      ...artistTracks,           // Highest priority: More tracks from same artists
+      ...featuredTracks,         // Second priority: Tracks featuring playlist artists
+      ...collaboratorTracks,     // Third priority: Tracks by collaborating artists
+      ...genreTracks,            // Fourth priority: Tracks with similar genres
+    ];
+
+    console.log(`[AI] Using fallback recommendations:
+      - Artist tracks: ${artistTracks.length}
+      - Featured tracks: ${featuredTracks.length}
+      - Collaborator tracks: ${collaboratorTracks.length}
+      - Genre tracks: ${genreTracks.length}
+    `);
+
+    // Ensure at least one new track in fallback recommendations
+    const suggestedTrackIds = allSuggestedTracks.slice(0, count).map(t => t.id);
+    const hasNewTrack = suggestedTrackIds.some(id => !userPlayedTrackIds.has(id));
+    if (!hasNewTrack && suggestedTrackIds.length > 0) {
+      const newTrack = allSuggestedTracks.find(t => !userPlayedTrackIds.has(t.id));
+      if (newTrack) {
+        suggestedTrackIds[suggestedTrackIds.length - 1] = newTrack.id;
+        console.log("[AI] Added one new track to fallback recommendations");
       }
     }
+
+    return suggestedTrackIds;
   } catch (error) {
     console.error("[AI] Error suggesting more tracks:", error);
     throw error;

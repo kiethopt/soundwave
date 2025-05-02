@@ -573,17 +573,35 @@ export const removeTrackFromPlaylist = async (
       userId,
     });
 
-    // Kiểm tra playlist có tồn tại không
-    const playlist = await prisma.playlist.findUnique({
-      where: {
-        id: playlistId,
-      },
-    });
+    // Kiểm tra playlist có tồn tại không và lấy thông tin track cần xóa
+    const [playlist, track] = await Promise.all([
+      prisma.playlist.findUnique({
+        where: {
+          id: playlistId,
+        },
+      }),
+      prisma.track.findUnique({
+        where: {
+          id: trackId,
+        },
+        select: {
+          duration: true
+        }
+      })
+    ]);
 
     if (!playlist) {
       res.status(404).json({
         success: false,
         message: "Playlist not found",
+      });
+      return;
+    }
+
+    if (!track) {
+      res.status(404).json({
+        success: false,
+        message: "Track not found",
       });
       return;
     }
@@ -614,7 +632,7 @@ export const removeTrackFromPlaylist = async (
       },
     });
 
-    // Cập nhật totalTracks của playlist
+    // Cập nhật totalTracks và totalDuration của playlist
     await prisma.playlist.update({
       where: {
         id: playlistId,
@@ -623,6 +641,9 @@ export const removeTrackFromPlaylist = async (
         totalTracks: {
           decrement: 1,
         },
+        totalDuration: {
+          decrement: track.duration
+        }
       },
     });
 
