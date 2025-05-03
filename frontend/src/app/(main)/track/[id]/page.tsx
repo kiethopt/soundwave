@@ -386,7 +386,7 @@ export default function TrackDetailPage() {
           >
             {/* Header - Desktop only */}
             <div
-              className={`hidden md:grid md:grid-cols-[48px_1.5fr_1fr_1fr_100px_50px] md:gap-4 px-6 py-4 border-b ${
+              className={`hidden md:grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_50px] md:gap-4 px-6 py-4 border-b ${
                 theme === "light" ? "border-gray-200" : "border-white/10"
               } text-sm font-medium ${
                 theme === "light" ? "text-gray-500" : "text-white/60"
@@ -396,6 +396,7 @@ export default function TrackDetailPage() {
               <div>Title</div>
               <div>Artists</div>
               <div className="text-center">Play Count</div>
+              <div className="w-[40px]"></div>
               <div className="text-right">Duration</div>
               <div></div>
             </div>
