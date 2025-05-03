@@ -60,7 +60,26 @@ export function usePlayHandler(results?: {
         } else {
           toast.error("No tracks available for this album");
         }
-      } else {
+      } else if ("playlist" in item) {
+        // Playlist
+        if (item.tracks.length > 0) {
+          const isCurrentPlaylistPlaying =
+            currentTrack &&
+            item.tracks.some((track: any) => track.id === currentTrack.id) &&
+            queueType === "playlist" &&
+            isPlaying;
+          if (isCurrentPlaylistPlaying) {
+            pauseTrack();
+          } else {
+            setQueueType("playlist");
+            trackQueue(item.tracks);
+            playTrack(item.tracks[0]);
+          }
+        } else {
+          toast.error("No tracks available for this playlist");
+        }
+      }      
+      else {
         // Artist
         const isCurrentArtistPlaying =
           currentTrack &&
