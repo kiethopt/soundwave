@@ -105,11 +105,13 @@ export function QueuePanel({ isOpen, onClose }: QueuePanelProps) {
                             onMouseEnter={() => setHoveredTrackId(track.id)}
                             onMouseLeave={() => setHoveredTrackId(null)}
                           >
-                            <div className="w-8 h-8 flex-shrink-0">
+                            <div className="w-12 h-12 flex-shrink-0">
                               {track.coverUrl ? (
                                 <Image 
                                   src={track.coverUrl} 
                                   alt={track.title} 
+                                  width={32}
+                                  height={32}
                                   className="w-full h-full object-cover rounded-sm"
                                 />
                               ) : (
