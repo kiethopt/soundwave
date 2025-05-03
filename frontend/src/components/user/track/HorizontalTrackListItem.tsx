@@ -1,5 +1,5 @@
 import React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Play, Pause, AddSimple } from "@/components/ui/Icons";
 import { Heart, ListMusic, MoreHorizontal, Share2 } from "lucide-react";
 import {
@@ -147,6 +147,74 @@ const HorizontalTrackListItem: React.FC<TrackListItemProps> = ({
       }
     });
   };
+
+  useEffect(() => {
+    const fetchFavoriteIds = async () => {
+      const token = localStorage.getItem("userToken");
+      if (!token) return;
+      try {
+        const playlistsResponse = await api.playlists.getUserPlaylists(token);
+        if (
+          playlistsResponse.success &&
+          Array.isArray(playlistsResponse.data)
+        ) {
+          const favoritePlaylistInfo = playlistsResponse.data.find(
+            (p: Playlist) => p.type === "FAVORITE"
+          );
+          if (favoritePlaylistInfo && favoritePlaylistInfo.id) {
+            const favoriteDetailsResponse = await api.playlists.getById(
+              favoritePlaylistInfo.id,
+              token
+            );
+            if (
+             favoriteDetailsResponse.success &&
+              favoriteDetailsResponse.data?.tracks
+            ) {
+            const trackIds = favoriteDetailsResponse.data.tracks.map(
+                (t: Track) => t.id
+              );
+              setFavoriteTrackIds(new Set(trackIds));
+            } else {
+              setFavoriteTrackIds(new Set());
+            }
+          } else {
+            setFavoriteTrackIds(new Set());
+          }
+        } else {
+          setFavoriteTrackIds(new Set());
+        }
+      } catch (error) {
+        console.error("Error fetching favorite track IDs:", error);
+        setFavoriteTrackIds(new Set());
+      }
+    };
+    fetchFavoriteIds();
+
+    // Listener for favorite changes
+    const handleFavoritesChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        action: "add" | "remove";
+        trackId: string;
+      }>;
+      if (!customEvent.detail) return;
+      const { action, trackId } = customEvent.detail;
+      setFavoriteTrackIds((prevIds) => {
+        const newIds = new Set(prevIds);
+        if (action === "add") {
+          newIds.add(trackId);
+        } else {
+          newIds.delete(trackId);
+        }
+        return newIds;
+      });
+    };
+
+    window.addEventListener("favorites-changed", handleFavoritesChanged);
+
+    return () => {
+      window.removeEventListener("favorites-changed", handleFavoritesChanged);
+    };
+  }, []);
 
   return (
     <div

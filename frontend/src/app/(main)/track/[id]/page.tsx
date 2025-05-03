@@ -66,31 +66,19 @@ export default function TrackDetailPage() {
     fetchTrackDetails();
   }, [fetchTrackDetails]);
 
-  // Fetch playlists (similar to album detail page)
   useEffect(() => {
     const fetchPlaylists = async () => {
       try {
-        const token = localStorage.getItem("userToken");
-        if (!token) return; // Only fetch if logged in
+        const token = localStorage.getItem('userToken');
+        if (!token) return;
 
-        const response = await api.playlists.getUserPlaylists(token); // Use getUserPlaylists
-        if (response.success && Array.isArray(response.data)) {
-          setPlaylists(
-            response.data.map((p: any) => ({
-              // Ensure correct mapping if needed
-              id: p.id,
-              name: p.name,
-              coverUrl: p.coverUrl,
-              // Add other necessary fields if the type from API is different
-            }))
-          );
-        } else {
-          console.error("Failed to fetch user playlists:", response.message);
-          setPlaylists([]); // Reset on failure
-        }
+        const response = await api.playlists.getAll(token);
+        const normalPlaylists = response.data.filter(
+          (playlist: Playlist) => playlist.type === "NORMAL"
+        );
+        setPlaylists(normalPlaylists);
       } catch (error) {
-        console.error("Error fetching playlists:", error);
-        setPlaylists([]); // Reset on error
+        console.error('Error fetching playlists:', error);
       }
     };
 

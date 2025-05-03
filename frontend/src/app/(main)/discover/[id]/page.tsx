@@ -20,6 +20,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function DiscoveryGenrePage({
   params,
@@ -40,7 +41,11 @@ export default function DiscoveryGenrePage({
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [section, setSection] = useState<string | null>(null);
   const [genreSystemPlaylists, setGenreSystemPlaylists] = useState<Playlist[]>([]);
-  
+  const [favoriteTrackIds, setFavoriteTrackIds] = useState<Set<string>>(
+    new Set()
+  );
+  const { handleProtectedAction } = useAuth();
+
   const {
     currentTrack,
     isPlaying,
@@ -101,6 +106,129 @@ export default function DiscoveryGenrePage({
     fetchGenreData();
   }, [id, router]);
 
+  useEffect(() => {
+    const fetchFavoriteIds = async () => {
+      const token = localStorage.getItem("userToken");
+      if (!token) return;
+      try {
+        const playlistsResponse = await api.playlists.getUserPlaylists(token);
+        if (
+          playlistsResponse.success &&
+          Array.isArray(playlistsResponse.data)
+        ) {
+          const favoritePlaylistInfo = playlistsResponse.data.find(
+            (p: Playlist) => p.type === "FAVORITE"
+          );
+          if (favoritePlaylistInfo && favoritePlaylistInfo.id) {
+            const favoriteDetailsResponse = await api.playlists.getById(
+              favoritePlaylistInfo.id,
+              token
+            );
+            if (
+             favoriteDetailsResponse.success &&
+              favoriteDetailsResponse.data?.tracks
+            ) {
+              const trackIds = favoriteDetailsResponse.data.tracks.map(
+                (t: Track) => t.id
+              );
+              setFavoriteTrackIds(new Set(trackIds));
+            } else {
+              setFavoriteTrackIds(new Set());
+            }
+          } else {
+            setFavoriteTrackIds(new Set());
+          }
+        } else {
+          setFavoriteTrackIds(new Set());
+        }
+      } catch (error) {
+        console.error("Error fetching favorite track IDs:", error);
+        setFavoriteTrackIds(new Set());
+      }
+    };
+    fetchFavoriteIds();
+
+    // Listener for favorite changes
+    const handleFavoritesChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        action: "add" | "remove";
+        trackId: string;
+      }>;
+      if (!customEvent.detail) return;
+      const { action, trackId } = customEvent.detail;
+      setFavoriteTrackIds((prevIds) => {
+        const newIds = new Set(prevIds);
+        if (action === "add") {
+          newIds.add(trackId);
+        } else {
+          newIds.delete(trackId);
+        }
+        return newIds;
+      });
+    };
+
+    window.addEventListener("favorites-changed", handleFavoritesChanged);
+
+    return () => {
+      window.removeEventListener("favorites-changed", handleFavoritesChanged);
+    };
+  }, []);
+
+  const handleToggleFavorite = async (
+    trackId: string,
+    isCurrentlyFavorite: boolean
+  ) => {
+    handleProtectedAction(async () => {
+      const token = localStorage.getItem("userToken");
+      if (!token) return;
+
+      // Optimistic UI update
+      setFavoriteTrackIds((prevIds) => {
+        const newIds = new Set(prevIds);
+        if (isCurrentlyFavorite) {
+          newIds.delete(trackId);
+        } else {
+          newIds.add(trackId);
+        }
+        return newIds;
+      });
+
+      try {
+        if (isCurrentlyFavorite) {
+          await api.tracks.unlike(trackId, token);
+          toast.success("Removed from Favorites");
+          window.dispatchEvent(
+            new CustomEvent("favorites-changed", {
+              detail: { action: "remove", trackId },
+            })
+          );
+        } else {
+          await api.tracks.like(trackId, token);
+          toast.success("Added to Favorites");
+          window.dispatchEvent(
+            new CustomEvent("favorites-changed", {
+              detail: { action: "add", trackId },
+            })
+          );
+        }
+      } catch (error: any) {
+        console.error("Error toggling favorite status:", error);
+        toast.error(error.message || "Failed to update favorites");
+        // Revert optimistic UI on error
+        setFavoriteTrackIds((prevIds) => {
+          const newIds = new Set(prevIds);
+          if (isCurrentlyFavorite) {
+            newIds.add(trackId);
+          } else {
+            newIds.delete(trackId);
+          }
+          return newIds;
+        });
+      }
+    });
+  };
+
+
   const sortSystemPlaylists = (playlists: Playlist[], genreId: string) => {
     const genreSystemPlaylists = playlists.filter((playlist) => {
       if (!playlist.tracks || playlist.tracks.length === 0) {
@@ -119,7 +247,6 @@ export default function DiscoveryGenrePage({
     try {
       console.log('Adding track to playlist:', { playlistId, trackId });
       const token = localStorage.getItem('userToken');
-      console.log('Token:', token);
 
       await api.playlists.addTrack(playlistId, trackId, token || '');
       toast.success('Track added to playlist');
@@ -438,10 +565,25 @@ export default function DiscoveryGenrePage({
                               </DropdownMenuSubContent>
                             </DropdownMenuPortal>
                           </DropdownMenuSub>
-                          
-                          <DropdownMenuItem className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10">
-                            <Heart className="w-4 h-4 mr-3 text-white/70" />
-                            Add to Favorites
+                          <DropdownMenuItem
+                            className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleFavorite(
+                                track.id,
+                                favoriteTrackIds.has(track.id)
+                              );
+                            }}
+                          >
+                            <Heart
+                              className="w-4 h-4 mr-3 text-white/70"
+                              fill={
+                                favoriteTrackIds.has(track.id) ? "currentColor" : "none"
+                              }
+                            />
+                            {favoriteTrackIds.has(track.id)
+                              ? "Remove from Favorites"
+                              : "Add to Favorites"}
                           </DropdownMenuItem>
                           
                           <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
@@ -549,7 +691,7 @@ export default function DiscoveryGenrePage({
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent 
-                          align="end" 
+                          align="start" 
                           className="w-56 py-1.5 bg-zinc-900/95 backdrop-blur-md border border-white/10 shadow-xl rounded-lg"
                         >
                           <DropdownMenuItem
@@ -610,9 +752,25 @@ export default function DiscoveryGenrePage({
                             </DropdownMenuPortal>
                           </DropdownMenuSub>
                           
-                          <DropdownMenuItem className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10">
-                            <Heart className="w-4 h-4 mr-3 text-white/70" />
-                            Add to Favorites
+                          <DropdownMenuItem
+                            className="cursor-pointer flex items-center px-3 py-2 text-sm text-white/90 hover:text-white hover:bg-white/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleFavorite(
+                                track.id,
+                                favoriteTrackIds.has(track.id)
+                              );
+                            }}
+                          >
+                            <Heart
+                              className="w-4 h-4 mr-3 text-white/70"
+                              fill={
+                                favoriteTrackIds.has(track.id) ? "currentColor" : "none"
+                              }
+                            />
+                            {favoriteTrackIds.has(track.id)
+                              ? "Remove from Favorites"
+                              : "Add to Favorites"}
                           </DropdownMenuItem>
                           
                           <DropdownMenuSeparator className="my-1 h-px bg-white/10" />
