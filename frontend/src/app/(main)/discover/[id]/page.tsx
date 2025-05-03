@@ -20,7 +20,6 @@ import {
   DropdownMenuSubContent,
   DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
-import { set } from 'lodash';
 
 export default function DiscoveryGenrePage({
   params,
@@ -92,7 +91,7 @@ export default function DiscoveryGenrePage({
         if (!token) return;
 
         const response = await api.playlists.getAll(token);
-        setPlaylists(response.data);
+        setPlaylists(response.data.filter((p: Playlist) => p.type === 'NORMAL'));
       } catch (error) {
         console.error('Error fetching playlists:', error);
       }
@@ -379,7 +378,7 @@ export default function DiscoveryGenrePage({
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent 
-                          align="end" 
+                          align="start" 
                           className="w-56 py-1.5 bg-zinc-900/95 backdrop-blur-md border border-white/10 shadow-xl rounded-lg"
                         >
                           <DropdownMenuItem
