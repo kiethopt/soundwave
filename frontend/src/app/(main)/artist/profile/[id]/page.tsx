@@ -1172,8 +1172,6 @@ export default function ArtistProfilePage({
                       onTrackClick={() => handleTopTrackPlay(track)}
                       playlists={playlists}
                       favoriteTrackIds={favoriteTrackIds}
-                      onAddToPlaylist={handleAddToPlaylist}
-                      onToggleFavorite={handleToggleFavorite}
                     />
                   ))}
                 </div>
@@ -1217,9 +1215,7 @@ export default function ArtistProfilePage({
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Discography</h2>
                 {/* Add "Show all" text - no functionality for now */}
-                <span className="text-sm font-medium text-neutral-500 dark:text-neutral-400 cursor-pointer hover:underline">
-                  Show all
-                </span>
+                
               </div>
 
               {/* Tab Buttons */}

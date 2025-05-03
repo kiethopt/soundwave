@@ -226,6 +226,12 @@ export default function Sidebar({
       fetchPlaylists();
     };
 
+    // Listen for playlist-updated event (for add/remove track, playlist changes)
+    const handlePlaylistUpdated = () => {
+      console.log("playlist-updated event received, refreshing playlists");
+      fetchPlaylists();
+    };
+    window.addEventListener("playlist-updated", handlePlaylistUpdated);
     window.addEventListener("favorites-changed", handleFavoritesChanged);
 
     // Socket event listeners for real-time updates
@@ -254,6 +260,7 @@ export default function Sidebar({
 
     return () => {
       window.removeEventListener("favorites-changed", handleFavoritesChanged);
+      window.removeEventListener("playlist-updated", handlePlaylistUpdated);
 
       // Clean up socket listeners
       if (socket) {

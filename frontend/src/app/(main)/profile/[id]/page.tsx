@@ -661,7 +661,7 @@ export default function UserProfilePage({
                           e.stopPropagation();
                           handleArtistPlay(topArtist, "topArtist", e);
                         }}
-                        className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute bottom-2 right-1 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         {isArtistPlaying(topArtist.id, "topArtist") ? (
                           <Pause className="w-6 h-6 text-white" />
@@ -713,8 +713,6 @@ export default function UserProfilePage({
                       onTrackClick={() => handleTopTrackPlay(track)}
                       playlists={playlists}
                       favoriteTrackIds={favoriteTrackIds}
-                      onAddToPlaylist={handleAddToPlaylist}
-                      onToggleFavorite={handleToggleFavorite}
                     />
                   )
                 )}
@@ -775,7 +773,7 @@ export default function UserProfilePage({
                           e.stopPropagation();
                           handleArtistPlay(followArtist, "followingArtist", e);
                         }}
-                        className="absolute bottom-6 right-2 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute bottom-2 right-1 p-3 rounded-full bg-[#A57865] opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         {isArtistPlaying(followArtist.id, "followingArtist") ? (
                           <Pause className="w-6 h-6 text-white" />

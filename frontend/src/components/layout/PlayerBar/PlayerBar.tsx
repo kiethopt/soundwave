@@ -33,6 +33,8 @@ export default function PlayerBar() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { handleProtectedAction } = useAuth();
+  const [isDraggingProgress, setIsDraggingProgress] = useState(false);
+  const [wasPlayingBeforeDrag, setWasPlayingBeforeDrag] = useState(false);
 
   const {
     currentTrack,
@@ -316,7 +318,28 @@ export default function PlayerBar() {
               <input
                 type="range"
                 value={isNaN(progress) ? 0 : progress}
-                onChange={(e) => seekTrack(parseFloat(e.target.value))}
+                onChange={(e) => {
+                  if (!isDraggingProgress) setIsDraggingProgress(true);
+                  seekTrack(parseFloat(e.target.value));
+                }}
+                onMouseDown={() => {
+                  setIsDraggingProgress(true);
+                  setWasPlayingBeforeDrag(isPlaying);
+                  if (isPlaying) pauseTrack();
+                }}
+                onMouseUp={() => {
+                  setIsDraggingProgress(false);
+                  if (wasPlayingBeforeDrag && currentTrack) playTrack(currentTrack);
+                }}
+                onTouchStart={() => {
+                  setIsDraggingProgress(true);
+                  setWasPlayingBeforeDrag(isPlaying);
+                  if (isPlaying) pauseTrack();
+                }}
+                onTouchEnd={() => {
+                  setIsDraggingProgress(false);
+                  if (wasPlayingBeforeDrag && currentTrack) playTrack(currentTrack);
+                }}
                 className="relative w-full h-1 appearance-none cursor-pointer bg-transparent z-10
                   [&::-webkit-slider-thumb]:appearance-none
                   group-hover:[&::-webkit-slider-thumb]:w-3
@@ -536,7 +559,28 @@ export default function PlayerBar() {
                 <input
                   type="range"
                   value={isNaN(progress) ? 0 : progress}
-                  onChange={(e) => seekTrack(parseFloat(e.target.value))}
+                  onChange={(e) => {
+                    if (!isDraggingProgress) setIsDraggingProgress(true);
+                    seekTrack(parseFloat(e.target.value));
+                  }}
+                  onMouseDown={() => {
+                    setIsDraggingProgress(true);
+                    setWasPlayingBeforeDrag(isPlaying);
+                    if (isPlaying) pauseTrack();
+                  }}
+                  onMouseUp={() => {
+                    setIsDraggingProgress(false);
+                    if (wasPlayingBeforeDrag && currentTrack) playTrack(currentTrack);
+                  }}
+                  onTouchStart={() => {
+                    setIsDraggingProgress(true);
+                    setWasPlayingBeforeDrag(isPlaying);
+                    if (isPlaying) pauseTrack();
+                  }}
+                  onTouchEnd={() => {
+                    setIsDraggingProgress(false);
+                    if (wasPlayingBeforeDrag && currentTrack) playTrack(currentTrack);
+                  }}
                   className="absolute w-full appearance-none cursor-pointer bg-transparent
                     [&::-webkit-slider-thumb]:appearance-none
                     [&::-webkit-slider-thumb]:w-3

@@ -66,31 +66,19 @@ export default function TrackDetailPage() {
     fetchTrackDetails();
   }, [fetchTrackDetails]);
 
-  // Fetch playlists (similar to album detail page)
   useEffect(() => {
     const fetchPlaylists = async () => {
       try {
-        const token = localStorage.getItem("userToken");
-        if (!token) return; // Only fetch if logged in
+        const token = localStorage.getItem('userToken');
+        if (!token) return;
 
-        const response = await api.playlists.getUserPlaylists(token); // Use getUserPlaylists
-        if (response.success && Array.isArray(response.data)) {
-          setPlaylists(
-            response.data.map((p: any) => ({
-              // Ensure correct mapping if needed
-              id: p.id,
-              name: p.name,
-              coverUrl: p.coverUrl,
-              // Add other necessary fields if the type from API is different
-            }))
-          );
-        } else {
-          console.error("Failed to fetch user playlists:", response.message);
-          setPlaylists([]); // Reset on failure
-        }
+        const response = await api.playlists.getAll(token);
+        const normalPlaylists = response.data.filter(
+          (playlist: Playlist) => playlist.type === "NORMAL"
+        );
+        setPlaylists(normalPlaylists);
       } catch (error) {
-        console.error("Error fetching playlists:", error);
-        setPlaylists([]); // Reset on error
+        console.error('Error fetching playlists:', error);
       }
     };
 
@@ -276,7 +264,7 @@ export default function TrackDetailPage() {
         </div>
 
         {/* Main Container */}
-        <div className="flex flex-col items-center md:items-start md:flex-row gap-8">
+        <div className="flex flex-col items-center md:items-end md:flex-row gap-8">
           {/* Track Cover */}
           <div className="w-[280px] md:w-[220px] flex-shrink-0">
             <img
@@ -287,7 +275,7 @@ export default function TrackDetailPage() {
           </div>
 
           {/* Track Info */}
-          <div className="w-full flex flex-col gap-4 justify-end">
+          <div className="w-full flex flex-col gap-4 justify-end mb-4">
             <div className="text-center md:text-left">
               <h1
                 className={`text-3xl md:text-4xl font-bold mb-2 ${
@@ -398,7 +386,7 @@ export default function TrackDetailPage() {
           >
             {/* Header - Desktop only */}
             <div
-              className={`hidden md:grid md:grid-cols-[48px_1.5fr_1fr_1fr_100px_50px] md:gap-4 px-6 py-4 border-b ${
+              className={`hidden md:grid grid-cols-[48px_1.5fr_1fr_1fr_40px_100px_50px] md:gap-4 px-6 py-4 border-b ${
                 theme === "light" ? "border-gray-200" : "border-white/10"
               } text-sm font-medium ${
                 theme === "light" ? "text-gray-500" : "text-white/60"
@@ -408,6 +396,7 @@ export default function TrackDetailPage() {
               <div>Title</div>
               <div>Artists</div>
               <div className="text-center">Play Count</div>
+              <div className="w-[40px]"></div>
               <div className="text-right">Duration</div>
               <div></div>
             </div>
