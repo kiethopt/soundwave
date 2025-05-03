@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { AlbumTracks } from '@/components/user/album/AlbumTracks';
 import io, { Socket } from 'socket.io-client'; // Import Socket
+import Image from 'next/image';
 export default function AlbumDetailPage() {
   const params = useParams();
   const albumId = params?.id
@@ -241,9 +242,11 @@ export default function AlbumDetailPage() {
           {/* Album Cover */}
           {album.coverUrl && (
             <div className="w-[280px] md:w-[220px] flex-shrink-0">
-              <img
+              <Image
                 src={album.coverUrl}
                 alt={album.title}
+                width={280}
+                height={280}
                 className="w-full aspect-square object-cover rounded-xl shadow-2xl"
               />
             </div>

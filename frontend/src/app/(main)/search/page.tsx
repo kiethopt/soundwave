@@ -677,9 +677,7 @@ function SearchContent() {
                                     playlists
                                       .filter(
                                         (playlist) =>
-                                          !filteredPlaylistNames.has(
-                                            playlist.name
-                                          )
+                                          playlist.type === 'NORMAL'
                                       ) // Filter out specific playlists
                                       .map((playlist) => (
                                         <DropdownMenuItem
@@ -884,9 +882,7 @@ function SearchContent() {
                                     playlists
                                       .filter(
                                         (playlist) =>
-                                          !filteredPlaylistNames.has(
-                                            playlist.name
-                                          )
+                                          playlist.type === 'NORMAL'
                                       ) // Filter out specific playlists
                                       .map((playlist) => (
                                         <DropdownMenuItem

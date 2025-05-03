@@ -36,7 +36,12 @@ interface AlbumTracksProps {
   currentTrack: Track | null;
   isPlaying: boolean;
   requiresAuth?: boolean;
-  playlists: { id: string; name: string; coverUrl?: string }[];
+  playlists: {
+    id: string;
+    name: string;
+    type: string;
+    coverUrl?: string;
+  }[];
 }
 
 export function AlbumTracks({
@@ -405,7 +410,7 @@ export function AlbumTracks({
                           playlists
                             .filter(
                               (playlist) =>
-                                !filteredPlaylistNames.has(playlist.name)
+                                playlist.type === 'NORMAL'
                             )
                             .map((playlist) => (
                               <DropdownMenuItem
@@ -421,6 +426,8 @@ export function AlbumTracks({
                                       <Image
                                         src={playlist.coverUrl}
                                         alt={playlist.name}
+                                        width={24}
+                                        height={24}
                                         className="w-full h-full object-cover rounded"
                                       />
                                     ) : (
