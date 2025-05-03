@@ -752,6 +752,7 @@ export const artistRequestDetailsSelect = {
   avatar: true,
   socialMediaLinks: true,
   verificationRequestedAt: true,
+  requestedLabelName: true,
   user: {
     select: {
       id: true,

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { api } from '@/utils/api';
-import toast from 'react-hot-toast';
 
 interface AdminRouteProps {
   children: React.ReactNode;

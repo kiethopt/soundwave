@@ -172,6 +172,7 @@ export interface ArtistRequest {
   };
   verificationRequestedAt: string;
   avatar?: string;
+  requestedLabelName?: string | null;
   user: {
     id: string;
     name: string;
@@ -280,7 +281,7 @@ export interface Track {
   updatedAt: string;
   artistId: string;
   albumId?: string;
-  labelId?: string; // Thêm trường labelId để khớp với API
+  labelId?: string;
   album?: {
     id: string;
     title: string;

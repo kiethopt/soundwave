@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Genre, User, Label } from "@/types";
+import { Genre, User, Label, Playlist } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label as UILabel } from "@/components/ui/label";
@@ -2779,6 +2779,7 @@ interface SystemPlaylistModalProps {
     description?: string;
     coverUrl?: string;
     privacy?: "PUBLIC" | "PRIVATE";
+    isAIGenerated?: boolean; // Add isAIGenerated here
     basedOnMood?: string;
     basedOnGenre?: string;
     basedOnArtist?: string;
@@ -4606,6 +4607,208 @@ export function EditAlbumModal({
           >
             {isUploading ? "Saving..." : "Save Changes"}
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// System Playlist Detail Modal (New)
+interface SystemPlaylistDetailModalProps {
+  playlist: Playlist | null;
+  isOpen: boolean;
+  onClose: () => void;
+  theme?: "light" | "dark";
+}
+
+export function SystemPlaylistDetailModal({
+  playlist,
+  isOpen,
+  onClose,
+  theme = "light",
+}: SystemPlaylistDetailModalProps) {
+  const { dominantColor } = useDominantColor(playlist?.coverUrl);
+
+  if (!playlist) return null;
+
+  const formatValue = (value: any) => {
+    if (value === undefined || value === null || value === "") return "N/A";
+    return String(value);
+  };
+
+  const formatBoolean = (value?: boolean) => {
+    return value === true ? "Yes" : "No";
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className={`${
+          theme === "dark" ? "bg-[#1e1e1e] border-[#404040]" : "bg-white"
+        }
+         p-0 rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden`}
+      >
+        <DialogTitle className="sr-only">{playlist.name}</DialogTitle>
+        <div
+          className="relative overflow-y-auto max-h-[90vh]"
+          style={{
+            background: dominantColor
+              ? `linear-gradient(180deg, 
+                  ${dominantColor} 0%, 
+                  ${dominantColor}99 15%,
+                  ${dominantColor}40 30%,
+                  ${theme === "light" ? "#ffffff" : "#1e1e1e"} 100%)`
+              : theme === "light"
+              ? "linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%)"
+              : "linear-gradient(180deg, #2c2c2c 0%, #1e1e1e 100%)",
+          }}
+        >
+          {/* Close button */}
+          <div className="absolute top-4 right-4 z-10">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="Close"
+              className={`
+                w-8 h-8 rounded-full flex items-center justify-center 
+                ${
+                  theme === "dark"
+                    ? "bg-black/20 hover:bg-black/40 text-white/90"
+                    : "bg-white/20 hover:bg-white/40 text-black/90"
+                }
+              `}
+            >
+              <XIcon className="w-5 h-5" />
+            </Button>
+          </div>
+          <div className="p-6">
+            {/* Playlist header */}
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-6">
+              {/* Playlist Cover */}
+              <div className="w-[200px] flex-shrink-0">
+                <img
+                  src={
+                    playlist.coverUrl ||
+                    "https://placehold.co/200x200?text=No+Cover"
+                  }
+                  alt={playlist.name}
+                  className={`w-full aspect-square object-cover rounded-xl shadow-2xl ${
+                    theme === "light" ? "shadow-gray-200/50" : "shadow-black/50"
+                  }`}
+                />
+              </div>
+
+              {/* Playlist Info */}
+              <div className="flex flex-col gap-3 text-center md:text-left flex-grow">
+                <h2
+                  className={`text-2xl md:text-3xl font-bold ${
+                    theme === "light" ? "text-gray-900" : "text-white"
+                  }`}
+                >
+                  {playlist.name}
+                </h2>
+
+                <p
+                  className={`text-sm leading-relaxed ${
+                    theme === "light" ? "text-gray-600" : "text-white/70"
+                  }`}
+                >
+                  {playlist.description || "No description provided."}
+                </p>
+
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 text-sm mt-2">
+                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                      playlist.type === "SYSTEM"
+                        ? theme === "dark"
+                          ? "bg-purple-900 text-purple-300"
+                          : "bg-purple-100 text-purple-800"
+                        : theme === "dark"
+                          ? "bg-blue-900 text-blue-300"
+                          : "bg-blue-100 text-blue-800"
+                    }`}>
+                      {playlist.type?.toLowerCase() || 'N/A'}
+                   </span>
+                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                      playlist.privacy === "PUBLIC"
+                        ? theme === "dark"
+                          ? "bg-green-900 text-green-300"
+                          : "bg-green-100 text-green-800"
+                        : theme === "dark"
+                          ? "bg-yellow-900 text-yellow-300"
+                          : "bg-yellow-100 text-yellow-800"
+                    }`}>
+                     {playlist.privacy?.toLowerCase() || 'N/A'}
+                   </span>
+                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                      playlist.isAIGenerated
+                        ? theme === "dark"
+                          ? "bg-teal-900 text-teal-300"
+                          : "bg-teal-100 text-teal-800"
+                        : theme === "dark"
+                          ? "bg-gray-700 text-gray-300"
+                          : "bg-gray-100 text-gray-800"
+                    }`}>
+                     AI Generated: {formatBoolean(playlist.isAIGenerated)}
+                   </span>
+                </div>
+              </div>
+            </div>
+
+             {/* AI Generation Parameters */}
+             {playlist.isAIGenerated && (
+               <div className={`rounded-xl p-4 md:p-6 border ${
+                    theme === 'light'
+                      ? 'bg-gray-50/80 border-gray-200'
+                      : 'bg-white/5 border-white/10'
+                  }`}>
+                 <h3 className={`text-lg font-semibold mb-4 ${
+                     theme === 'light' ? 'text-gray-800' : 'text-white/90'
+                   }`}>
+                   AI Generation Parameters
+                 </h3>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                   <div>
+                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Based on Mood:</span>
+                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
+                       {formatValue((playlist as any).basedOnMood)}
+                     </p>
+                   </div>
+                   <div>
+                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Based on Genre:</span>
+                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
+                       {formatValue((playlist as any).basedOnGenre)}
+                     </p>
+                   </div>
+                   <div>
+                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Based on Artist:</span>
+                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
+                       {formatValue((playlist as any).basedOnArtist)}
+                     </p>
+                   </div>
+                   <div>
+                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Based on Song Length (s):</span>
+                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
+                       {formatValue((playlist as any).basedOnSongLength)}
+                     </p>
+                   </div>
+                   <div>
+                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Based on Release Time:</span>
+                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
+                       {formatValue((playlist as any).basedOnReleaseTime)}
+                     </p>
+                   </div>
+                   <div>
+                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Target Track Count:</span>
+                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
+                       {formatValue((playlist as any).trackCount)}
+                     </p>
+                   </div>
+                 </div>
+               </div>
+             )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

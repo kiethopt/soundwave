@@ -277,6 +277,23 @@ export default function ArtistRequestDetail({
                       })}
                     </dd>
                   </div>
+                  
+                  {/* Label Information */}
+                  {request.requestedLabelName && (
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
+                      <dt
+                        className={
+                          theme === 'light' ? 'text-gray-600' : 'text-white/60'
+                        }
+                      >
+                        Requested Label
+                      </dt>
+                      <dd className="font-medium">
+                        {request.requestedLabelName}
+                      </dd>
+                    </div>
+                  )}
+
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
                     <dt
                       className={

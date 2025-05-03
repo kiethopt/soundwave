@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Search, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Search, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';

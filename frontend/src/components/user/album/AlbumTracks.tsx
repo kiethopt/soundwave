@@ -21,6 +21,7 @@ import { api } from "@/utils/api";
 import { useTrack } from "@/contexts/TrackContext";
 import { useState, useEffect } from "react";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
+import Image from "next/image";
 
 // Define the names of playlists to filter out
 const filteredPlaylistNames = new Set([
@@ -417,7 +418,7 @@ export function AlbumTracks({
                                 <div className="flex items-center gap-2 w-full">
                                   <div className="w-6 h-6 relative flex-shrink-0">
                                     {playlist.coverUrl ? (
-                                      <img
+                                      <Image
                                         src={playlist.coverUrl}
                                         alt={playlist.name}
                                         className="w-full h-full object-cover rounded"

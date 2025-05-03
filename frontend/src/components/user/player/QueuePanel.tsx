@@ -4,6 +4,7 @@ import { Play, Pause} from '@/components/ui/Icons';
 import { useState } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { Track } from "@/types";
+import Image from "next/image";
 
 interface QueuePanelProps {
   isOpen: boolean;
@@ -106,7 +107,7 @@ export function QueuePanel({ isOpen, onClose }: QueuePanelProps) {
                           >
                             <div className="w-8 h-8 flex-shrink-0">
                               {track.coverUrl ? (
-                                <img 
+                                <Image 
                                   src={track.coverUrl} 
                                   alt={track.title} 
                                   className="w-full h-full object-cover rounded-sm"

@@ -6,13 +6,6 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   MoreHorizontal,
   Trash2,
   Search,
@@ -29,7 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { Playlist } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
-import { SystemPlaylistModal } from "@/components/ui/admin-modals";
+import { SystemPlaylistModal, SystemPlaylistDetailModal } from "@/components/ui/admin-modals";
 
 interface SortConfig {
   key:
@@ -72,6 +65,8 @@ export const SystemPlaylistManagement: React.FC<{
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editPlaylist, setEditPlaylist] = useState<Playlist | null>(null);
   const [isUpdateLoading, setIsUpdateLoading] = useState(false);
+  const [viewingPlaylist, setViewingPlaylist] = useState<Playlist | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const limit = 10;
 
   const fetchPlaylists = useCallback(
@@ -301,6 +296,15 @@ export const SystemPlaylistManagement: React.FC<{
       }
       return newSet;
     });
+  };
+
+  const handleRowClick = (playlist: Playlist, e: React.MouseEvent<HTMLTableRowElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('[role="checkbox"]') || target.closest('button')) {
+        return;
+    }
+    setViewingPlaylist(playlist);
+    setIsDetailModalOpen(true);
   };
 
   const handlePageChange = (newPage: number) => {
@@ -625,6 +629,7 @@ export const SystemPlaylistManagement: React.FC<{
                       sortedPlaylists.map((playlist) => (
                         <tr
                           key={playlist.id}
+                          onClick={(e) => handleRowClick(playlist, e)}
                           className={`border-b cursor-pointer ${
                             theme === "dark"
                               ? "bg-gray-800 border-gray-700 hover:bg-gray-600"
@@ -641,7 +646,7 @@ export const SystemPlaylistManagement: React.FC<{
                               : ""
                           }`}
                         >
-                          <td className="w-4 p-4">
+                          <td className="w-4 p-4" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               id={`select-row-${playlist.id}`}
                               checked={selectedPlaylistIds.has(playlist.id)}
@@ -709,7 +714,22 @@ export const SystemPlaylistManagement: React.FC<{
                             {formatPlaylistDate(playlist.createdAt)}
                           </td>
                           <td className="py-4 px-6">
-                            <div className="flex items-center justify-center gap-1">
+                            <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${
+                                    theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditPlaylist(playlist);
+                                }}
+                                aria-label={`Edit playlist ${playlist.name}`}
+                                disabled={loading || actionLoading !== null}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -718,47 +738,15 @@ export const SystemPlaylistManagement: React.FC<{
                                     ? "hover:bg-red-500/20"
                                     : "hover:bg-red-100"
                                 }`}
-                                onClick={() =>
-                                  handleDeletePlaylist(playlist.id)
-                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePlaylist(playlist.id);
+                                }}
                                 aria-label={`Delete playlist ${playlist.name}`}
                                 disabled={loading || actionLoading !== null}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    className="h-8 w-8 p-0"
-                                    data-radix-dropdown-menu-trigger
-                                    disabled={loading || actionLoading !== null}
-                                  >
-                                    <span className="sr-only">Open menu</span>
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                  align="end"
-                                  className={
-                                    theme === "dark"
-                                      ? "bg-[#2a2a2a] border-gray-600 text-white"
-                                      : ""
-                                  }
-                                >
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                  <DropdownMenuItem>
-                                    <Eye className="mr-2 h-4 w-4" /> View
-                                    Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleEditPlaylist(playlist)}
-                                  >
-                                    <Edit className="mr-2 h-4 w-4" /> Edit
-                                    Playlist
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
                             </div>
                           </td>
                         </tr>
@@ -852,6 +840,7 @@ export const SystemPlaylistManagement: React.FC<{
             description: editPlaylist.description,
             coverUrl: editPlaylist.coverUrl,
             privacy: editPlaylist.privacy as "PUBLIC" | "PRIVATE",
+            isAIGenerated: editPlaylist.isAIGenerated,
             basedOnArtist: (editPlaylist as any).basedOnArtist || "",
             basedOnMood: (editPlaylist as any).basedOnMood || "",
             basedOnGenre: (editPlaylist as any).basedOnGenre || "",
@@ -863,6 +852,15 @@ export const SystemPlaylistManagement: React.FC<{
           mode="edit"
         />
       )}
+      <SystemPlaylistDetailModal
+        playlist={viewingPlaylist}
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setViewingPlaylist(null);
+        }}
+        theme={theme}
+      />
     </>
   );
 };

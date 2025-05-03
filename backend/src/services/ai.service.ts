@@ -1994,18 +1994,18 @@ export const suggestMoreTracksUsingAI = async (
     const playlist = await prisma.playlist.findUnique({
       where: { id: playlistId },
       include: {
-        tracks: {
+        tracks: { // Lấy danh sách các bài hát trong playlist
           include: {
-            track: {
+            track: { // Lấy thông tin chi tiết của từng bài hát
               include: {
-                artist: true,
+                artist: true, // Lấy thông tin nghệ sĩ chính
                 genres: {
                   include: {
-                    genre: true,
+                    genre: true, // Lấy thông tin thể loại của bài hát
                   },
                 },
                 album: true,
-                featuredArtists: {
+                featuredArtists: { // Lấy thông tin nghệ sĩ khách mời
                   include: {
                     artistProfile: true
                   }
@@ -2323,9 +2323,10 @@ export const suggestMoreTracksUsingAI = async (
           }
         }
 
-        // If AI filtering worked, use it
+        // Nếu AI đã lọc ra được track, sử dụng cái này
         if (aiFilteredTracks.length > 0) {
           console.log(`[AI] Using ${aiFilteredTracks.length} AI-filtered recommendations`);
+          // Chọn ra 5 track
           return aiFilteredTracks.slice(0, count).map(t => t.id);
         }
       }

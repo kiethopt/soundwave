@@ -19,8 +19,8 @@ export const singles: SingleTrackData[] = [
   {
     artistName: 'Vũ.',
     title: 'Vì Anh Đâu Có Biết',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743442415/testAlbum/V%C5%A9/V%C3%AC%20Anh%20%C4%90%C3%A2u%20C%C3%B3%20Bi%E1%BA%BFt/frou2hv5xqhghbnlervy.jpg',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1743442420/testAlbum/V%C5%A9/V%C3%AC%20Anh%20%C4%90%C3%A2u%20C%C3%B3%20Bi%E1%BA%BFt/w6t3yuq960odthomqphq.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746280308/frou2hv5xqhghbnlervy_cbhi9q.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746280279/V%C3%AC_Anh_%C4%90%C3%A2u_C%C3%B3_Bi%E1%BA%BFt_zfawia.mp3',
     genreNames: ['V-Pop', 'Ballad'],
     labelName: 'Warner Music Vietnam',
     featuredArtistNames: [],
@@ -29,8 +29,8 @@ export const singles: SingleTrackData[] = [
   {
     artistName: 'Vũ.',
     title: 'Lạ Lùng',
-    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745439076/lalung_jspxir.jpg',
-    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745439072/L%E1%BA%A1_L%C3%B9ng_amsc9e.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746280313/lalung_jspxir_pthcam.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746280265/L%E1%BA%A1_L%C3%B9ng_jmt6ay.mp3',
     genreNames: ['V-Pop', 'Indie'],
     labelName: 'Warner Music Vietnam',
     featuredArtistNames: [],
@@ -39,8 +39,8 @@ export const singles: SingleTrackData[] = [
   {
     artistName: 'Vũ.',
     title: 'Đông Kiếm Em',
-    coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745439348/dongkiemem_nstwin.jpg',
-    audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745439344/%C4%90%C3%B4ng_Ki%E1%BA%BFm_Em_vs63al.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746280306/dongkiemem_nstwin_tuqq71.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746280251/%C4%90%C3%B4ng_Ki%E1%BA%BFm_Em_knvcpg.mp3',
     genreNames: ['V-Pop', 'Ballad'],
     labelName: 'Warner Music Vietnam',
     featuredArtistNames: [],
@@ -51,20 +51,20 @@ export const singles: SingleTrackData[] = [
   {
     artistName: 'Wren Evans',
     title: 'Từng Quen',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743442570/testAlbum/Wren%20Evans/T%E1%BB%ABng%20Quen/wzrdd9fi2qihaqihoiro.jpg',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1743442574/testAlbum/Wren%20Evans/T%E1%BB%ABng%20Quen/c603qnanwdwodfrrc5xr.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746282419/tungquen_tjrtqe.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746281549/T%E1%BB%ABng_Quen_hyfhiq.mp3',
     genreNames: ['V-Pop', 'Hip-Hop'],
-    labelName: 'SPACESPEAKERS LABEL',
+    labelName: 'Universal Music Vietnam',
     featuredArtistNames: ['itsnk'],
     playCount: 80
   },
   {
     artistName: 'Wren Evans',
     title: 'Để Ý',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743442569/testAlbum/Wren%20Evans/%C4%90%E1%BB%83%20%C3%9D/dkziecvuunuibpmipxfs.jpg',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1743442576/testAlbum/Wren%20Evans/%C4%90%E1%BB%83%20%C3%9D/cdiz4wskknjr4hxtdpn6.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746282404/dey_jognc1.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746282342/%C4%90%E1%BB%83_%C3%9D_qrwsbs.mp3',
     genreNames: ['V-Pop', 'R&B'],
-    labelName: 'SPACESPEAKERS LABEL',
+    labelName: 'Universal Music Vietnam',
     featuredArtistNames: [],
     playCount: 75
   },
@@ -74,7 +74,7 @@ export const singles: SingleTrackData[] = [
     coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745433944/thichemhoinhieu_n1befr.jpg',
     audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745433941/Th%C3%ADch_Em_H%C6%A1i_Nhi%E1%BB%81u_-_The_Goodboi_Flip_jhiypj.mp3',
     genreNames: ['V-Pop'],
-    labelName: 'SPACESPEAKERS LABEL',
+    labelName: 'Universal Music Vietnam',
     featuredArtistNames: [],
     playCount: 70
   },
@@ -84,7 +84,7 @@ export const singles: SingleTrackData[] = [
     coverUrl: 'https://res.cloudinary.com/dbwhalglx/image/upload/v1745434174/cuulayamnhac_lic7qy.jpg',
     audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745434167/C%E1%BB%A9u_L%E1%BA%A5y_%C3%82m_Nh%E1%BA%A1c_f0y2xf.mp3',
     genreNames: ['V-Pop', 'Hip-Hop'],
-    labelName: 'SPACESPEAKERS LABEL',
+    labelName: 'Universal Music Vietnam',
     featuredArtistNames: ['itsnk'],
     playCount: 70
   },
@@ -93,33 +93,20 @@ export const singles: SingleTrackData[] = [
   {
     artistName: 'Phan Đinh Tùng',
     title: 'Khúc Hát Mừng Sinh Nhật',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743442756/testAlbum/Phan%20%C4%90inh%20T%C3%B9ng/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/tomj0zyas6grk3zft230.jpg',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1743442668/testAlbum/Phan%20%C4%90inh%20T%C3%B9ng/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/Kh%C3%BAc%20H%C3%A1t%20M%E1%BB%ABng%20Sinh%20Nh%E1%BA%ADt/qrm9ovig9ezxdpsysdwj.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746284252/khuchatmungsinhnhat_kxetsa.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746284266/Kh%C3%BAc_H%C3%A1t_M%E1%BB%ABng_Sinh_Nh%E1%BA%ADt_wfpthb.mp3',
     genreNames: ['V-Pop', 'Pop'],
     labelName: 'Đông Tây Promotion',
     featuredArtistNames: [],
     playCount: 90
-  },
-  
-  // HIEUTHUHAI's Single
-  {
-    artistName: 'HIEUTHUHAI',
-    title: 'Nước Mắt Cá Sấu',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1743870605/NMCS_rq3wmm.webp',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1743870609/N%C6%B0%E1%BB%9Bc_M%E1%BA%AFt_C%C3%A1_S%E1%BA%A5u_ldpno8.mp3',
-    genreNames: ['V-Pop', 'Hip-Hop', 'Rap'],
-    labelName: 'M Music Records',
-    featuredArtistNames: [],
-    playCount: 63,
-    releaseDate: new Date('2025-04-01')
   },
 
   // MONO - Ôm Em Thật Lâu
   {
     artistName: 'MONO',
     title: 'Ôm Em Thật Lâu',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436291/seed/artists/MONO/yt1xzctpsfy3hqr7sdmb.jpg',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745436293/seed/artists/MONO/ckois6mvulxsu4anpabz.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746284604/OmEmThatLau_itnwlk.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746284606/%C3%94m_Em_Th%E1%BA%ADt_L%C3%A2u_h02ka9.mp3',
     genreNames: ['V-Pop', 'Pop'],
     labelName: 'M Music Records',
     featuredArtistNames: [],
@@ -131,8 +118,8 @@ export const singles: SingleTrackData[] = [
   {
     artistName: 'MONO',
     title: 'Chăm Hoa',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745436544/seed/artists/MONO/vvlotcogfhiooiq3gctm.jpg',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745436548/seed/artists/MONO/bqbgkmbuvxmwqywz93ki.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746284998/ChamHoa_d3cygc.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746285002/Ch%C4%83m_Hoa_t6qo04.mp3',
     genreNames: ['V-Pop', 'Pop'],
     labelName: 'M Music Records',
     featuredArtistNames: [],
@@ -144,8 +131,8 @@ export const singles: SingleTrackData[] = [
   {
     artistName: 'Đen',
     title: 'Dưới Hiên Nhà',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437250/seed/artists/%C4%90en/iizch3ygybzl83q1zmfy.jpg',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745437256/seed/artists/%C4%90en/uvojxryuxqsnyxe7apaw.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746285393/DuoiHienNha_ppt0cy.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746285398/D%C6%B0%E1%BB%9Bi_Hi%C3%AAn_Nh%C3%A0_dxqiwq.mp3',
     genreNames: ['Hip-Hop', 'Rap'],
     labelName: 'Đen',
     featuredArtistNames: ['Emcee L (Da LAB)', 'JGKiD (Da LAB)'],
@@ -157,8 +144,8 @@ export const singles: SingleTrackData[] = [
   {
     artistName: 'Đen',
     title: 'Đi Theo Bóng Mặt Trời',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437393/seed/artists/%C4%90en/begfbwkugfedpwumd5et.jpg',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745437395/seed/artists/%C4%90en/ujvytchqdd0zry8zbxdb.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746287006/DiTheoBongMatTroi_flz7ba.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746287010/%C4%90i_Theo_B%C3%B3ng_M%E1%BA%B7t_Tr%E1%BB%9Di_vxabn1.mp3',
     genreNames: ['Hip-Hop', 'Rap'],
     labelName: 'Đen',
     featuredArtistNames: ['Giang Nguyễn'],
@@ -170,8 +157,8 @@ export const singles: SingleTrackData[] = [
   {
     artistName: 'Đen',
     title: 'Ta Cứ Đi Cùng Nhau',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437677/seed/artists/%C4%90en/dgk5twb5ki5vi0qq5ocl.jpg',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745437684/seed/artists/%C4%90en/qaeai8knaylimfg9ytwe.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746287181/TaCuDiCungNhau_mr0xxr.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746287186/Ta_C%E1%BB%A9_%C4%90i_C%C3%B9ng_Nhau_xnn9yy.mp3',
     genreNames: ['Hip-Hop', 'Rap', 'Pop'],
     labelName: 'Đen',
     featuredArtistNames: ['Linh Cáo'],
@@ -183,8 +170,8 @@ export const singles: SingleTrackData[] = [
   {
     artistName: 'Đen',
     title: 'Ngày Khác Lạ',
-    coverUrl: 'https://res.cloudinary.com/dsw1dm5ka/image/upload/v1745437804/seed/artists/%C4%90en/vdxgft0se7oxe6iilxqf.jpg',
-    audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1745437809/seed/artists/%C4%90en/rl0h6dr5lbhnx8twsvnk.mp3',
+    coverUrl: 'https://res.cloudinary.com/dwln9t6dv/image/upload/v1746287578/NgayKhacLa_jjjnja.jpg',
+    audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746287582/Ng%C3%A0y_Kh%C3%A1c_L%E1%BA%A1_ji7jt3.mp3',
     genreNames: ['Hip-Hop', 'Rap'],
     labelName: 'Đen',
     featuredArtistNames: ['Giang Phạm', 'Triple D'],
