@@ -21,6 +21,12 @@ const TrackUploadForm = ({
   const { theme } = useTheme();
   const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
 
+  // Log the received album prop to debug label issue
+  console.log('[TrackUploadForm] Received album prop:', album);
+
+  // Get label name from album artist's label, provide default
+  const artistLabelName = album?.label?.name || 'No Label Assigned';
+
   console.log('Received availableGenres prop:', availableGenres);
   const artistOptions = artists
     .filter((artist) => artist.isVerified && artist.role === 'ARTIST')
@@ -186,6 +192,24 @@ const TrackUploadForm = ({
                   }
                   placeholder="Select featured artists"
                   multiple
+                />
+              </div>
+
+              {/* Display Label (Read-only) */}
+              <div>
+                <label
+                  className={`block text-sm font-medium mb-2 ${theme === 'light' ? 'text-gray-700' : 'text-white/60'}`}
+                >
+                  Label
+                </label>
+                <input
+                  type="text"
+                  value={artistLabelName}
+                  readOnly
+                  className={`rounded-md px-3 py-2 w-full cursor-not-allowed ${theme === 'light'
+                    ? 'bg-gray-100 text-gray-500 border border-gray-300'
+                    : 'bg-white/5 text-white/60'
+                  }`}
                 />
               </div>
 

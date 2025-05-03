@@ -628,7 +628,7 @@ export const getAdminAllAlbums = async (req: Request) => {
           artist: { select: { id: true, artistName: true, avatar: true, isVerified: true } },
           genres: { include: { genre: true } },
           tracks: { 
-              where: { isActive: true },
+             //where: { isActive: true },
               select: trackSelect,
               orderBy: { trackNumber: 'asc' },
           },
@@ -651,12 +651,26 @@ export const getAlbumById = async (req: Request) => {
   const isAuthenticated = !!user;
 
   const album = await prisma.album.findUnique({
-    where: { id, isActive: true },
+    where: { id },
     select: albumSelect,
   });
 
   if (!album) throw new Error('Album not found');
-  return { ...album, requiresAuth: !isAuthenticated };
+
+  if (album.isActive) {
+    return { ...album, requiresAuth: !isAuthenticated };
+  }
+
+  const isOwnerOrAdmin = user && (
+    user.role === Role.ADMIN || 
+    (user.artistProfile?.id === album.artist?.id)
+  );
+
+  if (isOwnerOrAdmin) {
+    return { ...album, requiresAuth: !isAuthenticated };
+  } else {
+    throw new Error('Album not found or access denied');
+  }
 };
 
 export const playAlbum = async (req: Request) => {

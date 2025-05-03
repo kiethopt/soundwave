@@ -29,6 +29,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import io, { Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { EditTrackModal } from '@/components/ui/artist-modals';
 
 export default function AlbumDetailPage() {
   const params = useParams();
@@ -63,19 +64,11 @@ export default function AlbumDetailPage() {
     };
   }>({});
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [showEditTrackDialog, setShowEditTrackDialog] = useState(false);
   const [editingTrack, setEditingTrack] = useState<Track | null>(null);
-  const [trackEditForm, setTrackEditForm] = useState<TrackEditForm>({
-    title: '',
-    releaseDate: '',
-    trackNumber: 0,
-    featuredArtists: [],
-    genres: [],
-  });
   const [availableGenres, setAvailableGenres] = useState<Genre[]>([]);
-  const [trackGenreError, setTrackGenreError] = useState<string | null>(null);
   const { dominantColor } = useDominantColor(album?.coverUrl);
   const { theme } = useTheme();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     if (extractedAlbumId) {
@@ -131,6 +124,7 @@ export default function AlbumDetailPage() {
       }
 
       const data = await api.albums.getById(extractedAlbumId, token);
+      console.log('[AlbumDetailPage] API response for album:', data);
       setAlbum(data);
     } catch (err) {
       console.error('Error fetching album:', err);
@@ -193,93 +187,10 @@ export default function AlbumDetailPage() {
   };
 
   const handleEditTrack = async (track: Track) => {
-    console.log("Editing Track Object:", JSON.stringify(track, null, 2));
+    console.log("Editing Track Object (for Modal):", JSON.stringify(track, null, 2));
     setEditingTrack(track);
-    setTrackEditForm({
-      title: track.title,
-      releaseDate: new Date(track.releaseDate).toISOString().split('T')[0],
-      trackNumber: track.trackNumber,
-      featuredArtists: track.featuredArtists.map(
-        ({ artistProfile }) => artistProfile.id
-      ),
-      genres: track.genres?.map(({ genre }) => genre.id) ?? [],
-    });
-    setShowEditTrackDialog(true);
+    setIsEditModalOpen(true);
     setActiveTrackMenu(null);
-  };
-
-  const handleEditTrackSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingTrack || !album) return;
-
-    // Genre validation
-    if (!trackEditForm.genres || trackEditForm.genres.length === 0) {
-      setTrackGenreError("This field is required");
-      return; // Stop submission
-    } else {
-      setTrackGenreError(null);
-    }
-
-    try {
-      const token = localStorage.getItem('userToken');
-      if (!token) throw new Error('No authentication token found');
-
-      const formData = new FormData();
-      formData.append('title', trackEditForm.title);
-      formData.append('releaseDate', trackEditForm.releaseDate);
-      formData.append('trackNumber', trackEditForm.trackNumber.toString());
-      if (trackEditForm.featuredArtists.length > 0) {
-        formData.append(
-          'featuredArtists',
-          trackEditForm.featuredArtists.join(',')
-        );
-        formData.append('updateFeaturedArtists', 'true');
-      }
-
-      if (trackEditForm.genres && trackEditForm.genres.length > 0) {
-        formData.append('genreIds', trackEditForm.genres.join(','));
-        formData.append('updateGenres', 'true');
-      }
-
-      // Optimistic update with kiểu dữ liệu hợp lệ
-      const updatedTracks = album.tracks.map((t) => {
-        if (t.id === editingTrack.id) {
-          return {
-            ...t,
-            title: trackEditForm.title,
-            releaseDate: trackEditForm.releaseDate,
-            trackNumber: trackEditForm.trackNumber,
-            featuredArtists: trackEditForm.featuredArtists.map((artistId) => ({
-              artistProfile: {
-                id: artistId,
-                artistName:
-                  artists.find((a) => a.id === artistId)?.artistName || '',
-                avatar: artists.find((a) => a.id === artistId)?.avatar || null,
-                isVerified:
-                  artists.find((a) => a.id === artistId)?.isVerified || false,
-              },
-            })),
-            genres: trackEditForm.genres.map((genreId) => ({
-              genre: {
-                id: genreId,
-                name: availableGenres.find((g) => g.id === genreId)?.name || '',
-              },
-            })),
-          };
-        }
-        return t;
-      });
-
-      setAlbum({ ...album, tracks: updatedTracks });
-
-      await api.tracks.update(editingTrack.id, formData, token);
-      setShowEditTrackDialog(false);
-      toast.success('Track updated successfully');
-    } catch (err) {
-      await fetchAlbumDetails();
-      console.error('Error updating track:', err);
-      toast.error('Failed to update track');
-    }
   };
 
   const handleToggleTrackVisibility = async (track: Track) => {
@@ -359,6 +270,8 @@ export default function AlbumDetailPage() {
         return;
       }
 
+      const albumLabelId = album?.labelId;
+
       const formData = new FormData();
 
       newTracks.forEach((file, index) => {
@@ -380,7 +293,6 @@ export default function AlbumDetailPage() {
         }
       });
 
-      // Log the genres being sent for each track
       console.log('FormData - genres being sent:', formData.getAll('genres'));
 
       const response = await api.albums.uploadTracks(
@@ -440,121 +352,35 @@ export default function AlbumDetailPage() {
     }
   };
 
-  // WebSocket listener for album updates
-  // useEffect(() => {
-  //   if (!extractedAlbumId) return; // Don't connect if albumId is not available
-
-  //   let socket: Socket | null = null;
-  //   const connectTimer = setTimeout(() => {
-  //       socket = io(process.env.NEXT_PUBLIC_API_URL!);
-
-  //       console.log(`[WebSocket] Connecting for Artist Album Detail: ${extractedAlbumId}`);
-
-  //       socket.on('connect', () => {
-  //           console.log(`[WebSocket] Connected for Artist Album Detail: ${extractedAlbumId}`);
-  //       });
-  //       socket.on('disconnect', (reason: string) => {
-  //           console.log(`[WebSocket] Disconnected from Artist Album Detail ${extractedAlbumId}:`, reason);
-  //       });
-  //       socket.on('connect_error', (error: Error) => {
-  //           console.error(`[WebSocket] Connection Error for Artist Album Detail ${extractedAlbumId}:`, error);
-  //       });
-
-  //       // Update album data
-  //       socket.on('album:updated', (data: { album: Album }) => {
-  //           if (data.album.id === extractedAlbumId) {
-  //               console.log(`[WebSocket] Artist Album ${extractedAlbumId} updated:`, data.album);
-  //               // Merge new data with existing data, especially preserving tracks if not included in update
-  //               setAlbum((prevAlbum) => (prevAlbum ? { ...prevAlbum, ...data.album } : data.album));
-  //               setError(null);
-  //           }
-  //       });
-
-  //       // Handle album deletion
-  //       socket.on('album:deleted', (data: { albumId: string }) => {
-  //           if (data.albumId === extractedAlbumId) {
-  //               console.log(`[WebSocket] Artist Album ${extractedAlbumId} deleted`);
-  //               setAlbum(null);
-  //               setError('This album has been deleted.');
-  //           }
-  //       });
-
-  //       // Handle visibility change (Artist can still see inactive albums)
-  //       socket.on('album:visibilityChanged', (data: { albumId: string; isActive: boolean }) => {
-  //           if (data.albumId === extractedAlbumId) {
-  //               console.log(`[WebSocket] Artist Album ${extractedAlbumId} visibility changed to ${data.isActive}`);
-  //               setAlbum((prevAlbum) => prevAlbum ? { ...prevAlbum, isActive: data.isActive } : prevAlbum);
-  //               setError(null); // Clear error in case it was previously set by other means
-  //           }
-  //       });
-
-  //        // ---- Track Event Handling within Album Detail ----
-  //       // Update track within the album's track list
-  //       socket.on('track:updated', (data: { track: Track }) => {
-  //           if (data.track.albumId === extractedAlbumId) {
-  //               console.log(`[WebSocket] Track ${data.track.id} in Artist Album ${extractedAlbumId} updated:`, data.track);
-  //               setAlbum(prevAlbum => {
-  //                   if (!prevAlbum) return null;
-  //                   const updatedTracks = prevAlbum.tracks.map(t => 
-  //                       t.id === data.track.id ? { ...t, ...data.track } : t
-  //                   );
-  //                   return { ...prevAlbum, tracks: updatedTracks };
-  //               });
-  //           }
-  //       });
-
-  //       // Remove track from the album's track list
-  //       socket.on('track:deleted', (data: { trackId: string }) => {
-  //           setAlbum(prevAlbum => {
-  //               if (!prevAlbum) return null;
-  //               const trackExists = prevAlbum.tracks.some(t => t.id === data.trackId);
-  //               if (trackExists) {
-  //                   console.log(`[WebSocket] Track ${data.trackId} deleted from Artist Album ${extractedAlbumId}`);
-  //                   const updatedTracks = prevAlbum.tracks.filter(t => t.id !== data.trackId);
-  //                    // Recalculate duration/totalTracks if necessary
-  //                    const totalDuration = updatedTracks.reduce((sum, track) => sum + (track.duration || 0), 0);
-  //                    const totalTracks = updatedTracks.length;
-  //                    return { ...prevAlbum, tracks: updatedTracks, duration: totalDuration, totalTracks: totalTracks };
-  //               }
-  //               return prevAlbum;
-  //           });
-  //       });
-
-  //       // Update track visibility within the album's track list
-  //       socket.on('track:visibilityChanged', (data: { trackId: string, isActive: boolean }) => {
-  //            setAlbum(prevAlbum => {
-  //               if (!prevAlbum) return null;
-  //               const trackIndex = prevAlbum.tracks.findIndex(t => t.id === data.trackId);
-  //               if (trackIndex !== -1) {
-  //                   console.log(`[WebSocket] Track ${data.trackId} visibility changed to ${data.isActive} in Artist Album ${extractedAlbumId}`);
-  //                   const updatedTracks = prevAlbum.tracks.map(t => 
-  //                       t.id === data.trackId ? { ...t, isActive: data.isActive } : t
-  //                   );
-  //                   return { ...prevAlbum, tracks: updatedTracks };
-  //               }
-  //               return prevAlbum;
-  //           });
-  //       });
-  //   }, process.env.NODE_ENV === 'development' ? 100 : 0); // Add delay
-
-  //   // Cleanup
-  //   return () => {
-  //       clearTimeout(connectTimer);
-  //       if (socket) {
-  //           console.log(`[WebSocket] Disconnecting from Artist Album Detail ${extractedAlbumId}...`);
-  //           socket.off('connect');
-  //           socket.off('disconnect');
-  //           socket.off('connect_error');
-  //           socket.off('album:updated');
-  //           socket.off('album:deleted');
-  //           socket.off('album:visibilityChanged');
-  //           socket.off('track:updated');
-  //           socket.off('track:deleted');
-  //           socket.off('track:visibilityChanged');
-  //           socket.disconnect();
-  //       }
-  //   };
-  // }, [extractedAlbumId, setAlbum]); // setAlbum is needed for track updates
+  // Add this handler for the modal's onSubmit prop
+  const handleModalSubmit = async (trackId: string, formData: FormData) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) {
+      toast.error('Authentication required.');
+      throw new Error('Authentication required.'); // Throw error to prevent modal closing
+    }
+    try {
+      await api.tracks.update(trackId, formData, token);
+      toast.success('Track updated successfully');
+      // Optimistically update or refetch
+      // Option 1: Refetch album details to get the latest track list
+      await fetchAlbumDetails(); 
+      // Option 2: Optimistic update (if you have the updated track data from response)
+      // setAlbum(prevAlbum => {
+      //   if (!prevAlbum) return null;
+      //   return {
+      //     ...prevAlbum,
+      //     tracks: prevAlbum.tracks.map(t => t.id === trackId ? updatedTrackData : t)
+      //   };
+      // });
+      setIsEditModalOpen(false); // Close modal on success
+    } catch (err: any) {
+      console.error('Error updating track:', err);
+      toast.error(err.message || 'Failed to update track.');
+      // Optionally re-throw the error if you want the modal to stay open on failure
+      throw err;
+    }
+  };
 
   // Loading state
   if (isLoading) {
@@ -1214,194 +1040,22 @@ export default function AlbumDetailPage() {
           </div>
         )}
 
-        {/* Edit Track Dialog */}
-        {showEditTrackDialog && editingTrack && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div
-              className={`max-w-md w-full p-6 rounded-lg ${
-                theme === 'light' ? 'bg-white' : 'bg-[#121212]'
-              }`}
-            >
-              <h3
-                className={`text-xl font-bold mb-4 ${
-                  theme === 'light' ? 'text-gray-900' : 'text-white'
-                }`}
-              >
-                Edit Track
-              </h3>
-              <form onSubmit={handleEditTrackSubmit} className="space-y-4">
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-1 ${
-                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                    }`}
-                  >
-                    Title
-                  </label>
-                  <input
-                    type="text"
-                    value={trackEditForm.title}
-                    onChange={(e) =>
-                      setTrackEditForm({
-                        ...trackEditForm,
-                        title: e.target.value,
-                      })
-                    }
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
-                      theme === 'light'
-                        ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                        : 'bg-white/5 border-white/10 focus:ring-white/20'
-                    }`}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-1 ${
-                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                    }`}
-                  >
-                    Release Date
-                  </label>
-                  <input
-                    type="date"
-                    value={trackEditForm.releaseDate}
-                    onChange={(e) =>
-                      setTrackEditForm({
-                        ...trackEditForm,
-                        releaseDate: e.target.value,
-                      })
-                    }
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
-                      theme === 'light'
-                        ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                        : 'bg-white/5 border-white/10 focus:ring-white/20'
-                    }`}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-1 ${
-                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                    }`}
-                  >
-                    Track Number
-                  </label>
-                  <input
-                    type="number"
-                    value={trackEditForm.trackNumber}
-                    onChange={(e) =>
-                      setTrackEditForm({
-                        ...trackEditForm,
-                        trackNumber: Number.parseInt(e.target.value),
-                      })
-                    }
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
-                      theme === 'light'
-                        ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                        : 'bg-white/5 border-white/10 focus:ring-white/20'
-                    }`}
-                    required
-                    min="1"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-1 ${
-                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                    }`}
-                  >
-                    Featured Artists
-                  </label>
-                  <select
-                    multiple
-                    value={trackEditForm.featuredArtists}
-                    onChange={(e) => {
-                      const selectedArtists = Array.from(
-                        e.target.selectedOptions,
-                        (option) => option.value
-                      );
-                      setTrackEditForm({
-                        ...trackEditForm,
-                        featuredArtists: selectedArtists,
-                      });
-                    }}
-                    className={`w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 ${
-                      theme === 'light'
-                        ? 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500/20'
-                        : 'bg-white/5 border-white/10 text-white focus:ring-white/20'
-                    }`}
-                  >
-                    {artists.map((artist) => (
-                      <option key={artist.id} value={artist.id}>
-                        {artist.artistName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Genres Select */}
-                <div>
-                  <label
-                    className={`block text-sm font-medium mb-1 ${
-                      theme === 'light' ? 'text-gray-700' : 'text-white/60'
-                    }`}
-                  >
-                    Genres *
-                  </label>
-                  {/* Wrap SearchableSelect for error styling */}
-                  <div
-                    className={trackGenreError ? "rounded-md border border-red-500" : ""}
-                  >
-                    <SearchableSelect
-                      options={availableGenres.map((g) => ({ id: g.id, name: g.name }))}
-                      value={trackEditForm.genres}
-                      onChange={(value: string[]) =>
-                        setTrackEditForm({
-                          ...trackEditForm,
-                          genres: value,
-                        })
-                      }
-                      placeholder="Select genres..."
-                      multiple={true}
-                    />
-                  </div>
-                  {/* Display error message */}
-                  {trackGenreError && (
-                    <p className="text-sm text-red-500 mt-1">{trackGenreError}</p>
-                  )}
-                </div>
-
-                <div className="flex justify-end gap-4 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowEditTrackDialog(false)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg ${
-                      theme === 'light'
-                        ? 'text-gray-600 hover:text-gray-900'
-                        : 'text-white/60 hover:text-white'
-                    }`}
-                  > 
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                      theme === 'light'
-                        ? 'bg-gray-900 text-white hover:bg-gray-800'
-                        : 'bg-white text-black hover:bg-white/90'
-                    }`}
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+        {/* Render the imported EditTrackModal */}
+        {isEditModalOpen && editingTrack && (
+          <EditTrackModal
+            track={editingTrack}
+            isOpen={isEditModalOpen}
+            onClose={() => {
+              setIsEditModalOpen(false);
+              setEditingTrack(null); // Clear editing track on close
+            }}
+            onSubmit={handleModalSubmit} // Pass the new handler
+            theme={theme}
+            availableGenres={availableGenres}
+            // Pass available artists (assuming 'artists' state holds the correct data)
+            availableArtists={artists.map(a => ({ id: a.id, name: a.artistName }))}
+            // availableLabels={availableLabels} // No longer needed if modal handles label internally
+          />
         )}
       </div>
     </div>

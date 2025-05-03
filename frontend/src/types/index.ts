@@ -248,8 +248,8 @@ export interface Album {
   artist: {
     id: string;
     artistName: string;
-    avatar: string | null;
-    isVerified: boolean;
+    avatar?: string | null;
+    isVerified?: boolean;
   };
   tracks: Track[];
   genres: {

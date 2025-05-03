@@ -8,14 +8,15 @@ const userSockets = new Map<string, string>();
 
 // Initialize Socket.IO and attach it to the HTTP server
 export const initializeSocket = (server: http.Server): SocketIOServer => {
+  // Use the same allowed origins logic as in index.ts
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
+
   io = new SocketIOServer(server, {
-    // Configure CORS to allow connections from your frontend URL
     cors: {
-      origin: process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000", // Ensure this env variable is set or adjust the default
+      origin: allowedOrigins, // Use the array of allowed origins
       methods: ["GET", "POST"],
       credentials: true
     },
-    // Ưu tiên WebSocket hơn Polling
     transports: ['websocket', 'polling'],
     // Có thể tăng pingTimeout nếu mạng không ổn định (mặc định 5000ms)
     // pingTimeout: 7000,

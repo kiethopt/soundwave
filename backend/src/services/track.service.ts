@@ -24,7 +24,7 @@ export const canManageTrack = (user: any, trackArtistId: string): boolean => {
 export const deleteTrackById = async (id: string) => {
   const track = await prisma.track.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, albumId: true },
   });
 
   if (!track) {
@@ -35,8 +35,19 @@ export const deleteTrackById = async (id: string) => {
   const io = getIO();
   io.emit('track:deleted', { trackId: id });
 
-  return prisma.track.delete({
-    where: { id },
+  return prisma.$transaction(async (tx) => {
+    // Delete the track itself
+    await tx.track.delete({
+      where: { id },
+    });
+
+    // If the track belonged to an album, decrement the album's track count
+    if (track.albumId) {
+      await tx.album.update({
+        where: { id: track.albumId },
+        data: { totalTracks: { decrement: 1 } },
+      });
+    }
   });
 };
 
@@ -543,6 +554,7 @@ export const updateTrack = async (req: Request, id: string) => {
       artistId: true,
       coverUrl: true,
       labelId: true,
+      albumId: true,
     },
   });
 
@@ -646,10 +658,36 @@ export const updateTrack = async (req: Request, id: string) => {
   }
 
   const updatedTrack = await prisma.$transaction(async (tx) => {
+    // Get the original album ID *before* potentially updating the track
+    const originalAlbumId = currentTrack.albumId;
+
+    // Update the track itself (this handles connect/disconnect)
     await tx.track.update({
       where: { id },
       data: updateData, 
     });
+
+    // --- Update Album Track Counts --- 
+    const newAlbumId = (updateData.album as any)?.connect?.id ?? 
+                       (albumId === null || albumId === '' ? null : originalAlbumId); // Determine the new album ID after update
+
+    // If the album assignment changed...
+    if (originalAlbumId !== newAlbumId) {
+      // Decrement count of the original album if it existed
+      if (originalAlbumId) {
+        await tx.album.update({
+          where: { id: originalAlbumId },
+          data: { totalTracks: { decrement: 1 } },
+        });
+      }
+      // Increment count of the new album if it exists
+      if (newAlbumId) {
+        await tx.album.update({
+          where: { id: newAlbumId },
+          data: { totalTracks: { increment: 1 } },
+        });
+      }
+    }
 
     // --- Update Featured Artists ---
     if (req.body.featuredArtists !== undefined) {

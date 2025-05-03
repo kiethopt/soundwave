@@ -12,7 +12,7 @@ import {
   getNewestAlbums,
   getHotAlbums,
 } from '../controllers/album.controller';
-import { authenticate, authorize } from '../middleware/auth.middleware';
+import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import upload, { handleUploadError } from '../middleware/upload.middleware';
 import { cacheMiddleware } from '../middleware/cache.middleware';
@@ -70,7 +70,7 @@ router.post('/:albumId/play', authenticate, cacheMiddleware, playAlbum);
 // Public routes
 router.get('/newest', cacheMiddleware, getNewestAlbums);
 router.get('/hot', cacheMiddleware, getHotAlbums);
-router.get('/:id', cacheMiddleware, getAlbumById);
+router.get('/:id', optionalAuthenticate, cacheMiddleware, getAlbumById);
 
 // Route lấy danh sách tất cả album (có cache)
 router.get(
