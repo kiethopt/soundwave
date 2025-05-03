@@ -8,7 +8,6 @@ import { api } from "@/utils/api";
 import { Play } from "@/components/ui/Icons";
 const token = localStorage.getItem('userToken');
 
-
 const typeConfig = {
   "new-albums": {
     fetcher: () => api.albums.getNewestAlbums(),
@@ -84,6 +83,29 @@ export default function SeeAllPage() {
     router.push(`/artist/${artistId}`);
   };
 
+  // Add a play handler
+  const handlePlay = (e: React.MouseEvent, item: any, itemType: string) => {
+    e.stopPropagation();
+    // TODO: Integrate with your player context or API
+    if (itemType === "album") {
+      // Play the album (e.g., play first track or album as a whole)
+      console.log("Play album", item);
+      // player.playAlbum(item.id) or similar
+    } else if (itemType === "track") {
+      // Play the track
+      console.log("Play track", item);
+      // player.playTrack(item.id) or similar
+    } else if (itemType === "playlist") {
+      // Play the playlist
+      console.log("Play playlist", item);
+      // player.playPlaylist(item.id) or similar
+    } else if (itemType === "artist") {
+      // Play artist's top tracks or similar
+      console.log("Play artist", item);
+      // player.playArtist(item.id) or similar
+    }
+  };
+
   if (!config) return <div className="p-8">Invalid type</div>;
   if (loading) return <div className="p-8">Loading...</div>;
   if (error) return <div className="p-8 text-red-500">{error}</div>;
@@ -109,7 +131,10 @@ export default function SeeAllPage() {
                       height={160}
                       className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square"
                     />
-                    <button className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3">
+                    <button 
+                      className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3"
+                      onClick={(e) => handlePlay(e, item, config.itemType)}
+                    >
                       <Play className="w-6 h-6 text-white" fill="white" />
                     </button>
                   </div>
@@ -138,7 +163,10 @@ export default function SeeAllPage() {
                       height={160}
                       className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square"
                     />
-                    <button className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3">
+                    <button 
+                      className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3"
+                      onClick={(e) => handlePlay(e, item, config.itemType)}
+                    >
                       <Play className="w-6 h-6 text-white" fill="white" />
                     </button>
                   </div>
@@ -184,7 +212,10 @@ export default function SeeAllPage() {
                       height={160}
                       className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square"
                     />
-                    <button className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3">
+                    <button 
+                      className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3"
+                      onClick={(e) => handlePlay(e, item, config.itemType)}
+                    >
                       <Play className="w-6 h-6 text-white" fill="white" />
                     </button>
                   </div>

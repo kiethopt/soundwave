@@ -21,6 +21,7 @@ import toast from "react-hot-toast";
 import { useTrack } from "@/contexts/TrackContext";
 import { AlreadyExistsDialog } from "@/components/ui/AlreadyExistsDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { usePlayHandler } from "@/hooks/usePlayHandler";
 
 // Define the names of playlists to filter out (use the same set as in TrackList)
 const filteredPlaylistNames = new Set([
@@ -82,7 +83,6 @@ function SearchContent() {
   const {
     currentTrack,
     isPlaying,
-    playTrack,
     pauseTrack,
     queueType,
     setQueueType,
@@ -230,77 +230,7 @@ function SearchContent() {
     fetchFavoriteIds();
   }, []);
 
-  const handlePlay = async (item: Track | Album | Artist) => {
-    try {
-      const token = localStorage.getItem("userToken");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-
-      if ("audioUrl" in item) {
-        // Xử lý phát Track
-        if (currentTrack?.id === item.id && queueType === "track") {
-          if (isPlaying) {
-            pauseTrack();
-          } else {
-            playTrack(item);
-          }
-        } else {
-          setQueueType("track");
-          trackQueue(results.tracks);
-          playTrack(item);
-        }
-      } else if ("tracks" in item) {
-        if (item.tracks.length > 0) {
-          const isCurrentAlbumPlaying =
-            currentTrack &&
-            item.tracks.some((track) => track.id === currentTrack.id) &&
-            queueType === "album" &&
-            isPlaying;
-
-          if (isCurrentAlbumPlaying) {
-            pauseTrack();
-          } else {
-            setQueueType("album");
-            trackQueue(item.tracks);
-            playTrack(item.tracks[0]);
-          }
-        } else {
-          toast.error("No tracks available for this album");
-        }
-      } else {
-        // Xử lý phát Artist - Đã cập nhật để phù hợp với cấu trúc dữ liệu mới
-        const isCurrentArtistPlaying =
-          currentTrack &&
-          currentTrack.artist.id === item.id &&
-          queueType === "artist" &&
-          isPlaying;
-
-        if (isCurrentArtistPlaying) {
-          pauseTrack();
-        } else {
-          // Lấy tracks của artist
-          const response = await api.artists.getTrackByArtistId(item.id, token);
-          const artistTracks = response?.tracks || [];
-
-          if (artistTracks.length > 0) {
-            const sortedTracks = artistTracks.sort(
-              (a: any, b: any) => b.playCount - a.playCount
-            );
-            setQueueType("artist");
-            trackQueue(sortedTracks);
-            playTrack(sortedTracks[0]);
-          } else {
-            toast.error("No tracks available for this artist");
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error playing:", error);
-      toast.error("An error occurred while playing");
-    }
-  };
+  const handlePlay = usePlayHandler({ tracks: results.tracks });
 
   const handleAddToPlaylist = async (playlistId: string, trackId: string) => {
     const token = localStorage.getItem("userToken");

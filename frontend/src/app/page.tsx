@@ -663,7 +663,7 @@ export default function Home() {
       {/* New Releases Section - Horizontal scroll on mobile */}
       <Section title="New Releases" viewAllLink="/seeall?type=new-albums">
         <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
-          {newestAlbums.slice(0, 8).map((album) => (
+          {newestAlbums.slice(0, 10).map((album) => (
             <div
               key={album.id}
               className="cursor-pointer flex-shrink-0 w-40"
@@ -728,7 +728,7 @@ export default function Home() {
       {/* Popular Albums Section */}
       <Section title="Everyone's Listening To..." viewAllLink="/seeall?type=top-albums">
         <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
-          {hotAlbums.slice(0, 8).map((album) => (
+          {hotAlbums.slice(0, 10).map((album) => (
             <div
               key={album.id}
               className="cursor-pointer flex-shrink-0 w-40"
@@ -796,7 +796,7 @@ export default function Home() {
       {isAuthenticated && userPlayHistory.length > 0 && (
         <Section title="Recently Played" viewAllLink="/seeall?type=recently-played">
           <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
-            {userPlayHistory.slice(0, 8).map((track) => (
+            {userPlayHistory.slice(0, 10).map((track) => (
                 <div
                   key={track.id}
                   className="cursor-pointer flex-shrink-0 w-40"
