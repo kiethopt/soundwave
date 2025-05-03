@@ -264,7 +264,7 @@ export default function TrackDetailPage() {
         </div>
 
         {/* Main Container */}
-        <div className="flex flex-col items-center md:items-start md:flex-row gap-8">
+        <div className="flex flex-col items-center md:items-end md:flex-row gap-8">
           {/* Track Cover */}
           <div className="w-[280px] md:w-[220px] flex-shrink-0">
             <img
@@ -275,7 +275,7 @@ export default function TrackDetailPage() {
           </div>
 
           {/* Track Info */}
-          <div className="w-full flex flex-col gap-4 justify-end">
+          <div className="w-full flex flex-col gap-4 justify-end mb-4">
             <div className="text-center md:text-left">
               <h1
                 className={`text-3xl md:text-4xl font-bold mb-2 ${

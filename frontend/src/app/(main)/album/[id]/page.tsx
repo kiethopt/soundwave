@@ -238,7 +238,7 @@ export default function AlbumDetailPage() {
         </div>
 
         {/* Main Container */}
-        <div className="flex flex-col items-center md:items-start md:flex-row gap-8">
+        <div className="flex flex-col items-center md:items-end md:flex-row gap-8">
           {/* Album Cover */}
           {album.coverUrl && (
             <div className="w-[280px] md:w-[220px] flex-shrink-0">
@@ -253,7 +253,7 @@ export default function AlbumDetailPage() {
           )}
 
           {/* Album Info */}
-          <div className="w-full flex flex-col gap-4">
+          <div className="w-full flex flex-col gap-4 mb-4">
             <div className="text-center md:text-left">
               <h1
                 className={`text-3xl md:text-4xl font-bold mb-2 ${
@@ -317,44 +317,6 @@ export default function AlbumDetailPage() {
                   ))}
                 </div>
               )}
-
-              {/* Track Options */}
-              <div className="mt-4">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="p-2 opacity-60 hover:opacity-100 cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="w-5 h-5" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56">
-                    <DropdownMenuItem
-                      className="cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <AddSimple className="w-4 h-4 mr-2" />
-                      Add to Library
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Heart className="w-4 h-4 mr-2" />
-                      Add to Favorites
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="cursor-pointer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Share2 className="w-4 h-4 mr-2" />
-                      Share
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
             </div>
           </div>
         </div>
