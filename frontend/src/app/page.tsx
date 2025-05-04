@@ -283,6 +283,10 @@ export default function Home() {
     return currentTrack?.id === trackId && isPlaying;
   }
 
+  const uniqueUserPlayHistory = Array.from(
+    new Map(userPlayHistory.map(track => [track.id, track])).values()
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -793,10 +797,10 @@ export default function Home() {
       </Section>
 
       {/* Update the dropdown menu in the Recently Played section */}
-      {isAuthenticated && userPlayHistory.length > 0 && (
+      {isAuthenticated && uniqueUserPlayHistory.length > 0 && (
         <Section title="Recently Played" viewAllLink="/seeall?type=recently-played">
           <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-accent scrollbar-track-transparent">
-            {userPlayHistory.slice(0, 10).map((track) => (
+            {uniqueUserPlayHistory.slice(0, 10).map((track) => (
                 <div
                   key={track.id}
                   className="cursor-pointer flex-shrink-0 w-40"
