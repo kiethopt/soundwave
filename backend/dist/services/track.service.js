@@ -59,15 +59,23 @@ exports.canManageTrack = canManageTrack;
 const deleteTrackById = async (id) => {
     const track = await db_1.default.track.findUnique({
         where: { id },
-        select: { id: true },
+        select: { id: true, albumId: true },
     });
     if (!track) {
         throw new Error('Track not found');
     }
     const io = (0, socket_1.getIO)();
     io.emit('track:deleted', { trackId: id });
-    return db_1.default.track.delete({
-        where: { id },
+    return db_1.default.$transaction(async (tx) => {
+        await tx.track.delete({
+            where: { id },
+        });
+        if (track.albumId) {
+            await tx.album.update({
+                where: { id: track.albumId },
+                data: { totalTracks: { decrement: 1 } },
+            });
+        }
     });
 };
 exports.deleteTrackById = deleteTrackById;
@@ -460,6 +468,7 @@ const updateTrack = async (req, id) => {
             artistId: true,
             coverUrl: true,
             labelId: true,
+            albumId: true,
         },
     });
     if (!currentTrack)
@@ -552,10 +561,27 @@ const updateTrack = async (req, id) => {
         }
     }
     const updatedTrack = await db_1.default.$transaction(async (tx) => {
+        const originalAlbumId = currentTrack.albumId;
         await tx.track.update({
             where: { id },
             data: updateData,
         });
+        const newAlbumId = updateData.album?.connect?.id ??
+            (albumId === null || albumId === '' ? null : originalAlbumId);
+        if (originalAlbumId !== newAlbumId) {
+            if (originalAlbumId) {
+                await tx.album.update({
+                    where: { id: originalAlbumId },
+                    data: { totalTracks: { decrement: 1 } },
+                });
+            }
+            if (newAlbumId) {
+                await tx.album.update({
+                    where: { id: newAlbumId },
+                    data: { totalTracks: { increment: 1 } },
+                });
+            }
+        }
         if (req.body.featuredArtists !== undefined) {
             await tx.trackArtist.deleteMany({ where: { trackId: id } });
             const artistsInput = req.body.featuredArtists;

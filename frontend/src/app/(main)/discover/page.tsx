@@ -96,9 +96,7 @@ export default function DiscoveryPage() {
       const firstGenreColorClass = getGenreColor(genres[1].name);
       const dominantColor = getDominantHexColor(firstGenreColorClass);
       setFirstGenreColor(dominantColor);
-      
-      // Also update the genre data in context
-      updateGenreData(genres[0].name, dominantColor || '');
+      updateGenreData(genres[0].id, genres[0].name, dominantColor || '');
     }
   }, [genres, updateGenreData]);
 
@@ -181,7 +179,7 @@ export default function DiscoveryPage() {
                 key={genre.id}
                 onClick={() => {
                   const dominantColor = getDominantHexColor(colorClass);
-                  updateGenreData(genre.name, dominantColor || '');
+                  updateGenreData(genre.id, genre.name, dominantColor || '');
                 }}
                 onMouseEnter={() => handleGenreHover(genre.name)}
                 onMouseLeave={handleGenreHoverEnd}

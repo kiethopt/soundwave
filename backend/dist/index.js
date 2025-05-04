@@ -26,8 +26,17 @@ dotenv_1.default.config();
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
 (0, socket_1.initializeSocket)(server);
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
 app.use((0, cors_1.default)({
-    origin: 'http://localhost:3000',
+    origin: function (origin, callback) {
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
     credentials: true
 }));
 app.use(express_1.default.json({ limit: '50mb' }));

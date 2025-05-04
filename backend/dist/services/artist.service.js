@@ -402,8 +402,8 @@ class ArtistService {
                     lte: endDate,
                 },
             },
-            _sum: {
-                playCount: true,
+            _count: {
+                id: true,
             },
             orderBy: {
                 createdAt: 'asc',
@@ -419,8 +419,8 @@ class ArtistService {
                     lte: endDate,
                 },
             },
-            _sum: {
-                playCount: true,
+            _count: {
+                id: true,
             },
             orderBy: {
                 createdAt: 'asc',
@@ -573,7 +573,7 @@ class ArtistService {
                 }
             }
             streamData.forEach(item => {
-                const playCount = item._sum.playCount || 0;
+                const playCount = item._count.id || 0;
                 if (unit === 'month') {
                     const key = (0, date_fns_1.format)(item.createdAt, 'yyyy-MM');
                     if (counts[key] !== undefined) {

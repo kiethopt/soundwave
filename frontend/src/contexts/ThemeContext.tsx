@@ -5,20 +5,20 @@ type Theme = 'light' | 'dark';
 interface ThemeContextType {
   theme: Theme;
   toggleTheme: () => void;
-  genreData: { name: string; color: string };
-  setGenreData: React.Dispatch<React.SetStateAction<{ name: string; color: string }>>;
-  updateGenreData: (name: string, color: string) => void; 
+  genreData: { id: string; name: string; color: string };
+  setGenreData: React.Dispatch<React.SetStateAction<{ id: string; name: string; color: string }>>;
+  updateGenreData: (id: string, name: string, color: string) => void; 
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark');
-  const [genreData, setGenreData] = useState({ name: '', color: '' });
+  const [genreData, setGenreData] = useState({ id: '', name: '', color: '' });
 
-  const updateGenreData = useCallback((name: string, color: string) => {
+  const updateGenreData = useCallback((id: string, name: string, color: string) => {
     // Save to localStorage
-    localStorage.setItem('genreData', JSON.stringify({ name, color }));
+    localStorage.setItem('genreData', JSON.stringify({ id, name, color }));
   }, []);
 
   useEffect(() => {

@@ -81,6 +81,7 @@ export default function DiscoveryGenrePage({
         setTopTracks(tracks);
         setTopArtists(artists);
         setNewestTracks(newestTrack);
+
         const sortedGenreSystemPlaylists = sortSystemPlaylists(systemPlaylists, id);
         console.log('Sorted Genre System Playlists:', sortedGenreSystemPlaylists);
         setGenreSystemPlaylists(sortedGenreSystemPlaylists);
@@ -377,7 +378,7 @@ export default function DiscoveryGenrePage({
               </h2>
               <button 
                 className="flex items-center text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
-                onClick={() => router.push(`/genre/${id}/artists`)}
+                onClick={() => router.push(`/seeall?type=genre-top-artists&id=${id}`)}
               >
                 See all<Right className="w-3 h-3 inline-block ml-1" />
               </button>
@@ -444,7 +445,7 @@ export default function DiscoveryGenrePage({
               </h2>
               <button 
                 className="flex items-center text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
-                onClick={() => router.push(`/genre/${id}/tracks`)}
+                onClick={() => router.push(`/seeall?type=genre-top-tracks`)}
               >
                 See all<Right className="w-3 h-3 inline-block ml-1" />
               </button>
@@ -630,7 +631,7 @@ export default function DiscoveryGenrePage({
               </h2>
               <button 
                 className="flex items-center text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
-                onClick={() => router.push(`/genre/${id}/tracks`)}
+                onClick={() => router.push(`/seeall?type=genre-new-releases`)}
               >
                 See all<Right className="w-3 h-3 inline-block ml-1" />
               </button>
@@ -816,7 +817,7 @@ export default function DiscoveryGenrePage({
               </h2>
               <button 
                 className="flex items-center text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
-                onClick={() => router.push(`/genre/${id}/albums`)}
+                onClick={() => router.push(`/seeall?type=genre-top-albums`)}
               >
                 See all<Right className="w-3 h-3 inline-block ml-1" />
               </button>

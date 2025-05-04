@@ -181,7 +181,6 @@ model History {
   track     Track?      @relation(fields: [trackId], references: [id], onDelete: Cascade)
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, trackId, type])
   @@index([userId])
   @@index([type])
   @@index([trackId])

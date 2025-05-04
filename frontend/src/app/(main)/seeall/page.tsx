@@ -1,53 +1,101 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardTitle } from "@/components/user/track/TrackCard";
 import Image from "next/image";
 import { api } from "@/utils/api";
 import { Play, Pause } from "@/components/ui/Icons";
 import { usePlayHandler } from "@/hooks/usePlayHandler";
 import { useTrack } from "@/contexts/TrackContext";
-import { Playlist } from "@/types";
-const token = localStorage.getItem('userToken');
+import { Artist, Playlist } from "@/types";
 
-const typeConfig = {
-  "new-albums": {
-    fetcher: () => api.albums.getNewestAlbums(),
-    title: "New Albums",
-    itemType: "album" as const,
-  },
-  "top-albums": {
-    fetcher: () => api.albums.getHotAlbums(token || ''),
-    title: "Top Albums",
-    itemType: "album" as const,
-  },
-  "top-tracks": {
-    fetcher: () => api.user.getTopTracks(token || ''),
-    title: "Top Tracks",
-    itemType: "track" as const,
-  },
-  "recently-played": {
-    fetcher: () => api.user.getPlayHistory(token || ''),
-    title: "Recently Played",
-    itemType: "track" as const,
-  },
-  "trending-playlists": {
-    fetcher: () => api.playlists.getSystemPlaylists(token || ''),
-    title: "Trending Playlists",
-    itemType: "playlist" as const,
-  },
-  // Add more as needed
-} as const;
-
-type SeeAllType = keyof typeof typeConfig;
+type SeeAllType = "new-albums" | "top-albums" | "top-tracks" | "recently-played" | 
+                 "trending-playlists" | "user-top-artists" | "genre-top-tracks" | 
+                 "genre-new-releases" | "genre-top-albums" | "genre-top-artists";
 
 export default function SeeAllPage() {
+  const token = localStorage.getItem('userToken');
+  const userData = JSON.parse(localStorage.getItem('userData') || '{}');
   const searchParams = useSearchParams();
   const type = (searchParams.get("type") || "") as SeeAllType;
-  const config = typeConfig[type];
   const router = useRouter();
   const { currentTrack, isPlaying, queueType, trackQueue, queue } = useTrack();
+
+  const [genreDataState, setGenreDataState] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('genreData') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      try {
+        setGenreDataState(JSON.parse(localStorage.getItem('genreData') || '{}'));
+      } catch {
+        setGenreDataState({});
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const typeConfig = useMemo(() => ({
+    "new-albums": {
+      fetcher: () => api.albums.getNewestAlbums(),
+      title: "New Albums",
+      itemType: "album" as const,
+    },
+    "top-albums": {
+      fetcher: () => api.albums.getHotAlbums(token || ''),
+      title: "Top Albums",
+      itemType: "album" as const,
+    },
+    "top-tracks": {
+      fetcher: () => api.user.getTopTracks(token || ''),
+      title: "Top Tracks",
+      itemType: "track" as const,
+    },
+    "recently-played": {
+      fetcher: () => api.user.getPlayHistory(token || ''),
+      title: "Recently Played",
+      itemType: "track" as const,
+    },
+    "trending-playlists": {
+      fetcher: () => api.playlists.getSystemPlaylists(token || ''),
+      title: "Trending Playlists",
+      itemType: "playlist" as const,
+    },
+    "user-top-artists": {
+      fetcher: () => api.user.getUserTopArtists(userData.id ,token || ''),
+      title: "Top Artists",
+      itemType: "artist" as const,
+    },
+    "genre-top-tracks": {
+      fetcher: () => api.user.getGenreTopTracks(genreDataState.id, token || ''),
+      title: `Most Listened ${genreDataState.name} Tracks`,
+      itemType: "track" as const,
+    },
+    "genre-new-releases": {
+      fetcher: () => api.user.getGenreNewestTracks(genreDataState.id, token || ''),
+      title: `${genreDataState.name} New Releases`,
+      itemType: "track" as const,
+    },
+    "genre-top-albums": {
+      fetcher: () => api.user.getGenreTopAlbums(genreDataState.id, token || ''),
+      title: `Popular ${genreDataState.name} Albums`,
+      itemType: "album" as const,
+    },
+    "genre-top-artists": {
+      fetcher: () => api.user.getGenreTopArtists(genreDataState.id, token || ''),
+      title: `Most Listened ${genreDataState.name} Artists`,
+      itemType: "artist" as const,
+    },
+  }), [genreDataState.id, genreDataState.name]);
+
+  const config = useMemo(() => typeConfig[type], [typeConfig, type]);
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -66,25 +114,27 @@ export default function SeeAllPage() {
         setError(err.message);
         setLoading(false);
       });
-  }, [type, config]);
+  }, [type, config, genreDataState.id]);
 
   const handleCardClick = (item: any, itemType: string) => {
     if (itemType === "album") {
       router.push(`/album/${item.id}`);
     } else if (itemType === "track") {
-      if (item.album?.id) {
+      if (item.album) {
         router.push(`/album/${item.album.id}`);
       } else {
         router.push(`/track/${item.id}`);
       }
     } else if (itemType === "playlist") {
       router.push(`/playlist/${item.id}`);
+    } else if (itemType === "artist") {
+      router.push(`/artist/profile/${item.id}`);
     }
   };
 
   const handleArtistClick = (e: React.MouseEvent, artistId: string) => {
     e.stopPropagation();
-    router.push(`/artist/${artistId}`);
+    router.push(`/artist/profile/${artistId}`);
   };
 
   function isPlaylistPlaying(playlist:Playlist) {
@@ -94,6 +144,16 @@ export default function SeeAllPage() {
       if (playlist.tracks[i].id !== queue[i].id) return false;
     }
     return true;
+  }
+
+  console.log ('items', items);
+  function isArtistPlaying(artist:Artist) {
+    return (
+      isPlaying &&
+      queueType === "artist" &&
+      currentTrack &&
+      currentTrack.artist?.id === artist.id
+    );
   }
 
   const handlePlay = usePlayHandler({ tracks: items });
@@ -113,15 +173,15 @@ export default function SeeAllPage() {
             onClick={() => handleCardClick(item, config.itemType)}
           >
             <CardContent className="flex flex-col p-4">
-              {(config.itemType === "album" || config.itemType === "track" || config.itemType === "playlist") && (
+              {(config.itemType === "album" || config.itemType === "track" || config.itemType === "playlist" || config.itemType === "artist") && (
                 <div>
-                  <div className="relative mb-2">
+                  <div className="relative mb-4">
                     <Image
-                      src={item.coverUrl || `/images/default-${config.itemType}.jpg`}
-                      alt={item.title || item.name}
+                      src={item.coverUrl || item.avatar || `/images/default-${config.itemType}.jpg`}
+                      alt={item.title || item.name || item.artistName}
                       width={160}
                       height={160}
-                      className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square"
+                      className={`rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square ${config.itemType === "artist" ? "rounded-full" : ""}`}
                     />
                     <button 
                       className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3"
@@ -136,6 +196,9 @@ export default function SeeAllPage() {
                       ) : /* Playlist (Chưa có cái nào sử dụng chưa test)*/
                       config.itemType === "playlist" && isPlaylistPlaying(item) ? (
                         <Pause className="w-6 h-6 text-white" fill="white" />
+                      ) : /* Artist */
+                      config.itemType === "artist" && isArtistPlaying(item) ? (
+                        <Pause className="w-6 h-6 text-white" fill="white" />
                       ) : (
                         <Play className="w-6 h-6 text-white" fill="white" />
                       )}
@@ -143,7 +206,7 @@ export default function SeeAllPage() {
                   </div>
                   {config.itemType === "album" && (
                     <>
-                      <CardTitle className="text-base text-start line-clamp-2 mb-1 truncate">
+                      <CardTitle className="text-base text-start line-clamp-2 mb-1">
                         {item.title}
                       </CardTitle>
                       <div className="text-xs text-muted-foreground text-start line-clamp-1">
@@ -199,6 +262,16 @@ export default function SeeAllPage() {
                       </CardTitle>
                       <div className="text-xs text-muted-foreground text-start line-clamp-1">
                         {item.totalTracks} tracks
+                      </div>
+                    </>
+                  )}
+                  {config.itemType === "artist" && (
+                    <>
+                      <CardTitle className="text-base text-start line-clamp-2 mb-1">
+                        {item.artistName}
+                      </CardTitle>
+                      <div className="text-xs text-muted-foreground text-start line-clamp-1">
+                        {item.monthlyListeners} monthly listeners
                       </div>
                     </>
                   )}
