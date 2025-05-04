@@ -66,23 +66,39 @@ export default function ArtistDashboard() {
         });
         setTopTracks(data.topTracks || []);
 
-        // Cập nhật dữ liệu biểu đồ dựa trên số liệu monthlyListeners
-        setChartData((prev) => ({
-          ...prev,
-          datasets: [
-            {
-              ...prev.datasets[0],
-              data: [
-                data.monthlyListeners * 0.8,
-                data.monthlyListeners * 0.85,
-                data.monthlyListeners * 0.9,
-                data.monthlyListeners * 0.95,
-                data.monthlyListeners * 0.97,
-                data.monthlyListeners,
-              ],
-            },
-          ],
-        }));
+        // Cập nhật dữ liệu biểu đồ dựa trên số liệu monthlyListeners thực tế nếu có
+        if (data.listenerTrend && data.listenerTrend.labels && data.listenerTrend.data) {
+          setChartData((prev) => ({
+            ...prev,
+            labels: data.listenerTrend.labels, // Use actual labels
+            datasets: [
+              {
+                ...prev.datasets[0],
+                label: 'Monthly Listeners', // Update label for clarity
+                data: data.listenerTrend.data, // Use actual trend data
+                borderColor: theme === 'light' ? '#8b5cf6' : '#a78bfa', // Purple color
+                backgroundColor: theme === 'light' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(167, 139, 250, 0.1)',
+                tension: 0.3,
+                fill: true,
+                pointBackgroundColor: theme === 'light' ? '#8b5cf6' : '#a78bfa',
+                pointBorderColor: theme === 'light' ? '#fff' : '#1f2937', // white or gray-800 bg
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: theme === 'light' ? '#8b5cf6' : '#a78bfa',
+                pointHoverBorderColor: theme === 'light' ? '#fff' : '#1f2937',
+              },
+            ],
+          }));
+        } else {
+          // Fallback or keep existing placeholder if no trend data
+          console.warn("Listener trend data not available.");
+          // Optionally, you could clear the chart or show a message
+          setChartData((prev) => ({
+              ...prev,
+              labels: [], // Clear labels
+              datasets: [{ ...prev.datasets[0], data: [] }] // Clear data
+          }));
+        }
+
       } catch (err: any) {
         console.error('Error fetching artist stats:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch stats');

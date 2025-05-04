@@ -348,10 +348,11 @@ export class ArtistService {
         totalPlaysData,
         albumsData,
         topTracksData,
-        listenerHistory, // Should use trendStartDate6M or adjust range
+        listenerHistoryForTopListeners, // Renamed for clarity
         followerRecords,
         likeRecords,
-        playlistAddRecords
+        playlistAddRecords,
+        playHistoryForListenerTrend // Added query for listener trend
     ] = await Promise.all([
       // Artist Profile Data
       prisma.artistProfile.findUnique({
@@ -360,6 +361,7 @@ export class ArtistService {
           artistName: true,
           avatar: true,
           monthlyListeners: true,
+          label: true,
           _count: {
             select: {
               albums: { where: { isActive: true } },
@@ -493,6 +495,27 @@ export class ArtistService {
           }
         },
       }),
+      // History records for Monthly Listener Trend (Last 6 Months)
+      prisma.history.findMany({
+        where: {
+          type: HistoryType.PLAY,
+          track: {
+            artistId: artistProfileId,
+            isActive: true,
+          },
+          createdAt: {
+            gte: trendStartDate6M,
+            lte: endDate,
+          },
+          user: { // Ensure user is active
+            isActive: true,
+          }
+        },
+        select: {
+          userId: true,
+          createdAt: true,
+        },
+      }),
     ]);
 
     if (!artistData) {
@@ -538,13 +561,13 @@ export class ArtistService {
 
     // --- Process Top Listeners, Albums etc. --- 
     // --- Process Top Listeners ---
-    const topListenerIds = listenerHistory.map(item => item.userId);
+    const topListenerIds = listenerHistoryForTopListeners.map(item => item.userId);
     const topListenersDetails = topListenerIds.length > 0 ? await prisma.user.findMany({
         where: { id: { in: topListenerIds } },
         select: userSelect,
     }) : [];
 
-    const topListeners = listenerHistory.map(hist => {
+    const topListeners = listenerHistoryForTopListeners.map(hist => {
         const userDetail = topListenersDetails.find(u => u.id === hist.userId);
         return {
             ...(userDetail || {}),
@@ -745,6 +768,44 @@ export class ArtistService {
     const monthlyStreamTrend = processStreamTrend(monthlyStreamData, 12, 'month');
     const yearlyStreamTrend = processStreamTrend(yearlyStreamData, 5, 'year');
 
+    // --- Process Monthly Listener Trend (Last 6 Months) ---
+    const processListenerTrend6M = (records: { userId: string; createdAt: Date }[]) => {
+      const monthlyUserSets: { [key: string]: Set<string> } = {};
+      const labels: string[] = [];
+      const data: number[] = [];
+      const monthFormatter = new Intl.DateTimeFormat('en', { month: 'short' });
+
+      // Initialize monthly sets and labels for the last 6 months
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(endDate);
+        date.setMonth(endDate.getMonth() - i);
+        const yearMonth = format(date, 'yyyy-MM'); // Use date-fns for formatting
+        const label = monthFormatter.format(date);
+        monthlyUserSets[yearMonth] = new Set<string>();
+        labels.push(label);
+      }
+
+      // Populate the sets with unique user IDs for each month
+      records.forEach(record => {
+        const yearMonth = format(record.createdAt, 'yyyy-MM');
+        if (monthlyUserSets[yearMonth]) {
+          monthlyUserSets[yearMonth].add(record.userId);
+        }
+      });
+
+      // Extract the size (unique listener count) for each month
+      labels.forEach((_, index) => {
+        const date = new Date(endDate);
+        date.setMonth(endDate.getMonth() - (5 - index));
+        const yearMonth = format(date, 'yyyy-MM');
+        data.push(monthlyUserSets[yearMonth]?.size || 0);
+      });
+
+      return { labels, data };
+    };
+
+    const listenerTrend = processListenerTrend6M(playHistoryForListenerTrend);
+
     return {
       artistName: artistData.artistName,
       avatar: artistData.avatar,
@@ -763,6 +824,8 @@ export class ArtistService {
       // --- Add Stream Trends ---
       monthlyStreamTrend,
       yearlyStreamTrend,
+      label: artistData.label,
+      listenerTrend,
     };
   }
 

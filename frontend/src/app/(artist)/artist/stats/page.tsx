@@ -62,6 +62,11 @@ interface ArtistStats {
     totalPlays: number;
     artistName?: string;
     avatar?: string;
+    label?: {
+      id: string;
+      name: string;
+      logoUrl?: string | null;
+    } | null;
     genres?: { id: string; name: string }[];
     followerTrend?: TrendData;
     likeTrend?: TrendData;
@@ -69,6 +74,7 @@ interface ArtistStats {
     genreDistribution?: GenreDistribution[];
     monthlyStreamTrend?: TrendData;
     yearlyStreamTrend?: TrendData;
+    listenerTrend?: TrendData;
 }
 
 interface Track {
@@ -140,17 +146,11 @@ export default function ArtistDetailedStats() {
     const [topListeners, setTopListeners] = useState<TopListener[]>([]);
     const [followers, setFollowers] = useState<UserInfo[]>([]);
     const [trackLikers, setTrackLikers] = useState<UserInfo[]>([]);
-    const [chartData, setChartData] = useState<any>({
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [],
-    });
-    // --- State for new trend charts --- 
+    const [listenerChartData, setListenerChartData] = useState<any>({ labels: [], datasets: [] });
     const [followerChartData, setFollowerChartData] = useState<any>({ labels: [], datasets: [] });
     const [likeChartData, setLikeChartData] = useState<any>({ labels: [], datasets: [] });
     const [playlistAddChartData, setPlaylistAddChartData] = useState<any>({ labels: [], datasets: [] });
-    // --- State for new Genre Distribution Doughnut chart ---
     const [genreChartData, setGenreChartData] = useState<any>({ labels: [], datasets: [] });
-    // --- State for Stream Bar charts ---
     const [monthlyStreamChartData, setMonthlyStreamChartData] = useState<any>({ labels: [], datasets: [] });
     const [yearlyStreamChartData, setYearlyStreamChartData] = useState<any>({ labels: [], datasets: [] });
     const [loading, setLoading] = useState(true);
@@ -178,6 +178,7 @@ export default function ArtistDetailedStats() {
                     totalPlays: data.totalPlays || 0,
                     artistName: data.artistName || 'Artist Name',
                     avatar: data.avatar || '/default-avatar.png',
+                    label: data.label,
                     genres: data.genres || [],
                     followerTrend: data.followerTrend,
                     likeTrend: data.likeTrend,
@@ -185,6 +186,7 @@ export default function ArtistDetailedStats() {
                     genreDistribution: data.genreDistribution,
                     monthlyStreamTrend: data.monthlyStreamTrend,
                     yearlyStreamTrend: data.yearlyStreamTrend,
+                    listenerTrend: data.listenerTrend,
                 });
 
                 setTopTracks(data.topTracks || []);
@@ -273,45 +275,41 @@ export default function ArtistDetailedStats() {
                 }
 
                 // --- Configure all charts --- 
-                const listenerData = [
-                    data.monthlyListeners * 0.8,
-                    data.monthlyListeners * 0.85,
-                    data.monthlyListeners * 0.9,
-                    data.monthlyListeners * 0.95,
-                    data.monthlyListeners * 0.97,
-                    data.monthlyListeners,
-                ].map(val => Math.max(0, Math.round(val)));
 
-                // Existing Listener Trend Chart Config (Example - you might need to adjust)
-                const listenerConfig = {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], // Use actual labels if available
-                    datasets: [
-                         {
-                            label: 'Monthly Listeners',
-                            data: listenerData,
-                            fill: true,
-                            borderColor: theme === 'light' ? '#4f46e5' : '#818cf8',
-                            backgroundColor: (context: any) => {
-                                const ctx = context.chart.ctx;
-                                const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-                                if (theme === 'light') {
-                                    gradient.addColorStop(0, 'rgba(79, 70, 229, 0.5)');
-                                    gradient.addColorStop(1, 'rgba(79, 70, 229, 0)');
-                                } else {
-                                    gradient.addColorStop(0, 'rgba(129, 140, 248, 0.5)');
-                                    gradient.addColorStop(1, 'rgba(129, 140, 248, 0)');
-                                }
-                                return gradient;
+                // Listener Trend Chart (Using actual data)
+                if (data.listenerTrend && data.listenerTrend.labels && data.listenerTrend.data) {
+                     setListenerChartData({
+                        labels: data.listenerTrend.labels,
+                        datasets: [
+                            {
+                                label: 'Monthly Listeners',
+                                data: data.listenerTrend.data,
+                                fill: true,
+                                borderColor: theme === 'light' ? '#8b5cf6' : '#a78bfa', // Purple
+                                backgroundColor: (context: any) => {
+                                    const ctx = context.chart.ctx;
+                                    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                                    if (theme === 'light') {
+                                        gradient.addColorStop(0, 'rgba(139, 92, 246, 0.5)');
+                                        gradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
+                                    } else {
+                                        gradient.addColorStop(0, 'rgba(167, 139, 250, 0.5)');
+                                        gradient.addColorStop(1, 'rgba(167, 139, 250, 0)');
+                                    }
+                                    return gradient;
+                                },
+                                tension: 0.4,
+                                pointBackgroundColor: theme === 'light' ? '#8b5cf6' : '#a78bfa',
+                                pointBorderColor: theme === 'light' ? '#fff' : '#111827',
+                                pointHoverRadius: 6,
+                                pointHoverBackgroundColor: theme === 'light' ? '#8b5cf6' : '#a78bfa',
+                                pointHoverBorderColor: theme === 'light' ? '#fff' : '#111827',
                             },
-                            tension: 0.4,
-                            pointBackgroundColor: theme === 'light' ? '#4f46e5' : '#818cf8',
-                            pointBorderColor: theme === 'light' ? '#fff' : '#111827',
-                            pointHoverBackgroundColor: theme === 'light' ? '#fff' : '#111827',
-                            pointHoverBorderColor: theme === 'light' ? '#4f46e5' : '#818cf8',
-                        },
-                    ],
-                };
-                setChartData(listenerConfig); // Set existing chart data
+                        ],
+                    });
+                } else {
+                     setListenerChartData({ labels: [], datasets: [] }); // Fallback
+                }
 
                 // New Follower Trend Chart
                 setFollowerChartData(createLineChartConfig(
@@ -553,6 +551,12 @@ export default function ArtistDetailedStats() {
                     <p className="text-lg text-gray-600 dark:text-gray-400 mt-1">
                         {formatNumber(stats.followerCount)} followers
                     </p>
+                    {/* Display Label if it exists */}
+                    {stats.label && (
+                        <p className={`text-sm mt-1 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>
+                           Label: <span className="font-medium">{stats.label.name}</span> {/* Access the name property */}
+                        </p>
+                    )}
                     {stats.genres && stats.genres.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2 justify-center sm:justify-start">
                             {stats.genres.map((genre) => (
@@ -600,12 +604,12 @@ export default function ArtistDetailedStats() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className={`p-4 sm:p-6 rounded-lg shadow-md ${theme === 'light' ? 'bg-white' : 'bg-gray-800'}`}>
                     <h3 className="text-xl font-semibold mb-1">Monthly Listener Trend</h3>
-                    <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Listeners over the last 12 months</p>
+                    <p className={`text-sm mb-4 ${theme === 'light' ? 'text-gray-500' : 'text-gray-400'}`}>Listeners over the last 6 months</p>
                     <div className="h-[300px] sm:h-[350px]">
-                        {chartData.datasets.length > 0 ? (
-                            <Line data={chartData} options={lineChartOptions} />
+                        {listenerChartData.datasets.length > 0 && listenerChartData.datasets[0]?.data?.length > 0 ? (
+                            <Line data={listenerChartData} options={lineChartOptions} />
                         ) : (
-                            <div className="flex items-center justify-center h-full text-gray-500">Loading chart...</div>
+                            <div className="flex items-center justify-center h-full text-gray-500">No listener data available.</div>
                         )}
                     </div>
                 </div>
