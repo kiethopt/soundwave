@@ -432,7 +432,7 @@ export const albums: AlbumData[] = [
       },
       { 
         title: 'giá như', 
-        audioUrl: 'hhttps://res.cloudinary.com/dwln9t6dv/video/upload/v1746277349/gi%C3%A1_nh%C6%B0_yni3lm.mp3', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277349/gi%C3%A1_nh%C6%B0_yni3lm.mp3', 
         trackNumber: 5
       },
       { 
