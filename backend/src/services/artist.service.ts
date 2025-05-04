@@ -510,8 +510,8 @@ export class ArtistService {
           lte: endDate,
         },
       },
-      _sum: {
-        playCount: true,
+      _count: {
+        id: true,
       },
       orderBy: {
         createdAt: 'asc', 
@@ -528,8 +528,8 @@ export class ArtistService {
           lte: endDate,
         },
       },
-      _sum: {
-        playCount: true,
+      _count: {
+        id: true,
       },
        orderBy: {
         createdAt: 'asc', 
@@ -685,7 +685,7 @@ export class ArtistService {
     ]);
 
     // Helper to process grouped stream data (monthly or yearly)
-    const processStreamTrend = (streamData: { createdAt: Date; _sum: { playCount: number | null } }[], months: number, unit: 'month' | 'year') => {
+    const processStreamTrend = (streamData: { createdAt: Date; _count: { id: number } }[], months: number, unit: 'month' | 'year') => {
       const counts: { [key: string]: number } = {};
       const labels: string[] = [];
       const data: number[] = [];
@@ -711,7 +711,7 @@ export class ArtistService {
 
       // Aggregate counts from query results
       streamData.forEach(item => {
-        const playCount = item._sum.playCount || 0;
+        const playCount = item._count.id || 0; // Use the count of records
          if (unit === 'month') {
             const key = format(item.createdAt, 'yyyy-MM');
             if (counts[key] !== undefined) {

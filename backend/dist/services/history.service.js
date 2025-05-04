@@ -33,26 +33,14 @@ const savePlayHistoryService = async (userId, trackId, duration, completed) => {
             data: { monthlyListeners: { increment: 1 } },
         });
     }
-    const history = await db_1.default.history.upsert({
-        where: {
-            userId_trackId_type: {
-                userId: userId,
-                trackId: trackId,
-                type: client_1.HistoryType.PLAY,
-            },
-        },
-        update: {
-            updatedAt: new Date(),
-            completed,
-            ...(completed && { playCount: { increment: 1 } }),
-        },
-        create: {
+    const history = await db_1.default.history.create({
+        data: {
             type: client_1.HistoryType.PLAY,
             duration,
             completed,
             trackId,
             userId: userId,
-            playCount: completed ? 1 : 0,
+            playCount: 1,
         },
         select: prisma_selects_1.historySelect,
     });

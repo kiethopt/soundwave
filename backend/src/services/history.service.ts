@@ -41,26 +41,15 @@ export const savePlayHistoryService = async (
     });
   }
 
-  const history = await prisma.history.upsert({
-    where: {
-      userId_trackId_type: {
-        userId: userId,
-        trackId: trackId,
-        type: HistoryType.PLAY,
-      },
-    },
-    update: {
-      updatedAt: new Date(),
-      completed,
-      ...(completed && { playCount: { increment: 1 } }),
-    },
-    create: {
+  // Always create a new history record for each play event
+  const history = await prisma.history.create({
+    data: {
       type: HistoryType.PLAY,
       duration,
       completed,
       trackId,
       userId: userId,
-      playCount: completed ? 1 : 0,
+      playCount: 1, // Set playCount to 1 for each new record
     },
     select: historySelect,
   });

@@ -327,7 +327,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
         await audioRef.current.play();
         setIsPlaying(true);
-        saveHistory(trackToPlay.id, 0, false);
       } catch (error) {
         if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error in playTrack:', error);
