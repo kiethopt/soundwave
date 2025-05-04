@@ -3271,7 +3271,7 @@ export function SystemPlaylistModal({
                           <Input
                             id="trackCount"
                             type="number"
-                            value={trackCount}
+                            value={String(trackCount)}
                             onChange={(e) =>
                               setTrackCount(parseInt(e.target.value, 10))
                             }
@@ -4215,7 +4215,7 @@ export function EditTrackModal({
                 name="trackNumber"
                 type="number"
                 min="1"
-                value={formData.trackNumber || ""}
+                value={String(formData.trackNumber || "")}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
@@ -4239,7 +4239,7 @@ export function EditTrackModal({
                 type="number"
                 min="0"
                 step="1"
-                value={formData.duration || ""}
+                value={String(formData.duration || "")}
                 onChange={handleInputChange}
                 className={cn(
                   "w-full",
