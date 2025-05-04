@@ -5,9 +5,11 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardTitle } from "@/components/user/track/TrackCard";
 import Image from "next/image";
 import { api } from "@/utils/api";
-import { Play } from "@/components/ui/Icons";
+import { Play, Pause } from "@/components/ui/Icons";
+import { usePlayHandler } from "@/hooks/usePlayHandler";
+import { useTrack } from "@/contexts/TrackContext";
+import { Playlist } from "@/types";
 const token = localStorage.getItem('userToken');
-
 
 const typeConfig = {
   "new-albums": {
@@ -45,6 +47,7 @@ export default function SeeAllPage() {
   const type = (searchParams.get("type") || "") as SeeAllType;
   const config = typeConfig[type];
   const router = useRouter();
+  const { currentTrack, isPlaying, queueType, trackQueue, queue } = useTrack();
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -80,9 +83,20 @@ export default function SeeAllPage() {
   };
 
   const handleArtistClick = (e: React.MouseEvent, artistId: string) => {
-    e.stopPropagation(); // Prevent card click
+    e.stopPropagation();
     router.push(`/artist/${artistId}`);
   };
+
+  function isPlaylistPlaying(playlist:Playlist) {
+    if (queueType !== "playlist" || !isPlaying) return false;
+    if (!playlist.tracks || playlist.tracks.length !== trackQueue.length) return false;
+    for (let i = 0; i < playlist.tracks.length; i++) {
+      if (playlist.tracks[i].id !== queue[i].id) return false;
+    }
+    return true;
+  }
+
+  const handlePlay = usePlayHandler({ tracks: items });
 
   if (!config) return <div className="p-8">Invalid type</div>;
   if (loading) return <div className="p-8">Loading...</div>;
@@ -99,101 +113,95 @@ export default function SeeAllPage() {
             onClick={() => handleCardClick(item, config.itemType)}
           >
             <CardContent className="flex flex-col p-4">
-              {config.itemType === "album" && (
+              {(config.itemType === "album" || config.itemType === "track" || config.itemType === "playlist") && (
                 <div>
                   <div className="relative mb-2">
                     <Image
-                      src={item.coverUrl || "/images/default-album.jpg"}
-                      alt={item.title}
+                      src={item.coverUrl || `/images/default-${config.itemType}.jpg`}
+                      alt={item.title || item.name}
                       width={160}
                       height={160}
                       className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square"
                     />
-                    <button className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3">
-                      <Play className="w-6 h-6 text-white" fill="white" />
+                    <button 
+                      className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3"
+                      onClick={(e) => { e.stopPropagation(); handlePlay(item); }}
+                    >
+                      {/* Track */}
+                      {config.itemType === "track" && currentTrack?.id === item.id && isPlaying && queueType === "track" ? (
+                        <Pause className="w-6 h-6 text-white" fill="white" />
+                      ) : /* Album */
+                      config.itemType === "album" && item.tracks?.some((t:any) => t.id === currentTrack?.id) && isPlaying && queueType === "album" ? (
+                        <Pause className="w-6 h-6 text-white" fill="white" />
+                      ) : /* Playlist (Chưa có cái nào sử dụng chưa test)*/
+                      config.itemType === "playlist" && isPlaylistPlaying(item) ? (
+                        <Pause className="w-6 h-6 text-white" fill="white" />
+                      ) : (
+                        <Play className="w-6 h-6 text-white" fill="white" />
+                      )}
                     </button>
                   </div>
-                  <CardTitle className="text-base text-start line-clamp-2 mb-1 truncate">
-                    {item.title}
-                  </CardTitle>
-                  <div className="text-xs text-muted-foreground text-start line-clamp-1">
-                    {item.artist && (
-                      <span 
-                        className="hover:underline cursor-pointer" 
-                        onClick={(e) => handleArtistClick(e, item.artist.id)}
-                      >
-                        {item.artist.artistName}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-              {config.itemType === "track" && (
-                <div>
-                  <div className="relative mb-2">
-                    <Image
-                      src={item.coverUrl || "/images/default-track.jpg"}
-                      alt={item.title}
-                      width={160}
-                      height={160}
-                      className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square"
-                    />
-                    <button className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3">
-                      <Play className="w-6 h-6 text-white" fill="white" />
-                    </button>
-                  </div>
-                  <CardTitle className="text-base text-start line-clamp-2 mb-1">
-                    {item.title}
-                  </CardTitle>
-                  <div className="text-xs text-muted-foreground text-start line-clamp-1">
-                    {item.artist && (
-                      <span 
-                        className="hover:underline cursor-pointer" 
-                        onClick={(e) => handleArtistClick(e, item.artist.id)}
-                      >
-                        {item.artist.artistName}
-                      </span>
-                    )}
-                    {item.featuredArtists?.length > 0 && (
-                      <>
-                        {", "}
-                        {item.featuredArtists
-                          .map((fa: any, index: number) => (
-                            <span 
-                              key={fa.artistProfile?.id || index} 
-                              className="hover:underline cursor-pointer"
-                              onClick={(e) => fa.artistProfile?.id && handleArtistClick(e, fa.artistProfile.id)}
-                            >
-                              {fa.artistProfile?.artistName}
-                              {index < item.featuredArtists.length - 1 ? ", " : ""}
-                            </span>
-                          ))
-                          .filter(Boolean)}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-              {config.itemType === "playlist" && (
-                <div>
-                  <div className="relative mb-2">
-                    <Image
-                      src={item.coverUrl || "/images/default-playlist.jpg"}
-                      alt={item.name}
-                      width={160}
-                      height={160}
-                      className="rounded object-cover w-full h-full group-hover:brightness-50 transition-all duration-300 aspect-square"
-                    />
-                    <button className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[#A57865] rounded-full p-3">
-                      <Play className="w-6 h-6 text-white" fill="white" />
-                    </button>
-                  </div>
-                  <CardTitle className="text-base text-start line-clamp-2 mb-1">
-                    {item.name}
-                  </CardTitle>
-                  <div className="text-xs text-muted-foreground text-start line-clamp-1">
-                    {item.totalTracks} tracks
-                  </div>
+                  {config.itemType === "album" && (
+                    <>
+                      <CardTitle className="text-base text-start line-clamp-2 mb-1 truncate">
+                        {item.title}
+                      </CardTitle>
+                      <div className="text-xs text-muted-foreground text-start line-clamp-1">
+                        {item.artist && (
+                          <span 
+                            className="hover:underline cursor-pointer" 
+                            onClick={(e) => handleArtistClick(e, item.artist.id)}
+                          >
+                            {item.artist.artistName}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {config.itemType === "track" && (
+                    <>
+                      <CardTitle className="text-base text-start line-clamp-2 mb-1">
+                        {item.title}
+                      </CardTitle>
+                      <div className="text-xs text-muted-foreground text-start line-clamp-1">
+                        {item.artist && (
+                          <span 
+                            className="hover:underline cursor-pointer" 
+                            onClick={(e) => handleArtistClick(e, item.artist.id)}
+                          >
+                            {item.artist.artistName}
+                          </span>
+                        )}
+                        {item.featuredArtists?.length > 0 && (
+                          <>
+                            {", "}
+                            {item.featuredArtists
+                              .map((fa: any, index: number) => (
+                                <span 
+                                  key={fa.artistProfile?.id || index} 
+                                  className="hover:underline cursor-pointer"
+                                  onClick={(e) => fa.artistProfile?.id && handleArtistClick(e, fa.artistProfile.id)}
+                                >
+                                  {fa.artistProfile?.artistName}
+                                  {index < item.featuredArtists.length - 1 ? ", " : ""}
+                                </span>
+                              ))
+                              .filter(Boolean)}
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {config.itemType === "playlist" && (
+                    <>
+                      <CardTitle className="text-base text-start line-clamp-2 mb-1">
+                        {item.name}
+                      </CardTitle>
+                      <div className="text-xs text-muted-foreground text-start line-clamp-1">
+                        {item.totalTracks} tracks
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </CardContent>
