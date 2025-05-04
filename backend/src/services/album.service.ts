@@ -701,18 +701,38 @@ export const playAlbum = async (req: Request) => {
     });
   }
 
-  await prisma.history.upsert({
-    where: { userId_trackId_type: { userId: user.id, trackId: firstTrack.id, type: 'PLAY' } },
-    update: { playCount: { increment: 1 }, updatedAt: new Date() },
-    create: {
-      type: 'PLAY',
-      trackId: firstTrack.id,
+  // Manual upsert logic for History
+  const existingHistory = await prisma.history.findFirst({
+    where: {
       userId: user.id,
-      duration: firstTrack.duration,
-      completed: true,
-      playCount: 1,
+      trackId: firstTrack.id,
+      type: 'PLAY', // Assuming 'PLAY' is the correct HistoryType enum value or string
     },
+    select: { id: true }, // Select only the ID for efficiency
   });
+
+  if (existingHistory) {
+    // Update existing record
+    await prisma.history.update({
+      where: { id: existingHistory.id },
+      data: {
+        playCount: { increment: 1 },
+        updatedAt: new Date(),
+      },
+    });
+  } else {
+    // Create new record
+    await prisma.history.create({
+      data: {
+        type: 'PLAY',
+        trackId: firstTrack.id,
+        userId: user.id,
+        duration: firstTrack.duration, // Assuming duration and completed are relevant on creation
+        completed: true,
+        playCount: 1,
+      },
+    });
+  }
 
   return { message: 'Album playback started', track: firstTrack };
 };

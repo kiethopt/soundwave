@@ -1240,28 +1240,40 @@ export const playTrack = async (req: Request, trackId: string) => {
     });
   }
 
-  await prisma.history.upsert({
+  // Manual upsert logic for History
+  const existingHistoryRecord = await prisma.history.findFirst({
     where: {
-      userId_trackId_type: {
-        userId: user.id,
-        trackId: track.id,
-        type: 'PLAY',
-      },
-    },
-    update: {
-      playCount: { increment: 1 },
-      updatedAt: new Date(),
-    },
-    create: {
-      type: 'PLAY',
-      trackId: track.id,
       userId: user.id,
-      duration: track.duration,
-      completed: true,
-      playCount: 1,
+      trackId: track.id,
+      type: 'PLAY', // Assuming 'PLAY' is the correct HistoryType enum value or string
     },
+    select: { id: true }, // Select only the ID for efficiency
   });
 
+  if (existingHistoryRecord) {
+    // Update existing record
+    await prisma.history.update({
+      where: { id: existingHistoryRecord.id },
+      data: {
+        playCount: { increment: 1 },
+        updatedAt: new Date(),
+      },
+    });
+  } else {
+    // Create new record
+    await prisma.history.create({
+      data: {
+        type: 'PLAY',
+        trackId: track.id,
+        userId: user.id,
+        duration: track.duration,
+        completed: true, // Assuming completion on initial play record
+        playCount: 1,
+      },
+    });
+  }
+
+  // Increment track's playCount (moved outside the history logic)
   await prisma.track.update({
     where: { id: track.id },
     data: { playCount: { increment: 1 } },
