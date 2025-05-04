@@ -126,7 +126,6 @@ export default function UserProfilePage({
           storedToken
         );
 
-        console.log("Top Artists:", topArtistsResponse);
         setTopArtists(topArtistsResponse);
       } catch (error) {
         console.error("Failed to fetch top artists:", error);
@@ -635,14 +634,14 @@ export default function UserProfilePage({
                 <h2 className="text-2xl font-bold">Top artists this month</h2>
                 <button
                   className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
-                  onClick={() => router.push(`/profile/${id}/top-artists`)}
+                  onClick={() => router.push(`/seeall?type=user-top-artists`)}
                 >
                   See all
                   <Right className="w-3 h-3 inline-block ml-1" />
                 </button>
               </div>
               <div className="flex space-x-4 mt-4 overflow-x-auto pb-4">
-                {topArtists.map((topArtist) => (
+                {topArtists.slice(0, 10).map((topArtist) => (
                   <div
                     key={topArtist.id}
                     className="hover:bg-white/5 p-4 rounded-lg group relative cursor-pointer flex-shrink-0 w-[180px]"
@@ -744,7 +743,7 @@ export default function UserProfilePage({
                 <button
                   className="text-sm font-medium text-white/70 hover:text-white transition-colors hover:underline focus:outline-none"
                   onClick={() =>
-                    router.push(`/profile/${id}/following-artists`)
+                    router.push(`/profile/${id}/following`)
                   }
                 >
                   See all
@@ -752,7 +751,7 @@ export default function UserProfilePage({
                 </button>
               </div>
               <div className="flex space-x-4 mt-4 overflow-x-auto pb-4">
-                {followingArtists.map((followArtist) => (
+                {followingArtists.slice(0, 10).map((followArtist) => (
                   <div
                     key={followArtist.id}
                     className="hover:bg-white/5 p-4 rounded-lg group relative cursor-pointer flex-shrink-0 w-[180px]"
