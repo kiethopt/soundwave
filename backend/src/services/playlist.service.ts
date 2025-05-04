@@ -1072,7 +1072,7 @@ export const getPlaylistSuggestions = async (req: Request) => {
       },
     },
     orderBy: [{ playCount: "desc" }, { createdAt: "desc" }],
-    take: 20,
+    take: 40,
     include: {
       artist: true,
       album: true,
@@ -1084,11 +1084,14 @@ export const getPlaylistSuggestions = async (req: Request) => {
     },
   });
 
+  recommendedTracks.sort(() => Math.random() - 0.5);
+  const limitedRecommendedTracks = recommendedTracks.slice(0, 20);
+
   return {
     message: `Recommendations based on your top genres: ${topGenres
       .map((g) => g.name)
       .join(", ")}`,
-    tracks: recommendedTracks,
+    tracks: limitedRecommendedTracks,
     basedOn: "genres",
     topGenres: topGenres,
   };

@@ -94,15 +94,12 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
   const [loop, setLoop] = useState(false);
   const [duration, setDuration] = useState<number>(0);
   const [shuffle, setShuffle] = useState(false);
-  const [trackQueue, setTrackQueue] = useState<Track[]>([]); // Main queue for playback logic
+  const [trackQueue, setTrackQueue] = useState<Track[]>([]); 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [queueType, setQueueType] = useState<string>('track');
   const [playStartTime, setPlayStartTime] = useState<number | null>(null);
-  const [lastSavedTime, setLastSavedTime] = useState<number>(0);
-  // Removed token state as it wasn't used after initialization
   const [showPlayer, setShowPlayer] = useState(false);
-  const [queue, setQueue] = useState<Track[]>([]); // Queue for display/management UI
-
+  const [queue, setQueue] = useState<Track[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackQueueRef = useRef<Track[]>([]);
   const tabId = useRef(Math.random().toString(36).substring(2, 15)).current;
@@ -255,7 +252,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         }
 
         setPlayStartTime(Date.now());
-        setLastSavedTime(0);
         setProgress(0);
 
         audioRef.current.pause();
@@ -458,16 +454,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         requestAnimationFrame(() => {
           setProgress((audio.currentTime / audio.duration) * 100);
         });
-
-        if (
-          currentTrack &&
-          playStartTime &&
-          audio.currentTime - lastSavedTime >= 30
-        ) {
-          const duration = Math.floor(audio.currentTime);
-          saveHistory(currentTrack.id, duration, false);
-          setLastSavedTime(audio.currentTime);
-        }
       }
     };
 
@@ -539,7 +525,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
     skipRandom,
     currentTrack,
     playStartTime,
-    lastSavedTime,
     saveHistory,
     pauseTrack,
     tabId,
@@ -600,7 +585,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
             setCurrentTrack(null);
           }
         } else if (index < currentIndex) {
-          // Adjust currentIndex if removing a track before it
           setCurrentIndex(currentIndex - 1);
         }
 
@@ -651,10 +635,9 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
   // WebSocket listener for TrackContext updates
   useEffect(() => {
-    let socket: Socket | null = null; // Initialize socket as null
+    let socket: Socket | null = null; 
 
     const connectSocket = () => {
-      // Remove fallback URL and use non-null assertion
       socket = io(process.env.NEXT_PUBLIC_API_URL!); 
 
       console.log('[WebSocket] Attempting TrackContext connection...');
@@ -675,15 +658,12 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       socket.on('track:updated', (data: { track: Track }) => {
         const updatedTrack = data.track;
         console.log('[WebSocket] TrackContext received track:updated', updatedTrack);
-        // Update current track if it matches
         setCurrentTrack(prevTrack => 
           prevTrack?.id === updatedTrack.id ? { ...prevTrack, ...updatedTrack } : prevTrack
         );
-        // Update track in the display queue
         setQueue(prevQueue => 
           prevQueue.map(t => t.id === updatedTrack.id ? { ...t, ...updatedTrack } : t)
         );
-        // Update track in the playback queue (trackQueue)
          setTrackQueue(prevPlaybackQueue => 
           prevPlaybackQueue.map(t => t.id === updatedTrack.id ? { ...t, ...updatedTrack } : t)
         );
@@ -692,43 +672,36 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       socket.on('track:deleted', (data: { trackId: string }) => {
         const deletedTrackId = data.trackId;
         console.log('[WebSocket] TrackContext received track:deleted', deletedTrackId);
-        // Check if the deleted track is the current track
         if (currentTrack?.id === deletedTrackId) {
           console.log('[WebSocket] Current track deleted, skipping next...');
-           // Stop playback and attempt to play the next track
            if (audioRef.current) {
               audioRef.current.pause();
-              audioRef.current.src = ''; // Clear source
+              audioRef.current.src = '';
            }
            setCurrentTrack(null);
            setIsPlaying(false);
-           // Recalculate queue without the deleted track before skipping
            const nextQueue = trackQueueRef.current.filter(t => t.id !== deletedTrackId);
            setTrackQueue(nextQueue);
-           setQueue(nextQueue); // Update display queue as well
+           setQueue(nextQueue);
            trackQueueRef.current = nextQueue;
 
            if (nextQueue.length > 0) {
-              // Try to play the track at the current index (which might now be the next track)
-              // or wrap around if the deleted track was the last one.
               const nextIndex = Math.min(currentIndex, nextQueue.length - 1);
                if (nextQueue[nextIndex]) {
                    playTrack(nextQueue[nextIndex]);
                } else {
-                   setCurrentIndex(0); // Reset index if something went wrong
+                   setCurrentIndex(0);
                }
            } else {
-              setCurrentIndex(0); // No tracks left
+              setCurrentIndex(0);
            }
         } else {
-            // If not the current track, just remove from queues
             const nextQueue = queue.filter(t => t.id !== deletedTrackId);
             const nextPlaybackQueue = trackQueue.filter(t => t.id !== deletedTrackId);
             
             setQueue(nextQueue);
             setTrackQueue(nextPlaybackQueue);
             trackQueueRef.current = nextPlaybackQueue;
-            // Adjust currentIndex if a track before the current one was removed
              const deletedIndex = trackQueue.findIndex(t => t.id === deletedTrackId);
             if (deletedIndex !== -1 && deletedIndex < currentIndex) {
                 setCurrentIndex(prev => Math.max(0, prev - 1));
@@ -739,7 +712,7 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
       socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
         const { trackId, isActive } = data;
         console.log(`[WebSocket] TrackContext received track:visibilityChanged for ${trackId}: ${isActive}`);
-         if (!isActive) { // Only act if track becomes hidden
+         if (!isActive) { 
               let currentArtistId: string | null = null;
               try {
                   const userDataString = localStorage.getItem('userData');
@@ -751,7 +724,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
                   console.error("Error parsing user data for visibility check:", e);
               }
 
-               // Check current track
                if (currentTrack?.id === trackId && currentTrack.artistId !== currentArtistId) {
                   console.log('[WebSocket] Current track hidden and user is not owner, skipping next...');
                    if (audioRef.current) {
@@ -760,7 +732,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
                    }
                    setCurrentTrack(null);
                    setIsPlaying(false);
-                   // Recalculate queue without the hidden track before skipping
                    const nextQueue = trackQueueRef.current.filter(t => t.id !== trackId);
                    setTrackQueue(nextQueue);
                    setQueue(nextQueue);
@@ -777,16 +748,14 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
                        setCurrentIndex(0);
                    }
                } else {
-                   // If not the current track (or user is owner), just remove from queues if not owner
                    const nextQueue = queue.filter(t => t.id !== trackId || t.artistId === currentArtistId);
                    const nextPlaybackQueue = trackQueue.filter(t => t.id !== trackId || t.artistId === currentArtistId);
                    
-                   if (nextQueue.length !== queue.length) { // Check if filter actually removed something
+                   if (nextQueue.length !== queue.length) { 
                       console.log('[WebSocket] Hidden track removed from queues (user not owner)');
                       setQueue(nextQueue);
                       setTrackQueue(nextPlaybackQueue);
                       trackQueueRef.current = nextPlaybackQueue;
-                      // Adjust currentIndex if needed
                        const hiddenIndex = trackQueue.findIndex(t => t.id === trackId);
                       if (hiddenIndex !== -1 && hiddenIndex < currentIndex) {
                           setCurrentIndex(prev => Math.max(0, prev - 1));
@@ -794,7 +763,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
                    }
                }
          } else {
-              // Track became active, update isActive status if it exists in the state
                setCurrentTrack(prevTrack => 
                   prevTrack?.id === trackId ? { ...prevTrack, isActive: true } : prevTrack
                );
@@ -809,13 +777,11 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
     };
 
-    // Apply delay only in development for connection
     const timeoutId = setTimeout(connectSocket, process.env.NODE_ENV === 'development' ? 100 : 0);
 
-    // Cleanup function
     return () => {
-      clearTimeout(timeoutId); // Clear the connection timeout
-      if (socket) { // Check if socket was initialized before disconnecting
+      clearTimeout(timeoutId);
+      if (socket) { 
           console.log(`[WebSocket] TrackContext disconnecting...`);
           socket.off('connect');
           socket.off('disconnect');
@@ -826,7 +792,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
           socket.disconnect();
       }
     };
-    // Dependencies for the useEffect hook
   }, [currentTrack?.id, currentIndex, queue, trackQueue, setCurrentTrack, setQueue, setTrackQueue, setIsPlaying, setCurrentIndex, playTrack, pauseTrack, skipNext]);
 
   return (

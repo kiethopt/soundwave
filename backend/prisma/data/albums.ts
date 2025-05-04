@@ -387,7 +387,7 @@ export const albums: AlbumData[] = [
       },
       {
         title: 'BLACKJACK',
-        audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745729929/Th%C3%A1ng_N%C4%83m_pjozzp.mp3',
+        audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745729921/BLACKJACK_cpv6nz.mp3',
         trackNumber: 2,
         featuredArtists: ['Binz']
       },
