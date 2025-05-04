@@ -29,7 +29,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useSocket } from "@/contexts/SocketContext";
 import { Card } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useDominantColor } from "@/hooks/useDominantColor";
@@ -88,7 +87,6 @@ export default function PlaylistPage() {
     : null;
   const { isAuthenticated, dialogOpen, setDialogOpen, handleProtectedAction } =
     useAuth();
-  const { socket } = useSocket();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

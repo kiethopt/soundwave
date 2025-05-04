@@ -239,14 +239,13 @@ async function main() {
     }
 
     // === 4.2 Seed Regular User Accounts ===
-    const regularUserCount = 30;
+    const regularUserCount = 10;
     const userBar = multibar.create(regularUserCount, 0, { task: 'Seeding regular users' });
     const regularUserIds: string[] = [];
 
     for (let i = 0; i < regularUserCount; i++) {
       const firstName = faker.person.firstName();
       const lastName = faker.person.lastName();
-      // Ensure unique usernames/emails, even with Faker
       const username = `${faker.internet.username({ firstName, lastName }).toLowerCase()}_${faker.string.alphanumeric(4)}`;
       const email = `${username}@soundwave-user.com`; // Use a different domain
       const userCreatedDate = faker.date.between({ from: startDate, to: endDate });
