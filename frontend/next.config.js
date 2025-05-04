@@ -26,6 +26,11 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'api.dicebear.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.dicebear.com',
         port: '',
         pathname: '/7.x/pixel-art/**',
       },

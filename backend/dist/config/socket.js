@@ -5,9 +5,10 @@ const socket_io_1 = require("socket.io");
 let io;
 const userSockets = new Map();
 const initializeSocket = (server) => {
+    const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
     io = new socket_io_1.Server(server, {
         cors: {
-            origin: process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000",
+            origin: allowedOrigins,
             methods: ["GET", "POST"],
             credentials: true
         },

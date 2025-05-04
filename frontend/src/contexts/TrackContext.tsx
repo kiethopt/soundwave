@@ -331,7 +331,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
         await audioRef.current.play();
         setIsPlaying(true);
-        saveHistory(trackToPlay.id, 0, false);
       } catch (error) {
         if (error instanceof Error && error.name !== 'AbortError') {
           console.error('Error in playTrack:', error);
@@ -458,16 +457,6 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
         requestAnimationFrame(() => {
           setProgress((audio.currentTime / audio.duration) * 100);
         });
-
-        if (
-          currentTrack &&
-          playStartTime &&
-          audio.currentTime - lastSavedTime >= 30
-        ) {
-          const duration = Math.floor(audio.currentTime);
-          saveHistory(currentTrack.id, duration, false);
-          setLastSavedTime(audio.currentTime);
-        }
       }
     };
 
