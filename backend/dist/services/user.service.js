@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
@@ -282,10 +282,13 @@ const followTarget = async (follower, followingId) => {
     }
     else if (targetArtistProfile) {
         followingType = client_1.FollowingType.ARTIST;
-        const artistOwner = await db_1.default.user.findUnique({
-            where: { id: targetArtistProfile.userId },
-            select: { email: true, name: true, username: true, currentProfile: true },
-        });
+        let artistOwner = null;
+        if (targetArtistProfile.userId) {
+            artistOwner = await db_1.default.user.findUnique({
+                where: { id: targetArtistProfile.userId },
+                select: { email: true, name: true, username: true, currentProfile: true },
+            });
+        }
         followedUserEmail = artistOwner?.email || null;
         followedEntityName = targetArtistProfile.artistName || 'Nghệ sĩ';
         followedUserIdForPusher = targetArtistProfile.userId;
@@ -1258,10 +1261,11 @@ const getGenreTopTracks = async (genreId) => {
         where: {
             isActive: true,
             genres: {
-                every: {
+                some: {
                     genreId,
                 },
             },
+            type: 'SINGLE',
         },
         select: prisma_selects_1.searchTrackSelect,
         orderBy: { playCount: 'desc' },
@@ -1285,10 +1289,11 @@ const getGenreNewestTracks = async (genreId) => {
         where: {
             isActive: true,
             genres: {
-                every: {
+                some: {
                     genreId,
                 },
             },
+            type: 'SINGLE',
         },
         select: prisma_selects_1.searchTrackSelect,
         orderBy: { createdAt: 'desc' },
@@ -1378,4 +1383,96 @@ const getPlayHistory = async (user) => {
         .filter((track) => track !== null);
 };
 exports.getPlayHistory = getPlayHistory;
+const submitArtistClaim = async (userId, artistProfileId, proof) => {
+    if (!userId) {
+        throw new Error('Unauthorized: User must be logged in to submit a claim.');
+    }
+    if (!artistProfileId) {
+        throw new Error('Artist profile ID is required.');
+    }
+    if (!proof || proof.trim() === '') {
+        throw new Error('Proof is required to submit a claim.');
+    }
+    const targetProfile = await db_1.default.artistProfile.findUnique({
+        where: { id: artistProfileId },
+        select: { id: true, userId: true, isVerified: true, artistName: true }
+    });
+    if (!targetProfile) {
+        throw new Error('Artist profile not found.');
+    }
+    if (targetProfile.userId) {
+        throw new Error('This artist profile is already associated with a user.');
+    }
+    if (targetProfile.isVerified) {
+        throw new Error('This artist profile is already verified.');
+    }
+    const existingClaim = await db_1.default.artistClaimRequest.findFirst({
+        where: {
+            claimingUserId: userId,
+            artistProfileId: artistProfileId,
+        },
+        select: { id: true, status: true },
+    });
+    if (existingClaim) {
+        if (existingClaim.status === 'PENDING') {
+            throw new Error('You already have a pending claim for this artist profile.');
+        }
+        else if (existingClaim.status === 'APPROVED') {
+            throw new Error('Your claim for this artist profile has already been approved.');
+        }
+        else {
+            throw new Error('Your previous claim for this profile was rejected.');
+        }
+    }
+    const newClaim = await db_1.default.artistClaimRequest.create({
+        data: {
+            claimingUserId: userId,
+            artistProfileId: artistProfileId,
+            proof: proof,
+            status: client_1.ClaimStatus.PENDING,
+        },
+        select: {
+            id: true,
+            status: true,
+            submittedAt: true,
+            artistProfile: {
+                select: {
+                    id: true,
+                    artistName: true,
+                }
+            }
+        }
+    });
+    return newClaim;
+};
+exports.submitArtistClaim = submitArtistClaim;
+const getUserClaims = async (userId) => {
+    if (!userId) {
+        throw new Error('Unauthorized');
+    }
+    const claims = await db_1.default.artistClaimRequest.findMany({
+        where: {
+            claimingUserId: userId,
+        },
+        select: {
+            id: true,
+            status: true,
+            submittedAt: true,
+            reviewedAt: true,
+            rejectionReason: true,
+            artistProfile: {
+                select: {
+                    id: true,
+                    artistName: true,
+                    avatar: true,
+                }
+            }
+        },
+        orderBy: {
+            submittedAt: 'desc',
+        },
+    });
+    return claims;
+};
+exports.getUserClaims = getUserClaims;
 //# sourceMappingURL=user.service.js.map

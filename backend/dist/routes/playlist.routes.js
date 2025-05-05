@@ -15,7 +15,6 @@ router.use(auth_middleware_1.authenticate);
 router.get("/", playlist_controller_1.getPlaylists);
 router.post("/", playlist_controller_1.createPlaylist);
 router.get("/suggest", playlist_controller_1.getPlaylistSuggestions);
-router.post("/vibe-rewind", playlist_controller_1.updateVibeRewindPlaylist);
 router.get("/system/user", playlist_controller_1.getUserSystemPlaylists);
 router.post("/ai-generate", playlist_controller_1.generateAIPlaylist);
 router.post("/ai-generate/artist/:artistName", (req, res, next) => {

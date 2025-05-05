@@ -467,3 +467,74 @@ export const getPlayHistory = async (
     handleError(res, error, 'Get play history');
   }
 }
+
+// --- Artist Claim Controllers ---
+
+export const submitArtistClaim = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    // Explicitly type currentUser or access id safely
+    const currentUser = req.user as { id: string; [key: string]: any } | undefined;
+    if (!currentUser || !currentUser.id) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    const userId = currentUser.id; // Now userId is definitely a string
+    const { artistProfileId, proof } = req.body;
+
+    if (!artistProfileId || !proof) {
+      res.status(400).json({ message: 'Artist profile ID and proof are required.' });
+      return;
+    }
+
+    const claim = await userService.submitArtistClaim(
+      userId,
+      artistProfileId,
+      proof
+    );
+
+    res.status(201).json({ message: 'Claim submitted successfully.', claim });
+  } catch (error) {
+     if (error instanceof Error) {
+       // Handle specific errors from the service
+       if (error.message.includes('Unauthorized')) {
+         res.status(401).json({ message: error.message });
+       } else if (error.message.includes('not found') || error.message.includes('already associated') || error.message.includes('already verified')) {
+         res.status(404).json({ message: error.message });
+       } else if (error.message.includes('already have a pending claim') || error.message.includes('already been approved') || error.message.includes('was rejected')) {
+         res.status(409).json({ message: error.message }); // 409 Conflict
+       } else {
+         handleError(res, error, 'Submit artist claim');
+       }
+     } else {
+       handleError(res, error, 'Submit artist claim');
+     }
+  }
+};
+
+export const getUserClaims = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUser = req.user as { id: string; [key: string]: any } | undefined;
+    if (!currentUser || !currentUser.id) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+    const userId = currentUser.id; // userId is a string
+
+    const claims = await userService.getUserClaims(userId);
+    res.json(claims);
+  } catch (error) {
+     if (error instanceof Error && error.message.includes('Unauthorized')) {
+       res.status(401).json({ message: error.message });
+     } else {
+       handleError(res, error, 'Get user claims');
+     }
+  }
+};
+
+// --- End Artist Claim Controllers ---

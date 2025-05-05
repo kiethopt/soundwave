@@ -1,13 +1,78 @@
 import { Request, Response } from 'express';
 import * as trackService from '../services/track.service';
+import * as albumService from '../services/album.service';
+import { handleError } from '../utils/handle-utils';
+import { TrackService } from '../services/track.service';
 
 export const createTrack = async (req: Request, res: Response): Promise<void> => {
   try {
-    const result = await trackService.createTrack(req);
-    res.status(201).json(result);
+    const user = req.user;
+    if (!user || !user.artistProfile) {
+      res.status(403).json({ message: 'Forbidden: Only verified artists can upload tracks.' });
+      return;
+    }
+
+    const files = req.files as { 
+      audioFile?: Express.Multer.File[]; 
+      coverFile?: Express.Multer.File[];
+    };
+
+    if (!files || !files.audioFile || files.audioFile.length === 0) {
+      res.status(400).json({ message: 'Audio file is required.' });
+      return;
+    }
+
+    const audioFile = files.audioFile[0];
+    const coverFile = files.coverFile?.[0];
+
+    const {
+      title,
+      releaseDate,
+      genreIds,
+      featuredArtistIds,
+      featuredArtistNames,
+      labelId
+    } = req.body;
+
+    if (!title || !releaseDate) {
+      res.status(400).json({ message: 'Title and release date are required.' });
+      return;
+    }
+    
+    if (!Array.isArray(genreIds || [])) {
+       res.status(400).json({ message: 'Genres must be an array.' });
+       return;
+    }
+     if (!Array.isArray(featuredArtistIds || [])) {
+       res.status(400).json({ message: 'Featured artist IDs must be an array.' });
+       return;
+    }
+     if (!Array.isArray(featuredArtistNames || [])) {
+       res.status(400).json({ message: 'Featured artist names must be an array.' });
+       return;
+    }
+
+    const createData = {
+      title,
+      releaseDate,
+      type: 'SINGLE' as const,
+      genreIds: genreIds || [],
+      featuredArtistIds: featuredArtistIds || [],
+      featuredArtistNames: featuredArtistNames || [],
+      labelId: labelId || undefined
+    };
+
+    const newTrack = await TrackService.createTrack(
+      user.artistProfile.id,
+      createData,
+      audioFile,
+      coverFile
+    );
+
+    res.status(201).json({ message: 'Track created successfully', track: newTrack });
+
   } catch (error) {
-    console.error('Create track error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    handleError(res, error, 'Create track');
   }
 };
 

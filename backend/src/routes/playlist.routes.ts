@@ -51,7 +51,6 @@ router.post("/", createPlaylist);
 router.get("/suggest", getPlaylistSuggestions);
 
 // User-specific system playlist routes
-router.post("/vibe-rewind", updateVibeRewindPlaylist);
 router.get("/system/user", getUserSystemPlaylists);
 
 // AI playlist routes

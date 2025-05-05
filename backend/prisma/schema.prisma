@@ -30,6 +30,8 @@ model User {
   followed             UserFollow[]    @relation("Follower")
   followers            UserFollow[]    @relation("FollowingUser")
   likedTracks          UserLikeTrack[]
+  submittedClaims      ArtistClaimRequest[] @relation("ClaimingUser")
+  reviewedClaims       ArtistClaimRequest[] @relation("ReviewingAdmin")
 
   @@unique([email, username])
   @@index([email])
@@ -56,21 +58,23 @@ model ArtistProfile {
   requestedLabelName      String?
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
-  userId                  String         @unique
-  labelId                 String?        // Foreign key for Label
+  userId                  String?        @unique
+  labelId                 String?
   albums                  Album[]
   genres                  ArtistGenre[]
-  user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                    User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   label                   Label?         @relation(fields: [labelId], references: [id], onDelete: SetNull) // Relation to Label
   notifications           Notification[] @relation("ArtistNotifications")
-  TrackArtist             TrackArtist[]
   tracks                  Track[]
+  featuredInTracks        TrackArtist[] @relation("FeaturedArtistRelation")
   followers               UserFollow[]   @relation("FollowingArtist")
+  claimRequests           ArtistClaimRequest[] @relation("ClaimedProfile")
 
   @@index([artistName])
   @@index([isVerified])
   @@index([verifiedAt])
   @@index([labelId])
+  @@index([userId])
   @@map("artist_profiles")
 }
 
@@ -306,7 +310,7 @@ model TrackArtist {
   trackId       String
   artistId      String
   createdAt     DateTime      @default(now())
-  artistProfile ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artistProfile ArtistProfile @relation("FeaturedArtistRelation", fields: [artistId], references: [id], onDelete: Cascade)
   track         Track         @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([trackId, artistId])
@@ -342,6 +346,35 @@ model UserLikeTrack {
   @@index([userId])
   @@index([trackId])
   @@map("user_like_track")
+}
+
+model ArtistClaimRequest {
+  id                String        @id @default(cuid())
+  claimingUserId    String        // ID of the User submitting the claim
+  artistProfileId   String        // ID of the placeholder ArtistProfile being claimed
+  proof             String        // Text description or link to proof
+  // Optional: Add fields for uploaded proof files if needed
+  status            ClaimStatus   @default(PENDING) // PENDING, APPROVED, REJECTED
+  submittedAt       DateTime      @default(now())
+  reviewedAt        DateTime?
+  reviewedByAdminId String?       // ID of the Admin who reviewed
+  rejectionReason   String?
+
+  claimingUser      User          @relation("ClaimingUser", fields: [claimingUserId], references: [id], onDelete: Cascade)
+  artistProfile     ArtistProfile @relation("ClaimedProfile", fields: [artistProfileId], references: [id], onDelete: Cascade)
+  reviewedByAdmin   User?         @relation("ReviewingAdmin", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+
+  @@unique([claimingUserId, artistProfileId]) // A user can only claim a specific profile once
+  @@index([status])
+  @@index([submittedAt])
+  @@index([artistProfileId])
+  @@map("artist_claim_requests")
+}
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum Role {

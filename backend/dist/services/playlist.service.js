@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reorderPlaylistTracks = exports.getPlaylistSuggestions = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.updateVibeRewindPlaylist = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
+exports.reorderPlaylistTracks = exports.getPlaylistSuggestions = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const handle_utils_1 = require("../utils/handle-utils");
@@ -213,87 +213,6 @@ const getAllBaseSystemPlaylists = async (req) => {
     return result;
 };
 exports.getAllBaseSystemPlaylists = getAllBaseSystemPlaylists;
-const updateVibeRewindPlaylist = async (userId) => {
-    try {
-        let vibeRewindPlaylist = await db_1.default.playlist.findFirst({
-            where: {
-                userId,
-                name: "Vibe Rewind",
-            },
-        });
-        if (!vibeRewindPlaylist) {
-            vibeRewindPlaylist = await db_1.default.playlist.create({
-                data: {
-                    name: "Vibe Rewind",
-                    description: "Your personal time capsule - tracks you've been vibing to lately",
-                    privacy: "PRIVATE",
-                    type: "SYSTEM",
-                    userId,
-                    totalTracks: 0,
-                    totalDuration: 0,
-                },
-            });
-        }
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const recentTracks = (await db_1.default.history.findMany({
-            where: {
-                userId,
-                type: "PLAY",
-                trackId: { not: null },
-                createdAt: {
-                    gte: thirtyDaysAgo,
-                },
-            },
-            select: {
-                trackId: true,
-                track: {
-                    select: {
-                        id: true,
-                        duration: true,
-                    },
-                },
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
-            distinct: ["trackId"],
-            take: 30,
-        }));
-        if (recentTracks.length > 0) {
-            const validTracks = recentTracks.filter((track) => track.trackId !== null);
-            const totalDuration = validTracks.reduce((sum, { track }) => sum + (track?.duration || 0), 0);
-            await db_1.default.playlistTrack.deleteMany({
-                where: {
-                    playlistId: vibeRewindPlaylist.id,
-                },
-            });
-            await db_1.default.playlist.update({
-                where: {
-                    id: vibeRewindPlaylist.id,
-                },
-                data: {
-                    totalTracks: validTracks.length,
-                    totalDuration,
-                    tracks: {
-                        createMany: {
-                            data: validTracks.map((track, index) => ({
-                                trackId: track.trackId,
-                                trackOrder: index,
-                            })),
-                        },
-                    },
-                },
-            });
-        }
-        return vibeRewindPlaylist;
-    }
-    catch (error) {
-        console.error("Error updating Vibe Rewind playlist:", error);
-        throw error;
-    }
-};
-exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
 const getSystemPlaylists = async (req) => {
     const { search, sortBy, sortOrder } = req.query;
     const whereClause = {
@@ -801,7 +720,7 @@ const getPlaylistSuggestions = async (req) => {
             },
         },
         orderBy: [{ playCount: "desc" }, { createdAt: "desc" }],
-        take: 20,
+        take: 40,
         include: {
             artist: true,
             album: true,
@@ -812,11 +731,13 @@ const getPlaylistSuggestions = async (req) => {
             },
         },
     });
+    recommendedTracks.sort(() => Math.random() - 0.5);
+    const limitedRecommendedTracks = recommendedTracks.slice(0, 20);
     return {
         message: `Recommendations based on your top genres: ${topGenres
             .map((g) => g.name)
             .join(", ")}`,
-        tracks: recommendedTracks,
+        tracks: limitedRecommendedTracks,
         basedOn: "genres",
         topGenres: topGenres,
     };

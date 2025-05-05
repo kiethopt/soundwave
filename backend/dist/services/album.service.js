@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.playAlbum = exports.getAlbumById = exports.getAdminAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = exports.getAlbums = exports.getHotAlbums = exports.getNewestAlbums = exports.deleteAlbumById = void 0;
+exports.getAlbumById = exports.getAdminAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = exports.getAlbums = exports.getHotAlbums = exports.getNewestAlbums = exports.deleteAlbumById = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const upload_service_1 = require("./upload.service");
 const client_1 = require("@prisma/client");
@@ -619,42 +619,4 @@ const getAlbumById = async (req) => {
     }
 };
 exports.getAlbumById = getAlbumById;
-const playAlbum = async (req) => {
-    const { albumId } = req.params;
-    const user = req.user;
-    if (!user)
-        throw new Error('Unauthorized');
-    const album = await db_1.default.album.findFirst({
-        where: { id: albumId, isActive: true },
-        include: { tracks: { where: { isActive: true }, orderBy: { trackNumber: 'asc' }, take: 1, select: prisma_selects_1.trackSelect } },
-    });
-    if (!album || album.tracks.length === 0)
-        throw new Error('Album or tracks not found');
-    const firstTrack = album.tracks[0];
-    const lastMonth = new Date();
-    lastMonth.setMonth(lastMonth.getMonth() - 1);
-    const existingListen = await db_1.default.history.findFirst({
-        where: { userId: user.id, track: { artistId: firstTrack.artistId }, createdAt: { gte: lastMonth } },
-    });
-    if (!existingListen) {
-        await db_1.default.artistProfile.update({
-            where: { id: firstTrack.artistId },
-            data: { monthlyListeners: { increment: 1 } },
-        });
-    }
-    await db_1.default.history.upsert({
-        where: { userId_trackId_type: { userId: user.id, trackId: firstTrack.id, type: 'PLAY' } },
-        update: { playCount: { increment: 1 }, updatedAt: new Date() },
-        create: {
-            type: 'PLAY',
-            trackId: firstTrack.id,
-            userId: user.id,
-            duration: firstTrack.duration,
-            completed: true,
-            playCount: 1,
-        },
-    });
-    return { message: 'Album playback started', track: firstTrack };
-};
-exports.playAlbum = playAlbum;
 //# sourceMappingURL=album.service.js.map

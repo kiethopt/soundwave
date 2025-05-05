@@ -343,6 +343,22 @@ export const artistProfileSelect = {
       },
     },
   },
+  featuredInTracks: {
+    where: {
+      track: { isActive: true }
+    },
+    select: {
+      track: {
+        select: trackSelect
+      }
+    },
+    orderBy: {
+      track: {
+        releaseDate: 'desc'
+      }
+    },
+    take: 10
+  },
   user: {
     select: {
       id: true,

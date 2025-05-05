@@ -980,6 +980,21 @@ export default function ArtistProfilePage({
     }
   };
 
+  // Handler for playing tracks from the "Appears On" list
+  const handleFeaturedTrackPlay = (track: Track) => {
+    if (currentTrack?.id === track.id && isPlaying && queueType === "featuredOn") {
+      pauseTrack();
+    } else {
+      // Create a queue specifically from the featured tracks list
+      const featuredQueue = artist?.featuredInTracks?.map(item => item.track) || [];
+      if (featuredQueue.length > 0) {
+        setQueueType("featuredOn");
+        trackQueue(featuredQueue);
+        playTrack(track);
+      }
+    }
+  };
+
   if (!artist) return null;
 
   return (
@@ -1306,6 +1321,31 @@ export default function ArtistProfilePage({
                       monthly listeners
                     </p>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Appears On Section (Tracks Featured In) */}
+          {artist.featuredInTracks && artist.featuredInTracks.length > 0 && (
+            <div className="px-4 md:px-6 py-6">
+              <h2 className="text-2xl font-bold mb-4">Appears On</h2>
+              <div className="grid grid-cols-1 gap-4">
+                {artist.featuredInTracks.map(({ track }, index) => (
+                  <HorizontalTrackListItem
+                    key={`featured-${track.id}`}
+                    track={track}
+                    index={index}
+                    currentTrack={currentTrack}
+                    isPlaying={isPlaying}
+                    playCount={false}
+                    albumTitle={true}
+                    queueType={queueType}
+                    theme={theme}
+                    onTrackClick={() => handleFeaturedTrackPlay(track)}
+                    playlists={playlists}
+                    favoriteTrackIds={favoriteTrackIds}
+                  />
                 ))}
               </div>
             </div>

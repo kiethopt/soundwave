@@ -1,4 +1,4 @@
-import { PrismaClient, Role, FollowingType, Album, Track, HistoryType, Prisma } from '@prisma/client';
+import { PrismaClient, Role, FollowingType, HistoryType, ArtistProfile } from '@prisma/client';
 import {
   artistProfileSelect,
   albumSelect,
@@ -10,6 +10,52 @@ import { uploadFile } from './upload.service';
 import { format } from 'date-fns';
 
 const prisma = new PrismaClient();
+
+// --- Helper Function to Get or Create Artist Profile ---
+// This function will be used by track/album services
+export async function getOrCreateArtistProfile(artistNameOrId: string): Promise<ArtistProfile> {
+  const isLikelyId = /^[a-z0-9]{25}$/.test(artistNameOrId); 
+
+  if (isLikelyId) {
+    const existingProfile = await prisma.artistProfile.findUnique({
+      where: { id: artistNameOrId },
+    });
+    if (existingProfile) {
+      return existingProfile;
+    }
+  }
+
+  // Treat as name
+  const nameToSearch = artistNameOrId;
+  let artistProfile = await prisma.artistProfile.findFirst({
+    where: {
+      artistName: {
+        equals: nameToSearch,
+        mode: 'insensitive',
+      },
+    },
+  });
+
+  if (artistProfile) {
+    return artistProfile;
+  }
+
+  // If not found, create a placeholder profile
+  console.log(`Creating placeholder artist profile for: ${nameToSearch}`);
+  artistProfile = await prisma.artistProfile.create({
+    data: {
+      artistName: nameToSearch,
+      role: Role.ARTIST,
+      isVerified: false,
+      isActive: true,
+      userId: null,
+      monthlyListeners: 0,
+    },
+  });
+
+  return artistProfile;
+}
+// --- End Helper Function ---
 
 interface UpdateArtistProfileData {
   bio?: string;
@@ -142,11 +188,8 @@ export class ArtistService {
     }
 
     let whereCondition: any = { artistId: id };
-    if (user.role !== Role.ADMIN && user.id !== artistProfile.userId) {
+    if (!user || (user.role !== Role.ADMIN && user.id !== artistProfile.userId)) {
       whereCondition.isActive = true;
-      if (!artistProfile.isVerified) {
-        throw new Error('Artist is not verified');
-      }
     }
 
     const [albums, total] = await Promise.all([
@@ -204,11 +247,8 @@ export class ArtistService {
     }
 
     let whereCondition: any = { artistId: id };
-    if (user.role !== Role.ADMIN && user.id !== artistProfile.userId) {
+    if (!user || (user.role !== Role.ADMIN && user.id !== artistProfile.userId)) {
       whereCondition.isActive = true;
-      if (!artistProfile.isVerified) {
-        throw new Error('Artist is not verified');
-      }
     }
 
     const [tracks, total] = await Promise.all([

@@ -108,6 +108,7 @@ export interface ArtistProfile {
   genres?: { genre: Genre }[];
   albums?: Album[];
   tracks?: Track[];
+  featuredInTracks?: { track: Track }[];
   events?: Event[];
   followers?: UserFollow[];
   notifications?: Notification[];

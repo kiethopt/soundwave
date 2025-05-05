@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import prisma from '../config/db';
-import { FollowingType, HistoryType, Role, User } from '@prisma/client';
+import { FollowingType, HistoryType, Role, User, ClaimStatus } from '@prisma/client';
 import { uploadFile } from './upload.service';
 import {
   searchAlbumSelect,
@@ -290,10 +290,13 @@ export const followTarget = async (follower: any, followingId: string) => {
     recipientCurrentProfile = targetUser.currentProfile;
   } else if (targetArtistProfile) {
     followingType = FollowingType.ARTIST;
-    const artistOwner = await prisma.user.findUnique({
-      where: { id: targetArtistProfile.userId },
-      select: { email: true, name: true, username: true, currentProfile: true },
-    });
+    let artistOwner: { email: string | null, name: string | null, username: string | null, currentProfile: string | null } | null = null;
+    if (targetArtistProfile.userId) {
+      artistOwner = await prisma.user.findUnique({
+        where: { id: targetArtistProfile.userId },
+        select: { email: true, name: true, username: true, currentProfile: true },
+      });
+    }
     followedUserEmail = artistOwner?.email || null;
     followedEntityName = targetArtistProfile.artistName || 'Nghệ sĩ';
     followedUserIdForPusher = targetArtistProfile.userId;
@@ -1586,3 +1589,119 @@ export const getPlayHistory = async (user: any) => {
     .map(h => trackMap.get(h.trackId as string))
     .filter((track): track is NonNullable<typeof track> => track !== null);
 };
+
+// --- Artist Claim Functions ---
+
+/**
+ * Submit a request to claim an existing placeholder artist profile.
+ */
+export const submitArtistClaim = async (userId: string, artistProfileId: string, proof: string) => {
+  if (!userId) {
+    throw new Error('Unauthorized: User must be logged in to submit a claim.');
+  }
+  if (!artistProfileId) {
+    throw new Error('Artist profile ID is required.');
+  }
+  if (!proof || proof.trim() === '') {
+    throw new Error('Proof is required to submit a claim.');
+  }
+
+  // 1. Verify the target profile exists and is a claimable placeholder
+  const targetProfile = await prisma.artistProfile.findUnique({
+    where: { id: artistProfileId },
+    select: { id: true, userId: true, isVerified: true, artistName: true }
+  });
+
+  if (!targetProfile) {
+    throw new Error('Artist profile not found.');
+  }
+  if (targetProfile.userId) {
+    throw new Error('This artist profile is already associated with a user.');
+  }
+  if (targetProfile.isVerified) {
+    throw new Error('This artist profile is already verified.');
+  }
+
+  // 2. Check if the user already submitted a claim for this profile
+  const existingClaim = await prisma.artistClaimRequest.findFirst({
+    where: {
+      claimingUserId: userId,
+      artistProfileId: artistProfileId,
+    },
+    select: { id: true, status: true },
+  });
+
+  if (existingClaim) {
+    if (existingClaim.status === 'PENDING') {
+      throw new Error('You already have a pending claim for this artist profile.');
+    } else if (existingClaim.status === 'APPROVED') {
+      throw new Error('Your claim for this artist profile has already been approved.');
+    } else {
+      // Allow resubmission if rejected?
+      // For now, let's prevent resubmission after rejection to keep it simple.
+      throw new Error('Your previous claim for this profile was rejected.');
+    }
+  }
+
+  // 3. Create the claim request
+  const newClaim = await prisma.artistClaimRequest.create({
+    data: {
+      claimingUserId: userId,
+      artistProfileId: artistProfileId,
+      proof: proof,
+      status: ClaimStatus.PENDING,
+    },
+    select: {
+      id: true,
+      status: true,
+      submittedAt: true,
+      artistProfile: {
+        select: {
+          id: true,
+          artistName: true,
+        }
+      }
+    }
+  });
+
+  // Notify Admins (optional, consider if needed)
+  // Example: Find admins and create notifications or send emails
+
+  return newClaim;
+};
+
+/**
+ * Get the status of claims submitted by the current user.
+ */
+export const getUserClaims = async (userId: string) => {
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const claims = await prisma.artistClaimRequest.findMany({
+    where: {
+      claimingUserId: userId,
+    },
+    select: {
+      id: true,
+      status: true,
+      submittedAt: true,
+      reviewedAt: true,
+      rejectionReason: true,
+      artistProfile: {
+        select: {
+          id: true,
+          artistName: true,
+          avatar: true,
+        }
+      }
+    },
+    orderBy: {
+      submittedAt: 'desc',
+    },
+  });
+
+  return claims;
+};
+
+// --- End Artist Claim Functions ---

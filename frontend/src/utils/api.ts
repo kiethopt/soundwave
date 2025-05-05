@@ -1446,9 +1446,6 @@ export const api = {
     getPlaylistById: async (playlistId: string, token?: string) =>
       fetchWithAuth(`/api/playlists/${playlistId}`, { method: "GET" }, token),
 
-    updateVibeRewindPlaylist: async (token: string) =>
-      fetchWithAuth("/api/playlists/vibe-rewind", { method: "POST" }, token),
-
     getAllBaseSystemPlaylists: async (
       token: string,
       page: number = 1,

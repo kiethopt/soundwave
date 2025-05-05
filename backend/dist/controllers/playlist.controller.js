@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reorderPlaylistTracks = exports.suggestMoreTracksForPlaylist = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.updateVibeRewindPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
+exports.updateVibeRewindPlaylist = exports.reorderPlaylistTracks = exports.suggestMoreTracksForPlaylist = exports.getPlaylistSuggestions = exports.getHomePageData = exports.getAllBaseSystemPlaylists = exports.deleteBaseSystemPlaylist = exports.updateBaseSystemPlaylist = exports.createBaseSystemPlaylist = exports.updateAllSystemPlaylists = exports.generateAIPlaylist = exports.getUserSystemPlaylists = exports.getSystemPlaylists = exports.deletePlaylist = exports.updatePlaylist = exports.removeTrackFromPlaylist = exports.addTrackToPlaylist = exports.getPlaylistById = exports.getPlaylists = exports.createPlaylist = void 0;
 const playlistService = __importStar(require("../services/playlist.service"));
 const albumService = __importStar(require("../services/album.service"));
 const userService = __importStar(require("../services/user.service"));
@@ -103,37 +103,6 @@ const getPlaylists = async (req, res, next) => {
         }
         const filterType = req.header("X-Filter-Type");
         const isSystemFilter = filterType === "system";
-        if (!isSystemFilter) {
-            let favoritePlaylist = await db_1.default.playlist.findFirst({
-                where: {
-                    userId,
-                    type: "FAVORITE",
-                },
-            });
-            let vibeRewindPlaylist = await db_1.default.playlist.findFirst({
-                where: {
-                    userId,
-                    name: "Vibe Rewind",
-                },
-            });
-            if (!vibeRewindPlaylist) {
-                vibeRewindPlaylist = await db_1.default.playlist.create({
-                    data: {
-                        name: "Vibe Rewind",
-                        description: "Your personal time capsule - tracks you've been vibing to lately",
-                        privacy: "PRIVATE",
-                        type: "SYSTEM",
-                        userId,
-                    },
-                });
-                try {
-                    await playlistService.updateVibeRewindPlaylist(userId);
-                }
-                catch (error) {
-                    console.error("Error initializing Vibe Rewind playlist:", error);
-                }
-            }
-        }
         if (isSystemFilter) {
             const systemPlaylists = await db_1.default.playlist.findMany({
                 where: {
@@ -250,10 +219,6 @@ const getPlaylistById = async (req, res, next) => {
                 message: "Please log in to view this playlist",
             });
             return;
-        }
-        if (playlistExists.type === "NORMAL" &&
-            playlistExists.name === "Vibe Rewind") {
-            await playlistService.updateVibeRewindPlaylist(userId);
         }
         let playlist;
         if (isSystemPlaylist || isPublicPlaylist) {
@@ -750,28 +715,6 @@ const getUserSystemPlaylists = async (req, res, next) => {
     }
 };
 exports.getUserSystemPlaylists = getUserSystemPlaylists;
-const updateVibeRewindPlaylist = async (req, res, next) => {
-    try {
-        const user = req.user;
-        if (!user) {
-            res.status(401).json({ success: false, message: "Unauthorized" });
-            return;
-        }
-        await playlistService.updateVibeRewindPlaylist(user.id);
-        res.status(200).json({
-            success: true,
-            message: "Vibe Rewind playlist updated successfully",
-        });
-    }
-    catch (error) {
-        console.error("Update Vibe Rewind playlist error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to update Vibe Rewind playlist",
-        });
-    }
-};
-exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
 const generateAIPlaylist = async (req, res, next) => {
     try {
         const userId = req.user?.id;
@@ -1231,4 +1174,25 @@ const reorderPlaylistTracks = async (req, res, next) => {
     }
 };
 exports.reorderPlaylistTracks = reorderPlaylistTracks;
+const updateVibeRewindPlaylist = async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (!user) {
+            res.status(401).json({ success: false, message: "Unauthorized" });
+            return;
+        }
+        res.status(200).json({
+            success: true,
+            message: "Vibe Rewind playlist updated successfully",
+        });
+    }
+    catch (error) {
+        console.error("Update Vibe Rewind playlist error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update Vibe Rewind playlist",
+        });
+    }
+};
+exports.updateVibeRewindPlaylist = updateVibeRewindPlaylist;
 //# sourceMappingURL=playlist.controller.js.map

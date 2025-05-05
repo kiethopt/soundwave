@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkTrackLiked = exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracksAdminArtist = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = exports.getTracks = exports.unlikeTrack = exports.likeTrack = exports.deleteTrackById = exports.canManageTrack = void 0;
+exports.checkTrackLiked = exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracksAdminArtist = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.TrackService = exports.getTracks = exports.unlikeTrack = exports.likeTrack = exports.deleteTrackById = exports.canManageTrack = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
@@ -45,6 +45,8 @@ const emailService = __importStar(require("./email.service"));
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const socket_1 = require("../config/socket");
+const artist_service_1 = require("./artist.service");
+const mm = __importStar(require("music-metadata"));
 const canManageTrack = (user, trackArtistId) => {
     if (!user)
         return false;
@@ -323,141 +325,139 @@ const getTracks = async (req) => {
     };
 };
 exports.getTracks = getTracks;
-const createTrack = async (req) => {
-    const user = req.user;
-    if (!user)
-        throw new Error('Unauthorized');
-    const { title, releaseDate, trackNumber, albumId, featuredArtists, artistId, genreIds, } = req.body;
-    const finalArtistId = user.role === 'ADMIN' && artistId ? artistId : user.artistProfile?.id;
-    if (!finalArtistId) {
-        throw new Error(user.role === 'ADMIN'
-            ? 'Artist ID is required'
-            : 'Only verified artists can create tracks');
-    }
-    const artistProfile = await db_1.default.artistProfile.findUnique({
-        where: { id: finalArtistId },
-        select: {
-            artistName: true,
-            labelId: true
-        },
-    });
-    if (!artistProfile) {
-        throw new Error('Artist profile not found.');
-    }
-    const artistName = artistProfile.artistName || 'Nghệ sĩ';
-    const artistLabelId = artistProfile.labelId;
-    if (!req.files)
-        throw new Error('No files uploaded');
-    const files = req.files;
-    const audioFile = files.audioFile?.[0];
-    const coverFile = files.coverFile?.[0];
-    if (!audioFile)
-        throw new Error('Audio file is required');
-    const audioUpload = await (0, upload_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto');
-    const coverUrl = coverFile
-        ? (await (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image')).secure_url
-        : null;
-    const mm = await Promise.resolve().then(() => __importStar(require('music-metadata')));
-    const metadata = await mm.parseBuffer(audioFile.buffer);
-    const duration = Math.floor(metadata.format.duration || 0);
-    let isActive = false;
-    let trackReleaseDate = releaseDate ? new Date(releaseDate) : new Date();
-    if (albumId) {
-        const album = await db_1.default.album.findUnique({
-            where: { id: albumId },
-            select: { isActive: true, releaseDate: true, coverUrl: true },
+class TrackService {
+    static async createTrack(artistProfileId, data, audioFile, coverFile) {
+        const { title, releaseDate, type, genreIds, featuredArtistIds = [], featuredArtistNames = [], labelId } = data;
+        const mainArtist = await db_1.default.artistProfile.findUnique({
+            where: { id: artistProfileId },
+            select: { id: true, labelId: true, artistName: true, avatar: true }
         });
-        if (album) {
-            isActive = album.isActive;
-            trackReleaseDate = album.releaseDate;
+        if (!mainArtist) {
+            throw new Error(`Artist profile with ID ${artistProfileId} not found.`);
         }
-    }
-    else {
-        const now = new Date();
-        isActive = trackReleaseDate <= now;
-    }
-    const artistsArray = !featuredArtists
-        ? []
-        : Array.isArray(featuredArtists)
-            ? featuredArtists.map((id) => id.trim()).filter(Boolean)
-            : typeof featuredArtists === 'string'
-                ? featuredArtists.split(',').map((id) => id.trim()).filter(Boolean)
-                : [];
-    let genresArray = [];
-    if (genreIds) {
-        if (Array.isArray(genreIds)) {
-            genresArray = genreIds.map((id) => id.trim()).filter(Boolean);
+        const artistName = mainArtist.artistName;
+        const finalLabelId = labelId || mainArtist.labelId;
+        const [audioUploadResult, coverUploadResult] = await Promise.all([
+            (0, upload_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto'),
+            coverFile ? (0, upload_service_1.uploadFile)(coverFile.buffer, 'covers', 'image') : Promise.resolve(null),
+        ]);
+        let duration = 0;
+        try {
+            const metadata = await mm.parseBuffer(audioFile.buffer, audioFile.mimetype);
+            duration = Math.round(metadata.format.duration || 0);
         }
-        else if (typeof genreIds === 'string') {
-            genresArray = genreIds.split(',').map((id) => id.trim()).filter(Boolean);
+        catch (error) {
+            console.error('Error parsing audio metadata:', error);
         }
-    }
-    const trackData = {
-        title,
-        duration,
-        releaseDate: trackReleaseDate,
-        trackNumber: trackNumber ? Number(trackNumber) : null,
-        coverUrl,
-        audioUrl: audioUpload.secure_url,
-        artist: { connect: { id: finalArtistId } },
-        album: albumId ? { connect: { id: albumId } } : undefined,
-        type: albumId ? undefined : 'SINGLE',
-        isActive,
-        featuredArtists: artistsArray.length > 0
-            ? { create: artistsArray.map((featArtistId) => ({ artistProfile: { connect: { id: featArtistId } } })) }
-            : undefined,
-        genres: genresArray.length > 0
-            ? { create: genresArray.map((genreId) => ({ genre: { connect: { id: genreId } } })) }
-            : undefined,
-    };
-    if (artistLabelId) {
-        trackData.label = { connect: { id: artistLabelId } };
-    }
-    const track = await db_1.default.track.create({
-        data: trackData,
-        select: prisma_selects_1.trackSelect,
-    });
-    const followers = await db_1.default.userFollow.findMany({
-        where: {
-            followingArtistId: finalArtistId,
-            followingType: 'ARTIST',
-        },
-        select: { followerId: true },
-    });
-    const followerIds = followers.map((f) => f.followerId);
-    if (followerIds.length > 0) {
-        const followerUsers = await db_1.default.user.findMany({
-            where: { id: { in: followerIds } },
-            select: { id: true, email: true },
-        });
-        const notificationsData = followers.map((follower) => ({
-            type: client_1.NotificationType.NEW_TRACK,
-            message: `${artistName} just released a new track: ${title}`,
-            recipientType: client_1.RecipientType.USER,
-            userId: follower.followerId,
-            artistId: finalArtistId,
-            senderId: finalArtistId,
-            trackId: track.id,
-        }));
-        await db_1.default.notification.createMany({ data: notificationsData });
-        const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${track.id}`;
-        const io = (0, socket_1.getIO)();
-        for (const user of followerUsers) {
-            const room = `user-${user.id}`;
-            io.to(room).emit('notification', {
-                type: client_1.NotificationType.NEW_TRACK,
-                message: `${artistName} just released a new track: ${track.title}`,
-                trackId: track.id,
+        const allFeaturedArtistIds = new Set();
+        if (featuredArtistIds.length > 0) {
+            const existingArtists = await db_1.default.artistProfile.findMany({
+                where: { id: { in: featuredArtistIds } },
+                select: { id: true }
             });
-            if (user.email) {
-                const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'track', track.title, releaseLink, track.coverUrl);
-                await emailService.sendEmail(emailOptions);
+            existingArtists.forEach(artist => allFeaturedArtistIds.add(artist.id));
+        }
+        if (featuredArtistNames.length > 0) {
+            for (const name of featuredArtistNames) {
+                try {
+                    const profile = await (0, artist_service_1.getOrCreateArtistProfile)(name);
+                    if (profile.id !== artistProfileId) {
+                        allFeaturedArtistIds.add(profile.id);
+                    }
+                }
+                catch (error) {
+                    console.error(`Error finding or creating artist profile for \"${name}\":`, error);
+                }
             }
         }
+        const trackData = {
+            title,
+            duration,
+            releaseDate: new Date(releaseDate),
+            type,
+            audioUrl: audioUploadResult.secure_url,
+            coverUrl: coverUploadResult?.secure_url,
+            artist: { connect: { id: artistProfileId } },
+            label: finalLabelId ? { connect: { id: finalLabelId } } : undefined,
+            isActive: true,
+        };
+        if (genreIds && genreIds.length > 0) {
+            trackData.genres = {
+                create: genreIds.map((genreId) => ({ genre: { connect: { id: genreId } } })),
+            };
+        }
+        const featuredArtistIdsArray = Array.from(allFeaturedArtistIds);
+        if (featuredArtistIdsArray.length > 0) {
+            trackData.featuredArtists = {
+                create: featuredArtistIdsArray.map((artistId) => ({ artistProfile: { connect: { id: artistId } } })),
+            };
+        }
+        const newTrack = await db_1.default.track.create({
+            data: trackData,
+            select: {
+                ...prisma_selects_1.trackSelect,
+                albumId: true
+            },
+        });
+        try {
+            const followers = await db_1.default.userFollow.findMany({
+                where: {
+                    followingArtistId: artistProfileId,
+                    followingType: 'ARTIST',
+                },
+                select: { followerId: true },
+            });
+            const followerIds = followers.map((f) => f.followerId);
+            if (followerIds.length > 0) {
+                const followerUsers = await db_1.default.user.findMany({
+                    where: { id: { in: followerIds }, isActive: true },
+                    select: { id: true, email: true },
+                });
+                const notificationsData = followerUsers.map((follower) => ({
+                    type: client_1.NotificationType.NEW_TRACK,
+                    message: `${artistName} just released a new track: ${title}`,
+                    recipientType: client_1.RecipientType.USER,
+                    userId: follower.id,
+                    artistId: artistProfileId,
+                    senderId: artistProfileId,
+                    trackId: newTrack.id,
+                }));
+                await db_1.default.notification.createMany({ data: notificationsData });
+                const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${newTrack.id}`;
+                const io = (0, socket_1.getIO)();
+                for (const user of followerUsers) {
+                    const room = `user-${user.id}`;
+                    io.to(room).emit('notification', {
+                        type: client_1.NotificationType.NEW_TRACK,
+                        message: `${artistName} just released a new track: ${newTrack.title}`,
+                        trackId: newTrack.id,
+                        sender: {
+                            id: artistProfileId,
+                            name: artistName,
+                            avatar: mainArtist.avatar
+                        },
+                        track: {
+                            id: newTrack.id,
+                            title: newTrack.title,
+                            coverUrl: newTrack.coverUrl
+                        }
+                    });
+                    if (user.email) {
+                        const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'track', newTrack.title, releaseLink, newTrack.coverUrl);
+                        emailService.sendEmail(emailOptions).catch(emailError => {
+                            console.error(`Failed to send new track email to ${user.email}:`, emailError);
+                        });
+                    }
+                }
+            }
+        }
+        catch (notificationError) {
+            console.error("Error sending new track notifications:", notificationError);
+        }
+        return newTrack;
     }
-    return { message: 'Track created successfully', track };
-};
-exports.createTrack = createTrack;
+}
+exports.TrackService = TrackService;
 const updateTrack = async (req, id) => {
     const { title, releaseDate, type, trackNumber, albumId, labelId, } = req.body;
     const currentTrack = await db_1.default.track.findUnique({
@@ -1060,27 +1060,35 @@ const playTrack = async (req, trackId) => {
             data: { monthlyListeners: { increment: 1 } },
         });
     }
-    await db_1.default.history.upsert({
+    const existingHistoryRecord = await db_1.default.history.findFirst({
         where: {
-            userId_trackId_type: {
-                userId: user.id,
-                trackId: track.id,
-                type: 'PLAY',
-            },
-        },
-        update: {
-            playCount: { increment: 1 },
-            updatedAt: new Date(),
-        },
-        create: {
-            type: 'PLAY',
-            trackId: track.id,
             userId: user.id,
-            duration: track.duration,
-            completed: true,
-            playCount: 1,
+            trackId: track.id,
+            type: 'PLAY',
         },
+        select: { id: true },
     });
+    if (existingHistoryRecord) {
+        await db_1.default.history.update({
+            where: { id: existingHistoryRecord.id },
+            data: {
+                playCount: { increment: 1 },
+                updatedAt: new Date(),
+            },
+        });
+    }
+    else {
+        await db_1.default.history.create({
+            data: {
+                type: 'PLAY',
+                trackId: track.id,
+                userId: user.id,
+                duration: track.duration,
+                completed: true,
+                playCount: 1,
+            },
+        });
+    }
     await db_1.default.track.update({
         where: { id: track.id },
         data: { playCount: { increment: 1 } },

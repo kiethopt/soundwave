@@ -1,12 +1,48 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArtistService = void 0;
+exports.getOrCreateArtistProfile = getOrCreateArtistProfile;
 const client_1 = require("@prisma/client");
 const prisma_selects_1 = require("../utils/prisma-selects");
 const cache_middleware_1 = require("../middleware/cache.middleware");
 const upload_service_1 = require("./upload.service");
 const date_fns_1 = require("date-fns");
 const prisma = new client_1.PrismaClient();
+async function getOrCreateArtistProfile(artistNameOrId) {
+    const isLikelyId = /^[a-z0-9]{25}$/.test(artistNameOrId);
+    if (isLikelyId) {
+        const existingProfile = await prisma.artistProfile.findUnique({
+            where: { id: artistNameOrId },
+        });
+        if (existingProfile) {
+            return existingProfile;
+        }
+    }
+    const nameToSearch = artistNameOrId;
+    let artistProfile = await prisma.artistProfile.findFirst({
+        where: {
+            artistName: {
+                equals: nameToSearch,
+                mode: 'insensitive',
+            },
+        },
+    });
+    if (artistProfile) {
+        return artistProfile;
+    }
+    console.log(`Creating placeholder artist profile for: ${nameToSearch}`);
+    artistProfile = await prisma.artistProfile.create({
+        data: {
+            artistName: nameToSearch,
+            role: client_1.Role.ARTIST,
+            isVerified: false,
+            isActive: true,
+            userId: null,
+            monthlyListeners: 0,
+        },
+    });
+    return artistProfile;
+}
 class ArtistService {
     static async canViewArtistData(user, artistProfileId) {
         if (!user)
@@ -102,11 +138,8 @@ class ArtistService {
             return null;
         }
         let whereCondition = { artistId: id };
-        if (user.role !== client_1.Role.ADMIN && user.id !== artistProfile.userId) {
+        if (!user || (user.role !== client_1.Role.ADMIN && user.id !== artistProfile.userId)) {
             whereCondition.isActive = true;
-            if (!artistProfile.isVerified) {
-                throw new Error('Artist is not verified');
-            }
         }
         const [albums, total] = await Promise.all([
             prisma.album.findMany({
@@ -150,11 +183,8 @@ class ArtistService {
             return null;
         }
         let whereCondition = { artistId: id };
-        if (user.role !== client_1.Role.ADMIN && user.id !== artistProfile.userId) {
+        if (!user || (user.role !== client_1.Role.ADMIN && user.id !== artistProfile.userId)) {
             whereCondition.isActive = true;
-            if (!artistProfile.isVerified) {
-                throw new Error('Artist is not verified');
-            }
         }
         const [tracks, total] = await Promise.all([
             prisma.track.findMany({
@@ -255,13 +285,14 @@ class ArtistService {
         trendStartDate5Y.setFullYear(trendStartDate5Y.getFullYear() - 5);
         trendStartDate5Y.setMonth(0, 1);
         trendStartDate5Y.setHours(0, 0, 0, 0);
-        const [artistData, totalPlaysData, albumsData, topTracksData, listenerHistory, followerRecords, likeRecords, playlistAddRecords] = await Promise.all([
+        const [artistData, totalPlaysData, albumsData, topTracksData, listenerHistoryForTopListeners, followerRecords, likeRecords, playlistAddRecords, playHistoryForListenerTrend] = await Promise.all([
             prisma.artistProfile.findUnique({
                 where: { id: artistProfileId },
                 select: {
                     artistName: true,
                     avatar: true,
                     monthlyListeners: true,
+                    label: true,
                     _count: {
                         select: {
                             albums: { where: { isActive: true } },
@@ -388,6 +419,26 @@ class ArtistService {
                     }
                 },
             }),
+            prisma.history.findMany({
+                where: {
+                    type: client_1.HistoryType.PLAY,
+                    track: {
+                        artistId: artistProfileId,
+                        isActive: true,
+                    },
+                    createdAt: {
+                        gte: trendStartDate6M,
+                        lte: endDate,
+                    },
+                    user: {
+                        isActive: true,
+                    }
+                },
+                select: {
+                    userId: true,
+                    createdAt: true,
+                },
+            }),
         ]);
         if (!artistData) {
             throw new Error('Artist profile not found');
@@ -426,12 +477,12 @@ class ArtistService {
                 createdAt: 'asc',
             }
         });
-        const topListenerIds = listenerHistory.map(item => item.userId);
+        const topListenerIds = listenerHistoryForTopListeners.map(item => item.userId);
         const topListenersDetails = topListenerIds.length > 0 ? await prisma.user.findMany({
             where: { id: { in: topListenerIds } },
             select: prisma_selects_1.userSelect,
         }) : [];
-        const topListeners = listenerHistory.map(hist => {
+        const topListeners = listenerHistoryForTopListeners.map(hist => {
             const userDetail = topListenersDetails.find(u => u.id === hist.userId);
             return {
                 ...(userDetail || {}),
@@ -604,6 +655,34 @@ class ArtistService {
         };
         const monthlyStreamTrend = processStreamTrend(monthlyStreamData, 12, 'month');
         const yearlyStreamTrend = processStreamTrend(yearlyStreamData, 5, 'year');
+        const processListenerTrend6M = (records) => {
+            const monthlyUserSets = {};
+            const labels = [];
+            const data = [];
+            const monthFormatter = new Intl.DateTimeFormat('en', { month: 'short' });
+            for (let i = 5; i >= 0; i--) {
+                const date = new Date(endDate);
+                date.setMonth(endDate.getMonth() - i);
+                const yearMonth = (0, date_fns_1.format)(date, 'yyyy-MM');
+                const label = monthFormatter.format(date);
+                monthlyUserSets[yearMonth] = new Set();
+                labels.push(label);
+            }
+            records.forEach(record => {
+                const yearMonth = (0, date_fns_1.format)(record.createdAt, 'yyyy-MM');
+                if (monthlyUserSets[yearMonth]) {
+                    monthlyUserSets[yearMonth].add(record.userId);
+                }
+            });
+            labels.forEach((_, index) => {
+                const date = new Date(endDate);
+                date.setMonth(endDate.getMonth() - (5 - index));
+                const yearMonth = (0, date_fns_1.format)(date, 'yyyy-MM');
+                data.push(monthlyUserSets[yearMonth]?.size || 0);
+            });
+            return { labels, data };
+        };
+        const listenerTrend = processListenerTrend6M(playHistoryForListenerTrend);
         return {
             artistName: artistData.artistName,
             avatar: artistData.avatar,
@@ -621,6 +700,8 @@ class ArtistService {
             genreDistribution,
             monthlyStreamTrend,
             yearlyStreamTrend,
+            label: artistData.label,
+            listenerTrend,
         };
     }
     static async getRelatedArtists(id) {

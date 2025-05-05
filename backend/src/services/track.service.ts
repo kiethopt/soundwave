@@ -1,5 +1,5 @@
 import prisma from '../config/db';
-import { Prisma, Role, AlbumType, NotificationType, RecipientType } from '@prisma/client';
+import { Prisma, Role, AlbumType, NotificationType, RecipientType, Track } from '@prisma/client';
 import { Request } from 'express';
 import { uploadFile } from './upload.service';
 import { paginate } from '../utils/handle-utils';
@@ -7,6 +7,8 @@ import * as emailService from './email.service';
 import { client, setCache } from '../middleware/cache.middleware';
 import { trackSelect } from '../utils/prisma-selects';
 import { getIO } from '../config/socket';
+import { getOrCreateArtistProfile } from './artist.service';
+import * as mm from 'music-metadata';
 
 // Hàm kiểm tra quyền
 export const canManageTrack = (user: any, trackArtistId: string): boolean => {
@@ -348,192 +350,176 @@ export const getTracks = async (req: Request) => {
   };
 };
 
-// Tạo track mới
-export const createTrack = async (req: Request) => {
-  const user = req.user;
-  if (!user) throw new Error('Unauthorized');
+interface CreateTrackData {
+  title: string;
+  releaseDate: string;
+  type: 'SINGLE';
+  genreIds?: string[];
+  featuredArtistIds?: string[];
+  featuredArtistNames?: string[];
+  labelId?: string;
+}
 
-  const {
-    title,
-    releaseDate,
-    trackNumber,
-    albumId,
-    featuredArtists,
-    artistId,
-    genreIds,
-  } = req.body;
+export class TrackService {
+  static async createTrack(
+    artistProfileId: string,
+    data: CreateTrackData,
+    audioFile: Express.Multer.File,
+    coverFile?: Express.Multer.File
+  ): Promise<Track> {
+    const { title, releaseDate, type, genreIds, featuredArtistIds = [], featuredArtistNames = [], labelId } = data;
 
-  const finalArtistId =
-    user.role === 'ADMIN' && artistId ? artistId : user.artistProfile?.id;
-
-  if (!finalArtistId) {
-    throw new Error(
-      user.role === 'ADMIN'
-        ? 'Artist ID is required'
-        : 'Only verified artists can create tracks'
-    );
-  }
-
-  // Fetch artist profile including the label
-  const artistProfile = await prisma.artistProfile.findUnique({
-    where: { id: finalArtistId },
-    select: { 
-      artistName: true,
-      labelId: true // Fetch the labelId
-     },
-  });
-
-  if (!artistProfile) {
-    throw new Error('Artist profile not found.'); 
-  }
-  
-  const artistName = artistProfile.artistName || 'Nghệ sĩ';
-  const artistLabelId = artistProfile.labelId; // Get the artist's registered label ID
-
-  if (!req.files) throw new Error('No files uploaded');
-
-  const files = req.files as {
-    audioFile?: Express.Multer.File[];
-    coverFile?: Express.Multer.File[];
-  };
-  const audioFile = files.audioFile?.[0];
-  const coverFile = files.coverFile?.[0];
-
-  if (!audioFile) throw new Error('Audio file is required');
-
-  const audioUpload = await uploadFile(audioFile.buffer, 'tracks', 'auto');
-  const coverUrl = coverFile
-    ? (await uploadFile(coverFile.buffer, 'covers', 'image')).secure_url
-    : null;
-
-  const mm = await import('music-metadata');
-  const metadata = await mm.parseBuffer(audioFile.buffer);
-  const duration = Math.floor(metadata.format.duration || 0);
-
-  let isActive = false;
-  let trackReleaseDate = releaseDate ? new Date(releaseDate) : new Date();
-
-  if (albumId) {
-    const album = await prisma.album.findUnique({
-      where: { id: albumId },
-      select: { isActive: true, releaseDate: true, coverUrl: true },
+    const mainArtist = await prisma.artistProfile.findUnique({
+      where: { id: artistProfileId },
+      select: { id: true, labelId: true, artistName: true, avatar: true }
     });
-    if (album) {
-      isActive = album.isActive;
-      trackReleaseDate = album.releaseDate;
+    if (!mainArtist) {
+      throw new Error(`Artist profile with ID ${artistProfileId} not found.`);
     }
-  } else {
-    const now = new Date();
-    isActive = trackReleaseDate <= now;
-  }
+    const artistName = mainArtist.artistName;
 
-  const artistsArray = !featuredArtists
-    ? []
-    : Array.isArray(featuredArtists)
-      ? featuredArtists.map((id: string) => id.trim()).filter(Boolean)
-      : typeof featuredArtists === 'string'
-        ? featuredArtists.split(',').map((id: string) => id.trim()).filter(Boolean)
-        : [];
+    const finalLabelId = labelId || mainArtist.labelId;
 
-  let genresArray: string[] = [];
-  if (genreIds) {
-    if (Array.isArray(genreIds)) {
-      genresArray = genreIds.map((id: string) => id.trim()).filter(Boolean);
-    } else if (typeof genreIds === 'string') {
-      genresArray = genreIds.split(',').map((id: string) => id.trim()).filter(Boolean);
+    const [audioUploadResult, coverUploadResult] = await Promise.all([
+      uploadFile(audioFile.buffer, 'tracks', 'auto'),
+      coverFile ? uploadFile(coverFile.buffer, 'covers', 'image') : Promise.resolve(null),
+    ]);
+
+    let duration = 0;
+    try {
+      const metadata = await mm.parseBuffer(audioFile.buffer, audioFile.mimetype);
+      duration = Math.round(metadata.format.duration || 0);
+    } catch (error) {
+      console.error('Error parsing audio metadata:', error);
     }
-  }
 
-  // Construct the track data object BEFORE notification logic
-  const trackData: Prisma.TrackCreateInput = {
-      title,
-      duration,
-      releaseDate: trackReleaseDate,
-      trackNumber: trackNumber ? Number(trackNumber) : null,
-      coverUrl,
-      audioUrl: audioUpload.secure_url,
-      artist: { connect: { id: finalArtistId } }, 
-      album: albumId ? { connect: { id: albumId } } : undefined,
-      type: albumId ? undefined : 'SINGLE',
-      isActive,
-      featuredArtists:
-        artistsArray.length > 0
-          ? { create: artistsArray.map((featArtistId: string) => ({ artistProfile: { connect: { id: featArtistId } } })) }
-          : undefined,
-      genres:
-        genresArray.length > 0
-          ? { create: genresArray.map((genreId: string) => ({ genre: { connect: { id: genreId } } })) }
-          : undefined,
-  };
-
-  // Conditionally connect the track to the artist's label
-  if (artistLabelId) {
-    trackData.label = { connect: { id: artistLabelId } }; // Use connect with ID
-  }
-
-  // Create the track first
-  const track = await prisma.track.create({
-    data: trackData, 
-    select: trackSelect,
-  });
-
-  // --- Notification Logic START ---
-  const followers = await prisma.userFollow.findMany({
-    where: {
-      followingArtistId: finalArtistId,
-      followingType: 'ARTIST', // Type assertion might not be needed if Prisma types are correct
-    },
-    select: { followerId: true },
-  });
-
-  const followerIds = followers.map((f) => f.followerId);
-  if (followerIds.length > 0) {
-    const followerUsers = await prisma.user.findMany({
-      where: { id: { in: followerIds } },
-      select: { id: true, email: true },
-    });
-
-    // Explicitly type the notification data array
-    const notificationsData: Prisma.NotificationCreateManyInput[] = followers.map((follower) => ({
-      type: NotificationType.NEW_TRACK,
-      message: `${artistName} just released a new track: ${title}`,
-      recipientType: RecipientType.USER,
-      userId: follower.followerId,
-      artistId: finalArtistId,
-      senderId: finalArtistId,
-      trackId: track.id,
-    }));
-
-    await prisma.notification.createMany({ data: notificationsData });
-
-    const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${track.id}`;
-    const io = getIO();
-
-    for (const user of followerUsers) {
-      const room = `user-${user.id}`;
-      io.to(room).emit('notification', {
-        type: NotificationType.NEW_TRACK,
-        message: `${artistName} just released a new track: ${track.title}`,
-        trackId: track.id,
+    const allFeaturedArtistIds = new Set<string>();
+    if (featuredArtistIds.length > 0) {
+      const existingArtists = await prisma.artistProfile.findMany({
+        where: { id: { in: featuredArtistIds } },
+        select: { id: true }
       });
-
-      if (user.email) {
-        const emailOptions = emailService.createNewReleaseEmail(
-          user.email,
-          artistName,
-          'track',
-          track.title,
-          releaseLink,
-          track.coverUrl
-        );
-        await emailService.sendEmail(emailOptions);
+      existingArtists.forEach(artist => allFeaturedArtistIds.add(artist.id));
+    }
+    if (featuredArtistNames.length > 0) {
+      for (const name of featuredArtistNames) {
+        try {
+          const profile = await getOrCreateArtistProfile(name);
+          if (profile.id !== artistProfileId) {
+             allFeaturedArtistIds.add(profile.id);
+          }
+        } catch (error) {
+          console.error(`Error finding or creating artist profile for \"${name}\":`, error);
+        }
       }
     }
-  }
-  // --- Notification Logic END ---
 
-  return { message: 'Track created successfully', track };
-};
+    const trackData: Prisma.TrackCreateInput = {
+      title,
+      duration,
+      releaseDate: new Date(releaseDate),
+      type,
+      audioUrl: audioUploadResult.secure_url,
+      coverUrl: coverUploadResult?.secure_url,
+      artist: { connect: { id: artistProfileId } },
+      label: finalLabelId ? { connect: { id: finalLabelId } } : undefined,
+      isActive: true,
+    };
+
+    if (genreIds && genreIds.length > 0) {
+      trackData.genres = {
+        create: genreIds.map((genreId) => ({ genre: { connect: { id: genreId } } })),
+      };
+    }
+
+    const featuredArtistIdsArray = Array.from(allFeaturedArtistIds);
+    if (featuredArtistIdsArray.length > 0) {
+      trackData.featuredArtists = {
+        create: featuredArtistIdsArray.map((artistId) => ({ artistProfile: { connect: { id: artistId } } })),
+      };
+    }
+
+    const newTrack = await prisma.track.create({
+      data: trackData,
+      select: {
+        ...trackSelect,
+        albumId: true
+      },
+    });
+
+    try {
+        const followers = await prisma.userFollow.findMany({
+          where: {
+            followingArtistId: artistProfileId,
+            followingType: 'ARTIST',
+          },
+          select: { followerId: true },
+        });
+
+        const followerIds = followers.map((f) => f.followerId);
+        if (followerIds.length > 0) {
+          const followerUsers = await prisma.user.findMany({
+            where: { id: { in: followerIds }, isActive: true },
+            select: { id: true, email: true },
+          });
+
+          const notificationsData: Prisma.NotificationCreateManyInput[] = followerUsers.map((follower) => ({
+            type: NotificationType.NEW_TRACK,
+            message: `${artistName} just released a new track: ${title}`,
+            recipientType: RecipientType.USER,
+            userId: follower.id,
+            artistId: artistProfileId,
+            senderId: artistProfileId,
+            trackId: newTrack.id,
+          }));
+
+          await prisma.notification.createMany({ data: notificationsData });
+
+          const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${newTrack.id}`;
+          const io = getIO();
+
+          for (const user of followerUsers) {
+            const room = `user-${user.id}`;
+            io.to(room).emit('notification', {
+              type: NotificationType.NEW_TRACK,
+              message: `${artistName} just released a new track: ${newTrack.title}`,
+              trackId: newTrack.id,
+              sender: {
+                 id: artistProfileId,
+                 name: artistName,
+                 avatar: mainArtist.avatar
+              },
+              track: {
+                 id: newTrack.id,
+                 title: newTrack.title,
+                 coverUrl: newTrack.coverUrl
+              }
+            });
+
+            if (user.email) {
+              const emailOptions = emailService.createNewReleaseEmail(
+                user.email,
+                artistName,
+                'track',
+                newTrack.title,
+                releaseLink,
+                newTrack.coverUrl
+              );
+              emailService.sendEmail(emailOptions).catch(emailError => {
+                 console.error(`Failed to send new track email to ${user.email}:`, emailError);
+              });
+            }
+          }
+        }
+    } catch (notificationError) {
+        console.error("Error sending new track notifications:", notificationError);
+    }
+
+    return newTrack;
+  }
+
+  // ... (rest of TrackService class remains the same)
+}
 
 // Cập nhật track
 export const updateTrack = async (req: Request, id: string) => {

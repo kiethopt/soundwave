@@ -35,14 +35,53 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.checkTrackLiked = exports.unlikeTrack = exports.likeTrack = exports.playTrack = exports.getTracksByTypeAndGenre = exports.getTracksByGenre = exports.getTrackById = exports.getAllTracks = exports.getTracksByType = exports.searchTrack = exports.toggleTrackVisibility = exports.deleteTrack = exports.updateTrack = exports.createTrack = void 0;
 const trackService = __importStar(require("../services/track.service"));
+const handle_utils_1 = require("../utils/handle-utils");
+const track_service_1 = require("../services/track.service");
 const createTrack = async (req, res) => {
     try {
-        const result = await trackService.createTrack(req);
-        res.status(201).json(result);
+        const user = req.user;
+        if (!user || !user.artistProfile) {
+            res.status(403).json({ message: 'Forbidden: Only verified artists can upload tracks.' });
+            return;
+        }
+        const files = req.files;
+        if (!files || !files.audioFile || files.audioFile.length === 0) {
+            res.status(400).json({ message: 'Audio file is required.' });
+            return;
+        }
+        const audioFile = files.audioFile[0];
+        const coverFile = files.coverFile?.[0];
+        const { title, releaseDate, genreIds, featuredArtistIds, featuredArtistNames, labelId } = req.body;
+        if (!title || !releaseDate) {
+            res.status(400).json({ message: 'Title and release date are required.' });
+            return;
+        }
+        if (!Array.isArray(genreIds || [])) {
+            res.status(400).json({ message: 'Genres must be an array.' });
+            return;
+        }
+        if (!Array.isArray(featuredArtistIds || [])) {
+            res.status(400).json({ message: 'Featured artist IDs must be an array.' });
+            return;
+        }
+        if (!Array.isArray(featuredArtistNames || [])) {
+            res.status(400).json({ message: 'Featured artist names must be an array.' });
+            return;
+        }
+        const createData = {
+            title,
+            releaseDate,
+            type: 'SINGLE',
+            genreIds: genreIds || [],
+            featuredArtistIds: featuredArtistIds || [],
+            featuredArtistNames: featuredArtistNames || [],
+            labelId: labelId || undefined
+        };
+        const newTrack = await track_service_1.TrackService.createTrack(user.artistProfile.id, createData, audioFile, coverFile);
+        res.status(201).json({ message: 'Track created successfully', track: newTrack });
     }
     catch (error) {
-        console.error('Create track error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        (0, handle_utils_1.handleError)(res, error, 'Create track');
     }
 };
 exports.createTrack = createTrack;

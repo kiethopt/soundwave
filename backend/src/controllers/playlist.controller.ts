@@ -92,47 +92,6 @@ export const getPlaylists = async (
     const filterType = req.header("X-Filter-Type");
     const isSystemFilter = filterType === "system";
 
-    // Create system playlists if they don't exist (for all non-system requests)
-    if (!isSystemFilter) {
-      // Check for Favorites playlist
-      let favoritePlaylist = await prisma.playlist.findFirst({
-        where: {
-          userId,
-          type: "FAVORITE",
-        },
-      });
-
-      // Check for Vibe Rewind playlist
-      let vibeRewindPlaylist = await prisma.playlist.findFirst({
-        where: {
-          userId,
-          name: "Vibe Rewind",
-        },
-      });
-
-      // Create Vibe Rewind playlist if it doesn't exist
-      if (!vibeRewindPlaylist) {
-        vibeRewindPlaylist = await prisma.playlist.create({
-          data: {
-            name: "Vibe Rewind",
-            description:
-              "Your personal time capsule - tracks you've been vibing to lately",
-            privacy: "PRIVATE",
-            type: "SYSTEM",
-            userId,
-          },
-        });
-
-        // Automatically update it with user's history if available
-        try {
-          await playlistService.updateVibeRewindPlaylist(userId);
-        } catch (error) {
-          console.error("Error initializing Vibe Rewind playlist:", error);
-          // Continue even if this fails
-        }
-      }
-    }
-
     if (isSystemFilter) {
       // For system playlists, use a more specific query
       const systemPlaylists = await prisma.playlist.findMany({
@@ -273,14 +232,6 @@ export const getPlaylistById = async (
         message: "Please log in to view this playlist",
       });
       return;
-    }
-
-    // If the playlist is the Recommended Playlist, update it automatically
-    if (
-      playlistExists.type === "NORMAL" &&
-      playlistExists.name === "Vibe Rewind"
-    ) {
-      await playlistService.updateVibeRewindPlaylist(userId!);
     }
 
     let playlist;
@@ -902,35 +853,6 @@ export const getUserSystemPlaylists = async (
   } catch (error) {
     console.error("Error in getSystemPlaylists:", error);
     next(error);
-  }
-};
-
-// Update the Vibe Rewind playlist (tracks user has listened to)
-export const updateVibeRewindPlaylist = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const user = req.user;
-    if (!user) {
-      res.status(401).json({ success: false, message: "Unauthorized" });
-      return;
-    }
-
-    // Call the service function
-    await playlistService.updateVibeRewindPlaylist(user.id);
-
-    res.status(200).json({
-      success: true,
-      message: "Vibe Rewind playlist updated successfully",
-    });
-  } catch (error) {
-    console.error("Update Vibe Rewind playlist error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update Vibe Rewind playlist",
-    });
   }
 };
 
@@ -1558,5 +1480,34 @@ export const reorderPlaylistTracks = async (
   } catch (error) {
     console.error("Error in reorderPlaylistTracks controller:", error);
     next(error); // Pass error to the global error handler
+  }
+};
+
+// Update the Vibe Rewind playlist (tracks user has listened to)
+export const updateVibeRewindPlaylist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    // Call the service function
+    // await playlistService.updateVibeRewindPlaylist(user.id);
+
+    res.status(200).json({
+      success: true,
+      message: "Vibe Rewind playlist updated successfully",
+    });
+  } catch (error) {
+    console.error("Update Vibe Rewind playlist error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update Vibe Rewind playlist",
+    });
   }
 };

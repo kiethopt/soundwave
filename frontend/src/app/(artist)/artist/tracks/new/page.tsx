@@ -2,13 +2,24 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/utils/api'; // Đảm bảo api.labels đã được định nghĩa ở đây
-import Link from 'next/link';
-import { ArrowLeft } from '@/components/ui/Icons';
+import { api } from '@/utils/api';
+import { ArrowLeft, Upload, Music, FileAudio, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
-import { SearchableSelect } from '@/components/ui/SearchableSelect'; // Component chọn có tìm kiếm
+import { ArtistCreatableSelect } from '@/components/ui/ArtistCreatableSelect';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { ArtistProfile } from '@/types';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label as UILabel } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
+
+// Define the type for selected artists (can have ID or just name)
+interface SelectedArtist {
+  id?: string;
+  name: string;
+}
 
 // Định nghĩa kiểu dữ liệu cho Label (nếu chưa có)
 interface Label {
@@ -28,8 +39,9 @@ export default function NewTrack() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [availableArtists, setAvailableArtists] = useState<Array<{ id: string; name: string }>>([]);
-  const [featuredArtists, setFeaturedArtists] = useState<string[]>([]);
+  const [featuredArtists, setFeaturedArtists] = useState<SelectedArtist[]>([]);
   const [availableGenres, setAvailableGenres] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
@@ -49,8 +61,8 @@ export default function NewTrack() {
 
         // Fetch artists, genres, and profile in parallel
         const [artistsResponse, genresResponse, profileResponse] = await Promise.all([
-          api.artists.getAllArtistsProfile(token, 1, 100),
-          api.genres.getAll(token, 1, 100),
+          api.artists.getAllArtistsProfile(token, 1, 500),
+          api.genres.getAll(token, 1, 1000),
           api.auth.getMe(token), // Fetch current user profile
         ]);
 
@@ -113,10 +125,14 @@ export default function NewTrack() {
     }
   };
 
-
   // Hàm xử lý khi nhấn vào ảnh bìa để mở input file
   const handleCoverClick = () => {
     coverFileInputRef.current?.click();
+  };
+
+  // Function to trigger audio file input click
+  const handleAudioInputClick = () => {
+    audioFileInputRef.current?.click();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,8 +166,12 @@ export default function NewTrack() {
         toast('No cover image selected. You can update it later.');
       }
 
-      featuredArtists.forEach((artistId) => {
-        formData.append('featuredArtists[]', artistId);
+      featuredArtists.forEach((artist) => {
+        if (artist.id) {
+          formData.append('featuredArtistIds[]', artist.id);
+        } else {
+          formData.append('featuredArtistNames[]', artist.name);
+        }
       });
 
       selectedGenres.forEach((genreId) => {
@@ -178,254 +198,222 @@ export default function NewTrack() {
     >
       <div className="flex flex-col space-y-6">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
-          {/* Back Button */}
-          <div className="w-fit">
-            <Link
-              href="/artist/tracks"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${theme === 'light'
-                ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
-                : 'bg-white/10 hover:bg-white/15 text-white/80 hover:text-white'
-                }`}
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </Link>
-          </div>
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => router.back()}
+            className={cn(theme === 'dark' ? 'border-white/20 hover:bg-white/10' : '')}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          <h1 className={`text-2xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Upload New Single</h1>
+          <div className="w-[88px]"></div> {/* Spacer */}
         </div>
 
         {/* Main Form Card */}
-        <div
-          className={`rounded-xl p-6 border ${theme === 'light'
-            ? 'bg-white border-gray-200'
-            : 'bg-[#121212] border-gray-800'
-            }`}
-        >
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
-              {/* Title */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="title"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
+        <div className={cn(
+          'rounded-xl p-6 md:p-8 border',
+          theme === 'light' ? 'bg-white border-gray-200' : 'bg-[#181818] border-gray-700/50'
+        )}>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Left Column: Cover Art & Audio */}
+            <div className="md:col-span-1 space-y-8 flex flex-col items-center md:items-start">
+              {/* Cover Image Upload */}
+              <div className="w-full space-y-2 flex flex-col items-center">
+                <UILabel
+                  htmlFor="cover"
+                  className={cn(
+                    "self-start text-sm font-medium mb-1",
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  )}
                 >
-                  Title
-                </label>
+                  Cover Image (Optional)
+                </UILabel>
+                {/* New Cover Upload Area */}
+                <div 
+                  className={cn(
+                    "w-full aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative overflow-hidden group",
+                    theme === "dark" ? "border-gray-600 hover:border-gray-500 bg-white/5" : "border-gray-300 hover:border-gray-400 bg-gray-50"
+                  )}
+                  onClick={handleCoverClick}
+                >
+                  {previewImage ? (
+                    <img src={previewImage} alt="Track cover preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center p-4">
+                      <Upload className={cn("h-12 w-12 mx-auto mb-3", theme === 'dark' ? 'text-gray-500' : 'text-gray-400')} />
+                      <p className={cn("font-medium", theme === 'dark' ? 'text-gray-300' : 'text-gray-600')}>Click to upload cover</p>
+                      <p className={cn("text-xs mt-1", theme === 'dark' ? 'text-gray-500' : 'text-gray-400')}>PNG, JPG, GIF up to 10MB</p>
+                    </div>
+                  )}
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-white text-sm font-medium">{previewImage ? 'Change Cover' : 'Upload Cover'}</p>
+                  </div>
+                </div>
                 <input
+                  ref={coverFileInputRef}
+                  type="file"
+                  id="cover"
+                  name="cover"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                {coverFile && <span className={`mt-1 text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{coverFile.name}</span>}
+              </div>
+
+              {/* Audio File Upload */}
+              <div className="w-full space-y-2">
+                <UILabel
+                  htmlFor="audio-display"
+                  className={cn(
+                    "block text-sm font-medium",
+                    theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                  )}
+                >
+                  Audio File *
+                </UILabel>
+                {/* Hidden Actual Input */}
+                <input
+                  ref={audioFileInputRef}
+                  type="file"
+                  id="audio"
+                  name="audio"
+                  accept="audio/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  required
+                />
+                {/* Custom Audio Upload Button/Display */}
+                <div 
+                  id="audio-display"
+                  onClick={handleAudioInputClick} 
+                  className={cn(
+                    "w-full p-4 rounded-lg border flex items-center justify-center cursor-pointer transition-colors",
+                    theme === 'light' 
+                      ? 'border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-500' 
+                      : 'border-gray-600 bg-white/5 hover:bg-white/10 text-gray-400',
+                    audioFile ? (theme === 'light' ? 'border-green-500 bg-green-50' : 'border-green-700 bg-green-900/20') : (theme === 'light' ? 'hover:border-blue-400' : 'hover:border-blue-600'),
+                    'group'
+                  )}
+                >
+                  {audioFile ? (
+                    <div className="flex flex-col items-center text-center">
+                      <CheckCircle className={cn("h-8 w-8 mb-2", theme === 'light' ? 'text-green-600' : 'text-green-500')} />
+                      <p className={cn("text-sm font-medium break-all", theme === 'light' ? 'text-green-800' : 'text-green-300')}>{audioFile.name}</p>
+                      <p className={cn("text-xs mt-1", theme === 'light' ? 'text-gray-600 group-hover:text-blue-700' : 'text-gray-400 group-hover:text-blue-400')}>
+                        Click to change audio file
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center text-center">
+                      <FileAudio className="h-8 w-8 mb-2" />
+                      <p className="text-sm font-medium">Choose Audio File</p>
+                      <p className="text-xs mt-1">MP3, WAV, FLAC, etc.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Track Details */}
+            <div className="md:col-span-2 space-y-5">
+              {/* Title */}
+              <div className="space-y-1.5">
+                <UILabel htmlFor="title" className={theme === 'light' ? 'text-gray-700' : 'text-white/80'}>Title *</UILabel>
+                <Input
                   type="text"
                   id="title"
                   name="title"
                   value={trackData.title}
                   onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                    ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
-                    }`}
-                  required
-                />
-              </div>
-
-              {/* Type */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="type"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
-                >
-                  Type
-                </label>
-                <select
-                  id="type"
-                  name="type"
-                  value="SINGLE" // Chỉ cho phép chọn Single trong form này
-                  disabled // Vô hiệu hóa không cho thay đổi
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 appearance-none ${ // Thêm appearance-none để tùy chỉnh giao diện dễ hơn nếu muốn
-                    theme === 'light'
-                      ? 'bg-gray-100 border-gray-300 focus:ring-blue-500/20 text-gray-500' // Đổi màu nền và chữ khi disabled
-                      : 'bg-white/[0.05] border-white/[0.1] focus:ring-white/20 text-white/50' // Đổi màu nền và chữ khi disabled
-                    }`}
-                >
-                  <option
-                    value="SINGLE"
-                    className={
-                      theme === 'dark' ? 'bg-[#121212] text-white' : ''
-                    }
-                  >
-                    Single
-                  </option>
-                </select>
-              </div>
-
-              {/* Release Date & Time */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="releaseDate"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
-                >
-                  Release Date & Time
-                </label>
-                <input
-                  type="datetime-local"
-                  id="releaseDate"
-                  name="releaseDate"
-                  value={trackData.releaseDate}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                    ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
-                    } ${theme === 'dark' ? 'date-input-dark' : ''}`} // Thêm class để style riêng cho dark mode nếu cần
+                  className={cn(
+                    'w-full',
+                    theme === 'light' ? 'bg-white border-gray-300' : 'bg-white/[0.07] border-white/[0.1]'
+                  )}
                   required
                 />
               </div>
 
               {/* Featured Artists */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="featuredArtists"
-                  className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                    }`}
-                >
-                  Featured Artists
-                </label>
-                <SearchableSelect
-                  options={availableArtists}
+              <div className="space-y-1.5">
+                <UILabel className={theme === 'dark' ? 'text-white/80' : 'text-gray-700'}>Featured Artists (Optional)</UILabel>
+                <ArtistCreatableSelect
+                  existingArtists={availableArtists}
                   value={featuredArtists}
                   onChange={setFeaturedArtists}
-                  placeholder="Select featured artists..."
-                  multiple={true}
+                  placeholder="Search or add featured artists..."
                 />
               </div>
 
               {/* Genres */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="genres"
-                  className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                    }`}
-                >
-                  Genres *
-                </label>
+              <div className="space-y-1.5">
+                <UILabel className={theme === 'dark' ? 'text-white/80' : 'text-gray-700'}>Genres *</UILabel>
                 <SearchableSelect
                   options={availableGenres}
                   value={selectedGenres}
                   onChange={setSelectedGenres}
                   placeholder="Select genres..."
                   multiple={true}
-                  required={true} // Đánh dấu là bắt buộc
+                  required={true}
+                />
+              </div>
+
+              {/* Release Date & Time */}
+              <div className="space-y-1.5">
+                <UILabel htmlFor="releaseDate" className={theme === 'light' ? 'text-gray-700' : 'text-white/80'}>Release Date & Time *</UILabel>
+                <Input
+                  type="datetime-local"
+                  id="releaseDate"
+                  name="releaseDate"
+                  value={trackData.releaseDate}
+                  onChange={handleInputChange}
+                  className={cn(
+                    'w-full',
+                    theme === 'light' ? 'bg-white border-gray-300' : 'bg-white/[0.07] border-white/[0.1]',
+                    theme === 'dark' ? 'date-input-dark' : ''
+                  )}
+                  required
                 />
               </div>
 
               {/* Display Artist's Default Label (Read-only) */}
               {artistLabelName && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="labelDisplay"
-                    className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
-                  >
-                    Label 
-                  </label>
-                  <input
+                <div className="space-y-1.5">
+                  <UILabel htmlFor="labelDisplay" className={theme === 'dark' ? 'text-white/80' : 'text-gray-700'}>Label</UILabel>
+                  <Input
                     type="text"
                     id="labelDisplay"
                     value={artistLabelName}
                     disabled
-                    className={`w-full px-3 py-2 rounded-md border focus:outline-none ${theme === 'light'
+                    className={cn(
+                      'w-full',
+                      theme === 'light'
                         ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-white/[0.05] border-white/[0.1] text-white/50 cursor-not-allowed'
-                      }`}
+                    )}
                   />
                 </div>
               )}
 
-              {/* Audio File */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="audio"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
-                >
-                  Audio File *
-                </label>
-                <input
-                  type="file"
-                  id="audio"
-                  name="audio"
-                  accept="audio/*"
-                  onChange={handleFileChange}
-                  className={`w-full text-sm rounded-lg border cursor-pointer focus:outline-none ${theme === 'light'
-                    ? 'text-gray-900 border-gray-300 bg-gray-50 focus:border-blue-500'
-                    : 'text-gray-400 border-gray-600 bg-gray-700 placeholder-gray-400 focus:border-blue-500' // Style cho input file
-                    } file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold ${ // Style phần button của input file
-                    theme === 'light' ? 'file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200' : 'file:bg-white/10 file:text-white/80 hover:file:bg-white/20'
-                    }`}
-                  required
-                />
-                {audioFile && <span className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{audioFile.name}</span>}
-              </div>
-
-              {/* Cover Image */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="cover"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
-                >
-                  Cover Image (Optional)
-                </label>
-                <div
-                  className="w-full flex flex-col items-center mb-4 cursor-pointer"
-                  onClick={handleCoverClick} // Cho phép click vào khu vực này để chọn file
-                >
-                  <div
-                    className={`w-40 h-40 rounded-md overflow-hidden border-2 flex items-center justify-center ${theme === 'dark' ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-100'
-                      } hover:opacity-90 transition-opacity relative group`} // Thêm group cho hover effect
-                  >
-                    {previewImage ? (
-                      <img
-                        src={previewImage}
-                        alt="Track cover preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className={`${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'} text-xs text-center p-2`}>
-                        Click to upload cover
-                      </span>
-                    )}
-                    {/* Lớp phủ hiển thị khi hover */}
-                    <div
-                      className={`absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity text-white text-sm`}
-                    >
-                      Choose Cover
-                    </div>
-                  </div>
-                  <input
-                    ref={coverFileInputRef}
-                    type="file"
-                    id="cover"
-                    name="cover"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden" // Ẩn input gốc
-                  />
-                  {/* Hiển thị tên file đã chọn nếu có */}
-                  {coverFile && <span className={`mt-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{coverFile.name}</span>}
-                </div>
-              </div>
-
               {/* Submit Button */}
-              <div className="flex justify-end">
-                <button
+              <div className="flex justify-end pt-4">
+                <Button
                   type="submit"
-                  disabled={isLoading}
-                  className={`px-4 py-2 rounded-md font-medium transition-colors ${theme === 'light'
-                    ? 'bg-gray-900 text-white hover:bg-gray-800'
-                    : 'bg-white text-[#121212] hover:bg-white/90'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  disabled={isLoading || !audioFile || selectedGenres.length === 0}
+                  className={cn(
+                    'px-6 py-2.5', 
+                    theme === 'light'
+                      ? 'bg-gray-900 text-white hover:bg-gray-800'
+                      : 'bg-white text-[#121212] hover:bg-white/90',
+                    'disabled:opacity-50 disabled:cursor-not-allowed'
+                  )}
                 >
                   {isLoading ? 'Creating...' : 'Create Track'}
-                </button>
+                </Button>
               </div>
             </div>
           </form>
@@ -434,10 +422,3 @@ export default function NewTrack() {
     </div>
   );
 }
-
-// Optional: Add specific styles for dark mode date input if needed in your global CSS
-/*
-.date-input-dark::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-}
-*/
