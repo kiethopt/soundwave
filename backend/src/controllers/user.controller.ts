@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as userService from '../services/user.service';
 import { handleError } from '../utils/handle-utils';
 import { getIO, getUserSockets } from '../config/socket'; // Import socket functions
+import { uploadToCloudinary } from '../utils/cloudinary';
 
 // Yêu cầu trở thành Artist (Request Artist Role)
 export const requestToBecomeArtist = async (
@@ -475,18 +476,29 @@ export const submitArtistClaim = async (
   res: Response
 ): Promise<void> => {
   try {
-    // Explicitly type currentUser or access id safely
     const currentUser = req.user as { id: string; [key: string]: any } | undefined;
     if (!currentUser || !currentUser.id) {
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
-    const userId = currentUser.id; // Now userId is definitely a string
-    const { artistProfileId, proof } = req.body;
+    const userId = currentUser.id;
+    const { artistProfileId } = req.body;
+    const files = req.files as Express.Multer.File[];
 
-    if (!artistProfileId || !proof) {
+    if (!artistProfileId || !files || files.length === 0) {
       res.status(400).json({ message: 'Artist profile ID and proof are required.' });
       return;
+    }
+
+    // Upload all files to Cloudinary and collect URLs
+    const proof: string[] = [];
+    for (const file of files) {
+      const resourceType = file.mimetype.startsWith('image/') ? 'image' : 'raw';
+      const result: any = await uploadToCloudinary(file.buffer, {
+        folder: 'artist-claims',
+        resource_type: resourceType,
+      });
+      proof.push(result.secure_url);
     }
 
     const claim = await userService.submitArtistClaim(
@@ -497,20 +509,20 @@ export const submitArtistClaim = async (
 
     res.status(201).json({ message: 'Claim submitted successfully.', claim });
   } catch (error) {
-     if (error instanceof Error) {
-       // Handle specific errors from the service
-       if (error.message.includes('Unauthorized')) {
-         res.status(401).json({ message: error.message });
-       } else if (error.message.includes('not found') || error.message.includes('already associated') || error.message.includes('already verified')) {
-         res.status(404).json({ message: error.message });
-       } else if (error.message.includes('already have a pending claim') || error.message.includes('already been approved') || error.message.includes('was rejected')) {
-         res.status(409).json({ message: error.message }); // 409 Conflict
-       } else {
-         handleError(res, error, 'Submit artist claim');
-       }
-     } else {
-       handleError(res, error, 'Submit artist claim');
-     }
+    if (error instanceof Error) {
+      // Handle specific errors from the service
+      if (error.message.includes('Unauthorized')) {
+        res.status(401).json({ message: error.message });
+      } else if (error.message.includes('not found') || error.message.includes('already associated') || error.message.includes('already verified')) {
+        res.status(404).json({ message: error.message });
+      } else if (error.message.includes('already have a pending claim') || error.message.includes('already been approved') || error.message.includes('was rejected')) {
+        res.status(409).json({ message: error.message });
+      } else {
+        handleError(res, error, 'Submit artist claim');
+      }
+    } else {
+      handleError(res, error, 'Submit artist claim');
+    }
   }
 };
 
@@ -538,3 +550,18 @@ export const getUserClaims = async (
 };
 
 // --- End Artist Claim Controllers ---
+
+// --- Get Claimable Artist Profiles Controller ---
+export const getAllArtistsProfile = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    // Optionally, require authentication (already enforced at route level)
+    const artists = await userService.getAllArtistsProfile();
+    res.json(artists);
+  } catch (error) {
+    handleError(res, error, 'Get claimable artists');
+  }
+};
+// --- End Get Claimable Artist Profiles Controller ---

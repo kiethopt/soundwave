@@ -1595,14 +1595,14 @@ export const getPlayHistory = async (user: any) => {
 /**
  * Submit a request to claim an existing placeholder artist profile.
  */
-export const submitArtistClaim = async (userId: string, artistProfileId: string, proof: string) => {
+export const submitArtistClaim = async (userId: string, artistProfileId: string, proof: string[]) => {
   if (!userId) {
     throw new Error('Unauthorized: User must be logged in to submit a claim.');
   }
   if (!artistProfileId) {
     throw new Error('Artist profile ID is required.');
   }
-  if (!proof || proof.trim() === '') {
+  if (!proof || !Array.isArray(proof) || proof.length === 0) {
     throw new Error('Proof is required to submit a claim.');
   }
 
@@ -1705,3 +1705,35 @@ export const getUserClaims = async (userId: string) => {
 };
 
 // --- End Artist Claim Functions ---
+
+// --- Get Claimable Artist Profiles ---
+/**
+ * Get all artist profiles
+ */
+export const getAllArtistsProfile = async () => {
+  const artists = await prisma.artistProfile.findMany({
+    where: {
+      isActive: true,
+    },
+    select: {
+      id: true,
+      artistName: true,
+      avatar: true,
+      bio: true,
+      userId: true,
+      genres: {
+        select: {
+          genre: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { artistName: 'asc' },
+  });
+  return artists;
+};
+// --- End Get Claimable Artist Profiles ---

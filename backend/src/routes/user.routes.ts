@@ -27,6 +27,7 @@ import {
   getPlayHistory,
   submitArtistClaim,
   getUserClaims,
+  getAllArtistsProfile,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -95,8 +96,15 @@ router.get('/topAlbums', authenticate, getTopAlbums);
 router.get('/playHistory', authenticate, getPlayHistory);
 
 // Artist Claim Routes
-router.post('/artist-claims', authenticate, submitArtistClaim);
+router.post(
+  '/artist-claims',
+  authenticate,
+  upload.array('proof[]'),
+  handleUploadError,
+  submitArtistClaim
+);
 router.get('/artist-claims', authenticate, getUserClaims);
+router.get('/claimable-artists', authenticate, getAllArtistsProfile);
 
 // User profile stats routes (assuming they need authentication)
 router.get('/topAlbums/:id', authenticate, getUserTopAlbums);
@@ -106,5 +114,6 @@ router.get('/genre/topAlbums/:id', authenticate, getGenreTopAlbums);
 router.get('/genre/topTracks/:id', authenticate, getGenreTopTracks);
 router.get('/genre/topArtists/:id', authenticate, getGenreTopArtists);
 router.get('/genre/newestTracks/:id', authenticate, getGenreNewestTracks);
+
 
 export default router;

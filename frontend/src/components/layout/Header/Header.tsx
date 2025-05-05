@@ -695,7 +695,7 @@ export default function Header({
 
                     {user?.role === 'USER' && !user?.artistProfile && !user?.hasPendingArtistRequest && (
                       <Link
-                        href="/request-artist"
+                        href="/choose-artist-action"
                         className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}
                         onClick={() => setShowDropdown(false)}
                         role="menuitem"

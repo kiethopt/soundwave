@@ -1,4 +1,5 @@
 import { ArtistRequestFilters, CreatePlaylistData } from "@/types";
+import { getUserClaims } from '../../../backend/src/controllers/user.controller';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -742,6 +743,18 @@ export const api = {
 
     getPlayHistory: async (token: string) =>
       fetchWithAuth("/api/user/playHistory", { method: "GET" }, token),
+
+    getClaimableArtists: async (token: string) =>
+      fetchWithAuth("/api/user/claimable-artists", { method: "GET" }, token),
+
+    submitArtistClaim: async (token: string, data: FormData) =>
+      fetchWithAuth("/api/user/artist-claims", {
+        method: "POST",
+        body: data,
+      }, token),
+
+    getUserClaims: async (token: string) =>
+      fetchWithAuth("/api/user/artist-claims", { method: "GET" }, token),
   },
 
   artists: {

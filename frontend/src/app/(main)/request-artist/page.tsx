@@ -314,18 +314,14 @@ export default function RequestArtistPage() {
     <div className="min-h-screen space-y-8 bg-gradient-to-b from-[#2c2c2c] to-[#121212] text-white">
       <div className="bg-black/20 border border-white/10 rounded-lg overflow-hidden backdrop-blur-sm p-8">
         <div className="flex items-center justify-between mb-6">
-          <Button
+        <Button
             variant="secondary"
-            asChild
-            className="bg-neutral-700 hover:bg-neutral-600 text-neutral-100"
+            onClick={() => router.back()}
+            className="bg-neutral-700 hover:bg-neutral-600 text-neutral-100 flex items-center gap-2"
+            type="button"
           >
-            <Link
-              href="/"
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back to Home</span>
-            </Link>
+            <ArrowLeft className="w-5 h-5" />
+            <span>Back</span>
           </Button>
           <h1 className="text-3xl font-bold tracking-tight">
             Request to Become an Artist

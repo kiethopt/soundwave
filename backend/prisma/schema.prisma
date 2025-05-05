@@ -352,7 +352,7 @@ model ArtistClaimRequest {
   id                String        @id @default(cuid())
   claimingUserId    String
   artistProfileId   String
-  proof             String
+  proof             String[]
   status            ClaimStatus   @default(PENDING) // PENDING, APPROVED, REJECTED
   submittedAt       DateTime      @default(now())
   reviewedAt        DateTime?
