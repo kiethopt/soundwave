@@ -516,3 +516,50 @@ export interface SearchSuggestion {
     };
   };
 }
+
+// Type for Artist Verification Request (existing)
+export interface ArtistRequest {
+  id: string;
+  artistName: string;
+  bio?: string;
+  socialMediaLinks?: {
+    facebook?: string;
+    twitter?: string;
+    instagram?: string;
+  };
+  verificationRequestedAt: string;
+  avatar?: string;
+  requestedLabelName?: string | null;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  isVerified: boolean;
+}
+
+// --- NEW TYPE for Artist Claim Request --- 
+export interface ArtistClaimRequest {
+  id: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  submittedAt: string;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  proof: string;
+  claimingUser: User; // Full user object
+  artistProfile: {
+    // Information about the profile being claimed
+    id: string;
+    artistName: string;
+    avatar?: string | null;
+    userId?: string | null; // ID of the user currently linked (should be null for claimable profiles)
+    isVerified: boolean; // Status of the profile itself
+  };
+  reviewedByAdmin?: {
+    // Basic info of admin who reviewed
+    id: string;
+    name?: string | null;
+    username?: string | null;
+  } | null;
+}
+// --- End New Type ---

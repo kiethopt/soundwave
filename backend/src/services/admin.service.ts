@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Role, ClaimStatus } from '@prisma/client';
 import { Request } from 'express';
 import prisma from '../config/db';
 import {
@@ -7,6 +7,8 @@ import {
   artistRequestSelect,
   artistRequestDetailsSelect,
   genreSelect,
+  artistClaimRequestSelect,
+  artistClaimRequestDetailsSelect,
 } from '../utils/prisma-selects';
 import { paginate, toBooleanValue } from '../utils/handle-utils';
 import * as fs from 'fs';
@@ -1224,3 +1226,215 @@ ${newLine}`;
     }
   }
 };
+
+// --- Artist Claim Request Management ---
+
+export const getArtistClaimRequests = async (req: Request) => {
+  const { search, startDate, endDate } = req.query;
+
+  const where: Prisma.ArtistClaimRequestWhereInput = {
+    status: ClaimStatus.PENDING, // Only fetch pending requests
+    AND: [],
+  };
+
+  // Add search functionality (search by claiming user name/email or claimed artist name)
+  if (typeof search === 'string' && search.trim()) {
+    const trimmedSearch = search.trim();
+    if (Array.isArray(where.AND)) {
+      where.AND.push({
+        OR: [
+          { claimingUser: { name: { contains: trimmedSearch, mode: 'insensitive' } } },
+          { claimingUser: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
+          { claimingUser: { username: { contains: trimmedSearch, mode: 'insensitive' } } },
+          { artistProfile: { artistName: { contains: trimmedSearch, mode: 'insensitive' } } },
+        ],
+      });
+    }
+  }
+
+  // Add date filtering based on submittedAt
+  const dateFilter: { gte?: Date; lte?: Date } = {};
+  if (typeof startDate === 'string' && startDate) {
+      try {
+          const startOfDay = new Date(startDate);
+          startOfDay.setUTCHours(0, 0, 0, 0);
+          dateFilter.gte = startOfDay;
+      } catch (e) { console.error("Invalid start date format:", startDate); }
+  }
+  if (typeof endDate === 'string' && endDate) {
+      try {
+          const endOfDay = new Date(endDate);
+          endOfDay.setUTCHours(23, 59, 59, 999);
+          dateFilter.lte = endOfDay;
+      } catch (e) { console.error("Invalid end date format:", endDate); }
+  }
+  if (dateFilter.gte || dateFilter.lte) {
+      if (Array.isArray(where.AND)) {
+          where.AND.push({ submittedAt: dateFilter });
+      }
+  }
+
+  const options = {
+    where,
+    select: artistClaimRequestSelect, // Use the imported select
+    orderBy: { submittedAt: 'desc' },
+  };
+
+  // Assuming ArtistClaimRequest model exists and using paginate function
+  const result = await paginate<any>(prisma.artistClaimRequest, req, options);
+
+  return {
+    claimRequests: result.data,
+    pagination: result.pagination,
+  };
+};
+
+export const getArtistClaimRequestDetail = async (claimId: string) => {
+  const claimRequest = await prisma.artistClaimRequest.findUnique({
+    where: { id: claimId },
+    select: artistClaimRequestDetailsSelect, // Use the imported select
+  });
+
+  if (!claimRequest) {
+    throw new Error('Artist claim request not found.');
+  }
+
+  // Check if the profile is still claimable (not verified, not linked)
+  if (claimRequest.artistProfile.user?.id || claimRequest.artistProfile.isVerified) {
+    // If the request is PENDING but profile is already claimed/verified, mark request as REJECTED maybe?
+    // Or just throw an error indicating it's no longer claimable. Let's throw for now.
+    if (claimRequest.status === ClaimStatus.PENDING) {
+       console.warn(`Claim request ${claimId} is pending but target profile ${claimRequest.artistProfile.id} seems already claimed/verified.`);
+       // Optionally auto-reject here
+       // await prisma.artistClaimRequest.update({ where: { id: claimId }, data: { status: ClaimStatus.REJECTED, rejectionReason: 'Profile already claimed or verified.' }});
+       // throw new Error('This artist profile is no longer available for claiming.');
+    }
+  }
+
+  return claimRequest;
+};
+
+export const approveArtistClaim = async (claimId: string, adminUserId: string) => {
+  const claimRequest = await prisma.artistClaimRequest.findUnique({
+    where: { id: claimId },
+    select: {
+      id: true,
+      status: true,
+      claimingUserId: true,
+      artistProfileId: true,
+      artistProfile: { select: { userId: true, isVerified: true } } // Check target profile status
+    }
+  });
+
+  if (!claimRequest) {
+    throw new Error('Artist claim request not found.');
+  }
+
+  if (claimRequest.status !== ClaimStatus.PENDING) {
+    throw new Error(`Cannot approve claim request with status: ${claimRequest.status}`);
+  }
+
+  // Double-check if the target profile is still available before approving
+  if (claimRequest.artistProfile.userId || claimRequest.artistProfile.isVerified) {
+     // Optionally auto-reject here instead of throwing
+     await prisma.artistClaimRequest.update({
+       where: { id: claimId },
+       data: {
+         status: ClaimStatus.REJECTED,
+         rejectionReason: 'Profile became unavailable before approval.',
+         reviewedAt: new Date(),
+         reviewedByAdminId: adminUserId
+       }
+     });
+    throw new Error('Target artist profile is no longer available for claiming.');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    // 1. Update the Claim Request status
+    const updatedClaim = await tx.artistClaimRequest.update({
+      where: { id: claimId },
+      data: {
+        status: ClaimStatus.APPROVED,
+        reviewedAt: new Date(),
+        reviewedByAdminId: adminUserId,
+        rejectionReason: null,
+      },
+      select: { id: true, claimingUserId: true, artistProfileId: true } // Select IDs needed
+    });
+
+    // 2. Update the Artist Profile
+    const updatedProfile = await tx.artistProfile.update({
+      where: { id: updatedClaim.artistProfileId },
+      data: {
+        userId: updatedClaim.claimingUserId, // Link user to profile
+        isVerified: true, // Mark as verified
+        verifiedAt: new Date(),
+        role: Role.ARTIST, // Ensure role is ARTIST
+        // Reset any pending verification request fields if they exist (optional but good practice)
+        verificationRequestedAt: null,
+        requestedLabelName: null,
+      },
+       select: { id: true, artistName: true } // Select some profile info for return/logging
+    });
+
+    // 3. Update the User's role and current profile (Optional but recommended)
+    // Set currentProfile to ARTIST so they see the artist dashboard upon next login/refresh
+    await tx.user.update({
+        where: { id: updatedClaim.claimingUserId },
+        data: {
+            role: Role.ARTIST, // Change user role to ARTIST
+            currentProfile: 'ARTIST',
+        }
+    });
+
+
+    // TODO: Add notification/email logic here later
+
+    return {
+      message: `Claim approved. Profile '${updatedProfile.artistName}' is now linked to user ${updatedClaim.claimingUserId}.`,
+      claimId: updatedClaim.id,
+      artistProfileId: updatedProfile.id,
+      userId: updatedClaim.claimingUserId,
+    };
+  });
+};
+
+export const rejectArtistClaim = async (claimId: string, adminUserId: string, reason: string) => {
+  const claimRequest = await prisma.artistClaimRequest.findUnique({
+    where: { id: claimId },
+     select: { id: true, status: true, claimingUserId: true }
+  });
+
+  if (!claimRequest) {
+    throw new Error('Artist claim request not found.');
+  }
+
+  if (claimRequest.status !== ClaimStatus.PENDING) {
+    throw new Error(`Cannot reject claim request with status: ${claimRequest.status}`);
+  }
+
+  if (!reason || reason.trim() === '') {
+    throw new Error('Rejection reason is required.');
+  }
+
+  const rejectedClaim = await prisma.artistClaimRequest.update({
+    where: { id: claimId },
+    data: {
+      status: ClaimStatus.REJECTED,
+      rejectionReason: reason.trim(),
+      reviewedAt: new Date(),
+      reviewedByAdminId: adminUserId,
+    },
+    select: { id: true, claimingUserId: true } // Select needed IDs
+  });
+
+  // TODO: Add notification/email logic here later
+
+  return {
+    message: 'Artist claim request rejected successfully.',
+    claimId: rejectedClaim.id,
+    userId: rejectedClaim.claimingUserId
+  };
+};
+
+// --- End Artist Claim Request Management ---

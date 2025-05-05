@@ -783,3 +783,27 @@ export const artistRequestDetailsSelect = {
     select: trackSelect,
   },
 };
+
+// --- Select cho Artist Claim Request ---
+export const artistClaimRequestSelect = {
+  id: true,
+  status: true,
+  submittedAt: true,
+  claimingUser: { select: { id: true, name: true, username: true, email: true, avatar: true } }, // Claiming user info
+  artistProfile: { select: { id: true, artistName: true, avatar: true, userId: true, isVerified: true } }, // Claimed profile basic info
+};
+
+// Select chi tiết cho một Claim Request
+export const artistClaimRequestDetailsSelect = {
+  id: true,
+  status: true,
+  submittedAt: true,
+  proof: true, // Include the proof
+  reviewedAt: true,
+  rejectionReason: true,
+  claimingUser: { select: userSelect }, // Full claiming user details
+  artistProfile: { // Full claimed profile details
+    select: artistProfileSelect // Reuse the detailed artist profile select
+  },
+  reviewedByAdmin: { select: { id: true, name: true, username: true } }, // Admin who reviewed
+};

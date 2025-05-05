@@ -8,7 +8,7 @@ import {
 import prisma from '../config/db';
 import * as adminService from '../services/admin.service';
 import * as emailService from '../services/email.service';
-import { User as PrismaUser, Role } from '@prisma/client';
+import { User as PrismaUser, Role, ClaimStatus } from '@prisma/client';
 import { getIO, getUserSockets } from '../config/socket';
 
 // Define User type including adminLevel for controller scope
@@ -361,18 +361,22 @@ export const approveArtistRequest = async (
 
     // --- Gửi thông báo & email (logic cũ) ---
     // Create notification
-    await prisma.notification.create({
-      data: {
-        type: 'ARTIST_REQUEST_APPROVE',
-        message: 'Your request to become an Artist has been approved!',
-        recipientType: 'USER',
-        userId: updatedProfile.user.id,
-        isRead: false,
-      },
-    });
+    if (updatedProfile?.user?.id) {
+        await prisma.notification.create({
+          data: {
+            type: 'ARTIST_REQUEST_APPROVE',
+            message: 'Your request to become an Artist has been approved!',
+            recipientType: 'USER',
+            userId: updatedProfile.user.id,
+            isRead: false,
+          },
+        });
+    } else {
+        console.warn(`[Approve Request] Cannot create notification: User data missing in updatedProfile.`);
+    }
 
     // Send email
-    if (updatedProfile.user.email) {
+    if (updatedProfile?.user?.email) {
       try {
         const emailOptions = emailService.createArtistRequestApprovedEmail(
           updatedProfile.user.email,
@@ -385,7 +389,7 @@ export const approveArtistRequest = async (
       }
     } else {
       console.warn(
-        `Could not send approval email: No email found for user ${updatedProfile.user.id}`
+        `Could not send approval email: No email found for user ${updatedProfile?.user?.id ?? 'unknown'}`
       );
     }
 
@@ -424,18 +428,22 @@ export const rejectArtistRequest = async (
     }
 
     // Create notification
-    await prisma.notification.create({
-      data: {
-        type: 'ARTIST_REQUEST_REJECT',
-        message: notificationMessage,
-        recipientType: 'USER',
-        userId: result.user.id,
-        isRead: false,
-      },
-    });
+    if (result?.user?.id) {
+        await prisma.notification.create({
+          data: {
+            type: 'ARTIST_REQUEST_REJECT',
+            message: notificationMessage,
+            recipientType: 'USER',
+            userId: result.user.id,
+            isRead: false,
+          },
+        });
+    } else {
+         console.warn(`[Reject Request] Cannot create notification: User data missing in result.`);
+    }
 
     // Send email
-    if (result.user.email) {
+    if (result?.user?.email) {
       try {
         const emailOptions = emailService.createArtistRequestRejectedEmail(
           result.user.email,
@@ -449,7 +457,7 @@ export const rejectArtistRequest = async (
       }
     } else {
       console.warn(
-        `Could not send rejection email: No email found for user ${result.user.id}`
+        `Could not send rejection email: No email found for user ${result?.user?.id ?? 'unknown'}`
       );
     }
 
@@ -563,3 +571,114 @@ export const getSystemStatus = async (
     handleError(res, error, 'Get system status');
   }
 };
+
+// --- Artist Claim Request Controllers ---
+
+export const getAllArtistClaimRequests = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Assuming authentication middleware adds req.user
+    if (!req.user || req.user.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden: Admin access required.' });
+      return;
+    }
+    const { claimRequests, pagination } = await adminService.getArtistClaimRequests(req);
+    res.json({ claimRequests, pagination });
+  } catch (error) {
+    handleError(res, error, 'Get artist claim requests');
+  }
+};
+
+export const getArtistClaimRequestDetail = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Assuming authentication middleware adds req.user
+     if (!req.user || req.user.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden: Admin access required.' });
+      return;
+    }
+    const { id } = req.params; // Assuming id is the claim request ID
+    if (!id) {
+      res.status(400).json({ message: 'Claim Request ID is required.' });
+      return;
+    }
+    const claimRequest = await adminService.getArtistClaimRequestDetail(id);
+    res.json(claimRequest);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('not found')) {
+      res.status(404).json({ message: error.message });
+      return;
+    }
+     if (error instanceof Error && error.message.includes('no longer available')) {
+      res.status(409).json({ message: error.message }); // 409 Conflict
+      return;
+    }
+    handleError(res, error, 'Get artist claim request detail');
+  }
+};
+
+export const approveArtistClaimRequest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = req.user as UserWithAdminLevel; // Ensure req.user is properly typed
+    if (!adminUser || adminUser.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden: Admin access required.' });
+      return;
+    }
+    const { id } = req.params; // Assuming id is the claim request ID
+    if (!id) {
+      res.status(400).json({ message: 'Claim Request ID is required.' });
+      return;
+    }
+
+    const result = await adminService.approveArtistClaim(id, adminUser.id);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error) {
+        if (error.message.includes('not found')) {
+            res.status(404).json({ message: error.message });
+            return;
+        }
+        if (error.message.includes('Cannot approve claim request') || error.message.includes('no longer available')) {
+            res.status(409).json({ message: error.message }); // 409 Conflict
+            return;
+        }
+    }
+    handleError(res, error, 'Approve artist claim request');
+  }
+};
+
+export const rejectArtistClaimRequest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminUser = req.user as UserWithAdminLevel;
+    if (!adminUser || adminUser.role !== Role.ADMIN) {
+      res.status(403).json({ message: 'Forbidden: Admin access required.' });
+      return;
+    }
+    const { id } = req.params; // Assuming id is the claim request ID
+    const { reason } = req.body;
+
+    if (!id) {
+      res.status(400).json({ message: 'Claim Request ID is required.' });
+      return;
+    }
+    if (!reason || typeof reason !== 'string' || reason.trim() === '') {
+      res.status(400).json({ message: 'Rejection reason is required.' });
+      return;
+    }
+
+    const result = await adminService.rejectArtistClaim(id, adminUser.id, reason);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error) {
+        if (error.message.includes('not found')) {
+            res.status(404).json({ message: error.message });
+            return;
+        }
+        if (error.message.includes('Cannot reject claim request') || error.message.includes('Rejection reason is required')) {
+            res.status(400).json({ message: error.message });
+            return;
+        }
+     }
+    handleError(res, error, 'Reject artist claim request');
+  }
+};
+
+// --- End Artist Claim Request Controllers ---

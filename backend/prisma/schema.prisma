@@ -350,10 +350,9 @@ model UserLikeTrack {
 
 model ArtistClaimRequest {
   id                String        @id @default(cuid())
-  claimingUserId    String        // ID of the User submitting the claim
-  artistProfileId   String        // ID of the placeholder ArtistProfile being claimed
-  proof             String        // Text description or link to proof
-  // Optional: Add fields for uploaded proof files if needed
+  claimingUserId    String
+  artistProfileId   String
+  proof             String
   status            ClaimStatus   @default(PENDING) // PENDING, APPROVED, REJECTED
   submittedAt       DateTime      @default(now())
   reviewedAt        DateTime?
@@ -364,7 +363,7 @@ model ArtistClaimRequest {
   artistProfile     ArtistProfile @relation("ClaimedProfile", fields: [artistProfileId], references: [id], onDelete: Cascade)
   reviewedByAdmin   User?         @relation("ReviewingAdmin", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
 
-  @@unique([claimingUserId, artistProfileId]) // A user can only claim a specific profile once
+  @@unique([claimingUserId, artistProfileId])
   @@index([status])
   @@index([submittedAt])
   @@index([artistProfileId])

@@ -530,6 +530,67 @@ export const api = {
         token
       );
     },
+
+    // --- Artist Claim Requests --- 
+    getArtistClaimRequests: async (
+      token: string,
+      page: number = 1,
+      limit: number = 10,
+      filters?: ArtistRequestFilters
+    ) => {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      if (filters) {
+        if (filters.startDate) {
+          params.append("startDate", filters.startDate);
+        }
+        if (filters.endDate) {
+          params.append("endDate", filters.endDate);
+        }
+        if (filters.search) {
+          params.append("search", filters.search);
+        }
+      }
+
+      return fetchWithAuth(
+        `/api/admin/artist-claims?${params.toString()}`,
+        { method: "GET" },
+        token
+      );
+    },
+
+    getArtistClaimRequestDetail: async (claimId: string, token: string) =>
+      fetchWithAuth(
+        `/api/admin/artist-claims/${claimId}`,
+        { method: "GET" },
+        token
+      ),
+
+    approveArtistClaim: async (claimId: string, token: string) =>
+      fetchWithAuth(
+        `/api/admin/artist-claims/${claimId}/approve`,
+        {
+          method: "POST",
+        },
+        token
+      ),
+
+    rejectArtistClaim: async (
+      claimId: string,
+      reason: string,
+      token: string
+    ) =>
+      fetchWithAuth(
+        `/api/admin/artist-claims/${claimId}/reject`,
+        {
+          method: "POST",
+          body: JSON.stringify({ reason }),
+        },
+        token
+      ),
   },
 
   user: {

@@ -20,6 +20,10 @@ import {
   handleCacheStatus,
   handleAIModelStatus,
   getSystemStatus,
+  getAllArtistClaimRequests,
+  getArtistClaimRequestDetail,
+  approveArtistClaimRequest,
+  rejectArtistClaimRequest,
 } from '../controllers/admin.controller';
 import * as genreController from '../controllers/genre.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
@@ -159,5 +163,34 @@ router.get(
   authorize([Role.ADMIN]),
   getSystemStatus
 );
+
+// --- Artist Claim Request Routes ---
+router.get(
+  '/artist-claims',
+  authenticate,
+  authorize([Role.ADMIN]),
+  getAllArtistClaimRequests
+);
+router.get(
+  '/artist-claims/:id',
+  authenticate,
+  authorize([Role.ADMIN]),
+  cacheMiddleware,
+  getArtistClaimRequestDetail
+);
+router.post(
+  '/artist-claims/:id/approve',
+  authenticate,
+  authorize([Role.ADMIN]),
+  approveArtistClaimRequest
+);
+router.post(
+  '/artist-claims/:id/reject',
+  authenticate,
+  authorize([Role.ADMIN]),
+  rejectArtistClaimRequest
+);
+// Note: We might not need a specific DELETE for claims, rejecting usually suffices.
+// --- End Artist Claim Request Routes ---
 
 export default router;
