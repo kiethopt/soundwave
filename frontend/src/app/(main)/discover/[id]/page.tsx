@@ -76,11 +76,10 @@ export default function DiscoveryGenrePage({
           api.playlists.getUserSystemPlaylist(),
         ]);
 
-        const newestTrack = newest.filter((track: { type: string; }) => track.type === "SINGLE");
         setTopAlbums(albums);
         setTopTracks(tracks);
         setTopArtists(artists);
-        setNewestTracks(newestTrack);
+        setNewestTracks(newest);
 
         const sortedGenreSystemPlaylists = sortSystemPlaylists(systemPlaylists, id);
         console.log('Sorted Genre System Playlists:', sortedGenreSystemPlaylists);
