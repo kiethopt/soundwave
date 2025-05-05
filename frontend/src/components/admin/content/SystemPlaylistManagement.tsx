@@ -22,7 +22,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { Playlist } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
-import { SystemPlaylistModal, SystemPlaylistDetailModal } from "@/components/ui/admin-modals";
+import {
+  SystemPlaylistModal,
+  SystemPlaylistDetailModal,
+} from "@/components/ui/admin-modals";
 
 interface SortConfig {
   key:
@@ -298,10 +301,13 @@ export const SystemPlaylistManagement: React.FC<{
     });
   };
 
-  const handleRowClick = (playlist: Playlist, e: React.MouseEvent<HTMLTableRowElement>) => {
+  const handleRowClick = (
+    playlist: Playlist,
+    e: React.MouseEvent<HTMLTableRowElement>
+  ) => {
     const target = e.target as HTMLElement;
-    if (target.closest('[role="checkbox"]') || target.closest('button')) {
-        return;
+    if (target.closest('[role="checkbox"]') || target.closest("button")) {
+      return;
     }
     setViewingPlaylist(playlist);
     setIsDetailModalOpen(true);
@@ -446,19 +452,19 @@ export const SystemPlaylistManagement: React.FC<{
                 </>
               )}
             </Button>
-            <Button
-              variant="outline"
+            {/* <Button
+              variant=\"outline\"
               className={`${
-                theme === "dark"
-                  ? "bg-white/10 hover:bg-white/20 text-white border-white/20"
-                  : ""
+                theme === \"dark\"
+                  ? \"bg-white/10 hover:bg-white/20 text-white border-white/20\"
+                  : \"\"
               }`}
               disabled
             >
-              <Calendar className="mr-2 h-4 w-4" />
+              <Calendar className=\"mr-2 h-4 w-4\" />
               Schedule Update
-              <span className="ml-2 text-xs opacity-70">(Coming Soon)</span>
-            </Button>
+              <span className=\"ml-2 text-xs opacity-70\">(Coming Soon)</span>
+            </Button> */}
           </div>
 
           <div className="flex items-center justify-between gap-2 mb-4 mt-6">
@@ -646,7 +652,10 @@ export const SystemPlaylistManagement: React.FC<{
                               : ""
                           }`}
                         >
-                          <td className="w-4 p-4" onClick={(e) => e.stopPropagation()}>
+                          <td
+                            className="w-4 p-4"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <Checkbox
                               id={`select-row-${playlist.id}`}
                               checked={selectedPlaylistIds.has(playlist.id)}
@@ -714,12 +723,17 @@ export const SystemPlaylistManagement: React.FC<{
                             {formatPlaylistDate(playlist.createdAt)}
                           </td>
                           <td className="py-4 px-6">
-                            <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <div
+                              className="flex items-center justify-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${
-                                    theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'
+                                  theme === "dark"
+                                    ? "hover:bg-blue-500/20"
+                                    : "hover:bg-blue-100"
                                 }`}
                                 onClick={(e) => {
                                   e.stopPropagation();

@@ -3161,7 +3161,7 @@ export function SystemPlaylistModal({
                     </div>
                     {isAIGenerated && (
                       <div className="grid grid-cols-2 gap-4">
-                        <div>
+                        {/* <div>
                           <UILabel
                             htmlFor="basedOnMood"
                             className={theme === "dark" ? "text-white" : ""}
@@ -3179,7 +3179,7 @@ export function SystemPlaylistModal({
                                 : ""
                             }
                           />
-                        </div>
+                        </div> */}
                         <div>
                           <UILabel
                             htmlFor="basedOnGenre"
@@ -4719,95 +4719,165 @@ export function SystemPlaylistDetailModal({
                 </p>
 
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1 text-sm mt-2">
-                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
                       playlist.type === "SYSTEM"
                         ? theme === "dark"
                           ? "bg-purple-900 text-purple-300"
                           : "bg-purple-100 text-purple-800"
                         : theme === "dark"
-                          ? "bg-blue-900 text-blue-300"
-                          : "bg-blue-100 text-blue-800"
-                    }`}>
-                      {playlist.type?.toLowerCase() || 'N/A'}
-                   </span>
-                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                        ? "bg-blue-900 text-blue-300"
+                        : "bg-blue-100 text-blue-800"
+                    }`}
+                  >
+                    {playlist.type?.toLowerCase() || "N/A"}
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
                       playlist.privacy === "PUBLIC"
                         ? theme === "dark"
                           ? "bg-green-900 text-green-300"
                           : "bg-green-100 text-green-800"
                         : theme === "dark"
-                          ? "bg-yellow-900 text-yellow-300"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}>
-                     {playlist.privacy?.toLowerCase() || 'N/A'}
-                   </span>
-                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+                        ? "bg-yellow-900 text-yellow-300"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {playlist.privacy?.toLowerCase() || "N/A"}
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
                       playlist.isAIGenerated
                         ? theme === "dark"
                           ? "bg-teal-900 text-teal-300"
                           : "bg-teal-100 text-teal-800"
                         : theme === "dark"
-                          ? "bg-gray-700 text-gray-300"
-                          : "bg-gray-100 text-gray-800"
-                    }`}>
-                     AI Generated: {formatBoolean(playlist.isAIGenerated)}
-                   </span>
+                        ? "bg-gray-700 text-gray-300"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    AI Generated: {formatBoolean(playlist.isAIGenerated)}
+                  </span>
                 </div>
               </div>
             </div>
 
-             {/* AI Generation Parameters */}
-             {playlist.isAIGenerated && (
-               <div className={`rounded-xl p-4 md:p-6 border ${
-                    theme === 'light'
-                      ? 'bg-gray-50/80 border-gray-200'
-                      : 'bg-white/5 border-white/10'
-                  }`}>
-                 <h3 className={`text-lg font-semibold mb-4 ${
-                     theme === 'light' ? 'text-gray-800' : 'text-white/90'
-                   }`}>
-                   AI Generation Parameters
-                 </h3>
-                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                   <div>
-                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Based on Mood:</span>
-                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
-                       {formatValue((playlist as any).basedOnMood)}
-                     </p>
-                   </div>
-                   <div>
-                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Based on Genre:</span>
-                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
-                       {formatValue((playlist as any).basedOnGenre)}
-                     </p>
-                   </div>
-                   <div>
-                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Based on Artist:</span>
-                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
-                       {formatValue((playlist as any).basedOnArtist)}
-                     </p>
-                   </div>
-                   <div>
-                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Based on Song Length (s):</span>
-                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
-                       {formatValue((playlist as any).basedOnSongLength)}
-                     </p>
-                   </div>
-                   <div>
-                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Based on Release Time:</span>
-                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
-                       {formatValue((playlist as any).basedOnReleaseTime)}
-                     </p>
-                   </div>
-                   <div>
-                     <span className={theme === 'light' ? 'text-gray-500' : 'text-white/60'}>Target Track Count:</span>
-                     <p className={`font-medium mt-0.5 ${theme === 'light' ? 'text-gray-900' : 'text-white/90'}`}>
-                       {formatValue((playlist as any).trackCount)}
-                     </p>
-                   </div>
-                 </div>
-               </div>
-             )}
+            {/* AI Generation Parameters */}
+            {playlist.isAIGenerated && (
+              <div
+                className={`rounded-xl p-4 md:p-6 border ${
+                  theme === "light"
+                    ? "bg-gray-50/80 border-gray-200"
+                    : "bg-white/5 border-white/10"
+                }`}
+              >
+                <h3
+                  className={`text-lg font-semibold mb-4 ${
+                    theme === "light" ? "text-gray-800" : "text-white/90"
+                  }`}
+                >
+                  AI Generation Parameters
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span
+                      className={
+                        theme === "light" ? "text-gray-500" : "text-white/60"
+                      }
+                    >
+                      Based on Mood:
+                    </span>
+                    <p
+                      className={`font-medium mt-0.5 ${
+                        theme === "light" ? "text-gray-900" : "text-white/90"
+                      }`}
+                    >
+                      {formatValue((playlist as any).basedOnMood)}
+                    </p>
+                  </div>
+                  <div>
+                    <span
+                      className={
+                        theme === "light" ? "text-gray-500" : "text-white/60"
+                      }
+                    >
+                      Based on Genre:
+                    </span>
+                    <p
+                      className={`font-medium mt-0.5 ${
+                        theme === "light" ? "text-gray-900" : "text-white/90"
+                      }`}
+                    >
+                      {formatValue((playlist as any).basedOnGenre)}
+                    </p>
+                  </div>
+                  <div>
+                    <span
+                      className={
+                        theme === "light" ? "text-gray-500" : "text-white/60"
+                      }
+                    >
+                      Based on Artist:
+                    </span>
+                    <p
+                      className={`font-medium mt-0.5 ${
+                        theme === "light" ? "text-gray-900" : "text-white/90"
+                      }`}
+                    >
+                      {formatValue((playlist as any).basedOnArtist)}
+                    </p>
+                  </div>
+                  <div>
+                    <span
+                      className={
+                        theme === "light" ? "text-gray-500" : "text-white/60"
+                      }
+                    >
+                      Based on Song Length (s):
+                    </span>
+                    <p
+                      className={`font-medium mt-0.5 ${
+                        theme === "light" ? "text-gray-900" : "text-white/90"
+                      }`}
+                    >
+                      {formatValue((playlist as any).basedOnSongLength)}
+                    </p>
+                  </div>
+                  <div>
+                    <span
+                      className={
+                        theme === "light" ? "text-gray-500" : "text-white/60"
+                      }
+                    >
+                      Based on Release Time:
+                    </span>
+                    <p
+                      className={`font-medium mt-0.5 ${
+                        theme === "light" ? "text-gray-900" : "text-white/90"
+                      }`}
+                    >
+                      {formatValue((playlist as any).basedOnReleaseTime)}
+                    </p>
+                  </div>
+                  <div>
+                    <span
+                      className={
+                        theme === "light" ? "text-gray-500" : "text-white/60"
+                      }
+                    >
+                      Target Track Count:
+                    </span>
+                    <p
+                      className={`font-medium mt-0.5 ${
+                        theme === "light" ? "text-gray-900" : "text-white/90"
+                      }`}
+                    >
+                      {formatValue((playlist as any).trackCount)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>
