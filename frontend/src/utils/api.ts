@@ -1,5 +1,4 @@
 import { ArtistRequestFilters, CreatePlaylistData } from "@/types";
-import { getUserClaims } from '../../../backend/src/controllers/user.controller';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
