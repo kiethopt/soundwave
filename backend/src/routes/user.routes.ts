@@ -28,6 +28,7 @@ import {
   submitArtistClaim,
   getUserClaims,
   getAllArtistsProfile,
+  getDiscoverGenres,
 } from '../controllers/user.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
@@ -105,6 +106,9 @@ router.post(
 );
 router.get('/artist-claims', authenticate, getUserClaims);
 router.get('/claimable-artists', authenticate, getAllArtistsProfile);
+
+// Discover Genres Route
+router.get('/discover-genres', authenticate, getDiscoverGenres);
 
 // User profile stats routes (assuming they need authentication)
 router.get('/topAlbums/:id', authenticate, getUserTopAlbums);

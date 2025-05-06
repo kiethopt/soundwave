@@ -31,6 +31,17 @@ export default function SettingsPage() {
       try {
         setIsLoading(true);
         const userData = await api.auth.getMe(token);
+
+        // --- Redirect if Admin or Artist --- 
+        if (userData.role === 'ADMIN') {
+          router.push('/admin/dashboard');
+          return;
+        } else if (userData.currentProfile === 'ARTIST') {
+          router.push('/artist/dashboard');
+          return;
+        }
+        // --- End Redirect ---
+
         setShowSocialLists(userData.followVisibility || false);
         
         // Load other settings from localStorage

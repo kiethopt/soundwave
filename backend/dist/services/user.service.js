@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
+exports.getAllArtistsProfile = exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreTopArtists = exports.getGenreNewestTracks = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.editProfile = exports.getDiscoverGenres = exports.getAllGenres = exports.getArtistRequest = exports.requestArtistRole = exports.getUserFollowing = exports.getUserFollowers = exports.unfollowTarget = exports.followTarget = exports.search = exports.validateArtistData = void 0;
 const db_1 = __importDefault(require("../config/db"));
 const client_1 = require("@prisma/client");
 const upload_service_1 = require("./upload.service");
@@ -663,6 +663,26 @@ const getAllGenres = async () => {
     return genres;
 };
 exports.getAllGenres = getAllGenres;
+const getDiscoverGenres = async () => {
+    const genres = await db_1.default.genre.findMany({
+        where: {
+            OR: [
+                { tracks: { some: { track: { isActive: true } } } },
+                { albums: { some: { album: { isActive: true } } } },
+                { artistProfiles: { some: { artistProfile: { isActive: true, isVerified: true } } } }
+            ],
+        },
+        select: {
+            id: true,
+            name: true,
+        },
+        orderBy: {
+            name: 'asc',
+        },
+    });
+    return genres;
+};
+exports.getDiscoverGenres = getDiscoverGenres;
 const editProfile = async (user, profileData, avatarFile) => {
     if (!user) {
         throw new Error('Unauthorized');
@@ -1390,7 +1410,7 @@ const submitArtistClaim = async (userId, artistProfileId, proof) => {
     if (!artistProfileId) {
         throw new Error('Artist profile ID is required.');
     }
-    if (!proof || proof.trim() === '') {
+    if (!proof || !Array.isArray(proof) || proof.length === 0) {
         throw new Error('Proof is required to submit a claim.');
     }
     const targetProfile = await db_1.default.artistProfile.findUnique({
@@ -1475,4 +1495,31 @@ const getUserClaims = async (userId) => {
     return claims;
 };
 exports.getUserClaims = getUserClaims;
+const getAllArtistsProfile = async () => {
+    const artists = await db_1.default.artistProfile.findMany({
+        where: {
+            isActive: true,
+        },
+        select: {
+            id: true,
+            artistName: true,
+            avatar: true,
+            bio: true,
+            userId: true,
+            genres: {
+                select: {
+                    genre: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
+                },
+            },
+        },
+        orderBy: { artistName: 'asc' },
+    });
+    return artists;
+};
+exports.getAllArtistsProfile = getAllArtistsProfile;
 //# sourceMappingURL=user.service.js.map

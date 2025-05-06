@@ -7,7 +7,6 @@ import {
   searchAlbum,
   addTracksToAlbum,
   getAllAlbums,
-  playAlbum,
   toggleAlbumVisibility,
   getNewestAlbums,
   getHotAlbums,
@@ -63,9 +62,6 @@ router.post(
 
 // Route tìm kiếm album (có cache)
 router.get('/search', authenticate, cacheMiddleware, searchAlbum);
-
-// Route phát album
-router.post('/:albumId/play', authenticate, cacheMiddleware, playAlbum);
 
 // Public routes
 router.get('/newest', cacheMiddleware, getNewestAlbums);

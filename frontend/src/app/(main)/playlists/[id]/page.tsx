@@ -112,16 +112,12 @@ export default function PlaylistPage() {
   const { dominantColor } = useDominantColor(playlist?.coverUrl);
 
   // Check if this is a special system playlist
-  const isVibeRewindPlaylist =
-    playlist?.name === "Vibe Rewind" ||
-    (playlist?.type === "SYSTEM" && playlist?.name === "Vibe Rewind");
   const isFavoritePlaylist = playlist?.type === "FAVORITE";
   const isWelcomeMixPlaylist =
     playlist?.name === "Welcome Mix" ||
     (playlist?.type === "SYSTEM" && playlist?.name === "Welcome Mix");
   const isSpecialPlaylist =
     isFavoritePlaylist ||
-    isVibeRewindPlaylist ||
     isWelcomeMixPlaylist ||
     playlist?.type === "SYSTEM";
 
@@ -130,7 +126,6 @@ export default function PlaylistPage() {
     !playlist?.isAIGenerated &&
     playlist?.type !== "FAVORITE" &&
     playlist?.type !== "SYSTEM" &&
-    playlist?.name !== "Vibe Rewind" &&
     playlist?.name !== "Welcome Mix";
 
   const canEditPlaylist = playlist?.canEdit && playlist?.type === "NORMAL";
@@ -771,14 +766,6 @@ export default function PlaylistPage() {
               </Badge>
             )}
             {/* System Playlist Badges */}
-            {isVibeRewindPlaylist && (
-              <Badge
-                variant="secondary"
-                className="text-xs font-medium rounded-full px-2 py-0.5 w-fit bg-neutral-700 text-neutral-300"
-              >
-                Private
-              </Badge>
-            )}
             {isWelcomeMixPlaylist && (
               <Badge
                 variant="secondary"

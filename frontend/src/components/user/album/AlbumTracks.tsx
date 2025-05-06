@@ -25,7 +25,6 @@ import Image from "next/image";
 
 // Define the names of playlists to filter out
 const filteredPlaylistNames = new Set([
-  "Vibe Rewind",
   "Welcome Mix",
   "Favorites",
 ]);

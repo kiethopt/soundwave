@@ -682,3 +682,33 @@ export const rejectArtistClaimRequest = async (req: Request, res: Response): Pro
 };
 
 // --- End Artist Claim Request Controllers ---
+
+// --- Bulk Track Upload Controller ---
+export const bulkUploadTracks = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      res.status(400).json({ message: 'No files uploaded' });
+      return;
+    }
+
+    // Process the files
+    const createdTracks = await adminService.processBulkUpload(files);
+
+    // Get statistics
+    const successfulUploads = createdTracks.filter(track => track.success).length;
+    
+    // Return response with track information and stats
+    res.status(201).json({
+      message: `Successfully processed ${successfulUploads} out of ${files.length} files`,
+      createdTracks,
+      stats: {
+        total: files.length,
+        successful: successfulUploads,
+        failed: files.length - successfulUploads
+      }
+    });
+  } catch (error) {
+    handleError(res, error, 'Bulk upload tracks');
+  }
+};

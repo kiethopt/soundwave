@@ -61,8 +61,10 @@ router.get('/topTracks', auth_middleware_1.authenticate, user_controller_1.getTo
 router.get('/topArtists', auth_middleware_1.authenticate, user_controller_1.getTopArtists);
 router.get('/topAlbums', auth_middleware_1.authenticate, user_controller_1.getTopAlbums);
 router.get('/playHistory', auth_middleware_1.authenticate, user_controller_1.getPlayHistory);
-router.post('/artist-claims', auth_middleware_1.authenticate, user_controller_1.submitArtistClaim);
+router.post('/artist-claims', auth_middleware_1.authenticate, upload_middleware_1.default.array('proof[]'), upload_middleware_1.handleUploadError, user_controller_1.submitArtistClaim);
 router.get('/artist-claims', auth_middleware_1.authenticate, user_controller_1.getUserClaims);
+router.get('/claimable-artists', auth_middleware_1.authenticate, user_controller_1.getAllArtistsProfile);
+router.get('/discover-genres', auth_middleware_1.authenticate, user_controller_1.getDiscoverGenres);
 router.get('/topAlbums/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopAlbums);
 router.get('/topTracks/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopTracks);
 router.get('/topArtists/:id', auth_middleware_1.authenticate, user_controller_1.getUserTopArtists);

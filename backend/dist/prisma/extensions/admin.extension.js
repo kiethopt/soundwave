@@ -52,7 +52,7 @@ exports.adminExtension = client_1.Prisma.defineExtension((client) => {
                             where: { id: args.where.id },
                             select: { userId: true },
                         });
-                        if (artistProfile) {
+                        if (artistProfile && artistProfile.userId) {
                             await cache_middleware_2.client.del(`user_sessions:${artistProfile.userId}`);
                             await client.user.update({
                                 where: { id: artistProfile.userId },

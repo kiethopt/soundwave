@@ -37,14 +37,12 @@ export default function DiscoveryPage() {
     const fetchGenres = async () => {
       try {
         setLoading(true);
-        const response = await api.user.getAllGenres(token);
+        const response = await api.user.getDiscoverGenres(token);
         
-        if (response && response.genres && response.genres.length > 0) {
-          setGenres(response.genres);
-        } else if (response && Array.isArray(response)) {
+        if (Array.isArray(response)) {
           setGenres(response);
         } else {
-          console.warn('Unexpected API response format:', response);
+          console.warn('Unexpected API response format for discover genres:', response);
           setError('No genres available at this time.');
         }
       } catch (err) {

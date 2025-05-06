@@ -24,12 +24,13 @@ import {
   getArtistClaimRequestDetail,
   approveArtistClaimRequest,
   rejectArtistClaimRequest,
+  bulkUploadTracks,
 } from '../controllers/admin.controller';
 import * as genreController from '../controllers/genre.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { Role } from '@prisma/client';
 import { cacheMiddleware } from '../middleware/cache.middleware';
-import upload from '../middleware/upload.middleware';
+import upload, { handleUploadError } from '../middleware/upload.middleware';
 
 const router = express.Router();
 
@@ -162,6 +163,16 @@ router.get(
   authenticate,
   authorize([Role.ADMIN]),
   getSystemStatus
+);
+
+// --- Route for Bulk Track Upload ---
+router.post(
+  '/bulk-upload-tracks',
+  authenticate,
+  authorize([Role.ADMIN]),
+  upload.array('audioFiles', 50),
+  handleUploadError,
+  bulkUploadTracks
 );
 
 // --- Artist Claim Request Routes ---

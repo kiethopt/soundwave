@@ -751,6 +751,28 @@ export const getAllGenres = async () => {
   return genres;
 };
 
+// Function to get only genres with associated content for Discover page
+export const getDiscoverGenres = async () => {
+  const genres = await prisma.genre.findMany({
+    where: {
+      OR: [
+        { tracks: { some: { track: { isActive: true } } } },       // Has at least one active track
+        { albums: { some: { album: { isActive: true } } } },       // Has at least one active album
+        { artistProfiles: { some: { artistProfile: { isActive: true, isVerified: true } } } } // Has at least one active & verified artist
+      ],
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+  });
+
+  return genres;
+};
+
 export const editProfile = async (
   user: any,
   profileData: any,

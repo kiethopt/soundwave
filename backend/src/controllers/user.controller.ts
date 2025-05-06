@@ -536,7 +536,7 @@ export const getUserClaims = async (
       res.status(401).json({ message: 'Unauthorized' });
       return;
     }
-    const userId = currentUser.id; // userId is a string
+    const userId = currentUser.id;
 
     const claims = await userService.getUserClaims(userId);
     res.json(claims);
@@ -549,19 +549,26 @@ export const getUserClaims = async (
   }
 };
 
-// --- End Artist Claim Controllers ---
-
-// --- Get Claimable Artist Profiles Controller ---
 export const getAllArtistsProfile = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    // Optionally, require authentication (already enforced at route level)
     const artists = await userService.getAllArtistsProfile();
     res.json(artists);
   } catch (error) {
     handleError(res, error, 'Get claimable artists');
   }
 };
-// --- End Get Claimable Artist Profiles Controller ---
+
+export const getDiscoverGenres = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const genres = await userService.getDiscoverGenres();
+    res.json(genres);
+  } catch (error) {
+    handleError(res, error, 'Get discover genres');
+  }
+};

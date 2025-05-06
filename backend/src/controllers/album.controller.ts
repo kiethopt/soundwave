@@ -89,17 +89,6 @@ export const getAlbumById = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-export const playAlbum = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const result = await albumService.playAlbum(req);
-    res.json(result);
-  } catch (error: unknown) {
-    console.error('Play album error:', error);
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    res.status(500).json({ message });
-  }
-};
-
 export const getNewestAlbums = async (req: Request, res: Response): Promise<void> => {
   try {
     const albums = await albumService.getNewestAlbums(Number(req.query.limit) || 25);

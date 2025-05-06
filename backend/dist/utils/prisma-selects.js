@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.artistRequestDetailsSelect = exports.artistRequestSelect = exports.searchTrackSelect = exports.searchAlbumSelect = exports.genreSelect = exports.historySelect = exports.userSelect = exports.artistProfileForUserSelect = exports.artistProfileSelect = exports.trackSelect = exports.albumSelect = exports.labelSelect = void 0;
+exports.artistClaimRequestDetailsSelect = exports.artistClaimRequestSelect = exports.artistRequestDetailsSelect = exports.artistRequestSelect = exports.searchTrackSelect = exports.searchAlbumSelect = exports.genreSelect = exports.historySelect = exports.userSelect = exports.artistProfileForUserSelect = exports.artistProfileSelect = exports.trackSelect = exports.albumSelect = exports.labelSelect = void 0;
 exports.labelSelect = {
     id: true,
     name: true,
@@ -120,6 +120,12 @@ exports.trackSelect = {
     playCount: true,
     type: true,
     isActive: true,
+    tempo: true,
+    mood: true,
+    key: true,
+    scale: true,
+    danceability: true,
+    energy: true,
     createdAt: true,
     updatedAt: true,
     artistId: true,
@@ -698,6 +704,12 @@ exports.searchTrackSelect = {
     playCount: true,
     type: true,
     isActive: true,
+    tempo: true,
+    mood: true,
+    key: true,
+    scale: true,
+    danceability: true,
+    energy: true,
     createdAt: true,
     updatedAt: true,
     artist: {
@@ -771,5 +783,25 @@ exports.artistRequestDetailsSelect = {
     tracks: {
         select: exports.trackSelect,
     },
+};
+exports.artistClaimRequestSelect = {
+    id: true,
+    status: true,
+    submittedAt: true,
+    claimingUser: { select: { id: true, name: true, username: true, email: true, avatar: true } },
+    artistProfile: { select: { id: true, artistName: true, avatar: true, userId: true, isVerified: true } },
+};
+exports.artistClaimRequestDetailsSelect = {
+    id: true,
+    status: true,
+    submittedAt: true,
+    proof: true,
+    reviewedAt: true,
+    rejectionReason: true,
+    claimingUser: { select: exports.userSelect },
+    artistProfile: {
+        select: exports.artistProfileSelect
+    },
+    reviewedByAdmin: { select: { id: true, name: true, username: true } },
 };
 //# sourceMappingURL=prisma-selects.js.map

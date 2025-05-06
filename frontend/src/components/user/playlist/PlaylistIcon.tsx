@@ -21,14 +21,12 @@ export function PlaylistIcon({
   size = 20,
 }: PlaylistIconProps) {
   // Xác định nếu đây là playlist bình thường hay đặc biệt
-  const isVibeRewind = name === "Vibe Rewind";
   const isFavorite = type === "FAVORITE";
   const isWelcomeMix = name === "Welcome Mix";
   const isSystemPlaylist = type === "SYSTEM";
   const isNormalPlaylist =
     type === "NORMAL" &&
     !isAIGenerated &&
-    !isVibeRewind &&
     !isWelcomeMix &&
     !isSystemPlaylist;
 
@@ -73,15 +71,6 @@ export function PlaylistIcon({
           </svg>
         </div>
       </div>
-    );
-  }
-
-  if (isVibeRewind) {
-    return (
-      <Music
-        className={`text-emerald-500 ${className}`}
-        style={{ width: size, height: size }}
-      />
     );
   }
 

@@ -9,6 +9,64 @@ import { trackSelect } from '../utils/prisma-selects';
 import { getIO } from '../config/socket';
 import { getOrCreateArtistProfile } from './artist.service';
 import * as mm from 'music-metadata';
+import { Essentia, EssentiaWASM } from 'essentia.js';
+import { MPEGDecoder, MPEGDecodedAudio } from 'mpg123-decoder';
+
+// Helper function to convert MP3 buffer to Float32Array PCM data
+async function convertMp3BufferToPcmF32(audioBuffer: Buffer): Promise<Float32Array | null> {
+  try {
+    const decoder = new MPEGDecoder();
+    await decoder.ready; // Wait for the decoder WASM to be ready
+
+    // Decode the entire buffer
+    // Need to convert Node Buffer to Uint8Array for the decode method
+    const uint8ArrayBuffer = new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.length);
+    const decoded: MPEGDecodedAudio = decoder.decode(uint8ArrayBuffer);
+
+    decoder.free(); // Release resources
+
+    if (decoded.errors.length > 0) {
+      console.error('MP3 Decoding errors:', decoded.errors);
+      // Decide if you want to throw or return null based on error severity
+      // For now, let's return null if there are errors.
+      return null;
+    }
+
+    // Essentia usually works best with mono audio for analysis like BPM.
+    // Let's average the channels if it's stereo.
+    if (decoded.channelData.length > 1) {
+      const leftChannel = decoded.channelData[0];
+      const rightChannel = decoded.channelData[1];
+      const monoChannel = new Float32Array(leftChannel.length);
+      for (let i = 0; i < leftChannel.length; i++) {
+        monoChannel[i] = (leftChannel[i] + rightChannel[i]) / 2;
+      }
+      return monoChannel;
+    } else if (decoded.channelData.length === 1) {
+      // Already mono
+      return decoded.channelData[0];
+    } else {
+      // No channel data?
+      console.error('MP3 Decoding produced no channel data.');
+      return null;
+    }
+
+  } catch (error) {
+    console.error('Error during MP3 decoding or processing:', error);
+    return null; // Return null if any error occurs
+  }
+}
+
+// Simplified mood analysis function (example)
+function analyzeMood(energy: number, valence: number): string {
+  // This is a very basic example. Real mood analysis is complex.
+  if (energy > 0.6 && valence > 0.6) return 'Energetic/Happy';
+  if (energy > 0.6 && valence <= 0.4) return 'Energetic/Aggressive'; // Or Tense
+  if (energy <= 0.4 && valence > 0.6) return 'Calm/Happy'; // Or Peaceful
+  if (energy <= 0.4 && valence <= 0.4) return 'Sad/Calm';
+  if (energy > 0.5 && valence > 0.4 && valence <= 0.6) return 'Neutral/Driving';
+  return 'Neutral'; // Default
+}
 
 // Hàm kiểm tra quyền
 export const canManageTrack = (user: any, trackArtistId: string): boolean => {
@@ -386,11 +444,95 @@ export class TrackService {
     ]);
 
     let duration = 0;
+    let tempo = null;
+    let mood = null;
+    let key: string | null = null;
+    let scale: string | null = null;
+    let danceability: number | null = null;
+    let energy: number | null = null;
     try {
       const metadata = await mm.parseBuffer(audioFile.buffer, audioFile.mimetype);
       duration = Math.round(metadata.format.duration || 0);
+
+      // --- Essentia analysis --- 
+      tempo = null;
+      mood = null;
+
+      try {
+        const pcmF32 = await convertMp3BufferToPcmF32(audioFile.buffer);
+
+        if (pcmF32) {
+          const essentia = new Essentia(EssentiaWASM);
+          const audioVector = essentia.arrayToVector(pcmF32)
+          
+          // Tempo Estimation
+          try {
+            const tempoResult = essentia.PercivalBpmEstimator(audioVector);
+            tempo = Math.round(tempoResult.bpm);
+          } catch (tempoError) {
+            console.error('Error estimating tempo:', tempoError);
+            tempo = null;
+          }
+
+          // Danceability Estimation
+          try {
+            const danceabilityResult = essentia.Danceability(audioVector);
+            danceability = danceabilityResult.danceability;
+          } catch (danceabilityError) {
+            console.error('Error estimating danceability:', danceabilityError);
+            danceability = null;
+          }
+          
+          // Energy Calculation (used for mood placeholder and energy field)
+          try {
+            const energyResult = essentia.Energy(audioVector);
+            energy = energyResult.energy;
+            
+            // Mood Placeholder (based on energy)
+            if (typeof energy === 'number') {
+              if (energy > 0.6) {
+                mood = 'Energetic';
+              } else if (energy < 0.4) {
+                mood = 'Calm';
+              } else {
+                mood = 'Neutral';
+              }
+            }
+          } catch (energyError) {
+            console.error('Error calculating energy/mood:', energyError);
+            mood = null;
+            energy = null;
+          }
+          
+          // Key & Scale Estimation
+          // KeyExtractor often works better on the full signal representation if available,
+          // but let's try with the decoded PCM vector first.
+          try {
+             // Note: KeyExtractor might ideally take the raw signal buffer if essentia supports it directly,
+             // or requires specific preprocessing not done here. This is an attempt with PCM data.
+            const keyResult = essentia.KeyExtractor(audioVector);
+            key = keyResult.key;
+            scale = keyResult.scale;
+          } catch (keyError) {
+            console.error('Error estimating key/scale:', keyError);
+            key = null;
+            scale = null;
+          }
+          
+        } else {
+          console.warn('Audio decoding failed, skipping all audio analysis.');
+        }
+      } catch (analysisError) {
+          console.error('Error during audio analysis pipeline:', analysisError);
+          tempo = null;
+          mood = null;
+      }
+      // --- End Essentia analysis --- 
+      
     } catch (error) {
-      console.error('Error parsing audio metadata:', error);
+      console.error('Error parsing basic audio metadata:', error);
+      tempo = null;
+      mood = null;
     }
 
     const allFeaturedArtistIds = new Set<string>();
@@ -424,6 +566,12 @@ export class TrackService {
       artist: { connect: { id: artistProfileId } },
       label: finalLabelId ? { connect: { id: finalLabelId } } : undefined,
       isActive: true,
+      tempo: tempo,
+      mood: mood,
+      key: key,
+      scale: scale,
+      danceability: danceability,
+      energy: energy,
     };
 
     if (genreIds && genreIds.length > 0) {
