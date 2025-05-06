@@ -71,5 +71,9 @@ router
     .get(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleAIModelStatus)
     .post(auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.handleAIModelStatus);
 router.get('/system-status', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getSystemStatus);
+router.get('/artist-claims', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.getAllArtistClaimRequests);
+router.get('/artist-claims/:id', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), cache_middleware_1.cacheMiddleware, admin_controller_1.getArtistClaimRequestDetail);
+router.post('/artist-claims/:id/approve', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.approveArtistClaimRequest);
+router.post('/artist-claims/:id/reject', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)([client_1.Role.ADMIN]), admin_controller_1.rejectArtistClaimRequest);
 exports.default = router;
 //# sourceMappingURL=admin.routes.js.map

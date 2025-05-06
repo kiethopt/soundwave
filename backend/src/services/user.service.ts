@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import prisma from '../config/db';
-import { FollowingType, HistoryType, Role, User, ClaimStatus } from '@prisma/client';
+import { FollowingType, HistoryType, Role, User, ClaimStatus, NotificationType, RecipientType } from '@prisma/client';
 import { uploadFile } from './upload.service';
 import {
   searchAlbumSelect,
@@ -10,7 +10,7 @@ import {
 import { paginate } from '../utils/handle-utils';
 import { client, setCache } from '../middleware/cache.middleware';
 import * as emailService from './email.service';
-import { getIO } from '../config/socket';
+import { getUserSockets, getIO } from '../config/socket';
 import * as trackService from './track.service'
 
 // Hàm helper để lấy ngày đầu tháng hiện tại
@@ -361,37 +361,43 @@ export const followTarget = async (follower: any, followingId: string) => {
       }
     }
 
-    // Send notification if a message was generated
+    // Send notification and socket event if a message was generated
     if (followedUserIdForPusher && notificationMessage && notificationRecipientType) {
       try {
         const notification = await tx.notification.create({
           data: {
             type: 'NEW_FOLLOW',
             message: notificationMessage,
-            recipientType: notificationRecipientType, // Use the determined type
+            recipientType: notificationRecipientType,
             ...(notificationRecipientType === 'USER' && { userId: followingId }),
             ...(notificationRecipientType === 'ARTIST' && { artistId: followingId }),
             senderId: follower.id,
           },
         });
 
-        // Correctly emit to the specific user's room
+        // Emit directly to the user's socket ID if they are connected
         const io = getIO();
-        const room = `user-${followedUserIdForPusher}`; // Define the room based on the followed user ID
-        io.to(room).emit('notification', { // Use io.to(room).emit
-          id: notification.id,
-          type: 'NEW_FOLLOW',
-          message: notificationMessage,
-          recipientType: notificationRecipientType, // Send the determined type
-          isRead: false,
-          createdAt: notification.createdAt.toISOString(),
-          // Include sender details for frontend display
-          sender: {
-            id: follower.id,
-            name: follower.name || follower.username,
-            avatar: follower.avatar
-          }
-        });
+        const userSocketsMap = getUserSockets();
+        const targetSocketId = userSocketsMap.get(followedUserIdForPusher);
+
+        if (targetSocketId) {
+           console.log(`[Socket Emit] Sending NEW_FOLLOW notification to user ${followedUserIdForPusher} via socket ${targetSocketId}`);
+           io.to(targetSocketId).emit('notification', {
+           id: notification.id,
+           type: 'NEW_FOLLOW',
+           message: notificationMessage,
+           recipientType: notificationRecipientType,
+           isRead: false,
+           createdAt: notification.createdAt.toISOString(),
+           sender: {
+             id: follower.id,
+             name: follower.name || follower.username,
+             avatar: follower.avatar
+           }
+         });
+        } else {
+           console.log(`[Socket Emit] User ${followedUserIdForPusher} not connected, skipping NEW_FOLLOW socket event.`);
+        }
       } catch (error) {
         console.error('Error creating or sending notification:', error);
       }
@@ -681,8 +687,57 @@ export const requestArtistRole = async (
           genre: { connect: { id: genreId } },
         })),
       },
+      isVerified: false,
     },
+    include: { user: { select: { name: true, username: true } } } // Lấy tên user để dùng trong thông báo
   });
+
+  // --- START: Gửi thông báo cho ADMIN --- 
+  try {
+    const admins = await prisma.user.findMany({ where: { role: Role.ADMIN } });
+    const notificationPromises = admins.map(async (admin: { id: string }) => {
+      const notificationRecord = await prisma.notification.create({
+        data: {
+          type: NotificationType.ARTIST_REQUEST_SUBMITTED,
+          message: `User '${createdProfile.user?.name || createdProfile.user?.username || user.id}' requested to become artist: ${artistName}.`,
+          recipientType: RecipientType.USER,
+          userId: admin.id,
+          senderId: user.id,
+          artistId: createdProfile.id,
+        },
+        select: { id: true, type: true, message: true, recipientType: true, userId: true, senderId: true, artistId: true, createdAt: true, isRead: true }
+      });
+       return { adminId: admin.id, notification: notificationRecord };
+    });
+
+    const createdNotifications = await Promise.all(notificationPromises);
+
+     // Gửi socket event cho admin rooms
+     const io = getIO();
+     const userSocketsMap = getUserSockets();
+     createdNotifications.forEach(({ adminId, notification }) => {
+       const adminSocketId = userSocketsMap.get(adminId);
+       if (adminSocketId) {
+          console.log(`[Socket Emit] Sending ARTIST_REQUEST_SUBMITTED notification to admin ${adminId} via socket ${adminSocketId}`);
+          io.to(adminSocketId).emit('notification', {
+          id: notification.id,
+          type: notification.type,
+          message: notification.message,
+          recipientType: notification.recipientType,
+          isRead: notification.isRead,
+          createdAt: notification.createdAt.toISOString(),
+          artistId: notification.artistId,
+          senderId: notification.senderId,
+          sender: { id: user.id, name: user.name || user.username },
+          artistProfile: { id: createdProfile.id, artistName: artistName, avatar: createdProfile.avatar }
+        });
+       }
+     });
+
+  } catch (notificationError) {
+    console.error("[Notify Error] Failed to create admin notifications for artist request:", notificationError);
+  }
+  // --- END: Gửi thông báo cho ADMIN --- 
 
   // Send email notification to admin(s)
   const adminNotificationEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
@@ -1648,24 +1703,69 @@ export const submitArtistClaim = async (userId: string, artistProfileId: string,
     data: {
       claimingUserId: userId,
       artistProfileId: artistProfileId,
-      proof: proof,
+      proof: proof, // Pass the array directly, assuming the schema expects String[]
       status: ClaimStatus.PENDING,
     },
     select: {
       id: true,
       status: true,
       submittedAt: true,
-      artistProfile: {
-        select: {
-          id: true,
-          artistName: true,
-        }
-      }
+      claimingUser: { select: { id: true, name: true, username: true, avatar: true } },
+      artistProfile: { select: { id: true, artistName: true, avatar: true } }
     }
   });
 
-  // Notify Admins (optional, consider if needed)
-  // Example: Find admins and create notifications or send emails
+  // --- START: Gửi thông báo cho ADMIN --- 
+  try {
+    const admins = await prisma.user.findMany({ where: { role: Role.ADMIN } });
+    const userName = newClaim.claimingUser.name || newClaim.claimingUser.username || userId;
+    const artistName = newClaim.artistProfile.artistName;
+
+    const notificationPromises = admins.map(async (admin: { id: string }) => {
+      const notificationRecord = await prisma.notification.create({
+        data: {
+          type: NotificationType.CLAIM_REQUEST_SUBMITTED,
+          message: `User '${userName}' submitted a claim request for artist '${artistName}'.`,
+          recipientType: RecipientType.USER,
+          userId: admin.id,
+          senderId: userId,
+          artistId: artistProfileId,
+          claimId: newClaim.id,
+        },
+        select: { id: true, type: true, message: true, recipientType: true, userId: true, senderId: true, artistId: true, createdAt: true, isRead: true, claimId: true }
+      });
+       return { adminId: admin.id, notification: notificationRecord };
+    });
+
+    const createdClaimNotifications = await Promise.all(notificationPromises);
+
+     // Gửi socket event cho admin rooms
+     const io = getIO();
+     const userSocketsMap = getUserSockets();
+     createdClaimNotifications.forEach(({ adminId, notification }) => {
+       const adminSocketId = userSocketsMap.get(adminId);
+       if (adminSocketId) {
+          console.log(`[Socket Emit] Sending CLAIM_REQUEST_SUBMITTED notification to admin ${adminId} via socket ${adminSocketId}`);
+          io.to(adminSocketId).emit('notification', {
+          id: notification.id,
+          type: notification.type,
+          message: notification.message,
+          recipientType: notification.recipientType,
+          isRead: notification.isRead,
+          createdAt: notification.createdAt.toISOString(),
+          artistId: notification.artistId,
+          senderId: notification.senderId,
+          claimId: notification.claimId,
+          sender: { id: userId, name: userName, avatar: newClaim.claimingUser.avatar },
+          artistProfile: { id: newClaim.artistProfile.id, artistName: artistName, avatar: newClaim.artistProfile.avatar }
+        });
+       }
+     });
+
+  } catch (notificationError) {
+    console.error("[Notify Error] Failed to create admin notifications for claim request:", notificationError);
+  }
+  // --- END: Gửi thông báo cho ADMIN --- 
 
   return newClaim;
 };

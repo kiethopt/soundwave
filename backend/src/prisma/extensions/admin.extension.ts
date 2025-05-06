@@ -60,7 +60,7 @@ export const adminExtension = Prisma.defineExtension((client) => {
               where: { id: args.where.id },
               select: { userId: true },
             });
-            if (artistProfile) {
+            if (artistProfile && artistProfile.userId) {
               await redis.del(`user_sessions:${artistProfile.userId}`);
 
               // Cập nhật user về profile USER nếu đang ở profile ARTIST

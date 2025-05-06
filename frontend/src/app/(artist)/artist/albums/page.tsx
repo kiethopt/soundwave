@@ -532,7 +532,7 @@ export default function SimpleAlbumManagement() {
                       <td className="py-4 px-6">{formatDate(album.releaseDate)}</td>
                       <td className="py-4 px-6">
                          <div className="flex items-center justify-center gap-1">
-                           <Button
+                           {/* <Button
                              variant="ghost"
                              size="icon"
                              className={`text-red-600 hover:bg-red-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-100'}`}
@@ -541,7 +541,7 @@ export default function SimpleAlbumManagement() {
                              disabled={loading || actionLoading !== null}
                            >
                              <Trash2 className="h-4 w-4" />
-                           </Button>
+                           </Button> */}
                            <Button
                              variant="ghost"
                              size="icon"

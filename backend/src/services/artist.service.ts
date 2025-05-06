@@ -1,4 +1,5 @@
-import { PrismaClient, Role, FollowingType, HistoryType, ArtistProfile } from '@prisma/client';
+import prisma, { ExtendedPrismaClient } from '../config/db'; // Import shared prisma instance AND its type
+import { Role, FollowingType, HistoryType, ArtistProfile, Prisma } from '@prisma/client'; // Removed PrismaClient
 import {
   artistProfileSelect,
   albumSelect,
@@ -9,15 +10,22 @@ import { client, setCache } from '../middleware/cache.middleware';
 import { uploadFile } from './upload.service';
 import { format } from 'date-fns';
 
-const prisma = new PrismaClient();
+// Derive the specific transaction client type expected by the extended prisma client
+type ExtendedTransactionClient = Parameters<
+  Parameters<ExtendedPrismaClient['$transaction']>[0]
+>[0];
 
 // --- Helper Function to Get or Create Artist Profile ---
 // This function will be used by track/album services
-export async function getOrCreateArtistProfile(artistNameOrId: string): Promise<ArtistProfile> {
+export async function getOrCreateArtistProfile(
+  artistNameOrId: string,
+  tx?: ExtendedTransactionClient // Use the derived transaction client type
+): Promise<ArtistProfile> {
+  const db = tx || prisma; // Use transaction client if available, otherwise default prisma client
   const isLikelyId = /^[a-z0-9]{25}$/.test(artistNameOrId); 
 
   if (isLikelyId) {
-    const existingProfile = await prisma.artistProfile.findUnique({
+    const existingProfile = await db.artistProfile.findUnique({
       where: { id: artistNameOrId },
     });
     if (existingProfile) {
@@ -27,7 +35,7 @@ export async function getOrCreateArtistProfile(artistNameOrId: string): Promise<
 
   // Treat as name
   const nameToSearch = artistNameOrId;
-  let artistProfile = await prisma.artistProfile.findFirst({
+  let artistProfile = await db.artistProfile.findFirst({
     where: {
       artistName: {
         equals: nameToSearch,
@@ -42,7 +50,7 @@ export async function getOrCreateArtistProfile(artistNameOrId: string): Promise<
 
   // If not found, create a placeholder profile
   console.log(`Creating placeholder artist profile for: ${nameToSearch}`);
-  artistProfile = await prisma.artistProfile.create({
+  artistProfile = await db.artistProfile.create({
     data: {
       artistName: nameToSearch,
       role: Role.ARTIST,
@@ -891,3 +899,4 @@ export class ArtistService {
     });
   }
 }
+

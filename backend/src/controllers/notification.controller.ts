@@ -131,6 +131,20 @@ export const getNotifications = async (req: Request, res: Response): Promise<voi
   const notifications = await prisma.notification.findMany({
     where: { OR: whereConditions },
     orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      type: true,
+      message: true,
+      isRead: true,
+      recipientType: true,
+      userId: true,
+      artistId: true,
+      senderId: true,
+      trackId: true,
+      albumId: true,
+      claimId: true,
+      createdAt: true,
+    }
   });
 
   res.json(notifications);

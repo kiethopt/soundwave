@@ -614,7 +614,6 @@ export default function ArtistRequestManagement() {
                   <th className="py-3 px-6 text-left font-medium">Email</th>
                   <th className="py-3 px-6 text-left font-medium">Submitted At</th>
                   <th className="py-3 px-6 text-left font-medium">Status</th>
-                  <th className="py-3 px-6 text-left font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -649,33 +648,6 @@ export default function ArtistRequestManagement() {
                       <td className="py-4 px-6">{claim.claimingUser.email}</td>
                       <td className="py-4 px-6">{formatDate(claim.submittedAt)}</td>
                       <td className="py-4 px-6 capitalize">{claim.status.toLowerCase()}</td>
-                      <td className="py-4 px-6">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={e => {
-                            e.stopPropagation();
-                            setClaimRequestToApprove(claim);
-                            setIsClaimApproveModalOpen(true);
-                          }}
-                          disabled={claimActionLoading !== null}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="ml-2"
-                          onClick={e => {
-                            e.stopPropagation();
-                            setClaimRequestIdToReject(claim.id);
-                            setIsClaimRejectModalOpen(true);
-                          }}
-                          disabled={claimActionLoading !== null}
-                        >
-                          Reject
-                        </Button>
-                      </td>
                     </tr>
                   ))
                 )}

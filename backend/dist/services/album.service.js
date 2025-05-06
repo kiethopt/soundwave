@@ -44,6 +44,8 @@ const prisma_selects_1 = require("../utils/prisma-selects");
 const emailService = __importStar(require("./email.service"));
 const handle_utils_1 = require("src/utils/handle-utils");
 const socket_1 = require("../config/socket");
+const artist_service_1 = require("./artist.service");
+const mm = __importStar(require("music-metadata"));
 const canManageAlbum = (user, albumArtistId) => {
     if (!user)
         return false;
@@ -218,42 +220,51 @@ const createAlbum = async (req) => {
         data: albumData,
         select: prisma_selects_1.albumSelect,
     });
-    const followers = await db_1.default.userFollow.findMany({
-        where: { followingArtistId: targetArtistProfileId, followingType: 'ARTIST' },
-        select: { followerId: true },
-    });
-    const followerIds = followers.map((f) => f.followerId);
-    const followerUsers = await db_1.default.user.findMany({
-        where: { id: { in: followerIds } },
-        select: { id: true, email: true },
-    });
-    const notificationsData = followers.map((follower) => ({
-        type: client_1.NotificationType.NEW_ALBUM,
-        message: `${artistName} just released a new album: ${title}`,
-        recipientType: client_1.RecipientType.USER,
-        userId: follower.followerId,
-        artistId: targetArtistProfileId,
-        senderId: targetArtistProfileId,
-        albumId: album.id,
-    }));
-    if (notificationsData.length > 0) {
-        await db_1.default.notification.createMany({ data: notificationsData });
-    }
-    const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
     const io = (0, socket_1.getIO)();
-    for (const user of followerUsers) {
-        const room = `user-${user.id}`;
-        io.to(room).emit('notification', {
-            type: client_1.NotificationType.NEW_ALBUM,
-            message: `${artistName} just released a new album: ${album.title}`,
-            albumId: album.id,
-        });
-        if (user.email) {
-            const emailOptions = emailService.createNewReleaseEmail(user.email, artistName, 'album', album.title, releaseLink, album.coverUrl);
-            await emailService.sendEmail(emailOptions);
-        }
-    }
     io.emit('album:created', { album });
+    const sendNotifications = async () => {
+        const followers = await db_1.default.userFollow.findMany({
+            where: { followingArtistId: targetArtistProfileId, followingType: 'ARTIST' },
+            select: { followerId: true },
+        });
+        const followerIds = followers.map((f) => f.followerId);
+        if (followerIds.length === 0)
+            return;
+        const followerUsers = await db_1.default.user.findMany({
+            where: { id: { in: followerIds }, isActive: true },
+            select: { id: true, email: true },
+        });
+        const notificationsData = followerUsers.map((follower) => ({
+            type: client_1.NotificationType.NEW_ALBUM,
+            message: `${artistName} just released a new album: ${title}`,
+            recipientType: client_1.RecipientType.USER,
+            userId: follower.id,
+            artistId: targetArtistProfileId,
+            senderId: targetArtistProfileId,
+            albumId: album.id,
+        }));
+        await db_1.default.notification.createMany({ data: notificationsData });
+        const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/album/${album.id}`;
+        const io = (0, socket_1.getIO)();
+        const userSocketsMap = (0, socket_1.getUserSockets)();
+        for (const follower of followerUsers) {
+            const targetSocketId = userSocketsMap.get(follower.id);
+            if (targetSocketId) {
+                io.to(targetSocketId).emit('notification', {
+                    type: client_1.NotificationType.NEW_ALBUM,
+                    message: `${artistName} just released a new album: ${album.title}`,
+                    albumId: album.id,
+                });
+            }
+            if (follower.email) {
+                const emailOptions = emailService.createNewReleaseEmail(follower.email, artistName, 'album', album.title, releaseLink, album.coverUrl);
+                await emailService.sendEmail(emailOptions);
+            }
+        }
+    };
+    sendNotifications().catch(notificationError => {
+        console.error("Error sending new album notifications:", notificationError);
+    });
     return { message: 'Album created successfully', album };
 };
 exports.createAlbum = createAlbum;
@@ -269,6 +280,7 @@ const addTracksToAlbum = async (req) => {
             type: true,
             coverUrl: true,
             isActive: true,
+            releaseDate: true,
             labelId: true,
             tracks: { select: { trackNumber: true } }
         }
@@ -277,6 +289,7 @@ const addTracksToAlbum = async (req) => {
         throw new Error('Album not found');
     if (!canManageAlbum(user, albumWithLabel.artistId))
         throw new Error('You can only add tracks to your own albums');
+    const mainArtistId = albumWithLabel.artistId;
     const albumLabelId = albumWithLabel.labelId;
     const files = req.files;
     if (!files || !files.length)
@@ -286,50 +299,94 @@ const addTracksToAlbum = async (req) => {
         select: { trackNumber: true },
     });
     const maxTrackNumber = existingTracks.length > 0 ? Math.max(...existingTracks.map((t) => t.trackNumber || 0)) : 0;
-    const titles = Array.isArray(req.body.title) ? req.body.title : [req.body.title];
-    const releaseDates = Array.isArray(req.body.releaseDate) ? req.body.releaseDate : [req.body.releaseDate];
-    const featuredArtists = Array.isArray(req.body.featuredArtists)
-        ? req.body.featuredArtists.map((artists) => artists?.split(',').map((id) => id.trim()).filter(Boolean) ?? [])
-        : req.body.featuredArtists ? [req.body.featuredArtists.split(',').map((id) => id.trim()).filter(Boolean)] : [];
-    const genres = Array.isArray(req.body.genres)
-        ? req.body.genres.map((genreIds) => genreIds?.split(',').map((id) => id.trim()).filter(Boolean) ?? [])
-        : req.body.genres ? [req.body.genres.split(',').map((id) => id.trim()).filter(Boolean)] : [];
-    const mm = await Promise.resolve().then(() => __importStar(require('music-metadata')));
+    const titles = Array.isArray(req.body.titles) ? req.body.titles : [];
+    const trackNumbers = Array.isArray(req.body.trackNumbers) ? req.body.trackNumbers : [];
+    const featuredArtistIdsJson = Array.isArray(req.body.featuredArtistIds) ? req.body.featuredArtistIds : [];
+    const featuredArtistNamesJson = Array.isArray(req.body.featuredArtistNames) ? req.body.featuredArtistNames : [];
+    const genreIdsJson = Array.isArray(req.body.genreIds) ? req.body.genreIds : [];
+    if (files.length !== titles.length) {
+        throw new Error(`Mismatch between uploaded files (${files.length}) and titles (${titles.length}).`);
+    }
+    console.time('[addTracksToAlbum] Total Processing Time');
     const createdTracks = await Promise.all(files.map(async (file, index) => {
-        const metadata = await mm.parseBuffer(file.buffer);
-        const duration = Math.floor(metadata.format.duration || 0);
+        const titleForTrack = titles[index];
+        const featuredArtistIdsForTrack = JSON.parse(featuredArtistIdsJson[index] || '[]');
+        const featuredArtistNamesForTrack = JSON.parse(featuredArtistNamesJson[index] || '[]');
+        const genreIdsForTrack = JSON.parse(genreIdsJson[index] || '[]');
+        if (!titleForTrack) {
+            console.error(`Missing title for track at index ${index}`);
+            throw new Error(`Missing title or metadata for track at index ${index} (file: ${file.originalname})`);
+        }
+        console.time(`[addTracksToAlbum] Metadata Parse ${index}`);
+        let duration = 0;
+        try {
+            const metadata = await mm.parseBuffer(file.buffer);
+            duration = Math.floor(metadata.format.duration || 0);
+            console.log(`[addTracksToAlbum] Track ${index} (${file.originalname}): Parsed duration = ${metadata.format.duration}, Saved duration = ${duration}`);
+            if (!metadata.format.duration) {
+                console.warn(`[addTracksToAlbum] Track ${index} (${file.originalname}): music-metadata could not find duration.`);
+            }
+        }
+        catch (parseError) {
+            console.error(`[addTracksToAlbum] Track ${index} (${file.originalname}): Error parsing metadata:`, parseError);
+        }
+        console.timeEnd(`[addTracksToAlbum] Metadata Parse ${index}`);
+        console.time(`[addTracksToAlbum] Cloudinary Upload ${index}`);
         const uploadResult = await (0, upload_service_1.uploadFile)(file.buffer, 'tracks', 'auto');
+        console.timeEnd(`[addTracksToAlbum] Cloudinary Upload ${index}`);
         const existingTrack = await db_1.default.track.findFirst({
-            where: { title: titles[index], artistId: albumWithLabel.artistId },
+            where: { title: titleForTrack, artistId: mainArtistId },
         });
         if (existingTrack)
-            throw new Error(`Track with title "${titles[index]}" already exists for this artist.`);
+            console.warn(`Track with title \"${titleForTrack}\" already exists for this artist.`);
         const newTrackNumber = maxTrackNumber + index + 1;
+        console.time(`[addTracksToAlbum] Resolve Artists ${index}`);
+        const allFeaturedArtistIds = new Set();
+        if (featuredArtistIdsForTrack.length > 0) {
+            const existingArtists = await db_1.default.artistProfile.findMany({ where: { id: { in: featuredArtistIdsForTrack } }, select: { id: true } });
+            existingArtists.forEach(artist => { if (artist.id !== mainArtistId)
+                allFeaturedArtistIds.add(artist.id); });
+        }
+        if (featuredArtistNamesForTrack.length > 0) {
+            for (const name of featuredArtistNamesForTrack) {
+                try {
+                    const profile = await (0, artist_service_1.getOrCreateArtistProfile)(name);
+                    if (profile.id !== mainArtistId)
+                        allFeaturedArtistIds.add(profile.id);
+                }
+                catch (error) {
+                    console.error(`Error resolving artist name \"${name}\" for track ${index}:`, error);
+                }
+            }
+        }
+        console.timeEnd(`[addTracksToAlbum] Resolve Artists ${index}`);
         const trackData = {
-            title: titles[index],
+            title: titleForTrack,
             duration,
-            releaseDate: new Date(releaseDates[index] || Date.now()),
+            releaseDate: new Date(albumWithLabel?.releaseDate || Date.now()),
             trackNumber: newTrackNumber,
             coverUrl: albumWithLabel.coverUrl,
             audioUrl: uploadResult.secure_url,
-            artist: { connect: { id: albumWithLabel.artistId } },
+            artist: { connect: { id: mainArtistId } },
             album: { connect: { id: albumId } },
             type: albumWithLabel.type,
             isActive: albumWithLabel.isActive,
-            featuredArtists: featuredArtists[index]?.length > 0
-                ? { create: featuredArtists[index].map((artistProfileId) => ({ artistProfile: { connect: { id: artistProfileId } } })) }
+            featuredArtists: allFeaturedArtistIds.size > 0
+                ? { create: Array.from(allFeaturedArtistIds).map(artistId => ({ artistProfile: { connect: { id: artistId } } })) }
                 : undefined,
-            genres: genres[index]?.length > 0
-                ? { create: genres[index].map((genreId) => ({ genre: { connect: { id: genreId } } })) }
+            genres: genreIdsForTrack && genreIdsForTrack.length > 0
+                ? { create: genreIdsForTrack.map((genreId) => ({ genre: { connect: { id: genreId } } })) }
                 : undefined,
         };
         if (albumLabelId) {
             trackData.label = { connect: { id: albumLabelId } };
         }
+        console.time(`[addTracksToAlbum] DB Create Track ${index}`);
         const track = await db_1.default.track.create({
             data: trackData,
             select: prisma_selects_1.trackSelect,
         });
+        console.timeEnd(`[addTracksToAlbum] DB Create Track ${index}`);
         return track;
     }));
     const tracks = await db_1.default.track.findMany({ where: { albumId }, select: { duration: true } });
@@ -341,6 +398,7 @@ const addTracksToAlbum = async (req) => {
     });
     const io = (0, socket_1.getIO)();
     io.emit('album:updated', { album: updatedAlbum });
+    console.timeEnd('[addTracksToAlbum] Total Processing Time');
     return { message: 'Tracks added to album successfully', album: updatedAlbum, tracks: createdTracks };
 };
 exports.addTracksToAlbum = addTracksToAlbum;

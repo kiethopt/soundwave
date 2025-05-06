@@ -634,164 +634,164 @@ export const TrackProvider = ({ children }: { children: ReactNode }) => {
 
   // WebSocket listener for TrackContext updates
   useEffect(() => {
-    let socket: Socket | null = null; 
+    // let socket: Socket | null = null; 
 
-    const connectSocket = () => {
-      socket = io(process.env.NEXT_PUBLIC_API_URL!); 
+    // const connectSocket = () => {
+    //   socket = io(process.env.NEXT_PUBLIC_API_URL!); 
 
-      console.log('[WebSocket] Attempting TrackContext connection...');
+    //   console.log('[WebSocket] Attempting TrackContext connection...');
 
-      // --- Event Listeners --- 
-      socket.on('connect', () => {
-        console.log(`[WebSocket] TrackContext connected`);
-      });
+    //   // --- Event Listeners --- 
+    //   socket.on('connect', () => {
+    //     console.log(`[WebSocket] TrackContext connected`);
+    //   });
 
-      socket.on('disconnect', (reason: string) => {
-        console.log(`[WebSocket] TrackContext disconnected:`, reason);
-      });
+    //   socket.on('disconnect', (reason: string) => {
+    //     console.log(`[WebSocket] TrackContext disconnected:`, reason);
+    //   });
 
-      socket.on('connect_error', (error: Error) => {
-          console.error(`[WebSocket] TrackContext Connection Error:`, error);
-      });
+    //   socket.on('connect_error', (error: Error) => {
+    //       console.error(`[WebSocket] TrackContext Connection Error:`, error);
+    //   });
 
-      socket.on('track:updated', (data: { track: Track }) => {
-        const updatedTrack = data.track;
-        console.log('[WebSocket] TrackContext received track:updated', updatedTrack);
-        setCurrentTrack(prevTrack => 
-          prevTrack?.id === updatedTrack.id ? { ...prevTrack, ...updatedTrack } : prevTrack
-        );
-        setQueue(prevQueue => 
-          prevQueue.map(t => t.id === updatedTrack.id ? { ...t, ...updatedTrack } : t)
-        );
-         setTrackQueue(prevPlaybackQueue => 
-          prevPlaybackQueue.map(t => t.id === updatedTrack.id ? { ...t, ...updatedTrack } : t)
-        );
-      });
+    //   socket.on('track:updated', (data: { track: Track }) => {
+    //     const updatedTrack = data.track;
+    //     console.log('[WebSocket] TrackContext received track:updated', updatedTrack);
+    //     setCurrentTrack(prevTrack => 
+    //       prevTrack?.id === updatedTrack.id ? { ...prevTrack, ...updatedTrack } : prevTrack
+    //     );
+    //     setQueue(prevQueue => 
+    //       prevQueue.map(t => t.id === updatedTrack.id ? { ...t, ...updatedTrack } : t)
+    //     );
+    //      setTrackQueue(prevPlaybackQueue => 
+    //       prevPlaybackQueue.map(t => t.id === updatedTrack.id ? { ...t, ...updatedTrack } : t)
+    //     );
+    //   });
 
-      socket.on('track:deleted', (data: { trackId: string }) => {
-        const deletedTrackId = data.trackId;
-        console.log('[WebSocket] TrackContext received track:deleted', deletedTrackId);
-        if (currentTrack?.id === deletedTrackId) {
-          console.log('[WebSocket] Current track deleted, skipping next...');
-           if (audioRef.current) {
-              audioRef.current.pause();
-              audioRef.current.src = '';
-           }
-           setCurrentTrack(null);
-           setIsPlaying(false);
-           const nextQueue = trackQueueRef.current.filter(t => t.id !== deletedTrackId);
-           setTrackQueue(nextQueue);
-           setQueue(nextQueue);
-           trackQueueRef.current = nextQueue;
+    //   socket.on('track:deleted', (data: { trackId: string }) => {
+    //     const deletedTrackId = data.trackId;
+    //     console.log('[WebSocket] TrackContext received track:deleted', deletedTrackId);
+    //     if (currentTrack?.id === deletedTrackId) {
+    //       console.log('[WebSocket] Current track deleted, skipping next...');
+    //        if (audioRef.current) {
+    //           audioRef.current.pause();
+    //           audioRef.current.src = '';
+    //        }
+    //        setCurrentTrack(null);
+    //        setIsPlaying(false);
+    //        const nextQueue = trackQueueRef.current.filter(t => t.id !== deletedTrackId);
+    //        setTrackQueue(nextQueue);
+    //        setQueue(nextQueue);
+    //        trackQueueRef.current = nextQueue;
 
-           if (nextQueue.length > 0) {
-              const nextIndex = Math.min(currentIndex, nextQueue.length - 1);
-               if (nextQueue[nextIndex]) {
-                   playTrack(nextQueue[nextIndex]);
-               } else {
-                   setCurrentIndex(0);
-               }
-           } else {
-              setCurrentIndex(0);
-           }
-        } else {
-            const nextQueue = queue.filter(t => t.id !== deletedTrackId);
-            const nextPlaybackQueue = trackQueue.filter(t => t.id !== deletedTrackId);
+    //        if (nextQueue.length > 0) {
+    //           const nextIndex = Math.min(currentIndex, nextQueue.length - 1);
+    //            if (nextQueue[nextIndex]) {
+    //                playTrack(nextQueue[nextIndex]);
+    //            } else {
+    //                setCurrentIndex(0);
+    //            }
+    //        } else {
+    //           setCurrentIndex(0);
+    //        }
+    //     } else {
+    //         const nextQueue = queue.filter(t => t.id !== deletedTrackId);
+    //         const nextPlaybackQueue = trackQueue.filter(t => t.id !== deletedTrackId);
             
-            setQueue(nextQueue);
-            setTrackQueue(nextPlaybackQueue);
-            trackQueueRef.current = nextPlaybackQueue;
-             const deletedIndex = trackQueue.findIndex(t => t.id === deletedTrackId);
-            if (deletedIndex !== -1 && deletedIndex < currentIndex) {
-                setCurrentIndex(prev => Math.max(0, prev - 1));
-            }
-        }
-      });
+    //         setQueue(nextQueue);
+    //         setTrackQueue(nextPlaybackQueue);
+    //         trackQueueRef.current = nextPlaybackQueue;
+    //          const deletedIndex = trackQueue.findIndex(t => t.id === deletedTrackId);
+    //         if (deletedIndex !== -1 && deletedIndex < currentIndex) {
+    //             setCurrentIndex(prev => Math.max(0, prev - 1));
+    //         }
+    //     }
+    //   });
 
-      socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
-        const { trackId, isActive } = data;
-        console.log(`[WebSocket] TrackContext received track:visibilityChanged for ${trackId}: ${isActive}`);
-         if (!isActive) { 
-              let currentArtistId: string | null = null;
-              try {
-                  const userDataString = localStorage.getItem('userData');
-                  if (userDataString) {
-                      const userData = JSON.parse(userDataString);
-                      currentArtistId = userData?.artistProfile?.id || null;
-                  }
-              } catch (e) {
-                  console.error("Error parsing user data for visibility check:", e);
-              }
+    //   socket.on('track:visibilityChanged', (data: { trackId: string; isActive: boolean }) => {
+    //     const { trackId, isActive } = data;
+    //     console.log(`[WebSocket] TrackContext received track:visibilityChanged for ${trackId}: ${isActive}`);
+    //      if (!isActive) { 
+    //           let currentArtistId: string | null = null;
+    //           try {
+    //               const userDataString = localStorage.getItem('userData');
+    //               if (userDataString) {
+    //                   const userData = JSON.parse(userDataString);
+    //                   currentArtistId = userData?.artistProfile?.id || null;
+    //               }
+    //           } catch (e) {
+    //               console.error("Error parsing user data for visibility check:", e);
+    //           }
 
-               if (currentTrack?.id === trackId && currentTrack.artistId !== currentArtistId) {
-                  console.log('[WebSocket] Current track hidden and user is not owner, skipping next...');
-                   if (audioRef.current) {
-                      audioRef.current.pause();
-                      audioRef.current.src = '';
-                   }
-                   setCurrentTrack(null);
-                   setIsPlaying(false);
-                   const nextQueue = trackQueueRef.current.filter(t => t.id !== trackId);
-                   setTrackQueue(nextQueue);
-                   setQueue(nextQueue);
-                   trackQueueRef.current = nextQueue;
+    //            if (currentTrack?.id === trackId && currentTrack.artistId !== currentArtistId) {
+    //               console.log('[WebSocket] Current track hidden and user is not owner, skipping next...');
+    //                if (audioRef.current) {
+    //                   audioRef.current.pause();
+    //                   audioRef.current.src = '';
+    //                }
+    //                setCurrentTrack(null);
+    //                setIsPlaying(false);
+    //                const nextQueue = trackQueueRef.current.filter(t => t.id !== trackId);
+    //                setTrackQueue(nextQueue);
+    //                setQueue(nextQueue);
+    //                trackQueueRef.current = nextQueue;
 
-                   if (nextQueue.length > 0) {
-                       const nextIndex = Math.min(currentIndex, nextQueue.length - 1);
-                       if (nextQueue[nextIndex]) {
-                           playTrack(nextQueue[nextIndex]);
-                       } else {
-                           setCurrentIndex(0);
-                       }
-                   } else {
-                       setCurrentIndex(0);
-                   }
-               } else {
-                   const nextQueue = queue.filter(t => t.id !== trackId || t.artistId === currentArtistId);
-                   const nextPlaybackQueue = trackQueue.filter(t => t.id !== trackId || t.artistId === currentArtistId);
-                   
-                   if (nextQueue.length !== queue.length) { 
-                      console.log('[WebSocket] Hidden track removed from queues (user not owner)');
-                      setQueue(nextQueue);
-                      setTrackQueue(nextPlaybackQueue);
-                      trackQueueRef.current = nextPlaybackQueue;
-                       const hiddenIndex = trackQueue.findIndex(t => t.id === trackId);
-                      if (hiddenIndex !== -1 && hiddenIndex < currentIndex) {
-                          setCurrentIndex(prev => Math.max(0, prev - 1));
-                      }
-                   }
-               }
-         } else {
-               setCurrentTrack(prevTrack => 
-                  prevTrack?.id === trackId ? { ...prevTrack, isActive: true } : prevTrack
-               );
-              setQueue(prevQueue => 
-                  prevQueue.map(t => t.id === trackId ? { ...t, isActive: true } : t)
-              );
-              setTrackQueue(prevPlaybackQueue => 
-                  prevPlaybackQueue.map(t => t.id === trackId ? { ...t, isActive: true } : t)
-              );
-         }
-      });
+    //                if (nextQueue.length > 0) {
+    //                    const nextIndex = Math.min(currentIndex, nextQueue.length - 1);
+    //                    if (nextQueue[nextIndex]) {
+    //                        playTrack(nextQueue[nextIndex]);
+    //                    } else {
+    //                        setCurrentIndex(0);
+    //                    }
+    //                } else {
+    //                    setCurrentIndex(0);
+    //                }
+    //            } else {
+    //                const nextQueue = queue.filter(t => t.id !== trackId || t.artistId === currentArtistId);
+    //                const nextPlaybackQueue = trackQueue.filter(t => t.id !== trackId || t.artistId === currentArtistId);
+                    
+    //                if (nextQueue.length !== queue.length) { 
+    //                   console.log('[WebSocket] Hidden track removed from queues (user not owner)');
+    //                   setQueue(nextQueue);
+    //                   setTrackQueue(nextPlaybackQueue);
+    //                   trackQueueRef.current = nextPlaybackQueue;
+    //                    const hiddenIndex = trackQueue.findIndex(t => t.id === trackId);
+    //                   if (hiddenIndex !== -1 && hiddenIndex < currentIndex) {
+    //                       setCurrentIndex(prev => Math.max(0, prev - 1));
+    //                   }
+    //                }
+    //            }
+    //      } else {
+    //            setCurrentTrack(prevTrack => 
+    //               prevTrack?.id === trackId ? { ...prevTrack, isActive: true } : prevTrack
+    //            );
+    //           setQueue(prevQueue => 
+    //               prevQueue.map(t => t.id === trackId ? { ...t, isActive: true } : t)
+    //           );
+    //           setTrackQueue(prevPlaybackQueue => 
+    //               prevPlaybackQueue.map(t => t.id === trackId ? { ...t, isActive: true } : t)
+    //           );
+    //      }
+    //   });
 
-    };
+    // };
 
-    const timeoutId = setTimeout(connectSocket, process.env.NODE_ENV === 'development' ? 100 : 0);
+    // const timeoutId = setTimeout(connectSocket, process.env.NODE_ENV === 'development' ? 100 : 0);
 
-    return () => {
-      clearTimeout(timeoutId);
-      if (socket) { 
-          console.log(`[WebSocket] TrackContext disconnecting...`);
-          socket.off('connect');
-          socket.off('disconnect');
-          socket.off('connect_error');
-          socket.off('track:updated');
-          socket.off('track:deleted');
-          socket.off('track:visibilityChanged');
-          socket.disconnect();
-      }
-    };
-  }, [currentTrack?.id, currentIndex, queue, trackQueue, setCurrentTrack, setQueue, setTrackQueue, setIsPlaying, setCurrentIndex, playTrack, pauseTrack, skipNext]);
+    // return () => {
+    //   clearTimeout(timeoutId);
+    //   if (socket) { 
+    //       console.log(`[WebSocket] TrackContext disconnecting...`);
+    //       socket.off('connect');
+    //       socket.off('disconnect');
+    //       socket.off('connect_error');
+    //       socket.off('track:updated');
+    //       socket.off('track:deleted');
+    //       socket.off('track:visibilityChanged');
+    //       socket.disconnect();
+    //   }
+    // };
+  }, [currentTrack?.id, currentIndex, queue, trackQueue, setCurrentTrack, setQueue, setTrackQueue, setIsPlaying, setCurrentIndex, playTrack, pauseTrack, skipNext]); // Consider which dependencies are truly needed if socket logic is removed
 
   return (
     <TrackContext.Provider

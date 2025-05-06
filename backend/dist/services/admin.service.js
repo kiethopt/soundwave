@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
+exports.rejectArtistClaim = exports.approveArtistClaim = exports.getArtistClaimRequestDetail = exports.getArtistClaimRequests = exports.updateAIModel = exports.updateCacheStatus = exports.getAIModelStatus = exports.getCacheStatus = exports.getSystemStatus = exports.getDashboardStats = exports.deleteArtistRequest = exports.rejectArtistRequest = exports.approveArtistRequest = exports.deleteGenreById = exports.updateGenreInfo = exports.createNewGenre = exports.getGenres = exports.getArtistById = exports.getArtists = exports.deleteArtistById = exports.deleteUserById = exports.updateArtistInfo = exports.updateUserInfo = exports.getArtistRequestDetail = exports.getArtistRequests = exports.getUserById = exports.getUsers = void 0;
 const client_1 = require("@prisma/client");
 const db_1 = __importDefault(require("../config/db"));
 const prisma_selects_1 = require("../utils/prisma-selects");
@@ -49,6 +49,8 @@ const client_2 = require("@prisma/client");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const date_fns_1 = require("date-fns");
 const emailService = __importStar(require("./email.service"));
+const socket_1 = require("../config/socket");
+const socket_2 = require("../config/socket");
 const VALID_GEMINI_MODELS = [
     'gemini-2.5-flash-preview-04-17',
     'gemini-2.5-pro-preview-03-25',
@@ -670,6 +672,7 @@ const approveArtistRequest = async (requestId) => {
                 message: 'Your request to become an Artist has been approved!',
                 recipientType: 'USER',
                 userId: userForNotification.id,
+                artistId: updatedProfile.id
             },
         }).catch(err => console.error('[Async Notify Error] Failed to create approval notification:', err));
         if (userForNotification.email) {
@@ -1059,4 +1062,274 @@ ${newLine}`;
     }
 };
 exports.updateAIModel = updateAIModel;
+const getArtistClaimRequests = async (req) => {
+    const { search, startDate, endDate } = req.query;
+    const where = {
+        status: client_1.ClaimStatus.PENDING,
+        AND: [],
+    };
+    if (typeof search === 'string' && search.trim()) {
+        const trimmedSearch = search.trim();
+        if (Array.isArray(where.AND)) {
+            where.AND.push({
+                OR: [
+                    { claimingUser: { name: { contains: trimmedSearch, mode: 'insensitive' } } },
+                    { claimingUser: { email: { contains: trimmedSearch, mode: 'insensitive' } } },
+                    { claimingUser: { username: { contains: trimmedSearch, mode: 'insensitive' } } },
+                    { artistProfile: { artistName: { contains: trimmedSearch, mode: 'insensitive' } } },
+                ],
+            });
+        }
+    }
+    const dateFilter = {};
+    if (typeof startDate === 'string' && startDate) {
+        try {
+            const startOfDay = new Date(startDate);
+            startOfDay.setUTCHours(0, 0, 0, 0);
+            dateFilter.gte = startOfDay;
+        }
+        catch (e) {
+            console.error("Invalid start date format:", startDate);
+        }
+    }
+    if (typeof endDate === 'string' && endDate) {
+        try {
+            const endOfDay = new Date(endDate);
+            endOfDay.setUTCHours(23, 59, 59, 999);
+            dateFilter.lte = endOfDay;
+        }
+        catch (e) {
+            console.error("Invalid end date format:", endDate);
+        }
+    }
+    if (dateFilter.gte || dateFilter.lte) {
+        if (Array.isArray(where.AND)) {
+            where.AND.push({ submittedAt: dateFilter });
+        }
+    }
+    const options = {
+        where,
+        select: prisma_selects_1.artistClaimRequestSelect,
+        orderBy: { submittedAt: 'desc' },
+    };
+    const result = await (0, handle_utils_1.paginate)(db_1.default.artistClaimRequest, req, options);
+    return {
+        claimRequests: result.data,
+        pagination: result.pagination,
+    };
+};
+exports.getArtistClaimRequests = getArtistClaimRequests;
+const getArtistClaimRequestDetail = async (claimId) => {
+    const claimRequest = await db_1.default.artistClaimRequest.findUnique({
+        where: { id: claimId },
+        select: prisma_selects_1.artistClaimRequestDetailsSelect,
+    });
+    if (!claimRequest) {
+        throw new Error('Artist claim request not found.');
+    }
+    if (claimRequest.artistProfile.user?.id || claimRequest.artistProfile.isVerified) {
+        if (claimRequest.status === client_1.ClaimStatus.PENDING) {
+            console.warn(`Claim request ${claimId} is pending but target profile ${claimRequest.artistProfile.id} seems already claimed/verified.`);
+        }
+    }
+    return claimRequest;
+};
+exports.getArtistClaimRequestDetail = getArtistClaimRequestDetail;
+const approveArtistClaim = async (claimId, adminUserId) => {
+    const claimRequest = await db_1.default.artistClaimRequest.findUnique({
+        where: { id: claimId },
+        select: {
+            id: true,
+            status: true,
+            claimingUserId: true,
+            artistProfileId: true,
+            artistProfile: { select: { userId: true, isVerified: true, artistName: true } }
+        }
+    });
+    if (!claimRequest) {
+        throw new Error('Artist claim request not found.');
+    }
+    if (claimRequest.status !== client_1.ClaimStatus.PENDING) {
+        throw new Error(`Cannot approve claim request with status: ${claimRequest.status}`);
+    }
+    if (claimRequest.artistProfile.userId || claimRequest.artistProfile.isVerified) {
+        await db_1.default.artistClaimRequest.update({
+            where: { id: claimId },
+            data: {
+                status: client_1.ClaimStatus.REJECTED,
+                rejectionReason: 'Profile became unavailable before approval.',
+                reviewedAt: new Date(),
+                reviewedByAdminId: adminUserId
+            }
+        });
+        throw new Error('Target artist profile is no longer available for claiming.');
+    }
+    return db_1.default.$transaction(async (tx) => {
+        const updatedClaim = await tx.artistClaimRequest.update({
+            where: { id: claimId },
+            data: {
+                status: client_1.ClaimStatus.APPROVED,
+                reviewedAt: new Date(),
+                reviewedByAdminId: adminUserId,
+                rejectionReason: null,
+            },
+            select: { id: true, claimingUserId: true, artistProfileId: true }
+        });
+        const updatedProfile = await tx.artistProfile.update({
+            where: { id: updatedClaim.artistProfileId },
+            data: {
+                userId: updatedClaim.claimingUserId,
+                isVerified: true,
+                verifiedAt: new Date(),
+                role: client_1.Role.ARTIST,
+                verificationRequestedAt: null,
+                requestedLabelName: null,
+            },
+            select: { id: true, artistName: true }
+        });
+        await tx.artistClaimRequest.updateMany({
+            where: {
+                artistProfileId: updatedClaim.artistProfileId,
+                id: { not: claimId },
+                status: client_1.ClaimStatus.PENDING,
+            },
+            data: {
+                status: client_1.ClaimStatus.REJECTED,
+                rejectionReason: 'Another claim for this artist was approved.',
+                reviewedAt: new Date(),
+                reviewedByAdminId: adminUserId,
+            }
+        });
+        await tx.artistClaimRequest.updateMany({
+            where: {
+                claimingUserId: updatedClaim.claimingUserId,
+                artistProfileId: { not: updatedClaim.artistProfileId },
+                status: { in: [client_1.ClaimStatus.PENDING, client_1.ClaimStatus.REJECTED] },
+            },
+            data: {
+                status: client_1.ClaimStatus.REJECTED,
+                rejectionReason: 'You have been approved for another artist claim.',
+                reviewedAt: new Date(),
+                reviewedByAdminId: adminUserId,
+            }
+        });
+        try {
+            const notificationData = {
+                data: {
+                    type: client_1.NotificationType.CLAIM_REQUEST_APPROVED,
+                    message: `Your claim request for artist '${claimRequest.artistProfile.artistName}' has been approved.`,
+                    recipientType: client_1.RecipientType.USER,
+                    userId: updatedClaim.claimingUserId,
+                    artistId: updatedClaim.artistProfileId,
+                    senderId: adminUserId,
+                    isRead: false
+                },
+                select: { id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true, artistId: true, senderId: true }
+            };
+            const notification = await tx.notification.create(notificationData);
+            const io = (0, socket_1.getIO)();
+            const targetSocketId = (0, socket_2.getUserSockets)().get(updatedClaim.claimingUserId);
+            if (targetSocketId) {
+                console.log(`[Socket Emit] Sending CLAIM_REQUEST_APPROVED notification to user ${updatedClaim.claimingUserId} via socket ${targetSocketId}`);
+                io.to(targetSocketId).emit('notification', {
+                    id: notification.id,
+                    type: notification.type,
+                    message: notification.message,
+                    recipientType: notification.recipientType,
+                    isRead: notification.isRead,
+                    createdAt: notification.createdAt.toISOString(),
+                    artistId: notification.artistId,
+                    senderId: notification.senderId
+                });
+            }
+            else {
+                console.log(`[Socket Emit] User ${updatedClaim.claimingUserId} not connected, skipping CLAIM_REQUEST_APPROVED socket event.`);
+            }
+        }
+        catch (notificationError) {
+            console.error("[Notify/Socket Error] Failed processing claim approval notification/socket:", notificationError);
+        }
+        return {
+            message: `Claim approved. Profile '${updatedProfile.artistName}' is now linked to user ${updatedClaim.claimingUserId}.`,
+            claimId: updatedClaim.id,
+            artistProfileId: updatedProfile.id,
+            userId: updatedClaim.claimingUserId,
+        };
+    });
+};
+exports.approveArtistClaim = approveArtistClaim;
+const rejectArtistClaim = async (claimId, adminUserId, reason) => {
+    const claimRequest = await db_1.default.artistClaimRequest.findUnique({
+        where: { id: claimId },
+        select: {
+            id: true,
+            status: true,
+            claimingUserId: true,
+            artistProfile: { select: { id: true, artistName: true } }
+        }
+    });
+    if (!claimRequest) {
+        throw new Error('Artist claim request not found.');
+    }
+    if (claimRequest.status !== client_1.ClaimStatus.PENDING) {
+        throw new Error(`Cannot reject claim request with status: ${claimRequest.status}`);
+    }
+    if (!reason || reason.trim() === '') {
+        throw new Error('Rejection reason is required.');
+    }
+    const rejectedClaim = await db_1.default.artistClaimRequest.update({
+        where: { id: claimId },
+        data: {
+            status: client_1.ClaimStatus.REJECTED,
+            rejectionReason: reason.trim(),
+            reviewedAt: new Date(),
+            reviewedByAdminId: adminUserId,
+        },
+        select: { id: true, claimingUserId: true, artistProfileId: true }
+    });
+    if (rejectedClaim && claimRequest) {
+        try {
+            const notification = await db_1.default.notification.create({
+                data: {
+                    type: client_1.NotificationType.CLAIM_REQUEST_REJECTED,
+                    message: `Your claim request for artist '${claimRequest.artistProfile.artistName}' was rejected. Reason: ${reason.trim()}`,
+                    recipientType: client_1.RecipientType.USER,
+                    userId: rejectedClaim.claimingUserId,
+                    artistId: rejectedClaim.artistProfileId,
+                    senderId: adminUserId,
+                    isRead: false
+                },
+                select: { id: true, type: true, message: true, recipientType: true, isRead: true, createdAt: true, artistId: true, senderId: true }
+            });
+            const io = (0, socket_1.getIO)();
+            const targetSocketId = (0, socket_2.getUserSockets)().get(rejectedClaim.claimingUserId);
+            if (targetSocketId) {
+                console.log(`[Socket Emit] Sending CLAIM_REQUEST_REJECTED notification to user ${rejectedClaim.claimingUserId} via socket ${targetSocketId}`);
+                io.to(targetSocketId).emit('notification', {
+                    id: notification.id,
+                    type: notification.type,
+                    message: notification.message,
+                    recipientType: notification.recipientType,
+                    isRead: notification.isRead,
+                    createdAt: notification.createdAt.toISOString(),
+                    artistId: notification.artistId,
+                    senderId: notification.senderId,
+                    rejectionReason: reason.trim()
+                });
+            }
+            else {
+                console.log(`[Socket Emit] User ${rejectedClaim.claimingUserId} not connected, skipping CLAIM_REQUEST_REJECTED socket event.`);
+            }
+        }
+        catch (notificationError) {
+            console.error("[Notify/Socket Error] Failed processing claim rejection notification/socket:", notificationError);
+        }
+    }
+    return {
+        message: 'Artist claim request rejected successfully.',
+        claimId: rejectedClaim.id,
+        userId: rejectedClaim.claimingUserId
+    };
+};
+exports.rejectArtistClaim = rejectArtistClaim;
 //# sourceMappingURL=admin.service.js.map

@@ -112,25 +112,23 @@ export default function NewTrack() {
       } else if (e.target.name === 'cover' && e.target.files.length > 0) {
         const file = e.target.files[0];
         setCoverFile(file);
+        // Clean up previous object URL if exists to prevent memory leaks
+        if (previewImage && previewImage.startsWith('blob:')) {
+            URL.revokeObjectURL(previewImage);
+        }
         const reader = new FileReader();
         reader.onloadend = () => {
           setPreviewImage(reader.result as string);
         };
         reader.readAsDataURL(file);
-        // Clean up previous object URL if exists to prevent memory leaks
-        if (previewImage && previewImage.startsWith('blob:')) {
-          URL.revokeObjectURL(previewImage);
-        }
       }
     }
   };
 
-  // Hàm xử lý khi nhấn vào ảnh bìa để mở input file
   const handleCoverClick = () => {
     coverFileInputRef.current?.click();
   };
 
-  // Function to trigger audio file input click
   const handleAudioInputClick = () => {
     audioFileInputRef.current?.click();
   };
@@ -221,9 +219,9 @@ export default function NewTrack() {
             {/* Left Column: Cover Art & Audio */}
             <div className="md:col-span-1 space-y-8 flex flex-col items-center md:items-start">
               {/* Cover Image Upload */}
-              <div className="w-full space-y-2 flex flex-col items-center">
+              <div className={cn("w-full space-y-2 p-4 rounded-lg", theme === 'dark' ? 'bg-white/5' : 'bg-gray-50 border')}>
                 <UILabel
-                  htmlFor="cover"
+                  htmlFor="cover-upload-area"
                   className={cn(
                     "self-start text-sm font-medium mb-1",
                     theme === 'light' ? 'text-gray-700' : 'text-white/80'
@@ -231,11 +229,11 @@ export default function NewTrack() {
                 >
                   Cover Image (Optional)
                 </UILabel>
-                {/* New Cover Upload Area */}
-                <div 
+                <div
+                  id="cover-upload-area"
                   className={cn(
                     "w-full aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative overflow-hidden group",
-                    theme === "dark" ? "border-gray-600 hover:border-gray-500 bg-white/5" : "border-gray-300 hover:border-gray-400 bg-gray-50"
+                    theme === "dark" ? "border-gray-600 hover:border-gray-500 bg-black/20" : "border-gray-300 hover:border-gray-400 bg-gray-100"
                   )}
                   onClick={handleCoverClick}
                 >
@@ -266,7 +264,7 @@ export default function NewTrack() {
               </div>
 
               {/* Audio File Upload */}
-              <div className="w-full space-y-2">
+              <div className={cn("w-full space-y-2 p-4 rounded-lg", theme === 'dark' ? 'bg-white/5' : 'bg-gray-50 border')}>
                 <UILabel
                   htmlFor="audio-display"
                   className={cn(
@@ -288,14 +286,14 @@ export default function NewTrack() {
                   required
                 />
                 {/* Custom Audio Upload Button/Display */}
-                <div 
+                <div
                   id="audio-display"
-                  onClick={handleAudioInputClick} 
+                  onClick={handleAudioInputClick}
                   className={cn(
-                    "w-full p-4 rounded-lg border flex items-center justify-center cursor-pointer transition-colors",
-                    theme === 'light' 
-                      ? 'border-gray-300 bg-gray-50 hover:bg-gray-100 text-gray-500' 
-                      : 'border-gray-600 bg-white/5 hover:bg-white/10 text-gray-400',
+                    "w-full p-6 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors",
+                    theme === 'light'
+                      ? 'border-gray-300 bg-gray-100 hover:bg-gray-200 text-gray-500'
+                      : 'border-gray-600 bg-black/20 hover:bg-black/30 text-gray-400',
                     audioFile ? (theme === 'light' ? 'border-green-500 bg-green-50' : 'border-green-700 bg-green-900/20') : (theme === 'light' ? 'hover:border-blue-400' : 'hover:border-blue-600'),
                     'group'
                   )}
@@ -403,9 +401,9 @@ export default function NewTrack() {
               <div className="flex justify-end pt-4">
                 <Button
                   type="submit"
-                  disabled={isLoading || !audioFile || selectedGenres.length === 0}
+                  disabled={isLoading || !audioFile || selectedGenres.length === 0 || !trackData.title || !trackData.releaseDate}
                   className={cn(
-                    'px-6 py-2.5', 
+                    'px-6 py-2.5',
                     theme === 'light'
                       ? 'bg-gray-900 text-white hover:bg-gray-800'
                       : 'bg-white text-[#121212] hover:bg-white/90',

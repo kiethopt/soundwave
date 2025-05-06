@@ -12,7 +12,7 @@ export interface TrackUploadFormProps {
     [key: string]: {
       title: string;
       artist: string;
-      featuredArtists: string[];
+      featuredArtists: SelectedArtist[];
       trackNumber: number;
       releaseDate: string;
       genres: string[];
@@ -20,7 +20,7 @@ export interface TrackUploadFormProps {
   };
   isUploading: boolean;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onSubmit: (e: React.FormEvent) => Promise<void>;
+  onSubmit: (e: React.FormEvent) => void;
   onTrackDetailChange: (fileName: string, field: string, value: any) => void;
   artists?: ArtistProfile[];
   availableGenres?: Genre[];
@@ -563,3 +563,9 @@ export interface ArtistClaimRequest {
   } | null;
 }
 // --- End New Type ---
+
+// Add this interface definition, e.g., near other related type definitions
+export interface SelectedArtist {
+  id?: string;
+  name: string;
+}

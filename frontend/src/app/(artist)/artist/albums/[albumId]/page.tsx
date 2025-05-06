@@ -31,6 +31,12 @@ import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { EditTrackModal } from '@/components/ui/artist-modals';
 
+// Define the type for selected artists (can have ID or just name)
+interface SelectedArtist {
+  id?: string;
+  name: string;
+}
+
 export default function AlbumDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -57,7 +63,7 @@ export default function AlbumDetailPage() {
     [key: string]: {
       title: string;
       artist: string;
-      featuredArtists: string[];
+      featuredArtists: SelectedArtist[];
       trackNumber: number;
       releaseDate: string;
       genres: string[];
@@ -274,24 +280,36 @@ export default function AlbumDetailPage() {
 
       const formData = new FormData();
 
+      // Append album-level info if needed by the backend (currently not, but good practice)
+      // formData.append('albumId', extractedAlbumId);
+
       newTracks.forEach((file, index) => {
         const details = trackDetails[file.name];
-        if (!details) throw new Error('Missing track details');
 
+        if (!details) throw new Error(`Missing track details for ${file.name}`);
+
+        // Append the file itself with an indexed name if backend expects multiple files under one key
+        // Or just 'tracks[]' if backend handles array of files
         formData.append('tracks', file);
-        formData.append(`title`, details.title);
-        formData.append(
-          'releaseDate',
-          album?.releaseDate || new Date().toISOString().split('T')[0]
-        );
-        formData.append(`trackNumber`, details.trackNumber.toString());
+
+        // Append indexed metadata for each track
+        formData.append('titles[]', details.title);
+        formData.append('trackNumbers[]', details.trackNumber.toString());
+
+        const trackFeaturedArtistIds = details.featuredArtists?.filter(a => a.id).map(a => a.id!) || [];
+        const trackFeaturedArtistNames = details.featuredArtists?.filter(a => !a.id).map(a => a.name) || [];
         if (details.featuredArtists && details.featuredArtists.length > 0) {
-          formData.append(`featuredArtists`, details.featuredArtists.join(','));
+          formData.append(`featuredArtistIds[${index}]`, JSON.stringify(trackFeaturedArtistIds));
+          formData.append(`featuredArtistNames[${index}]`, JSON.stringify(trackFeaturedArtistNames));
         }
+
         if (details.genres && details.genres.length > 0) {
-          formData.append(`genres`, details.genres.join(','));
+          formData.append(`genreIds[${index}]`, JSON.stringify(details.genres));
         }
       });
+
+      // Append indexed release date
+      formData.append('releaseDate', album?.releaseDate || new Date().toISOString().split('T')[0]);
 
       console.log('FormData - genres being sent:', formData.getAll('genres'));
 
@@ -338,9 +356,9 @@ export default function AlbumDetailPage() {
       files.forEach((file, index) => {
         if (!newTrackDetails[file.name]) {
           newTrackDetails[file.name] = {
-            title: file.name.replace(/\.[^/.]+$/, ''),
+            title: file.name.replace(/\.[^/.]+$/, ''), // Default title from filename
             artist: album?.artist.id || '',
-            featuredArtists: [],
+            featuredArtists: [], // Initialize as empty array
             trackNumber: existingTrackCount + index + 1,
             releaseDate:
               album?.releaseDate || new Date().toISOString().split('T')[0],
@@ -619,70 +637,15 @@ export default function AlbumDetailPage() {
                         {(track.duration % 60).toString().padStart(2, '0')}
                       </div>
                       <div className="flex items-center justify-center">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            className={`opacity-0 group-hover:opacity-100 p-2 rounded-full transition-all ${
-                              theme === 'light'
-                                ? 'hover:bg-gray-200'
-                                : 'hover:bg-white/10'
-                            }`}
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            className={
-                              theme === 'light'
-                                ? 'bg-white border border-gray-200'
-                                : 'bg-[#282828] border border-white/10'
-                            }
-                          >
-                            <DropdownMenuItem
-                              onClick={() => handleEditTrack(track)}
-                              className={
-                                theme === 'light'
-                                  ? 'text-gray-700'
-                                  : 'text-white'
-                              }
-                            >
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit Track
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleToggleTrackVisibility(track)}
-                              className={
-                                theme === 'light'
-                                  ? 'text-gray-700'
-                                  : 'text-white'
-                              }
-                            >
-                              {track.isActive ? (
-                                <>
-                                  <EyeOff className="w-4 h-4 mr-2" />
-                                  Hide Track
-                                </>
-                              ) : (
-                                <>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  Show Track
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator
-                              className={
-                                theme === 'light'
-                                  ? 'bg-gray-200'
-                                  : 'bg-white/10'
-                              }
-                            />
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteTrack(track)}
-                              className="text-red-500"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete Track
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 group-hover:opacity-100 opacity-0 transition-opacity ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
+                          onClick={(e) => { e.stopPropagation(); handleEditTrack(track); }}
+                          aria-label={`Edit track ${track.title}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
 
@@ -751,72 +714,15 @@ export default function AlbumDetailPage() {
                             {Math.floor(track.duration / 60)}:
                             {(track.duration % 60).toString().padStart(2, '0')}
                           </span>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              className={`p-2 rounded-full ${
-                                theme === 'light'
-                                  ? 'hover:bg-gray-200'
-                                  : 'hover:bg-white/10'
-                              }`}
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              className={
-                                theme === 'light'
-                                  ? 'bg-white border border-gray-200'
-                                  : 'bg-[#282828] border border-white/10'
-                              }
-                            >
-                              <DropdownMenuItem
-                                onClick={() => handleEditTrack(track)}
-                                className={
-                                  theme === 'light'
-                                    ? 'text-gray-700'
-                                    : 'text-white'
-                                }
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Track
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleToggleTrackVisibility(track)
-                                }
-                                className={
-                                  theme === 'light'
-                                    ? 'text-gray-700'
-                                    : 'text-white'
-                                }
-                              >
-                                {track.isActive ? (
-                                  <>
-                                    <EyeOff className="w-4 h-4 mr-2" />
-                                    Hide Track
-                                  </>
-                                ) : (
-                                  <>
-                                    <Eye className="w-4 h-4 mr-2" />
-                                    Show Track
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator
-                                className={
-                                  theme === 'light'
-                                    ? 'bg-gray-200'
-                                    : 'bg-white/10'
-                                }
-                              />
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteTrack(track)}
-                                className="text-red-500"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete Track
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`text-blue-600 hover:bg-blue-100/10 h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-blue-500/20' : 'hover:bg-blue-100'}`}
+                            onClick={(e) => { e.stopPropagation(); handleEditTrack(track); }}
+                            aria-label={`Edit track ${track.title}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -859,7 +765,7 @@ export default function AlbumDetailPage() {
                   },
                 }));
               }}
-              artists={artists}
+              availableArtists={artists.map(a => ({ id: a.id, name: a.artistName }))}
               availableGenres={availableGenres}
               existingTrackCount={album.tracks?.length || 0}
             />

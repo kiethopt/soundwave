@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getHotAlbums = exports.getNewestAlbums = exports.playAlbum = exports.getAlbumById = exports.getAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = void 0;
+exports.getHotAlbums = exports.getNewestAlbums = exports.getAlbumById = exports.getAllAlbums = exports.searchAlbum = exports.toggleAlbumVisibility = exports.deleteAlbum = exports.updateAlbum = exports.addTracksToAlbum = exports.createAlbum = void 0;
 const albumService = __importStar(require("../services/album.service"));
 const createAlbum = async (req, res) => {
     try {
@@ -131,18 +131,6 @@ const getAlbumById = async (req, res) => {
     }
 };
 exports.getAlbumById = getAlbumById;
-const playAlbum = async (req, res) => {
-    try {
-        const result = await albumService.playAlbum(req);
-        res.json(result);
-    }
-    catch (error) {
-        console.error('Play album error:', error);
-        const message = error instanceof Error ? error.message : 'Internal server error';
-        res.status(500).json({ message });
-    }
-};
-exports.playAlbum = playAlbum;
 const getNewestAlbums = async (req, res) => {
     try {
         const albums = await albumService.getNewestAlbums(Number(req.query.limit) || 25);

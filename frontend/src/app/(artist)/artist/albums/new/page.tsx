@@ -4,10 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/utils/api';
 import Link from 'next/link';
-import { ArrowLeft } from '@/components/ui/Icons';
+import { ArrowLeft, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { Input } from "@/components/ui/input";
+import { Label as UILabel } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { cn } from '@/lib/utils';
 
 // Định nghĩa kiểu dữ liệu cho Label
 interface Label {
@@ -86,6 +90,10 @@ export default function NewAlbum() {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setCoverFile(file);
+      // Clean up previous object URL if exists
+      if (previewImage && previewImage.startsWith('blob:')) {
+        URL.revokeObjectURL(previewImage);
+      }
       const imageUrl = URL.createObjectURL(file);
       setPreviewImage(imageUrl);
     }
@@ -143,213 +151,175 @@ export default function NewAlbum() {
     >
       <div className="flex flex-col space-y-6">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
-          <div className="w-fit">
-            <Link
-              href="/artist/albums"
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${theme === 'light'
-                ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
-                : 'bg-white/10 hover:bg-white/15 text-white/80 hover:text-white'
-                }`}
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </Link>
-          </div>
+        <div className="flex items-center justify-between gap-4 mb-4">
+           <Button
+             variant="outline"
+             size="default"
+             onClick={() => router.push('/artist/albums')}
+             className={cn(theme === 'dark' ? 'border-white/20 hover:bg-white/10' : '')}
+           >
+             <ArrowLeft className="mr-2 h-4 w-4" />
+             Back to Albums
+           </Button>
+           <h1 className={`text-2xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Create New Album/EP</h1>
+           <div className="w-[150px]"></div>
         </div>
 
         {/* Main Form Card */}
         <div
-          className={`rounded-xl p-6 border ${theme === 'light'
+          className={`rounded-xl p-6 md:p-8 border ${theme === 'light'
             ? 'bg-white border-gray-200'
-            : 'bg-[#121212] border-gray-800'
+            : 'bg-[#181818] border-gray-700/50'
             }`}
         >
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
-              {/* Title */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="title"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
-                >
-                  Title
-                </label>
-                <input
-                  type="text"
-                  id="title"
-                  name="title"
-                  value={albumData.title}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                    ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-                    }`}
-                  required
-                />
-              </div>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* --- Left Column: Cover Art --- */}
+            <div className="md:col-span-1 space-y-2 flex flex-col items-center md:items-start">
+               <UILabel
+                 htmlFor="cover-upload-area"
+                 className={cn(
+                   "self-start text-sm font-medium mb-1",
+                   theme === 'light' ? 'text-gray-700' : 'text-white/80'
+                 )}
+               >
+                 Cover Image (Optional)
+               </UILabel>
+               <div
+                 id="cover-upload-area"
+                 className={cn(
+                   "w-full aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer relative overflow-hidden group",
+                   theme === "dark" ? "border-gray-600 hover:border-gray-500 bg-white/5" : "border-gray-300 hover:border-gray-400 bg-gray-50"
+                 )}
+                 onClick={handleCoverClick}
+               >
+                 {previewImage ? (
+                   <img src={previewImage} alt="Album cover preview" className="w-full h-full object-cover" />
+                 ) : (
+                   <div className="text-center p-4">
+                     <Upload className={cn("h-16 w-16 mx-auto mb-3", theme === 'dark' ? 'text-gray-500' : 'text-gray-400')} />
+                     <p className={cn("font-medium", theme === 'dark' ? 'text-gray-300' : 'text-gray-600')}>Click to upload cover</p>
+                     <p className={cn("text-xs mt-1", theme === 'dark' ? 'text-gray-500' : 'text-gray-400')}>PNG, JPG, GIF up to 10MB</p>
+                   </div>
+                 )}
+                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <p className="text-white text-sm font-medium">{previewImage ? 'Change Cover' : 'Upload Cover'}</p>
+                 </div>
+               </div>
+               <input
+                 ref={fileInputRef}
+                 type="file"
+                 id="cover"
+                 name="cover"
+                 accept="image/*"
+                 onChange={handleFileChange}
+                 className="hidden"
+               />
+                {coverFile && <span className={`mt-1 text-xs self-center md:self-start ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>{coverFile.name}</span>}
+            </div>
 
-              {/* Type */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="type"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
-                >
-                  Type
-                </label>
-                <select
-                  id="type"
-                  name="type"
-                  value={albumData.type}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                    ? 'bg-white border-gray-300 focus:ring-blue-500/20 text-gray-900'
-                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20 text-white'
-                    }`}
-                >
-                  <option
-                    value="ALBUM"
-                    className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
-                  >
-                    Album
-                  </option>
-                  <option
-                    value="EP"
-                    className={theme === 'dark' ? 'bg-[#121212] text-white' : ''}
-                  >
-                    EP
-                  </option>
-                </select>
-              </div>
+             {/* --- Right Column: Album Details --- */}
+            <div className="md:col-span-2 space-y-5">
+               {/* Title */}
+               <div className="space-y-1.5">
+                 <UILabel htmlFor="title" className={theme === 'light' ? 'text-gray-700' : 'text-white/80'}>Title *</UILabel>
+                 <Input
+                   type="text"
+                   id="title"
+                   name="title"
+                   value={albumData.title}
+                   onChange={handleInputChange}
+                   className={cn(theme === 'light' ? 'bg-white border-gray-300' : 'bg-white/[0.07] border-white/[0.1]')}
+                   required
+                 />
+               </div>
 
-              {/* Release Date & Time */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="releaseDate"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
-                >
-                  Release Date & Time
-                </label>
-                <input
-                  type="datetime-local"
-                  id="releaseDate"
-                  name="releaseDate"
-                  value={albumData.releaseDate}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 ${theme === 'light'
-                    ? 'bg-white border-gray-300 focus:ring-blue-500/20'
-                    : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/20'
-                    }`}
-                  required
-                />
-              </div>
+               {/* Type */}
+               <div className="space-y-1.5">
+                 <UILabel htmlFor="type" className={theme === 'light' ? 'text-gray-700' : 'text-white/80'}>Type *</UILabel>
+                 <select
+                   id="type"
+                   name="type"
+                   value={albumData.type}
+                   onChange={handleInputChange}
+                   className={cn(
+                      'w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-1 appearance-none',
+                      theme === 'light'
+                        ? 'bg-white border-gray-300 focus:ring-blue-500/50 text-gray-900'
+                        : 'bg-white/[0.07] border-white/[0.1] focus:ring-white/30 text-white'
+                   )}
+                   style={ theme === 'dark' ? { backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: `right 0.5rem center`, backgroundRepeat: `no-repeat`, backgroundSize: `1.5em 1.5em`} : {} }
+                 >
+                   <option value="ALBUM" className={theme === 'dark' ? 'bg-[#181818] text-white' : ''}>Album</option>
+                   <option value="EP" className={theme === 'dark' ? 'bg-[#181818] text-white' : ''}>EP</option>
+                 </select>
+               </div>
 
-              {/* Genres */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="genres"
-                  className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
-                    }`}
-                >
-                  Genres *
-                </label>
-                <SearchableSelect
-                  options={availableGenres}
-                  value={selectedGenres}
-                  onChange={setSelectedGenres}
-                  placeholder="Select genres..."
-                  multiple={true}
-                  required={true}
-                />
-              </div>
+               {/* Release Date & Time */}
+               <div className="space-y-1.5">
+                 <UILabel htmlFor="releaseDate" className={theme === 'light' ? 'text-gray-700' : 'text-white/80'}>Release Date & Time *</UILabel>
+                 <Input
+                   type="datetime-local"
+                   id="releaseDate"
+                   name="releaseDate"
+                   value={albumData.releaseDate}
+                   onChange={handleInputChange}
+                   className={cn(
+                     'w-full',
+                     theme === 'light' ? 'bg-white border-gray-300' : 'bg-white/[0.07] border-white/[0.1]',
+                     theme === 'dark' ? 'date-input-dark' : ''
+                   )}
+                   required
+                 />
+               </div>
 
-              {/* Display Artist's Default Label (Read-only) */}
-              {artistLabelName && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="labelDisplay"
-                    className={`block text-sm font-medium ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
-                  >
-                    Label 
-                  </label>
-                  <input
-                    type="text"
-                    id="labelDisplay"
-                    value={artistLabelName}
-                    disabled
-                    className={`w-full px-3 py-2 rounded-md border focus:outline-none ${theme === 'light'
-                        ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-white/[0.05] border-white/[0.1] text-white/50 cursor-not-allowed'
-                      }`}
-                  />
-                </div>
-              )}
+               {/* Genres */}
+               <div className="space-y-1.5">
+                 <UILabel className={theme === 'dark' ? 'text-white/80' : 'text-gray-700'}>Genres *</UILabel>
+                 <SearchableSelect
+                   options={availableGenres}
+                   value={selectedGenres}
+                   onChange={setSelectedGenres}
+                   placeholder="Select genres..."
+                   multiple={true}
+                   required={true}
+                 />
+               </div>
 
-              {/* Cover Image */}
-              <div className="space-y-2">
-                <label
-                  htmlFor="cover"
-                  className={`block text-sm font-medium ${theme === 'light' ? 'text-gray-700' : 'text-white/80'
-                    }`}
-                >
-                  Cover Image (Optional)
-                </label>
-                <div
-                  className="w-full flex flex-col items-center mb-4"
-                  onClick={handleCoverClick}
-                >
-                  <div
-                    className={`w-40 h-40 rounded-md overflow-hidden cursor-pointer border-2 ${theme === 'dark' ? 'border-gray-600' : 'border-gray-300'
-                      } hover:opacity-90 transition-opacity relative`}
-                  >
-                    <img
-                      src={
-                        previewImage ||
-                        'https://placehold.co/150x150?text=No+Cover'
-                      }
-                      alt="Album cover"
-                      className="w-full h-full object-cover"
-                    />
-                    <div
-                      className={`absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 hover:opacity-100 transition-opacity text-white`}
-                    >
-                      <span>Choose Cover</span>
-                    </div>
-                  </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    id="cover"
-                    name="cover"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                  <span
-                    className={`mt-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                      }`}
-                  >
-                    Click to upload cover image
-                  </span>
-                </div>
-              </div>
+               {/* Display Artist's Default Label (Read-only) */}
+               {artistLabelName && (
+                 <div className="space-y-1.5">
+                   <UILabel htmlFor="labelDisplay" className={theme === 'dark' ? 'text-white/80' : 'text-gray-700'}>Label</UILabel>
+                   <Input
+                     type="text"
+                     id="labelDisplay"
+                     value={artistLabelName}
+                     disabled
+                     className={cn(
+                       'w-full',
+                       theme === 'light'
+                         ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                         : 'bg-white/[0.05] border-white/[0.1] text-white/50 cursor-not-allowed'
+                     )}
+                   />
+                 </div>
+               )}
 
-              {/* Submit Button */}
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className={`px-4 py-2 rounded-md font-medium transition-colors ${theme === 'light'
-                    ? 'bg-gray-900 text-white hover:bg-gray-800'
-                    : 'bg-white text-[#121212] hover:bg-white/90'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {isLoading ? 'Creating...' : 'Create Album'}
-                </button>
-              </div>
+                {/* Submit Button */}
+               <div className="flex justify-end pt-4">
+                 <Button
+                   type="submit"
+                   disabled={isLoading || !albumData.title || !albumData.releaseDate || selectedGenres.length === 0}
+                   className={cn(
+                     'px-6 py-2.5',
+                     theme === 'light'
+                       ? 'bg-gray-900 text-white hover:bg-gray-800'
+                       : 'bg-white text-[#121212] hover:bg-white/90',
+                     'disabled:opacity-50 disabled:cursor-not-allowed'
+                   )}
+                 >
+                   {isLoading ? 'Creating...' : 'Create Album'}
+                 </Button>
+               </div>
             </div>
           </form>
         </div>

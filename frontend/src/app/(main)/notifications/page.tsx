@@ -17,7 +17,11 @@ export type NotificationType = {
   | 'EVENT_REMINDER'
   | 'NEW_FOLLOW'
   | 'ARTIST_REQUEST_APPROVE'
-  | 'ARTIST_REQUEST_REJECT';
+  | 'ARTIST_REQUEST_REJECT'
+  | 'ARTIST_REQUEST_SUBMITTED'
+  | 'CLAIM_REQUEST_SUBMITTED'
+  | 'CLAIM_REQUEST_APPROVED'
+  | 'CLAIM_REQUEST_REJECTED';
   message: string;
   isRead: boolean;
   coverUrl?: string;
@@ -27,6 +31,8 @@ export type NotificationType = {
   recipientType: string;
   trackId?: string;
   albumId?: string;
+  artistId?: string;
+  claimId?: string;
 };
 
 export default function NotificationsPage() {
@@ -90,9 +96,18 @@ export default function NotificationsPage() {
 
         const allNotifications = await api.notifications.getList(token);
 
-        const relevantNotifications = filterNotificationsByProfile(allNotifications, user);
+        let relevantNotifications = [];
+        if (user) {
+          if (user.role === 'ADMIN') {
+            relevantNotifications = allNotifications.filter(
+              (n: any) => n.userId === user?.id && n.recipientType === 'USER'
+            );
+          } else {
+            relevantNotifications = filterNotificationsByProfile(allNotifications, user);
+          }
+        }
 
-        setNotifications(relevantNotifications);
+        setNotifications(relevantNotifications.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
 
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -198,30 +213,60 @@ export default function NotificationsPage() {
       return;
     }
 
+    const user = currentUser;
+    if (!user) {
+        toast.error('Could not determine user context.');
+        return;
+    }
+
     let path: string | null = null;
     let shouldNavigate = true;
 
     try {
-        if (notification.type === 'NEW_FOLLOW' && notification.senderId) {
-          path = `/profile/${notification.senderId}`;
-        } else if (notification.type === 'NEW_TRACK' && notification.trackId) {
-          const track: Track = await api.tracks.getById(notification.trackId, token);
-          if (!track.isActive) {
-            toast.error('This track is currently unavailable.');
-            shouldNavigate = false;
-          } else {
-            path = `/track/${notification.trackId}`;
-          }
-        } else if (notification.type === 'NEW_ALBUM' && notification.albumId) {
-          const album: Album = await api.albums.getById(notification.albumId, token);
-           if (!album.isActive) {
-             toast.error('This album is currently unavailable.');
-             shouldNavigate = false;
-           } else {
-             path = `/album/${notification.albumId}`;
-           }
+        if (user.role === 'ADMIN') {
+            if (notification.type === 'ARTIST_REQUEST_SUBMITTED' && notification.artistId) {
+                path = `/admin/artist-requests/${notification.artistId}`;
+            } else if (notification.type === 'CLAIM_REQUEST_SUBMITTED') {
+                if (notification.claimId) {
+                    path = `/admin/artist-requests/claim/${notification.claimId}`;
+                } else {
+                    console.warn('Claim ID missing in CLAIM_REQUEST_SUBMITTED notification payload. Falling back to list view.');
+                    path = `/admin/artist-requests?tab=claim`;
+                }
+            } 
         } else {
-           path = `/notification/${notification.id}`;
+            if (notification.type === 'NEW_FOLLOW' && notification.senderId) {
+              path = `/profile/${notification.senderId}`;
+            } else if (notification.type === 'NEW_TRACK' && notification.trackId) {
+              const track: Track = await api.tracks.getById(notification.trackId, token);
+              if (!track.isActive) {
+                toast.error('This track is currently unavailable.');
+                shouldNavigate = false;
+              } else {
+                path = `/track/${notification.trackId}`;
+              }
+            } else if (notification.type === 'NEW_ALBUM' && notification.albumId) {
+              const album: Album = await api.albums.getById(notification.albumId, token);
+               if (!album.isActive) {
+                 toast.error('This album is currently unavailable.');
+                 shouldNavigate = false;
+               } else {
+                 path = `/album/${notification.albumId}`;
+               }
+            } else if (notification.type === 'ARTIST_REQUEST_APPROVE' && notification.artistId) {
+                path = `/artist/profile/${notification.artistId}`;
+            } else if (notification.type === 'CLAIM_REQUEST_APPROVED' && notification.artistId) {
+                 path = `/artist/profile/${notification.artistId}`;
+            } else if (notification.type === 'ARTIST_REQUEST_REJECT' || notification.type === 'CLAIM_REQUEST_REJECTED') {
+                path = `/profile/${user.id}`;
+                toast('Your request was reviewed. Check your profile or settings.');
+            }
+        }
+        
+        if (!path && shouldNavigate) {
+           console.warn(`No specific path defined for notification type: ${notification.type}. Defaulting.`);
+           shouldNavigate = false;
+           toast('Notification opened. No specific page to navigate to.');
         }
 
         if (shouldNavigate && path) {
@@ -236,7 +281,6 @@ export default function NotificationsPage() {
               );
             } catch (error) {
               markedAsReadSuccess = false;
-              // console.error('Error marking notification as read:', error);
               toast.error('Failed to mark notification as read');
                return;
             }
@@ -247,24 +291,18 @@ export default function NotificationsPage() {
           }
         }
     } catch (error) {
-        // console.error('Error handling notification click:', error);
-
         if (error instanceof Error) {
             const errorMessage = error.message.toLowerCase();
-            // Check for variations of "not found" errors
             if (errorMessage.includes('not found') || errorMessage.includes('404')) {
                  toast.error('The requested content could not be found.');
             } 
-            // Check specifically for the internal server error from track/album fetch
             else if (errorMessage.includes('internal server error')) {
                  toast.error('Could not retrieve details due to a server issue.');
             } 
-            // Handle other potential errors
             else {
                 toast.error('An error occurred while processing the notification.');
             }
         } else {
-            // Fallback for non-Error objects
             toast.error('An unexpected error occurred.');
         }
     }

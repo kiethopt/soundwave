@@ -26,4 +26,8 @@ const extendedPrisma = prisma
   .$extends(labelExtension)
   .$extends(playlistExtension);
 
+// Export the extended client instance
 export default extendedPrisma;
+
+// Export the type of the extended client
+export type ExtendedPrismaClient = typeof extendedPrisma;

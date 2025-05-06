@@ -33,10 +33,11 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreNewestTracks = exports.getGenreTopArtists = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
+exports.getAllArtistsProfile = exports.getUserClaims = exports.submitArtistClaim = exports.getPlayHistory = exports.setFollowVisibility = exports.getGenreNewestTracks = exports.getGenreTopArtists = exports.getGenreTopTracks = exports.getGenreTopAlbums = exports.getUserTopAlbums = exports.getUserTopArtists = exports.getUserTopTracks = exports.getNewestAlbums = exports.getNewestTracks = exports.getTopTracks = exports.getTopArtists = exports.getTopAlbums = exports.getRecommendedArtists = exports.getUserProfile = exports.checkArtistRequest = exports.editProfile = exports.getFollowing = exports.getFollowers = exports.unfollowUser = exports.followUser = exports.getAllGenres = exports.searchAll = exports.requestToBecomeArtist = void 0;
 const userService = __importStar(require("../services/user.service"));
 const handle_utils_1 = require("../utils/handle-utils");
 const socket_1 = require("../config/socket");
+const cloudinary_1 = require("../utils/cloudinary");
 const requestToBecomeArtist = async (req, res) => {
     try {
         const currentUser = req.user;
@@ -454,10 +455,20 @@ const submitArtistClaim = async (req, res) => {
             return;
         }
         const userId = currentUser.id;
-        const { artistProfileId, proof } = req.body;
-        if (!artistProfileId || !proof) {
+        const { artistProfileId } = req.body;
+        const files = req.files;
+        if (!artistProfileId || !files || files.length === 0) {
             res.status(400).json({ message: 'Artist profile ID and proof are required.' });
             return;
+        }
+        const proof = [];
+        for (const file of files) {
+            const resourceType = file.mimetype.startsWith('image/') ? 'image' : 'raw';
+            const result = await (0, cloudinary_1.uploadToCloudinary)(file.buffer, {
+                folder: 'artist-claims',
+                resource_type: resourceType,
+            });
+            proof.push(result.secure_url);
         }
         const claim = await userService.submitArtistClaim(userId, artistProfileId, proof);
         res.status(201).json({ message: 'Claim submitted successfully.', claim });
@@ -504,4 +515,14 @@ const getUserClaims = async (req, res) => {
     }
 };
 exports.getUserClaims = getUserClaims;
+const getAllArtistsProfile = async (req, res) => {
+    try {
+        const artists = await userService.getAllArtistsProfile();
+        res.json(artists);
+    }
+    catch (error) {
+        (0, handle_utils_1.handleError)(res, error, 'Get claimable artists');
+    }
+};
+exports.getAllArtistsProfile = getAllArtistsProfile;
 //# sourceMappingURL=user.controller.js.map
