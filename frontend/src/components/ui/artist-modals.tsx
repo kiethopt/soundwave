@@ -358,7 +358,7 @@ export function EditAlbumModal({
                         aria-label="Toggle album visibility"
                       />
                     </div>
-            </div>
+               </div>
         </div>
         </form>
 

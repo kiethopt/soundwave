@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useContext } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Notifications,
   DiscoverFilled,
@@ -17,17 +17,16 @@ import {
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { User, SearchSuggestion } from '@/types';
-import { getSocket, disconnectSocket } from '@/utils/socket';
+import type { SearchSuggestion } from '@/types';
+import { disconnectSocket } from '@/utils/socket';
 import { api } from '@/utils/api';
 import toast from 'react-hot-toast';
 import { useTheme } from '@/contexts/ThemeContext';
-import { LogOut, Clock } from 'lucide-react';
+import { LogOut, Clock, Flag } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { useSession } from '@/contexts/SessionContext';
 import { useSocket } from '@/contexts/SocketContext';
-import { Notification } from '@/types';
 
 // Define RecipientType locally for frontend use
 enum RecipientType { 
@@ -343,6 +342,16 @@ export default function Header({
       }
 
       setShowNotifications(false);
+
+      // Handle navigation based on notification type
+      if (notification.type === 'NEW_REPORT_SUBMITTED' || notification.type === 'REPORT_RESOLVED') {
+        // For report notifications, navigate to the reports page with the report ID
+        if (notification.reportId) {
+          router.push(`/reports?reportId=${notification.reportId}`);
+        } else {
+          router.push('/reports');
+        }
+      }
 
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -778,6 +787,18 @@ export default function Header({
                       <ProfileIcon className="w-4 h-4" />
                       <span className="text-sm font-medium">Profile</span>
                     </Link>
+
+                    {user?.role === 'USER' && user?.currentProfile === 'USER' && (
+                      <Link
+                        href="/reports"
+                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors duration-200 ${theme === 'light' ? 'hover:bg-zinc-50 text-zinc-900' : 'hover:bg-zinc-800/50 text-zinc-100'}`}
+                        onClick={() => setShowDropdown(false)}
+                        role="menuitem"
+                      >
+                        <Flag className="w-4 h-4" />
+                        <span className="text-sm font-medium">My Reports</span>
+                      </Link>
+                    )}
 
                     {user?.role === 'USER' && user?.currentProfile === 'USER' && (
                       <Link

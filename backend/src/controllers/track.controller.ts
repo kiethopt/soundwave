@@ -66,7 +66,8 @@ export const createTrack = async (req: Request, res: Response): Promise<void> =>
       user.artistProfile.id,
       createData,
       audioFile,
-      coverFile
+      coverFile,
+      user
     );
 
     res.status(201).json({ message: 'Track created successfully', track: newTrack });

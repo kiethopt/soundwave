@@ -7,6 +7,12 @@ export interface TrackData {
   trackNumber: number;
   featuredArtists?: string[];
   coverUrl?: string;
+  tempo?: number;
+  mood?: string;
+  key?: string;
+  scale?: string;
+  danceability?: number;
+  energy?: number;
 }
 
 // Album data structure
@@ -38,27 +44,57 @@ export const albums: AlbumData[] = [
         title: 'MỘNG YU',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278900/M%E1%BB%98NG_YU_hdzoip.mp3',
         trackNumber: 1,
-        featuredArtists: ['RPT MCK']
+        featuredArtists: ['RPT MCK'],
+        tempo: 105,
+        mood: 'Dreamy',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.75,
+        energy: 0.68
       },
       {
         title: 'Cuộc gọi lúc nửa đêm',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278902/Cu%E1%BB%99c_g%E1%BB%8Di_l%C3%BAc_n%E1%BB%ADa_%C4%91%C3%AAm_poavd2.mp3',
         trackNumber: 2,
+        tempo: 92,
+        mood: 'Melancholic',
+        key: 'F',
+        scale: 'minor',
+        danceability: 0.62,
+        energy: 0.55
       },
       {
         title: 'Beautiful nightmare (interlude)',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278901/Beautiful_nightmare_interlude_l5mgzv.mp3',
         trackNumber: 3,
+        tempo: 80,
+        mood: 'Atmospheric',
+        key: 'Bb',
+        scale: 'minor',
+        danceability: 0.40,
+        energy: 0.35
       },
       {
         title: 'Miền Mộng Mị',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278903/Mi%E1%BB%81n_M%E1%BB%99ng_M%E1%BB%8B_ytlbc6.mp3',
         trackNumber: 4,
+        tempo: 98,
+        mood: 'Ethereal',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.70,
+        energy: 0.60
       },
       {
         title: '2000 câu hỏi vì sao',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278906/2000_c%C3%A2u_h%E1%BB%8Fi_v%C3%AC_sao_kjuj2s.mp3',
         trackNumber: 5,
+        tempo: 110,
+        mood: 'Curious',
+        key: 'A',
+        scale: 'major',
+        danceability: 0.78,
+        energy: 0.70
       }
     ]
   },
@@ -77,51 +113,111 @@ export const albums: AlbumData[] = [
         title: 'Nếu Những Tiếc Nuối',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279173/N%E1%BA%BFu_Nh%E1%BB%AFng_Ti%E1%BA%BFc_Nu%E1%BB%91i_pm4vid.mp3',
         trackNumber: 1,
+        tempo: 75,
+        mood: 'Nostalgic',
+        key: 'C',
+        scale: 'minor',
+        danceability: 0.45,
+        energy: 0.40
       },
       {
         title: 'Mùa Mưa Ấy',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279230/M%C3%B9a_M%C6%B0a_%E1%BA%A4y_oqmyir.mp3',
         trackNumber: 2,
+        tempo: 80,
+        mood: 'Melancholic',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.50,
+        energy: 0.42
       },
       {
         title: 'Ngồi Chờ Trong Vấn Vương',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279232/Ng%E1%BB%93i_Ch%E1%BB%9D_Trong_V%E1%BA%A5n_V%C6%B0%C6%A1ng_u5yxxf.mp3',
         trackNumber: 3,
+        tempo: 85,
+        mood: 'Longing',
+        key: 'F',
+        scale: 'major',
+        danceability: 0.55,
+        energy: 0.48
       },
       {
         title: 'Dành Hết Xuân Thì Để Chờ Nhau',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279245/D%C3%A0nh_H%E1%BA%BFt_Xu%C3%A2n_Th%C3%AC_%C4%90%E1%BB%83_Ch%E1%BB%9D_Nhau_w7qpyu.mp3',
         trackNumber: 4, 
+        tempo: 72,
+        mood: 'Romantic',
+        key: 'A',
+        scale: 'minor',
+        danceability: 0.48,
+        energy: 0.45
       },
       {
         title: 'Và Em Sẽ Luôn Là Người Tôi Yêu Nhất',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279246/V%C3%A0_Em_S%E1%BA%BD_Lu%C3%B4n_L%C3%A0_Ng%C6%B0%E1%BB%9Di_T%C3%B4i_Y%C3%AAu_Nh%E1%BA%A5t_uytipi.mp3',
         trackNumber: 5,
+        tempo: 78,
+        mood: 'Emotional',
+        key: 'E',
+        scale: 'minor',
+        danceability: 0.52,
+        energy: 0.50
       },
       {
         title: 'Những Chuyến Bay',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279235/Nh%E1%BB%AFng_Chuy%E1%BA%BFn_Bay_ocwwlh.mp3',
         trackNumber: 6,
+        tempo: 95,
+        mood: 'Contemplative',
+        key: 'G',
+        scale: 'major',
+        danceability: 0.60,
+        energy: 0.55
       },
       {
         title: 'Mây Khóc Vì Điều Gì',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279237/M%C3%A2y_Kh%C3%B3c_V%C3%AC_%C4%90i%E1%BB%81u_G%C3%AC_nwjsrz.mp3',
         trackNumber: 7,
+        tempo: 70,
+        mood: 'Sad',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.45,
+        energy: 0.40
       },
       {
         title: 'Những Lời Hứa Bỏ Quên',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279239/Nh%E1%BB%AFng_L%E1%BB%9Di_H%E1%BB%A9a_B%E1%BB%8F_Qu%C3%AAn_l7e4sr.mp3',
         trackNumber: 8,
+        tempo: 82,
+        mood: 'Regretful',
+        key: 'Bb',
+        scale: 'minor',
+        danceability: 0.50,
+        energy: 0.45
       },
       {
         title: 'Không Yêu Em Thì Yêu Ai',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279239/Kh%C3%B4ng_Y%C3%AAu_Em_Th%C3%AC_Y%C3%AAu_Ai_y1zpmr.mp3',
         trackNumber: 9,
+        tempo: 88,
+        mood: 'Passionate',
+        key: 'C',
+        scale: 'major',
+        danceability: 0.58,
+        energy: 0.62
       },
       {
         title: 'bình yên',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279240/b%C3%ACnh_y%C3%AAn_emdk2s.mp3',
         trackNumber: 10,
+        tempo: 68,
+        mood: 'Peaceful',
+        key: 'G',
+        scale: 'major',
+        danceability: 0.40,
+        energy: 0.35
       },
     ],
   },
@@ -140,36 +236,78 @@ export const albums: AlbumData[] = [
         title: '1000 Ánh Mắt',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278547/1000_%C3%81nh_M%E1%BA%AFt_kur2fn.mp3',
         trackNumber: 1,
+        tempo: 85,
+        mood: 'Dreamy',
+        key: 'F#',
+        scale: 'minor',
+        danceability: 0.60,
+        energy: 0.45
       },
       {
         title: 'Anh Vẫn Đợi',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278547/Anh_V%E1%BA%ABn_%C4%90%E1%BB%A3i_fesftl.mp3',
         trackNumber: 2,
+        tempo: 75,
+        mood: 'Patient',
+        key: 'C',
+        scale: 'minor',
+        danceability: 0.48,
+        energy: 0.40
       },
       {
         title: 'Có Đôi Điều',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278553/C%C3%B3_%C4%90%C3%B4i_%C4%90i%E1%BB%81u_sujo0g.mp3',
         trackNumber: 3,
+        tempo: 90,
+        mood: 'Contemplative',
+        key: 'A',
+        scale: 'minor',
+        danceability: 0.55,
+        energy: 0.48
       },
       {
         title: 'Lặng',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278549/L%E1%BA%B7ng_cjpemv.mp3',
         trackNumber: 4,
+        tempo: 70,
+        mood: 'Quiet',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.42,
+        energy: 0.30
       },
       {
         title: 'Night Time',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278550/Night_Time_r292qy.mp3',
         trackNumber: 5,
+        tempo: 80,
+        mood: 'Ambient',
+        key: 'E',
+        scale: 'minor',
+        danceability: 0.58,
+        energy: 0.40
       },
       {
         title: 'Perfect',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278551/Perfect_yhyrok.mp3',
         trackNumber: 6,
+        tempo: 95,
+        mood: 'Serene',
+        key: 'G',
+        scale: 'major',
+        danceability: 0.65,
+        energy: 0.50
       }, 
       {
         title: 'Take Off Your Hands',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746278552/Take_Off_Your_Hands_n9hon1.mp3',
         trackNumber: 7,
+        tempo: 88,
+        mood: 'Melancholic',
+        key: 'B',
+        scale: 'minor',
+        danceability: 0.62,
+        energy: 0.45
       },
     ],
   },
@@ -189,21 +327,45 @@ export const albums: AlbumData[] = [
         title: 'DÂU TẰM',
         audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1743437229/testAlbum/tlinh%2C%20Low%20G/FLVR/bgsotddidlfj6zrzbtyn.mp3',
         trackNumber: 1,
+        tempo: 130,
+        mood: 'Energetic',
+        key: 'C',
+        scale: 'minor',
+        danceability: 0.85,
+        energy: 0.80
       },
       {
         title: 'NGÂN',
         audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1743437334/testAlbum/tlinh%2C%20Low%20G/FLVR/ntlvaidfotjbmw9rxg3z.mp3',
         trackNumber: 2,
+        tempo: 125,
+        mood: 'Smooth',
+        key: 'F#',
+        scale: 'minor',
+        danceability: 0.80,
+        energy: 0.75
       },
       {
         title: 'HOP ON DA SHOW',
         audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1743437358/testAlbum/tlinh%2C%20Low%20G/FLVR/pgdrfb8oux5ub958hrvf.mp3',
         trackNumber: 3,
+        tempo: 140,
+        mood: 'Confident',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.88,
+        energy: 0.90
       },
       {
         title: 'PHÓNG ZÌN ZÌN',
         audioUrl: 'https://res.cloudinary.com/dsw1dm5ka/video/upload/v1743437384/testAlbum/tlinh%2C%20Low%20G/FLVR/vqv3bigkrhgob2diijnu.mp3',
         trackNumber: 4,
+        tempo: 135,
+        mood: 'Intense',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.90,
+        energy: 0.92
       },
     ],
   },
@@ -218,21 +380,171 @@ export const albums: AlbumData[] = [
     genreNames: ['Pop', 'R&B'],
     releaseDate: new Date('2025-02-28'),
     tracks: [
-      { title: 'Get Closer', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279871/Get_Closer_tg61oi.mp3', trackNumber: 1 },
-      { title: 'Deep', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279872/Deep_efc5xm.mp3', trackNumber: 2 },
-      { title: 'Fight', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279873/Fight_fpnp4q.mp3', trackNumber: 3 },
-      { title: 'Myself', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279875/Myself_mtvhug.mp3', trackNumber: 4 },
-      { title: 'Heaven-Sent', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279878/Heaven-Sent_rbml79.mp3', trackNumber: 5 },
-      { title: 'BADAK', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279879/BADAK_nbwxcx.mp3', trackNumber: 6 },
-      { title: 'Fuck Off', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279882/Fuck_Off_bwlkgg.mp3', trackNumber: 7 },
-      { title: 'Kill Me', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279925/Kill_Me_d81ifb.mp3', trackNumber: 8 },
-      { title: 'Her', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279926/Her_ihixgz.mp3', trackNumber: 9 },
-      { title: 'How Come ?', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279930/How_Come_giwyhd.mp3', trackNumber: 10 },
-      { title: 'Change', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279930/Change_wodzpx.mp3', trackNumber: 11 },
-      { title: 'Face Out', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279932/Face_Out_tuzx6i.mp3', trackNumber: 12 },
-      { title: 'Love Yaaa', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279933/Love_Yaaa_n9uy5o.mp3', trackNumber: 13 },
-      { title: 'Tease My Lover', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279939/Tease_My_Lover_tq6lcq.mp3', trackNumber: 14 },
-      { title: 'Grateful To Us', audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279945/Grateful_To_Us_dr2lov.mp3', trackNumber: 15 }
+      { 
+        title: 'Get Closer', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279871/Get_Closer_tg61oi.mp3', 
+        trackNumber: 1,
+        tempo: 110,
+        mood: 'Intimate',
+        key: 'D',
+        scale: 'major',
+        danceability: 0.78,
+        energy: 0.72
+      },
+      { 
+        title: 'Deep', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279872/Deep_efc5xm.mp3', 
+        trackNumber: 2,
+        tempo: 95,
+        mood: 'Introspective',
+        key: 'F',
+        scale: 'minor',
+        danceability: 0.65,
+        energy: 0.60
+      },
+      { 
+        title: 'Fight', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279873/Fight_fpnp4q.mp3', 
+        trackNumber: 3,
+        tempo: 128,
+        mood: 'Fierce',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.80,
+        energy: 0.85
+      },
+      { 
+        title: 'Myself', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279875/Myself_mtvhug.mp3', 
+        trackNumber: 4,
+        tempo: 90,
+        mood: 'Reflective',
+        key: 'C',
+        scale: 'major',
+        danceability: 0.62,
+        energy: 0.58
+      },
+      { 
+        title: 'Heaven-Sent', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279878/Heaven-Sent_rbml79.mp3', 
+        trackNumber: 5,
+        tempo: 100,
+        mood: 'Ethereal',
+        key: 'E',
+        scale: 'major',
+        danceability: 0.70,
+        energy: 0.65
+      },
+      { 
+        title: 'BADAK', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279879/BADAK_nbwxcx.mp3', 
+        trackNumber: 6,
+        tempo: 135,
+        mood: 'Aggressive',
+        key: 'A',
+        scale: 'minor',
+        danceability: 0.85,
+        energy: 0.90
+      },
+      { 
+        title: 'Fuck Off', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279882/Fuck_Off_bwlkgg.mp3', 
+        trackNumber: 7,
+        tempo: 125,
+        mood: 'Defiant',
+        key: 'F#',
+        scale: 'minor',
+        danceability: 0.82,
+        energy: 0.88
+      },
+      { 
+        title: 'Kill Me', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279925/Kill_Me_d81ifb.mp3', 
+        trackNumber: 8,
+        tempo: 115,
+        mood: 'Dark',
+        key: 'B',
+        scale: 'minor',
+        danceability: 0.75,
+        energy: 0.82
+      },
+      { 
+        title: 'Her', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279926/Her_ihixgz.mp3', 
+        trackNumber: 9,
+        tempo: 88,
+        mood: 'Tender',
+        key: 'D',
+        scale: 'major',
+        danceability: 0.60,
+        energy: 0.55
+      },
+      { 
+        title: 'How Come ?', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279930/How_Come_giwyhd.mp3', 
+        trackNumber: 10,
+        tempo: 95,
+        mood: 'Questioning',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.68,
+        energy: 0.62
+      },
+      { 
+        title: 'Change', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279930/Change_wodzpx.mp3', 
+        trackNumber: 11,
+        tempo: 105,
+        mood: 'Transformative',
+        key: 'A',
+        scale: 'major',
+        danceability: 0.75,
+        energy: 0.70
+      },
+      { 
+        title: 'Face Out', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279932/Face_Out_tuzx6i.mp3', 
+        trackNumber: 12,
+        tempo: 120,
+        mood: 'Assertive',
+        key: 'E',
+        scale: 'minor',
+        danceability: 0.78,
+        energy: 0.75
+      },
+      { 
+        title: 'Love Yaaa', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279933/Love_Yaaa_n9uy5o.mp3', 
+        trackNumber: 13,
+        tempo: 98,
+        mood: 'Affectionate',
+        key: 'C',
+        scale: 'major',
+        danceability: 0.72,
+        energy: 0.65
+      },
+      { 
+        title: 'Tease My Lover', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279939/Tease_My_Lover_tq6lcq.mp3', 
+        trackNumber: 14,
+        tempo: 115,
+        mood: 'Flirtatious',
+        key: 'F',
+        scale: 'major',
+        danceability: 0.85,
+        energy: 0.75
+      },
+      { 
+        title: 'Grateful To Us', 
+        audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746279945/Grateful_To_Us_dr2lov.mp3', 
+        trackNumber: 15,
+        tempo: 85,
+        mood: 'Thankful',
+        key: 'D',
+        scale: 'major',
+        danceability: 0.65,
+        energy: 0.60
+      }
     ]
   },
   
@@ -251,67 +563,133 @@ export const albums: AlbumData[] = [
         title: 'Phóng Đổ Tim Em', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276623/Ph%C3%B3ng_%C4%90%E1%BB%95_Tim_Em_hhkpr8.mp3', 
         trackNumber: 1, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 145,
+        mood: 'Energetic',
+        key: 'E',
+        scale: 'major',
+        danceability: 0.88,
+        energy: 0.92
       },
       { 
         title: 'Call Me', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276616/Call_Me_id3iie.mp3', 
         trackNumber: 2, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 140,
+        mood: 'Upbeat',
+        key: 'A',
+        scale: 'minor',
+        danceability: 0.85,
+        energy: 0.90
       },
       { 
         title: 'Cầu Vĩnh Tuy', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276616/C%E1%BA%A7u_V%C4%A9nh_Tuy_cxas2h.mp3', 
         trackNumber: 3, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 130,
+        mood: 'Nostalgic',
+        key: 'D',
+        scale: 'major',
+        danceability: 0.80,
+        energy: 0.85
       },
       { 
         title: 'Từng Quen', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276618/T%E1%BB%ABng_Quen_gn45g4.mp3', 
         trackNumber: 4, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 150,
+        mood: 'Energetic',
+        key: 'C',
+        scale: 'major',
+        danceability: 0.81,
+        energy: 0.88
       },
       { 
         title: 'bé ơi từ từ', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276619/b%C3%A9_%C6%A1i_t%E1%BB%AB_t%E1%BB%AB_o8tl7q.mp3', 
         trackNumber: 5, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 120,
+        mood: 'Playful',
+        key: 'F',
+        scale: 'major',
+        danceability: 0.78,
+        energy: 0.75
       },
       { 
         title: 'Lối Chơi (Interlude)', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276623/L%E1%BB%91i_Ch%C6%A1i_Interlude_wifhgb.mp3', 
         trackNumber: 6, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 110,
+        mood: 'Atmospheric',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.60,
+        energy: 0.55
       },
       { 
         title: 'Tình Yêu Vĩ Mô', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276617/T%C3%ACnh_Y%C3%AAu_V%C4%A9_M%C3%B4_ilxt4k.mp3', 
         trackNumber: 7, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 125,
+        mood: 'Romantic',
+        key: 'B',
+        scale: 'major',
+        danceability: 0.75,
+        energy: 0.80
       },
       { 
         title: 'Việt Kiều', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276617/Vi%E1%BB%87t_Ki%E1%BB%81u_mfa6i7.mp3', 
         trackNumber: 8, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 135,
+        mood: 'Bold',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.82,
+        energy: 0.85
       },
       { 
         title: 'ĐĐĐ', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276621/%C4%90%C4%90%C4%90_fhp5py.mp3', 
         trackNumber: 9, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 140,
+        mood: 'Intense',
+        key: 'F#',
+        scale: 'minor',
+        danceability: 0.85,
+        energy: 0.90
       },
       { 
         title: 'Quyền Anh', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276621/Quy%E1%BB%81n_Anh_oshath.mp3', 
         trackNumber: 10, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 130,
+        mood: 'Powerful',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.80,
+        energy: 0.88
       },
       { 
         title: 'Tò Te Tí', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746276623/T%C3%B2_Te_T%C3%AD_aqvkxg.mp3', 
         trackNumber: 11, 
-        featuredArtists: ['itsnk']
+        featuredArtists: ['itsnk'],
+        tempo: 125,
+        mood: 'Playful',
+        key: 'C',
+        scale: 'major',
+        danceability: 0.85,
+        energy: 0.82
       }
     ]
   },
@@ -329,42 +707,90 @@ export const albums: AlbumData[] = [
       {
         title: 'Chiều Hôm Ấy (Intro)',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745729627/Chi%E1%BB%81u_H%C3%B4m_%E1%BA%A4y_Intro_xzzfkh.mp3',
-        trackNumber: 1
+        trackNumber: 1,
+        tempo: 85,
+        mood: 'Atmospheric',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.45,
+        energy: 0.40
       },
       {
         title: 'Cơn Đau',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745728507/C%C6%A1n_%C4%90au_bvpv0s.mp3',
-        trackNumber: 2
+        trackNumber: 2,
+        tempo: 125,
+        mood: 'Intense',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.78,
+        energy: 0.85
       },
       {
         title: 'Anh Thấy (Interlude)',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745729621/Anh_Th%E1%BA%A5y_Interlude_e4ac0g.mp3',
-        trackNumber: 3
+        trackNumber: 3,
+        tempo: 90,
+        mood: 'Reflective',
+        key: 'A',
+        scale: 'minor',
+        danceability: 0.55,
+        energy: 0.48
       },
       {
         title: 'Gặp May',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745728522/G%E1%BA%B7p_May_zwzesf.mp3',
-        trackNumber: 4
+        trackNumber: 4,
+        tempo: 120,
+        mood: 'Hopeful',
+        key: 'C',
+        scale: 'major',
+        danceability: 0.80,
+        energy: 0.75
       },
       {
         title: 'Thích Em Hơi Nhiều',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745728522/Th%C3%ADch_Em_H%C6%A1i_Nhi%E1%BB%81u_cfj6yh.mp3',
-        trackNumber: 5
+        trackNumber: 5,
+        tempo: 110,
+        mood: 'Romantic',
+        key: 'G',
+        scale: 'major',
+        danceability: 0.76,
+        energy: 0.68
       },
       {
         title: 'Trao',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745728523/Trao_hkvjpz.mp3',
-        trackNumber: 6
+        trackNumber: 6,
+        tempo: 105,
+        mood: 'Gentle',
+        key: 'F',
+        scale: 'major',
+        danceability: 0.70,
+        energy: 0.65
       },
       {
         title: 'Màu Đỏ (Interlude)',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745728506/M%C3%A0u_%C4%90%E1%BB%8F_Interlude_vqifhe.mp3',
-        trackNumber: 7
+        trackNumber: 7,
+        tempo: 88,
+        mood: 'Mysterious',
+        key: 'E',
+        scale: 'minor',
+        danceability: 0.50,
+        energy: 0.45
       },
       {
         title: 'Mấy Khi',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745728507/M%E1%BA%A5y_Khi_jgc28s.mp3',
-        trackNumber: 8
+        trackNumber: 8,
+        tempo: 115,
+        mood: 'Wistful',
+        key: 'Bb',
+        scale: 'major',
+        danceability: 0.75,
+        energy: 0.70
       },
     ]
   },
@@ -383,19 +809,37 @@ export const albums: AlbumData[] = [
         title: 'Trò Chơi',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745729932/Tr%C3%B2_Ch%C6%A1i_uv2orf.mp3',
         trackNumber: 1,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 115,
+        mood: 'Playful',
+        key: 'F',
+        scale: 'minor',
+        danceability: 0.85,
+        energy: 0.80
       },
       {
         title: 'BLACKJACK',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745729921/BLACKJACK_cpv6nz.mp3',
         trackNumber: 2,
-        featuredArtists: ['Binz']
+        featuredArtists: ['Binz'],
+        tempo: 130,
+        mood: 'Confident',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.90,
+        energy: 0.85
       },
       {
         title: 'Tháng Năm',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745729929/Th%C3%A1ng_N%C4%83m_pjozzp.mp3',
         trackNumber: 3,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 95,
+        mood: 'Nostalgic',
+        key: 'D',
+        scale: 'major',
+        danceability: 0.70,
+        energy: 0.65
       },
     ]
   },
@@ -413,55 +857,115 @@ export const albums: AlbumData[] = [
       { 
         title: 'Intro', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277346/Intro_ywaskk.mp3', 
-        trackNumber: 1
+        trackNumber: 1,
+        tempo: 90,
+        mood: 'Atmospheric',
+        key: 'C',
+        scale: 'minor',
+        danceability: 0.50,
+        energy: 0.55
       },
       { 
         title: 'DANCING IN THE DARK', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277346/DANCING_IN_THE_DARK_ttd4m7.mp3', 
-        trackNumber: 2
+        trackNumber: 2,
+        tempo: 125,
+        mood: 'Mysterious',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.88,
+        energy: 0.80
       },
       { 
         title: 'Sunset In the City - Deluxe Version', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277347/Sunset_In_The_City_-_Deluxe_Version_iuzgxj.mp3', 
-        trackNumber: 3
+        trackNumber: 3,
+        tempo: 110,
+        mood: 'Chill',
+        key: 'D',
+        scale: 'major',
+        danceability: 0.75,
+        energy: 0.70
       },
       { 
         title: 'Sẽ Quên Em Nhanh Thôi', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277346/S%E1%BA%BD_Qu%C3%AAn_Em_Nhanh_Th%C3%B4i_lonmak.mp3', 
-        trackNumber: 4
+        trackNumber: 4,
+        tempo: 95,
+        mood: 'Resolute',
+        key: 'A',
+        scale: 'minor',
+        danceability: 0.65,
+        energy: 0.62
       },
       { 
         title: 'giá như', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277349/gi%C3%A1_nh%C6%B0_yni3lm.mp3', 
-        trackNumber: 5
+        trackNumber: 5,
+        tempo: 80,
+        mood: 'Melancholic',
+        key: 'F',
+        scale: 'minor',
+        danceability: 0.55,
+        energy: 0.48
       },
       { 
         title: 'Ai Mà Biết Được', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277347/Ai_M%C3%A0_Bi%E1%BA%BFt_%C4%90%C6%B0%E1%BB%A3c_feat._tlinh_zpz4la.mp3',
         trackNumber: 6, 
-        featuredArtists: ['tlinh']
+        featuredArtists: ['tlinh'],
+        tempo: 115,
+        mood: 'Curious',
+        key: 'E',
+        scale: 'minor',
+        danceability: 0.82,
+        energy: 0.75
       },
       { 
         title: 'Bật Nó Lên', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277348/B%E1%BA%ADt_N%C3%B3_L%C3%AAn_vrlrla.mp3', 
-        trackNumber: 7
+        trackNumber: 7,
+        tempo: 128,
+        mood: 'Energetic',
+        key: 'C',
+        scale: 'major',
+        danceability: 0.90,
+        energy: 0.85
       },
       { 
         title: 'Heyyy', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277350/Heyyy_tafehi.mp3', 
-        trackNumber: 8
+        trackNumber: 8,
+        tempo: 118,
+        mood: 'Flirtatious',
+        key: 'Bb',
+        scale: 'major',
+        danceability: 0.85,
+        energy: 0.78
       },
       { 
         title: 'Luật Anh', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277350/Lu%E1%BA%ADt_Anh_feat._Andree_Right_Hand_aafw1m.mp3', 
         trackNumber: 9, 
-        featuredArtists: ['Andree Right Hand']
+        featuredArtists: ['Andree Right Hand'],
+        tempo: 130,
+        mood: 'Confident',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.88,
+        energy: 0.85
       },
       { 
         title: 'Lu Mờ', 
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277351/Lu_M%E1%BB%9D_feat._Kris_V_d3gohk.mp3', 
         trackNumber: 10, 
-        featuredArtists: ['Kris V']
+        featuredArtists: ['Kris V'],
+        tempo: 110,
+        mood: 'Hazy',
+        key: 'G',
+        scale: 'minor',
+        danceability: 0.80,
+        energy: 0.72
       }
     ]
   },
@@ -480,31 +984,61 @@ export const albums: AlbumData[] = [
         title: 'Intro',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277976/Intro_ofgkdq.mp3',
         trackNumber: 1,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 80,
+        mood: 'Atmospheric',
+        key: 'F',
+        scale: 'major',
+        danceability: 0.45,
+        energy: 0.40
       },
       {
         title: 'Cười Lên',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277973/C%C6%B0%E1%BB%9Di_L%C3%AAn_yx80yr.mp3',
         trackNumber: 2,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 115,
+        mood: 'Uplifting',
+        key: 'G',
+        scale: 'major',
+        danceability: 0.80,
+        energy: 0.75
       },
       {
         title: 'Em Xinh',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277973/Em_Xinh_e56kir.mp3',
         trackNumber: 3,
-        featuredArtists: ['Onionn']
+        featuredArtists: ['Onionn'],
+        tempo: 105,
+        mood: 'Admiring',
+        key: 'C',
+        scale: 'major',
+        danceability: 0.75,
+        energy: 0.70
       },
       {
         title: 'Young',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277974/Young_wcisev.mp3',
         trackNumber: 4,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 120,
+        mood: 'Youthful',
+        key: 'D',
+        scale: 'major',
+        danceability: 0.85,
+        energy: 0.80
       },
       {
         title: 'Open Your Eyes',
         audioUrl: 'https://res.cloudinary.com/dwln9t6dv/video/upload/v1746277976/Open_Your_Eyes_svtz3v.mp3',
         trackNumber: 5,
-        featuredArtists: ['Onionn']
+        featuredArtists: ['Onionn'],
+        tempo: 110,
+        mood: 'Inspirational',
+        key: 'A',
+        scale: 'major',
+        danceability: 0.78,
+        energy: 0.75
       }
     ],
     featuredArtistNames: []
@@ -524,25 +1058,49 @@ export const albums: AlbumData[] = [
         title: 'Intro 2022',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745720915/Intro_2022_fiw56y.mp3',
         trackNumber: 1,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 90,
+        mood: 'Cinematic',
+        key: 'C',
+        scale: 'minor',
+        danceability: 0.40,
+        energy: 0.45
       },
       {
         title: 'Cơn Mưa Xa Dần',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745720920/C%C6%A1n_M%C6%B0a_Xa_D%E1%BA%A7n_ybhkn5.mp3',
         trackNumber: 2,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 110,
+        mood: 'Nostalgic',
+        key: 'G',
+        scale: 'major',
+        danceability: 0.75,
+        energy: 0.70
       },
       {
         title: 'Nắng Ấm Ngang Qua',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745720932/N%E1%BA%AFng_%E1%BA%A4m_Ngang_Qua_k4pttn.mp3',
         trackNumber: 3,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 125,
+        mood: 'Bright',
+        key: 'E',
+        scale: 'major',
+        danceability: 0.85,
+        energy: 0.80
       },
       {
         title: 'Special Thanks',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745720924/Special_Thanks_piuhdr.mp3',
         trackNumber: 4,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 95,
+        mood: 'Grateful',
+        key: 'D',
+        scale: 'major',
+        danceability: 0.60,
+        energy: 0.55
       },
     ],
     featuredArtistNames: [] // No featured artists for the whole EP
@@ -684,25 +1242,49 @@ export const albums: AlbumData[] = [
         title: 'Chập Chờn',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731353/Ch%E1%BA%ADp_Ch%E1%BB%9Dn_akpg6s.mp3',
         trackNumber: 1,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 90,
+        mood: 'Dreamy',
+        key: 'F',
+        scale: 'minor',
+        danceability: 0.65,
+        energy: 0.55
       },
       {
         title: 'Tràn Bộ Nhớ',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731355/Tr%C3%A0n_B%E1%BB%99_Nh%E1%BB%9B_ry2ikr.mp3',
         trackNumber: 2,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 105,
+        mood: 'Overwhelmed',
+        key: 'D',
+        scale: 'minor',
+        danceability: 0.72,
+        energy: 0.65
       },
       {
         title: 'Pin Dự Phòng',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731355/Pin_D%E1%BB%B1_Ph%C3%B2ng_w6wafm.mp3',
         trackNumber: 3,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 95,
+        mood: 'Reflective',
+        key: 'G',
+        scale: 'major',
+        danceability: 0.68,
+        energy: 0.60
       },
       {
         title: 'Mất Kết Nối',
         audioUrl: 'https://res.cloudinary.com/dbwhalglx/video/upload/v1745731355/M%E1%BA%A5t_K%E1%BA%BFt_N%E1%BB%91i_qcxd1j.mp3',
         trackNumber: 4,
-        featuredArtists: []
+        featuredArtists: [],
+        tempo: 85,
+        mood: 'Disconnected',
+        key: 'C',
+        scale: 'minor',
+        danceability: 0.60,
+        energy: 0.52
       },
     ],
   },

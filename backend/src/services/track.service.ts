@@ -11,6 +11,137 @@ import { getOrCreateArtistProfile } from './artist.service';
 import * as mm from 'music-metadata';
 import { Essentia, EssentiaWASM } from 'essentia.js';
 import { MPEGDecoder, MPEGDecodedAudio } from 'mpg123-decoder';
+import { Audd } from 'audd.io';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { tmpdir } from 'os';
+
+const auddApiKey = process.env.AUDD_API_KEY;
+let auddInstance: Audd | null = null;
+
+if (auddApiKey) {
+  auddInstance = new Audd(auddApiKey);
+} else {
+  console.warn('AUDD_API_KEY not found in .env. Copyright check will be skipped.');
+}
+
+function normalizeString(str: string): string {
+  if (!str) return '';
+  
+  // Convert to lowercase
+  let result = str.toLowerCase().trim();
+  
+  // Remove diacritics (accents)
+  result = result.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  
+  // Remove special characters (keep only alphanumeric)
+  result = result.replace(/[^a-z0-9]/g, '');
+  
+  return result;
+}
+
+// Helper function to check copyright using AudD
+async function checkCopyrightWithAudD(audioBuffer: Buffer, originalFileName?: string): Promise<{ isMatched: boolean, match?: any, error?: boolean }> {
+  if (!auddInstance) {
+    console.warn('AudD client not initialized. Skipping copyright check.');
+    return { isMatched: false, error: true };
+  }
+
+  let tempFilePath: string | null = null;
+  try {
+    // 1. Save buffer to a temporary file
+    const fileExtension = originalFileName ? path.extname(originalFileName) : '.mp3';
+    const tempFileName = `audd_upload_${Date.now()}${fileExtension}`;
+    tempFilePath = path.join(tmpdir(), tempFileName);
+    await fs.writeFile(tempFilePath, audioBuffer);
+
+    // 2. Call fromFile with the path
+    const result = await auddInstance.recognize.fromFile(tempFilePath);
+
+    if (result && result.status === 'success' && result.result) {
+      return {
+        isMatched: true,
+        match: result.result,
+      };
+    }
+    if (result && result.status === 'error') {
+      console.error('AudD API Error:', result.error);
+      return { isMatched: false, error: true, match: result.error };
+    }
+    return { isMatched: false };
+  } catch (error) {
+    console.error('Error during AudD copyright check (file method):', error);
+    return { isMatched: false, error: true };
+  } finally {
+    if (tempFilePath) {
+      try {
+        await fs.unlink(tempFilePath);
+      } catch (unlinkError) {
+        console.error('Failed to delete temporary audio file:', unlinkError);
+      }
+    }
+  }
+}
+
+// Helper function to compare artist names for similarity
+// A more robust implementation that handles diacritics, case, and special characters
+function getArtistNameSimilarity(name1: string, name2: string): number {
+  if (!name1 || !name2) return 0;
+  
+  const normalized1 = normalizeString(name1);
+  const normalized2 = normalizeString(name2);
+  
+  // Exact match after normalization
+  if (normalized1 === normalized2) return 1;
+  
+  // Check for containment after normalization
+  if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) {
+    return Math.min(normalized1.length, normalized2.length) / Math.max(normalized1.length, normalized2.length);
+  }
+  
+  // For very short names (1-3 chars), be more generous with similarity
+  if (normalized1.length <= 3 && normalized2.length <= 3) {
+    // Count shared characters
+    let matches = 0;
+    for (const char of normalized1) {
+      if (normalized2.includes(char)) {
+        matches++;
+      }
+    }
+    // If at least one character matches in these very short names
+    if (matches > 0) {
+      return 0.8; // High similarity for short names with partial matches
+    }
+  }
+  
+  // More sophisticated similarity algorithm for longer names
+  let matches = 0;
+  const longer = normalized1.length > normalized2.length ? normalized1 : normalized2;
+  const shorter = normalized1.length > normalized2.length ? normalized2 : normalized1;
+  
+  // Check for sequential matches
+  let sequentialMatches = 0;
+  let maxSequence = 0;
+  for (let i = 0; i < shorter.length; i++) {
+    if (longer.includes(shorter.substring(i, i+2))) {
+      sequentialMatches++;
+      maxSequence = Math.max(maxSequence, 2);
+    }
+  }
+  
+  // Check for individual character matches
+  for (let i = 0; i < shorter.length; i++) {
+    if (longer.includes(shorter[i])) {
+      matches++;
+    }
+  }
+  
+  // Calculate final similarity based on matches and sequential matches
+  const charSimilarity = matches / longer.length;
+  const sequenceSimilarity = sequentialMatches > 0 ? (sequentialMatches * maxSequence) / (longer.length * 2) : 0;
+  
+  return Math.max(charSimilarity, sequenceSimilarity);
+}
 
 // Helper function to convert MP3 buffer to Float32Array PCM data
 async function convertMp3BufferToPcmF32(audioBuffer: Buffer): Promise<Float32Array | null> {
@@ -295,8 +426,6 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
   // Get the IO instance for WebSocket communication
   const io = getIO();
 
-  // Check if this was the last track in the playlist
-  // If favoritePlaylist._count.tracks is 1, that means after deletion it will be empty
   if (favoritePlaylist._count.tracks === 1) {
     // Delete the entire Favorites playlist since it's now empty
     await prisma.playlist.delete({
@@ -305,14 +434,12 @@ export const unlikeTrack = async (userId: string, trackId: string) => {
       }
     });
     
-    // Emit WebSocket event to notify clients that the Favorites playlist was deleted
     io.emit('playlist-updated');
     io.to(`user-${userId}`).emit('favorites-updated', { action: 'deleted', playlistId: favoritePlaylist.id });
     
     return { message: 'Track unliked and empty Favorites playlist removed' };
   }
 
-  // Emit WebSocket event to notify clients that the Favorites playlist was updated
   io.emit('playlist-updated');
   io.to(`user-${userId}`).emit('favorites-updated', { action: 'remove', trackId });
 
@@ -423,18 +550,113 @@ export class TrackService {
     artistProfileId: string,
     data: CreateTrackData,
     audioFile: Express.Multer.File,
-    coverFile?: Express.Multer.File
+    coverFile?: Express.Multer.File,
+    requestUser?: any
   ): Promise<Track> {
     const { title, releaseDate, type, genreIds, featuredArtistIds = [], featuredArtistNames = [], labelId } = data;
 
     const mainArtist = await prisma.artistProfile.findUnique({
       where: { id: artistProfileId },
-      select: { id: true, labelId: true, artistName: true, avatar: true }
+      select: { id: true, labelId: true, artistName: true, avatar: true, isVerified: true, createdAt: true }
     });
     if (!mainArtist) {
       throw new Error(`Artist profile with ID ${artistProfileId} not found.`);
     }
     const artistName = mainArtist.artistName;
+
+    const copyrightCheckResult = await checkCopyrightWithAudD(audioFile.buffer, audioFile.originalname);
+    if (copyrightCheckResult.error) {
+        console.warn("Copyright check with AudD failed or was skipped. Proceeding with caution.");
+    } else if (copyrightCheckResult.isMatched && copyrightCheckResult.match) {
+        const match = copyrightCheckResult.match;
+        const isAdminUpload = requestUser && requestUser.role === Role.ADMIN && requestUser.id !== mainArtist.id; // Assuming requestUser has role and mainArtist has an id property
+        
+        if ((mainArtist.isVerified || isAdminUpload) && match.artist) {
+            const uploaderSimilarity = getArtistNameSimilarity(match.artist, artistName);
+            const SIMILARITY_THRESHOLD = 0.7;
+
+            console.log(`Artist name comparison: "${match.artist}" (AudD) vs "${artistName}" (uploader: ${mainArtist.id})`);
+            console.log(`Normalized comparison: "${normalizeString(match.artist)}" vs "${normalizeString(artistName)}"`);
+            console.log(`Uploader Similarity score: ${uploaderSimilarity.toFixed(3)} (threshold: ${SIMILARITY_THRESHOLD})`);
+
+            if (uploaderSimilarity >= SIMILARITY_THRESHOLD) {
+                let allowUpload = true;
+                let blockingReason = "";
+
+                if (mainArtist.isVerified && !isAdminUpload) {
+                    const otherVerifiedArtists = await prisma.artistProfile.findMany({
+                        where: {
+                            id: { not: mainArtist.id },
+                            isVerified: true,
+                        }
+                    });
+
+                    let canonicalArtist = mainArtist; // Assume uploader is canonical initially
+                    let highestSimilarity = uploaderSimilarity;
+
+                    for (const otherArtist of otherVerifiedArtists) {
+                        const otherSimilarity = getArtistNameSimilarity(match.artist, otherArtist.artistName);
+                        console.log(`Comparing with other verified artist "${otherArtist.artistName}" (ID: ${otherArtist.id}). Similarity to AudD match: ${otherSimilarity.toFixed(3)}`);
+                        
+                        if (otherSimilarity > highestSimilarity) {
+                            highestSimilarity = otherSimilarity;
+                            canonicalArtist = otherArtist;
+                        } else if (otherSimilarity === highestSimilarity) {
+                            // Tie-breaking:
+                            // 1. Prefer exact normalized match
+                            const normAudD = normalizeString(match.artist);
+                            const normUploader = normalizeString(canonicalArtist.artistName);
+                            const normOther = normalizeString(otherArtist.artistName);
+
+                            if (normOther === normAudD && normUploader !== normAudD) {
+                                canonicalArtist = otherArtist; // Other is exact, current canonical was not
+                            } else if (normOther === normAudD && normUploader === normAudD) {
+                                // Both are exact normalized matches, prefer older profile
+                                if (new Date(otherArtist.createdAt) < new Date(canonicalArtist.createdAt)) {
+                                    canonicalArtist = otherArtist;
+                                }
+                            }
+                            // else, if both are similar but not exact, current canonical (which could be mainArtist) stands or older profile if previous canonical was not mainArtist
+                            else if (normOther !== normAudD && normUploader !== normAudD){
+                                 if (new Date(otherArtist.createdAt) < new Date(canonicalArtist.createdAt)) {
+                                    canonicalArtist = otherArtist;
+                                }
+                            }
+                        }
+                    }
+
+                    if (canonicalArtist.id !== mainArtist.id) {
+                        allowUpload = false;
+                        blockingReason = `Upload blocked. While your artist name is similar, the song appears to more closely match verified artist "${canonicalArtist.artistName}".`;
+                         console.warn(`Potential impersonation upload by "${mainArtist.artistName}" (ID: ${mainArtist.id}). Song by "${match.artist}" more closely matches "${canonicalArtist.artistName}" (ID: ${canonicalArtist.id}).`);
+                    }
+                }
+
+                if (allowUpload) {
+                    const uploadType = isAdminUpload ? "Admin uploading for artist" : (mainArtist.isVerified ? "Verified artist uploading own content" : "Unverified artist (edge case, should not happen here)");
+                    console.log(`${uploadType} "${artistName}" - "${match.title}". Similarity score: ${uploaderSimilarity.toFixed(3)}`);
+                    console.log("AudD Match Details (allowed):", match);
+                } else {
+                    console.error("AudD Match Details (blocked due to canonical artist conflict):", match);
+                    throw new Error(blockingReason);
+                }
+            } else { // Uploader similarity below threshold
+                let errorMessage = `Copyright violation detected. The uploaded audio appears to match "${match.title}" by "${match.artist}".`;
+                errorMessage += ` Your artist name has a similarity score of ${(uploaderSimilarity * 100).toFixed(1)}% with the matched artist. A higher similarity is required.`;
+                if (match.album) errorMessage += ` (Album: ${match.album})`;
+                console.error("AudD Match Details (blocked due to low similarity):", match);
+                throw new Error(errorMessage);
+            }
+        } else { // Artist not verified (and not admin upload) OR no artist in AudD match
+            let errorMessage = `Copyright violation detected. `;
+            if (match.artist && match.title) errorMessage += `The uploaded audio appears to match "${match.title}" by ${match.artist}.`;
+            else if (match.title) errorMessage += `The uploaded audio appears to match the title "${match.title}".`;
+            else errorMessage += `The uploaded audio appears to match a copyrighted track.`;
+            if (match.album) errorMessage += ` (Album: ${match.album})`;
+            console.error("AudD Match Details (blocked, general):", match);
+            throw new Error(errorMessage);
+        }
+    }
 
     const finalLabelId = labelId || mainArtist.labelId;
 
@@ -454,7 +676,6 @@ export class TrackService {
       const metadata = await mm.parseBuffer(audioFile.buffer, audioFile.mimetype);
       duration = Math.round(metadata.format.duration || 0);
 
-      // --- Essentia analysis --- 
       tempo = null;
       mood = null;
 
@@ -465,7 +686,6 @@ export class TrackService {
           const essentia = new Essentia(EssentiaWASM);
           const audioVector = essentia.arrayToVector(pcmF32)
           
-          // Tempo Estimation
           try {
             const tempoResult = essentia.PercivalBpmEstimator(audioVector);
             tempo = Math.round(tempoResult.bpm);
@@ -474,7 +694,6 @@ export class TrackService {
             tempo = null;
           }
 
-          // Danceability Estimation
           try {
             const danceabilityResult = essentia.Danceability(audioVector);
             danceability = danceabilityResult.danceability;
@@ -483,12 +702,10 @@ export class TrackService {
             danceability = null;
           }
           
-          // Energy Calculation (used for mood placeholder and energy field)
           try {
             const energyResult = essentia.Energy(audioVector);
             energy = energyResult.energy;
             
-            // Mood Placeholder (based on energy)
             if (typeof energy === 'number') {
               if (energy > 0.6) {
                 mood = 'Energetic';
@@ -504,12 +721,7 @@ export class TrackService {
             energy = null;
           }
           
-          // Key & Scale Estimation
-          // KeyExtractor often works better on the full signal representation if available,
-          // but let's try with the decoded PCM vector first.
           try {
-             // Note: KeyExtractor might ideally take the raw signal buffer if essentia supports it directly,
-             // or requires specific preprocessing not done here. This is an attempt with PCM data.
             const keyResult = essentia.KeyExtractor(audioVector);
             key = keyResult.key;
             scale = keyResult.scale;
@@ -527,7 +739,6 @@ export class TrackService {
           tempo = null;
           mood = null;
       }
-      // --- End Essentia analysis --- 
       
     } catch (error) {
       console.error('Error parsing basic audio metadata:', error);
@@ -627,7 +838,7 @@ export class TrackService {
 
         const releaseLink = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/track/${newTrack.id}`;
         const io = getIO();
-        const userSocketsMap = getUserSockets(); // Assuming getUserSockets is available
+        const userSocketsMap = getUserSockets(); 
 
         for (const user of followerUsers) {
           const targetSocketId = userSocketsMap.get(user.id);
@@ -666,7 +877,6 @@ export class TrackService {
       }
     };
 
-    // Trigger notifications without awaiting
     sendNotifications().catch(notificationError => {
       console.error("Error sending new track notifications:", notificationError);
     });

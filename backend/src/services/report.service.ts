@@ -1,4 +1,4 @@
-import { PrismaClient, ReportType, ReportStatus, Role } from '@prisma/client';
+import { PrismaClient, ReportType, ReportStatus, Role, NotificationType, RecipientType } from '@prisma/client';
 import { reportSelect } from '../utils/prisma-selects';
 
 const prisma = new PrismaClient();
@@ -18,7 +18,6 @@ interface ResolveReportData {
 
 export class ReportService {
   static async createReport(userId: string, data: CreateReportData) {
-    // Validate that at least one entity ID is provided
     if (!data.trackId && !data.playlistId && !data.albumId) {
       throw new Error('A report must be associated with a track, playlist, or album');
     }
@@ -63,6 +62,53 @@ export class ReportService {
       },
       select: reportSelect,
     });
+
+    // Get entity name for notification
+    let entityName = 'content';
+    let entityType = 'unknown';
+    
+    if (data.trackId) {
+      const track = await prisma.track.findUnique({
+        where: { id: data.trackId },
+        select: { title: true }
+      });
+      entityName = track?.title || 'track';
+      entityType = 'track';
+    } else if (data.albumId) {
+      const album = await prisma.album.findUnique({
+        where: { id: data.albumId },
+        select: { title: true }
+      });
+      entityName = album?.title || 'album';
+      entityType = 'album';
+    } else if (data.playlistId) {
+      const playlist = await prisma.playlist.findUnique({
+        where: { id: data.playlistId },
+        select: { name: true }
+      });
+      entityName = playlist?.name || 'playlist';
+      entityType = 'playlist';
+    }
+
+    // Send notification to all admins
+    const admins = await prisma.user.findMany({
+      where: { role: Role.ADMIN }
+    });
+
+    // Create notification for each admin
+    for (const admin of admins) {
+      await prisma.notification.create({
+        data: {
+          type: NotificationType.NEW_REPORT_SUBMITTED,
+          message: `New ${data.type} report submitted for ${entityType} "${entityName}"`,
+          recipientType: RecipientType.USER,
+          userId: admin.id,
+          senderId: userId,
+          trackId: data.trackId,
+          albumId: data.albumId,
+        }
+      });
+    }
 
     return report;
   }
@@ -151,48 +197,112 @@ export class ReportService {
     id: string,
     adminId: string,
     data: ResolveReportData
-  ) {
-    const report = await prisma.report.findUnique({
-      where: { id },
-      include: {
-        track: { select: { id: true, isActive: true } },
-      },
-    });
-
-    if (!report) {
-      throw new Error('Report not found');
-    }
-
-    // Check if report is already resolved
-    if (report.status !== ReportStatus.PENDING) {
-      throw new Error('This report has already been processed');
-    }
-
-    // Update the report
-    const updatedReport = await prisma.report.update({
-      where: { id },
-      data: {
-        status: data.status,
-        resolution: data.resolution,
-        resolverId: adminId,
-        resolvedAt: new Date(),
-      },
-      select: reportSelect,
-    });
-
-    // If it's a copyright violation that's being resolved as valid, deactivate the track
-    if (
-      report.type === ReportType.COPYRIGHT_VIOLATION &&
-      data.status === ReportStatus.RESOLVED &&
-      report.trackId &&
-      report.track?.isActive
     ) {
-      await prisma.track.update({
-        where: { id: report.trackId },
-        data: { isActive: false },
-      });
-    }
+        const report = await prisma.report.findUnique({
+        where: { id },
+        include: {
+            track: { 
+            select: { 
+                id: true, 
+                isActive: true,
+                title: true 
+            }
+            },
+            album: {
+            select: {
+                id: true,
+                isActive: true,
+                title: true
+            }
+            },
+            playlist: {
+            select: {
+                id: true,
+                name: true
+            }
+            },
+            reporter: {
+            select: {
+                id: true,
+                name: true
+            }
+            }
+        },
+        });
 
-    return updatedReport;
-  }
-} 
+        if (!report) {
+        throw new Error('Report not found');
+        }
+
+        // Check if report is already resolved
+        if (report.status !== ReportStatus.PENDING) {
+        throw new Error('This report has already been processed');
+        }
+
+        // Update the report
+        const updatedReport = await prisma.report.update({
+        where: { id },
+        data: {
+            status: data.status,
+            resolution: data.resolution,
+            resolverId: adminId,
+            resolvedAt: new Date(),
+        },
+        select: reportSelect,
+        });
+
+        // If it's a copyright violation that's being resolved as valid, deactivate the track
+        if (
+        report.type === ReportType.COPYRIGHT_VIOLATION &&
+        data.status === ReportStatus.RESOLVED &&
+        report.trackId &&
+        report.track?.isActive
+        ) {
+        await prisma.track.update({
+            where: { id: report.trackId },
+            data: { isActive: false },
+        });
+        } else if (
+        report.type === ReportType.COPYRIGHT_VIOLATION &&
+        data.status === ReportStatus.RESOLVED &&
+        report.albumId &&
+        report.album?.isActive
+        ) {
+        await prisma.album.update({
+            where: { id: report.albumId },
+            data: { isActive: false },
+        });
+
+        // Get entity name for notification
+        let entityName = 'content';
+        let entityType = 'unknown';
+        
+        if (report.trackId && report.track) {
+        entityName = report.track.title || 'track';
+        entityType = 'track';
+        } else if (report.albumId && report.album) {
+        entityName = report.album.title || 'album';
+        entityType = 'album';
+        } else if (report.playlistId && report.playlist) {
+        entityName = report.playlist.name || 'playlist';
+        entityType = 'playlist';
+        }
+
+        // Create notification for the report submitter
+        const statusText = data.status === ReportStatus.RESOLVED ? 'resolved' : 'rejected';
+        await prisma.notification.create({
+        data: {
+            type: NotificationType.REPORT_RESOLVED,
+            message: `Your report for ${entityType} "${entityName}" has been ${statusText}`,
+            recipientType: RecipientType.USER,
+            userId: report.reporter.id,
+            senderId: adminId,
+            trackId: report.trackId,
+            albumId: report.albumId,
+        }
+        });
+
+        return updatedReport;
+    }
+}
+}

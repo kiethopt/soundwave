@@ -35,6 +35,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Flag } from "lucide-react";
 
 const getInitialCollapsedState = (): boolean => {
   if (typeof window === "undefined" || !window.localStorage) {
@@ -1020,28 +1021,29 @@ export default function Sidebar({
                     )}
                   </Link>
 
-                  {/* Old Genres Management */}
-                  {/* <Link
-                    href="/admin/genres"
+                  <Link
+                    href="/admin/reports"
                     className={`flex items-center px-3 py-2.5 rounded-md ${
-                      pathname && pathname.startsWith("/admin/genres")
+                      pathname && pathname.startsWith("/admin/reports")
                         ? "bg-gray-200 text-gray-900"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
                   >
                     {isCollapsed ? (
                       <div className="w-full flex justify-center">
-                        <Genres className="w-6 h-6" />
+                        <Flag className="w-6 h-6" />
                       </div>
                     ) : (
                       <>
                         <div className="min-w-[32px] flex justify-center">
-                          <Genres className="w-5 h-5" />
+                          <Flag className="w-5 h-5" />
                         </div>
-                        <span className="ml-3 font-medium text-sm">Genres</span>
+                        <span className="ml-3 font-medium text-sm">
+                          Reports
+                        </span>
                       </>
                     )}
-                  </Link> */}
+                  </Link>
 
                   <Link
                     href="/admin/genres"

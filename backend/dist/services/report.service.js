@@ -44,6 +44,48 @@ class ReportService {
             },
             select: prisma_selects_1.reportSelect,
         });
+        let entityName = 'content';
+        let entityType = 'unknown';
+        if (data.trackId) {
+            const track = await prisma.track.findUnique({
+                where: { id: data.trackId },
+                select: { title: true }
+            });
+            entityName = track?.title || 'track';
+            entityType = 'track';
+        }
+        else if (data.albumId) {
+            const album = await prisma.album.findUnique({
+                where: { id: data.albumId },
+                select: { title: true }
+            });
+            entityName = album?.title || 'album';
+            entityType = 'album';
+        }
+        else if (data.playlistId) {
+            const playlist = await prisma.playlist.findUnique({
+                where: { id: data.playlistId },
+                select: { name: true }
+            });
+            entityName = playlist?.name || 'playlist';
+            entityType = 'playlist';
+        }
+        const admins = await prisma.user.findMany({
+            where: { role: client_1.Role.ADMIN }
+        });
+        for (const admin of admins) {
+            await prisma.notification.create({
+                data: {
+                    type: client_1.NotificationType.NEW_REPORT_SUBMITTED,
+                    message: `New ${data.type} report submitted for ${entityType} "${entityName}"`,
+                    recipientType: client_1.RecipientType.USER,
+                    userId: admin.id,
+                    senderId: userId,
+                    trackId: data.trackId,
+                    albumId: data.albumId,
+                }
+            });
+        }
         return report;
     }
     static async getReports(user, page = 1, limit = 10, filters = {}) {
@@ -109,7 +151,32 @@ class ReportService {
         const report = await prisma.report.findUnique({
             where: { id },
             include: {
-                track: { select: { id: true, isActive: true } },
+                track: {
+                    select: {
+                        id: true,
+                        isActive: true,
+                        title: true
+                    }
+                },
+                album: {
+                    select: {
+                        id: true,
+                        isActive: true,
+                        title: true
+                    }
+                },
+                playlist: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                reporter: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                }
             },
         });
         if (!report) {
@@ -137,7 +204,42 @@ class ReportService {
                 data: { isActive: false },
             });
         }
-        return updatedReport;
+        else if (report.type === client_1.ReportType.COPYRIGHT_VIOLATION &&
+            data.status === client_1.ReportStatus.RESOLVED &&
+            report.albumId &&
+            report.album?.isActive) {
+            await prisma.album.update({
+                where: { id: report.albumId },
+                data: { isActive: false },
+            });
+            let entityName = 'content';
+            let entityType = 'unknown';
+            if (report.trackId && report.track) {
+                entityName = report.track.title || 'track';
+                entityType = 'track';
+            }
+            else if (report.albumId && report.album) {
+                entityName = report.album.title || 'album';
+                entityType = 'album';
+            }
+            else if (report.playlistId && report.playlist) {
+                entityName = report.playlist.name || 'playlist';
+                entityType = 'playlist';
+            }
+            const statusText = data.status === client_1.ReportStatus.RESOLVED ? 'resolved' : 'rejected';
+            await prisma.notification.create({
+                data: {
+                    type: client_1.NotificationType.REPORT_RESOLVED,
+                    message: `Your report for ${entityType} "${entityName}" has been ${statusText}`,
+                    recipientType: client_1.RecipientType.USER,
+                    userId: report.reporter.id,
+                    senderId: adminId,
+                    trackId: report.trackId,
+                    albumId: report.albumId,
+                }
+            });
+            return updatedReport;
+        }
     }
 }
 exports.ReportService = ReportService;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/utils/api";
 import { Track, Playlist } from "@/types";
-import { ArrowLeft, Calendar, Music, Flag } from "lucide-react";
+import { ArrowLeft, Calendar, Music, Flag, Pause, Play } from "lucide-react";
 import { useDominantColor } from "@/hooks/useDominantColor";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,6 +14,8 @@ import { AlbumTracks } from "@/components/user/album/AlbumTracks";
 import io, { Socket } from "socket.io-client";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
+import Link from "next/link";
 
 export default function TrackDetailPage() {
   const params = useParams();
@@ -195,10 +197,15 @@ export default function TrackDetailPage() {
         socket.disconnect();
       }
     };
-  }, [trackId]); // Re-run effect if trackId changes
+  }, [trackId]);
+
+  useEffect(() => {
+    if ((!track && !loading) || error || (track && !track.isActive)) {
+      router.push('/');
+    }
+  }, [track, loading, error, router]);
 
   const handleTrackPlay = (track: Track) => {
-    // Check if user is authenticated before playing
     handleProtectedAction(() => {
       if (currentTrack?.id === track.id && isPlaying && queueType === "track") {
         pauseTrack();
@@ -221,18 +228,13 @@ export default function TrackDetailPage() {
     );
   }
 
-  // Error state
-  if (error) {
+  // Error state or not found - show loading while redirecting via the effect
+  if (error || !track || !track.isActive) {
     return (
-      <div className="p-4 bg-red-500/10 text-red-500 rounded">
-        Error: {error}
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
       </div>
     );
-  }
-
-  // Not found state
-  if (!track) {
-    return <div>Track not found</div>;
   }
 
   return (
@@ -272,7 +274,7 @@ export default function TrackDetailPage() {
           <div className="w-[280px] md:w-[220px] flex-shrink-0">
             <img
               src={track.coverUrl || "/images/default-track.jpg"}
-              alt={track.title}
+              alt={track.title || "Track"}
               className="w-full aspect-square object-cover rounded-xl shadow-2xl"
             />
           </div>
@@ -280,100 +282,55 @@ export default function TrackDetailPage() {
           {/* Track Info */}
           <div className="w-full flex flex-col gap-4 justify-end mb-4">
             <div className="text-center md:text-left">
-              <h1
-                className={`text-3xl md:text-4xl font-bold mb-2 ${
-                  theme === "light" ? "text-gray-900" : "text-white"
-                }`}
-              >
+              <p className="text-xs text-gray-400 uppercase tracking-wider">
+                {track.type}
+              </p>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mt-1">
                 {track.title}
               </h1>
-
-              <div className="flex items-center justify-center md:justify-start gap-2 mb-4">
-                <span
-                  className={`cursor-pointer hover:underline underline-offset-2 ${
-                    theme === "light" ? "text-gray-900" : "text-white/90"
-                  }`}
-                  onClick={() =>
-                    router.push(`/artist/profile/${track.artist.id}`)
-                  }
-                >
-                  {track.artist.artistName}
-                </span>
-
-                {/* Track type badge */}
-                {track.type && (
-                  <span
-                    className={`px-2 py-0.5 text-xs rounded-full ${
-                      theme === "light"
-                        ? "bg-gray-200 text-gray-800"
-                        : "bg-white/20 text-white/90"
-                    }`}
-                  >
-                    {track.type}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-6 text-base">
-                {track.album && (
-                  <div
-                    className={`flex items-center gap-2 cursor-pointer ${
-                      theme === "light" ? "text-gray-600" : "text-white/60"
-                    }`}
-                    onClick={() => router.push(`/album/${track.album?.id}`)}
-                  >
-                    <Music className="w-5 h-5" />
-                    <span className="hover:underline underline-offset-2">
-                      {track.album.title}
-                    </span>
-                  </div>
-                )}
-
-                <div
-                  className={`flex items-center gap-2 ${
-                    theme === "light" ? "text-gray-600" : "text-white/60"
-                  }`}
-                >
-                  <Calendar className="w-5 h-5" />
-                  <span>
-                    {new Date(track.releaseDate).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </span>
+              <div className="mt-4 flex items-center gap-4 text-sm text-white/90">
+                <div className="flex items-center gap-2">
+                  {track.artist?.avatar ? (
+                    <Image
+                      src={track.artist.avatar}
+                      alt={track.artist?.artistName || "Artist"}
+                      width={24}
+                      height={24}
+                      className="rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-gray-600"></div>
+                  )}
+                  <span>{track.artist?.artistName || "Unknown Artist"}</span>
                 </div>
-
-                {track.duration && (
-                  <div
-                    className={`flex items-center gap-2 ${
-                      theme === "light" ? "text-gray-600" : "text-white/60"
-                    }`}
-                  >
-                    <span>
-                      {Math.floor(track.duration / 60)}:
-                      {String(track.duration % 60).padStart(2, "0")}
-                    </span>
-                  </div>
-                )}
+                <span>•</span>
+                <span>{new Date(track.releaseDate).getFullYear()}</span>
+                <span>•</span>
+                <span>{formatDuration(track.duration)}</span>
               </div>
-
-              {track.genres && track.genres.length > 0 && (
-                <div className="flex gap-2 flex-wrap justify-center md:justify-start mt-4">
-                  {track.genres.map(({ genre }) => (
-                    <span
-                      key={genre.id}
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        theme === "light"
-                          ? "bg-gray-200 text-gray-800"
-                          : "bg-white/10 text-white/80"
-                      }`}
-                    >
-                      {genre.name}
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                {track.genres?.map(({ genre }) => (
+                  <Link href={`/genre/${genre?.id || ""}`} key={genre?.id}>
+                    <span className="px-2 py-0.5 bg-white/10 text-xs rounded-full hover:bg-white/20">
+                      {genre?.name || "Unknown Genre"}
                     </span>
-                  ))}
-                </div>
-              )}
+                  </Link>
+                ))}
+              </div>
+              {/* Report Button (Moved Here) */}
+              <Button
+                variant="outline"
+                size="sm"
+                className={`mt-4 ${
+                  theme === "light"
+                    ? "bg-white/90 border-gray-300 text-gray-800 hover:bg-gray-100 hover:text-gray-900"
+                    : "bg-neutral-700/90 border-neutral-600 text-white/90 hover:bg-neutral-600 hover:text-white"
+                }`}
+                onClick={() => setIsReportDialogOpen(true)}
+              >
+                <Flag className="mr-2 h-4 w-4" />
+                Report this track
+              </Button>
             </div>
           </div>
         </div>
@@ -431,20 +388,6 @@ export default function TrackDetailPage() {
               </span>
             </div>
           )}
-          
-          {/* Report Button */}
-          <div className="flex items-center gap-2 mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => setIsReportDialogOpen(true)}
-              title="Report this track"
-            >
-              <Flag className="h-4 w-4" />
-              Report
-            </Button>
-          </div>
         </div>
 
         {/* Auth Dialog */}
@@ -463,4 +406,11 @@ export default function TrackDetailPage() {
       </div>
     </div>
   );
+}
+
+function formatDuration(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 }

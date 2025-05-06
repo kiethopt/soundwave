@@ -3,24 +3,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/utils/api';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, Music, AddSimple } from '@/components/ui/Icons';
+import { ArrowLeft, Calendar, Music } from '@/components/ui/Icons';
+import { Flag } from 'lucide-react';
 import { useDominantColor } from '@/hooks/useDominantColor';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Album, Track, Playlist } from '@/types';
 import { useTrack } from '@/contexts/TrackContext';
-import { Heart, MoreHorizontal, Share2 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { MusicAuthDialog } from '@/components/ui/data-table/data-table-modals';
 import { AlbumTracks } from '@/components/user/album/AlbumTracks';
-import io, { Socket } from 'socket.io-client'; // Import Socket
+import io, { Socket } from 'socket.io-client';
 import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { ReportDialog } from '@/components/shared/ReportDialog';
+
 export default function AlbumDetailPage() {
   const params = useParams();
   const albumId = params?.id
@@ -47,6 +43,7 @@ export default function AlbumDetailPage() {
   } = useTrack();
   const { isAuthenticated, dialogOpen, setDialogOpen, handleProtectedAction } =
     useAuth();
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
   const fetchAlbumDetails = useCallback(async () => {
     try {
@@ -62,7 +59,7 @@ export default function AlbumDetailPage() {
         token ?? undefined
       );
       setAlbum(data);
-      console.log('data', data);
+      // console.log('data', data);
     } catch (err) {
       console.error('Error fetching album:', err);
       setError(err instanceof Error ? err.message : 'Failed to load album');
@@ -72,10 +69,15 @@ export default function AlbumDetailPage() {
   }, [albumId]);
 
   useEffect(() => {
-    if (albumId) {
-      fetchAlbumDetails();
-    }
+    fetchAlbumDetails();
   }, [albumId, fetchAlbumDetails]);
+
+  // Add new effect for handling redirection
+  useEffect(() => {
+    if ((!album && !isLoading) || error || (album && !album.isActive)) {
+      router.push('/');
+    }
+  }, [album, isLoading, error, router]);
 
   useEffect(() => {
     const fetchPlaylists = async () => {
@@ -192,18 +194,13 @@ export default function AlbumDetailPage() {
     );
   }
 
-  // Error state
-  if (error) {
+  // Error state or not found - show loading while redirecting via the effect
+  if (error || !album || !album.isActive) {
     return (
-      <div className="p-4 bg-red-500/10 text-red-500 rounded">
-        Error: {error}
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
       </div>
     );
-  }
-
-  // Not found state
-  if (!album) {
-    return <div>Album not found</div>;
   }
 
   return (
@@ -268,11 +265,13 @@ export default function AlbumDetailPage() {
                   className={`cursor-pointer hover:underline underline-offset-4 ${
                     theme === 'light' ? 'text-gray-900' : 'text-white/90'
                   }`}
-                  onClick={() =>
-                    router.push(`/artist/profile/${album.artist.id}`)
-                  }
+                  onClick={() => {
+                    if (album.artist?.id) {
+                      router.push(`/artist/profile/${album.artist.id}`);
+                    }
+                  }}
                 >
-                  {album.artist.artistName}
+                  {album.artist?.artistName || 'Unknown Artist'}
                 </span>
               </div>
 
@@ -317,6 +316,21 @@ export default function AlbumDetailPage() {
                   ))}
                 </div>
               )}
+
+              {/* Report Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                className={`mt-4 ${
+                  theme === 'light'
+                    ? 'bg-white/90 border-gray-300 text-gray-800 hover:bg-gray-100 hover:text-gray-900'
+                    : 'bg-neutral-700/90 border-neutral-600 text-white/90 hover:bg-neutral-600 hover:text-white'
+                }`}
+                onClick={() => setIsReportDialogOpen(true)}
+              >
+                <Flag className="mr-2 h-4 w-4" />
+                Report this album
+              </Button>
             </div>
           </div>
         </div>
@@ -380,6 +394,17 @@ export default function AlbumDetailPage() {
 
         {/* Auth Dialog */}
         <MusicAuthDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+        
+        {/* Report Dialog */}
+        {album && (
+          <ReportDialog
+            open={isReportDialogOpen}
+            onOpenChange={setIsReportDialogOpen}
+            entityType="album"
+            entityId={album.id}
+            entityName={album.title}
+          />
+        )}
       </div>
     </div>
   );

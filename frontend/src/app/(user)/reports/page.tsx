@@ -16,7 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRight, Eye } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function UserReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -27,10 +27,53 @@ export default function UserReportsPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const { theme } = useTheme();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Check user access and redirect if Admin or Artist
+  useEffect(() => {
+    const checkAccess = () => {
+      try {
+        const userData = localStorage.getItem('userData');
+        if (!userData) {
+          router.push('/login');
+          return;
+        }
+
+        const user = JSON.parse(userData);
+        
+        // Redirect Admins to admin dashboard
+        if (user.role === 'ADMIN') {
+          router.push('/admin/dashboard');
+          return;
+        }
+        
+        // Redirect Artists to artist dashboard
+        if (user.currentProfile === 'ARTIST') {
+          router.push('/artist/dashboard');
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking user access:', error);
+        router.push('/');
+      }
+    };
+
+    checkAccess();
+  }, [router]);
 
   useEffect(() => {
     fetchReports();
   }, [currentPage]);
+
+  useEffect(() => {
+    const reportId = searchParams.get('reportId');
+    if (reportId && reports.length > 0) {
+      const report = reports.find(r => r.id === reportId);
+      if (report) {
+        handleViewDetails(report);
+      }
+    }
+  }, [reports, searchParams]);
 
   const fetchReports = async () => {
     try {
@@ -47,6 +90,16 @@ export default function UserReportsPage() {
       if (response.reports && response.pagination) {
         setReports(response.reports);
         setTotalPages(response.pagination.totalPages);
+
+        // Check if there's a reportId in the URL after loading reports
+        const reportId = searchParams.get('reportId');
+        if (reportId) {
+          const report = response.reports.find((r: Report) => r.id === reportId);
+          if (report) {
+            setSelectedReport(report);
+            setIsDetailOpen(true);
+          }
+        }
       } else {
         toast.error('Failed to fetch reports');
       }

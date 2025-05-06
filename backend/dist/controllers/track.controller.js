@@ -77,7 +77,7 @@ const createTrack = async (req, res) => {
             featuredArtistNames: featuredArtistNames || [],
             labelId: labelId || undefined
         };
-        const newTrack = await track_service_1.TrackService.createTrack(user.artistProfile.id, createData, audioFile, coverFile);
+        const newTrack = await track_service_1.TrackService.createTrack(user.artistProfile.id, createData, audioFile, coverFile, user);
         res.status(201).json({ message: 'Track created successfully', track: newTrack });
     }
     catch (error) {

@@ -1649,23 +1649,27 @@ export const getPlayHistory = async (user: any) => {
     take: 20,
   });
 
-  const trackIds = history.map(h => h.trackId).filter((id): id is string => typeof id === 'string');
+  // Filter out any null or undefined trackIds first
+  const trackIds = history
+    .map(h => h.trackId)
+    .filter((id): id is string => typeof id === 'string');
+
+  // If there are no valid trackIds, return empty array
+  if (trackIds.length === 0) {
+    return [];
+  }
 
   // Fetch all tracks in one query for efficiency
   const tracks = await prisma.track.findMany({
-    where: { id: { in: trackIds } },
+    where: { 
+      id: { in: trackIds },
+      isActive: true 
+    },
     select: searchTrackSelect,
   });
 
-  // Map for quick lookup
-  const trackMap = new Map(tracks.map(track => [track.id, track]));
-
-  // Return history with full track info
-  return history
-    .filter(h => typeof h.trackId === 'string')
-    .map(h => trackMap.get(h.trackId as string))
-    .filter((track): track is NonNullable<typeof track> => track !== null);
-};
+  return tracks;
+}
 
 // --- Artist Claim Functions ---
 

@@ -1441,16 +1441,20 @@ const getPlayHistory = async (user) => {
         orderBy: { createdAt: 'desc' },
         take: 20,
     });
-    const trackIds = history.map(h => h.trackId).filter((id) => typeof id === 'string');
+    const trackIds = history
+        .map(h => h.trackId)
+        .filter((id) => typeof id === 'string');
+    if (trackIds.length === 0) {
+        return [];
+    }
     const tracks = await db_1.default.track.findMany({
-        where: { id: { in: trackIds } },
+        where: {
+            id: { in: trackIds },
+            isActive: true
+        },
         select: prisma_selects_1.searchTrackSelect,
     });
-    const trackMap = new Map(tracks.map(track => [track.id, track]));
-    return history
-        .filter(h => typeof h.trackId === 'string')
-        .map(h => trackMap.get(h.trackId))
-        .filter((track) => track !== null);
+    return tracks;
 };
 exports.getPlayHistory = getPlayHistory;
 const submitArtistClaim = async (userId, artistProfileId, proof) => {

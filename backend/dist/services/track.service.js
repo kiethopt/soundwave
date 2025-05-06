@@ -49,6 +49,106 @@ const artist_service_1 = require("./artist.service");
 const mm = __importStar(require("music-metadata"));
 const essentia_js_1 = require("essentia.js");
 const mpg123_decoder_1 = require("mpg123-decoder");
+const audd_io_1 = require("audd.io");
+const fs = __importStar(require("fs/promises"));
+const path = __importStar(require("path"));
+const os_1 = require("os");
+const auddApiKey = process.env.AUDD_API_KEY;
+let auddInstance = null;
+if (auddApiKey) {
+    auddInstance = new audd_io_1.Audd(auddApiKey);
+}
+else {
+    console.warn('AUDD_API_KEY not found in .env. Copyright check will be skipped.');
+}
+function normalizeString(str) {
+    if (!str)
+        return '';
+    let result = str.toLowerCase().trim();
+    result = result.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    result = result.replace(/[^a-z0-9]/g, '');
+    return result;
+}
+async function checkCopyrightWithAudD(audioBuffer, originalFileName) {
+    if (!auddInstance) {
+        console.warn('AudD client not initialized. Skipping copyright check.');
+        return { isMatched: false, error: true };
+    }
+    let tempFilePath = null;
+    try {
+        const fileExtension = originalFileName ? path.extname(originalFileName) : '.mp3';
+        const tempFileName = `audd_upload_${Date.now()}${fileExtension}`;
+        tempFilePath = path.join((0, os_1.tmpdir)(), tempFileName);
+        await fs.writeFile(tempFilePath, audioBuffer);
+        const result = await auddInstance.recognize.fromFile(tempFilePath);
+        if (result && result.status === 'success' && result.result) {
+            return {
+                isMatched: true,
+                match: result.result,
+            };
+        }
+        if (result && result.status === 'error') {
+            console.error('AudD API Error:', result.error);
+            return { isMatched: false, error: true, match: result.error };
+        }
+        return { isMatched: false };
+    }
+    catch (error) {
+        console.error('Error during AudD copyright check (file method):', error);
+        return { isMatched: false, error: true };
+    }
+    finally {
+        if (tempFilePath) {
+            try {
+                await fs.unlink(tempFilePath);
+            }
+            catch (unlinkError) {
+                console.error('Failed to delete temporary audio file:', unlinkError);
+            }
+        }
+    }
+}
+function getArtistNameSimilarity(name1, name2) {
+    if (!name1 || !name2)
+        return 0;
+    const normalized1 = normalizeString(name1);
+    const normalized2 = normalizeString(name2);
+    if (normalized1 === normalized2)
+        return 1;
+    if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) {
+        return Math.min(normalized1.length, normalized2.length) / Math.max(normalized1.length, normalized2.length);
+    }
+    if (normalized1.length <= 3 && normalized2.length <= 3) {
+        let matches = 0;
+        for (const char of normalized1) {
+            if (normalized2.includes(char)) {
+                matches++;
+            }
+        }
+        if (matches > 0) {
+            return 0.8;
+        }
+    }
+    let matches = 0;
+    const longer = normalized1.length > normalized2.length ? normalized1 : normalized2;
+    const shorter = normalized1.length > normalized2.length ? normalized2 : normalized1;
+    let sequentialMatches = 0;
+    let maxSequence = 0;
+    for (let i = 0; i < shorter.length; i++) {
+        if (longer.includes(shorter.substring(i, i + 2))) {
+            sequentialMatches++;
+            maxSequence = Math.max(maxSequence, 2);
+        }
+    }
+    for (let i = 0; i < shorter.length; i++) {
+        if (longer.includes(shorter[i])) {
+            matches++;
+        }
+    }
+    const charSimilarity = matches / longer.length;
+    const sequenceSimilarity = sequentialMatches > 0 ? (sequentialMatches * maxSequence) / (longer.length * 2) : 0;
+    return Math.max(charSimilarity, sequenceSimilarity);
+}
 async function convertMp3BufferToPcmF32(audioBuffer) {
     try {
         const decoder = new mpg123_decoder_1.MPEGDecoder();
@@ -374,16 +474,106 @@ const getTracks = async (req) => {
 };
 exports.getTracks = getTracks;
 class TrackService {
-    static async createTrack(artistProfileId, data, audioFile, coverFile) {
+    static async createTrack(artistProfileId, data, audioFile, coverFile, requestUser) {
         const { title, releaseDate, type, genreIds, featuredArtistIds = [], featuredArtistNames = [], labelId } = data;
         const mainArtist = await db_1.default.artistProfile.findUnique({
             where: { id: artistProfileId },
-            select: { id: true, labelId: true, artistName: true, avatar: true }
+            select: { id: true, labelId: true, artistName: true, avatar: true, isVerified: true, createdAt: true }
         });
         if (!mainArtist) {
             throw new Error(`Artist profile with ID ${artistProfileId} not found.`);
         }
         const artistName = mainArtist.artistName;
+        const copyrightCheckResult = await checkCopyrightWithAudD(audioFile.buffer, audioFile.originalname);
+        if (copyrightCheckResult.error) {
+            console.warn("Copyright check with AudD failed or was skipped. Proceeding with caution.");
+        }
+        else if (copyrightCheckResult.isMatched && copyrightCheckResult.match) {
+            const match = copyrightCheckResult.match;
+            const isAdminUpload = requestUser && requestUser.role === client_1.Role.ADMIN && requestUser.id !== mainArtist.id;
+            if ((mainArtist.isVerified || isAdminUpload) && match.artist) {
+                const uploaderSimilarity = getArtistNameSimilarity(match.artist, artistName);
+                const SIMILARITY_THRESHOLD = 0.7;
+                console.log(`Artist name comparison: "${match.artist}" (AudD) vs "${artistName}" (uploader: ${mainArtist.id})`);
+                console.log(`Normalized comparison: "${normalizeString(match.artist)}" vs "${normalizeString(artistName)}"`);
+                console.log(`Uploader Similarity score: ${uploaderSimilarity.toFixed(3)} (threshold: ${SIMILARITY_THRESHOLD})`);
+                if (uploaderSimilarity >= SIMILARITY_THRESHOLD) {
+                    let allowUpload = true;
+                    let blockingReason = "";
+                    if (mainArtist.isVerified && !isAdminUpload) {
+                        const otherVerifiedArtists = await db_1.default.artistProfile.findMany({
+                            where: {
+                                id: { not: mainArtist.id },
+                                isVerified: true,
+                            }
+                        });
+                        let canonicalArtist = mainArtist;
+                        let highestSimilarity = uploaderSimilarity;
+                        for (const otherArtist of otherVerifiedArtists) {
+                            const otherSimilarity = getArtistNameSimilarity(match.artist, otherArtist.artistName);
+                            console.log(`Comparing with other verified artist "${otherArtist.artistName}" (ID: ${otherArtist.id}). Similarity to AudD match: ${otherSimilarity.toFixed(3)}`);
+                            if (otherSimilarity > highestSimilarity) {
+                                highestSimilarity = otherSimilarity;
+                                canonicalArtist = otherArtist;
+                            }
+                            else if (otherSimilarity === highestSimilarity) {
+                                const normAudD = normalizeString(match.artist);
+                                const normUploader = normalizeString(canonicalArtist.artistName);
+                                const normOther = normalizeString(otherArtist.artistName);
+                                if (normOther === normAudD && normUploader !== normAudD) {
+                                    canonicalArtist = otherArtist;
+                                }
+                                else if (normOther === normAudD && normUploader === normAudD) {
+                                    if (new Date(otherArtist.createdAt) < new Date(canonicalArtist.createdAt)) {
+                                        canonicalArtist = otherArtist;
+                                    }
+                                }
+                                else if (normOther !== normAudD && normUploader !== normAudD) {
+                                    if (new Date(otherArtist.createdAt) < new Date(canonicalArtist.createdAt)) {
+                                        canonicalArtist = otherArtist;
+                                    }
+                                }
+                            }
+                        }
+                        if (canonicalArtist.id !== mainArtist.id) {
+                            allowUpload = false;
+                            blockingReason = `Upload blocked. While your artist name is similar, the song appears to more closely match verified artist "${canonicalArtist.artistName}".`;
+                            console.warn(`Potential impersonation upload by "${mainArtist.artistName}" (ID: ${mainArtist.id}). Song by "${match.artist}" more closely matches "${canonicalArtist.artistName}" (ID: ${canonicalArtist.id}).`);
+                        }
+                    }
+                    if (allowUpload) {
+                        const uploadType = isAdminUpload ? "Admin uploading for artist" : (mainArtist.isVerified ? "Verified artist uploading own content" : "Unverified artist (edge case, should not happen here)");
+                        console.log(`${uploadType} "${artistName}" - "${match.title}". Similarity score: ${uploaderSimilarity.toFixed(3)}`);
+                        console.log("AudD Match Details (allowed):", match);
+                    }
+                    else {
+                        console.error("AudD Match Details (blocked due to canonical artist conflict):", match);
+                        throw new Error(blockingReason);
+                    }
+                }
+                else {
+                    let errorMessage = `Copyright violation detected. The uploaded audio appears to match "${match.title}" by "${match.artist}".`;
+                    errorMessage += ` Your artist name has a similarity score of ${(uploaderSimilarity * 100).toFixed(1)}% with the matched artist. A higher similarity is required.`;
+                    if (match.album)
+                        errorMessage += ` (Album: ${match.album})`;
+                    console.error("AudD Match Details (blocked due to low similarity):", match);
+                    throw new Error(errorMessage);
+                }
+            }
+            else {
+                let errorMessage = `Copyright violation detected. `;
+                if (match.artist && match.title)
+                    errorMessage += `The uploaded audio appears to match "${match.title}" by ${match.artist}.`;
+                else if (match.title)
+                    errorMessage += `The uploaded audio appears to match the title "${match.title}".`;
+                else
+                    errorMessage += `The uploaded audio appears to match a copyrighted track.`;
+                if (match.album)
+                    errorMessage += ` (Album: ${match.album})`;
+                console.error("AudD Match Details (blocked, general):", match);
+                throw new Error(errorMessage);
+            }
+        }
         const finalLabelId = labelId || mainArtist.labelId;
         const [audioUploadResult, coverUploadResult] = await Promise.all([
             (0, upload_service_1.uploadFile)(audioFile.buffer, 'tracks', 'auto'),

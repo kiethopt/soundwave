@@ -11,6 +11,12 @@ export interface SingleTrackData {
   featuredArtistNames: string[];
   playCount?: number;
   releaseDate?: Date;
+  tempo?: number;
+  mood?: string;
+  key?: string;
+  scale?: string;
+  danceability?: number;
+  energy?: number;
 }
 
 // Export the singles data
@@ -24,7 +30,13 @@ export const singles: SingleTrackData[] = [
     genreNames: ['V-Pop', 'Ballad'],
     labelName: 'Warner Music Vietnam',
     featuredArtistNames: [],
-    playCount: 100
+    playCount: 100,
+    tempo: 117,
+    mood: 'Energetic',
+    key: 'Eb',
+    scale: 'minor',
+    danceability: 0.98,
+    energy: 0.82
   },
   {
     artistName: 'Vũ.',
@@ -34,7 +46,13 @@ export const singles: SingleTrackData[] = [
     genreNames: ['V-Pop', 'Indie'],
     labelName: 'Warner Music Vietnam',
     featuredArtistNames: [],
-    playCount: 90
+    playCount: 90,
+    tempo: 73,
+    mood: 'Melancholic',
+    key: 'C#',
+    scale: 'major',
+    danceability: 0.72,
+    energy: 0.40
   },
   {
     artistName: 'Vũ.',
@@ -44,7 +62,13 @@ export const singles: SingleTrackData[] = [
     genreNames: ['V-Pop', 'Ballad'],
     labelName: 'Warner Music Vietnam',
     featuredArtistNames: [],
-    playCount: 80
+    playCount: 80,
+    tempo: 101,
+    mood: 'Chill',
+    key: 'E',
+    scale: 'minor',
+    danceability: 0.65,
+    energy: 0.35
   },
   
   // Wren Evans' Singles
@@ -56,7 +80,13 @@ export const singles: SingleTrackData[] = [
     genreNames: ['V-Pop', 'Hip-Hop'],
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: ['itsnk'],
-    playCount: 80
+    playCount: 80,
+    tempo: 150,
+    mood: 'Energetic',
+    key: 'C',
+    scale: 'major',
+    danceability: 0.81,
+    energy: 0.88
   },
   {
     artistName: 'Wren Evans',
@@ -66,7 +96,13 @@ export const singles: SingleTrackData[] = [
     genreNames: ['V-Pop', 'R&B'],
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: [],
-    playCount: 75
+    playCount: 75,
+    tempo: 95,
+    mood: 'Smooth',
+    key: 'F',
+    scale: 'minor',
+    danceability: 0.78,
+    energy: 0.65
   },
   {
     artistName: 'Wren Evans',
@@ -76,7 +112,13 @@ export const singles: SingleTrackData[] = [
     genreNames: ['V-Pop'],
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: [],
-    playCount: 70
+    playCount: 70,
+    tempo: 110,
+    mood: 'Romantic',
+    key: 'G',
+    scale: 'major',
+    danceability: 0.76,
+    energy: 0.68
   },
   {
     artistName: 'Wren Evans',
@@ -86,7 +128,13 @@ export const singles: SingleTrackData[] = [
     genreNames: ['V-Pop', 'Hip-Hop'],
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: ['itsnk'],
-    playCount: 70
+    playCount: 70,
+    tempo: 135,
+    mood: 'Energetic',
+    key: 'A',
+    scale: 'minor',
+    danceability: 0.85,
+    energy: 0.80
   },
   
   // Phan Đinh Tùng's Single
@@ -98,7 +146,13 @@ export const singles: SingleTrackData[] = [
     genreNames: ['V-Pop', 'Pop'],
     labelName: 'Đông Tây Promotion',
     featuredArtistNames: [],
-    playCount: 90
+    playCount: 90,
+    tempo: 120,
+    mood: 'Happy',
+    key: 'C',
+    scale: 'major',
+    danceability: 0.85,
+    energy: 0.75
   },
 
   // MONO - Ôm Em Thật Lâu
@@ -111,7 +165,13 @@ export const singles: SingleTrackData[] = [
     labelName: 'M Music Records',
     featuredArtistNames: [],
     playCount: 0,
-    releaseDate: new Date('2025-04-03')
+    releaseDate: new Date('2025-04-03'),
+    tempo: 98,
+    mood: 'Romantic',
+    key: 'D',
+    scale: 'major',
+    danceability: 0.70,
+    energy: 0.65
   },
 
   // MONO - Chăm Hoa
@@ -124,7 +184,13 @@ export const singles: SingleTrackData[] = [
     labelName: 'M Music Records',
     featuredArtistNames: [],
     playCount: 0,
-    releaseDate: new Date('2024-10-22')
+    releaseDate: new Date('2024-10-22'),
+    tempo: 105,
+    mood: 'Upbeat',
+    key: 'F',
+    scale: 'major',
+    danceability: 0.75,
+    energy: 0.70
   },
 
   // Đen - Dưới Hiên Nhà
@@ -137,7 +203,13 @@ export const singles: SingleTrackData[] = [
     labelName: 'Đen',
     featuredArtistNames: ['Emcee L (Da LAB)', 'JGKiD (Da LAB)'],
     playCount: 0,
-    releaseDate: new Date('2016-08-06')
+    releaseDate: new Date('2016-08-06'),
+    tempo: 92,
+    mood: 'Chill',
+    key: 'G',
+    scale: 'minor',
+    danceability: 0.65,
+    energy: 0.60
   },
 
   // Đen - Đi Theo Bóng Mặt Trời
@@ -150,7 +222,13 @@ export const singles: SingleTrackData[] = [
     labelName: 'Đen',
     featuredArtistNames: ['Giang Nguyễn'],
     playCount: 0,
-    releaseDate: new Date('2017-05-13')
+    releaseDate: new Date('2017-05-13'),
+    tempo: 95,
+    mood: 'Reflective',
+    key: 'Bb',
+    scale: 'minor',
+    danceability: 0.68,
+    energy: 0.62
   },
 
   // Đen - Ta Cứ Đi Cùng Nhau
@@ -163,7 +241,13 @@ export const singles: SingleTrackData[] = [
     labelName: 'Đen',
     featuredArtistNames: ['Linh Cáo'],
     playCount: 0,
-    releaseDate: new Date('2017-09-11')
+    releaseDate: new Date('2017-09-11'),
+    tempo: 100,
+    mood: 'Uplifting',
+    key: 'A',
+    scale: 'minor',
+    danceability: 0.72,
+    energy: 0.68
   },
 
   // Đen - Ngày Khác Lạ
@@ -176,7 +260,13 @@ export const singles: SingleTrackData[] = [
     labelName: 'Đen',
     featuredArtistNames: ['Giang Phạm', 'Triple D'],
     playCount: 0,
-    releaseDate: new Date('2018-02-23')
+    releaseDate: new Date('2018-02-23'),
+    tempo: 87,
+    mood: 'Inspirational',
+    key: 'E',
+    scale: 'minor',
+    danceability: 0.70,
+    energy: 0.75
   },
 
   {
@@ -188,6 +278,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'M Music Records',
     featuredArtistNames: [],
     playCount: 45,
+    tempo: 140,
+    mood: 'Confident',
+    key: 'D',
+    scale: 'minor',
+    danceability: 0.85,
+    energy: 0.90
   },
 
   // SOOBIN's Single
@@ -200,6 +296,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: [],
     playCount: 37,
+    tempo: 75,
+    mood: 'Melancholic',
+    key: 'Eb',
+    scale: 'minor',
+    danceability: 0.45,
+    energy: 0.38
   },
 
   {
@@ -211,6 +313,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: [],
     playCount: 15,
+    tempo: 82,
+    mood: 'Nostalgic',
+    key: 'C',
+    scale: 'major',
+    danceability: 0.55,
+    energy: 0.45
   },
 
   {
@@ -222,6 +330,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: [],
     playCount: 25,
+    tempo: 78,
+    mood: 'Sad',
+    key: 'F#',
+    scale: 'minor',
+    danceability: 0.48,
+    energy: 0.40
   },
 
   {
@@ -233,6 +347,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: ['Lê Hiếu'],
     playCount: 16,
+    tempo: 85,
+    mood: 'Gentle',
+    key: 'G',
+    scale: 'major',
+    danceability: 0.58,
+    energy: 0.52
   },
 
   // Son Tung M-TP's Single
@@ -245,6 +365,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'M-TP Entertainment',
     featuredArtistNames: [],
     playCount: 100,
+    tempo: 128,
+    mood: 'Intense',
+    key: 'F',
+    scale: 'minor',
+    danceability: 0.92,
+    energy: 0.88
   },
 
   {
@@ -256,6 +382,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'M-TP Entertainment',
     featuredArtistNames: [],
     playCount: 80,
+    tempo: 125,
+    mood: 'Upbeat',
+    key: 'A',
+    scale: 'major',
+    danceability: 0.88,
+    energy: 0.85
   },
 
   {
@@ -267,6 +399,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'M-TP Entertainment',
     featuredArtistNames: [],
     playCount: 90,
+    tempo: 118,
+    mood: 'Vibrant',
+    key: 'D',
+    scale: 'major',
+    danceability: 0.90,
+    energy: 0.80
   },
 
   // tlinh's Single
@@ -279,6 +417,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'M Music Records',
     featuredArtistNames: ['GREY D'],
     playCount: 50,
+    tempo: 95,
+    mood: 'Emotional',
+    key: 'Ab',
+    scale: 'major',
+    danceability: 0.65,
+    energy: 0.60
   },
   {
     artistName: 'tlinh',
@@ -289,6 +433,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'M Music Records',
     featuredArtistNames: ['Low G'],
     playCount: 40,
+    tempo: 132,
+    mood: 'Bold',
+    key: 'C',
+    scale: 'minor',
+    danceability: 0.83,
+    energy: 0.85
   },
 
   // Obito's Single
@@ -301,6 +451,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: ['Seachains'],
     playCount: 40,
+    tempo: 110,
+    mood: 'Dreamy',
+    key: 'B',
+    scale: 'major',
+    danceability: 0.75,
+    energy: 0.65
   },
   {
     artistName: 'Obito',
@@ -311,6 +467,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: ['Low G', 'WOKEUP'],
     playCount: 30,
+    tempo: 125,
+    mood: 'Energetic',
+    key: 'G',
+    scale: 'minor',
+    danceability: 0.82,
+    energy: 0.78
   },
   {
     artistName: 'Obito',
@@ -321,6 +483,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'Universal Music Vietnam',
     featuredArtistNames: ['Seachains'],
     playCount: 20,
+    tempo: 105,
+    mood: 'Chill',
+    key: 'D',
+    scale: 'minor',
+    danceability: 0.72,
+    energy: 0.60
   },
 
   // Dương Domic's Single
@@ -333,6 +501,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'DAO Entertainment',
     featuredArtistNames: [],
     playCount: 25,
+    tempo: 80,
+    mood: 'Romantic',
+    key: 'Bb',
+    scale: 'major',
+    danceability: 0.60,
+    energy: 0.55
   },
   {
     artistName: 'Dương Domic',
@@ -343,6 +517,12 @@ export const singles: SingleTrackData[] = [
     labelName: 'DAO Entertainment',
     featuredArtistNames: [],
     playCount: 25,
+    tempo: 90,
+    mood: 'Sensual',
+    key: 'F',
+    scale: 'minor',
+    danceability: 0.68,
+    energy: 0.58
   },
   
   
