@@ -25,11 +25,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-<<<<<<< HEAD
 import { ArtistCreatableSelect } from '@/components/ui/ArtistCreatableSelect';
-=======
 import { Textarea } from '@/components/ui/textarea';
->>>>>>> dabf14e3545e792907af12c5943f7cf419bef408
 
 // Edit Album Modal for Artists
 interface EditAlbumModalProps {
