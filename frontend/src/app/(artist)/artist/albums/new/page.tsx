@@ -22,10 +22,21 @@ interface Label {
 export default function NewAlbum() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const { theme } = useTheme();
+
+  // Helper function to get current date and time in YYYY-MM-DDTHH:MM format
+  const getCurrentDateTime = () => {
+    const now = new Date();
+    // Adjust for local timezone
+    const offset = now.getTimezoneOffset();
+    const localNow = new Date(now.getTime() - (offset * 60 * 1000));
+    return localNow.toISOString().slice(0, 16);
+  };
+
   const [albumData, setAlbumData] = useState({
     title: '',
     type: 'ALBUM',
-    releaseDate: '',
+    releaseDate: getCurrentDateTime(), // Set current date and time as default
   });
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -36,7 +47,6 @@ export default function NewAlbum() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   // State to store the artist's default label name
   const [artistLabelName, setArtistLabelName] = useState<string | null>(null);
-  const { theme } = useTheme();
 
   useEffect(() => {
     // Fetch genres and artist profile data

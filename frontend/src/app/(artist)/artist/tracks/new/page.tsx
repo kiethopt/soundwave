@@ -30,10 +30,21 @@ interface Label {
 export default function NewTrack() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const { theme } = useTheme();
+
+  // Helper function to get current date and time in YYYY-MM-DDTHH:MM format
+  const getCurrentDateTime = () => {
+    const now = new Date();
+    // Adjust for local timezone
+    const offset = now.getTimezoneOffset();
+    const localNow = new Date(now.getTime() - (offset * 60 * 1000));
+    return localNow.toISOString().slice(0, 16);
+  };
+
   const [trackData, setTrackData] = useState({
     title: '',
     type: 'SINGLE',
-    releaseDate: '',
+    releaseDate: getCurrentDateTime(), // Set current date and time as default
   });
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -47,7 +58,6 @@ export default function NewTrack() {
 
   // State to store the artist's default label name
   const [artistLabelName, setArtistLabelName] = useState<string | null>(null);
-  const { theme } = useTheme();
 
   useEffect(() => {
     const fetchData = async () => {
